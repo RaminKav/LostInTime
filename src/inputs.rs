@@ -1,7 +1,7 @@
+use crate::attributes::ActiveConsumableBuffs;
 use crate::blessings::OwnedBlessings;
 use crate::chaos::ChaosTracker;
 use crate::cursor::CursorPos;
-use crate::attributes::ActiveConsumableBuffs;
 use crate::ui::tips::SeenTips;
 use std::f32::consts::PI;
 use std::time::Duration;
@@ -10,7 +10,7 @@ use crate::animations::player_sprite::PlayerAnimation;
 use crate::animations::{AttackEvent, HitAnimationTracker};
 use crate::assets::SpriteAnchor;
 use crate::attributes::hunger::Hunger;
-use crate::audio::{AudioSoundEffect, SoundSpawner};
+use crate::audio::{AudioSoundEffect, AudioVolume, SoundSpawner};
 use crate::client::is_not_paused;
 use crate::enemy::spawn_helpers::can_spawn_mob_here;
 use crate::enemy::spawner::GlobalSpawners;
@@ -82,6 +82,7 @@ pub struct InputsPlugin;
 impl Plugin for InputsPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(CursorPos::default())
+            .init_resource::<AutoAttackState>()
             .register_type::<CursorPos>()
             .add_event::<BounceEvent>()
             // .add_plugin(ResourceInspectorPlugin::<CursorPos>::default())
@@ -100,6 +101,7 @@ impl Plugin for InputsPlugin {
                 (
                     player_move_inputs.run_if(is_not_paused),
                     turn_player.run_if(is_not_paused),
+                    toggle_auto_attack.run_if(is_not_paused),
                     mouse_click_system.run_if(is_not_paused).after(CustomFlush),
                     dispatch_active_skill_events.run_if(is_not_paused),
                     handle_hotbar_key_input,
@@ -126,6 +128,9 @@ impl Plugin for InputsPlugin {
             );
     }
 }
+
+#[derive(Resource, Debug, Default)]
+pub struct AutoAttackState(pub bool);
 
 #[derive(Component, Debug, Default)]
 pub struct MovementVector(pub Vec2);
@@ -265,6 +270,7 @@ pub fn player_move_inputs(
     mut particle: Query<&mut EffectSpawner, With<DustParticles>>,
     asset_server: Res<AssetServer>,
     audio: Res<Audio>,
+    audio_volume: Res<AudioVolume>,
     mut audio_timer: Local<Timer>,
     mut active_skill_event: EventWriter<ActiveSkillUsedEvent>,
     mut ammo_query: Query<&mut Ammo>,
@@ -446,8 +452,12 @@ pub fn player_move_inputs(
             let walk4 = asset_server.load("sounds/walk_grass4.ogg");
             let walk5 = asset_server.load("sounds/walk_grass5.ogg");
             let walks = vec![walk1, walk2, walk3, walk4, walk5];
+            let sfx = audio_volume.sfx_fraction();
             walks.iter().choose(&mut rand::thread_rng()).map(|sound| {
-                audio.play_with_settings(sound.clone(), PlaybackSettings::ONCE.with_volume(0.35))
+                audio.play_with_settings(
+                    sound.clone(),
+                    PlaybackSettings::ONCE.with_volume(0.35 * sfx),
+                )
             });
         }
     } else if curr_anim.is_walking() {
@@ -883,6 +893,22 @@ pub fn diagnostics(
         debug!("Spawner Count: {:?}", spawners.spawners.iter().count());
     }
 }
+pub fn toggle_auto_attack(
+    key_input: Res<Input<KeyCode>>,
+    mouse_input: Res<Input<MouseButton>>,
+    keybinds: Res<InputMappings>,
+    mut auto_attack: ResMut<AutoAttackState>,
+    ui_state: Res<State<UIState>>,
+) {
+    if ui_state.0 != UIState::Closed {
+        return;
+    }
+    if keybinds.check_auto_attack_toggle_input(&key_input, &mouse_input) {
+        auto_attack.0 = !auto_attack.0;
+        info!("Auto Attack: {}", if auto_attack.0 { "ON" } else { "OFF" });
+    }
+}
+
 pub fn mouse_click_system(
     mut commands: Commands,
     mouse_button_input: Res<Input<MouseButton>>,
@@ -909,6 +935,7 @@ pub fn mouse_click_system(
     mut ranged_attack_event: EventWriter<RangedAttackEvent>,
     mut item_action_param: ItemActionParam,
     ammo_query_any: Query<&Ammo>,
+    auto_attack: Res<AutoAttackState>,
 ) {
     if ui_state.0 != UIState::Closed {
         return;
@@ -940,7 +967,7 @@ pub fn mouse_click_system(
     }
 
     // Hit Item, send attack event
-    if mouse_button_input.pressed(MouseButton::Left) {
+    if mouse_button_input.pressed(MouseButton::Left) || auto_attack.0 {
         if *DEBUG && mouse_button_input.just_pressed(MouseButton::Left) {
             let obj = game.get_object_from_chunk_cache(cursor_tile_pos);
             info!(

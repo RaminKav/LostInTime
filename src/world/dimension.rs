@@ -115,8 +115,8 @@ impl Era {
     pub fn get_chaos_modifier(&self) -> f32 {
         match self {
             Era::Main => 0.,
-            Era::Second => 13.0, // era2: slightly harder (+3 over previous 10)
-            Era::Third => 30.0,  // era3: +10 over previous 20
+            Era::Second => 8.0, // era2: slightly harder (+3 over previous 10)
+            Era::Third => 22.0, // era3: +10 over previous 20
             Era::DungeonMain => 1.0,
         }
     }

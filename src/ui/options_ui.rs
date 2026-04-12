@@ -4,7 +4,7 @@ use bevy::sprite::Anchor;
 
 use crate::{
     assets::Graphics,
-    audio::{AudioSoundEffect, SoundSpawner},
+    audio::{AudioSoundEffect, AudioVolume, SoundSpawner},
     cursor::CursorPos,
     keybinds::InputMappings,
     ui::{
@@ -76,6 +76,7 @@ pub enum KeyBindType {
     Inventory,
     Minimap,
     QuickConsume(usize),
+    AutoAttackToggle,
 }
 
 #[derive(Component)]
@@ -86,6 +87,29 @@ pub struct KeyBindText {
 #[derive(Component)]
 pub struct WaitingForKeyInput {
     pub bind_type: KeyBindType,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum VolumeChannel {
+    Music,
+    Sfx,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum VolumeDirection {
+    Down,
+    Up,
+}
+
+#[derive(Component)]
+pub struct VolumeButton {
+    pub channel: VolumeChannel,
+    pub direction: VolumeDirection,
+}
+
+#[derive(Component)]
+pub struct VolumeValueText {
+    pub channel: VolumeChannel,
 }
 
 pub fn handle_options_clicks(
@@ -177,6 +201,9 @@ pub fn handle_key_rebind_input(
                 KeyBindType::QuickConsume(slot) => {
                     keybinds.set_quick_consume_key(slot, InputBinding::KeyBinding(key))
                 }
+                KeyBindType::AutoAttackToggle => {
+                    keybinds.set_auto_attack_toggle_key(InputBinding::KeyBinding(key))
+                }
             }
             keybinds.save();
             commands.entity(entity).remove::<WaitingForKeyInput>();
@@ -205,6 +232,9 @@ pub fn handle_key_rebind_input(
                 }
                 KeyBindType::QuickConsume(slot) => {
                     keybinds.set_quick_consume_key(slot, InputBinding::MouseBinding(mouse_button))
+                }
+                KeyBindType::AutoAttackToggle => {
+                    keybinds.set_auto_attack_toggle_key(InputBinding::MouseBinding(mouse_button))
                 }
             }
             keybinds.save();
@@ -250,6 +280,7 @@ pub fn update_keybind_text(
                 KeyBindType::Inventory => keybinds.get_inventory_key(),
                 KeyBindType::Minimap => keybinds.get_minimap_key(),
                 KeyBindType::QuickConsume(slot) => keybinds.get_quick_consume_key(slot),
+                KeyBindType::AutoAttackToggle => keybinds.get_auto_attack_toggle_key(),
             };
             text.sections[0].value = crate::keybinds::get_key_display_name(key);
             text.sections[0].style.color = crate::colors::WHITE;
@@ -271,6 +302,7 @@ pub fn setup_options_ui(
     keybinds: Res<InputMappings>,
     game_state: Res<State<crate::GameState>>,
     cheat_settings: Res<CheatSettings>,
+    audio_volume: Res<AudioVolume>,
 ) {
     let overlay = ui_helpers::spawn_ui_overlay(
         &mut commands,
@@ -421,8 +453,28 @@ pub fn setup_options_ui(
         &keybinds,
     );
 
+    // Auto attack toggle keybind
+    let auto_attack_y = minimap_y + row_spacing;
+    spawn_keybind_row(
+        &mut commands,
+        &graphics,
+        &asset_server,
+        KeyBindType::AutoAttackToggle,
+        Vec3::new(
+            left_side_x + 2.,
+            auto_attack_y,
+            ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
+        ),
+        Vec3::new(
+            left_side_x + 160.,
+            auto_attack_y - 3.5,
+            ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
+        ),
+        &keybinds,
+    );
+
     // Quick consume section
-    let quick_consume_section_y = minimap_y + row_spacing * 1.5;
+    let quick_consume_section_y = auto_attack_y + row_spacing * 1.5;
     commands.spawn((
         Text2dBundle {
             text: Text::from_section(
@@ -594,6 +646,58 @@ pub fn setup_options_ui(
         cheat_settings.show_tile_hover,
     );
 
+    // Volume section
+    let volume_section_y = tile_hover_checkbox_y - 28.;
+    commands.spawn((
+        Text2dBundle {
+            text: Text::from_section(
+                "Volume",
+                TextStyle {
+                    font: asset_server.load("fonts/alagard.ttf"),
+                    font_size: 15.0,
+                    color: crate::colors::DARK_WOOD_BROWN,
+                },
+            )
+            .with_alignment(TextAlignment::Left),
+            text_anchor: bevy::sprite::Anchor::CenterLeft,
+            transform: Transform::from_translation(Vec3::new(
+                right_side_x,
+                volume_section_y,
+                ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
+            )),
+            ..Default::default()
+        },
+        RenderLayers::from_layers(&[3]),
+        OptionsUI,
+        Name::new("Volume Section Title"),
+    ));
+
+    let music_vol_y = volume_section_y - 26.;
+    spawn_volume_row(
+        &mut commands,
+        &graphics,
+        &asset_server,
+        "Music:",
+        VolumeChannel::Music,
+        audio_volume.music,
+        Vec3::new(
+            right_side_x,
+            music_vol_y,
+            ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
+        ),
+    );
+
+    let sfx_vol_y = music_vol_y - 18.;
+    spawn_volume_row(
+        &mut commands,
+        &graphics,
+        &asset_server,
+        "SFX:",
+        VolumeChannel::Sfx,
+        audio_volume.sfx,
+        Vec3::new(right_side_x, sfx_vol_y, ui_helpers::Z_DEPTH_OPTIONS_CONTENT),
+    );
+
     //TODO: fix restart button
     if game_state.0 == crate::GameState::Main {
         // // Restart button
@@ -658,6 +762,7 @@ fn spawn_keybind_row(
         }
         KeyBindType::Inventory => ("Inventory:", keybinds.get_inventory_key()),
         KeyBindType::Minimap => ("Map:", keybinds.get_minimap_key()),
+        KeyBindType::AutoAttackToggle => ("Auto Attack:", keybinds.get_auto_attack_toggle_key()),
         KeyBindType::QuickConsume(slot) => {
             let label = match slot {
                 1 => "Quick Use Slot 2:",
@@ -966,5 +1071,236 @@ pub fn update_cheat_checkbox_visual(
             }
         };
         *texture = graphics.get_ui_element_texture(checkbox_ui).clone();
+    }
+}
+
+fn spawn_volume_row(
+    commands: &mut Commands,
+    graphics: &Graphics,
+    asset_server: &AssetServer,
+    label: &str,
+    channel: VolumeChannel,
+    current_value: u8,
+    label_pos: Vec3,
+) {
+    // Label
+    commands.spawn((
+        Text2dBundle {
+            text: Text::from_section(
+                label,
+                TextStyle {
+                    font: asset_server.load("fonts/4x5.ttf"),
+                    font_size: 5.0,
+                    color: crate::colors::DARK_WOOD_BROWN,
+                },
+            )
+            .with_alignment(TextAlignment::Left),
+            text_anchor: bevy::sprite::Anchor::CenterLeft,
+            transform: Transform::from_translation(label_pos),
+            ..Default::default()
+        },
+        RenderLayers::from_layers(&[3]),
+        OptionsUI,
+        UIState::Options,
+        Name::new(format!("Volume Label {:?}", channel)),
+    ));
+
+    let controls_x = label_pos.x + 50.;
+
+    // "-" button
+    let minus_entity = commands
+        .spawn(SpriteBundle {
+            texture: graphics.get_ui_element_texture(UIElement::XLKey).clone(),
+            sprite: Sprite {
+                custom_size: Some(Vec2::new(14., 12.)),
+                ..Default::default()
+            },
+            transform: Transform::from_translation(Vec3::new(
+                controls_x,
+                label_pos.y - 3.5,
+                label_pos.z,
+            )),
+            visibility: Visibility::Visible,
+            ..Default::default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(UIState::Options)
+        .insert(UIElement::XLKey)
+        .insert(OptionsUI)
+        .insert(VolumeButton {
+            channel,
+            direction: VolumeDirection::Down,
+        })
+        .insert(Interactable::default())
+        .insert(Name::new(format!("Volume Down {:?}", channel)))
+        .id();
+
+    commands
+        .spawn((
+            Text2dBundle {
+                text: Text::from_section(
+                    "<",
+                    TextStyle {
+                        font: asset_server.load("fonts/4x5.ttf"),
+                        font_size: 5.0,
+                        color: crate::colors::WHITE,
+                    },
+                )
+                .with_alignment(TextAlignment::Center),
+                text_anchor: bevy::sprite::Anchor::Center,
+                transform: Transform::from_translation(Vec3::new(0., 0.5, 1.)),
+                ..Default::default()
+            },
+            RenderLayers::from_layers(&[3]),
+            UIState::Options,
+        ))
+        .set_parent(minus_entity);
+
+    // Value text
+    commands.spawn((
+        Text2dBundle {
+            text: Text::from_section(
+                format!("{}", current_value),
+                TextStyle {
+                    font: asset_server.load("fonts/4x5.ttf"),
+                    font_size: 5.0,
+                    color: crate::colors::YELLOW_2,
+                },
+            )
+            .with_alignment(TextAlignment::Center),
+            text_anchor: bevy::sprite::Anchor::Center,
+            transform: Transform::from_translation(Vec3::new(
+                controls_x + 18.,
+                label_pos.y - 3.,
+                label_pos.z,
+            )),
+            ..Default::default()
+        },
+        RenderLayers::from_layers(&[3]),
+        OptionsUI,
+        UIState::Options,
+        VolumeValueText { channel },
+        Name::new(format!("Volume Value {:?}", channel)),
+    ));
+
+    // "+" button
+    let plus_entity = commands
+        .spawn(SpriteBundle {
+            texture: graphics.get_ui_element_texture(UIElement::XLKey).clone(),
+            sprite: Sprite {
+                custom_size: Some(Vec2::new(14., 12.)),
+                ..Default::default()
+            },
+            transform: Transform::from_translation(Vec3::new(
+                controls_x + 36.,
+                label_pos.y - 3.5,
+                label_pos.z,
+            )),
+            visibility: Visibility::Visible,
+            ..Default::default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(UIState::Options)
+        .insert(UIElement::XLKey)
+        .insert(OptionsUI)
+        .insert(VolumeButton {
+            channel,
+            direction: VolumeDirection::Up,
+        })
+        .insert(Interactable::default())
+        .insert(Name::new(format!("Volume Up {:?}", channel)))
+        .id();
+
+    commands
+        .spawn((
+            Text2dBundle {
+                text: Text::from_section(
+                    ">",
+                    TextStyle {
+                        font: asset_server.load("fonts/4x5.ttf"),
+                        font_size: 5.0,
+                        color: crate::colors::WHITE,
+                    },
+                )
+                .with_alignment(TextAlignment::Center),
+                text_anchor: bevy::sprite::Anchor::Center,
+                transform: Transform::from_translation(Vec3::new(0., 0.5, 1.)),
+                ..Default::default()
+            },
+            RenderLayers::from_layers(&[3]),
+            UIState::Options,
+        ))
+        .set_parent(plus_entity);
+}
+
+pub fn handle_volume_button_click(
+    cursor_pos: Res<CursorPos>,
+    mouse_input: Res<Input<MouseButton>>,
+    ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
+    mut buttons: Query<(Entity, &mut Interactable, &VolumeButton)>,
+    mut audio_volume: ResMut<AudioVolume>,
+    mut commands: Commands,
+    graphics: Res<Graphics>,
+) {
+    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    let left_mouse_released = mouse_input.just_released(MouseButton::Left);
+
+    for (entity, mut interactable, vol_button) in buttons.iter_mut() {
+        match hit_test {
+            Some(hit) if hit.0 == entity => match interactable.current() {
+                Interaction::None => {
+                    interactable.change(Interaction::Hovering);
+                    commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonHover, 0.05));
+                    commands
+                        .entity(entity)
+                        .insert(UIElement::XLKeyHover)
+                        .insert(graphics.get_ui_element_texture(UIElement::XLKeyHover));
+                }
+                Interaction::Hovering => {
+                    if left_mouse_released {
+                        let val = match vol_button.channel {
+                            VolumeChannel::Music => &mut audio_volume.music,
+                            VolumeChannel::Sfx => &mut audio_volume.sfx,
+                        };
+                        match vol_button.direction {
+                            VolumeDirection::Down => {
+                                *val = val.saturating_sub(1);
+                            }
+                            VolumeDirection::Up => {
+                                *val = (*val + 1).min(10);
+                            }
+                        }
+                        commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.2));
+                    }
+                }
+                _ => {}
+            },
+            _ => {
+                let Interaction::Hovering = interactable.current() else {
+                    continue;
+                };
+                interactable.change(Interaction::None);
+                commands
+                    .entity(entity)
+                    .insert(UIElement::XLKey)
+                    .insert(graphics.get_ui_element_texture(UIElement::XLKey));
+            }
+        }
+    }
+}
+
+pub fn update_volume_text(
+    audio_volume: Res<AudioVolume>,
+    mut texts: Query<(&VolumeValueText, &mut Text)>,
+) {
+    if !audio_volume.is_changed() {
+        return;
+    }
+    for (vol_text, mut text) in texts.iter_mut() {
+        let val = match vol_text.channel {
+            VolumeChannel::Music => audio_volume.music,
+            VolumeChannel::Sfx => audio_volume.sfx,
+        };
+        text.sections[0].value = format!("{}", val);
     }
 }

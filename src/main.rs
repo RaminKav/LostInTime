@@ -165,6 +165,10 @@ lazy_static! {
     pub static ref NO_DROPS: bool = env::var("NO_DROPS").is_ok();
 }
 lazy_static! {
+    /// Spawns/despawns 100 mobs + 200 item drops in a tight loop to stress Rapier (see `collider_load_test`).
+    pub static ref NO_XP: bool = env::var("NO_XP").is_ok();
+}
+lazy_static! {
     /// Disables overworld mob spawning from `enemy::spawner` (timers, events, Stone Golem timer).
     pub static ref NO_SPAWN: bool = env::var("NO_SPAWN").is_ok();
 }
@@ -350,9 +354,7 @@ fn main() {
     }
 
     if *DIAGNOSTICS {
-        app.add_system(
-            gameplay_load_tests::diagnostics_tick.in_set(OnUpdate(GameState::Main)),
-        );
+        app.add_system(gameplay_load_tests::diagnostics_tick.in_set(OnUpdate(GameState::Main)));
     }
 
     if *COLLIDERS {

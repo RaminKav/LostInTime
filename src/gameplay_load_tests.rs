@@ -77,7 +77,7 @@ const WEAPON_SWORD_PER_WAVE: u32 = 5;
 const WEAPON_SHOUT_PER_WAVE: u32 = 2;
 
 const LOOT_CYCLE_WAVE_INTERVAL_SECS: f32 = 0.3;
-const LOOT_CYCLE_DROPS_PER_WAVE: u32 = 20;
+const LOOT_CYCLE_DROPS_PER_WAVE: u32 = 100;
 /// Items linger long enough to pile up, but not 300s like production.
 const LOOT_CYCLE_DESPAWN_SECS: f32 = 40.0;
 
@@ -767,6 +767,7 @@ fn make_test_loot_table() -> LootTable {
             Loot::new(WorldObject::Coin, 1, 3, 0.6),
             Loot::new(WorldObject::XPShard, 1, 1, 0.8),
             Loot::new(WorldObject::SmallPotion, 1, 1, 0.06),
+            Loot::new(WorldObject::RedMushroomBlock, 1, 2, 1.0),
         ],
     }
 }
@@ -877,11 +878,19 @@ pub fn diagnostics_tick(
          [DIAG] queued_texts={:<4}\n\
          [DIAG] rapier_bodies={:<5} rapier_colliders={:<5}\n\
          [DIAG] ==========================================",
-        total, delta,
-        mobs.iter().count(), item_drops.iter().count(), colliders.iter().count(),
-        damage_numbers.iter().count(), move_ui_anims.iter().count(), sound_spawners.iter().count(),
-        particle_effects.iter().count(), marked_for_death.iter().count(), burning_and_pulled.iter().count(),
+        total,
+        delta,
+        mobs.iter().count(),
+        item_drops.iter().count(),
+        colliders.iter().count(),
+        damage_numbers.iter().count(),
+        move_ui_anims.iter().count(),
+        sound_spawners.iter().count(),
+        particle_effects.iter().count(),
+        marked_for_death.iter().count(),
+        burning_and_pulled.iter().count(),
         queued_texts.iter().count(),
-        rapier_bodies, rapier_colliders,
+        rapier_bodies,
+        rapier_colliders,
     );
 }

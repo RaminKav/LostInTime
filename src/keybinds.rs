@@ -11,6 +11,9 @@ fn default_quick_consume_slot_1() -> InputBinding {
 fn default_quick_consume_slot_2() -> InputBinding {
     InputBinding::KeyBinding(KeyCode::X)
 }
+fn default_auto_attack_toggle() -> InputBinding {
+    InputBinding::KeyBinding(KeyCode::T)
+}
 
 #[derive(Resource, Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct InputMappings {
@@ -25,6 +28,8 @@ pub struct InputMappings {
     pub quick_consume_slot_1: InputBinding,
     #[serde(default = "default_quick_consume_slot_2")]
     pub quick_consume_slot_2: InputBinding,
+    #[serde(default = "default_auto_attack_toggle")]
+    pub auto_attack_toggle: InputBinding,
 }
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 
@@ -45,6 +50,7 @@ impl Default for InputMappings {
             minimap: InputBinding::KeyBinding(KeyCode::M),
             quick_consume_slot_1: InputBinding::KeyBinding(KeyCode::Z),
             quick_consume_slot_2: InputBinding::KeyBinding(KeyCode::X),
+            auto_attack_toggle: InputBinding::KeyBinding(KeyCode::T),
         }
     }
 }
@@ -143,6 +149,26 @@ impl InputMappings {
         mouse: &Res<Input<MouseButton>>,
     ) -> bool {
         let input = self.get_quick_consume_key(slot);
+        match input {
+            InputBinding::KeyBinding(key) => keys.just_pressed(key),
+            InputBinding::MouseBinding(button) => mouse.just_pressed(button),
+        }
+    }
+
+    pub fn get_auto_attack_toggle_key(&self) -> InputBinding {
+        self.auto_attack_toggle
+    }
+
+    pub fn set_auto_attack_toggle_key(&mut self, key: InputBinding) {
+        self.auto_attack_toggle = key;
+    }
+
+    pub fn check_auto_attack_toggle_input(
+        &self,
+        keys: &Res<Input<KeyCode>>,
+        mouse: &Res<Input<MouseButton>>,
+    ) -> bool {
+        let input = self.get_auto_attack_toggle_key();
         match input {
             InputBinding::KeyBinding(key) => keys.just_pressed(key),
             InputBinding::MouseBinding(button) => mouse.just_pressed(button),

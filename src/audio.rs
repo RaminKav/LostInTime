@@ -23,6 +23,30 @@ use crate::{
 const MAX_HIT_SOUNDS_PER_FRAME: usize = 3;
 const SFX_CLEANUP_DELAY_SECS: f32 = 5.0;
 
+/// Controls the global volume for music and sound effects independently.
+/// Values range from 0 (muted) to 10 (full volume).
+#[derive(Resource, Debug, Clone)]
+pub struct AudioVolume {
+    pub music: u8,
+    pub sfx: u8,
+}
+
+impl Default for AudioVolume {
+    fn default() -> Self {
+        Self { music: 7, sfx: 7 }
+    }
+}
+
+impl AudioVolume {
+    pub fn music_fraction(&self) -> f32 {
+        self.music as f32 / 10.0
+    }
+
+    pub fn sfx_fraction(&self) -> f32 {
+        self.sfx as f32 / 10.0
+    }
+}
+
 pub struct AudioPlugin;
 
 #[derive(Resource, Debug)]
@@ -71,13 +95,16 @@ impl SoundCache {
         &mut self,
         path: &str,
         volume: f32,
+        global_volume: f32,
         asset_server: &AssetServer,
         audio: &Audio,
         tracker: &mut SinkCleanupTracker,
     ) {
         if let Some(handle) = self.get_or_load(path, asset_server) {
-            let sink_handle =
-                audio.play_with_settings(handle, PlaybackSettings::ONCE.with_volume(volume));
+            let sink_handle = audio.play_with_settings(
+                handle,
+                PlaybackSettings::ONCE.with_volume(volume * global_volume),
+            );
             tracker.pending.push((
                 sink_handle.id(),
                 Timer::from_seconds(SFX_CLEANUP_DELAY_SECS, TimerMode::Once),
@@ -169,11 +196,13 @@ impl Plugin for AudioPlugin {
             current_track: "sounds/bgm_day.ogg".to_owned(),
             current_handle: None,
         })
+        .init_resource::<AudioVolume>()
         .init_resource::<SoundCooldowns>()
         .init_resource::<SoundCache>()
         .init_resource::<SinkCleanupTracker>()
         .add_event::<UpdateBGMTrackEvent>()
         .add_system(bgm_audio)
+        .add_system(update_bgm_volume)
         .add_system(handle_sound_spawners)
         .add_system(tick_sound_cooldowns)
         .add_system(update_sound_cache)
@@ -290,6 +319,7 @@ pub fn handle_sound_spawners(
     mut cooldowns: ResMut<SoundCooldowns>,
     mut cache: ResMut<SoundCache>,
     mut tracker: ResMut<SinkCleanupTracker>,
+    volume: Res<AudioVolume>,
 ) {
     if *crate::NO_AUDIO {
         for (e, _) in sounds.iter() {
@@ -327,15 +357,30 @@ pub fn handle_sound_spawners(
                 );
             }
 
+            let sfx_vol = volume.sfx_fraction();
             if sound.sound == AudioSoundEffect::SwordSwing {
                 use rand::seq::SliceRandom;
                 let paths = ["sounds/swing.ogg", "sounds/swing2.ogg", "sounds/swing3.ogg"];
                 if let Some(path) = paths.choose(&mut rand::thread_rng()) {
-                    cache.play(path, sound.volume, &asset_server, &audio, &mut tracker);
+                    cache.play(
+                        path,
+                        sound.volume,
+                        sfx_vol,
+                        &asset_server,
+                        &audio,
+                        &mut tracker,
+                    );
                 }
             } else {
                 let path = format!("sounds/{}.ogg", sound.sound);
-                cache.play(&path, sound.volume, &asset_server, &audio, &mut tracker);
+                cache.play(
+                    &path,
+                    sound.volume,
+                    sfx_vol,
+                    &asset_server,
+                    &audio,
+                    &mut tracker,
+                );
             }
             commands.entity(e).despawn();
         }
@@ -370,6 +415,7 @@ pub fn bgm_audio(
     audio_handles: Res<Assets<AudioSink>>,
     mut bgm_update_events: EventReader<UpdateBGMTrackEvent>,
     mut cache: ResMut<SoundCache>,
+    volume: Res<AudioVolume>,
 ) {
     if *crate::NO_AUDIO {
         bgm_update_events.clear();
@@ -384,10 +430,27 @@ pub fn bgm_audio(
         let path = event.asset_path.clone();
         bgm_tracker.current_track = path.clone();
         if let Some(bgm_handle) = cache.get_or_load(&path, &asset_server) {
-            let new_handle = audio_handles.get_handle(
-                audio.play_with_settings(bgm_handle, PlaybackSettings::LOOP.with_volume(0.75)),
-            );
+            let new_handle = audio_handles.get_handle(audio.play_with_settings(
+                bgm_handle,
+                PlaybackSettings::LOOP.with_volume(0.75 * volume.music_fraction()),
+            ));
             bgm_tracker.current_handle = Some(new_handle);
+        }
+    }
+}
+
+/// Adjusts the currently-playing BGM sink whenever the music volume changes.
+pub fn update_bgm_volume(
+    volume: Res<AudioVolume>,
+    bgm_tracker: Res<BGMPicker>,
+    audio_sinks: Res<Assets<AudioSink>>,
+) {
+    if !volume.is_changed() {
+        return;
+    }
+    if let Some(handle) = bgm_tracker.current_handle.as_ref() {
+        if let Some(sink) = audio_sinks.get(handle) {
+            sink.set_volume(0.75 * volume.music_fraction());
         }
     }
 }
@@ -398,11 +461,13 @@ pub fn use_item_audio(
     mut use_item_event: EventReader<UseItemEvent>,
     mut cache: ResMut<SoundCache>,
     mut tracker: ResMut<SinkCleanupTracker>,
+    volume: Res<AudioVolume>,
 ) {
     if *crate::NO_AUDIO {
         use_item_event.clear();
         return;
     }
+    let sfx_vol = volume.sfx_fraction();
     for item in use_item_event.iter() {
         if [
             WorldObject::Apple,
@@ -421,11 +486,11 @@ pub fn use_item_audio(
                 "sounds/crunch3.ogg",
             ];
             if let Some(path) = paths.iter().choose(&mut rand::thread_rng()) {
-                cache.play(path, 0.2, &asset_server, &audio, &mut tracker);
+                cache.play(path, 0.2, sfx_vol, &asset_server, &audio, &mut tracker);
             }
         } else {
             let path = format!("sounds/{}.ogg", item.0);
-            cache.play(&path, 0.2, &asset_server, &audio, &mut tracker);
+            cache.play(&path, 0.2, sfx_vol, &asset_server, &audio, &mut tracker);
         }
     }
 }
@@ -436,11 +501,13 @@ pub fn break_item_audio(
     mut obj_break_events: EventReader<ObjBreakEvent>,
     mut cache: ResMut<SoundCache>,
     mut tracker: ResMut<SinkCleanupTracker>,
+    volume: Res<AudioVolume>,
 ) {
     if *crate::NO_AUDIO {
         obj_break_events.clear();
         return;
     }
+    let sfx_vol = volume.sfx_fraction();
     for item in obj_break_events.iter() {
         if [
             WorldObject::Grass,
@@ -464,11 +531,11 @@ pub fn break_item_audio(
                 "sounds/rustle7.ogg",
             ];
             if let Some(path) = paths.iter().choose(&mut rand::thread_rng()) {
-                cache.play(path, 0.15, &asset_server, &audio, &mut tracker);
+                cache.play(path, 0.15, sfx_vol, &asset_server, &audio, &mut tracker);
             }
         } else {
             let path = format!("sounds/{}.ogg", item.obj);
-            cache.play(&path, 0.15, &asset_server, &audio, &mut tracker);
+            cache.play(&path, 0.15, sfx_vol, &asset_server, &audio, &mut tracker);
         }
     }
 }
@@ -481,11 +548,13 @@ pub fn hit_collision_audio(
     mobs: Query<&Mob>,
     mut cache: ResMut<SoundCache>,
     mut tracker: ResMut<SinkCleanupTracker>,
+    volume: Res<AudioVolume>,
 ) {
     if *crate::NO_AUDIO {
         hit_events.clear();
         return;
     }
+    let sfx_vol = volume.sfx_fraction();
     let mut played = 0;
     for hit in hit_events.iter() {
         if played >= MAX_HIT_SOUNDS_PER_FRAME {
@@ -493,11 +562,11 @@ pub fn hit_collision_audio(
         }
         if let Ok(obj) = world_objects.get(hit.hit_entity) {
             let path = format!("sounds/{}.ogg", obj);
-            cache.play(&path, 0.15, &asset_server, &audio, &mut tracker);
+            cache.play(&path, 0.15, sfx_vol, &asset_server, &audio, &mut tracker);
             played += 1;
         } else if let Ok(mob) = mobs.get(hit.hit_entity) {
             let path = format!("sounds/{}.ogg", mob);
-            cache.play(&path, 0.15, &asset_server, &audio, &mut tracker);
+            cache.play(&path, 0.15, sfx_vol, &asset_server, &audio, &mut tracker);
             played += 1;
         }
     }

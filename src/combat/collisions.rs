@@ -10,6 +10,7 @@ use crate::player::combat_heirlooms::ThornsOnDamageTracker;
 use crate::player::skill_heirlooms::{handle_fire_pillar_hit_clear, handle_laser_beam_hit_clear};
 use crate::player::skills::{Heirloom, PlayerSkills};
 use crate::ui::damage_numbers::FloatingTextQueue;
+use crate::NO_XP;
 use crate::{
     animations::{player_sprite::PlayerAnimation, ui_animaitons::UIIconMover},
     attributes::{
@@ -795,12 +796,15 @@ pub fn check_item_drop_collisions(
                 || obj == WorldObject::XPShardMedium
                 || obj == WorldObject::XPShardLarge
             {
-                let xp_amount = match obj {
+                let mut xp_amount = match obj {
                     WorldObject::XPShard => 20,
                     WorldObject::XPShardMedium => 100,
                     WorldObject::XPShardLarge => 500,
                     _ => 0,
                 };
+                if *NO_XP {
+                    xp_amount = 0;
+                }
                 let player_skills = game.get_player_skills();
                 let mut player_level = game.get_player_level_mut();
                 let did_level = player_level.add_xp(xp_amount, &player_skills, &mut chaos_tracker);

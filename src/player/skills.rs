@@ -1754,7 +1754,7 @@ impl Default for HeirloomChoiceQueue {
                 HeirloomChoiceState::new(Heirloom::IncreaseProjectileCount, HeirloomRarity::Rare),
                 HeirloomChoiceState::new(Heirloom::BowArrowSpeed, HeirloomRarity::Uncommon),
                 HeirloomChoiceState::new(Heirloom::IceStaffAoE, HeirloomRarity::Uncommon),
-                HeirloomChoiceState::new(Heirloom::FullStomach, HeirloomRarity::Uncommon),
+                // HeirloomChoiceState::new(Heirloom::FullStomach, HeirloomRarity::Uncommon),
                 // HeirloomChoiceState::new(Heirloom::ReinforcedArmor, HeirloomRarity::Rare),
                 HeirloomChoiceState::new(Heirloom::DaggerCombo, HeirloomRarity::Legendary),
                 HeirloomChoiceState::new(Heirloom::StoneTooth, HeirloomRarity::Uncommon),

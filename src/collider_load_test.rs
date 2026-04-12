@@ -22,13 +22,13 @@ use crate::{
     GameState,
 };
 
-const MOB_COUNT: usize = 20;
+const MOB_COUNT: usize = 100;
 const ITEM_COUNT: usize = 0;
 /// Delay before mobs are hit with lethal damage, giving them time to fully initialize.
-const MOB_KILL_DELAY_SECS: f32 = 0.5;
+const MOB_KILL_DELAY_SECS: f32 = 0.3;
 const ITEM_LIFETIME_SECS: f32 = 0.1;
 /// Public for unified F9 toggle reset (`gameplay_load_tests`).
-pub const WAVE_INTERVAL_SECS: f32 = 0.25;
+pub const WAVE_INTERVAL_SECS: f32 = 0.3;
 
 #[derive(Resource, Default)]
 pub struct ColliderLoadTestActive {
@@ -127,13 +127,13 @@ fn collider_load_test_spawn_wave(
     let mut rng = rand::thread_rng();
     let non_boss_mobs = [
         // Mob::Slime,
-        Mob::SpikeSlime,
+        // Mob::SpikeSlime,
+        // Mob::StoneGolem,
         Mob::FurDevil,
-        // Mob::Hog,
-        Mob::StingFly,
-        Mob::Bushling,
+        // Mob::StingFly,
+        // Mob::Bushling,
         // Mob::Fairy,
-        Mob::RedMushling,
+        // Mob::RedMushling,
         // Mob::Crow,
     ];
 
