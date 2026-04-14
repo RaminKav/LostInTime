@@ -30,7 +30,8 @@ use crate::{
         RawItemBaseAttributes, RawItemBonusAttributes,
     },
     enemy::{
-        CombatAlignment, EnemyMaterial, FollowSpeed, LeapAttack, Mob, MobLevel, ProjectileAttack,
+        BullChargeAttack, CircleAttack, CombatAlignment, EnemyMaterial, FollowSpeed, LeapAttack,
+        Mob, MobLevel, MultiLeapAttack, ProjectileAttack,
     },
     inputs::FacingDirection,
     inventory::ItemStack,
@@ -148,6 +149,9 @@ impl Plugin for ProtoPlugin {
             .register_type::<Option<RangeInclusive<i32>>>()
             .register_type::<Option<u8>>()
             .register_type::<Range<i32>>()
+            .register_type::<CircleAttack>()
+            .register_type::<MultiLeapAttack>()
+            .register_type::<BullChargeAttack>()
             .register_type::<RangeInclusive<i32>>()
             .register_type_data::<Range<i32>, ReflectDeserialize>()
             .register_type_data::<RangeInclusive<i32>, ReflectDeserialize>()

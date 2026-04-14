@@ -1,19 +1,24 @@
 use bevy::prelude::*;
 use bevy_aseprite::{anim::AsepriteAnimation, aseprite, AsepriteBundle};
-use bevy_rapier2d::prelude::{CollisionGroups, Group, KinematicCharacterController};
+use bevy_rapier2d::prelude::{Collider, CollisionGroups, Group, KinematicCharacterController};
 use seldom_state::prelude::{StateMachine, Trigger};
 
 use crate::{
     ai::{
-        CachedAttackDistance, CachedLineOfSight, EnemyAttackCooldown, FollowState, HurtByPlayer,
-        IdleState, LeapAttackState, NightTimeAggro, ProjectileAttackState,
+        BullChargePhase, BullChargeState, CachedAttackDistance, CachedLineOfSight,
+        CircleAttackState, EnemyAttackCooldown, FollowState, HurtByPlayer, IdleState,
+        LeapAttackState, MultiLeapAttackState, MultiLeapPhase, NightTimeAggro,
+        ProjectileAttackState,
     },
     animations::enemy_sprites::spawn_attack_warning_aseprite,
     attributes::Attack,
-    combat::status_effects::Frozen,
-    enemy::{CombatAlignment, FollowSpeed, LeapAttack, Mob, MobIsAttacking, ProjectileAttack},
+    combat::{combat_helpers::spawn_temp_collider, status_effects::Frozen},
+    enemy::{
+        BullChargeAttack, CircleAttack, CombatAlignment, FollowSpeed, LeapAttack, Mob,
+        MobIsAttacking, MultiLeapAttack, ProjectileAttack,
+    },
     inputs::FacingDirection,
-    item::projectile::{Projectile, RangedAttackEvent},
+    item::projectile::{EnemyProjectile, Projectile, RangedAttackEvent},
     night::NightTracker,
     player::{
         melee_skills::Parried,
@@ -26,6 +31,9 @@ use crate::{
 
 // Each "basic" aseprite enemy (walk + lunge) must be declared here so the macro runs at compile time.
 aseprite!(pub Crow, "textures/crow.ase");
+aseprite!(pub SmallCactusAse, "textures/cactus_small/cactus_small.ase");
+aseprite!(pub BigCactusAse, "textures/cactus_large/cactus_large.ase");
+aseprite!(pub BullAse, "textures/bull/bull.ase");
 
 /// Fixed animation tag names for the shared aseprite basic enemy behavior.
 /// Aseprite files must use these exact tag names: WalkUp, WalkDown, WalkSide, AttackUp, AttackDown, AttackSide.
@@ -35,6 +43,9 @@ const WALK_SIDE: &str = "WalkSide";
 const ATTACK_UP: &str = "AttackUp";
 const ATTACK_DOWN: &str = "AttackDown";
 const ATTACK_SIDE: &str = "AttackSide";
+const ATTACK_STOP_UP: &str = "AttackStopUp";
+const ATTACK_STOP_DOWN: &str = "AttackStopDown";
+const ATTACK_STOP_SIDE: &str = "AttackStopSide";
 
 /// Marker for enemies that use the shared aseprite walk + lunge behavior.
 /// Setup is done in code via `get_aseprite_basic_config` (each such mob needs an `aseprite!` macro).
@@ -51,6 +62,9 @@ pub struct CurrentAsepriteTag(pub String);
 fn get_aseprite_basic_config(mob: &Mob) -> Option<(&'static str, &'static str)> {
     match mob {
         Mob::Crow => Some((Crow::PATH, WALK_DOWN)),
+        Mob::SmallCactus => Some((SmallCactusAse::PATH, WALK_DOWN)),
+        Mob::BigCactus => Some((BigCactusAse::PATH, WALK_DOWN)),
+        Mob::Bull => Some((BullAse::PATH, WALK_DOWN)),
         _ => None,
     }
 }
@@ -104,9 +118,9 @@ fn set_animation_tag(
 /// Maps an attack tag to the matching walk tag so post-attack we keep the same direction.
 fn attack_tag_to_walk_tag(attack_tag: &str) -> &'static str {
     match attack_tag {
-        ATTACK_UP => WALK_UP,
-        ATTACK_DOWN => WALK_DOWN,
-        ATTACK_SIDE => WALK_SIDE,
+        ATTACK_UP | ATTACK_STOP_UP => WALK_UP,
+        ATTACK_DOWN | ATTACK_STOP_DOWN => WALK_DOWN,
+        ATTACK_SIDE | ATTACK_STOP_SIDE => WALK_SIDE,
         _ => WALK_DOWN,
     }
 }
@@ -122,12 +136,24 @@ pub fn handle_new_aseprite_enemy_state_machine(
             &FollowSpeed,
             Option<&LeapAttack>,
             Option<&ProjectileAttack>,
+            Option<&CircleAttack>,
+            Option<&MultiLeapAttack>,
+            Option<&BullChargeAttack>,
         ),
         Added<AsepriteBasicEnemy>,
     >,
     dungeon_check: Query<&Dungeon>,
 ) {
-    for (e, alignment, follow_speed, leap_attack_option, proj_attack_option) in spawn_events.iter()
+    for (
+        e,
+        alignment,
+        follow_speed,
+        leap_attack_option,
+        proj_attack_option,
+        circle_attack_option,
+        multi_leap_option,
+        bull_charge_option,
+    ) in spawn_events.iter()
     {
         let mut alignment = alignment.clone();
         commands
@@ -252,6 +278,119 @@ pub fn handle_new_aseprite_enemy_state_machine(
                         speed: follow_speed.0,
                     },
                 );
+        }
+
+        if let Some(circle_attack) = circle_attack_option {
+            state_machine = state_machine
+                .trans::<FollowState>(
+                    CachedAttackDistance {
+                        range_sq: circle_attack.activation_distance
+                            * circle_attack.activation_distance,
+                    },
+                    CircleAttackState {
+                        target: game.game.player,
+                        attack_startup_timer: Timer::from_seconds(
+                            circle_attack.startup,
+                            TimerMode::Once,
+                        ),
+                        attack_cooldown_timer: Timer::from_seconds(
+                            circle_attack.cooldown,
+                            TimerMode::Once,
+                        ),
+                        dir: None,
+                        spawned_hitbox: false,
+                        hitbox_delay_timer: Timer::from_seconds(
+                            circle_attack.hitbox_delay,
+                            TimerMode::Once,
+                        ),
+                    },
+                )
+                .trans::<CircleAttackState>(
+                    Trigger::not(CachedAttackDistance {
+                        range_sq: (circle_attack.activation_distance + 32.).powi(2),
+                    }),
+                    FollowState {
+                        target: game.game.player,
+                        curr_delta: None,
+                        curr_path: None,
+                        speed: follow_speed.0,
+                    },
+                );
+        }
+
+        if let Some(multi_leap) = multi_leap_option {
+            state_machine = state_machine
+                .trans::<FollowState>(
+                    CachedAttackDistance {
+                        range_sq: multi_leap.activation_distance * multi_leap.activation_distance,
+                    },
+                    MultiLeapAttackState {
+                        target: game.game.player,
+                        attack_startup_timer: Timer::from_seconds(
+                            multi_leap.startup,
+                            TimerMode::Once,
+                        ),
+                        attack_duration_timer: Timer::from_seconds(
+                            multi_leap.duration_per_hit,
+                            TimerMode::Once,
+                        ),
+                        attack_cooldown_timer: Timer::from_seconds(
+                            multi_leap.cooldown,
+                            TimerMode::Once,
+                        ),
+                        attack_clip_timer: Timer::from_seconds(
+                            multi_leap.attack_anim_duration,
+                            TimerMode::Once,
+                        ),
+                        speed: multi_leap.speed,
+                        dir: None,
+                        hits_remaining: multi_leap.num_hits,
+                        hit_pause_timer: Timer::from_seconds(
+                            multi_leap.pause_between_hits,
+                            TimerMode::Once,
+                        ),
+                        lunge_delay_timer: Timer::from_seconds(
+                            multi_leap.lunge_delay,
+                            TimerMode::Once,
+                        ),
+                        current_phase: MultiLeapPhase::Startup,
+                    },
+                )
+                .trans::<MultiLeapAttackState>(
+                    Trigger::not(CachedAttackDistance {
+                        range_sq: (multi_leap.activation_distance + 32.).powi(2),
+                    }),
+                    FollowState {
+                        target: game.game.player,
+                        curr_delta: None,
+                        curr_path: None,
+                        speed: follow_speed.0,
+                    },
+                );
+        }
+
+        if let Some(bull_charge) = bull_charge_option {
+            state_machine = state_machine.trans::<FollowState>(
+                CachedAttackDistance {
+                    range_sq: bull_charge.activation_distance * bull_charge.activation_distance,
+                },
+                BullChargeState {
+                    target: game.game.player,
+                    charge_target_pos: None,
+                    charge_dir: None,
+                    charge_speed: bull_charge.charge_speed,
+                    attack_startup_timer: Timer::from_seconds(bull_charge.startup, TimerMode::Once),
+                    attack_cooldown_timer: Timer::from_seconds(
+                        bull_charge.cooldown,
+                        TimerMode::Once,
+                    ),
+                    deceleration_timer: Timer::from_seconds(
+                        bull_charge.stop_duration,
+                        TimerMode::Once,
+                    ),
+                    phase: BullChargePhase::WindUp,
+                },
+            );
         }
 
         if alignment != CombatAlignment::Passive {
@@ -686,6 +825,472 @@ pub fn aseprite_projectile_attack(
                 .remove::<ProjectileAttackState>()
                 .insert(EnemyAttackCooldown(attack.attack_cooldown_timer.clone()));
             set_animation_tag(&mut anim, &mut current_tag, walk_tag);
+        }
+    }
+}
+
+fn direction_to_attack_tag(delta: Vec2) -> &'static str {
+    if delta.x.abs() > delta.y.abs() * 1.1 {
+        ATTACK_SIDE
+    } else if delta.y > 0. {
+        ATTACK_UP
+    } else {
+        ATTACK_DOWN
+    }
+}
+
+fn direction_to_attack_stop_tag(delta: Vec2) -> &'static str {
+    if delta.x.abs() > delta.y.abs() * 1.1 {
+        ATTACK_STOP_SIDE
+    } else if delta.y > 0. {
+        ATTACK_STOP_UP
+    } else {
+        ATTACK_STOP_DOWN
+    }
+}
+
+/// Horizontal flip for side-dominant direction — must match [`aseprite_follow`] so charge/stop
+/// match walk facing (bull has no [`FollowState`] during [`BullChargeState`], so follow does not run).
+fn apply_horizontal_sprite_flip_for_dir(transform: &mut Transform, dir: Vec2) {
+    let abs_x = dir.x.abs();
+    let abs_y = dir.y.abs();
+    if abs_x > abs_y * 1.1 && abs_x > f32::EPSILON {
+        if dir.x < 0. && transform.scale.x > 0. {
+            transform.scale.x = -1.0;
+        } else if dir.x > 0. && transform.scale.x < 0. {
+            transform.scale.x = 1.0;
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Small Cactus: circle attack (spawn hitbox in front of self)
+// ---------------------------------------------------------------------------
+pub fn aseprite_circle_attack(
+    mut transforms: Query<&GlobalTransform>,
+    mut attacks: Query<
+        (
+            Entity,
+            &Mob,
+            &Attack,
+            &mut CircleAttackState,
+            &FollowSpeed,
+            &mut AsepriteAnimation,
+            &mut CurrentAsepriteTag,
+            Option<&crate::player::combat_heirlooms::DeathDefianceFrozen>,
+            Option<&Frozen>,
+        ),
+        With<AsepriteBasicEnemy>,
+    >,
+    circle_configs: Query<&CircleAttack>,
+    mut commands: Commands,
+    time: Res<Time>,
+    asset_server: Res<AssetServer>,
+) {
+    for (
+        entity,
+        mob,
+        enemy_attack,
+        mut attack,
+        follow_speed,
+        mut anim,
+        mut current_tag,
+        defiance_frozen_option,
+        blessing_frozen_option,
+    ) in attacks.iter_mut()
+    {
+        if defiance_frozen_option.is_some() || blessing_frozen_option.is_some() {
+            continue;
+        }
+
+        let target_pos = transforms.get(attack.target).unwrap().translation();
+        let my_pos = transforms.get(entity).unwrap().translation();
+        let delta = (target_pos.truncate() - my_pos.truncate()).normalize_or_zero();
+
+        // Phase 1: startup (show warning)
+        if !attack.attack_startup_timer.finished() {
+            if attack.attack_startup_timer.percent() == 0. {
+                spawn_attack_warning_aseprite(
+                    &mut commands,
+                    &asset_server,
+                    Vec3::new(0., 12., 10.),
+                    entity,
+                    attack.attack_startup_timer.duration().as_secs_f32() + 0.01,
+                );
+            }
+            attack.attack_startup_timer.tick(time.delta());
+            continue;
+        }
+
+        // Phase 2: play attack animation
+        let attack_tag = direction_to_attack_tag(delta);
+        set_animation_tag(&mut anim, &mut current_tag, attack_tag);
+
+        if attack.dir.is_none() {
+            attack.dir = Some(delta);
+        }
+
+        commands.entity(entity).insert(MobIsAttacking(mob.clone()));
+
+        // Phase 3: spawn circle hitbox after delay
+        attack.hitbox_delay_timer.tick(time.delta());
+        if attack.hitbox_delay_timer.finished() && !attack.spawned_hitbox {
+            attack.spawned_hitbox = true;
+
+            let config = circle_configs.get(entity).ok();
+            let offset_dist = config.map_or(16., |c| c.hitbox_offset);
+            let radius = config.map_or(10., |c| c.hitbox_radius);
+
+            let dir = attack.dir.unwrap();
+            let hitbox_pos = my_pos + (dir * offset_dist).extend(0.);
+
+            let hitbox = spawn_temp_collider(
+                &mut commands,
+                Transform::from_translation(hitbox_pos),
+                0.3,
+                enemy_attack.0,
+                Collider::ball(radius),
+                Projectile::CactusSlam,
+            );
+            commands.entity(hitbox).insert(EnemyProjectile {
+                entity,
+                mob: mob.clone(),
+            });
+        }
+
+        // Phase 4: wait for anim to finish
+        if anim.just_finished() {
+            let walk_tag = attack_tag_to_walk_tag(&current_tag.0);
+            commands
+                .entity(entity)
+                .insert(FollowState {
+                    target: attack.target,
+                    curr_delta: None,
+                    curr_path: None,
+                    speed: follow_speed.0,
+                })
+                .remove::<CircleAttackState>()
+                .remove::<MobIsAttacking>()
+                .insert(EnemyAttackCooldown(attack.attack_cooldown_timer.clone()));
+            set_animation_tag(&mut anim, &mut current_tag, walk_tag);
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Big Cactus: multi-hit leap (3 successive lunges)
+// ---------------------------------------------------------------------------
+pub fn aseprite_multi_leap_attack(
+    mut transforms: Query<&mut GlobalTransform>,
+    mut attacks: Query<
+        (
+            Entity,
+            &Mob,
+            &mut KinematicCharacterController,
+            &mut MultiLeapAttackState,
+            &FollowSpeed,
+            &mut AsepriteAnimation,
+            &mut CurrentAsepriteTag,
+            Option<&Slow>,
+            Option<&crate::player::combat_heirlooms::DeathDefianceFrozen>,
+            Option<&Frozen>,
+        ),
+        With<AsepriteBasicEnemy>,
+    >,
+    multi_configs: Query<&MultiLeapAttack>,
+    mut commands: Commands,
+    time: Res<Time>,
+    skills: Query<&PlayerSkills>,
+    asset_server: Res<AssetServer>,
+) {
+    for (
+        entity,
+        mob,
+        mut kcc,
+        mut attack,
+        follow_speed,
+        mut anim,
+        mut current_tag,
+        slow_option,
+        defiance_frozen_option,
+        blessing_frozen_option,
+    ) in attacks.iter_mut()
+    {
+        if defiance_frozen_option.is_some() || blessing_frozen_option.is_some() {
+            continue;
+        }
+
+        let target_pos = transforms.get(attack.target).unwrap().translation();
+        let my_pos = transforms.get_mut(entity).unwrap().translation();
+
+        let delta_xy = (target_pos.truncate() - my_pos.truncate()).normalize_or_zero();
+
+        // Wall-clock cap for the full attack clip (after startup). Avoids aseprite forward-tags looping past one play.
+        if attack.current_phase != MultiLeapPhase::Startup {
+            attack.attack_clip_timer.tick(time.delta());
+        }
+
+        match attack.current_phase {
+            MultiLeapPhase::Startup => {
+                // Show warning icon, wait for startup timer — no movement, walk anim continues.
+                if attack.attack_startup_timer.percent() == 0. {
+                    // Switch to attack anim facing the player, wait for lunge_delay before moving.
+                    let attack_tag = direction_to_attack_tag(delta_xy);
+                    set_animation_tag(&mut anim, &mut current_tag, attack_tag);
+                    spawn_attack_warning_aseprite(
+                        &mut commands,
+                        &asset_server,
+                        Vec3::new(0., 12., 10.),
+                        entity,
+                        attack.attack_startup_timer.duration().as_secs_f32() + 0.01,
+                    );
+                }
+                attack.attack_startup_timer.tick(time.delta());
+                if attack.attack_startup_timer.finished() {
+                    attack.current_phase = MultiLeapPhase::LungeWindup;
+                    attack.lunge_delay_timer.reset();
+                }
+            }
+            MultiLeapPhase::LungeWindup => {
+                // Switch to attack anim facing the player, wait for lunge_delay before moving.
+                let attack_tag = direction_to_attack_tag(delta_xy);
+                set_animation_tag(&mut anim, &mut current_tag, attack_tag);
+                commands.entity(entity).insert(MobIsAttacking(mob.clone()));
+
+                attack.lunge_delay_timer.tick(time.delta());
+                if attack.lunge_delay_timer.finished() {
+                    attack.current_phase = MultiLeapPhase::Lunging;
+                    attack.attack_duration_timer.reset();
+                    attack.dir = None;
+                }
+            }
+            MultiLeapPhase::Lunging => {
+                // Move forward for duration_per_hit.
+                if attack.dir.is_none() {
+                    attack.dir = Some(
+                        delta_xy
+                            * attack.speed
+                            * time.delta_seconds()
+                            * (1. - slow_option.map_or(0., |s| s.num_stacks as f32 * 0.15)),
+                    );
+                }
+
+                kcc.translation = Some(attack.dir.unwrap());
+                attack.attack_duration_timer.tick(time.delta());
+
+                let attack_tag = direction_to_attack_tag(attack.dir.unwrap_or(delta_xy));
+                set_animation_tag(&mut anim, &mut current_tag, attack_tag);
+
+                if attack.attack_duration_timer.finished() {
+                    attack.hits_remaining = attack.hits_remaining.saturating_sub(1);
+                    if attack.hits_remaining > 0 {
+                        attack.current_phase = MultiLeapPhase::Pausing;
+                        attack.hit_pause_timer.reset();
+                        attack.dir = None;
+                    }
+                }
+            }
+            MultiLeapPhase::Pausing => {
+                // Brief gap between hits, then start the next lunge windup.
+                attack.hit_pause_timer.tick(time.delta());
+                if attack.hit_pause_timer.finished() {
+                    attack.current_phase = MultiLeapPhase::LungeWindup;
+                    attack.lunge_delay_timer.reset();
+                    attack.dir = None;
+                }
+            }
+        }
+
+        let hits_complete = attack.hits_remaining == 0
+            && attack.current_phase == MultiLeapPhase::Lunging
+            && attack.attack_duration_timer.finished();
+
+        if hits_complete || attack.attack_clip_timer.finished() {
+            attack.dir = None;
+            kcc.translation = None;
+            let walk_tag = attack_tag_to_walk_tag(&current_tag.0);
+            commands
+                .entity(entity)
+                .insert(FollowState {
+                    target: attack.target,
+                    curr_delta: None,
+                    curr_path: None,
+                    speed: follow_speed.0,
+                })
+                .remove::<MultiLeapAttackState>()
+                .remove::<MobIsAttacking>()
+                .insert(EnemyAttackCooldown(attack.attack_cooldown_timer.clone()));
+            set_animation_tag(&mut anim, &mut current_tag, walk_tag);
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Bull: charge attack (straight-line dash past player, then decelerate)
+// ---------------------------------------------------------------------------
+pub fn aseprite_bull_charge(
+    global_transforms: Query<&GlobalTransform>,
+    mut local_transforms: Query<&mut Transform>,
+    mut attacks: Query<
+        (
+            Entity,
+            &Mob,
+            &Attack,
+            &mut KinematicCharacterController,
+            &mut BullChargeState,
+            &FollowSpeed,
+            &mut AsepriteAnimation,
+            &mut CurrentAsepriteTag,
+            Option<&Slow>,
+            Option<&crate::player::combat_heirlooms::DeathDefianceFrozen>,
+            Option<&Frozen>,
+        ),
+        With<AsepriteBasicEnemy>,
+    >,
+    bull_configs: Query<&BullChargeAttack>,
+    mut commands: Commands,
+    time: Res<Time>,
+    asset_server: Res<AssetServer>,
+) {
+    for (
+        entity,
+        mob,
+        _enemy_attack,
+        mut kcc,
+        mut charge,
+        follow_speed,
+        mut anim,
+        mut current_tag,
+        slow_option,
+        defiance_frozen_option,
+        blessing_frozen_option,
+    ) in attacks.iter_mut()
+    {
+        if defiance_frozen_option.is_some() || blessing_frozen_option.is_some() {
+            continue;
+        }
+
+        let config = bull_configs.get(entity).ok();
+        let overshoot = config.map_or(32., |c| c.overshoot);
+
+        match charge.phase {
+            BullChargePhase::WindUp => {
+                if charge.attack_startup_timer.percent() == 0. {
+                    spawn_attack_warning_aseprite(
+                        &mut commands,
+                        &asset_server,
+                        Vec3::new(0., 12., 10.),
+                        entity,
+                        charge.attack_startup_timer.duration().as_secs_f32() + 0.01,
+                    );
+                }
+                // No FollowState during charge — keep sprite facing the player during wind-up.
+                if let (Ok(target_tf), Ok(my_tf), Ok(mut tf)) = (
+                    global_transforms.get(charge.target),
+                    global_transforms.get(entity),
+                    local_transforms.get_mut(entity),
+                ) {
+                    let to_target =
+                        target_tf.translation().truncate() - my_tf.translation().truncate();
+                    if to_target.length_squared() >= 4.0 {
+                        apply_horizontal_sprite_flip_for_dir(
+                            &mut tf,
+                            to_target.normalize_or_zero(),
+                        );
+                    }
+                }
+                charge.attack_startup_timer.tick(time.delta());
+                if charge.attack_startup_timer.finished() {
+                    let target_pos = global_transforms.get(charge.target).unwrap().translation();
+                    let my_pos = global_transforms.get(entity).unwrap().translation();
+                    let dir = (target_pos.truncate() - my_pos.truncate()).normalize_or_zero();
+                    let destination = target_pos.truncate() + dir * overshoot;
+                    charge.charge_target_pos = Some(destination);
+                    charge.charge_dir = Some(dir);
+                    charge.phase = BullChargePhase::Charging;
+
+                    let attack_tag = direction_to_attack_tag(dir);
+                    set_animation_tag(&mut anim, &mut current_tag, attack_tag);
+                    commands.entity(entity).insert(MobIsAttacking(mob.clone()));
+                    if let Ok(mut tf) = local_transforms.get_mut(entity) {
+                        apply_horizontal_sprite_flip_for_dir(&mut tf, dir);
+                    }
+                }
+            }
+            BullChargePhase::Charging => {
+                let my_pos = global_transforms.get(entity).unwrap().translation();
+                let Some(target_pos) = charge.charge_target_pos else {
+                    continue;
+                };
+                let Some(dir) = charge.charge_dir else {
+                    continue;
+                };
+
+                let dist_remaining = (target_pos - my_pos.truncate()).dot(dir);
+
+                if dist_remaining <= 0. {
+                    charge.phase = BullChargePhase::Stopping;
+                    charge.deceleration_timer.reset();
+                    let stop_tag = direction_to_attack_stop_tag(dir);
+                    set_animation_tag(&mut anim, &mut current_tag, stop_tag);
+                    if let Ok(mut tf) = local_transforms.get_mut(entity) {
+                        apply_horizontal_sprite_flip_for_dir(&mut tf, dir);
+                    }
+                } else {
+                    let speed = charge.charge_speed
+                        * time.delta_seconds()
+                        * (1. - slow_option.map_or(0., |s| s.num_stacks as f32 * 0.15));
+                    kcc.translation = Some(dir * speed);
+                    kcc.filter_groups = Some(bevy_rapier2d::prelude::CollisionGroups::new(
+                        bevy_rapier2d::prelude::Group::NONE,
+                        bevy_rapier2d::prelude::Group::NONE,
+                    ));
+                    if let Ok(mut tf) = local_transforms.get_mut(entity) {
+                        apply_horizontal_sprite_flip_for_dir(&mut tf, dir);
+                    }
+                }
+            }
+            BullChargePhase::Stopping => {
+                charge.deceleration_timer.tick(time.delta());
+
+                let dir = charge.charge_dir.unwrap_or(Vec2::ZERO);
+                let t = charge.deceleration_timer.percent();
+                let decel_speed = charge.charge_speed * (1.0 - t) * 0.3 * time.delta_seconds();
+                if decel_speed > 0.1 {
+                    kcc.translation = Some(dir * decel_speed);
+                }
+                if dir.length_squared() > f32::EPSILON {
+                    if let Ok(mut tf) = local_transforms.get_mut(entity) {
+                        apply_horizontal_sprite_flip_for_dir(&mut tf, dir);
+                    }
+                }
+
+                if charge.deceleration_timer.finished() {
+                    // Re-initiate: go back to wind-up with a fresh target
+                    charge.phase = BullChargePhase::WindUp;
+                    charge.attack_startup_timer.reset();
+                    charge.charge_target_pos = None;
+                    charge.charge_dir = None;
+
+                    let walk_tag = attack_tag_to_walk_tag(&current_tag.0);
+                    commands
+                        .entity(entity)
+                        .remove::<MobIsAttacking>()
+                        .insert(EnemyAttackCooldown(charge.attack_cooldown_timer.clone()));
+
+                    // Transition back to follow for re-approach
+                    commands
+                        .entity(entity)
+                        .insert(FollowState {
+                            target: charge.target,
+                            curr_delta: None,
+                            curr_path: None,
+                            speed: follow_speed.0,
+                        })
+                        .remove::<BullChargeState>();
+                    set_animation_tag(&mut anim, &mut current_tag, walk_tag);
+                }
+            }
         }
     }
 }

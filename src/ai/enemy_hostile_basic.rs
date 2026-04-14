@@ -268,6 +268,65 @@ pub struct ProjectileAttackState {
     pub projectile: Projectile,
 }
 
+/// Small Cactus: stops, plays attack anim, spawns a circle hitbox ~16px in front, then returns to follow.
+#[derive(Clone, Component, Reflect)]
+#[component(storage = "SparseSet")]
+pub struct CircleAttackState {
+    pub target: Entity,
+    pub attack_startup_timer: Timer,
+    pub attack_cooldown_timer: Timer,
+    pub dir: Option<Vec2>,
+    pub spawned_hitbox: bool,
+    pub hitbox_delay_timer: Timer,
+}
+
+/// Big Cactus: triple-hit leap. Performs 3 successive short lunges in the same direction.
+#[derive(Clone, Component, Reflect)]
+#[component(storage = "SparseSet")]
+pub struct MultiLeapAttackState {
+    pub target: Entity,
+    pub attack_startup_timer: Timer,
+    pub attack_duration_timer: Timer,
+    pub attack_cooldown_timer: Timer,
+    /// Starts after startup; wall-clock cap for the full attack clip (`MultiLeapAttack::attack_anim_duration`).
+    pub attack_clip_timer: Timer,
+    pub speed: f32,
+    pub dir: Option<Vec2>,
+    pub hits_remaining: u8,
+    pub hit_pause_timer: Timer,
+    pub lunge_delay_timer: Timer,
+    pub current_phase: MultiLeapPhase,
+}
+
+#[derive(Clone, Reflect, PartialEq, Debug)]
+pub enum MultiLeapPhase {
+    Startup,
+    LungeWindup,
+    Lunging,
+    Pausing,
+}
+
+/// Bull: charges in a straight line past the stored player position, then decelerates.
+#[derive(Clone, Component, Reflect)]
+#[component(storage = "SparseSet")]
+pub struct BullChargeState {
+    pub target: Entity,
+    pub charge_target_pos: Option<Vec2>,
+    pub charge_dir: Option<Vec2>,
+    pub charge_speed: f32,
+    pub attack_startup_timer: Timer,
+    pub attack_cooldown_timer: Timer,
+    pub deceleration_timer: Timer,
+    pub phase: BullChargePhase,
+}
+
+#[derive(Clone, Reflect, PartialEq, Debug)]
+pub enum BullChargePhase {
+    WindUp,
+    Charging,
+    Stopping,
+}
+
 pub fn follow(
     mut transforms: Query<&mut Transform>,
     mut mover: Query<&mut KinematicCharacterController>,

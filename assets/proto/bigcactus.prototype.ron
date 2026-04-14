@@ -1,0 +1,89 @@
+(
+  name: "BigCactus",
+  templates: ["aseprite_mob_basic.prototype.ron"],
+  schematics: {
+    "survival_rogue_like::enemy::Mob": BigCactus,
+    "survival_rogue_like::enemy::CombatAlignment": Hostile,
+    "survival_rogue_like::enemy::FollowSpeed": (0.25),
+    "survival_rogue_like::enemy::MultiLeapAttack": (activation_distance: 38., duration_per_hit: 0.3, cooldown: 1.8, startup: 0.5, speed: 85., num_hits: 3, pause_between_hits: 0.1, lunge_delay: 0.01, attack_anim_duration: 1.6),
+    "survival_rogue_like::proto::ColliderCapsulProto": (x1: 0., y1: -1., x2: 0., y2: -1.5, r: 12.),
+    "survival_rogue_like::attributes::MaxHealth": (20),
+    "survival_rogue_like::attributes::Attack": (7),
+    "survival_rogue_like::player::levels::ExperienceReward": (30),
+    "survival_rogue_like::item::loot_table::LootTable": (
+        drops: [(
+                item: SmallPotion,
+                min: 1,
+                max: 1,
+                rate: 0.0006
+            ),
+            (
+                item: LargePotion,
+                min: 1,
+                max: 1,
+                rate: 0.00025
+            ),
+            (
+                item: AttackSpeedPotion,
+                min: 1,
+                max: 1,
+                rate: 0.0006
+            ),
+            (
+                item: MovementSpeedPotion,
+                min: 1,
+                max: 1,
+                rate: 0.0006
+            ),
+            (
+                item: ChestBlock,
+                min: 1,
+                max: 1,
+                rate: 0.0009
+            ),
+            (
+                item: HeirloomChest,
+                min: 1,
+                max: 1,
+                rate: 0.001
+            ),
+            (
+                item: UpgradeTome,
+                min: 1,
+                max: 1,
+                rate: 0.003
+            ),
+            (
+                item: OrbOfTransformation,
+                min: 1,
+                max: 1,
+                rate: 0.00128
+            ),
+            (
+                item: Key,
+                min: 1,
+                max: 1,
+                rate: 0.0005
+            ),
+            (
+                item: TimeFragment,
+                min: 1,
+                max: 1,
+                rate: 0.003
+            ),
+            (
+                item: XPShard,
+                min: 1,
+                max: 1,
+                rate: 1.
+            ),
+            (
+                item: Coin,
+                min: 1,
+                max: 1,
+                rate: 0.22
+            ),
+            ]
+        ),
+  }
+)

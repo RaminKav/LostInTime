@@ -23,6 +23,101 @@ use super::{spawn_helpers::can_spawn_mob_here, CombatAlignment, EliteMob, Mob};
 pub const BASE_MAX_MOBS_TOTAL: i32 = 60;
 pub const ELITE_SPAWN_RATE: f32 = 0.06;
 
+/// Tracks which era the current [`GlobalSpawners::spawners`] list was built for (overworld only).
+#[derive(Resource, Default, Debug)]
+pub struct SpawnerListEraTracker {
+    pub era_at_last_build: Option<Era>,
+}
+
+/// Overworld mob spawner rows for the given era (weights, timers, min day, batch size).  
+/// Dungeon and other dimensions do not use this list — keep [`Era::DungeonMain`] mapping empty.
+pub fn overworld_spawners_for_era(era: Era) -> Vec<Spawner> {
+    match era {
+        Era::Main => spawners_era_main(),
+        Era::Second => spawners_era_second(),
+        Era::Third => spawners_era_third(),
+        Era::DungeonMain => vec![],
+    }
+}
+
+fn spawners_era_main() -> Vec<Spawner> {
+    vec![
+        Spawner {
+            enemy: Mob::SpikeSlime,
+            weight: 100.,
+            spawn_timer: Timer::from_seconds(11., TimerMode::Once),
+            min_days_to_spawn: 3,
+            num_to_spawn: Some(1),
+        },
+        Spawner {
+            enemy: Mob::FurDevil,
+            weight: 100.,
+            spawn_timer: Timer::from_seconds(2.5, TimerMode::Once),
+            min_days_to_spawn: 0,
+            num_to_spawn: Some(1),
+        },
+        Spawner {
+            enemy: Mob::RedMushling,
+            weight: 200.,
+            spawn_timer: Timer::from_seconds(25., TimerMode::Once),
+            min_days_to_spawn: 0,
+            num_to_spawn: None,
+        },
+        Spawner {
+            enemy: Mob::StingFly,
+            weight: 100.,
+            spawn_timer: Timer::from_seconds(14., TimerMode::Once),
+            min_days_to_spawn: 1,
+            num_to_spawn: Some(2),
+        },
+        Spawner {
+            enemy: Mob::Bushling,
+            weight: 100.,
+            spawn_timer: Timer::from_seconds(7., TimerMode::Once),
+            min_days_to_spawn: 1,
+            num_to_spawn: Some(1),
+        },
+    ]
+}
+
+fn spawners_era_second() -> Vec<Spawner> {
+    vec![
+        Spawner {
+            enemy: Mob::FurDevil,
+            weight: 60.,
+            spawn_timer: Timer::from_seconds(2.5, TimerMode::Once),
+            min_days_to_spawn: 0,
+            num_to_spawn: Some(1),
+        },
+        Spawner {
+            enemy: Mob::SmallCactus,
+            weight: 100.,
+            spawn_timer: Timer::from_seconds(3., TimerMode::Once),
+            min_days_to_spawn: 0,
+            num_to_spawn: Some(1),
+        },
+        Spawner {
+            enemy: Mob::BigCactus,
+            weight: 90.,
+            spawn_timer: Timer::from_seconds(8., TimerMode::Once),
+            min_days_to_spawn: 1,
+            num_to_spawn: Some(1),
+        },
+        Spawner {
+            enemy: Mob::Bull,
+            weight: 110.,
+            spawn_timer: Timer::from_seconds(17., TimerMode::Once),
+            min_days_to_spawn: 2,
+            num_to_spawn: Some(1),
+        },
+    ]
+}
+
+/// Era 3: tune separately when ready; currently matches era 2 pool cadence.
+fn spawners_era_third() -> Vec<Spawner> {
+    spawners_era_main()
+}
+
 /// Resource to track if mob spawning should be paused (e.g., after boss defeat with time remaining)
 #[derive(Resource, Default, Debug)]
 pub struct MobSpawningPaused {
@@ -49,8 +144,10 @@ impl Plugin for SpawnerPlugin {
         app.add_event::<MobSpawnEvent>()
             .init_resource::<MobSpawningPaused>()
             .init_resource::<EnemyDespawnTimer>()
+            .init_resource::<SpawnerListEraTracker>()
             .add_systems(
                 (
+                    sync_overworld_spawners_with_era,
                     handle_spawn_mobs,
                     tick_spawner_timers.run_if(is_not_paused),
                     tick_enemy_despawn_timer.run_if(is_not_paused),
@@ -129,60 +226,44 @@ fn test_mob_count(q: Query<&Mob>, key_input: Res<Input<KeyCode>>) {
 fn add_spawners_to_new_chunks(
     mut commands: Commands,
     maybe_dungeon: Query<&Dungeon, With<ActiveDimension>>,
+    game: GameParam,
 ) {
-    let mut spawners = vec![];
-    if maybe_dungeon.get_single().is_err() {
-        spawners.push(Spawner {
-            enemy: Mob::SpikeSlime,
-            weight: 100.,
-            spawn_timer: Timer::from_seconds(11., TimerMode::Once),
-            min_days_to_spawn: 3,
-            num_to_spawn: Some(1),
-        });
-        spawners.push(Spawner {
-            enemy: Mob::FurDevil,
-            weight: 100.,
-            spawn_timer: Timer::from_seconds(2.5, TimerMode::Once),
-            min_days_to_spawn: 0,
-            num_to_spawn: Some(1),
-        });
-        spawners.push(Spawner {
-            enemy: Mob::RedMushling,
-            weight: 200.,
-            spawn_timer: Timer::from_seconds(25., TimerMode::Once),
-            min_days_to_spawn: 0,
-            num_to_spawn: None,
-        });
-        // spawners.push(Spawner {
-        //     enemy: Mob::Hog,
-        //     weight: 20.,
-        //     spawn_timer: Timer::from_seconds(120., TimerMode::Once),
-        //     min_days_to_spawn: 0,
-        //     num_to_spawn: None,
-        // });
-        spawners.push(Spawner {
-            enemy: Mob::StingFly,
-            weight: 100.,
-            spawn_timer: Timer::from_seconds(14., TimerMode::Once),
-            min_days_to_spawn: 1,
-            num_to_spawn: Some(2),
-        });
-        spawners.push(Spawner {
-            enemy: Mob::Bushling,
-            weight: 100.,
-            spawn_timer: Timer::from_seconds(7., TimerMode::Once),
-            min_days_to_spawn: 1,
-            num_to_spawn: Some(1),
-        });
-    }
+    let era = game.era.current_era.clone();
+    let spawners = if maybe_dungeon.get_single().is_err() && !era.is_dungeon() {
+        overworld_spawners_for_era(era.clone())
+    } else {
+        vec![]
+    };
+    let era_at_last_build = if spawners.is_empty() { None } else { Some(era) };
     commands.insert_resource(GlobalSpawners {
         spawners,
         initial_spawn_delay: Timer::from_seconds(5., TimerMode::Once),
     });
+    commands.insert_resource(SpawnerListEraTracker { era_at_last_build });
+}
+
+/// Rebuild overworld spawner table when [`EraManager::current_era`] changes (not in dungeon).
+fn sync_overworld_spawners_with_era(
+    game: GameParam,
+    mut spawners: ResMut<GlobalSpawners>,
+    mut tracker: ResMut<SpawnerListEraTracker>,
+    maybe_dungeon: Query<&Dungeon, With<ActiveDimension>>,
+) {
+    if maybe_dungeon.get_single().is_ok() {
+        return;
+    }
+    let era = game.era.current_era.clone();
+    if era.is_dungeon() {
+        return;
+    }
+    if tracker.era_at_last_build.as_ref() == Some(&era) {
+        return;
+    }
+    tracker.era_at_last_build = Some(era.clone());
+    spawners.spawners = overworld_spawners_for_era(era);
 }
 
 fn handle_spawn_mobs(
-    game: GameParam,
     mut proto_commands: ProtoCommands,
     mut commands: Commands,
     prototypes: Prototypes,
@@ -231,22 +312,15 @@ fn handle_spawn_mobs(
             picked_mob_to_spawn = Some((e.mob.clone(), pos));
         }
         if let Some((mob, pos)) = picked_mob_to_spawn {
-            // Temporary: in era 2, spawn Crow instead of SpikeSlime
-            let mob_to_spawn = if mob == Mob::SpikeSlime && game.era.current_era == Era::Second {
-                Mob::Crow
-            } else {
-                mob
-            };
             if let Some(spawned_mob) =
-                proto_commands.spawn_from_proto(mob_to_spawn.clone(), &prototypes, pos)
+                proto_commands.spawn_from_proto(mob.clone(), &prototypes, pos)
             {
                 debug!("SPAWNED A MOB!!! {spawned_mob:?}");
-                if rng.gen::<f32>() < ELITE_SPAWN_RATE
-                    && !(proto_param
-                        .get_component::<CombatAlignment, _>(mob_to_spawn)
-                        .expect("mob has no alignment")
-                        == &CombatAlignment::Passive)
-                {
+                let can_be_elite = proto_param
+                    .get_component::<CombatAlignment, _>(mob.clone())
+                    .map(|a| a != &CombatAlignment::Passive)
+                    .unwrap_or(false);
+                if rng.gen::<f32>() < ELITE_SPAWN_RATE && can_be_elite {
                     commands.entity(spawned_mob).insert(EliteMob);
                 }
 

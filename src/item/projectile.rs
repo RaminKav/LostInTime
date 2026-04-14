@@ -95,6 +95,7 @@ pub enum Projectile {
     SpinAttack,
     IceFloor,
     CrowFeather,
+    CactusSlam,
 }
 
 impl Projectile {

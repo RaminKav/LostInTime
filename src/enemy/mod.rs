@@ -128,6 +128,9 @@ pub enum Mob {
     RedMushking,
     StoneGolem,
     Crow,
+    SmallCactus,
+    BigCactus,
+    Bull,
 }
 
 impl Mob {
@@ -145,7 +148,9 @@ impl Mob {
             Mob::Hog => LIGHT_BROWN,
             Mob::StoneGolem => GREY,
             Mob::Crow => BLACK,
-            _ => BLACK,
+            Mob::SmallCactus => DARK_GREEN,
+            Mob::BigCactus => DARK_GREEN,
+            Mob::Bull => LIGHT_BROWN,
         }
     }
     pub fn get_base_kb(&self) -> f32 {
@@ -162,6 +167,9 @@ impl Mob {
             Mob::RedMushking => 0.,
             Mob::StoneGolem => 20.,
             Mob::Hog => 50.,
+            Mob::SmallCactus => 60.,
+            Mob::BigCactus => 50.,
+            Mob::Bull => 30.,
         }
     }
     pub fn is_boss(&self) -> bool {
@@ -219,6 +227,69 @@ pub struct LeapAttack {
 
 #[derive(Component)]
 pub struct MobIsAttacking(pub Mob);
+
+/// Small Cactus attack config: spawns a circle hitbox in front of itself.
+#[derive(FromReflect, Debug, Default, Reflect, Clone, Component, Schematic)]
+#[reflect(Component, Schematic, Default)]
+pub struct CircleAttack {
+    pub activation_distance: f32,
+    pub cooldown: f32,
+    pub startup: f32,
+    /// How far in front of the mob the hitbox spawns (pixels).
+    pub hitbox_offset: f32,
+    /// Delay after attack anim starts before hitbox spawns.
+    pub hitbox_delay: f32,
+    /// Radius of the circle collider.
+    pub hitbox_radius: f32,
+}
+
+/// Big Cactus attack config: triple-hit leap.
+#[derive(FromReflect, Debug, Reflect, Clone, Component, Schematic)]
+#[reflect(Component, Schematic, Default)]
+pub struct MultiLeapAttack {
+    pub activation_distance: f32,
+    pub duration_per_hit: f32,
+    pub cooldown: f32,
+    pub startup: f32,
+    pub speed: f32,
+    pub num_hits: u8,
+    /// Pause between successive lunges.
+    pub pause_between_hits: f32,
+    /// Per-lunge windup delay before movement begins (attack anim plays during this).
+    pub lunge_delay: f32,
+    /// Total wall-clock duration of the full attack tag (sum of frame delays). Ends the attack state when elapsed so the clip does not loop past once.
+    pub attack_anim_duration: f32,
+}
+
+impl Default for MultiLeapAttack {
+    fn default() -> Self {
+        Self {
+            activation_distance: 0.,
+            duration_per_hit: 0.,
+            cooldown: 0.,
+            startup: 0.,
+            speed: 0.,
+            num_hits: 0,
+            pause_between_hits: 0.,
+            lunge_delay: 0.,
+            attack_anim_duration: 1.6,
+        }
+    }
+}
+
+/// Bull charge attack config.
+#[derive(FromReflect, Debug, Default, Reflect, Clone, Component, Schematic)]
+#[reflect(Component, Schematic, Default)]
+pub struct BullChargeAttack {
+    pub activation_distance: f32,
+    pub charge_speed: f32,
+    pub startup: f32,
+    pub cooldown: f32,
+    /// Extra distance past the player position.
+    pub overshoot: f32,
+    /// How long the deceleration/stop phase lasts.
+    pub stop_duration: f32,
+}
 
 #[derive(FromReflect, Reflect, Clone, Component, Schematic)]
 #[reflect(Component, Schematic, Default)]

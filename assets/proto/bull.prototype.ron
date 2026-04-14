@@ -1,0 +1,89 @@
+(
+  name: "Bull",
+  templates: ["aseprite_mob_basic.prototype.ron"],
+  schematics: {
+    "survival_rogue_like::enemy::Mob": Bull,
+    "survival_rogue_like::enemy::CombatAlignment": Hostile,
+    "survival_rogue_like::enemy::FollowSpeed": (0.35),
+    "survival_rogue_like::enemy::BullChargeAttack": (activation_distance: 180., charge_speed: 160., startup: 0.7, cooldown: 1.2, overshoot: 32., stop_duration: 0.6),
+    "survival_rogue_like::proto::ColliderCapsulProto": (x1: 0., y1: -1., x2: 0., y2: -1.5, r: 7.),
+    "survival_rogue_like::attributes::MaxHealth": (26),
+    "survival_rogue_like::attributes::Attack": (16),
+    "survival_rogue_like::player::levels::ExperienceReward": (35),
+    "survival_rogue_like::item::loot_table::LootTable": (
+        drops: [(
+                item: SmallPotion,
+                min: 1,
+                max: 1,
+                rate: 0.0006
+            ),
+            (
+                item: LargePotion,
+                min: 1,
+                max: 1,
+                rate: 0.00025
+            ),
+            (
+                item: AttackSpeedPotion,
+                min: 1,
+                max: 1,
+                rate: 0.0006
+            ),
+            (
+                item: MovementSpeedPotion,
+                min: 1,
+                max: 1,
+                rate: 0.0006
+            ),
+            (
+                item: ChestBlock,
+                min: 1,
+                max: 1,
+                rate: 0.0009
+            ),
+            (
+                item: HeirloomChest,
+                min: 1,
+                max: 1,
+                rate: 0.001
+            ),
+            (
+                item: UpgradeTome,
+                min: 1,
+                max: 1,
+                rate: 0.003
+            ),
+            (
+                item: OrbOfTransformation,
+                min: 1,
+                max: 1,
+                rate: 0.00128
+            ),
+            (
+                item: Key,
+                min: 1,
+                max: 1,
+                rate: 0.0005
+            ),
+            (
+                item: TimeFragment,
+                min: 1,
+                max: 1,
+                rate: 0.003
+            ),
+            (
+                item: XPShard,
+                min: 1,
+                max: 1,
+                rate: 1.
+            ),
+            (
+                item: Coin,
+                min: 1,
+                max: 1,
+                rate: 0.22
+            ),
+            ]
+        ),
+  }
+)
