@@ -61,8 +61,8 @@ use crate::world::world_helpers::world_pos_to_tile_pos;
 use crate::player::ice_slide::{clear_ice_slide_when_stuck, tick_ice_slide_movement};
 use crate::{
     bounce_player, update_bounce_effect, update_shadow, BounceEffect, BounceEvent, Game,
-    GameUpscale, InputMappings, Player, ScreenResolution, UpdatePetWeaponEvent, DEBUG,
-    PLAYER_DASH_SPEED, TIME_STEP,
+    InputMappings, Player, ScreenResolution, UpdatePetWeaponEvent, DEBUG, PLAYER_DASH_SPEED,
+    TIME_STEP,
 };
 use crate::{
     custom_commands::CommandsExt, AppExt, CustomFlush, GameParam, GameState, MainCamera,
@@ -859,11 +859,8 @@ pub fn cursor_pos_in_world(
     cam: &Camera,
 ) -> Vec3 {
     let window = windows.single();
-
     let window_size = Vec2::new(window.width(), window.height());
 
-    // Convert screen position [0..resolution] to ndc [-1..1]
-    // (ndc = normalized device coordinates)
     let ndc_to_world = cam_t.compute_matrix() * cam.projection_matrix().inverse();
     let ndc = (cursor_pos / window_size) * 2.0 - Vec2::ONE;
     ndc_to_world.project_point3(ndc.extend(0.0))
@@ -874,12 +871,9 @@ pub fn cursor_pos_in_ui(
     cam: &Camera,
 ) -> Vec3 {
     let window = windows.single();
-
     let window_size = Vec2::new(window.width(), window.height());
 
-    // Convert screen position [0..resolution] to ndc [-1..1]
-    // (ndc = normalized device coordinates)
-    let t = Transform::from_translation(Vec3::new(0., 0., 0.));
+    let t = Transform::from_translation(Vec3::ZERO);
     let ndc_to_world = t.compute_matrix() * cam.projection_matrix().inverse();
     let ndc = (cursor_pos / window_size) * 2.0 - Vec2::ONE;
     ndc_to_world.project_point3(ndc.extend(0.0))
@@ -1188,7 +1182,6 @@ pub fn move_camera_with_player(
         (&Transform, &RawPosition, &MovementVector),
         (
             With<Player>,
-            // Changed<Transform>,
             Without<MainCamera>,
             Without<TextureCamera>,
             Without<UICamera>,
@@ -1196,11 +1189,7 @@ pub fn move_camera_with_player(
     >,
     mut game_camera: Query<
         (&mut Transform, &mut RawPosition),
-        (Without<MainCamera>, Without<UICamera>, With<TextureCamera>),
-    >,
-    mut screen_camera: Query<
-        (&mut Transform, &GameUpscale),
-        (With<MainCamera>, Without<UICamera>, Without<TextureCamera>),
+        (With<TextureCamera>,),
     >,
     time: Res<Time>,
     resolution: Res<ScreenResolution>,
@@ -1214,19 +1203,7 @@ pub fn move_camera_with_player(
     let delta = raw_player_pos.0 - raw_camera_pos.0;
     raw_camera_pos.0 += delta * camera_lookahead_scale * time.delta_seconds();
 
-    // Snap camera to the screen-pixel grid: 1 screen pixel = 1/scale game units.
-    // This ensures:
-    //   - Sprites at integer game positions always land at exact render texture pixels
-    //     (offset * scale = integer, since offset is a multiple of 1/scale)
-    //   - Camera movement is smooth at screen-pixel granularity (finest visible unit)
-    //   - Display camera stays at (0,0), so letterbox bars are perfectly stable
     let pixel_step = 1.0 / resolution.scale as f32;
     game_camera_transform.translation.x = (raw_camera_pos.x / pixel_step).round() * pixel_step;
     game_camera_transform.translation.y = (raw_camera_pos.y / pixel_step).round() * pixel_step;
-
-    // Display camera stays fixed at origin — sub-pixel smoothing is fully handled
-    // by the texture camera's 1/scale quantization. No frame shift, no letterbox jitter.
-    let (mut screen_camera_transform, _game_upscale) = screen_camera.single_mut();
-    screen_camera_transform.translation.x = 0.0;
-    screen_camera_transform.translation.y = 0.0;
 }

@@ -2,8 +2,6 @@
   name: "ItemDrop",
   templates: [],
   schematics: {
-  "survival_rogue_like::proto::ColliderProto": (x: 5., y: 5.),
-  "survival_rogue_like::proto::SensorProto": (),
   "survival_rogue_like::assets::SpriteSize": Small,
   "survival_rogue_like::assets::SpriteAnchor": ((x: 0., y: 0.)),
   "survival_rogue_like::proto::AnimationTimerProto": (secs: 0.1),

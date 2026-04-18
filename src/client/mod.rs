@@ -61,8 +61,7 @@ use crate::{
         y_sort::YSort,
         WallTextureData, WorldGeneration,
     },
-    CustomFlush, GameParam, GameState, MainCamera, RawPosition, TextureCamera, TileMapPosition,
-    UICamera,
+    CustomFlush, GameParam, GameState, RawPosition, TextureCamera, TileMapPosition,
 };
 
 #[derive(Component, Reflect, Default)]
@@ -543,10 +542,7 @@ pub fn load_state(
     mut commands: Commands,
     mut proto_commands: ProtoCommands,
     mut dim_event: EventWriter<DimensionSpawnEvent>,
-    mut game_camera: Query<
-        (&mut Transform, &mut RawPosition),
-        (Without<MainCamera>, Without<UICamera>, With<TextureCamera>),
-    >,
+    mut game_camera: Query<(&mut Transform, &mut RawPosition), With<TextureCamera>>,
     mut era: ResMut<EraManager>,
 ) {
     let mut rng = rand::thread_rng();

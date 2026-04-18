@@ -2,7 +2,7 @@ use bevy::prelude::*;
 
 use crate::{
     attributes::PickupRange,
-    item::ItemDrop,
+    item::{object_actions::TouchTriggerObjectAction, ItemDrop},
     player::{skills::PlayerSkills, Player},
 };
 
@@ -56,6 +56,7 @@ pub fn mark_items_in_pickup_range(
             With<ItemDrop>,
             Without<Player>,
             Without<BeingPulledToPlayer>,
+            Without<TouchTriggerObjectAction>,
         ),
     >,
     player_query: Query<(&Transform, &PickupRadius), With<Player>>,
@@ -135,6 +136,7 @@ pub fn handle_magnet_pull(
             With<ItemDrop>,
             Without<Player>,
             Without<BeingPulledToPlayer>,
+            Without<TouchTriggerObjectAction>,
         ),
     >,
     mut commands: Commands,

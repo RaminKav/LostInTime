@@ -33,17 +33,7 @@ use bevy::{
     ecs::{schedule::ScheduleLabel, system::SystemParam},
     log::LogPlugin,
     prelude::*,
-    reflect::TypeUuid,
-    render::{
-        camera::{RenderTarget, ScalingMode},
-        mesh::Indices,
-        render_resource::{
-            AsBindGroup, Extent3d, PrimitiveTopology, ShaderRef, TextureDescriptor,
-            TextureDimension, TextureFormat, TextureUsages,
-        },
-        view::RenderLayers,
-    },
-    sprite::{Material2d, Material2dPlugin, MaterialMesh2dBundle},
+    render::{camera::ScalingMode, view::RenderLayers},
     window::{PresentMode, PrimaryWindow, WindowMode, WindowResolution},
 };
 use bevy_common_assets::ron::RonAssetPlugin;
@@ -251,8 +241,7 @@ fn main() {
                 .set(ImagePlugin::default_nearest())
                 .set(WindowPlugin {
                     primary_window: Some(Window {
-                        resolution: WindowResolution::new(WIDTH, HEIGHT)
-                            .with_scale_factor_override(1.0),
+                        resolution: WindowResolution::new(WIDTH, HEIGHT),
                         title: "Lost in Time".to_string(),
                         present_mode: PresentMode::Immediate,
                         resizable: true,
@@ -276,7 +265,6 @@ fn main() {
         .add_plugin(panic_handler::PanicHandler::new().build())
         .add_plugin(AsepritePlugin)
         .add_plugin(FrameTimeDiagnosticsPlugin)
-        .add_plugin(Material2dPlugin::<UITextureMaterial>::default())
         .add_plugin(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(100.0))
         .add_plugin(WorldInspectorPlugin::new().run_if(should_show_inspector))
         .add_plugin(TilemapPlugin)
@@ -305,6 +293,7 @@ fn main() {
         .add_plugin(BlessingsPlugin)
         // .add_plugin(DiagnosticExplorerAgentPlugin)
         .add_startup_system(setup)
+        .add_system(update_pixel_perfect_viewport)
         .add_loading_state(
             LoadingState::new(GameState::Loading).continue_to_state(GameState::LoadingProtos),
         )
@@ -925,13 +914,8 @@ pub struct MainCamera;
 pub struct TextureCamera;
 #[derive(Component, Default)]
 pub struct UICamera;
-#[derive(Component, Default)]
-pub struct TextureTarget;
 #[derive(Component, Debug, Default)]
 pub struct RawPosition(Vec2);
-
-#[derive(Component)]
-pub struct GameUpscale(pub f32);
 
 impl Deref for RawPosition {
     type Target = Vec2;
@@ -944,19 +928,6 @@ impl DerefMut for RawPosition {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
-}
-impl Material2d for UITextureMaterial {
-    fn fragment_shader() -> ShaderRef {
-        "shaders/ui_texture.wgsl".into()
-    }
-}
-
-#[derive(AsBindGroup, TypeUuid, Debug, Clone)]
-#[uuid = "9600f1e5-1911-4286-9810-e9bd9ff685e2"]
-pub struct UITextureMaterial {
-    #[texture(0)]
-    #[sampler(1)]
-    pub source_texture: Option<Handle<Image>>,
 }
 
 #[derive(Resource, Clone)]
@@ -977,316 +948,68 @@ pub struct ScreenResolution {
     /// Size of the actual viewport (may be smaller than window due to letterboxing)
     pub viewport_size: Vec2,
 }
-/// Creates a quad mesh with padding around the edges to prevent flickering artifacts
-/// from sub-pixel camera shifts. The inner area (width × height) maps to UV (0,0)→(1,1).
-/// The padding area uses UVs outside 0-1, which with ClampToEdge texture wrapping
-/// repeats the edge texels seamlessly — no stretching, no gaps.
-fn create_padded_quad(width: f32, height: f32, padding: f32) -> Mesh {
-    let total_w = width + 2.0 * padding;
-    let total_h = height + 2.0 * padding;
-    let hw = total_w / 2.0;
-    let hh = total_h / 2.0;
-
-    // UV padding ratios — how far beyond 0-1 the UVs extend
-    let u_pad = padding / width;
-    let v_pad = padding / height;
-
-    // Vertex layout matches Bevy's Quad: positions in 2D plane, UV y-axis flipped
-    let positions: Vec<[f32; 3]> = vec![
-        [-hw, -hh, 0.0], // bottom-left
-        [-hw, hh, 0.0],  // top-left
-        [hw, hh, 0.0],   // top-right
-        [hw, -hh, 0.0],  // bottom-right
-    ];
-    let normals: Vec<[f32; 3]> = vec![[0.0, 0.0, 1.0]; 4];
-    let uvs: Vec<[f32; 2]> = vec![
-        [-u_pad, 1.0 + v_pad],      // bottom-left
-        [-u_pad, -v_pad],           // top-left
-        [1.0 + u_pad, -v_pad],      // top-right
-        [1.0 + u_pad, 1.0 + v_pad], // bottom-right
-    ];
-    let indices = vec![0u32, 1, 2, 0, 2, 3];
-
-    let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
-    mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
-    mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
-    mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
-    mesh.set_indices(Some(Indices::U32(indices)));
-    mesh
-}
-
-/// Calculate integer scale factor and viewport for pixel-perfect rendering
-/// Adjusts the game's aspect ratio to better match the monitor for optimal scaling
+/// Calculate pixel-perfect resolution by deriving game_height from the window size.
+/// Instead of forcing a fixed game_height into a viewport, we adjust game_height
+/// so that `window_height / game_height` is an exact integer (the scale factor).
+/// This means the camera renders to the full window — no viewport, no letterbox,
+/// and guaranteed integer texel-to-pixel mapping.
 fn calculate_pixel_perfect_resolution(window_width: f32, window_height: f32) -> ScreenResolution {
-    let base_height = GAME_HEIGHT;
-    let window_aspect = window_width / window_height;
-    let default_aspect = ASPECT_RATIO;
+    let target_height = GAME_HEIGHT;
 
-    // Allow adjusting the aspect ratio to better match the monitor
-    // Limit adjustment to ±10% to avoid breaking gameplay/UI
-    let max_aspect_adjustment = 0.10;
-    let min_aspect = default_aspect * (1.0 - max_aspect_adjustment);
-    let max_aspect = default_aspect * (1.0 + max_aspect_adjustment);
+    // Pick the integer scale closest to (window_height / target_height) that fits.
+    let scale = (window_height / target_height).floor().max(1.0) as u32;
 
-    // Use the window's aspect ratio (clamped) to minimize black bars
-    // This ensures the game's aspect ratio matches the monitor as closely as possible
-    // within the allowed adjustment range
-    let aspect_ratio = window_aspect.clamp(min_aspect, max_aspect);
+    // Derive the actual game dimensions so the window divides evenly.
+    // game_height * scale == window_height (exact), so each game unit == scale pixels.
+    let game_height = window_height / scale as f32;
+    let game_width = window_width / scale as f32;
+    let aspect_ratio = window_width / window_height;
 
-    // Calculate base width based on adjusted aspect ratio
-    // Keep height fixed to maintain consistent vertical gameplay
-    // Round to nearest integer for pixel-perfect rendering
-    let base_width = (base_height * aspect_ratio).round();
+    let render_width = window_width as u32;
+    let render_height = window_height as u32;
 
-    // Debug logging
     info!(
-        "Resolution calculation: window={}x{} (aspect={:.3}), default_aspect={:.3}, adjusted_aspect={:.3}, base={}x{}",
-        window_width, window_height, window_aspect, default_aspect, aspect_ratio, base_width, base_height
+        "Pixel-perfect resolution: window={}x{}, scale={}, game={}x{} (target_height was {})",
+        window_width, window_height, scale, game_width, game_height, target_height
     );
-
-    // Calculate the maximum integer scale that fits in each dimension
-    let scale_x = (window_width / base_width).floor() as u32;
-    let scale_y = (window_height / base_height).floor() as u32;
-
-    // For pixel-perfect rendering, we need to maintain the adjusted aspect ratio
-    // Start with the smaller scale to ensure everything fits within the window
-    let mut scale = scale_x.min(scale_y).max(1);
-
-    // If both dimensions give the same scale, we'll have black bars on all sides.
-    // Try using scale+1 to fill one dimension completely (the other will be cropped by window edges).
-    // This ensures we only have black bars on one axis, not both.
-    if scale_x == scale_y && scale > 0 {
-        let test_scale = scale + 1;
-        let test_width = base_width * test_scale as f32;
-        let test_height = base_height * test_scale as f32;
-
-        // Use the larger scale if at least one dimension still fits
-        // This will fill one dimension completely, with the other being cropped
-        if test_width <= window_width || test_height <= window_height {
-            scale = test_scale;
-            info!(
-                "Using larger scale {} to fill one dimension completely",
-                scale
-            );
-        }
-    }
-
-    // Calculate actual render texture size (must be integer)
-    let render_width = (base_width * scale as f32) as u32;
-    let render_height = (base_height * scale as f32) as u32;
-
-    // Debug logging
-    info!(
-        "Scale calculation: scale_x={}, scale_y={}, scale={}, render={}x{}, black_bars_h={:.1}, black_bars_v={:.1}",
-        scale_x, scale_y, scale, render_width, render_height,
-        window_width - render_width as f32,
-        window_height - render_height as f32
-    );
-
-    // Calculate viewport size (the actual displayed area)
-    let viewport_width = render_width as f32;
-    let viewport_height = render_height as f32;
-
-    // Calculate letterbox/pillarbox offset to center the viewport
-    // In world coordinates (center origin), the viewport should be centered at (0, 0)
-    // So the offset is 0 - the quad will be positioned at the origin
-    // The letterboxing happens automatically because the quad is smaller than the window
-    let viewport_offset = Vec2::ZERO;
 
     ScreenResolution {
         width: window_width,
         height: window_height,
-        game_width: base_width,
-        game_height: base_height,
-        aspect_ratio: aspect_ratio, // Use adjusted aspect ratio, not window aspect
+        game_width,
+        game_height,
+        aspect_ratio,
         scale,
         render_width,
         render_height,
-        viewport_offset,
-        viewport_size: Vec2::new(viewport_width, viewport_height),
+        viewport_offset: Vec2::ZERO,
+        viewport_size: Vec2::new(window_width, window_height),
     }
 }
 
-fn setup(
-    mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut game_render_materials: ResMut<Assets<ColorMaterial>>,
-    mut ui_render_materials: ResMut<Assets<UITextureMaterial>>,
-    mut images: ResMut<Assets<Image>>,
-    window_query: Query<&Window, With<PrimaryWindow>>,
-) {
+fn setup(mut commands: Commands, window_query: Query<&Window, With<PrimaryWindow>>) {
     let window = window_query.get_single().ok();
     let resolution = if let Some(window) = window {
-        let win_width = window.width();
-        let win_height = window.height();
-        info!("Window detected: {}x{}", win_width, win_height);
-        calculate_pixel_perfect_resolution(win_width, win_height)
+        let phys_w = window.resolution.physical_width() as f32;
+        let phys_h = window.resolution.physical_height() as f32;
+        info!(
+            "Window detected: physical={}x{}, logical={}x{}, scale_factor={:.2}",
+            phys_w,
+            phys_h,
+            window.width(),
+            window.height(),
+            window.resolution.scale_factor()
+        );
+        calculate_pixel_perfect_resolution(phys_w, phys_h)
     } else {
         info!("No window found, using default resolution");
         calculate_pixel_perfect_resolution(WIDTH, HEIGHT)
     };
-    info!(
-        "Final resolution resource: game_size={}x{}, render={}x{}, scale={}",
-        resolution.game_width,
-        resolution.game_height,
-        resolution.render_width,
-        resolution.render_height,
-        resolution.scale
-    );
     commands.insert_resource(resolution.clone());
 
-    let img_size = Extent3d {
-        width: resolution.render_width,
-        height: resolution.render_height,
-        ..default()
-    };
-
-    // This is the texture that will be rendered to.
-    let mut game_image = Image {
-        texture_descriptor: TextureDescriptor {
-            label: None,
-            size: img_size,
-            dimension: TextureDimension::D2,
-            format: TextureFormat::Bgra8UnormSrgb,
-            mip_level_count: 1,
-            sample_count: 1,
-            usage: TextureUsages::TEXTURE_BINDING
-                | TextureUsages::COPY_DST
-                | TextureUsages::RENDER_ATTACHMENT,
-            view_formats: &[],
-        },
-        ..default()
-    };
-    let mut ui_image = Image {
-        texture_descriptor: TextureDescriptor {
-            label: None,
-            size: img_size,
-            dimension: TextureDimension::D2,
-            format: TextureFormat::Bgra8UnormSrgb,
-            mip_level_count: 1,
-            sample_count: 1,
-            usage: TextureUsages::TEXTURE_BINDING
-                | TextureUsages::COPY_DST
-                | TextureUsages::RENDER_ATTACHMENT,
-            view_formats: &[],
-        },
-        ..default()
-    };
-
-    // fill image.data with zeroes
-    game_image.resize(img_size);
-    ui_image.resize(img_size);
-
-    let game_image_handle = images.add(game_image);
-    let ui_image_handle = images.add(ui_image);
-
-    // This specifies the layer used for the first pass, which will be attached to the first pass camera and cube.
-    let first_pass_layer = RenderLayers::layer(1);
-    let second_pass_layer = RenderLayers::layer(2);
-
-    commands.spawn((
-        Camera2dBundle {
-            camera: Camera {
-                // render before the "main pass" camera
-                order: -2,
-                target: RenderTarget::Image(game_image_handle.clone()),
-                ..default()
-            },
-            projection: OrthographicProjection {
-                scaling_mode: ScalingMode::FixedVertical(resolution.game_height),
-                scale: 1.0,
-                ..default()
-            },
-            ..default()
-        },
-        DoNotDespawnOnGameOver,
-        TextureCamera,
-        RawPosition::default(),
-    ));
-    commands.spawn((
-        Camera2dBundle {
-            camera: Camera {
-                // render before the "main pass" camera
-                order: -1,
-                target: RenderTarget::Image(ui_image_handle.clone()),
-                ..default()
-            },
-            camera_2d: Camera2d {
-                clear_color: ClearColorConfig::Custom(Color::rgba(0., 0., 0., 0.)),
-            },
-            projection: OrthographicProjection {
-                scaling_mode: ScalingMode::FixedVertical(resolution.game_height),
-                scale: 1.0,
-                ..default()
-            },
-            ..default()
-        },
-        DoNotDespawnOnGameOver,
-        RenderLayers::from_layers(&[3]),
-    ));
-
-    // This material has the texture that has been rendered.
-    let game_render_material_handle =
-        game_render_materials.add(ColorMaterial::from(game_image_handle));
-    let ui_render_material_handle = ui_render_materials.add(UITextureMaterial {
-        source_texture: Some(ui_image_handle),
-    });
-
-    // Padding for the display quads — prevents edge flickering from sub-pixel camera shifts.
-    // The max sub-pixel shift is (scale - epsilon) pixels, so we pad by `scale` on each side.
-    let quad_padding = resolution.scale as f32;
-
-    // Main pass quad, with material containing the rendered first pass texture.
-    // The padded quad extends slightly into the letterbox area. The padding uses
-    // ClampToEdge UV wrapping to repeat edge texels — no stretching, no gaps.
-    let _game_texture_image = commands
-        .spawn((
-            MaterialMesh2dBundle {
-                mesh: meshes
-                    .add(create_padded_quad(
-                        resolution.render_width as f32,
-                        resolution.render_height as f32,
-                        quad_padding,
-                    ))
-                    .into(),
-                transform: Transform {
-                    translation: Vec3::ZERO, // Centered at origin
-                    scale: Vec3::new(1., 1., 1.),
-                    ..default()
-                },
-                material: game_render_material_handle,
-                ..default()
-            },
-            TextureTarget,
-            DoNotDespawnOnGameOver,
-            first_pass_layer,
-        ))
-        .id();
-    let _ui_texture_image = commands
-        .spawn((
-            MaterialMesh2dBundle {
-                mesh: meshes
-                    .add(create_padded_quad(
-                        resolution.render_width as f32,
-                        resolution.render_height as f32,
-                        quad_padding,
-                    ))
-                    .into(),
-                transform: Transform {
-                    translation: Vec3::new(0., 0., 1.), // Slightly in front, centered at origin
-                    scale: Vec3::new(1., 1., 1.),
-                    ..default()
-                },
-                material: ui_render_material_handle,
-                ..default()
-            },
-            DoNotDespawnOnGameOver,
-            // TextureTarget,
-            second_pass_layer,
-        ))
-        .id();
-
-    // The main pass camera.
+    // Game camera — renders the game world directly to the full window.
+    // No viewport: game_height is derived from window_height / integer_scale,
+    // so the scaling is guaranteed integer.
     commands.spawn((
         Camera2dBundle {
             camera: Camera {
@@ -1297,7 +1020,7 @@ fn setup(
                 clear_color: ClearColorConfig::Custom(Color::BLACK),
             },
             projection: OrthographicProjection {
-                scaling_mode: ScalingMode::FixedVertical(resolution.height),
+                scaling_mode: ScalingMode::FixedVertical(resolution.game_height),
                 scale: 1.0,
                 ..default()
             },
@@ -1305,9 +1028,11 @@ fn setup(
         },
         DoNotDespawnOnGameOver,
         MainCamera,
-        GameUpscale(resolution.scale as f32),
-        first_pass_layer,
+        TextureCamera,
+        RawPosition::default(),
     ));
+
+    // UI camera — renders UI elements (layer 3) on top.
     commands.spawn((
         Camera2dBundle {
             camera: Camera {
@@ -1318,17 +1043,66 @@ fn setup(
                 clear_color: ClearColorConfig::None,
             },
             projection: OrthographicProjection {
-                scaling_mode: ScalingMode::FixedVertical(resolution.height),
+                scaling_mode: ScalingMode::FixedVertical(resolution.game_height),
                 scale: 1.0,
                 ..default()
             },
             ..default()
         },
-        UICamera,
         DoNotDespawnOnGameOver,
-        GameUpscale(resolution.scale as f32),
-        second_pass_layer,
+        UICamera,
+        RenderLayers::from_layers(&[3]),
     ));
+}
+
+/// Recalculates pixel-perfect scaling whenever the window or camera target size changes.
+/// Uses the actual Camera render target size (what wgpu renders to) instead of
+/// the window's reported size — these can differ on macOS Retina displays.
+fn update_pixel_perfect_viewport(
+    windows: Query<&Window, With<PrimaryWindow>>,
+    mut cameras: Query<
+        (&Camera, &mut OrthographicProjection),
+        Or<(With<TextureCamera>, With<UICamera>)>,
+    >,
+    mut last_size: Local<UVec2>,
+    mut resolution: ResMut<ScreenResolution>,
+) {
+    let Ok(window) = windows.get_single() else {
+        return;
+    };
+
+    // Use the camera's actual physical render target size.
+    // This is what wgpu is *really* rendering to — source of truth.
+    let target_size = cameras
+        .iter()
+        .next()
+        .and_then(|(cam, _)| cam.physical_target_size())
+        .unwrap_or(UVec2::new(
+            window.resolution.physical_width(),
+            window.resolution.physical_height(),
+        ));
+
+    if *last_size == target_size {
+        return;
+    }
+
+    info!(
+        "Render target changed: {}x{} -> {}x{} | window physical: {}x{}, logical: {:.0}x{:.0}, scale_factor: {:.3}",
+        last_size.x, last_size.y, target_size.x, target_size.y,
+        window.resolution.physical_width(),
+        window.resolution.physical_height(),
+        window.width(), window.height(),
+        window.resolution.scale_factor()
+    );
+    *last_size = target_size;
+
+    let new_res = calculate_pixel_perfect_resolution(target_size.x as f32, target_size.y as f32);
+
+    for (_, mut proj) in cameras.iter_mut() {
+        proj.scaling_mode = ScalingMode::FixedVertical(new_res.game_height);
+    }
+
+    *resolution = new_res;
 }
 
 trait AppExt {

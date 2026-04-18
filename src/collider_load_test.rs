@@ -127,13 +127,13 @@ fn collider_load_test_spawn_wave(
     let mut rng = rand::thread_rng();
     let non_boss_mobs = [
         // Mob::Slime,
-        // Mob::SpikeSlime,
+        Mob::SpikeSlime,
         // Mob::StoneGolem,
-        Mob::FurDevil,
+        // Mob::FurDevil,
         // Mob::StingFly,
         // Mob::Bushling,
         // Mob::Fairy,
-        // Mob::RedMushling,
+        Mob::RedMushling,
         // Mob::Crow,
     ];
 

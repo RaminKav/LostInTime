@@ -27,7 +27,7 @@ use crate::{
         projectile::{
             EnemyProjectile, PetProjectileMarker, Projectile, ProjectileState, RangedAttackEvent,
         },
-        Equipment, MainHand, WorldObject,
+        Equipment, ItemDrop, MainHand, WorldObject,
     },
     player::rogue_skills::LungeState,
     player::skill_heirlooms::Stealthed,
@@ -39,7 +39,7 @@ use crate::{
     CustomFlush, GameParam, GameState, Player, ScreenResolution,
 };
 use bevy::prelude::*;
-use bevy_rapier2d::prelude::{CollisionEvent, RapierContext};
+use bevy_rapier2d::prelude::{Collider, CollisionEvent, RapierContext};
 use rand::Rng;
 
 use crate::pets::state::Pet;
@@ -728,20 +728,21 @@ fn check_projectile_hit_player_collisions(
         }
     }
 }
+pub const ITEM_PICKUP_DISTANCE: f32 = 6.0;
+
 pub fn check_item_drop_collisions(
     mut commands: Commands,
-    player: Query<(Entity, &ManaRegen), With<Player>>,
-    allowed_targets: Query<
-        Entity,
+    player: Query<(&Transform, &ManaRegen), With<Player>>,
+    item_drops: Query<
+        (Entity, &Transform, &ItemStack),
         (
-            With<ItemStack>,
+            With<ItemDrop>,
             Without<MainHand>,
             Without<Equipment>,
             Without<TouchTriggerObjectAction>,
+            Without<Player>,
         ),
     >,
-    rapier_context: Res<RapierContext>,
-    items_query: Query<&ItemStack>,
     mut game: GameParam,
     mut inv: Query<&mut Inventory>,
     mut analytics: EventWriter<AnalyticsUpdateEvent>,
@@ -751,118 +752,124 @@ pub fn check_item_drop_collisions(
     mut chaos_tracker: ResMut<ChaosTracker>,
     mut flash_event: EventWriter<FlashExpBarEvent>,
 ) {
-    let (player_e, mana_regen) = player.single();
-    for (e1, e2, _) in rapier_context.intersections_with(player_e) {
-        for (e1, e2) in [(e1, e2), (e2, e1)] {
-            //if the player is colliding with an entity...
-            let Ok(_) = player.get(e1) else { continue };
-            if !allowed_targets.contains(e2) {
-                continue;
-            }
-            let item_stack = items_query.get(e2).unwrap().clone();
-            let obj = item_stack.obj_type;
-            if obj == WorldObject::TimeFragment || obj == WorldObject::Coin {
-                commands.spawn(UIIconMover::new(
-                    Vec3::new(0., 0., 9.),
-                    Vec3::new(
-                        -resolution.game_width / 2. + 15.,
-                        resolution.game_height / 2. - 50.
-                            + if obj == WorldObject::Coin { -12. } else { 0. },
-                        9.,
-                    ),
-                    obj,
-                    0.,
-                    800.,
-                    None,
-                    false,
-                    item_stack.clone(),
-                    true,
-                ));
-                commands.entity(e2).despawn_recursive();
-                analytics.send(AnalyticsUpdateEvent {
-                    update_type: AnalyticsTrigger::ItemCollected(obj),
-                });
-                text_timer.add_item(obj);
-                continue;
-            } else if obj == WorldObject::ManaOrb {
-                modify_mana_event.send(ModifyManaEvent(mana_regen.0));
-                analytics.send(AnalyticsUpdateEvent {
-                    update_type: AnalyticsTrigger::ItemCollected(obj),
-                });
-                commands.entity(e2).despawn_recursive();
-                commands.spawn(SoundSpawner::new(AudioSoundEffect::ItemPickup, 0.15));
-                continue;
-            } else if obj == WorldObject::XPShard
-                || obj == WorldObject::XPShardMedium
-                || obj == WorldObject::XPShardLarge
-            {
-                let mut xp_amount = match obj {
-                    WorldObject::XPShard => 20,
-                    WorldObject::XPShardMedium => 100,
-                    WorldObject::XPShardLarge => 500,
-                    _ => 0,
-                };
-                if *NO_XP {
-                    xp_amount = 0;
-                }
-                let player_skills = game.get_player_skills();
-                let mut player_level = game.get_player_level_mut();
-                let did_level = player_level.add_xp(xp_amount, &player_skills, &mut chaos_tracker);
+    let (player_txfm, mana_regen) = player.single();
+    let player_pos = player_txfm.translation.truncate();
 
-                // Send FlashExpBarEvent to update the XP bar UI
-                flash_event.send(FlashExpBarEvent {
-                    amount: xp_amount,
-                    did_level,
-                });
-
-                analytics.send(AnalyticsUpdateEvent {
-                    update_type: AnalyticsTrigger::ItemCollected(obj),
-                });
-                commands.entity(e2).despawn_recursive();
-                commands.spawn(SoundSpawner::new(AudioSoundEffect::ItemPickup, 0.15));
-                continue;
-            }
-            // ...and the entity is an item stack...
-            let inv_container = inv.single().items.clone();
-            if inv_container.get_first_empty_slot().is_none()
-                && inv_container
-                    .get_slot_for_item_in_container_with_space(&item_stack, None)
-                    .is_none()
-            {
-                return;
-            }
-            // ...and inventory has room, add it to the player's inventory
-
-            item_stack.add_to_inventory(&mut inv.single_mut().items, &mut game.inv_slot_query);
-
-            // Add item to notification queue (exclude currency items that have special handling)
-            if obj != WorldObject::TimeFragment
-                && obj != WorldObject::Coin
-                && obj != WorldObject::ManaOrb
-                && obj != WorldObject::XPShard
-                && obj != WorldObject::XPShardMedium
-                && obj != WorldObject::XPShardLarge
-            {
-                text_timer.add_item(obj);
-            }
-
+    for (e2, item_txfm, item_stack) in item_drops.iter() {
+        let item_pos = item_txfm.translation.truncate();
+        if player_pos.distance_squared(item_pos) > ITEM_PICKUP_DISTANCE * ITEM_PICKUP_DISTANCE {
+            continue;
+        }
+        let item_stack = item_stack.clone();
+        let obj = item_stack.obj_type;
+        if obj == WorldObject::TimeFragment || obj == WorldObject::Coin {
+            commands.spawn(UIIconMover::new(
+                Vec3::new(0., 0., 9.),
+                Vec3::new(
+                    -resolution.game_width / 2. + 15.,
+                    resolution.game_height / 2. - 50.
+                        + if obj == WorldObject::Coin { -12. } else { 0. },
+                    9.,
+                ),
+                obj,
+                0.,
+                800.,
+                None,
+                false,
+                item_stack.clone(),
+                true,
+            ));
             commands.entity(e2).despawn_recursive();
             analytics.send(AnalyticsUpdateEvent {
                 update_type: AnalyticsTrigger::ItemCollected(obj),
             });
+            text_timer.add_item(obj);
+            continue;
+        } else if obj == WorldObject::ManaOrb {
+            modify_mana_event.send(ModifyManaEvent(mana_regen.0));
+            analytics.send(AnalyticsUpdateEvent {
+                update_type: AnalyticsTrigger::ItemCollected(obj),
+            });
+            commands.entity(e2).despawn_recursive();
             commands.spawn(SoundSpawner::new(AudioSoundEffect::ItemPickup, 0.15));
+            continue;
+        } else if obj == WorldObject::XPShard
+            || obj == WorldObject::XPShardMedium
+            || obj == WorldObject::XPShardLarge
+        {
+            let mut xp_amount = match obj {
+                WorldObject::XPShard => 20,
+                WorldObject::XPShardMedium => 100,
+                WorldObject::XPShardLarge => 500,
+                _ => 0,
+            };
+            if *NO_XP {
+                xp_amount = 0;
+            }
+            let player_skills = game.get_player_skills();
+            let mut player_level = game.get_player_level_mut();
+            let did_level = player_level.add_xp(xp_amount, &player_skills, &mut chaos_tracker);
+
+            flash_event.send(FlashExpBarEvent {
+                amount: xp_amount,
+                did_level,
+            });
+
+            analytics.send(AnalyticsUpdateEvent {
+                update_type: AnalyticsTrigger::ItemCollected(obj),
+            });
+            commands.entity(e2).despawn_recursive();
+            commands.spawn(SoundSpawner::new(AudioSoundEffect::ItemPickup, 0.15));
+            continue;
         }
+        let inv_container = inv.single().items.clone();
+        if inv_container.get_first_empty_slot().is_none()
+            && inv_container
+                .get_slot_for_item_in_container_with_space(&item_stack, None)
+                .is_none()
+        {
+            return;
+        }
+
+        item_stack.add_to_inventory(&mut inv.single_mut().items, &mut game.inv_slot_query);
+
+        if obj != WorldObject::TimeFragment
+            && obj != WorldObject::Coin
+            && obj != WorldObject::ManaOrb
+            && obj != WorldObject::XPShard
+            && obj != WorldObject::XPShardMedium
+            && obj != WorldObject::XPShardLarge
+        {
+            text_timer.add_item(obj);
+        }
+
+        commands.entity(e2).despawn_recursive();
+        analytics.send(AnalyticsUpdateEvent {
+            update_type: AnalyticsTrigger::ItemCollected(obj),
+        });
+        commands.spawn(SoundSpawner::new(AudioSoundEffect::ItemPickup, 0.15));
     }
 }
 pub fn check_object_trigger_collisions(
     mut commands: Commands,
     player: Query<Entity, With<Player>>,
-    allowed_targets: Query<
+    player_txfm: Query<&Transform, With<Player>>,
+    allowed_targets_with_collider: Query<
         Entity,
         (
             Without<MainHand>,
             Without<Equipment>,
             With<TouchTriggerObjectAction>,
+            With<Collider>,
+        ),
+    >,
+    trigger_objects_no_collider: Query<
+        (Entity, &Transform, &TouchTriggerObjectAction),
+        (
+            Without<MainHand>,
+            Without<Equipment>,
+            Without<Player>,
+            Without<Collider>,
         ),
     >,
     rapier_context: Res<RapierContext>,
@@ -878,11 +885,13 @@ pub fn check_object_trigger_collisions(
         return;
     }
     let player_e = player.single();
+    let player_pos = player_txfm.single().translation.truncate();
+
+    // Collider-backed triggers (e.g. PinkFlower): use Rapier overlap so the sensor position matches gameplay.
     for (e1, e2, _) in rapier_context.intersections_with(player_e) {
         for (e1, e2) in [(e1, e2), (e2, e1)] {
-            //if the player is colliding with an entity...
             let Ok(_) = player.get(e1) else { continue };
-            if !allowed_targets.contains(e2) {
+            if !allowed_targets_with_collider.contains(e2) {
                 continue;
             }
             let action = items_query.get(e2).unwrap();
@@ -895,6 +904,22 @@ pub fn check_object_trigger_collisions(
 
             action.run_action(e2, &mut commands, &mut item_action_param);
         }
+    }
+
+    // No collider (e.g. chests using item_drop template): distance check only.
+    for (entity, obj_txfm, action) in trigger_objects_no_collider.iter() {
+        let obj_pos = obj_txfm.translation.truncate();
+        if player_pos.distance_squared(obj_pos) > ITEM_PICKUP_DISTANCE * ITEM_PICKUP_DISTANCE {
+            continue;
+        }
+
+        if matches!(action, TouchTriggerObjectAction::Bounce) {
+            if let Ok(mut anim) = flower_anim_query.get_mut(entity) {
+                anim.play();
+            }
+        }
+
+        action.run_action(entity, &mut commands, &mut item_action_param);
     }
 }
 fn check_mob_to_player_collisions(

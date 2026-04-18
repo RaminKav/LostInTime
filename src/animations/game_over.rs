@@ -29,8 +29,9 @@ use crate::{
         boss_health_bar::{BossHealthBar, BossHealthBarFrame, BossNameText},
         damage_numbers::spawn_text,
         key_input_guide::InteractGuide,
-        spawn_item_stack_icon, spawn_stats_tooltip_at, ui_helpers, CurrencyText, Interactable,
-        Interaction, MenuButton, TimeFragmentIcon, UIElement, UIState,
+        spawn_item_stack_icon, spawn_stats_tooltip_at,
+        ui_helpers::{self, Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND},
+        CurrencyText, Interactable, Interaction, MenuButton, TimeFragmentIcon, UIElement, UIState,
     },
     world::{
         dimension::{Era, EraManager},
@@ -121,7 +122,7 @@ pub fn handle_game_over_fadeout(
                     ..default()
                 },
                 transform: Transform {
-                    translation: Vec3::new(0., 0., 10.),
+                    translation: Vec3::new(0., 0., Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND + 10.),
                     scale: Vec3::new(1., 1., 1.),
                     ..Default::default()
                 },
@@ -142,7 +143,11 @@ pub fn handle_game_over_fadeout(
                     },
                 ),
                 transform: Transform {
-                    translation: Vec3::new(0., 100., 21.),
+                    translation: Vec3::new(
+                        0.,
+                        100.,
+                        Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND + 21.,
+                    ),
                     scale: Vec3::new(1., 1., 1.),
                     ..Default::default()
                 },
@@ -170,7 +175,7 @@ pub fn handle_game_over_fadeout(
                     },
                 ),
                 transform: Transform {
-                    translation: Vec3::new(0., 64., 21.), // Moved 30px higher
+                    translation: Vec3::new(0., 64., Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND + 21.), // Moved 30px higher
                     scale: Vec3::new(1., 1., 1.),
                     ..Default::default()
                 },
@@ -204,7 +209,7 @@ pub fn handle_game_over_fadeout(
                     },
                 ),
                 transform: Transform {
-                    translation: Vec3::new(0., 48., 21.), // Moved 30px higher
+                    translation: Vec3::new(0., 48., Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND + 21.), // Moved 30px higher
                     scale: Vec3::new(1., 1., 1.),
                     ..Default::default()
                 },
@@ -224,7 +229,11 @@ pub fn handle_game_over_fadeout(
             &mut commands,
             &asset_server,
             &damage_tracker,
-            Transform::from_translation(Vec3::new(panel_x + 42.0, start_y, 21.0)),
+            Transform::from_translation(Vec3::new(
+                panel_x + 42.0,
+                start_y,
+                Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND + 21.0,
+            )),
             0.0,
             84.0,
             Some(&pet_stats),
@@ -246,7 +255,11 @@ pub fn handle_game_over_fadeout(
                 )
                 .with_alignment(TextAlignment::Left),
                 text_anchor: Anchor::CenterLeft,
-                transform: Transform::from_translation(Vec3::new(stats_left_x, y_offset + 16., 21.)),
+                transform: Transform::from_translation(Vec3::new(
+                    stats_left_x,
+                    y_offset + 16.,
+                    Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND + 21.,
+                )),
                 ..default()
             },
             GameOverText,
@@ -270,7 +283,7 @@ pub fn handle_game_over_fadeout(
                         transform: Transform::from_translation(Vec3::new(
                             stats_left_x,
                             y_offset,
-                            21.,
+                            Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND + 21.,
                         )),
                         ..default()
                     },
@@ -294,7 +307,7 @@ pub fn handle_game_over_fadeout(
                 transform: Transform::from_translation(Vec3::new(
                     stats_left_x,
                     y_offset + 32.,
-                    21.,
+                    Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND + 21.,
                 )),
                 ..default()
             },
@@ -315,7 +328,7 @@ pub fn handle_game_over_fadeout(
                     transform: Transform::from_translation(Vec3::new(
                         panel_x + 42.,
                         y_offset + 48.,
-                        22.,
+                        Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND + 22.,
                     )),
                     ..default()
                 },
@@ -358,7 +371,11 @@ pub fn handle_game_over_fadeout(
                         custom_size: Some(Vec2::new(84., 18.)),
                         ..Default::default()
                     },
-                    transform: Transform::from_translation(Vec3::new(0., -99., 23.)),
+                    transform: Transform::from_translation(Vec3::new(
+                        0.,
+                        -99.,
+                        Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND + 23.,
+                    )),
                     ..Default::default()
                 },
                 Interactable::default(),

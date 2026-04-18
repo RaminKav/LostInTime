@@ -23,10 +23,9 @@ use bevy_aseprite::{anim::AsepriteAnimation, AsepriteBundle};
 
 use crate::item::ammo::Ammo;
 use bevy_proto::prelude::*;
-use bevy_rapier2d::prelude::{Collider, Sensor};
 use serde::{Deserialize, Serialize};
 
-pub const INVENTORY_SIZE: usize = 6 * 4;
+pub const INVENTORY_SIZE: usize = 8 * 4;
 pub const MAX_STACK_SIZE: usize = 9999;
 
 #[derive(Component, Debug, Default, Clone, Serialize, Deserialize)]
@@ -381,9 +380,6 @@ impl ItemStack {
             .insert(ItemDrop)
             .insert(Name::new("DropItem"))
             .insert(self.clone())
-            //TODO: double colliders??
-            .insert(Collider::cuboid(8., 8.))
-            .insert(Sensor)
             .insert(AnimationTimer(Timer::from_seconds(
                 0.1,
                 TimerMode::Repeating,
