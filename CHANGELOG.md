@@ -251,3 +251,18 @@ Heirlooms:
 
 - Snow biome for Era3
 - Add unique coloring in the minimap for each biome
+
+## 0.17.0
+
+- Remove Jam
+- nerf crit ring (25% -> 15%)
+- Add volume buttons to settings
+- Add auto attack keybind (auto casts weapon attack in direction of cursor)
+- Nerf Chaos increase from Era 2 and 3 (they should feel easier)
+- Nerf boss and stone golem hp
+- New desert enemies
+- Performance improvements (hopfully)
+- New inventory and crafting system
+- New hotbar system and keybinds
+- new food items/recipes
+- Pet auto selects in class selection
