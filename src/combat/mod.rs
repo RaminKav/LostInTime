@@ -37,6 +37,7 @@ use crate::{
         is_not_paused,
     },
     custom_commands::CommandsExt,
+    inventory::Inventory,
     enemy::{
         red_mushking::{AoEAttackState, DeathState, ReturnToShrineState, SummonAttackState},
         stone_golem::{SpikeAttackState, SpikeWarning},
@@ -443,7 +444,10 @@ pub fn handle_hits(
     mut hallucination_query: Query<&mut HallucinationStats, With<Player>>,
     mut attribute_events: EventWriter<AttributeChangeEvent>,
     asset_server: Res<AssetServer>,
-    mut player_blessing_mana_query: Query<(&OwnedBlessings, &mut CurrentMana), With<Player>>,
+    mut player_blessing_mana_query: Query<
+        (&OwnedBlessings, &mut CurrentMana, &Inventory),
+        With<Player>,
+    >,
 ) {
     for hit in hit_events.iter() {
         // is in invincibility frames from a previous hit
@@ -479,9 +483,30 @@ pub fn handle_hits(
                 hit.damage
             };
             if let Some(obj) = obj_option {
-                // Allow projectile damage only on breakable objects
+                // Skill projectiles (AoE, shouts, explosions, etc.) never satisfy tool gating -
+                // only regular attack projectiles can chop/mine when the player carries the tool.
+                let is_skill_projectile = hit
+                    .hit_with_projectile
+                    .as_ref()
+                    .map_or(false, |p| p.is_skill_projectile());
+
+                // Does the player have the tool required to break this object in any inventory slot?
+                let player_has_required_tool = if let Some(item_type_req) = hit_req_option {
+                    !is_skill_projectile
+                        && player_blessing_mana_query
+                            .get_single()
+                            .ok()
+                            .map_or(false, |(_, _, inv)| {
+                                inv.has_equipment_type(&item_type_req.0, &proto_param)
+                            })
+                } else {
+                    false
+                };
+
+                // Allow projectile damage on breakable objects, OR on tool-gated objects when the
+                // player carries the matching tool (e.g. axe in inventory lets arrows chop trees).
                 if hit.hit_with_projectile.is_some() && hit.hit_by_mob.is_none() {
-                    if !obj.is_breakable_by_projectile() {
+                    if !obj.is_breakable_by_projectile() && !player_has_required_tool {
                         continue;
                     }
                 }
@@ -490,19 +515,23 @@ pub fn handle_hits(
                     .unwrap_or(&SpriteAnchor(Vec2::ZERO));
                 let pos = world_pos_to_tile_pos(t.translation().truncate() - anchor.0);
 
-                //TODO: create breaks with tool component, instead of using properties
+                // Tool requirement: the player just needs the appropriate tool somewhere in their
+                // inventory for attacks to break the object. Fall back to the old main-hand check
+                // for compatibility (e.g. mob `ignore_tool: true` hits, or legacy hits where the
+                // tool was used directly as the melee weapon).
                 if let Some(item_type_req) = hit_req_option {
-                    if let Some(hit_item_type) = hit.hit_with_melee {
-                        if proto_param
-                            .get_component::<EquipmentType, _>(hit_item_type)
-                            .unwrap_or(&EquipmentType::None)
-                            != &item_type_req.0
-                            && !hit.ignore_tool
-                        {
+                    if !hit.ignore_tool && !player_has_required_tool {
+                        if let Some(hit_item_type) = hit.hit_with_melee {
+                            if proto_param
+                                .get_component::<EquipmentType, _>(hit_item_type)
+                                .unwrap_or(&EquipmentType::None)
+                                != &item_type_req.0
+                            {
+                                continue;
+                            }
+                        } else {
                             continue;
                         }
-                    } else if !hit.ignore_tool {
-                        continue;
                     }
                 }
                 hit_health.0 -= dmg;
@@ -601,7 +630,7 @@ pub fn handle_hits(
                     // ManaGuard blessing: 80% of damage comes from mana instead of health
                     let mana_guard_percentage = player_blessing_mana_query
                         .get_single()
-                        .map(|(b, _)| b.get_mana_guard_percentage())
+                        .map(|(b, _, _)| b.get_mana_guard_percentage())
                         .unwrap_or(0.0);
 
                     if is_player && mana_guard_percentage > 0.0 {
@@ -609,7 +638,7 @@ pub fn handle_hits(
                         let health_damage = damage_to_apply - mana_damage;
 
                         // Apply mana damage first
-                        if let Ok((_, mut current_mana)) =
+                        if let Ok((_, mut current_mana, _)) =
                             player_blessing_mana_query.get_single_mut()
                         {
                             let actual_mana_damage = mana_damage.min(current_mana.0);
@@ -626,7 +655,7 @@ pub fn handle_hits(
                     }
 
                     if is_player && game.has_skill(Heirloom::OnHitEcho) {
-                        if let Ok((_, mut current_mana)) =
+                        if let Ok((_, mut current_mana, _)) =
                             player_blessing_mana_query.get_single_mut()
                         {
                             let mana_cost = Heirloom::OnHitEcho.get_mana_cost();

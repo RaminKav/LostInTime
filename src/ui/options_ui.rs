@@ -73,9 +73,11 @@ pub struct KeyBindButton {
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum KeyBindType {
     ActiveSkill(usize),
+    /// Consume/use the item sitting in hotbar slot `usize` (0..=3).
+    /// Note this is not an "active slot" binding — there is no selected slot anymore.
+    Hotbar(usize),
     Inventory,
     Minimap,
-    QuickConsume(usize),
     AutoAttackToggle,
 }
 
@@ -196,11 +198,11 @@ pub fn handle_key_rebind_input(
                 KeyBindType::ActiveSkill(slot) => {
                     keybinds.set_active_skill_key(slot, InputBinding::KeyBinding(key))
                 }
+                KeyBindType::Hotbar(slot) => {
+                    keybinds.set_hotbar_key(slot, InputBinding::KeyBinding(key))
+                }
                 KeyBindType::Inventory => keybinds.set_inventory_key(InputBinding::KeyBinding(key)),
                 KeyBindType::Minimap => keybinds.set_minimap_key(InputBinding::KeyBinding(key)),
-                KeyBindType::QuickConsume(slot) => {
-                    keybinds.set_quick_consume_key(slot, InputBinding::KeyBinding(key))
-                }
                 KeyBindType::AutoAttackToggle => {
                     keybinds.set_auto_attack_toggle_key(InputBinding::KeyBinding(key))
                 }
@@ -224,14 +226,14 @@ pub fn handle_key_rebind_input(
                 KeyBindType::ActiveSkill(slot) => {
                     keybinds.set_active_skill_key(slot, InputBinding::MouseBinding(mouse_button))
                 }
+                KeyBindType::Hotbar(slot) => {
+                    keybinds.set_hotbar_key(slot, InputBinding::MouseBinding(mouse_button))
+                }
                 KeyBindType::Inventory => {
                     keybinds.set_inventory_key(InputBinding::MouseBinding(mouse_button))
                 }
                 KeyBindType::Minimap => {
                     keybinds.set_minimap_key(InputBinding::MouseBinding(mouse_button))
-                }
-                KeyBindType::QuickConsume(slot) => {
-                    keybinds.set_quick_consume_key(slot, InputBinding::MouseBinding(mouse_button))
                 }
                 KeyBindType::AutoAttackToggle => {
                     keybinds.set_auto_attack_toggle_key(InputBinding::MouseBinding(mouse_button))
@@ -277,9 +279,9 @@ pub fn update_keybind_text(
         } else {
             let key = match key_text.bind_type {
                 KeyBindType::ActiveSkill(slot) => keybinds.get_active_skill_key(slot),
+                KeyBindType::Hotbar(slot) => keybinds.get_hotbar_key(slot),
                 KeyBindType::Inventory => keybinds.get_inventory_key(),
                 KeyBindType::Minimap => keybinds.get_minimap_key(),
-                KeyBindType::QuickConsume(slot) => keybinds.get_quick_consume_key(slot),
                 KeyBindType::AutoAttackToggle => keybinds.get_auto_attack_toggle_key(),
             };
             text.sections[0].value = crate::keybinds::get_key_display_name(key);
@@ -387,8 +389,52 @@ pub fn setup_options_ui(
         );
     }
 
+    // Hotbar keybinds section (Hotbar consume/use keys for slots 0-3)
+    let hotbar_section_y = start_y + row_spacing * 4.5;
+    commands.spawn((
+        Text2dBundle {
+            text: Text::from_section(
+                "Hotbar Keybinds",
+                TextStyle {
+                    font: asset_server.load("fonts/alagard.ttf"),
+                    font_size: 15.0,
+                    color: crate::colors::DARK_WOOD_BROWN,
+                },
+            )
+            .with_alignment(TextAlignment::Left),
+            text_anchor: bevy::sprite::Anchor::CenterLeft,
+            transform: Transform::from_translation(Vec3::new(
+                left_side_x,
+                hotbar_section_y,
+                ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
+            )),
+            ..Default::default()
+        },
+        RenderLayers::from_layers(&[3]),
+        OptionsUI,
+        Name::new("Hotbar Keybind Section Title"),
+    ));
+
+    let hotbar_start_y = hotbar_section_y + row_spacing * 1.;
+    for slot in 0..4 {
+        let y = hotbar_start_y + row_spacing * slot as f32;
+        spawn_keybind_row(
+            &mut commands,
+            &graphics,
+            &asset_server,
+            KeyBindType::Hotbar(slot),
+            Vec3::new(left_side_x + 2., y, ui_helpers::Z_DEPTH_OPTIONS_CONTENT),
+            Vec3::new(
+                left_side_x + 160.,
+                y - 3.5,
+                ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
+            ),
+            &keybinds,
+        );
+    }
+
     // UI keybinds section
-    let ui_section_y = start_y + row_spacing * 4.5;
+    let ui_section_y = hotbar_start_y + row_spacing * 4.5;
     commands.spawn((
         Text2dBundle {
             text: Text::from_section(
@@ -472,49 +518,6 @@ pub fn setup_options_ui(
         ),
         &keybinds,
     );
-
-    // Quick consume section
-    let quick_consume_section_y = auto_attack_y + row_spacing * 1.5;
-    commands.spawn((
-        Text2dBundle {
-            text: Text::from_section(
-                "Quick Use Keybinds",
-                TextStyle {
-                    font: asset_server.load("fonts/alagard.ttf"),
-                    font_size: 15.0,
-                    color: crate::colors::DARK_WOOD_BROWN,
-                },
-            )
-            .with_alignment(TextAlignment::Left),
-            text_anchor: bevy::sprite::Anchor::CenterLeft,
-            transform: Transform::from_translation(Vec3::new(
-                left_side_x,
-                quick_consume_section_y,
-                ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
-            )),
-            ..Default::default()
-        },
-        RenderLayers::from_layers(&[3]),
-        OptionsUI,
-        Name::new("Quick Use Keybind Section Title"),
-    ));
-
-    for slot in 1..=2usize {
-        let y = quick_consume_section_y + row_spacing * (slot as f32);
-        spawn_keybind_row(
-            &mut commands,
-            &graphics,
-            &asset_server,
-            KeyBindType::QuickConsume(slot),
-            Vec3::new(left_side_x + 2., y, ui_helpers::Z_DEPTH_OPTIONS_CONTENT),
-            Vec3::new(
-                left_side_x + 160.,
-                y - 3.5,
-                ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
-            ),
-            &keybinds,
-        );
-    }
 
     // Cheats section
     let cheats_section_y = 90.;
@@ -760,17 +763,19 @@ fn spawn_keybind_row(
             };
             (label, keybinds.get_active_skill_key(slot))
         }
+        KeyBindType::Hotbar(slot) => {
+            let label = match slot {
+                0 => "Hotbar 1:",
+                1 => "Hotbar 2:",
+                2 => "Hotbar 3:",
+                3 => "Hotbar 4:",
+                _ => "Unknown Hotbar",
+            };
+            (label, keybinds.get_hotbar_key(slot))
+        }
         KeyBindType::Inventory => ("Inventory:", keybinds.get_inventory_key()),
         KeyBindType::Minimap => ("Map:", keybinds.get_minimap_key()),
         KeyBindType::AutoAttackToggle => ("Auto Attack:", keybinds.get_auto_attack_toggle_key()),
-        KeyBindType::QuickConsume(slot) => {
-            let label = match slot {
-                1 => "Quick Use Slot 2:",
-                2 => "Quick Use Slot 3:",
-                _ => "Quick Use:",
-            };
-            (label, keybinds.get_quick_consume_key(slot))
-        }
     };
 
     commands.spawn((

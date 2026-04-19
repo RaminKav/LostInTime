@@ -18,7 +18,10 @@ use crate::{
     attributes::attribute_helpers::{build_item_stack_with_parsed_attributes, get_rarity_rng},
     blessings::{Blessing, HeirloomStatsBonuses, OwnedBlessings},
     client::{is_not_paused, GameOverEvent},
-    colors::{GREY, LIGHT_BLUE, LIGHT_GREY, LIGHT_RED, ORANGE, UNCOMMON_GREEN},
+    colors::{
+        COMMON_TOOLTIP_TITLE, GREY, LEGENDARY_TOOLTIP_TITLE, LIGHT_BLUE, LIGHT_GREY, LIGHT_RED,
+        ORANGE, RARE_TOOLTIP_TITLE, UNCOMMON_TOOLTIP_TITLE,
+    },
     inputs::player_move_inputs,
     inventory::{Inventory, ItemStack},
     item::{BonusStatLine, Equipment, EquipmentType, WorldObject},
@@ -37,10 +40,9 @@ use crate::{
     ui::{
         scrapper_ui::{Scrap, ScrapsInto},
         stats_ui::StatsButtonState,
-        DropOnSlotEvent, InventoryState, RemoveFromSlotEvent, ShowInvPlayerStatsEvent, UIElement,
-        UIState,
+        DropOnSlotEvent, RemoveFromSlotEvent, ShowInvPlayerStatsEvent, UIElement, UIState,
     },
-    CustomFlush, Game, GameParam, GameState, Player, TextureCamera,
+    CustomFlush, GameParam, GameState, Player, TextureCamera,
 };
 use modifiers::*;
 pub mod attribute_helpers;
@@ -48,8 +50,7 @@ pub mod consumable_buffs;
 pub mod hunger;
 pub use consumable_buffs::{
     merge_intrinsic_stats_with_consumable_buff_layer, summarize_active_consumable_buffs,
-    tick_active_consumable_buffs, ActiveConsumableBuffs, ConsumableBuffAttributeSummary,
-    ConsumableBuffEffect, ConsumableBuffEntry,
+    tick_active_consumable_buffs, ActiveConsumableBuffs, ConsumableBuffEffect, ConsumableBuffEntry,
 };
 use hunger::*;
 pub mod item_abilities;
@@ -1038,10 +1039,10 @@ impl ItemRarity {
     }
     pub fn get_color(&self) -> Color {
         match self {
-            ItemRarity::Common => LIGHT_GREY,
-            ItemRarity::Uncommon => UNCOMMON_GREEN,
-            ItemRarity::Rare => LIGHT_BLUE,
-            ItemRarity::Legendary => LIGHT_RED,
+            ItemRarity::Common => COMMON_TOOLTIP_TITLE,
+            ItemRarity::Uncommon => UNCOMMON_TOOLTIP_TITLE,
+            ItemRarity::Rare => RARE_TOOLTIP_TITLE,
+            ItemRarity::Legendary => LEGENDARY_TOOLTIP_TITLE,
         }
     }
     pub fn get_next_rarity(&self) -> ItemRarity {
@@ -1055,8 +1056,8 @@ impl ItemRarity {
     pub fn get_item_glow(&self) -> Option<ItemGlow> {
         match self {
             ItemRarity::Common => None,
-            ItemRarity::Uncommon => Some(ItemGlow::Green),
-            ItemRarity::Rare => Some(ItemGlow::Blue),
+            ItemRarity::Uncommon => Some(ItemGlow::Blue),
+            ItemRarity::Rare => Some(ItemGlow::Purple),
             ItemRarity::Legendary => Some(ItemGlow::Red),
         }
     }
@@ -1668,21 +1669,24 @@ pub fn regen_shield(
     }
 }
 
-///Tracks player held item changes, spawns new held item entity and updates player attributes
+///Tracks player held item changes, spawns new held item entity and updates player attributes.
+///
+/// The equipped weapon is sourced from the `Inventory::weapon_items` single-slot container
+/// (populated by dropping a weapon onto the Weapon slot in the equipment panel). Previously
+/// this read from `items[active_hotbar_slot]`, but the "selected hotbar slot" concept was
+/// removed — the Weapon slot is the sole source of truth for the player's main hand.
 fn update_attributes_with_held_item_change(
     mut commands: Commands,
     mut game_param: GameParam,
-    inv_state: Res<InventoryState>,
     mut inv: Query<&mut Inventory>,
     item_stack_query: Query<&ItemAttributes>,
     mut att_event: EventWriter<AttributeChangeEvent>,
     proto: ProtoParam,
 ) {
-    let active_hotbar_slot = inv_state.active_hotbar_slot;
-    let active_hotbar_item = inv.single_mut().items.items[active_hotbar_slot].clone();
+    let equipped_weapon = inv.single_mut().weapon_items.items[0].clone();
     let player_data = game_param.player_mut();
     let prev_held_item_data = &player_data.main_hand_slot;
-    if let Some(new_item) = active_hotbar_item {
+    if let Some(new_item) = equipped_weapon {
         let new_item_stack = new_item.item_stack.clone();
         if let Some(current_item) = prev_held_item_data {
             let Ok(curr_attributes) = item_stack_query.get(current_item.entity) else {

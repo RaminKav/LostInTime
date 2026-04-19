@@ -302,7 +302,7 @@ pub fn auto_fetch_leaderboard_on_menu(
 
     // Fetch every time we enter the main menu
     events.send(FetchLeaderboardEvent {
-        limit: 5,
+        limit: 10,
         class_filter: None,
     });
 

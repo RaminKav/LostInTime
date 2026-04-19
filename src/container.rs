@@ -1,7 +1,10 @@
 use std::cmp::min;
 
 use crate::{
-    inventory::{InventoryError, InventoryItemStack, ItemStack, MAX_STACK_SIZE},
+    inventory::{
+        InventoryError, InventoryItemStack, ItemStack, MAX_STACK_SIZE, INVENTORY_HOTBAR_SLOTS,
+        INVENTORY_SIZE,
+    },
     item::{CraftedItemEvent, WorldObject},
     ui::{mark_slot_dirty, InventorySlotState, InventorySlotType, UIContainersParam},
     world::TileMapPosition,
@@ -11,6 +14,35 @@ use bevy::{prelude::*, utils::HashMap};
 use serde::{Deserialize, Serialize};
 
 pub const CONTAINER_UNIT: Option<InventoryItemStack> = None;
+
+/// Main player inventory grid is row-major with 4 columns; row 0 is the **bottom** row of the UI.
+/// Bag slots (`INVENTORY_HOTBAR_SLOTS..`) fill **top to bottom** when picking an empty slot.
+fn player_main_inv_bag_slots_top_to_bottom(len: usize) -> impl Iterator<Item = usize> {
+    const COLS: usize = 4;
+    debug_assert_eq!(len, INVENTORY_SIZE);
+    debug_assert_eq!(len % COLS, 0);
+    let rows = len / COLS;
+    (0..rows).flat_map(move |rt| {
+        let rb = rows - 1 - rt;
+        (0..COLS).filter_map(move |c| {
+            let idx = rb * COLS + c;
+            if idx >= INVENTORY_HOTBAR_SLOTS && idx < len {
+                Some(idx)
+            } else {
+                None
+            }
+        })
+    })
+}
+
+fn first_empty_player_main_inventory(c: &Container) -> Option<usize> {
+    let len = c.items.len();
+    (0..INVENTORY_HOTBAR_SLOTS.min(len))
+        .find(|&i| c.items[i].is_none())
+        .or_else(|| {
+            player_main_inv_bag_slots_top_to_bottom(len).find(|&i| c.items[i].is_none())
+        })
+}
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct Container {
@@ -36,20 +68,30 @@ impl Container {
         self
     }
     pub fn get_first_empty_slot(&self) -> Option<usize> {
-        //TODO: maybe move the actual inv to a type in this file, and move this fn into that struct
-        (0..self.items.len()).find(|&i| self.items[i].is_none())
+        if self.items.len() == INVENTORY_SIZE {
+            first_empty_player_main_inventory(self)
+        } else {
+            (0..self.items.len()).find(|&i| self.items[i].is_none())
+        }
     }
     pub fn get_first_empty_hotbar_slot(&self) -> Option<usize> {
-        (0..6).find(|&i| self.items[i].is_none())
+        (0..INVENTORY_HOTBAR_SLOTS.min(self.items.len())).find(|&i| self.items[i].is_none())
     }
 
-    /// First empty hotbar slot excluding quick-use slots (1, 2, 3). Used so shift-click
-    /// and auto-moves do not place items into slots the player reserves for quick keys.
+    /// First empty hotbar slot excluding quick-use slots (0-3, bound to keys 1-4).
+    /// Used so shift-click and auto-moves do not place items into slots the player
+    /// reserves for quick-consume keys.
     pub fn get_first_empty_hotbar_slot_excluding_quick_use(&self) -> Option<usize> {
-        [0, 4, 5].into_iter().find(|&i| self.items[i].is_none())
+        [4, 5].into_iter().find(|&i| self.items[i].is_none())
     }
     pub fn get_first_empty_non_hotbar_slot(&self) -> Option<usize> {
-        (6..self.items.len()).find(|&i| self.items[i].is_none())
+        if self.items.len() == INVENTORY_SIZE {
+            player_main_inv_bag_slots_top_to_bottom(self.items.len())
+                .find(|&i| self.items[i].is_none())
+        } else {
+            (INVENTORY_HOTBAR_SLOTS.min(self.items.len())..self.items.len())
+                .find(|&i| self.items[i].is_none())
+        }
     }
 
     pub fn get_slot_for_item_in_container(&self, obj: &WorldObject) -> Option<usize> {
@@ -127,7 +169,7 @@ impl Container {
     /// use only on inventory container
     pub fn move_item_from_hotbar_to_inv_or_vice_versa(&mut self, slot: usize) {
         let inv_item = self.items[slot].clone();
-        let is_from_hotbar = slot < 6;
+        let is_from_hotbar = slot < INVENTORY_HOTBAR_SLOTS;
         if let Some(mut inv_item_stack) = inv_item {
             let stack_count = inv_item_stack.item_stack.count;
             if let Some(existing_item_slot) = Self::get_slot_for_item_in_container_with_space(
@@ -135,14 +177,14 @@ impl Container {
                 &inv_item_stack.item_stack,
                 Some(slot),
             ) {
-                if is_from_hotbar && existing_item_slot < 6 {
+                if is_from_hotbar && existing_item_slot < INVENTORY_HOTBAR_SLOTS {
                     if let Some(next_avail_inv_slot) = Self::get_first_empty_non_hotbar_slot(self) {
                         self.items[next_avail_inv_slot] =
                             Some(inv_item_stack.modify_slot(next_avail_inv_slot));
                         self.items[slot] = None;
                     }
                     return;
-                } else if !is_from_hotbar && existing_item_slot >= 6 {
+                } else if !is_from_hotbar && existing_item_slot >= INVENTORY_HOTBAR_SLOTS {
                     if let Some(next_avail_hotbar_slot) = Self::get_first_empty_hotbar_slot(self) {
                         self.items[next_avail_hotbar_slot] =
                             Some(inv_item_stack.modify_slot(next_avail_hotbar_slot));

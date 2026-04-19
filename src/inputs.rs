@@ -21,7 +21,6 @@ use crate::player::skills::{
 };
 use crate::ui::key_input_guide::InteractionGuideTrigger;
 use crate::world::dimension::{DimensionSpawnEvent, Era};
-use bevy::input::mouse::MouseWheel;
 use bevy::prelude::*;
 use bevy::transform::TransformSystem;
 use bevy::window::PrimaryWindow;
@@ -50,9 +49,8 @@ use crate::item::projectile::{RangedAttack, RangedAttackEvent};
 use crate::item::{Equipment, WorldObject};
 use crate::proto::proto_param::ProtoParam;
 use crate::ui::{
-    change_hotbar_slot,
     tips::{Tip, TipEvent},
-    EssenceShopChoices, FlashExpBarEvent, InventoryState, UIState,
+    EssenceShopChoices, FlashExpBarEvent, UIState,
 };
 use crate::world::chunk::Chunk;
 
@@ -61,7 +59,7 @@ use crate::world::world_helpers::world_pos_to_tile_pos;
 use crate::player::ice_slide::{clear_ice_slide_when_stuck, tick_ice_slide_movement};
 use crate::{
     bounce_player, update_bounce_effect, update_shadow, BounceEffect, BounceEvent, Game,
-    InputMappings, Player, ScreenResolution, UpdatePetWeaponEvent, DEBUG, PLAYER_DASH_SPEED,
+    InputMappings, Player, ScreenResolution, DEBUG, PLAYER_DASH_SPEED,
     TIME_STEP,
 };
 use crate::{
@@ -69,14 +67,9 @@ use crate::{
     RawPosition, TextureCamera, UICamera, PLAYER_MOVE_SPEED,
 };
 
-const HOTBAR_KEYCODES: [KeyCode; 6] = [
-    KeyCode::Key1,
-    KeyCode::Key2,
-    KeyCode::Key3,
-    KeyCode::Key4,
-    KeyCode::Key5,
-    KeyCode::Key6,
-];
+/// Number of hotbar slots that are bound to a consume/use key. Keep in sync with the
+/// HUD's `HUD_HOTBAR_SLOTS` and the `InputMappings::hotbar_slot_*` fields.
+pub const HOTBAR_CONSUME_SLOT_COUNT: usize = 4;
 pub struct InputsPlugin;
 
 impl Plugin for InputsPlugin {
@@ -93,7 +86,7 @@ impl Plugin for InputsPlugin {
                 (
                     bounce_player.run_if(is_not_paused),
                     update_shadow.run_if(is_not_paused),
-                    update_bounce_effect.before(handle_hotbar_key_input),
+                    update_bounce_effect,
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
@@ -104,13 +97,11 @@ impl Plugin for InputsPlugin {
                     toggle_auto_attack.run_if(is_not_paused),
                     mouse_click_system.run_if(is_not_paused).after(CustomFlush),
                     dispatch_active_skill_events.run_if(is_not_paused),
-                    handle_hotbar_key_input,
+                    handle_hotbar_consume_keys.run_if(is_not_paused),
                     tick_dash_timer.run_if(is_not_paused),
                     manage_ability_phasing.run_if(is_not_paused),
                     handle_open_essence_ui,
                     diagnostics,
-                    handle_quick_hotbar_consume.before(handle_hotbar_key_input),
-                    handle_mapped_quick_consume.run_if(is_not_paused),
                     handle_interact_objects.run_if(is_not_paused),
                 )
                     .in_set(OnUpdate(GameState::Main)),
@@ -629,7 +620,15 @@ pub fn toggle_inventory(
     if keybinds.check_inv_input(&key_input, &mouse_input) {
         // Don't allow opening inventory while item chest is open
         if curr_ui_state.0 != UIState::ItemChest {
-            next_ui_state.set(UIState::Inventory);
+            // Closing the inventory from `InventoryCrafting` still acts as a toggle off.
+            // `handle_new_ui_state` maps a no-op transition (next == current) to `Closed`,
+            // so re-using the current state here hands that off correctly.
+            let target = if curr_ui_state.0 == UIState::InventoryCrafting {
+                UIState::InventoryCrafting
+            } else {
+                UIState::Inventory
+            };
+            next_ui_state.set(target);
 
             if let Ok(inventory) = inv.get_single() {
                 let occupied_slots = inventory
@@ -752,73 +751,12 @@ pub fn toggle_inventory(
         }
     }
 }
-fn handle_hotbar_key_input(
-    mut game: GameParam,
-    key_input: ResMut<Input<KeyCode>>,
-    mut mouse_wheel_event: EventReader<MouseWheel>,
-    mut inv_state: ResMut<InventoryState>,
-    mut events: EventWriter<UpdatePetWeaponEvent>,
-) {
-    for e in mouse_wheel_event.iter() {
-        if e.y > 0. {
-            change_hotbar_slot(
-                (inv_state.active_hotbar_slot + 5) % 6,
-                &mut inv_state,
-                &mut game.inv_slot_query,
-            );
-            events.send(UpdatePetWeaponEvent);
-        } else if e.y < 0. {
-            change_hotbar_slot(
-                (inv_state.active_hotbar_slot + 1) % 6,
-                &mut inv_state,
-                &mut game.inv_slot_query,
-            );
-            events.send(UpdatePetWeaponEvent);
-        }
-    }
-    for (slot, key) in HOTBAR_KEYCODES.iter().enumerate() {
-        if key_input.just_pressed(*key) {
-            change_hotbar_slot(slot, &mut inv_state, &mut game.inv_slot_query);
-            events.send(UpdatePetWeaponEvent);
-        }
-    }
-}
-
-pub fn handle_quick_hotbar_consume(
-    mut key_input: ResMut<Input<KeyCode>>,
-    mut game: GameParam,
-    proto_param: ProtoParam,
-    mut commands: Commands,
-    inv: Query<&mut Inventory>,
-    mut item_action_param: ItemActionParam,
-) {
-    let shift_key_pressed =
-        key_input.pressed(KeyCode::LShift) || key_input.pressed(KeyCode::RShift);
-    let hot_bar_key_pressed = HOTBAR_KEYCODES.iter().any(|k| key_input.just_pressed(*k));
-    if shift_key_pressed && hot_bar_key_pressed {
-        let hotbar_slot = HOTBAR_KEYCODES
-            .iter()
-            .position(|k| key_input.just_pressed(*k))
-            .unwrap();
-        key_input.clear_just_pressed(HOTBAR_KEYCODES[hotbar_slot]);
-        let held_item_option = inv.single().items.items[hotbar_slot].clone();
-        if let Some(held_item) = held_item_option {
-            let held_obj = *held_item.get_obj();
-            if let Some(item_actions) = proto_param.get_component::<ItemActions, _>(held_obj) {
-                item_actions.run_action(
-                    held_obj,
-                    held_item.slot,
-                    Some(&held_item.item_stack),
-                    &mut item_action_param,
-                    &mut game,
-                    &proto_param,
-                    &mut commands,
-                );
-            }
-        }
-    }
-}
-pub fn handle_mapped_quick_consume(
+/// The user-configurable hotbar keys (defaults `1`-`4`) directly consume / use the item
+/// stored in hotbar slots 0-3. There is no longer a "selected hotbar slot" concept — pressing
+/// the key for slot `i` runs the `ItemActions` of the item currently in `items.items[i]`.
+///
+/// Slots 4-5 are still part of the hotbar container for passive storage but have no binding.
+pub fn handle_hotbar_consume_keys(
     key_input: Res<Input<KeyCode>>,
     mouse_input: Res<Input<MouseButton>>,
     keybinds: Res<InputMappings>,
@@ -828,25 +766,27 @@ pub fn handle_mapped_quick_consume(
     inv: Query<&Inventory>,
     mut item_action_param: ItemActionParam,
 ) {
-    // Hotbar slots are 0-indexed; "slot 2" and "slot 3" in UI are indices 1 and 2
-    for slot in 1..=2usize {
-        if keybinds.check_quick_consume_input(slot, &key_input, &mouse_input) {
-            let held_item_option = inv.single().items.items[slot].clone();
-            if let Some(held_item) = held_item_option {
-                let held_obj = *held_item.get_obj();
-                if let Some(item_actions) = proto_param.get_component::<ItemActions, _>(held_obj) {
-                    item_actions.run_action(
-                        held_obj,
-                        held_item.slot,
-                        Some(&held_item.item_stack),
-                        &mut item_action_param,
-                        &mut game,
-                        &proto_param,
-                        &mut commands,
-                    );
-                }
-            }
+    for slot in 0..HOTBAR_CONSUME_SLOT_COUNT {
+        if !keybinds.check_hotbar_input(slot, &key_input, &mouse_input) {
+            continue;
         }
+        let held_item_option = inv.single().items.items[slot].clone();
+        let Some(held_item) = held_item_option else {
+            continue;
+        };
+        let held_obj = *held_item.get_obj();
+        let Some(item_actions) = proto_param.get_component::<ItemActions, _>(held_obj) else {
+            continue;
+        };
+        item_actions.run_action(
+            held_obj,
+            held_item.slot,
+            Some(&held_item.item_stack),
+            &mut item_action_param,
+            &mut game,
+            &proto_param,
+            &mut commands,
+        );
     }
 }
 
@@ -925,12 +865,9 @@ pub fn mouse_click_system(
         ),
         With<Player>,
     >,
-    mut inv: Query<&mut Inventory>,
-    inv_state: Res<InventoryState>,
     ui_state: Res<State<UIState>>,
     ranged_query: Query<(&WorldObject, &RangedAttack), With<Equipment>>,
     mut ranged_attack_event: EventWriter<RangedAttackEvent>,
-    mut item_action_param: ItemActionParam,
     ammo_query_any: Query<&Ammo>,
     auto_attack: Res<AutoAttackState>,
 ) {
@@ -942,26 +879,6 @@ pub fn mouse_click_system(
     let player_pos = game.player().position;
     let (player_e, attack_timer_option, player_anim, blessings, mut current_mana) =
         player_query.single_mut();
-
-    if mouse_button_input.just_pressed(MouseButton::Left) {
-        let hotbar_slot = inv_state.active_hotbar_slot;
-        let held_item_option = inv.single().items.items[hotbar_slot].clone();
-        if let Some(held_item) = held_item_option {
-            let held_obj = *held_item.get_obj();
-            if let Some(item_actions) = proto_param.get_component::<ItemActions, _>(held_obj) {
-                item_actions.run_action(
-                    held_obj,
-                    held_item.slot,
-                    Some(&held_item.item_stack),
-                    &mut item_action_param,
-                    &mut game,
-                    &proto_param,
-                    &mut commands,
-                );
-                return;
-            }
-        }
-    }
 
     // Hit Item, send attack event
     if mouse_button_input.pressed(MouseButton::Left) || auto_attack.0 {

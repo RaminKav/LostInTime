@@ -60,9 +60,8 @@ use crate::{
         hunger::{Hunger, HungerTracker},
         modifiers::handle_modify_health_event,
         ActiveConsumableBuffs, Attack, AttackCooldown, AttributeQuality, AttributeValue,
-        BonusAttackSpeed, CritChance,
-        CritDamage, CurrentMana, HealthRegen, InvincibilityCooldown, ItemAttributes, ManaRegen,
-        MaxHealth, MaxMana, PlayerAttributeBundle, ShieldRegen,
+        BonusAttackSpeed, CritChance, CritDamage, CurrentMana, HealthRegen, InvincibilityCooldown,
+        ItemAttributes, ManaRegen, MaxHealth, MaxMana, PlayerAttributeBundle, ShieldRegen,
     },
     blessings::{HeirloomStatsBonuses, OwnedBlessings},
     client::is_not_paused,
@@ -86,9 +85,7 @@ use crate::{
 use skills::*;
 
 use self::{
-    levels::{
-        handle_level_up, hide_particles_when_inv_open, spawn_particles_when_leveling, PlayerLevel,
-    },
+    levels::{handle_level_up, hide_particles_when_inv_open, PlayerLevel},
     stats::{send_attribute_event_on_stats_update, PlayerStats, SkillPoints},
 };
 pub struct PlayerPlugin;
@@ -180,7 +177,6 @@ impl Plugin for PlayerPlugin {
                     send_attribute_event_on_stats_update,
                     handle_level_up,
                     handle_toggle_sprinting,
-                    spawn_particles_when_leveling,
                     handle_teleport
                         .run_if(is_not_paused)
                         .before(skill_heirlooms::handle_active_skill_event),
@@ -410,9 +406,12 @@ fn spawn_player(
                     .with_item_in_slot(3, cape_stack.clone())
                     .clone(),
                 accessory_items: Container::with_size(4),
+                weapon_items: Container::with_size(1),
+                pet_items: Container::with_size(1),
                 crafting_items: Container::with_size(0),
                 furnace_items: Container::with_size(2),
                 trash_items: Container::with_size(1),
+                crafting_inputs_items: Container::with_size(3),
             },
             //TODO: remove itematt and construct from components?
             ItemAttributes {

@@ -1,5 +1,7 @@
 use bevy::prelude::Color;
 
+use crate::attributes::ItemRarity;
+
 pub const RED: Color = Color::rgba(145. / 255., 54. / 255., 54. / 255., 1.);
 pub const DMG_NUM_RED: Color = Color::rgba(179. / 255., 61. / 255., 61. / 255., 1.);
 pub const DMG_NUM_GREEN: Color = Color::rgba(185. / 255., 185. / 255., 110. / 255., 1.);
@@ -42,6 +44,16 @@ pub const SNOW_WATER: Color = Color::rgba(19. / 255., 67. / 255., 127. / 255., 1
 pub const SNOW_DARK: Color = Color::rgba(73. / 255., 105. / 255., 117. / 255., 1.);
 pub const SNOW_BLUE: Color = Color::rgba(81. / 255., 176. / 255., 213. / 255., 1.);
 pub const SNOW_GREEN: Color = Color::rgba(86. / 255., 128. / 255., 66. / 255., 1.);
+
+pub const STATS_TITLE: Color = Color::rgba(199. / 255., 235. / 255., 243. / 255., 1.);
+pub const HOTBAR_TITLE: Color = Color::rgba(255. / 255., 191. / 255., 153. / 255., 1.);
+pub const EQUIP_TITLE: Color = Color::rgba(72. / 255., 40. / 255., 26. / 255., 1.);
+pub const CRAFT_BUTTON_TEXT: Color = Color::rgba(225. / 255., 224. / 255., 164. / 255., 1.);
+
+pub const COMMON_TOOLTIP_TITLE: Color = Color::rgba(225. / 255., 222. / 255., 231. / 255., 1.);
+pub const UNCOMMON_TOOLTIP_TITLE: Color = Color::rgba(186. / 255., 243. / 255., 234. / 255., 1.);
+pub const RARE_TOOLTIP_TITLE: Color = Color::rgba(234. / 255., 140. / 255., 245. / 255., 1.);
+pub const LEGENDARY_TOOLTIP_TITLE: Color = Color::rgba(233. / 255., 149. / 255., 7. / 255., 1.);
 
 pub fn overwrite_alpha(color: Color, alpha: f32) -> Color {
     Color::rgba(color.r(), color.g(), color.b(), alpha)

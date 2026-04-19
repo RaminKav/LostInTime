@@ -5,14 +5,20 @@ use std::io::BufReader;
 
 use crate::datafiles;
 
-fn default_quick_consume_slot_1() -> InputBinding {
-    InputBinding::KeyBinding(KeyCode::Z)
-}
-fn default_quick_consume_slot_2() -> InputBinding {
-    InputBinding::KeyBinding(KeyCode::X)
-}
 fn default_auto_attack_toggle() -> InputBinding {
     InputBinding::KeyBinding(KeyCode::T)
+}
+fn default_hotbar_slot_0() -> InputBinding {
+    InputBinding::KeyBinding(KeyCode::Key1)
+}
+fn default_hotbar_slot_1() -> InputBinding {
+    InputBinding::KeyBinding(KeyCode::Key2)
+}
+fn default_hotbar_slot_2() -> InputBinding {
+    InputBinding::KeyBinding(KeyCode::Key3)
+}
+fn default_hotbar_slot_3() -> InputBinding {
+    InputBinding::KeyBinding(KeyCode::Key4)
 }
 
 #[derive(Resource, Debug, Clone, Copy, Serialize, Deserialize)]
@@ -24,12 +30,19 @@ pub struct InputMappings {
     pub active_skill_slot_4: InputBinding, // Bonus slot from blessings
     pub inventory: InputBinding,
     pub minimap: InputBinding,
-    #[serde(default = "default_quick_consume_slot_1")]
-    pub quick_consume_slot_1: InputBinding,
-    #[serde(default = "default_quick_consume_slot_2")]
-    pub quick_consume_slot_2: InputBinding,
     #[serde(default = "default_auto_attack_toggle")]
     pub auto_attack_toggle: InputBinding,
+    /// Keys that consume / use the item currently sitting in hotbar slot 0..=3.
+    /// Driven by `handle_hotbar_consume_keys` — pressing runs the slot item's
+    /// `ItemActions`, no "selection" is performed.
+    #[serde(default = "default_hotbar_slot_0")]
+    pub hotbar_slot_0: InputBinding,
+    #[serde(default = "default_hotbar_slot_1")]
+    pub hotbar_slot_1: InputBinding,
+    #[serde(default = "default_hotbar_slot_2")]
+    pub hotbar_slot_2: InputBinding,
+    #[serde(default = "default_hotbar_slot_3")]
+    pub hotbar_slot_3: InputBinding,
 }
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 
@@ -48,9 +61,11 @@ impl Default for InputMappings {
             active_skill_slot_4: InputBinding::KeyBinding(KeyCode::E), // Bonus slot
             inventory: InputBinding::KeyBinding(KeyCode::Tab),
             minimap: InputBinding::KeyBinding(KeyCode::M),
-            quick_consume_slot_1: InputBinding::KeyBinding(KeyCode::Z),
-            quick_consume_slot_2: InputBinding::KeyBinding(KeyCode::X),
             auto_attack_toggle: InputBinding::KeyBinding(KeyCode::T),
+            hotbar_slot_0: InputBinding::KeyBinding(KeyCode::Key1),
+            hotbar_slot_1: InputBinding::KeyBinding(KeyCode::Key2),
+            hotbar_slot_2: InputBinding::KeyBinding(KeyCode::Key3),
+            hotbar_slot_3: InputBinding::KeyBinding(KeyCode::Key4),
         }
     }
 }
@@ -126,35 +141,6 @@ impl InputMappings {
         self.minimap = key;
     }
 
-    pub fn get_quick_consume_key(&self, slot: usize) -> InputBinding {
-        match slot {
-            1 => self.quick_consume_slot_1,
-            2 => self.quick_consume_slot_2,
-            _ => InputBinding::KeyBinding(KeyCode::Z),
-        }
-    }
-
-    pub fn set_quick_consume_key(&mut self, slot: usize, key: InputBinding) {
-        match slot {
-            1 => self.quick_consume_slot_1 = key,
-            2 => self.quick_consume_slot_2 = key,
-            _ => {}
-        }
-    }
-
-    pub fn check_quick_consume_input(
-        &self,
-        slot: usize,
-        keys: &Res<Input<KeyCode>>,
-        mouse: &Res<Input<MouseButton>>,
-    ) -> bool {
-        let input = self.get_quick_consume_key(slot);
-        match input {
-            InputBinding::KeyBinding(key) => keys.just_pressed(key),
-            InputBinding::MouseBinding(button) => mouse.just_pressed(button),
-        }
-    }
-
     pub fn get_auto_attack_toggle_key(&self) -> InputBinding {
         self.auto_attack_toggle
     }
@@ -170,6 +156,40 @@ impl InputMappings {
     ) -> bool {
         let input = self.get_auto_attack_toggle_key();
         match input {
+            InputBinding::KeyBinding(key) => keys.just_pressed(key),
+            InputBinding::MouseBinding(button) => mouse.just_pressed(button),
+        }
+    }
+
+    /// Returns the binding that consumes/uses the item in hotbar slot `slot` (0..=3).
+    /// Any out-of-range slot falls back to the slot-0 binding.
+    pub fn get_hotbar_key(&self, slot: usize) -> InputBinding {
+        match slot {
+            0 => self.hotbar_slot_0,
+            1 => self.hotbar_slot_1,
+            2 => self.hotbar_slot_2,
+            3 => self.hotbar_slot_3,
+            _ => self.hotbar_slot_0,
+        }
+    }
+
+    pub fn set_hotbar_key(&mut self, slot: usize, key: InputBinding) {
+        match slot {
+            0 => self.hotbar_slot_0 = key,
+            1 => self.hotbar_slot_1 = key,
+            2 => self.hotbar_slot_2 = key,
+            3 => self.hotbar_slot_3 = key,
+            _ => {}
+        }
+    }
+
+    pub fn check_hotbar_input(
+        &self,
+        slot: usize,
+        keys: &Res<Input<KeyCode>>,
+        mouse: &Res<Input<MouseButton>>,
+    ) -> bool {
+        match self.get_hotbar_key(slot) {
             InputBinding::KeyBinding(key) => keys.just_pressed(key),
             InputBinding::MouseBinding(button) => mouse.just_pressed(button),
         }

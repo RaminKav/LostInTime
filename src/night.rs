@@ -10,7 +10,7 @@ use crate::{
     run_once_per_run,
     ui::tips::{SeenTips, Tip, TipEvent},
     world::dimension::EraManager,
-    GameState, ScreenResolution, GAME_HEIGHT,
+    GameState, ScreenResolution,
 };
 
 #[derive(Component)]
@@ -274,7 +274,7 @@ pub fn spawn_night(
         .spawn(SpriteBundle {
             sprite: Sprite {
                 color: overwrite_alpha(NIGHT, night_tracker.get_alpha()),
-                custom_size: Some(Vec2::new(res.game_width, GAME_HEIGHT)),
+                custom_size: Some(Vec2::new(res.game_width, res.game_height)),
                 ..default()
             },
             transform: Transform {

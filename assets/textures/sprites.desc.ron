@@ -685,6 +685,21 @@
             size: (16., 16.),
             anchor: None,
         ),
+        PinkFlowerStew: WorldObjectData(
+            texture_pos: (11., 6.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        YellowFlowerStew: WorldObjectData(
+            texture_pos: (15., 6.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        BerryJam: WorldObjectData(
+            texture_pos: (11., 19.),
+            size: (16., 16.),
+            anchor: None,
+        ),
         RawMeat: WorldObjectData(
             texture_pos: (13., 5.),
             size: (16., 16.),

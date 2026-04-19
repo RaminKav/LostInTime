@@ -3,23 +3,37 @@ use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
 use bevy_proto::prelude::ProtoCommands;
 
 use crate::chaos::ChaosTracker;
-use crate::colors::{DARK_WOOD_BROWN, UNCOMMON_GREEN};
+use crate::colors::{
+    CRAFT_BUTTON_TEXT, DARK_WOOD_BROWN, EQUIP_TITLE, HOTBAR_TITLE, STATS_TITLE, YELLOW_2,
+};
 use crate::cursor::CursorPos;
 use crate::custom_commands::CommandsExt;
-use crate::item::ammo::Ammo;
 use crate::night::EraTimer;
 use crate::player::skills::{Heirloom, HeirloomRarity, HeirloomWithRarity, PlayerSkills};
 use crate::player::unlocks::RunUnlockState;
 use crate::player::ModifyCurencyEvent;
 use crate::proto::proto_param::ProtoParam;
+use crate::ui::{
+    INVENTORY_BLUEPRINT_UI_SIZE, INVENTORY_CRAFTING_PANEL_UI_SIZE, INVENTORY_EQUIPMENT_UI_SIZE,
+    INVENTORY_UPGRADE_UI_SIZE, INVENTORY_Y_OFFSET, INV_BLUEPRINT_SLOT_CENTER_X,
+    INV_BLUEPRINT_SLOT_ICON_X_OFFSET, INV_BLUEPRINT_SLOT_LABEL_X_OFFSET,
+    INV_BLUEPRINT_SLOT_ROW_GAP, INV_BLUEPRINT_SLOT_SIZE, INV_BLUEPRINT_SLOT_TOP_Y,
+    INV_CRAFTING_INPUT_SLOTS_Y_LOCAL, INV_CRAFTING_INPUT_SLOT_SPACING_X,
+    INV_CRAFTING_PANEL_INGREDIENT_COUNT_Y_OFFSET, INV_CRAFTING_PANEL_INGREDIENT_ROW_Y,
+    INV_CRAFTING_PANEL_INGREDIENT_SPACING_X, INV_CRAFTING_PANEL_RESULT_Y,
+    INV_UPGRADE_PANEL_OFFSET_Y_CRAFTING, MAX_BLUEPRINT_ROWS, UI_UPGRADE_SLOT_SIZE,
+};
 use crate::world::dimension::{DimensionSpawnEvent, Era};
 use crate::GameParam;
 use crate::Player;
 use crate::{
     assets::Graphics,
-    attributes::{add_item_glows, AttributeChangeEvent},
+    attributes::{
+        add_item_glows, attribute_helpers::create_new_random_item_stack_with_attributes,
+        AttributeChangeEvent,
+    },
     inventory::{Inventory, InventoryItemStack, ItemStack},
-    item::WorldObject,
+    item::{CraftedItemEvent, Recipes, WorldObject},
     ui::{crafting_ui::UpgradeButton, FurnaceState, CHEST_INVENTORY_UI_SIZE, INVENTORY_UI_SIZE},
     ScreenResolution, GAME_HEIGHT,
 };
@@ -31,7 +45,14 @@ use super::{
     player_hud::FlashExpBarEvent,
     ui_helpers::spawn_ui_overlay,
     ShowInvPlayerStatsEvent, UIContainersParam, UIElement, CRAFTING_INVENTORY_UI_SIZE,
-    FURNACE_INVENTORY_UI_SIZE, UI_SLOT_SIZE,
+    FURNACE_INVENTORY_UI_SIZE, HUD_ACTION_ROW_Y_FROM_BOTTOM, HUD_HOTBAR_CENTER_X, HUD_HOTBAR_SLOTS,
+    INVENTORY_GRID_COLS, INV_CHEST_SCRAPPER_GRID_OFFSET_Y, INV_CRAFTING_BASE_Y, INV_CRAFTING_COLS,
+    INV_CRAFTING_NUDGE_IN_MAIN_INV, INV_CRAFTING_ROW_GAP, INV_CRAFTING_X_ANCHOR,
+    INV_EQUIP_GRID_ROW_BOT_Y, INV_EQUIP_GRID_ROW_MID_Y, INV_EQUIP_GRID_ROW_TOP_Y,
+    INV_EQUIP_GRID_SPACING, INV_EQUIP_PANEL_OFFSET_X, INV_EQUIP_PANEL_OFFSET_Y, INV_FURNACE_SLOT_0,
+    INV_FURNACE_SLOT_1, INV_GRID_FIRST_ROW_NUDGE_Y, INV_GRID_INSET_BOTTOM, INV_GRID_INSET_LEFT,
+    INV_SLOT_SPACING_X, INV_SLOT_SPACING_Y, INV_TRASH_OFFSET_X, INV_TRASH_OFFSET_Y,
+    INV_UI_PARENT_OFFSET_CRAFTING, UI_SLOT_SIZE,
 };
 
 #[derive(Clone, Eq, PartialEq, Debug, Hash, Default, States, Component)]
@@ -47,6 +68,10 @@ pub enum UIState {
     ActiveSkillShrine,
     MicrowaveShrine,
     Crafting,
+    /// Alternate inventory mode that swaps the equipment panel for the blueprints panel
+    /// and the upgrade slots for three normal crafting material slots.
+    /// Toggled via the CRAFT / UPGRADE button on the upgrade / crafting side panel.
+    InventoryCrafting,
     Furnace,
     Essence,
     Unlocks,
@@ -60,10 +85,16 @@ pub enum UIState {
 impl UIState {
     pub fn is_inv_open(&self) -> bool {
         self == &UIState::Inventory
+            || self == &UIState::InventoryCrafting
             || self == &UIState::Chest
             || self == &UIState::Scrapper
             || self == &UIState::Crafting
             || self == &UIState::Furnace
+    }
+    /// Whether this state renders the main inventory panel (as opposed to a side-container panel).
+    /// `Inventory` and `InventoryCrafting` both use the same inventory sprite + hotbar layout.
+    pub fn is_main_inventory(&self) -> bool {
+        self == &UIState::Inventory || self == &UIState::InventoryCrafting
     }
 }
 
@@ -72,6 +103,60 @@ pub struct GrantHeirloomDevEvent(pub Heirloom);
 
 #[derive(Component, Default, Clone)]
 pub struct InventoryUI;
+
+/// Dynamic prompt text shown on the upgrade panel (Inventory mode only).
+/// Text switches between "Add Upgrade Material", "Use Tome", and "Use Orb" depending on which
+/// consumable is sitting in furnace slot 0 (see `update_upgrade_material_prompt_text`).
+#[derive(Component, Default, Clone)]
+pub struct UpgradeMaterialPromptText;
+
+/// Clickable hit area on the bottom of the upgrade / crafting side panel that toggles the UI
+/// between `UIState::Inventory` (CRAFT label → switch to crafting) and
+/// `UIState::InventoryCrafting` (UPGRADE label → switch back).
+#[derive(Component, Default, Clone)]
+pub struct CraftModeToggleButton;
+
+/// Tag for a single row slot on the blueprints panel in `UIState::InventoryCrafting`.
+/// Holds the recipe [`WorldObject`] that this blueprint produces.
+#[derive(Component, Clone, Debug)]
+pub struct BlueprintSlot {
+    pub recipe_obj: WorldObject,
+}
+
+/// Tag for one of the three ingredient display slots on the crafting side panel in
+/// `UIState::InventoryCrafting`. Purely visual — does not accept item drops.
+#[derive(Component, Clone, Debug)]
+pub struct CraftingIngredientDisplaySlot {
+    pub slot_index: usize,
+}
+
+/// Tag for the craftable result slot that sits above the ingredient row on the crafting panel
+/// in `UIState::InventoryCrafting`. Clicking the slot crafts one of the selected recipe into the
+/// dragged cursor stack (see `handle_crafting_result_slot_click`).
+#[derive(Component, Default, Clone, Debug)]
+pub struct CraftingResultSlot;
+
+/// Tag text child under an ingredient slot that displays "owned/needed" (e.g. "2/3").
+#[derive(Component, Default, Clone, Debug)]
+pub struct CraftingIngredientCountText {
+    pub slot_index: usize,
+}
+
+/// Marker on the currently-rendered item icon for one of the three ingredient display slots.
+/// Re-spawned whenever [`SelectedCraftingRecipe`] or the inventory changes.
+#[derive(Component, Default, Clone, Debug)]
+pub struct CraftingIngredientIcon {
+    pub slot_index: usize,
+}
+
+/// Marker on the currently-rendered item icon inside the craft result slot.
+#[derive(Component, Default, Clone, Debug)]
+pub struct CraftingResultIcon;
+
+/// Resource holding the player's currently-selected blueprint in `UIState::InventoryCrafting`.
+/// Populated by clicking a blueprint row slot; cleared when the UI closes.
+#[derive(Resource, Default, Clone, Debug)]
+pub struct SelectedCraftingRecipe(pub Option<WorldObject>);
 
 /// Dev-only button shown in inventory when dev mode is enabled (Options > Dev Mode).
 #[derive(Component, Clone, Copy, PartialEq, Eq, Debug)]
@@ -101,10 +186,8 @@ pub struct InventorySlotState {
 }
 #[derive(Resource, Default, Debug)]
 pub struct InventoryState {
-    pub active_hotbar_slot: usize,
     pub inv_size: Vec2,
     pub furnace_state: FurnaceState,
-    pub hotbar_dirty: bool,
 }
 #[derive(FromReflect, PartialEq, Reflect, Debug, Clone, Copy)]
 pub enum InventorySlotType {
@@ -113,10 +196,16 @@ pub enum InventorySlotType {
     Crafting,
     Equipment,
     Accessory,
+    Weapon,
+    Pet,
     Chest,
     Furnace,
     Scrapper,
     Trash,
+    /// Three slots on the "CRAFTING" side panel shown in `UIState::InventoryCrafting`.
+    /// Behaves like a `Normal` inventory slot (drag/drop, right-click split) but is backed by
+    /// `Inventory::crafting_inputs_items` instead of the main grid.
+    CraftingInput,
 }
 impl InventorySlotType {
     pub fn is_crafting(self) -> bool {
@@ -134,6 +223,12 @@ impl InventorySlotType {
     pub fn is_accessory(self) -> bool {
         self == InventorySlotType::Accessory
     }
+    pub fn is_weapon_slot(self) -> bool {
+        self == InventorySlotType::Weapon
+    }
+    pub fn is_pet_slot(self) -> bool {
+        self == InventorySlotType::Pet
+    }
     pub fn is_inventory(self) -> bool {
         self == InventorySlotType::Normal
     }
@@ -146,6 +241,9 @@ impl InventorySlotType {
     pub fn is_trash(self) -> bool {
         self == InventorySlotType::Trash
     }
+    pub fn is_crafting_input(self) -> bool {
+        self == InventorySlotType::CraftingInput
+    }
 }
 pub fn setup_inv_ui(
     mut commands: Commands,
@@ -156,36 +254,15 @@ pub fn setup_inv_ui(
     resolution: Res<ScreenResolution>,
     asset_server: Res<AssetServer>,
     cheat_settings: Option<Res<CheatSettings>>,
+    recipes: Res<Recipes>,
+    mut selected_recipe: ResMut<SelectedCraftingRecipe>,
+    proto_param: ProtoParam,
 ) {
-    // Title
-    let _upgrade_text = commands
-        .spawn(Text2dBundle {
-            text: Text::from_section(
-                "Upgrade",
-                TextStyle {
-                    font: asset_server.load("fonts/alagard.ttf"),
-                    font_size: 15.0,
-                    color: DARK_WOOD_BROWN,
-                },
-            ),
-            text_anchor: Anchor::Center,
-            transform: Transform {
-                translation: Vec3::new(106., resolution.game_height / 2. - 100., 10.),
-                scale: Vec3::new(1., 1., 1.),
-                ..Default::default()
-            },
-            ..default()
-        })
-        .insert(RenderLayers::from_layers(&[3]))
-        .insert(Name::new("CLASS TITLE"))
-        .insert(UIState::Inventory)
-        .id();
-
     let (size, texture, pos_offset) = match cur_inv_state.0 {
-        UIState::Inventory => (
+        UIState::Inventory | UIState::InventoryCrafting => (
             INVENTORY_UI_SIZE,
             graphics.get_ui_element_texture(UIElement::Inventory),
-            Vec2::new(22., 0.5),
+            Vec2::new(-185., INVENTORY_Y_OFFSET),
         ),
         UIState::Chest => (
             CHEST_INVENTORY_UI_SIZE,
@@ -200,7 +277,7 @@ pub fn setup_inv_ui(
         UIState::Crafting => (
             CRAFTING_INVENTORY_UI_SIZE,
             graphics.get_ui_element_texture(UIElement::CraftingInventory),
-            Vec2::new(22.5, 0.),
+            Vec2::new(22.5, INVENTORY_Y_OFFSET),
         ),
         UIState::Furnace => (
             FURNACE_INVENTORY_UI_SIZE,
@@ -212,7 +289,7 @@ pub fn setup_inv_ui(
 
     spawn_ui_overlay(
         &mut commands,
-        Vec2::new(resolution.game_width + 10., GAME_HEIGHT + 20.),
+        Vec2::new(resolution.game_width + 10., resolution.game_height + 20.),
         0.8,
         9.,
     );
@@ -236,20 +313,425 @@ pub fn setup_inv_ui(
         .insert(Name::new("INVENTORY"))
         .insert(RenderLayers::from_layers(&[3]))
         .id();
+    let _inv_text = commands
+        .spawn(Text2dBundle {
+            text: Text::from_section(
+                "INVENTORY",
+                TextStyle {
+                    font: asset_server.load("fonts/alagard.ttf"),
+                    font_size: 15.0,
+                    color: STATS_TITLE,
+                },
+            ),
+            text_anchor: Anchor::Center,
+            transform: Transform {
+                translation: Vec3::new(3., size.y / 2. - 10., 1.),
+                scale: Vec3::new(1., 1., 1.),
+                ..Default::default()
+            },
+            ..default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(Name::new("INVENTORY TITLE"))
+        .insert(cur_inv_state.0.clone())
+        .set_parent(inv)
+        .id();
+    let _hotbar_text = commands
+        .spawn(Text2dBundle {
+            text: Text::from_section(
+                "HOTBAR",
+                TextStyle {
+                    font: asset_server.load("fonts/alagard.ttf"),
+                    font_size: 15.0,
+                    color: HOTBAR_TITLE,
+                },
+            ),
+            text_anchor: Anchor::Center,
+            transform: Transform {
+                translation: Vec3::new(3., size.y / 2. - 246., 1.),
+                scale: Vec3::new(1., 1., 1.),
+                ..Default::default()
+            },
+            ..default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(Name::new("HOTBAR TITLE"))
+        .insert(cur_inv_state.0.clone())
+        .set_parent(inv)
+        .id();
+
+    let is_crafting_mode = cur_inv_state.0 == UIState::InventoryCrafting;
+    let (side_panel_size, side_panel_element) = if is_crafting_mode {
+        (INVENTORY_CRAFTING_PANEL_UI_SIZE, UIElement::CraftingPanel)
+    } else {
+        (INVENTORY_UPGRADE_UI_SIZE, UIElement::UpgradePanel)
+    };
+    let upgrade_panel_y_local = if is_crafting_mode {
+        INV_UPGRADE_PANEL_OFFSET_Y_CRAFTING
+    } else {
+        -75.0
+    };
+    let upgrade_panel = commands
+        .spawn(SpriteBundle {
+            texture: graphics.get_ui_element_texture(side_panel_element.clone()),
+            sprite: Sprite {
+                custom_size: Some(side_panel_size),
+                ..Default::default()
+            },
+            transform: Transform {
+                translation: Vec3::new(
+                    pos_offset.x + 150.,
+                    pos_offset.y + upgrade_panel_y_local,
+                    10.,
+                ),
+                scale: Vec3::new(1., 1., 1.),
+                ..Default::default()
+            },
+            ..Default::default()
+        })
+        .insert(cur_inv_state.0.clone())
+        .insert(Name::new(if is_crafting_mode {
+            "CRAFTING PANEL"
+        } else {
+            "UPGRADES"
+        }))
+        .insert(side_panel_element)
+        .insert(RenderLayers::from_layers(&[3]))
+        .id();
+    let upgrade_title = if is_crafting_mode {
+        "CRAFTING"
+    } else {
+        "UPGRADES"
+    };
+    let _upgrade_text = commands
+        .spawn(Text2dBundle {
+            text: Text::from_section(
+                upgrade_title,
+                TextStyle {
+                    font: asset_server.load("fonts/alagard.ttf"),
+                    font_size: 15.0,
+                    color: EQUIP_TITLE,
+                },
+            ),
+            text_anchor: Anchor::Center,
+            transform: Transform {
+                translation: Vec3::new(0., side_panel_size.y / 2. - 12., 1.),
+                scale: Vec3::new(1., 1., 1.),
+                ..Default::default()
+            },
+            ..default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(Name::new("upgrade/crafting TITLE"))
+        .insert(cur_inv_state.0.clone())
+        .set_parent(upgrade_panel)
+        .id();
+
+    // Equipment panel (only in standard Inventory mode — crafting mode hides equipment).
+    if cur_inv_state.0 == UIState::Inventory {
+        let equip_panel = commands
+            .spawn(SpriteBundle {
+                texture: graphics.get_ui_element_texture(UIElement::EquipmentPanel),
+                sprite: Sprite {
+                    custom_size: Some(INVENTORY_EQUIPMENT_UI_SIZE),
+                    ..Default::default()
+                },
+                transform: Transform {
+                    translation: Vec3::new(pos_offset.x + 150., pos_offset.y + 86., 10.),
+                    scale: Vec3::new(1., 1., 1.),
+                    ..Default::default()
+                },
+                ..Default::default()
+            })
+            .insert(cur_inv_state.0.clone())
+            .insert(Name::new("EQUIPMENTS"))
+            .insert(RenderLayers::from_layers(&[3]))
+            .id();
+        let _eqp_text = commands
+            .spawn(Text2dBundle {
+                text: Text::from_section(
+                    "EQUIPMENT",
+                    TextStyle {
+                        font: asset_server.load("fonts/alagard.ttf"),
+                        font_size: 15.0,
+                        color: EQUIP_TITLE,
+                    },
+                ),
+                text_anchor: Anchor::Center,
+                transform: Transform {
+                    translation: Vec3::new(0., INVENTORY_EQUIPMENT_UI_SIZE.y / 2. - 11., 1.),
+                    scale: Vec3::new(1., 1., 1.),
+                    ..Default::default()
+                },
+                ..default()
+            })
+            .insert(RenderLayers::from_layers(&[3]))
+            .insert(Name::new("eqp TITLE"))
+            .insert(UIState::Inventory)
+            .set_parent(equip_panel)
+            .id();
+    }
+
+    // Blueprint panel (only in `InventoryCrafting` — replaces the stats tooltip column).
+    if is_crafting_mode {
+        // Mirror the stats tooltip positioning from `handle_spawn_inv_player_stats` so this sits
+        // in exactly the same on-screen location as the stats panel it replaces.
+        let blueprint_x_local = (INVENTORY_UI_SIZE.x
+            + INVENTORY_BLUEPRINT_UI_SIZE.x
+            + INVENTORY_UPGRADE_UI_SIZE.x
+            + INVENTORY_EQUIPMENT_UI_SIZE.x
+            + 8.)
+            / 2.;
+        let blueprint_panel = commands
+            .spawn(SpriteBundle {
+                texture: graphics.get_ui_element_texture(UIElement::BlueprintsPanel),
+                sprite: Sprite {
+                    custom_size: Some(INVENTORY_BLUEPRINT_UI_SIZE),
+                    ..Default::default()
+                },
+                transform: Transform {
+                    translation: Vec3::new(blueprint_x_local, 0., 2.),
+                    scale: Vec3::new(1., 1., 1.),
+                    ..Default::default()
+                },
+                ..Default::default()
+            })
+            .insert(cur_inv_state.0.clone())
+            .insert(Name::new("BLUEPRINTS"))
+            .insert(UIElement::BlueprintsPanel)
+            .insert(RenderLayers::from_layers(&[3]))
+            .id();
+        let _bp_text = commands
+            .spawn(Text2dBundle {
+                text: Text::from_section(
+                    "BLUEPRINTS",
+                    TextStyle {
+                        font: asset_server.load("fonts/alagard.ttf"),
+                        font_size: 15.0,
+                        color: STATS_TITLE,
+                    },
+                ),
+                text_anchor: Anchor::Center,
+                transform: Transform {
+                    translation: Vec3::new(0., INVENTORY_BLUEPRINT_UI_SIZE.y / 2. - 11., 1.),
+                    scale: Vec3::new(1., 1., 1.),
+                    ..Default::default()
+                },
+                ..default()
+            })
+            .insert(RenderLayers::from_layers(&[3]))
+            .insert(Name::new("blueprint TITLE"))
+            .insert(cur_inv_state.0.clone())
+            .set_parent(blueprint_panel)
+            .id();
+        commands.entity(inv).push_children(&[blueprint_panel]);
+
+        // Reset any previously-held selection; refreshing logic re-populates on pick.
+        selected_recipe.0 = None;
+
+        // Populate one blueprint row per recipe the player has access to. Sort by `Debug` name so
+        // the row order is stable between panel rebuilds. Cap at `MAX_BLUEPRINT_ROWS` because the
+        // `BlueprintsPanel` background art only has room for that many.
+        let mut recipe_list: Vec<WorldObject> = recipes.crafting_list.keys().copied().collect();
+        recipe_list.sort_by_key(|obj| format!("{:?}", obj));
+        for (i, recipe_obj) in recipe_list.iter().take(MAX_BLUEPRINT_ROWS).enumerate() {
+            let row_y = INV_BLUEPRINT_SLOT_TOP_Y
+                - i as f32 * (INV_BLUEPRINT_SLOT_SIZE.y + INV_BLUEPRINT_SLOT_ROW_GAP);
+            let row_entity = commands
+                .spawn(SpriteBundle {
+                    texture: graphics.get_ui_element_texture(UIElement::BlueprintSlot),
+                    sprite: Sprite {
+                        custom_size: Some(INV_BLUEPRINT_SLOT_SIZE),
+                        ..Default::default()
+                    },
+                    transform: Transform {
+                        translation: Vec3::new(INV_BLUEPRINT_SLOT_CENTER_X, row_y, 1.),
+                        scale: Vec3::new(1., 1., 1.),
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                })
+                .insert(Name::new(format!("BLUEPRINT ROW {:?}", recipe_obj)))
+                .insert(UIElement::BlueprintSlot)
+                .insert(Interactable::default())
+                .insert(BlueprintSlot {
+                    recipe_obj: *recipe_obj,
+                })
+                .insert(cur_inv_state.0.clone())
+                .insert(RenderLayers::from_layers(&[3]))
+                .id();
+
+            // Recipe result icon, anchored near the left edge of the row. Uses the same sprite
+            // pipeline as inventory items so rarity/metadata render consistently.
+            if let Some(item_data) = proto_param.get_item_data(*recipe_obj).cloned() {
+                let icon_stack = item_data.copy_with_count(1);
+                let icon_entity = spawn_item_stack_icon(
+                    &mut commands,
+                    &graphics,
+                    &icon_stack,
+                    &asset_server,
+                    Vec2::new(
+                        -INV_BLUEPRINT_SLOT_SIZE.x * 0.5 + INV_BLUEPRINT_SLOT_ICON_X_OFFSET,
+                        0.,
+                    ),
+                    Vec2::ZERO,
+                    3,
+                );
+                commands
+                    .entity(icon_entity)
+                    .insert(Name::new("BLUEPRINT ROW ICON"))
+                    .set_parent(row_entity);
+            }
+
+            // Label: recipe result name (shifted right to clear the icon).
+            let label = proto_param
+                .get_item_data(*recipe_obj)
+                .map(|s| s.metadata.name.clone())
+                .unwrap_or_else(|| format!("{:?}", recipe_obj));
+            let _row_text = commands
+                .spawn(Text2dBundle {
+                    text: Text::from_section(
+                        label,
+                        TextStyle {
+                            font: asset_server.load("fonts/slkscrbold.ttf"),
+                            font_size: 8.4,
+                            color: YELLOW_2,
+                        },
+                    ),
+                    text_anchor: Anchor::CenterLeft,
+                    transform: Transform {
+                        translation: Vec3::new(
+                            -INV_BLUEPRINT_SLOT_SIZE.x * 0.5 + INV_BLUEPRINT_SLOT_LABEL_X_OFFSET,
+                            0.,
+                            1.,
+                        ),
+                        scale: Vec3::new(1., 1., 1.),
+                        ..Default::default()
+                    },
+                    ..default()
+                })
+                .insert(RenderLayers::from_layers(&[3]))
+                .insert(Name::new("BLUEPRINT ROW LABEL"))
+                .set_parent(row_entity)
+                .id();
+            commands
+                .entity(blueprint_panel)
+                .push_children(&[row_entity]);
+        }
+
+        // Ingredient display slots on the crafting side panel (x3). Purely visual; the
+        // icon + "owned/needed" text are populated by `refresh_crafting_ingredient_display`
+        // when the player clicks a blueprint row.
+        for i in 0..3 {
+            let local_x = 1. + (i as f32 - 1.0) * INV_CRAFTING_PANEL_INGREDIENT_SPACING_X;
+            let slot_entity = commands
+                .spawn(SpriteBundle {
+                    texture: graphics.get_ui_element_texture(UIElement::InventorySlot),
+                    sprite: Sprite {
+                        custom_size: Some(UI_SLOT_SIZE),
+                        color: Color::Rgba {
+                            red: 0.,
+                            green: 0.,
+                            blue: 0.,
+                            alpha: 0.,
+                        },
+                        ..Default::default()
+                    },
+                    transform: Transform {
+                        translation: Vec3::new(local_x, INV_CRAFTING_PANEL_INGREDIENT_ROW_Y, 1.),
+                        scale: Vec3::new(1., 1., 1.),
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                })
+                .insert(Name::new(format!("CRAFTING INGREDIENT SLOT {}", i)))
+                .insert(UIElement::InventorySlot)
+                .insert(CraftingIngredientDisplaySlot { slot_index: i })
+                .insert(cur_inv_state.0.clone())
+                .insert(RenderLayers::from_layers(&[3]))
+                .id();
+
+            // "owned/needed" label (4x5 font, size 5). Starts blank.
+            let count_text = commands
+                .spawn(Text2dBundle {
+                    text: Text::from_section(
+                        "",
+                        TextStyle {
+                            font: asset_server.load("fonts/4x5.ttf"),
+                            font_size: 5.0,
+                            color: Color::WHITE,
+                        },
+                    )
+                    .with_alignment(TextAlignment::Center),
+                    text_anchor: Anchor::Center,
+                    transform: Transform {
+                        translation: Vec3::new(
+                            0.,
+                            INV_CRAFTING_PANEL_INGREDIENT_COUNT_Y_OFFSET,
+                            2.,
+                        ),
+                        scale: Vec3::new(1., 1., 1.),
+                        ..Default::default()
+                    },
+                    ..default()
+                })
+                .insert(RenderLayers::from_layers(&[3]))
+                .insert(CraftingIngredientCountText { slot_index: i })
+                .insert(cur_inv_state.0.clone())
+                .insert(Name::new("CRAFTING INGREDIENT COUNT"))
+                .set_parent(slot_entity)
+                .id();
+            let _ = count_text;
+            commands.entity(upgrade_panel).push_children(&[slot_entity]);
+        }
+
+        // Craft result slot (hotbar-style). Clicking it crafts one into the dragged cursor
+        // stack via `handle_crafting_result_slot_click`.
+        let result_slot = commands
+            .spawn(SpriteBundle {
+                texture: graphics.get_ui_element_texture(UIElement::InventorySlotHotbar),
+                sprite: Sprite {
+                    custom_size: Some(UI_SLOT_SIZE),
+                    color: Color::Rgba {
+                        red: 0.,
+                        green: 0.,
+                        blue: 0.,
+                        alpha: 0.,
+                    },
+                    ..Default::default()
+                },
+                transform: Transform {
+                    translation: Vec3::new(1., INV_CRAFTING_PANEL_RESULT_Y, 1.),
+                    scale: Vec3::new(1., 1., 1.),
+                    ..Default::default()
+                },
+                ..Default::default()
+            })
+            .insert(Name::new("CRAFTING RESULT SLOT"))
+            .insert(UIElement::InventorySlotHotbar)
+            .insert(Interactable::default())
+            .insert(CraftingResultSlot)
+            .insert(cur_inv_state.0.clone())
+            .insert(RenderLayers::from_layers(&[3]))
+            .id();
+        commands.entity(upgrade_panel).push_children(&[result_slot]);
+    }
 
     inv_state.inv_size = size;
-    if cur_inv_state.0 != UIState::Scrapper {
+    // Furnace "accept" arrow button — only meaningful in standard Inventory mode (upgrades).
+    // Hidden in Scrapper (no upgrade flow) and InventoryCrafting (panel contents differ).
+    if cur_inv_state.0 == UIState::Inventory {
         let upgrade_button = commands
             .spawn(SpriteBundle {
                 texture: graphics
                     .get_ui_element_texture(UIElement::UpgradeButton)
                     .clone(),
                 sprite: Sprite {
-                    custom_size: Some(Vec2::new(13., 13.)),
+                    custom_size: Some(Vec2::new(100., 20.)),
                     ..Default::default()
                 },
                 transform: Transform {
-                    translation: Vec3::new(95., 44., 10.),
+                    translation: Vec3::new(-1., -INVENTORY_UPGRADE_UI_SIZE.y / 2. + 66., 1.),
                     scale: Vec3::new(1., 1., 1.),
                     ..Default::default()
                 },
@@ -262,8 +744,90 @@ pub fn setup_inv_ui(
             .insert(UpgradeButton)
             .insert(Name::new("UPGRADE BUTTON"))
             .id();
-        commands.entity(inv).push_children(&[upgrade_button]);
+        commands
+            .entity(upgrade_panel)
+            .push_children(&[upgrade_button]);
+
+        let upgrade_material_text = commands
+            .spawn(Text2dBundle {
+                text: Text::from_section(
+                    "Add Materials",
+                    TextStyle {
+                        font: asset_server.load("fonts/slkscrbold.ttf"),
+                        font_size: 8.4,
+                        color: YELLOW_2,
+                    },
+                ),
+                text_anchor: Anchor::Center,
+                transform: Transform {
+                    translation: Vec3::new(0., 0., 1.),
+                    scale: Vec3::new(1., 1., 1.),
+                    ..Default::default()
+                },
+                ..default()
+            })
+            .insert(RenderLayers::from_layers(&[3]))
+            .insert(Name::new("upgrade material prompt"))
+            .insert(UIState::Inventory)
+            .insert(UpgradeMaterialPromptText)
+            .id();
+        commands
+            .entity(upgrade_button)
+            .push_children(&[upgrade_material_text]);
     }
+
+    // CRAFT / UPGRADE toggle button — shown on both `Inventory` and `InventoryCrafting`
+    // so the player can flip between the two side-panel layouts.  The visual is the
+    // `CraftButton` sprite (which has a matching `CraftButtonHover` variant handled by the
+    // hover highlight system), and the label text sits as a child of that sprite.
+    let toggle_label = if is_crafting_mode { "Done" } else { "Craft" };
+    let toggle_button = commands
+        .spawn(SpriteBundle {
+            texture: graphics.get_ui_element_texture(UIElement::CraftButton),
+            sprite: Sprite {
+                custom_size: Some(Vec2::new(60., 18.)),
+                ..Default::default()
+            },
+            transform: Transform {
+                translation: Vec3::new(0., -side_panel_size.y / 2. + 36., 2.),
+                scale: Vec3::new(1., 1., 1.),
+                ..Default::default()
+            },
+            ..Default::default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(Interactable::default())
+        .insert(UIElement::CraftButton)
+        .insert(CraftModeToggleButton)
+        .insert(cur_inv_state.0.clone())
+        .insert(Name::new("CRAFT/UPGRADE TOGGLE"))
+        .id();
+    let _toggle_text = commands
+        .spawn(Text2dBundle {
+            text: Text::from_section(
+                toggle_label,
+                TextStyle {
+                    font: asset_server.load("fonts/alagard.ttf"),
+                    font_size: 15.0,
+                    color: CRAFT_BUTTON_TEXT,
+                },
+            ),
+            text_anchor: Anchor::Center,
+            transform: Transform {
+                translation: Vec3::new(0., -1., 1.),
+                scale: Vec3::new(1., 1., 1.),
+                ..Default::default()
+            },
+            ..default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(Name::new("CRAFT/UPGRADE LABEL"))
+        .insert(cur_inv_state.0.clone())
+        .set_parent(toggle_button)
+        .id();
+    commands
+        .entity(upgrade_panel)
+        .push_children(&[toggle_button]);
 
     // Dev mode buttons (far left of inventory, only when Options > Dev Mode is on)
     let dev_mode = cheat_settings.map(|c| c.dev_mode).unwrap_or(false);
@@ -272,7 +836,7 @@ pub fn setup_inv_ui(
         const DEV_BUTTON_HEIGHT: f32 = 11.;
         const DEV_BUTTON_SPACING: f32 = 14.;
         // Left of inventory panel in local space (inv center is 22, 0.5 in world; panel half-width 109)
-        let dev_x = -INVENTORY_UI_SIZE.x / 2. - DEV_BUTTON_WIDTH / 2. - 130.;
+        let dev_x = -INVENTORY_UI_SIZE.x / 2. - DEV_BUTTON_WIDTH / 2. - 0.;
         let start_y = 48.0f32;
         let labels: [(DevButtonAction, &str); 13] = [
             (DevButtonAction::GrantXp, "+250 xp"),
@@ -355,6 +919,7 @@ pub fn setup_inv_slots_ui(
     }
     let (should_spawn_equipment, crafting_items_option) = match inv_state.0 {
         UIState::Inventory => (true, Some(inv.single().crafting_items.clone())),
+        UIState::InventoryCrafting => (false, None),
         UIState::Crafting => (true, Some(crafting_container.unwrap().items.clone())),
         UIState::Chest => (false, None),
         UIState::Scrapper => (false, None),
@@ -406,41 +971,79 @@ pub fn setup_inv_slots_ui(
             );
         }
     }
-    if let Some(crafting_items) = crafting_items_option {
-        for (slot_index, item) in crafting_items.items.iter().enumerate() {
-            spawn_inv_slot(
-                &mut commands,
-                &inv_state,
-                &graphics,
-                slot_index,
-                Interaction::None,
-                &inv_state_res,
-                &inv_query,
-                &asset_server,
-                InventorySlotType::Crafting,
-                item.to_owned(),
-            );
-        }
+    // Single-slot Weapon + Pet cells in the equipment panel's mid row.
+    // Both containers are size 1 (see `player::spawn_player`), so we spawn them outside
+    // the main-grid loop with `slot_index = 0`.
+    // World weapon pickups auto-fill these when empty via `inventory::try_auto_equip_weapon_on_pickup`
+    // (`check_item_drop_collisions`): main weapon first, then pet slot if the player has a pet.
+    if should_spawn_equipment {
+        let weapon_item = inv
+            .single_mut()
+            .weapon_items
+            .items
+            .get(0)
+            .and_then(|x| x.clone());
+        spawn_inv_slot(
+            &mut commands,
+            &inv_state,
+            &graphics,
+            0,
+            Interaction::None,
+            &inv_state_res,
+            &inv_query,
+            &asset_server,
+            InventorySlotType::Weapon,
+            weapon_item,
+        );
+        let pet_item = inv
+            .single_mut()
+            .pet_items
+            .items
+            .get(0)
+            .and_then(|x| x.clone());
+        spawn_inv_slot(
+            &mut commands,
+            &inv_state,
+            &graphics,
+            0,
+            Interaction::None,
+            &inv_state_res,
+            &inv_query,
+            &asset_server,
+            InventorySlotType::Pet,
+            pet_item,
+        );
     }
     if inv_state.0 != UIState::Scrapper {
-        if let Some(furnace_items) = inv.single_mut().furnace_items.clone().into() {
-            for (slot_index, item) in furnace_items.items.iter().enumerate() {
-                spawn_inv_slot(
-                    &mut commands,
-                    &inv_state,
-                    &graphics,
-                    slot_index,
-                    Interaction::None,
-                    &inv_state_res,
-                    &inv_query,
-                    &asset_server,
-                    InventorySlotType::Furnace,
-                    item.to_owned(),
-                );
+        // Upgrade tome / orb slots live on the upgrade side panel; in `InventoryCrafting`
+        // the side panel is replaced by the three crafting inputs so we skip these.
+        if inv_state.0 != UIState::InventoryCrafting {
+            if let Some(furnace_items) = inv.single_mut().furnace_items.clone().into() {
+                for (slot_index, item) in furnace_items.items.iter().enumerate() {
+                    spawn_inv_slot(
+                        &mut commands,
+                        &inv_state,
+                        &graphics,
+                        slot_index,
+                        Interaction::None,
+                        &inv_state_res,
+                        &inv_query,
+                        &asset_server,
+                        InventorySlotType::Furnace,
+                        item.to_owned(),
+                    );
+                }
             }
         }
+        // In crafting mode the upgrade panel is replaced by the `CraftingPanel`, which hosts
+        // three ingredient *display* slots plus the craft result slot. Those are spawned by
+        // `spawn_inventory_crafting_side_panel_slots` since they are not regular droppable
+        // inventory slots.
         // Spawn trash slot (only in regular inventory, not scrapper)
-        if inv_state.0 == UIState::Inventory || inv_state.0 == UIState::Crafting {
+        if inv_state.0 == UIState::Inventory
+            || inv_state.0 == UIState::InventoryCrafting
+            || inv_state.0 == UIState::Crafting
+        {
             let trash_item = inv
                 .single_mut()
                 .trash_items
@@ -463,6 +1066,140 @@ pub fn setup_inv_slots_ui(
     }
 }
 
+/// Center of a main-grid slot (`Normal`, and base for chest/scrapper) in inventory panel space.
+fn main_inventory_grid_center(slot_index: usize, inv_size: Vec2) -> Vec2 {
+    let hw = inv_size.x * 0.5;
+    let hh = inv_size.y * 0.5;
+    let col = slot_index % INVENTORY_GRID_COLS;
+    let row = slot_index / INVENTORY_GRID_COLS;
+    let x = (-hw + INV_GRID_INSET_LEFT + UI_SLOT_SIZE.x * 0.5 + col as f32 * INV_SLOT_SPACING_X)
+        .floor();
+    let y_base =
+        (-hh + INV_GRID_INSET_BOTTOM + UI_SLOT_SIZE.y * 0.5 + row as f32 * INV_SLOT_SPACING_Y)
+            .floor();
+    let y = if row == 0 {
+        y_base + INV_GRID_FIRST_ROW_NUDGE_Y
+    } else {
+        y_base
+    };
+    Vec2::new(x, y)
+}
+
+/// Maps an equipment / accessory / weapon / pet slot to its (col, row) cell in the
+/// equipment panel's 3×3 grid, where col/row are each in `0..3` with `col = 0` left
+/// and `row = 0` top.
+///
+/// Layout (matches reference art):
+/// ```text
+///   ┌─────────────┬─────────────┬─────────────┐
+///   │ Ring  (Acc1)│ Neck  (Acc0)│ Ring  (Acc2)│   row 0 (top,   y = +26)
+///   ├─────────────┼─────────────┼─────────────┤
+///   │ Weapon      │ Chest (Eq2) │ Pet Weapon  │   row 1 (mid,   y =  −4)
+///   ├─────────────┼─────────────┼─────────────┤
+///   │ Shoes (Eq0) │ Pants (Eq1) │ Cape  (Eq3) │   row 2 (bot,   y = −34)
+///   └─────────────┴─────────────┴─────────────┘
+/// ```
+/// Weapon / Pet slots each use slot_index 0 (single-slot containers).
+fn equipment_grid_cell(slot_type: InventorySlotType, slot_index: usize) -> (usize, usize) {
+    match (slot_type, slot_index) {
+        (InventorySlotType::Accessory, 1) => (0, 0),
+        (InventorySlotType::Accessory, 0) => (1, 0),
+        (InventorySlotType::Accessory, 2) => (2, 0),
+        (InventorySlotType::Weapon, _) => (0, 1),
+        (InventorySlotType::Equipment, 2) => (1, 1),
+        (InventorySlotType::Pet, _) => (2, 1),
+        (InventorySlotType::Equipment, 0) => (0, 2),
+        (InventorySlotType::Equipment, 1) => (1, 2),
+        (InventorySlotType::Equipment, 3) => (2, 2),
+        _ => (1, 1),
+    }
+}
+
+/// Panel-local position (relative to the inventory panel center) for an equipment / accessory slot.
+fn equipment_grid_position(slot_type: InventorySlotType, slot_index: usize) -> Vec2 {
+    let (col, row) = equipment_grid_cell(slot_type, slot_index);
+    let row_y = match row {
+        0 => INV_EQUIP_GRID_ROW_TOP_Y,
+        1 => INV_EQUIP_GRID_ROW_MID_Y,
+        _ => INV_EQUIP_GRID_ROW_BOT_Y,
+    };
+    Vec2::new(
+        INV_EQUIP_PANEL_OFFSET_X + (col as f32 - 1.0) * INV_EQUIP_GRID_SPACING,
+        INV_EQUIP_PANEL_OFFSET_Y + row_y,
+    )
+}
+
+/// Panel-local position for a slot’s center (before optional crafting-mode parent nudge).
+fn inv_slot_local_position(
+    slot_type: InventorySlotType,
+    slot_index: usize,
+    inv_size: Vec2,
+    ui_state: &UIState,
+) -> Vec2 {
+    match slot_type {
+        InventorySlotType::Hotbar => {
+            // Hotbar shares a row with the class-skill icons in the HUD. Slots are laid out
+            // symmetrically around `HUD_HOTBAR_CENTER_X`, so slot 0 is the leftmost and
+            // slot `HUD_HOTBAR_SLOTS - 1` is the rightmost. Slots >= HUD_HOTBAR_SLOTS still
+            // exist in the container but are not spawned into the HUD (see `setup_hotbar_hud`).
+            let half_span = (HUD_HOTBAR_SLOTS as f32 - 1.0) * 0.5;
+            Vec2::new(
+                HUD_HOTBAR_CENTER_X + (slot_index as f32 - half_span) * INV_SLOT_SPACING_X,
+                -GAME_HEIGHT * 0.5 + HUD_ACTION_ROW_Y_FROM_BOTTOM,
+            )
+        }
+        InventorySlotType::Crafting => {
+            let hw = inv_size.x * 0.5;
+            let hh = inv_size.y * 0.5;
+            let col = slot_index % INV_CRAFTING_COLS;
+            let row = slot_index / INV_CRAFTING_COLS;
+            let mut x = -hw
+                + INV_CRAFTING_X_ANCHOR
+                + UI_SLOT_SIZE.x * 0.5
+                + col as f32 * INV_SLOT_SPACING_X;
+            let mut y = -(row as f32) * (INV_SLOT_SPACING_Y + INV_CRAFTING_ROW_GAP) - hh
+                + INV_CRAFTING_BASE_Y;
+            if matches!(ui_state, UIState::Inventory) {
+                x += INV_CRAFTING_NUDGE_IN_MAIN_INV.x;
+                y += INV_CRAFTING_NUDGE_IN_MAIN_INV.y;
+            }
+            Vec2::new(x, y)
+        }
+        InventorySlotType::Equipment => {
+            equipment_grid_position(InventorySlotType::Equipment, slot_index)
+        }
+        InventorySlotType::Accessory => {
+            equipment_grid_position(InventorySlotType::Accessory, slot_index)
+        }
+        InventorySlotType::Weapon => equipment_grid_position(InventorySlotType::Weapon, slot_index),
+        InventorySlotType::Pet => equipment_grid_position(InventorySlotType::Pet, slot_index),
+        InventorySlotType::Chest | InventorySlotType::Scrapper => {
+            let mut p = main_inventory_grid_center(slot_index, inv_size);
+            p.y += INV_CHEST_SCRAPPER_GRID_OFFSET_Y;
+            p
+        }
+        InventorySlotType::Furnace => match slot_index {
+            0 => INV_FURNACE_SLOT_0,
+            1 => INV_FURNACE_SLOT_1,
+            _ => Vec2::ZERO,
+        },
+        InventorySlotType::CraftingInput => {
+            // Three slots laid out horizontally, centered on the upgrade panel's local x (150).
+            // The crafting panel sits higher than the default upgrade panel, so slot y uses the
+            // shared constant (see `INV_CRAFTING_INPUT_SLOTS_Y_LOCAL`).
+            let center_x = 150.0;
+            let x = center_x + (slot_index as f32 - 1.0) * INV_CRAFTING_INPUT_SLOT_SPACING_X;
+            Vec2::new(x, INV_CRAFTING_INPUT_SLOTS_Y_LOCAL)
+        }
+        InventorySlotType::Trash => {
+            let hw = inv_size.x * 0.5;
+            let hh = inv_size.y * 0.5;
+            Vec2::new(-hw + INV_TRASH_OFFSET_X, hh + INV_TRASH_OFFSET_Y)
+        }
+        InventorySlotType::Normal => main_inventory_grid_center(slot_index, inv_size),
+    }
+}
+
 pub fn spawn_inv_slot(
     commands: &mut Commands,
     inv_ui_state: &Res<State<UIState>>,
@@ -478,62 +1215,12 @@ pub fn spawn_inv_slot(
     // spawns an inv slot, with an item icon as its child if an item exists in that inv slot.
     // the slot's parent is set to the inv ui entity.
     let inv_slot_offset = match inv_ui_state.0 {
-        UIState::Chest => Vec2::new(0., 0.),
-        UIState::Crafting => Vec2::new(0., -4.),
-        _ => Vec2::new(0., 0.),
+        UIState::Crafting => INV_UI_PARENT_OFFSET_CRAFTING,
+        _ => Vec2::ZERO,
     };
 
-    let mut x = ((slot_index % 6) as f32 * UI_SLOT_SIZE) - (inv_state.inv_size.x) / 2.
-        + UI_SLOT_SIZE / 2.
-        + 4.;
-    let mut y = ((slot_index / 6) as f32).trunc() * UI_SLOT_SIZE - (inv_state.inv_size.y) / 2.
-        + 7.
-        + UI_SLOT_SIZE / 2.;
-
-    if slot_type.is_hotbar() {
-        y = -GAME_HEIGHT / 2. + 14.;
-        x = ((slot_index % 6) as f32 * UI_SLOT_SIZE) - 2. * UI_SLOT_SIZE;
-    } else if slot_type.is_crafting() {
-        x = ((slot_index % 8) as f32 * UI_SLOT_SIZE) - (inv_state.inv_size.x) / 2.
-            + UI_SLOT_SIZE / 2.
-            + 6.;
-
-        y = -((slot_index / 8) as f32).trunc() * (UI_SLOT_SIZE + 1.) - (inv_state.inv_size.y) / 2.
-            + 7. * UI_SLOT_SIZE
-            + 16.;
-        if inv_ui_state.0 == UIState::Inventory {
-            x -= 2.;
-            y -= 29.;
-        }
-    } else if slot_type.is_equipment() {
-        x = UI_SLOT_SIZE - (inv_state.inv_size.x) / 2. + UI_SLOT_SIZE / 2. + 7. + 5. * UI_SLOT_SIZE;
-        y = slot_index as f32 * UI_SLOT_SIZE - (inv_state.inv_size.y + UI_SLOT_SIZE) / 2.
-            + UI_SLOT_SIZE
-            + 1. * slot_index as f32
-            + 4.;
-    } else if slot_type.is_accessory() {
-        x = UI_SLOT_SIZE - (inv_state.inv_size.x) / 2. + UI_SLOT_SIZE / 2. + 8. + 6. * UI_SLOT_SIZE;
-        y = slot_index as f32 * UI_SLOT_SIZE - (inv_state.inv_size.y + UI_SLOT_SIZE) / 2.
-            + UI_SLOT_SIZE
-            + 1. * slot_index as f32
-            + 4.;
-    } else if slot_type.is_chest() || slot_type.is_scrapper() {
-        y += 4. * UI_SLOT_SIZE + 11.;
-    } else if slot_type.is_furnace() {
-        if slot_index == 0 {
-            x = 76.;
-            y = 33.5;
-        } else if slot_index == 1 {
-            x = 76.;
-            y = 54.5;
-        }
-    } else if slot_type.is_trash() {
-        x = UI_SLOT_SIZE - (inv_state.inv_size.x) / 2. + UI_SLOT_SIZE / 2. + 4.;
-        y = -inv_state.inv_size.y / 2. - UI_SLOT_SIZE / 2. - 2.;
-    } else if ((slot_index / 6) as f32).trunc() == 0. {
-        y -= 3.;
-    }
-    let translation = Vec3::new(x, y, 1.) + inv_slot_offset.extend(0.);
+    let local = inv_slot_local_position(slot_type, slot_index, inv_state.inv_size, &inv_ui_state.0);
+    let translation = (local + inv_slot_offset).extend(1.);
     let mut item_icon_option = None;
     let mut item_type_option = None;
     let mut item_count_option = None;
@@ -550,7 +1237,7 @@ pub fn spawn_inv_slot(
             &item.item_stack,
             asset_server,
             Vec2::ZERO,
-            if slot_index == 5 || slot_index == 2 {
+            if slot_index % INVENTORY_GRID_COLS == 3 || slot_index % INVENTORY_GRID_COLS == 2 {
                 Vec2::new(0.5, 0.)
             } else {
                 Vec2::ZERO
@@ -580,12 +1267,19 @@ pub fn spawn_inv_slot(
             0 => Some("ui/icons/OrbSlotIcon.png"),
             _ => None,
         },
+        InventorySlotType::Weapon => Some("ui/icons/SwordSlotIcon.png"),
+        InventorySlotType::Pet => Some("ui/icons/PetSlotIcon.png"),
         _ => None,
     };
 
     if item_icon_option.is_some() {
         slot_icon = None;
     }
+    let size = if slot_type.is_trash() {
+        Vec2::new(20., 20.)
+    } else {
+        Vec2::new(18., 18.)
+    };
 
     let icon_entity_option = slot_icon.map(|slot_icon| {
         commands
@@ -593,11 +1287,15 @@ pub fn spawn_inv_slot(
                 texture: asset_server.load(slot_icon),
                 transform: Transform {
                     translation: Vec3::new(0., 0., 1.),
-                    scale: Vec3::new(1., 1., 1.),
+                    scale: if slot_type.is_furnace() {
+                        Vec3::new(2., 2., 1.)
+                    } else {
+                        Vec3::new(1., 1., 1.)
+                    },
                     ..Default::default()
                 },
                 sprite: Sprite {
-                    custom_size: Some(Vec2::new(16., 16.)),
+                    custom_size: Some(size),
                     ..Default::default()
                 },
                 ..Default::default()
@@ -607,15 +1305,13 @@ pub fn spawn_inv_slot(
     });
 
     let mut slot_entity = commands.spawn(SpriteBundle {
-        texture: graphics.get_ui_element_texture(
-            if slot_type.is_hotbar() && inv_state.active_hotbar_slot == slot_index {
-                UIElement::InventorySlotHover
-            } else if slot_type.is_hotbar() {
-                UIElement::InventorySlotHotbar
-            } else {
-                UIElement::InventorySlot
-            },
-        ),
+        texture: graphics.get_ui_element_texture(if slot_type.is_hotbar() {
+            UIElement::InventorySlotHotbar
+        } else if slot_type.is_furnace() {
+            UIElement::UpgradeSlot
+        } else {
+            UIElement::InventorySlot
+        }),
 
         transform: Transform {
             translation,
@@ -623,7 +1319,11 @@ pub fn spawn_inv_slot(
             ..Default::default()
         },
         sprite: Sprite {
-            custom_size: Some(Vec2::new(UI_SLOT_SIZE, UI_SLOT_SIZE)),
+            custom_size: Some(if slot_type.is_furnace() {
+                UI_UPGRADE_SLOT_SIZE
+            } else {
+                UI_SLOT_SIZE
+            }),
             ..Default::default()
         },
         ..Default::default()
@@ -638,7 +1338,11 @@ pub fn spawn_inv_slot(
             dirty: false,
             r#type: slot_type,
         })
-        .insert(UIElement::InventorySlot)
+        .insert(if slot_type.is_furnace() {
+            UIElement::UpgradeSlot
+        } else {
+            UIElement::InventorySlot
+        })
         .insert(Name::new(if slot_type.is_crafting() {
             "CRAFTING SLOT"
         } else {
@@ -660,61 +1364,7 @@ pub fn spawn_inv_slot(
     if let Some(icon_entity) = icon_entity_option {
         slot_entity.push_children(&[icon_entity]);
     }
-    let id = slot_entity.id();
-    // Attach an ammo bar to the active hotbar slot (UI only shows for active weapon)
-    if slot_type.is_hotbar() && inv_state.active_hotbar_slot == slot_index {
-        commands
-            .spawn(SpriteBundle {
-                sprite: Sprite {
-                    color: UNCOMMON_GREEN,
-                    custom_size: Some(Vec2::new(0., 1.)),
-                    anchor: Anchor::CenterLeft,
-                    ..Default::default()
-                },
-                transform: Transform {
-                    translation: Vec3::new(-6., -6.5, 4.),
-                    ..Default::default()
-                },
-                ..Default::default()
-            })
-            .insert(RenderLayers::from_layers(&[3]))
-            .insert(Name::new("AMMO BAR"))
-            .insert(AmmoBarHotbar)
-            .set_parent(id);
-    }
-
-    id
-}
-
-#[derive(Component)]
-pub struct AmmoBarHotbar;
-
-pub fn update_hotbar_ammo_bar(
-    game: GameParam,
-    mut bars: Query<&mut Sprite, With<AmmoBarHotbar>>,
-    ammo_query: Query<&Ammo>,
-) {
-    if bars.is_empty() {
-        return;
-    }
-    if let Some(main_hand) = game.player().main_hand_slot.clone() {
-        if let Ok(ammo) = ammo_query.get(main_hand.entity) {
-            let percent = if ammo.reloading {
-                ammo.reload.percent()
-            } else if ammo.max > 0 {
-                ammo.current as f32 / ammo.max as f32
-            } else {
-                0.
-            };
-            for mut sprite in bars.iter_mut() {
-                sprite.custom_size = Some(Vec2::new(12. * percent.clamp(0.0, 1.0), 1.));
-            }
-        } else {
-            for mut sprite in bars.iter_mut() {
-                sprite.custom_size = Some(Vec2::new(0., 1.));
-            }
-        }
-    }
+    slot_entity.id()
 }
 pub fn spawn_item_stack_icon(
     commands: &mut Commands,
@@ -786,20 +1436,6 @@ pub fn spawn_item_stack_icon(
     }
     item_entity
 }
-//TODO: make event?
-pub fn change_hotbar_slot(
-    slot: usize,
-    inv_state: &mut InventoryState,
-    inv_slots: &mut Query<&mut InventorySlotState>,
-) {
-    mark_slot_dirty(
-        inv_state.active_hotbar_slot,
-        InventorySlotType::Hotbar,
-        inv_slots,
-    );
-    inv_state.active_hotbar_slot = slot;
-    mark_slot_dirty(slot, InventorySlotType::Hotbar, inv_slots);
-}
 pub fn update_inventory_ui(
     mut commands: Commands,
     graphics: Res<Graphics>,
@@ -810,6 +1446,7 @@ pub fn update_inventory_ui(
     asset_server: Res<AssetServer>,
     inv: Query<&mut Inventory>,
     cont_param: UIContainersParam,
+    keybinds: Res<crate::keybinds::InputMappings>,
 ) {
     for (e, mut slot_state) in ui_elements.iter_mut() {
         // check current inventory state against that slot's state
@@ -863,7 +1500,7 @@ pub fn update_inventory_ui(
 
         if slot_state.dirty || slot_state.count != real_count {
             commands.entity(e).despawn_recursive();
-            spawn_inv_slot(
+            let new_slot_entity = spawn_inv_slot(
                 &mut commands,
                 &inv_ui_state,
                 &graphics,
@@ -879,6 +1516,21 @@ pub fn update_inventory_ui(
                 slot_state.r#type,
                 item_option.clone(),
             );
+
+            // Re-attach the hotbar keybind badge (it lives as a child of the slot entity,
+            // so `despawn_recursive` above destroyed it). Only the first
+            // `HUD_HOTBAR_SLOTS` slots get a key binding; the rest are passive storage.
+            if slot_state.r#type.is_hotbar() && slot_state.slot_index < crate::ui::HUD_HOTBAR_SLOTS
+            {
+                crate::ui::player_hud::spawn_hotbar_keybind_badge_for_slot(
+                    &mut commands,
+                    &graphics,
+                    &asset_server,
+                    &keybinds,
+                    slot_state.slot_index,
+                    new_slot_entity,
+                );
+            }
         }
     }
 }
@@ -1077,5 +1729,403 @@ pub fn apply_grant_heirloom_dev(
             heirloom.add_heirloom_components(player_entity, &mut commands, skills.clone());
             att_event.send(AttributeChangeEvent);
         }
+    }
+}
+
+/// Keeps the dynamic upgrade-material prompt text in sync with furnace slot 0 (the tome/orb slot).
+/// Runs while the inventory (non-crafting) UI is open so the prompt updates as soon as a material
+/// is dropped onto the slot.
+pub fn update_upgrade_material_prompt_text(
+    inv: Query<&Inventory>,
+    mut prompt: Query<&mut Text, With<UpgradeMaterialPromptText>>,
+) {
+    let Ok(inventory) = inv.get_single() else {
+        return;
+    };
+    let next_label = match inventory
+        .furnace_items
+        .items
+        .get(0)
+        .and_then(|slot| slot.as_ref())
+        .map(|i| i.item_stack.obj_type)
+    {
+        Some(WorldObject::UpgradeTome) => "Use Tome",
+        Some(WorldObject::OrbOfTransformation) => "Use Orb",
+        _ => "Add Materials",
+    };
+    for mut text in prompt.iter_mut() {
+        if let Some(section) = text.sections.get_mut(0) {
+            if section.value != next_label {
+                section.value = next_label.to_string();
+            }
+        }
+    }
+}
+
+/// Handles hover + click on the CRAFT / UPGRADE toggle button that flips the inventory side
+/// panels between the standard equipment/upgrade layout and the crafting/blueprints layout.
+pub fn handle_cursor_inventory_craft_toggle_button(
+    cursor_pos: Res<CursorPos>,
+    mouse_input: Res<Input<MouseButton>>,
+    ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
+    mut toggle_buttons: Query<
+        (Entity, &mut Interactable, &CraftModeToggleButton),
+        Without<InventorySlotState>,
+    >,
+    mut commands: Commands,
+    curr_ui_state: Res<State<UIState>>,
+    mut next_ui_state: ResMut<NextState<UIState>>,
+) {
+    let hit_test = super::ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
+
+    for (e, mut interactable, _) in toggle_buttons.iter_mut() {
+        match hit_test {
+            Some((hit_ent, _, _)) if hit_ent == e => match interactable.current() {
+                Interaction::None => {
+                    interactable.change(Interaction::Hovering);
+                }
+                Interaction::Hovering => {
+                    if left_mouse_pressed {
+                        let target = match curr_ui_state.0 {
+                            UIState::Inventory => UIState::InventoryCrafting,
+                            UIState::InventoryCrafting => UIState::Inventory,
+                            _ => continue,
+                        };
+                        next_ui_state.set(target);
+                        commands.spawn(crate::audio::SoundSpawner::new(
+                            crate::audio::AudioSoundEffect::ButtonClick,
+                            0.2,
+                        ));
+                    }
+                }
+                _ => (),
+            },
+            _ => {
+                if matches!(interactable.current(), Interaction::Hovering) {
+                    interactable.change(Interaction::None);
+                }
+            }
+        }
+    }
+}
+
+/// Hover + click handler for blueprint row slots on the BlueprintsPanel (InventoryCrafting).
+/// - Hover enters transition -> emit a recipe tooltip (`is_recipe = true`).
+/// - Hover exits -> despawn the tooltip.
+/// - Click -> set `SelectedCraftingRecipe`.
+pub fn handle_blueprint_slot_interaction(
+    mut commands: Commands,
+    cursor_pos: Res<CursorPos>,
+    mouse_input: Res<Input<MouseButton>>,
+    ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
+    mut blueprint_slots: Query<(Entity, &mut Interactable, &BlueprintSlot)>,
+    mut selected: ResMut<SelectedCraftingRecipe>,
+    mut tooltip_update: EventWriter<crate::ui::ToolTipUpdateEvent>,
+    mut tooltip_teardown: EventWriter<crate::ui::TooltipTeardownEvent>,
+    cur_ui_state: Res<State<UIState>>,
+    proto: ProtoParam,
+) {
+    if cur_ui_state.0 != UIState::InventoryCrafting {
+        return;
+    }
+    let hit_test = super::ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
+
+    for (e, mut interactable, bp) in blueprint_slots.iter_mut() {
+        match hit_test {
+            Some((hit_ent, _, _)) if hit_ent == e => match interactable.current() {
+                Interaction::None => {
+                    interactable.change(Interaction::Hovering);
+                    // Build an `ItemStack` for the recipe result so the tooltip renders its
+                    // ingredients + name via the existing `is_recipe` pipeline.
+                    if let Some(item_data) = proto.get_item_data(bp.recipe_obj) {
+                        tooltip_update.send(crate::ui::ToolTipUpdateEvent {
+                            item_stack: item_data.clone(),
+                            is_recipe: true,
+                            show_range: false,
+                        });
+                    }
+                }
+                Interaction::Hovering => {
+                    if left_mouse_pressed {
+                        selected.0 = Some(bp.recipe_obj);
+                        commands.spawn(crate::audio::SoundSpawner::new(
+                            crate::audio::AudioSoundEffect::ButtonClick,
+                            0.2,
+                        ));
+                    }
+                }
+                _ => (),
+            },
+            _ => {
+                if matches!(interactable.current(), Interaction::Hovering) {
+                    interactable.change(Interaction::None);
+                    tooltip_teardown.send_default();
+                }
+            }
+        }
+    }
+}
+
+/// Rebuilds the icon + count label on each of the three ingredient display slots and the
+/// craft-result slot whenever the selection or inventory changes. Icons are faded to 40%
+/// alpha if the player does not have enough of that ingredient.
+pub fn refresh_crafting_ingredient_display(
+    mut commands: Commands,
+    cur_ui_state: Res<State<UIState>>,
+    selected: Res<SelectedCraftingRecipe>,
+    inv_q: Query<&Inventory>,
+    inv_changed_q: Query<Entity, (With<Inventory>, Changed<Inventory>)>,
+    recipes: Res<Recipes>,
+    proto: ProtoParam,
+    ingredient_slots: Query<(Entity, &CraftingIngredientDisplaySlot)>,
+    result_slots: Query<Entity, With<CraftingResultSlot>>,
+    existing_ing_icons: Query<Entity, With<CraftingIngredientIcon>>,
+    existing_result_icons: Query<Entity, With<CraftingResultIcon>>,
+    mut count_texts: Query<(&mut Text, &CraftingIngredientCountText)>,
+    graphics: Res<Graphics>,
+    asset_server: Res<AssetServer>,
+) {
+    if cur_ui_state.0 != UIState::InventoryCrafting {
+        return;
+    }
+    let needs_refresh = selected.is_changed() || !inv_changed_q.is_empty();
+    if !needs_refresh {
+        return;
+    }
+    let Ok(inv) = inv_q.get_single() else {
+        return;
+    };
+
+    // Clear current icons so we can repaint from scratch.
+    for e in existing_ing_icons.iter() {
+        commands.entity(e).despawn_recursive();
+    }
+    for e in existing_result_icons.iter() {
+        commands.entity(e).despawn_recursive();
+    }
+
+    // Default: clear all count labels.
+    for (mut text, _) in count_texts.iter_mut() {
+        if let Some(section) = text.sections.get_mut(0) {
+            section.value.clear();
+        }
+    }
+
+    let Some(recipe_obj) = selected.0 else {
+        return;
+    };
+    let Some(recipe) = recipes.crafting_list.get(&recipe_obj) else {
+        return;
+    };
+
+    // Helper closure: are all ingredients satisfied?
+    let all_satisfied = recipe
+        .0
+        .iter()
+        .all(|ing| inv.items.get_item_count_in_container(ing.item) >= ing.count);
+
+    // Ingredients.
+    for (slot_entity, slot) in ingredient_slots.iter() {
+        let ingredient = recipe.0.get(slot.slot_index);
+        if let Some(ingredient) = ingredient {
+            let owned = inv.items.get_item_count_in_container(ingredient.item);
+            let has_enough = owned >= ingredient.count;
+            let alpha = if has_enough { 1.0 } else { 0.4 };
+
+            // Spawn icon.
+            if let Some(base_stack) = proto.get_item_data(ingredient.item).cloned() {
+                let icon = spawn_item_stack_icon(
+                    &mut commands,
+                    &graphics,
+                    &base_stack.copy_with_count(1),
+                    &asset_server,
+                    Vec2::ZERO,
+                    Vec2::ZERO,
+                    3,
+                );
+                commands
+                    .entity(icon)
+                    .insert(CraftingIngredientIcon {
+                        slot_index: slot.slot_index,
+                    })
+                    .insert(UIState::InventoryCrafting);
+                // Fade if unavailable.
+                commands.add(move |world: &mut World| {
+                    if let Some(mut e) = world.get_entity_mut(icon) {
+                        if let Some(mut sprite) = e.get_mut::<TextureAtlasSprite>() {
+                            sprite.color.set_a(alpha);
+                        }
+                    }
+                });
+                commands.entity(slot_entity).push_children(&[icon]);
+            }
+
+            // Update count label.
+            for (mut text, tag) in count_texts.iter_mut() {
+                if tag.slot_index == slot.slot_index {
+                    if let Some(section) = text.sections.get_mut(0) {
+                        section.value = format!("{}/{}", owned, ingredient.count);
+                        section.style.color = if has_enough {
+                            Color::WHITE
+                        } else {
+                            crate::colors::RED
+                        };
+                    }
+                }
+            }
+        }
+    }
+
+    // Result slot icon.
+    let result_alpha = if all_satisfied { 1.0 } else { 0.4 };
+    if let Ok(result_entity) = result_slots.get_single() {
+        if let Some(result_stack) = proto.get_item_data(recipe_obj).cloned() {
+            let stack_count = recipe.2.max(1);
+            let icon = spawn_item_stack_icon(
+                &mut commands,
+                &graphics,
+                &result_stack.copy_with_count(stack_count),
+                &asset_server,
+                Vec2::ZERO,
+                Vec2::ZERO,
+                3,
+            );
+            commands
+                .entity(icon)
+                .insert(CraftingResultIcon)
+                .insert(UIState::InventoryCrafting);
+            commands.add(move |world: &mut World| {
+                if let Some(mut e) = world.get_entity_mut(icon) {
+                    if let Some(mut sprite) = e.get_mut::<TextureAtlasSprite>() {
+                        sprite.color.set_a(result_alpha);
+                    }
+                }
+            });
+            commands.entity(result_entity).push_children(&[icon]);
+        }
+    }
+}
+
+/// Hover + click handler for the craft result slot on the CraftingPanel. Clicking crafts a
+/// single instance of the selected recipe and places it onto the player's dragged cursor
+/// stack. Repeated clicks accumulate count (up to `MAX_STACK_SIZE`).
+pub fn handle_crafting_result_slot_click(
+    mut commands: Commands,
+    cursor_pos: Res<CursorPos>,
+    mut mouse_input: ResMut<Input<MouseButton>>,
+    ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
+    mut result_slots: Query<(Entity, &mut Interactable), With<CraftingResultSlot>>,
+    cur_ui_state: Res<State<UIState>>,
+    selected: Res<SelectedCraftingRecipe>,
+    recipes: Res<Recipes>,
+    inv_q: Query<&Inventory>,
+    proto: ProtoParam,
+    graphics: Res<Graphics>,
+    asset_server: Res<AssetServer>,
+    dragging_query: Query<(Entity, &ItemStack), With<crate::ui::DraggedItem>>,
+    mut crafted_event: EventWriter<CraftedItemEvent>,
+    player_atts: Query<&crate::attributes::LootRateBonus, With<crate::player::Player>>,
+) {
+    if cur_ui_state.0 != UIState::InventoryCrafting {
+        return;
+    }
+    let hit_test = super::ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
+
+    for (result_entity, mut interactable) in result_slots.iter_mut() {
+        // 1. Hover-enter / hover-exit bookkeeping.
+        let hovering_this_frame =
+            matches!(hit_test, Some((hit_ent, _, _)) if hit_ent == result_entity);
+        if !hovering_this_frame {
+            if matches!(interactable.current(), Interaction::Hovering) {
+                interactable.change(Interaction::None);
+            }
+            continue;
+        }
+        if matches!(interactable.current(), Interaction::None) {
+            interactable.change(Interaction::Hovering);
+        }
+        if !left_mouse_pressed {
+            continue;
+        }
+
+        // 2. Craftability check.
+        let Some(recipe_obj) = selected.0 else {
+            continue;
+        };
+        let Some(recipe) = recipes.crafting_list.get(&recipe_obj) else {
+            continue;
+        };
+        let Ok(inv) = inv_q.get_single() else {
+            continue;
+        };
+        let can_craft = recipe
+            .0
+            .iter()
+            .all(|ing| inv.items.get_item_count_in_container(ing.item) >= ing.count);
+        if !can_craft {
+            continue;
+        }
+
+        let stack_count = recipe.2.max(1);
+
+        // 3. Either start a new dragged stack or extend the one we already hold. On each
+        //    craft we despawn-and-respawn the icon so the stack-count text refreshes, and we
+        //    drive `Interaction::Dragging` on the result slot so that subsequent clicks on
+        //    other inventory slots route through the standard drop pipeline.
+        let existing_drag = dragging_query.iter().next();
+        let (new_stack, old_drag_entity) = if let Some((drag_e, drag_stack)) = existing_drag {
+            if drag_stack.obj_type != recipe_obj {
+                continue;
+            }
+            let new_count = (drag_stack.count + stack_count).min(crate::inventory::MAX_STACK_SIZE);
+            if new_count == drag_stack.count {
+                continue;
+            }
+            (drag_stack.copy_with_count(new_count), Some(drag_e))
+        } else {
+            let Some(base_stack) = proto.get_item_data(recipe_obj).cloned() else {
+                continue;
+            };
+            let loot_bonus = player_atts.get_single().map(|a| a.0).unwrap_or(0);
+            let rolled = create_new_random_item_stack_with_attributes(
+                &base_stack.copy_with_count(stack_count),
+                &proto,
+                &mut commands,
+                loot_bonus,
+                false,
+            );
+            (rolled, None)
+        };
+
+        if let Some(old) = old_drag_entity {
+            commands.entity(old).despawn_recursive();
+        }
+
+        let icon = spawn_item_stack_icon(
+            &mut commands,
+            &graphics,
+            &new_stack,
+            &asset_server,
+            Vec2::ZERO,
+            Vec2::ZERO,
+            3,
+        );
+        commands
+            .entity(icon)
+            .insert(new_stack.clone())
+            .insert(crate::ui::DraggedItem);
+
+        // Put the result slot into Dragging state so the existing drop pipeline can
+        // handle dropping the crafted stack into inventory / world.
+        interactable.change(Interaction::Dragging {
+            item: icon,
+            origin_slot: crate::ui::VIRTUAL_DRAG_ORIGIN_SLOT,
+        });
+
+        crafted_event.send(CraftedItemEvent { obj: recipe_obj });
+        mouse_input.clear();
     }
 }

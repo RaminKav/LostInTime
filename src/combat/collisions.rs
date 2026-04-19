@@ -20,7 +20,9 @@ use crate::{
     chaos::ChaosTracker,
     client::analytics::{AnalyticsTrigger, AnalyticsUpdateEvent},
     enemy::{Mob, MobIsAttacking},
-    inventory::{Inventory, ItemStack},
+    inventory::{
+        can_auto_equip_weapon_on_pickup, try_auto_equip_weapon_on_pickup, Inventory, ItemStack,
+    },
     item::{
         item_actions::ItemActionParam,
         object_actions::TouchTriggerObjectAction,
@@ -733,6 +735,7 @@ pub const ITEM_PICKUP_DISTANCE: f32 = 6.0;
 pub fn check_item_drop_collisions(
     mut commands: Commands,
     player: Query<(&Transform, &ManaRegen), With<Player>>,
+    pets: Query<(), With<Pet>>,
     item_drops: Query<
         (Entity, &Transform, &ItemStack),
         (
@@ -822,16 +825,27 @@ pub fn check_item_drop_collisions(
             commands.spawn(SoundSpawner::new(AudioSoundEffect::ItemPickup, 0.15));
             continue;
         }
-        let inv_container = inv.single().items.clone();
-        if inv_container.get_first_empty_slot().is_none()
-            && inv_container
-                .get_slot_for_item_in_container_with_space(&item_stack, None)
-                .is_none()
-        {
-            return;
+        let player_has_pet = pets.iter().next().is_some();
+        if !can_auto_equip_weapon_on_pickup(&item_stack, inv.single(), player_has_pet) {
+            let inv_container = inv.single().items.clone();
+            if inv_container.get_first_empty_slot().is_none()
+                && inv_container
+                    .get_slot_for_item_in_container_with_space(&item_stack, None)
+                    .is_none()
+            {
+                return;
+            }
         }
 
-        item_stack.add_to_inventory(&mut inv.single_mut().items, &mut game.inv_slot_query);
+        let mut inv_mut = inv.single_mut();
+        if !try_auto_equip_weapon_on_pickup(
+            item_stack.clone(),
+            &mut inv_mut,
+            &mut game.inv_slot_query,
+            player_has_pet,
+        ) {
+            item_stack.add_to_inventory(&mut inv_mut.items, &mut game.inv_slot_query);
+        }
 
         if obj != WorldObject::TimeFragment
             && obj != WorldObject::Coin

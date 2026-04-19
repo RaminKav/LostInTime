@@ -84,6 +84,8 @@ pub enum ItemAction {
     ApplyTemporarySpeed(i32, f32),
     /// Heal `i32` every `f32` seconds for `f32` total seconds.
     ApplyPeriodicHeal(i32, f32, f32),
+    /// Triggers a bounce effect (same as walking over a pink flower).
+    TriggerBounce,
 }
 impl ItemAction {
     pub fn get_tooltip(&self) -> Option<String> {
@@ -123,6 +125,7 @@ impl ItemAction {
                 "+{} HP every {:.1}s for {:.0}s",
                 heal, interval, total
             )),
+            ItemAction::TriggerBounce => Some("Bounce!".to_string()),
             _ => None,
         }
     }
@@ -151,6 +154,7 @@ impl ItemActions {
                 ItemAction::ApplyTemporaryThorns(_, _) => has_consumable = true,
                 ItemAction::ApplyTemporarySpeed(_, _) => has_consumable = true,
                 ItemAction::ApplyPeriodicHeal(_, _, _) => has_consumable = true,
+                ItemAction::TriggerBounce => has_consumable = true,
                 _ => {}
             }
         }
@@ -280,6 +284,10 @@ impl ItemActions {
                         *duration,
                         ConsumableBuffEffect::FlatSpeed(*amount),
                     );
+                    item_action_param.use_item_event.send(UseItemEvent(obj));
+                }
+                ItemAction::TriggerBounce => {
+                    item_action_param.bounce_event.send(BounceEvent);
                     item_action_param.use_item_event.send(UseItemEvent(obj));
                 }
                 ItemAction::ApplyPeriodicHeal(heal, interval, total_duration) => {
@@ -461,6 +469,9 @@ pub fn handle_item_action_success(
                     WorldObject::BrownMushroomBlock,
                     WorldObject::RedMushroomBlock,
                     WorldObject::RedStew,
+                    WorldObject::PinkFlowerStew,
+                    WorldObject::YellowFlowerStew,
+                    WorldObject::BerryJam,
                     WorldObject::Berries,
                     WorldObject::CookedMeat,
                 ];
@@ -471,12 +482,14 @@ pub fn handle_item_action_success(
                     WorldObject::Apple,
                     WorldObject::CookedMeat,
                     WorldObject::RedStew,
+                    WorldObject::BerryJam,
                     WorldObject::RedMushroomBlock,
                     WorldObject::Berries,
                 ];
                 let consumable_slot = item_action_item.slot;
-                // Don't auto-refill quick-use hotbar slots (1, 2, 3); player manages those manually
-                let is_quick_use_slot = matches!(consumable_slot, 1 | 2 | 3);
+                // Don't auto-refill quick-use hotbar slots (0, 1, 2, 3 — the keys 1-4);
+                // the player manages those manually.
+                let is_quick_use_slot = matches!(consumable_slot, 0..=3);
                 let mut was_food = false;
                 let mut was_healing = false;
                 let item_actions = proto_param

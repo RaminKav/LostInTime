@@ -12,7 +12,6 @@ use crate::{
     item::projectile::{Projectile, RangedAttack, RangedAttackEvent},
     player::Player,
     proto::proto_param::ProtoParam,
-    ui::InventoryState,
     world::y_sort::YSort,
     FairyPetSprite, SlimePetSprite, DEBUG,
 };
@@ -115,7 +114,6 @@ pub struct PetState {
     pub current_target: Option<Entity>,
     pub attack_cooldown: Timer,
     pub projectile: Projectile,
-    pub hot_bar_slot: usize,
     pub is_following_player: bool,
 }
 #[derive(Clone)]
@@ -267,23 +265,9 @@ pub fn test_spawn_pet(mut commands: Commands, _proto: ProtoParam, keys: Res<Inpu
 pub fn configure_pet_on_spawn(
     mut commands: Commands,
     new_pets: Query<(Entity, &Pet), Added<Pet>>,
-    existing_pets: Query<&PetState>,
     mut events: EventWriter<UpdatePetWeaponEvent>,
 ) {
     for (pet_entity, pet) in new_pets.iter() {
-        // Determine which hotbar slot to use based on number of existing pets
-        // First pet uses slot 5 (6th slot), second pet uses slot 4 (5th slot)
-        let num_existing_pets = existing_pets.iter().count();
-        let hot_bar_slot = match num_existing_pets {
-            0 => 5, // First pet: 6th slot
-            1 => 4, // Second pet: 5th slot
-            _ => {
-                // If somehow there are more than 2 pets, default to slot 5
-                warn!("More than 2 pets detected! Defaulting to slot 5.");
-                5
-            }
-        };
-
         let pet_state = PetState {
             max_distance_from_player: 16. * 9.,
             max_target_distance: 16. * 9.,
@@ -294,7 +278,6 @@ pub fn configure_pet_on_spawn(
             current_target: None,
             attack_cooldown: Timer::from_seconds(10.0, TimerMode::Repeating),
             projectile: Projectile::None,
-            hot_bar_slot,
             is_following_player: false,
         };
 
@@ -336,11 +319,18 @@ pub fn configure_pet_on_spawn(
     }
 }
 
+/// Refreshes every pet's weapon from the single-slot `Inventory::pet_items` container.
+///
+/// Previously this read from `items[pet_state.hot_bar_slot]` (last hotbar slots were
+/// reserved for pet weapons), but the hotbar is no longer used for that purpose — the
+/// dedicated Pet slot in the equipment panel is now the sole source of truth.
+///
+/// All pets currently share the same Pet slot; if per-pet weapon slots are needed later,
+/// extend `Inventory::pet_items` to `with_size(N)` and index by pet id.
 pub fn update_pet_weapon_on_inv_change(
     mut pets: Query<&mut PetState, With<Pet>>,
     player_inventory: Query<&Inventory>,
     proto: ProtoParam,
-    inv_state: Res<InventoryState>,
     mut events: EventReader<UpdatePetWeaponEvent>,
     blessings: Query<&OwnedBlessings>,
 ) {
@@ -352,27 +342,16 @@ pub fn update_pet_weapon_on_inv_change(
             } else {
                 1.0
             };
+            let pet_weapon = inventory
+                .pet_items
+                .items
+                .get(0)
+                .cloned()
+                .flatten()
+                .filter(|stack| stack.get_obj().is_weapon())
+                .map(|stack| stack.item_stack.clone());
             for mut pet_state in pets.iter_mut() {
-                if inv_state.active_hotbar_slot == pet_state.hot_bar_slot {
-                    pet_state.change_wepon(None, &proto, attack_speed_buff);
-                    continue;
-                }
-                // Check if player has a weapon in their hot bar slot
-                if let Some(item_stack) = &inventory.items.items[pet_state.hot_bar_slot] {
-                    let weapon_obj = item_stack.get_obj();
-                    if weapon_obj.is_weapon() {
-                        pet_state.change_wepon(
-                            Some(item_stack.item_stack.clone()),
-                            &proto,
-                            attack_speed_buff,
-                        );
-                    } else {
-                        // Player has no weapon in hot bar slot
-                        pet_state.change_wepon(None, &proto, attack_speed_buff);
-                    }
-                } else {
-                    pet_state.change_wepon(None, &proto, attack_speed_buff);
-                }
+                pet_state.change_wepon(pet_weapon.clone(), &proto, attack_speed_buff);
             }
         }
     }

@@ -1621,7 +1621,7 @@ pub fn handle_crit_heal(
             continue;
         }
 
-        let chance = 25 * stacks; // 25% per stack
+        let chance = 15 * stacks; // 15% per stack
         let heal_amount = if chance > 100 {
             // Past 100%, chance for 2 HP
             let extra_chance = chance - 100;

@@ -26,7 +26,11 @@ pub fn create_new_random_item_stack_with_attributes(
     loot_bonus: i32,
     play_audio: bool,
 ) -> ItemStack {
-    let Some(eqp_type) = proto.get_component::<EquipmentType, _>(stack.obj_type) else {
+    let eqp_type_option = proto.get_component::<EquipmentType, _>(stack.obj_type);
+    // Tools (axe, pickaxe) are passive inventory items and behave like normal item drops,
+    // so skip the equipment attribute pipeline even though they have an EquipmentType.
+    let is_tool_item = eqp_type_option.map_or(false, |e| e.is_tool());
+    let Some(eqp_type) = eqp_type_option.filter(|_| !is_tool_item) else {
         let mut stack = stack.clone();
         stack.metadata = proto
             .get_item_data(stack.obj_type)
@@ -58,13 +62,17 @@ pub fn create_new_random_item_stack_with_attributes(
 
 pub fn reroll_item_bonus_attributes(stack: &ItemStack, proto: &ProtoParam) -> ItemStack {
     let level = stack.metadata.level.unwrap_or(1);
+    let Some(eqp_type) = proto.get_component::<EquipmentType, _>(stack.obj_type) else {
+        return stack.clone();
+    };
+    // Tools are passive inventory items with no stats; nothing to reroll.
+    if eqp_type.is_tool() {
+        return stack.clone();
+    }
     let raw_base_att = proto
         .get_component::<RawItemBaseAttributes, _>(stack.obj_type)
         .unwrap();
     let raw_bonus_att_option = proto.get_component::<RawItemBonusAttributes, _>(stack.obj_type);
-    let Some(eqp_type) = proto.get_component::<EquipmentType, _>(stack.obj_type) else {
-        return stack.clone();
-    };
 
     let mut rng = rand::thread_rng();
     let rarity_rng = rng.gen_range(0..=4);

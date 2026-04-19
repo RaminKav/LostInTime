@@ -9,6 +9,7 @@ use crate::{
         tips::{SeenTips, Tip, TipEvent},
     },
 };
+use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 use bevy_proto::prelude::ProtoCommands;
 use rand::Rng;
@@ -26,7 +27,6 @@ use crate::{
     cursor::CursorPos,
     inventory::{Inventory, InventoryItemStack, ItemStack},
     item::{heirloom_shrine::HeirloomShrineState, CraftedItemEvent, EquipmentType},
-    pets::state::UpdatePetWeaponEvent,
     player::{
         combat_heirlooms::HallucinationStatType,
         levels::PlayerLevel,
@@ -37,7 +37,6 @@ use crate::{
     proto::proto_param::ProtoParam,
     ui::{
         crafting_ui::UpgradeButton,
-        inventory_ui::change_hotbar_slot,
         item_chest::{
             ChestType, ItemChestAnimChangeEvent, ItemChestAnimState, ItemChestButton,
             ItemChestState,
@@ -63,6 +62,8 @@ pub enum UIElement {
     ChestInventory,
     InventorySlot,
     InventorySlotHotbar,
+    UpgradeSlot,
+    UpgradeSlotHover,
     InventorySlotHover,
     XPBarFrame,
     Tooltip,
@@ -111,7 +112,10 @@ pub enum UIElement {
     SkillChoiceMeleeHover,
     SkillChoiceRogueHover,
     SkillChoiceMagicHover,
-    StarIcon,
+    StarIconCommon,
+    StarIconUncommon,
+    StarIconRare,
+    StarIconLegendary,
     InfoModal,
     TitleBar,
     SkillClassTracker,
@@ -173,6 +177,25 @@ pub enum UIElement {
     MinimapSkullIcon,
     MinimapPortalIcon,
     TipBox,
+    UpgradePanel,
+    EquipmentPanel,
+    BlueprintsPanel,
+    /// Side panel shown in `UIState::InventoryCrafting` in place of the `UpgradePanel`.
+    /// Hosts the three ingredient display slots and the craft result slot.
+    CraftingPanel,
+    /// Background sprite for one blueprint row in the blueprints panel (`InventoryCrafting`).
+    /// Clicking selects the recipe, hover opens the recipe tooltip.
+    CraftingSlot,
+    CraftingSlotHover,
+    /// Visual frame around the CRAFT / UPGRADE swap label that sits on the bottom of the
+    /// upgrade / crafting side panel. Decorative only — the click behaviour is driven by
+    /// `CraftModeToggleButton`.
+    CraftButton,
+    CraftButtonHover,
+    /// One row in the blueprints panel (`InventoryCrafting`). Houses the recipe icon and
+    /// name label. Clicking selects the recipe, hover opens the recipe tooltip.
+    BlueprintSlot,
+    BlueprintSlotHover,
 }
 impl UIElement {
     pub fn get_hover_state(&self) -> Option<UIElement> {
@@ -191,6 +214,10 @@ impl UIElement {
             UIElement::AchievementsButton => Some(UIElement::AchievementsButtonHover),
             UIElement::UnlocksButton => Some(UIElement::UnlocksButtonHover),
             UIElement::OptionsButton => Some(UIElement::OptionsButtonHover),
+            UIElement::UpgradeSlot => Some(UIElement::UpgradeSlotHover),
+            UIElement::CraftingSlot => Some(UIElement::CraftingSlotHover),
+            UIElement::CraftButton => Some(UIElement::CraftButtonHover),
+            UIElement::BlueprintSlot => Some(UIElement::BlueprintSlotHover),
             _ => None,
         }
     }
@@ -210,6 +237,10 @@ impl UIElement {
             UIElement::AchievementsButtonHover => Some(UIElement::AchievementsButton),
             UIElement::UnlocksButtonHover => Some(UIElement::UnlocksButton),
             UIElement::OptionsButtonHover => Some(UIElement::OptionsButton),
+            UIElement::UpgradeSlotHover => Some(UIElement::UpgradeSlot),
+            UIElement::CraftingSlotHover => Some(UIElement::CraftingSlot),
+            UIElement::CraftButtonHover => Some(UIElement::CraftButton),
+            UIElement::BlueprintSlotHover => Some(UIElement::BlueprintSlot),
             _ => None,
         }
     }
@@ -246,6 +277,10 @@ impl Interactable {
         self.state = new_state;
     }
 }
+/// `Interaction::Dragging.origin_slot` when the drag did not start from a real inventory slot
+/// (e.g. crafting result panel). Must never equal a real [`InventorySlotState::slot_index`].
+pub const VIRTUAL_DRAG_ORIGIN_SLOT: usize = usize::MAX;
+
 #[derive(Component, Default, Debug, Clone)]
 pub enum Interaction {
     #[default]
@@ -274,6 +309,14 @@ pub struct DropOnSlotEvent {
 pub struct RemoveFromSlotEvent {
     pub removed_item_stack: ItemStack,
     pub removed_slot_state: InventorySlotState,
+}
+
+/// Bundles event writers for `handle_interaction_clicks` (Bevy `SystemParam` tuple limit).
+#[derive(SystemParam)]
+pub struct InvSlotInteractionEvents<'w> {
+    pub remove_from_slot: EventWriter<'w, RemoveFromSlotEvent>,
+    pub tooltip_update: EventWriter<'w, ToolTipUpdateEvent>,
+    pub tooltip_teardown: EventWriter<'w, TooltipTeardownEvent>,
 }
 
 #[derive(Debug, Clone)]
@@ -328,8 +371,8 @@ pub fn handle_drop_in_world_events(
                         origin_slot: game_param
                             .inv_slot_query
                             .get(parent_e)
-                            .expect("parent is an inv slot")
-                            .slot_index,
+                            .map(|s| s.slot_index)
+                            .unwrap_or(VIRTUAL_DRAG_ORIGIN_SLOT),
                     });
                 }
             }
@@ -347,6 +390,7 @@ pub fn handle_drop_on_slot_events(
     asset_server: Res<AssetServer>,
     mut inv: Query<&mut Inventory>,
     mut cont_param: UIContainersParam,
+    mut tooltip_update_events: EventWriter<ToolTipUpdateEvent>,
 ) {
     for drop_event in events.iter() {
         // all we need to do here is swap spots in the inventory
@@ -438,8 +482,21 @@ pub fn handle_drop_on_slot_events(
                     origin_slot: game
                         .inv_slot_query
                         .get(drop_event.parent_interactable_entity)
-                        .expect("parent is an inv slot")
-                        .slot_index,
+                        .map(|s| s.slot_index)
+                        .unwrap_or(VIRTUAL_DRAG_ORIGIN_SLOT),
+                });
+            }
+        }
+
+        if slot_type.is_furnace() && drop_event.drop_target_slot_state.slot_index == 1 {
+            if let Some(stack) = inv.single().furnace_items.items[1]
+                .as_ref()
+                .map(|i| i.item_stack.clone())
+            {
+                tooltip_update_events.send(ToolTipUpdateEvent {
+                    item_stack: stack,
+                    is_recipe: false,
+                    show_range: false,
                 });
             }
         }
@@ -448,23 +505,15 @@ pub fn handle_drop_on_slot_events(
 
 pub fn handle_dragging(
     cursor_pos: Res<CursorPos>,
-    mut interactables: Query<(Entity, &mut Interactable)>,
-    mut drag_query: Query<(Entity, &mut Transform)>,
+    mut drag_query: Query<&mut Transform, With<DraggedItem>>,
 ) {
-    // iter all interactables, find ones in dragging.
-    // set translation to cursor, and bring them to the top z layer so they render on top of everything
-
-    // check things that were just dropped (.previous == dragging)
-    // check cursor pos to see if it dropped on top of another item
-    // if so, swap their places in the inventory
-    // if dropped outside inventory space, remove item and spawn dropped entity item stack
-    // else, it is an invalid drag, reset the its original location
-    for (_e, interactable) in interactables.iter_mut() {
-        if let Interaction::Dragging { item, .. } = interactable.current() {
-            if let Ok((_e, mut t)) = drag_query.get_mut(*item) {
-                t.translation = cursor_pos.ui_coords.truncate().extend(998.);
-            }
-        }
+    // Any entity tagged `DraggedItem` follows the mouse cursor at the top z layer so it
+    // renders on top of the rest of the UI. (The `Interactable::Dragging` state on the
+    // origin slot still drives drop/merge flow via `handle_item_drop_clicks`, but transform
+    // updates are decoupled so programmatically-spawned drags — e.g. the inventory-craft
+    // result slot — also follow the cursor.)
+    for mut t in drag_query.iter_mut() {
+        t.translation = cursor_pos.ui_coords.truncate().extend(998.);
     }
 }
 pub fn handle_hovering(
@@ -579,6 +628,17 @@ pub fn handle_hovering(
                 // Skip tooltip for heirlooms - the name is already displayed in the UI
                 // let _essence = essence_option.expect("essence buttons have essence state");
             }
+            // Generic sprite-swap hover for UI elements whose only hover effect is a texture
+            // swap (no tooltip side-effects, no state routing). Tooltip + click side-effects
+            // for `BlueprintSlot` are handled separately in `handle_blueprint_slot_interaction`.
+            if ui == &UIElement::CraftButton || ui == &UIElement::BlueprintSlot {
+                if let Some(hover) = ui.get_hover_state() {
+                    commands
+                        .entity(e)
+                        .insert(hover.clone())
+                        .insert(graphics.get_ui_element_texture(hover));
+                }
+            }
         }
         if let Interaction::Hovering = interactable.previous() {
             if ui == &UIElement::InventorySlotHover {
@@ -608,6 +668,15 @@ pub fn handle_hovering(
                     .insert(graphics.get_ui_element_texture(UIElement::EssenceButton));
 
                 tooltip_teardown_events.send_default();
+            }
+            // Generic reverse-swap for elements handled above.
+            if ui == &UIElement::CraftButtonHover || ui == &UIElement::BlueprintSlotHover {
+                if let Some(normal) = ui.get_normal_state() {
+                    commands
+                        .entity(e)
+                        .insert(normal.clone())
+                        .insert(graphics.get_ui_element_texture(normal));
+                }
             }
         }
     }
@@ -737,7 +806,7 @@ pub fn handle_interaction_clicks(
     graphics: Res<Graphics>,
     asset_server: Res<AssetServer>,
     mut inv: Query<&mut Inventory>,
-    mut remove_item_event: EventWriter<RemoveFromSlotEvent>,
+    mut inv_slot_events: InvSlotInteractionEvents,
     mut container_param: UIContainersParam,
     proto: ProtoParam,
     ui_state: Res<State<UIState>>,
@@ -783,7 +852,7 @@ pub fn handle_interaction_clicks(
                                     .remove_parent()
                                     .insert(DraggedItem);
 
-                                remove_item_event.send(RemoveFromSlotEvent {
+                                inv_slot_events.remove_from_slot.send(RemoveFromSlotEvent {
                                     removed_item_stack: item_icon.2.clone(),
                                     removed_slot_state: state.clone(),
                                 });
@@ -817,6 +886,9 @@ pub fn handle_interaction_clicks(
                                     });
                                 } else {
                                     container_items.items[state.slot_index] = None;
+                                    if state.r#type.is_furnace() && state.slot_index == 1 {
+                                        inv_slot_events.tooltip_teardown.send_default();
+                                    }
                                 }
 
                                 state.dirty = true;
@@ -909,25 +981,36 @@ pub fn handle_interaction_clicks(
                                         let item_to_move = inv.items.items[state.slot_index].take();
                                         if let Some(mut moved_item) = item_to_move {
                                             moved_item.slot = 1;
+                                            let stack = moved_item.item_stack.clone();
                                             inv.furnace_items.items[1] = Some(moved_item);
+                                            inv_slot_events.tooltip_update.send(
+                                                ToolTipUpdateEvent {
+                                                    item_stack: stack,
+                                                    is_recipe: false,
+                                                    show_range: false,
+                                                },
+                                            );
                                         }
                                         state.dirty = true;
                                         continue;
                                     }
                                 }
                             } else if state.r#type.is_furnace() {
+                                let from_slot = state.slot_index;
                                 // Moving from furnace slots back to inventory
                                 // Take the item from furnace first to avoid double borrow
-                                let furnace_item = inv.furnace_items.items[state.slot_index].take();
+                                let furnace_item = inv.furnace_items.items[from_slot].take();
                                 if let Some(mut moved_item) = furnace_item {
                                     // Find first empty slot in inventory
                                     if let Some(empty_slot) = inv.items.get_first_empty_slot() {
                                         moved_item.slot = empty_slot;
                                         inv.items.items[empty_slot] = Some(moved_item);
+                                        if from_slot == 1 {
+                                            inv_slot_events.tooltip_teardown.send_default();
+                                        }
                                     } else {
                                         // No empty slot, put it back
-                                        inv.furnace_items.items[state.slot_index] =
-                                            Some(moved_item);
+                                        inv.furnace_items.items[from_slot] = Some(moved_item);
                                     }
                                 }
                                 state.dirty = true;
@@ -1820,61 +1903,6 @@ pub fn handle_cursor_essence_buttons(
 
                 interactable.change(Interaction::None);
             }
-        }
-    }
-}
-
-pub fn handle_hotbar_slot_clicks_when_inv_closed(
-    mut param_set: ParamSet<(
-        Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
-        Query<(Entity, &InventorySlotState)>,
-        Query<&mut InventorySlotState>,
-    )>,
-    cursor_pos: Res<CursorPos>,
-    mouse_input: Res<Input<MouseButton>>,
-    mut inv_state: ResMut<InventoryState>,
-    ui_state: Res<State<UIState>>,
-    mut pet_weapon_events: EventWriter<UpdatePetWeaponEvent>,
-) {
-    // Only handle clicks when inventory is closed
-    if ui_state.0.is_inv_open() {
-        return;
-    }
-
-    let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
-    if !left_mouse_pressed {
-        return;
-    }
-
-    // Extract slot_index first using read queries
-    let clicked_slot_index = {
-        // First, find which entity was clicked
-        let ui_sprites = param_set.p0();
-        let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
-
-        let clicked_entity = if let Some((hit_entity, _, _)) = hit_test {
-            hit_entity
-        } else {
-            return;
-        };
-
-        // Then, check if it's a hotbar slot and get its slot_index
-        let slot_slots = param_set.p1();
-        slot_slots.iter().find_map(|(entity, slot_state)| {
-            if entity == clicked_entity && slot_state.r#type.is_hotbar() {
-                Some(slot_state.slot_index)
-            } else {
-                None
-            }
-        })
-    };
-
-    // If we found a clicked hotbar slot, change to it using mutable query
-    if let Some(slot_index) = clicked_slot_index {
-        if slot_index != inv_state.active_hotbar_slot {
-            let mut slot_query = param_set.p2();
-            change_hotbar_slot(slot_index, &mut inv_state, &mut slot_query);
-            pet_weapon_events.send(UpdatePetWeaponEvent);
         }
     }
 }

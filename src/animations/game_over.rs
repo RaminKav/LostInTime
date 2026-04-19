@@ -14,10 +14,8 @@ use crate::{
     },
     chaos::ChaosTracker,
     client::{leaderboard::LastSubmittedScore, GameData, GameOverEvent},
-    colors::{overwrite_alpha, GREY, WHITE, YELLOW_2},
-    combat::damage_tracker::{
-        format_damage, spawn_damage_tracker_ui, DamageTracker, PetAbilityStats,
-    },
+    colors::{overwrite_alpha, WHITE, YELLOW_2},
+    combat::damage_tracker::{spawn_damage_tracker_ui, DamageTracker, PetAbilityStats},
     datafiles,
     inputs::FacingDirection,
     inventory::ItemStack,
@@ -37,7 +35,7 @@ use crate::{
         dimension::{Era, EraManager},
         y_sort::YSort,
     },
-    GameState, RawPosition, ScreenResolution, GAME_HEIGHT,
+    GameState, RawPosition, ScreenResolution,
 };
 
 use super::ui_animaitons::{MoveUIAnimation, UIIconMover};
@@ -118,11 +116,14 @@ pub fn handle_game_over_fadeout(
             .spawn(SpriteBundle {
                 sprite: Sprite {
                     color: Color::rgba(0., 0., 0., 0.),
-                    custom_size: Some(Vec2::new(resolution.game_width + 10., GAME_HEIGHT + 20.)),
+                    custom_size: Some(Vec2::new(
+                        resolution.game_width + 10.,
+                        resolution.game_height + 20.,
+                    )),
                     ..default()
                 },
                 transform: Transform {
-                    translation: Vec3::new(0., 0., Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND + 10.),
+                    translation: Vec3::new(0., 0., Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND - 1.),
                     scale: Vec3::new(1., 1., 1.),
                     ..Default::default()
                 },
@@ -143,11 +144,7 @@ pub fn handle_game_over_fadeout(
                     },
                 ),
                 transform: Transform {
-                    translation: Vec3::new(
-                        0.,
-                        100.,
-                        Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND + 21.,
-                    ),
+                    translation: Vec3::new(0., 100., Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND),
                     scale: Vec3::new(1., 1., 1.),
                     ..Default::default()
                 },
@@ -175,7 +172,7 @@ pub fn handle_game_over_fadeout(
                     },
                 ),
                 transform: Transform {
-                    translation: Vec3::new(0., 64., Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND + 21.), // Moved 30px higher
+                    translation: Vec3::new(0., 64., Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND), // Moved 30px higher
                     scale: Vec3::new(1., 1., 1.),
                     ..Default::default()
                 },
@@ -209,7 +206,7 @@ pub fn handle_game_over_fadeout(
                     },
                 ),
                 transform: Transform {
-                    translation: Vec3::new(0., 48., Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND + 21.), // Moved 30px higher
+                    translation: Vec3::new(0., 48., Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND), // Moved 30px higher
                     scale: Vec3::new(1., 1., 1.),
                     ..Default::default()
                 },
@@ -232,7 +229,7 @@ pub fn handle_game_over_fadeout(
             Transform::from_translation(Vec3::new(
                 panel_x + 42.0,
                 start_y,
-                Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND + 21.0,
+                Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND,
             )),
             0.0,
             84.0,
@@ -258,7 +255,7 @@ pub fn handle_game_over_fadeout(
                 transform: Transform::from_translation(Vec3::new(
                     stats_left_x,
                     y_offset + 16.,
-                    Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND + 21.,
+                    Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND,
                 )),
                 ..default()
             },
@@ -283,7 +280,7 @@ pub fn handle_game_over_fadeout(
                         transform: Transform::from_translation(Vec3::new(
                             stats_left_x,
                             y_offset,
-                            Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND + 21.,
+                            Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND,
                         )),
                         ..default()
                     },
@@ -307,7 +304,7 @@ pub fn handle_game_over_fadeout(
                 transform: Transform::from_translation(Vec3::new(
                     stats_left_x,
                     y_offset + 32.,
-                    Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND + 21.,
+                    Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND,
                 )),
                 ..default()
             },
@@ -328,7 +325,7 @@ pub fn handle_game_over_fadeout(
                     transform: Transform::from_translation(Vec3::new(
                         panel_x + 42.,
                         y_offset + 48.,
-                        Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND + 22.,
+                        Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND + 1.,
                     )),
                     ..default()
                 },
@@ -374,7 +371,7 @@ pub fn handle_game_over_fadeout(
                     transform: Transform::from_translation(Vec3::new(
                         0.,
                         -99.,
-                        Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND + 23.,
+                        Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND + 2.,
                     )),
                     ..Default::default()
                 },
@@ -502,7 +499,11 @@ pub fn tick_game_over_overlay(
             spawn_text(
                 &mut commands,
                 &asset_server,
-                Vec3::new(0., -GAME_HEIGHT / 2. + 56.5, 21.),
+                Vec3::new(
+                    0.,
+                    -res.game_height / 2. + 56.5,
+                    Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND,
+                ),
                 WHITE,
                 format!("Tip: {}", picked_tip),
                 Anchor::Center,
@@ -530,7 +531,11 @@ pub fn tick_game_over_overlay(
             let text = spawn_text(
                 &mut commands,
                 &asset_server,
-                Vec3::new(res.game_width / 2. - 35., GAME_HEIGHT / 2. - 43.5, 21.),
+                Vec3::new(
+                    res.game_width / 2. - 35.,
+                    res.game_height / 2. - 43.5,
+                    Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND,
+                ),
                 WHITE,
                 format!("{:}", total_currency - currency_this_run as u128),
                 Anchor::CenterLeft,
@@ -611,11 +616,11 @@ pub fn handle_spawn_collected_time_fragments(
                     .clone()
                     .copy_with_count(0);
                 commands.spawn(UIIconMover::new(
-                    Vec3::new(0., 10., 21.),
+                    Vec3::new(0., 10., Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND),
                     Vec3::new(
                         -total_offset / 2. + row_i as f32 * spacing,
                         -10. + (col_i as f32 + 1.) * -8.,
-                        21.,
+                        Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND,
                     ),
                     WorldObject::TimeFragment,
                     0.,
@@ -630,8 +635,11 @@ pub fn handle_spawn_collected_time_fragments(
                 for (txfm, mut mover) in all_time_fragments.iter_mut() {
                     if mover.end == txfm.translation() {
                         mover.start = txfm.translation();
-                        mover.end =
-                            Vec3::new(res.game_width / 2. - 30., GAME_HEIGHT / 2. - 43.5, 21.);
+                        mover.end = Vec3::new(
+                            res.game_width / 2. - 30.,
+                            res.game_height / 2. - 43.5,
+                            Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND,
+                        );
                         mover.startup_delay = Timer::from_seconds(1.0, TimerMode::Once);
                         mover.despawn_when_done = true;
                         mover.item_stack.count = 1;

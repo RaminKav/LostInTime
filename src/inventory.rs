@@ -26,6 +26,8 @@ use bevy_proto::prelude::*;
 use serde::{Deserialize, Serialize};
 
 pub const INVENTORY_SIZE: usize = 8 * 4;
+/// First this many `Inventory::items` indices are the quickbar (keys 1–4 + two extra storage slots).
+pub const INVENTORY_HOTBAR_SLOTS: usize = 4;
 pub const MAX_STACK_SIZE: usize = 9999;
 
 #[derive(Component, Debug, Default, Clone, Serialize, Deserialize)]
@@ -33,10 +35,32 @@ pub struct Inventory {
     pub items: Container,
     pub equipment_items: Container,
     pub accessory_items: Container,
+    /// Single-slot container for the player's currently-equipped weapon.
+    /// Drives `PlayerState::main_hand_slot` (see `update_attributes_with_held_item_change`).
+    #[serde(default = "default_single_slot_container")]
+    pub weapon_items: Container,
+    /// Single-slot container for the pet's equipped weapon.
+    /// Drives `PetState::weapon_slot` (see `update_pet_weapon_on_inv_change`).
+    #[serde(default = "default_single_slot_container")]
+    pub pet_items: Container,
     pub crafting_items: Container,
     pub furnace_items: Container,
     pub trash_items: Container,
+    /// Three input slots rendered on the "CRAFTING" side panel (inventory → crafting mode toggle).
+    /// Kept separate from `crafting_items` (the recipe strip) and `furnace_items` (tome/orb upgrade).
+    #[serde(default = "default_crafting_inputs_container")]
+    pub crafting_inputs_items: Container,
     // pub crafting_result_item: Container,
+}
+
+/// Serde default for single-slot containers (used by migration of older saves
+/// that predate the `weapon_items` / `pet_items` fields).
+fn default_single_slot_container() -> Container {
+    Container::with_size(1)
+}
+/// Serde default for `crafting_inputs_items` so saves predating this container deserialize cleanly.
+fn default_crafting_inputs_container() -> Container {
+    Container::with_size(3)
 }
 impl Inventory {
     pub fn is_empty(&self) -> bool {
@@ -51,9 +75,12 @@ impl Inventory {
         match slot_type {
             InventorySlotType::Equipment => &self.equipment_items,
             InventorySlotType::Accessory => &self.accessory_items,
+            InventorySlotType::Weapon => &self.weapon_items,
+            InventorySlotType::Pet => &self.pet_items,
             InventorySlotType::Crafting => &self.crafting_items,
             InventorySlotType::Furnace => &self.furnace_items,
             InventorySlotType::Trash => &self.trash_items,
+            InventorySlotType::CraftingInput => &self.crafting_inputs_items,
             _ => &self.items,
         }
     }
@@ -61,11 +88,37 @@ impl Inventory {
         match slot_type {
             InventorySlotType::Equipment => &mut self.equipment_items,
             InventorySlotType::Accessory => &mut self.accessory_items,
+            InventorySlotType::Weapon => &mut self.weapon_items,
+            InventorySlotType::Pet => &mut self.pet_items,
             InventorySlotType::Crafting => &mut self.crafting_items,
             InventorySlotType::Furnace => &mut self.furnace_items,
             InventorySlotType::Trash => &mut self.trash_items,
+            InventorySlotType::CraftingInput => &mut self.crafting_inputs_items,
             _ => &mut self.items,
         }
+    }
+
+    /// True if any slot in the main grid, equipment, accessory, weapon, or pet containers holds
+    /// an item with this [`EquipmentType`] (e.g. [`EquipmentType::Axe`] for trees).
+    pub fn has_equipment_type(&self, required: &EquipmentType, proto: &ProtoParam) -> bool {
+        let containers = [
+            &self.items,
+            &self.equipment_items,
+            &self.accessory_items,
+            &self.weapon_items,
+            &self.pet_items,
+        ];
+        for container in containers {
+            for slot in container.items.iter().flatten() {
+                let obj = slot.item_stack.obj_type;
+                if let Some(eq_type) = proto.get_component::<EquipmentType, _>(obj) {
+                    if eq_type == required {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
     }
 }
 
@@ -127,7 +180,10 @@ impl InventoryItemStack {
             if target_item.get_obj() == &obj_type
                 && target_item.item_stack.metadata == self.item_stack.metadata
                 && target_item.item_stack.attributes == self.item_stack.attributes
-                && !(slot_type.is_equipment() || slot_type.is_accessory())
+                && !(slot_type.is_equipment()
+                    || slot_type.is_accessory()
+                    || slot_type.is_weapon_slot()
+                    || slot_type.is_pet_slot())
             {
                 mark_slot_dirty(self.slot, slot_type, inv_slots);
                 return container.merge_item_stacks(self.item_stack.clone(), target_item);
@@ -307,6 +363,11 @@ impl InventoryItemStack {
         if slot_type.is_furnace() {
             return ui_cont_param.inv_state.furnace_state.slot_map[self.slot]
                 .contains(&self.item_stack.obj_type);
+        }
+        // Weapon / Pet slots: accept any item whose `WorldObject::is_weapon()` is true.
+        // Both slots are size 1, so `self.slot` must be 0.
+        if slot_type.is_weapon_slot() || slot_type.is_pet_slot() {
+            return self.slot == 0 && self.item_stack.obj_type.is_weapon();
         }
         if !(slot_type.is_accessory() || slot_type.is_equipment()) {
             return true;
@@ -520,4 +581,76 @@ impl ItemStack {
         }
         self.clone()
     }
+}
+
+/// True if a weapon pickup could go into an empty main-weapon or pet slot (so we should not
+/// reject the pickup when the main grid is full). See [`try_auto_equip_weapon_on_pickup`].
+pub fn can_auto_equip_weapon_on_pickup(
+    item_stack: &ItemStack,
+    inventory: &Inventory,
+    player_has_pet: bool,
+) -> bool {
+    if !item_stack.obj_type.is_weapon() {
+        return false;
+    }
+    if inventory
+        .weapon_items
+        .items
+        .get(0)
+        .map_or(true, |s| s.is_none())
+    {
+        return true;
+    }
+    player_has_pet
+        && inventory
+            .pet_items
+            .items
+            .get(0)
+            .map_or(true, |s| s.is_none())
+}
+
+/// Places a weapon stack into the main weapon slot if empty, else into the pet slot if the
+/// player has a pet and that slot is empty. Returns `true` if the stack was stored (caller
+/// should not add it to the main grid).
+pub fn try_auto_equip_weapon_on_pickup(
+    item_stack: ItemStack,
+    inventory: &mut Inventory,
+    inv_slots: &mut Query<&mut InventorySlotState>,
+    player_has_pet: bool,
+) -> bool {
+    if !item_stack.obj_type.is_weapon() {
+        return false;
+    }
+    if inventory
+        .weapon_items
+        .items
+        .get(0)
+        .map_or(true, |s| s.is_none())
+    {
+        InventoryItemStack {
+            item_stack,
+            slot: 0,
+        }
+        .add_to_container(
+            &mut inventory.weapon_items,
+            InventorySlotType::Weapon,
+            inv_slots,
+        );
+        return true;
+    }
+    if player_has_pet
+        && inventory
+            .pet_items
+            .items
+            .get(0)
+            .map_or(true, |s| s.is_none())
+    {
+        InventoryItemStack {
+            item_stack,
+            slot: 0,
+        }
+        .add_to_container(&mut inventory.pet_items, InventorySlotType::Pet, inv_slots);
+        return true;
+    }
+    false
 }

@@ -1,6 +1,6 @@
 use bevy::{prelude::*, render::view::RenderLayers};
 
-use crate::{ScreenResolution, DEBUG, GAME_HEIGHT};
+use crate::{ScreenResolution, DEBUG};
 
 #[derive(Resource)]
 pub struct FlashEffect {
@@ -30,7 +30,10 @@ pub fn screen_flash_effect(
             .spawn(SpriteBundle {
                 sprite: Sprite {
                     color: flash_state.color,
-                    custom_size: Some(Vec2::new(resolution.game_width + 10., GAME_HEIGHT + 10.)),
+                    custom_size: Some(Vec2::new(
+                        resolution.game_width + 10.,
+                        resolution.game_height + 10.,
+                    )),
                     ..default()
                 },
                 transform: Transform {

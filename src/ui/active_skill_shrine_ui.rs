@@ -7,14 +7,12 @@ use crate::{
     colors::DARK_WOOD_BROWN,
     item::active_skill_shrine::{ActiveSkillShrineOverwrite, ActiveSkillShrineSelection},
     player::skills::{ActiveSkillChoiceState, PlayerSkills},
-    ScreenResolution, GAME_HEIGHT,
+    ScreenResolution,
 };
 
 use super::{
     interactions::Interaction, main_menu::spawn_back_button,
-    player_hud::spawn_skill_tooltip_content,
-    ui_helpers::spawn_ui_overlay,
-    Interactable, UIElement,
+    player_hud::spawn_skill_tooltip_content, ui_helpers::spawn_ui_overlay, Interactable, UIElement,
     UIState,
 };
 
@@ -41,7 +39,7 @@ pub fn setup_active_skill_shrine_ui(
 ) {
     spawn_ui_overlay(
         &mut commands,
-        Vec2::new(res.game_width + 10., GAME_HEIGHT + 100.),
+        Vec2::new(res.game_width + 10., res.game_height + 100.),
         0.9,
         9.,
     );
@@ -275,7 +273,7 @@ pub fn setup_active_skill_shrine_overwrite_ui(
 ) {
     spawn_ui_overlay(
         &mut commands,
-        Vec2::new(res.game_width + 10., GAME_HEIGHT + 100.),
+        Vec2::new(res.game_width + 10., res.game_height + 100.),
         0.9,
         9.,
     );

@@ -1,0 +1,18 @@
+(
+  name: "PinkFlowerStew",
+  templates: ["item_drop.prototype.ron"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": PinkFlowerStew,
+  "survival_rogue_like::item::item_actions::ItemActions": (actions: [TriggerBounce]),
+  "survival_rogue_like::item::item_actions::ConsumableItem": (),
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: PinkFlowerStew,
+        metadata: (
+            name: "Pink Stew", 
+            desc: ["A sweet, floral", "stew that makes", "you bounce with", "every step!"]
+        ),
+        rarity: Uncommon,
+        count: 1
+  ),
+  }
+)

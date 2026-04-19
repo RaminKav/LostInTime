@@ -16,7 +16,7 @@ use crate::{
     },
     proto::proto_param::ProtoParam,
     ui::{key_input_guide::InteractionGuideTrigger, minimap::UpdateMiniMapEvent},
-    GameParam, ScreenResolution, GAME_HEIGHT,
+    GameParam, ScreenResolution,
 };
 
 /// Resource to track how many purchases the player has made at blacksmith merchants
@@ -168,7 +168,7 @@ pub fn setup_essence_ui(
 
     let overlay = spawn_ui_overlay(
         &mut commands,
-        Vec2::new(resolution.game_width + 10., GAME_HEIGHT + 20.),
+        Vec2::new(resolution.game_width + 10., resolution.game_height + 20.),
         0.8,
         -1.,
     );

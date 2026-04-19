@@ -4,11 +4,17 @@ use rand::Rng;
 use std::collections::HashMap;
 
 use super::{
-    damage_numbers::spawn_text, interactions::Interaction, spawn_heirloom_tooltip_card,
-    spawn_inv_slot, spawn_item_stack_icon, tooltips::spawn_world_item_tooltip_for_stack,
+    damage_numbers::spawn_text,
+    interactions::Interaction,
+    spawn_heirloom_tooltip_card, spawn_inv_slot, spawn_item_stack_icon,
+    tooltips::spawn_world_item_tooltip_for_stack,
     tooltips::ConsumableBuffHudTooltip,
-    ui_helpers::{Z_DEPTH_HUD_ACTIVE_SKILLS, Z_DEPTH_HUD_HEIRLOOM_ICONS},
+    ui_helpers::{
+        get_key_size_and_element, spawn_keybind_badge, Z_DEPTH_HUD_ACTIVE_SKILLS,
+        Z_DEPTH_HUD_HEIRLOOM_ICONS,
+    },
     InventorySlotType, InventoryState, InventoryUI, UIElement, UIState,
+    HUD_ACTION_ROW_Y_FROM_BOTTOM, HUD_HOTBAR_SLOTS, HUD_SKILLS_CENTER_X, HUD_SKILL_SPACING_X,
 };
 use crate::{
     assets::Graphics,
@@ -40,7 +46,7 @@ use crate::{
     },
     proto::proto_param::ProtoParam,
     ui::Interactable,
-    GameState, InputBinding, InputMappings, ScreenResolution, GAME_HEIGHT,
+    GameState, InputMappings, ScreenResolution, GAME_HEIGHT,
 };
 use bevy::utils::Duration;
 aseprite!(pub Clock, "ui/Clock.aseprite");
@@ -123,6 +129,16 @@ pub struct InventoryKeybindText;
 pub struct InventoryKeyBackground;
 
 #[derive(Component)]
+pub struct HotbarKeybindText {
+    pub slot: usize,
+}
+
+#[derive(Component)]
+pub struct HotbarKeyBackground {
+    pub slot: usize,
+}
+
+#[derive(Component)]
 pub struct ChaosText;
 
 #[derive(Component)]
@@ -137,33 +153,6 @@ fn lerp_color(a: Color, b: Color, t: f32) -> Color {
         a.b() + (b.b() - a.b()) * t,
         a.a() + (b.a() - a.a()) * t,
     )
-}
-
-/// Helper function to determine key size and UI element based on KeyCode
-fn get_key_size_and_element(key: InputBinding) -> (UIElement, f32) {
-    match key {
-        // Large keys (Space, Enter, etc.)
-        InputBinding::KeyBinding(KeyCode::Space) => (UIElement::LargeKey, 30.0),
-        InputBinding::KeyBinding(KeyCode::Return) => (UIElement::LargeKey, 30.0),
-        InputBinding::KeyBinding(KeyCode::Escape) => (UIElement::LargeKey, 30.0),
-
-        // Medium keys (Shift, Ctrl, Alt, Tab, Caps, etc.)
-        InputBinding::KeyBinding(KeyCode::LShift) | InputBinding::KeyBinding(KeyCode::RShift) => {
-            (UIElement::MediumKey, 26.0)
-        }
-        InputBinding::KeyBinding(KeyCode::LControl)
-        | InputBinding::KeyBinding(KeyCode::RControl) => (UIElement::MediumKey, 26.0),
-        InputBinding::KeyBinding(KeyCode::LAlt) | InputBinding::KeyBinding(KeyCode::RAlt) => {
-            (UIElement::MediumKey, 26.0)
-        }
-        InputBinding::KeyBinding(KeyCode::Tab) => (UIElement::MediumKey, 26.0),
-        InputBinding::KeyBinding(KeyCode::Capital) => (UIElement::MediumKey, 26.0),
-        InputBinding::KeyBinding(KeyCode::Back) => (UIElement::MediumKey, 26.0),
-        InputBinding::MouseBinding(_) => (UIElement::MediumKey, 26.0),
-
-        // Small keys (all single character keys, numbers, etc.)
-        _ => (UIElement::SmallKey, 10.0),
-    }
 }
 
 #[derive(Component)]
@@ -363,24 +352,6 @@ pub fn setup_xp_bar_ui(
         .insert(XPBarBg)
         .insert(Name::new("inner xp bar"))
         .id();
-    // let xp_bar_frame = commands
-    //     .spawn(SpriteBundle {
-    //         texture: graphics.get_ui_element_texture(UIElement::XPBarFrame),
-
-    //         sprite: Sprite {
-    //             custom_size: Some(Vec2::new(119.5, 24.)),
-    //             ..Default::default()
-    //         },
-    //         transform: Transform {
-    //             translation: Vec3::new(10., -GAME_HEIGHT / 2. + 34., 5.),
-    //             scale: Vec3::new(1., 1., 1.),
-    //             ..Default::default()
-    //         },
-    //         ..Default::default()
-    //     })
-    //     .insert(Name::new("XP BAR"))
-    //     .insert(RenderLayers::from_layers(&[3]))
-    //     .id();
     let level_frame = commands
         .spawn(SpriteBundle {
             sprite: Sprite {
@@ -456,7 +427,11 @@ pub fn setup_currency_ui(
                 ),
                 text_anchor: Anchor::CenterLeft,
                 transform: Transform {
-                    translation: Vec3::new(-res.game_width / 2. + 13., GAME_HEIGHT / 2. - 46., 6.),
+                    translation: Vec3::new(
+                        -res.game_width / 2. + 13.,
+                        res.game_height / 2. - 46.,
+                        6.,
+                    ),
                     scale: Vec3::new(1., 1., 1.),
                     ..Default::default()
                 },
@@ -495,7 +470,11 @@ pub fn setup_currency_ui(
                 ),
                 text_anchor: Anchor::CenterLeft,
                 transform: Transform {
-                    translation: Vec3::new(-res.game_width / 2. + 44., GAME_HEIGHT / 2. - 46., 6.),
+                    translation: Vec3::new(
+                        -res.game_width / 2. + 44.,
+                        res.game_height / 2. - 46.,
+                        6.,
+                    ),
                     scale: Vec3::new(1., 1., 1.),
                     ..Default::default()
                 },
@@ -553,7 +532,11 @@ pub fn setup_currency_ui(
                 ),
                 text_anchor: Anchor::CenterLeft,
                 transform: Transform {
-                    translation: Vec3::new(-res.game_width / 2. + 4., GAME_HEIGHT / 2. - 101., 6.),
+                    translation: Vec3::new(
+                        -res.game_width / 2. + 4.,
+                        res.game_height / 2. - 101.,
+                        6.,
+                    ),
                     scale: Vec3::new(1., 1., 1.),
                     ..Default::default()
                 },
@@ -571,50 +554,24 @@ pub fn setup_currency_ui(
         &graphics,
         &ItemStack::crate_icon_stack(WorldObject::InventoryBag),
         &asset_server,
-        Vec2::new(86.5, -GAME_HEIGHT / 2. + 10.),
+        Vec2::new(140.5, -res.game_height / 2. + 8.),
         Vec2::new(0., 0.),
         3,
     );
 
-    // Get the inventory keybind and determine the key size/element
     let inventory_key = keybinds.get_inventory_key();
-    let (key_element, key_width) = get_key_size_and_element(inventory_key);
-
-    // Spawn dynamic key background
-    let key_bg = commands
-        .spawn(SpriteBundle {
-            texture: graphics.get_ui_element_texture(key_element),
-            transform: Transform::from_translation(Vec3::new(-0.5, 13., 1.)),
-            sprite: Sprite {
-                custom_size: Some(Vec2::new(key_width, 10.)),
-                ..Default::default()
-            },
-            ..Default::default()
-        })
-        .insert(RenderLayers::from_layers(&[3]))
-        .insert(InventoryKeyBackground)
-        .set_parent(bag_icon)
-        .id();
-
-    // Spawn keybind text as child of key background
-    commands
-        .spawn(Text2dBundle {
-            text: Text::from_section(
-                crate::keybinds::get_key_display_name(inventory_key),
-                TextStyle {
-                    font: asset_server.load("fonts/slkscr.ttf"),
-                    font_size: 8.4,
-                    color: crate::colors::DARK_WOOD_BROWN,
-                },
-            )
-            .with_alignment(TextAlignment::Center),
-            text_anchor: bevy::sprite::Anchor::Center,
-            transform: Transform::from_translation(Vec3::new(1., 0., 1.)),
-            ..Default::default()
-        })
-        .insert(RenderLayers::from_layers(&[3]))
-        .insert(InventoryKeybindText)
-        .set_parent(key_bg);
+    let (key_bg, key_text) = spawn_keybind_badge(
+        &mut commands,
+        &graphics,
+        &asset_server,
+        inventory_key,
+        bag_icon,
+        Vec3::new(-0.5, 13., 1.),
+        Vec3::new(1., 0., 1.),
+        3,
+    );
+    commands.entity(key_bg).insert(InventoryKeyBackground);
+    commands.entity(key_text).insert(InventoryKeybindText);
 }
 
 pub fn setup_chaos_ui(
@@ -641,7 +598,11 @@ pub fn setup_chaos_ui(
                 ),
                 text_anchor: Anchor::CenterLeft,
                 transform: Transform {
-                    translation: Vec3::new(-res.game_width / 2. + 4., GAME_HEIGHT / 2. - 111., 6.),
+                    translation: Vec3::new(
+                        -res.game_width / 2. + 4.,
+                        res.game_height / 2. - 111.,
+                        6.,
+                    ),
                     ..Default::default()
                 },
                 ..default()
@@ -1543,7 +1504,7 @@ pub fn handle_active_skill_hud_tooltip(
 
     // Spawn new tooltip if hovering
     if let Some((skill, slot_index, icon_pos)) = currently_hovered {
-        let tooltip_pos = Vec3::new(icon_pos.x + 40., icon_pos.y + 50., icon_pos.z + 10.);
+        let tooltip_pos = Vec3::new(icon_pos.x - 30., icon_pos.y + 56., icon_pos.z + 10.);
         let container = commands
             .spawn(RenderLayers::from_layers(&[3]))
             .insert(ActiveSkillHudTooltip)
@@ -1752,7 +1713,7 @@ pub fn handle_update_player_skills(
 
                 let offset = Vec2::new(
                     col as f32 * ICON_SPACING + (-res.game_width) / 2. + 98.,
-                    (GAME_HEIGHT - 15.) / 2. - 8.5 - (row as f32 * ROW_SPACING),
+                    (res.game_height - 15.) / 2. - 8.5 - (row as f32 * ROW_SPACING),
                 );
 
                 // Create the main icon with interactability directly attached
@@ -1876,6 +1837,11 @@ pub fn handle_update_player_skills(
             }
         }
 
+        // Skills are centered around `HUD_SKILLS_CENTER_X` on the right side of the action
+        // row. The half-span shifts with the number of skills (4 normally, 5 when the bonus
+        // blessing is active) so the group stays centered regardless of count.
+        let num_skills = active_skill_slots.len() as f32;
+        let skill_half_span = (num_skills - 1.0) * 0.5;
         for (i, (active_skill_option, slot_index)) in active_skill_slots.iter().enumerate() {
             let icon_bg = commands
                 .spawn(SpriteBundle {
@@ -1886,10 +1852,9 @@ pub fn handle_update_player_skills(
                     },
                     transform: Transform {
                         translation: Vec3::new(
-                            // -res.game_width / 2. + 18. + i as f32 * 31.,
-                            // -GAME_HEIGHT / 2. + 14.,
-                            -6. + (i as f32 - 1.) * 31.,
-                            -GAME_HEIGHT / 2. + 38.,
+                            HUD_SKILLS_CENTER_X
+                                + (i as f32 - skill_half_span) * HUD_SKILL_SPACING_X,
+                            -GAME_HEIGHT / 2. + HUD_ACTION_ROW_Y_FROM_BOTTOM,
                             Z_DEPTH_HUD_ACTIVE_SKILLS,
                         ),
                         scale: Vec3::new(1., 1., 1.),
@@ -1907,45 +1872,23 @@ pub fn handle_update_player_skills(
                     slot_index: *slot_index,
                 })
                 .id();
-            // Get the actual keybind for this slot
             let keybind = keybinds.get_active_skill_key(*slot_index);
-            let (key_element, key_width) = get_key_size_and_element(keybind);
-
-            // Spawn generic key background
-            let _key_bg = commands
-                .spawn(SpriteBundle {
-                    texture: graphics.get_ui_element_texture(key_element),
-                    transform: Transform::from_translation(Vec3::new(0., 13., 2.)),
-                    sprite: Sprite {
-                        custom_size: Some(Vec2::new(key_width, 10.)),
-                        ..Default::default()
-                    },
-                    ..Default::default()
-                })
-                .insert(RenderLayers::from_layers(&[3]))
-                .insert(ActiveSkillKeyBackground { slot: i })
-                .set_parent(icon_bg)
-                .id();
-
-            // Spawn keybind text as child of key background
+            let (key_bg, key_text) = spawn_keybind_badge(
+                &mut commands,
+                &graphics,
+                &asset_server,
+                keybind,
+                icon_bg,
+                Vec3::new(0., 13., 2.),
+                Vec3::new(0., 1., 1.),
+                3,
+            );
             commands
-                .spawn(Text2dBundle {
-                    text: Text::from_section(
-                        crate::keybinds::get_key_display_name(keybind),
-                        TextStyle {
-                            font: asset_server.load("fonts/slkscr.ttf"),
-                            font_size: 8.4,
-                            color: crate::colors::DARK_WOOD_BROWN,
-                        },
-                    )
-                    .with_alignment(TextAlignment::Center),
-                    text_anchor: bevy::sprite::Anchor::Center,
-                    transform: Transform::from_translation(Vec3::new(0., 14., 3.)),
-                    ..Default::default()
-                })
-                .insert(RenderLayers::from_layers(&[3]))
-                .insert(ActiveSkillKeybindText { slot: i })
-                .set_parent(icon_bg);
+                .entity(key_bg)
+                .insert(ActiveSkillKeyBackground { slot: i });
+            commands
+                .entity(key_text)
+                .insert(ActiveSkillKeybindText { slot: i });
             if let Some(active_skill) = active_skill_option.clone() {
                 commands
                     .spawn(SpriteBundle {
@@ -2064,6 +2007,43 @@ pub fn update_skill_charge_text(
     }
 }
 
+/// Spawns a hotbar keybind badge (key-cap + text) above the given hotbar slot entity,
+/// tagged with `HotbarKeyBackground`/`HotbarKeybindText` so `update_hotbar_keybind_text`
+/// can refresh it when the player rebinds the key.
+///
+/// Called both from initial HUD setup and from `update_inventory_ui` after a dirty
+/// hotbar slot is despawned and respawned (which would otherwise nuke its badge).
+pub fn spawn_hotbar_keybind_badge_for_slot(
+    commands: &mut Commands,
+    graphics: &Graphics,
+    asset_server: &AssetServer,
+    keybinds: &crate::keybinds::InputMappings,
+    slot: usize,
+    slot_entity: Entity,
+) {
+    let key = keybinds.get_hotbar_key(slot);
+    let (bg_entity, text_entity) = spawn_keybind_badge(
+        commands,
+        graphics,
+        asset_server,
+        key,
+        slot_entity,
+        Vec3::new(0., 15., 2.),
+        Vec3::new(0., 1., 1.),
+        3,
+    );
+    commands
+        .entity(bg_entity)
+        .insert(HotbarKeyBackground { slot });
+    commands
+        .entity(text_entity)
+        .insert(HotbarKeybindText { slot });
+}
+
+/// Spawns the on-screen hotbar (`HUD_HOTBAR_SLOTS` slots, each bound to a user-configurable
+/// key that defaults to `1`-`N`) and a static keybind badge above each slot. The underlying
+/// `Inventory::items` container still has more slots (for passive storage), but only the
+/// first `HUD_HOTBAR_SLOTS` are rendered and wired to keys.
 pub fn setup_hotbar_hud(
     mut commands: Commands,
     graphics: Res<Graphics>,
@@ -2072,23 +2052,37 @@ pub fn setup_hotbar_hud(
     asset_server: Res<AssetServer>,
     mut inv: Query<&mut Inventory>,
     inv_ui_state: Res<State<UIState>>,
+    keybinds: Res<crate::keybinds::InputMappings>,
 ) {
-    for (slot_index, item) in inv.single_mut().items.items.iter().enumerate() {
-        // hotbar slots
-        if slot_index <= 5 {
-            spawn_inv_slot(
-                &mut commands,
-                &inv_ui_state,
-                &graphics,
-                slot_index,
-                Interaction::None,
-                &inv_state,
-                &inv_query,
-                &asset_server,
-                InventorySlotType::Hotbar,
-                item.clone(),
-            );
-        }
+    for (slot_index, item) in inv
+        .single_mut()
+        .items
+        .items
+        .iter()
+        .take(HUD_HOTBAR_SLOTS)
+        .enumerate()
+    {
+        let slot_entity = spawn_inv_slot(
+            &mut commands,
+            &inv_ui_state,
+            &graphics,
+            slot_index,
+            Interaction::None,
+            &inv_state,
+            &inv_query,
+            &asset_server,
+            InventorySlotType::Hotbar,
+            item.clone(),
+        );
+
+        spawn_hotbar_keybind_badge_for_slot(
+            &mut commands,
+            &graphics,
+            &asset_server,
+            &keybinds,
+            slot_index,
+            slot_entity,
+        );
     }
 }
 
@@ -2120,7 +2114,7 @@ pub fn setup_clock_hud(
             transform: Transform {
                 translation: Vec3::new(
                     -res.game_width / 2. + 17.5,
-                    (GAME_HEIGHT - 15.) / 2. - 72.5,
+                    (res.game_height - 15.) / 2. - 72.5,
                     6.,
                 ),
                 scale: Vec3::new(1., 1., 1.),
@@ -2202,7 +2196,7 @@ pub fn setup_era_timer_hud(
             transform: Transform {
                 translation: Vec3::new(
                     -res.game_width / 2. + 50.5,
-                    (GAME_HEIGHT - 16.) / 2. - 74., // Right of the clock
+                    (res.game_height - 16.) / 2. - 74., // Right of the clock
                     5.,
                 ),
                 ..Default::default()
@@ -2575,6 +2569,29 @@ pub fn update_active_skill_keybind_text(
     }
 }
 
+pub fn update_hotbar_keybind_text(
+    keybinds: Res<crate::keybinds::InputMappings>,
+    mut texts: Query<(&HotbarKeybindText, &mut Text)>,
+    mut key_backgrounds: Query<(&HotbarKeyBackground, &mut Handle<Image>, &mut Sprite)>,
+    graphics: Res<Graphics>,
+) {
+    if !keybinds.is_changed() {
+        return;
+    }
+
+    for (keybind_text, mut text) in texts.iter_mut() {
+        let key = keybinds.get_hotbar_key(keybind_text.slot);
+        text.sections[0].value = crate::keybinds::get_key_display_name(key);
+    }
+
+    for (key_bg, mut texture, mut sprite) in key_backgrounds.iter_mut() {
+        let key = keybinds.get_hotbar_key(key_bg.slot);
+        let (key_element, key_width) = get_key_size_and_element(key);
+        *texture = graphics.get_ui_element_texture(key_element);
+        sprite.custom_size = Some(Vec2::new(key_width, 10.));
+    }
+}
+
 pub fn update_inventory_keybind_text(
     keybinds: Res<crate::keybinds::InputMappings>,
     mut texts: Query<&mut Text, With<InventoryKeybindText>>,
@@ -2653,8 +2670,10 @@ pub fn sync_consumable_buff_hud(
     for (hud_slot, (_entry_index, entry)) in visible.iter().enumerate() {
         let stack = entry.item_stack.as_ref().unwrap().clone();
         let i = hud_slot as f32;
-        let x =
-            -50. - 2. - (CONSUMABLE_BUFF_HUD_ICON_PX / 2.) - i * (CONSUMABLE_BUFF_HUD_ICON_PX + 2.);
+        let x = -120.
+            - 2.
+            - (CONSUMABLE_BUFF_HUD_ICON_PX / 2.)
+            - i * (CONSUMABLE_BUFF_HUD_ICON_PX + 2.);
         let y = -GAME_HEIGHT / 2. + 14.;
 
         let icon_root = commands

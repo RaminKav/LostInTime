@@ -10,28 +10,42 @@ use crate::{
         PickupRange, ProjectileSize, RawItemBaseAttributes, RawItemBonusAttributes, SkillPower,
         Speed, Thorns, XpRateBonus,
     },
-    colors::{
-        BLACK, GREY, LIGHT_GREY, LIGHT_RED, ORANGE, TOOLTIP_BLACK, TOOLTIP_BLACK_2, WHITE, YELLOW_2,
-    },
-    combat::damage_tracker::{DamageTracker, PetAbilityStats, spawn_damage_tracker_ui},
+    colors::{ORANGE, STATS_TITLE, TOOLTIP_BLACK, TOOLTIP_BLACK_2, WHITE, YELLOW, YELLOW_2},
+    combat::damage_tracker::{spawn_damage_tracker_ui, DamageTracker, PetAbilityStats},
     inventory::{Inventory, ItemStack},
     item::{item_actions::ItemActions, EquipmentType, Recipes, WorldObject},
     juice::bounce::BounceOnHit,
     player::{stats::StatType, Player},
     proto::proto_param::ProtoParam,
-    ui::{spawn_item_stack_icon, TOOLTIP_UI_SIZE},
+    ui::{
+        spawn_item_stack_icon, INVENTORY_EQUIPMENT_UI_SIZE, INVENTORY_UPGRADE_UI_SIZE,
+        TOOLTIP_UI_SIZE,
+    },
 };
 
 use super::{
     item_chest::ItemChestUI, EssenceUI, InventoryUI, UIElement, UIState, CHEST_INVENTORY_UI_SIZE,
     CRAFTING_INVENTORY_UI_SIZE, ESSENCE_UI_SIZE, FURNACE_INVENTORY_UI_SIZE, INVENTORY_UI_SIZE,
-    SKILLS_CHOICE_UI_SIZE,
+    INVENTORY_Y_OFFSET, SKILLS_CHOICE_UI_SIZE,
 };
 
-aseprite!(pub InventoryStatHighlight, "textures/effects/InventoryStatHighlight.ase");
+aseprite!(pub InventoryStatHighlightCommon, "textures/effects/InventoryStatHighlightCommon.ase");
+aseprite!(pub InventoryStatHighlightUncommon, "textures/effects/InventoryStatHighlightUncommon.ase");
+aseprite!(pub InventoryStatHighlightRare, "textures/effects/InventoryStatHighlightRare.ase");
+aseprite!(pub InventoryStatHighlightLegendary, "textures/effects/InventoryStatHighlightLegendary.ase");
 
 /// Panel size for `LargeTooltip*` sprites (inventory item card + consumable buff HUD hover).
-pub const ITEM_TOOLTIP_LARGE_CARD_SIZE: Vec2 = Vec2::new(140., 184.5);
+pub const ITEM_TOOLTIP_LARGE_CARD_SIZE: Vec2 = Vec2::new(172., 272.);
+/// Horizontal spacing between recipe ingredient icons on the recipe tooltip (center-to-center).
+pub const RECIPE_TOOLTIP_INGREDIENT_SPACING_X: f32 = 28.;
+/// Panel-local Y for the ingredient icon row (below the title, above the type line).
+pub const RECIPE_TOOLTIP_INGREDIENT_ROW_Y: f32 = 22.;
+/// Y offset for the required-count label under each ingredient icon.
+pub const RECIPE_TOOLTIP_INGREDIENT_COUNT_Y_OFFSET: f32 = 10.;
+
+/// Wait after an inventory item tooltip closes before showing the stats tooltip again
+/// (avoids flicker when moving quickly across slots).
+pub const STATS_TOOLTIP_RESPAWN_DELAY_SECS: f32 = 0.18;
 
 #[derive(Component)]
 pub struct PlayerStatsTooltip;
@@ -48,6 +62,8 @@ pub struct RecipeIngredientTooltipIcon;
 #[derive(Resource, Clone)]
 pub struct TooltipsManager {
     pub timer: Timer,
+    /// Fires [`ShowInvPlayerStatsEvent`] when finished; cleared when a new item tooltip spawns.
+    pub stats_respawn_delay: Option<Timer>,
 }
 
 #[derive(Debug, Clone)]
@@ -100,11 +116,27 @@ impl TooltipTextProps {
 #[derive(Default)]
 pub struct TooltipTeardownEvent;
 
-pub fn tick_tooltip_timer(time: Res<Time>, mut tooltip_manager: ResMut<TooltipsManager>) {
-    if tooltip_manager.timer.finished() {
-        return;
+pub fn tick_tooltip_timer(
+    time: Res<Time>,
+    mut tooltip_manager: ResMut<TooltipsManager>,
+    mut stats_event: EventWriter<ShowInvPlayerStatsEvent>,
+    cur_ui_state: Res<State<UIState>>,
+) {
+    if !tooltip_manager.timer.finished() {
+        tooltip_manager.timer.tick(time.delta());
     }
-    tooltip_manager.timer.tick(time.delta());
+    if let Some(ref mut delay) = tooltip_manager.stats_respawn_delay {
+        delay.tick(time.delta());
+        if delay.finished() {
+            tooltip_manager.stats_respawn_delay = None;
+            if cur_ui_state.0 == UIState::Inventory {
+                stats_event.send(ShowInvPlayerStatsEvent {
+                    stat: None,
+                    ignore_timer: true,
+                });
+            }
+        }
+    }
 }
 
 pub fn handle_tooltip_teardown(
@@ -115,6 +147,7 @@ pub fn handle_tooltip_teardown(
     inv: Query<&Inventory>,
 
     mut tooltip_update_events: EventWriter<ToolTipUpdateEvent>,
+    cur_ui_state: Res<State<UIState>>,
 ) {
     if updates.iter().count() > 0 {
         let inv = inv.single();
@@ -131,6 +164,12 @@ pub fn handle_tooltip_teardown(
             // begin delay for next tooltip
             if tooltip.iter().count() > 0 {
                 tooltip_manager.timer.reset();
+            }
+            if cur_ui_state.0 == UIState::Inventory {
+                tooltip_manager.stats_respawn_delay = Some(Timer::from_seconds(
+                    STATS_TOOLTIP_RESPAWN_DELAY_SECS,
+                    TimerMode::Once,
+                ));
             }
         }
     }
@@ -149,13 +188,44 @@ pub fn handle_spawn_inv_item_tooltip(
     item_stacks: Query<(Entity, &ItemStack), Without<RecipeIngredientTooltipIcon>>,
     proto: ProtoParam,
     old_tooltips: Query<Entity, With<ItemOrRecipeTooltip>>,
+    player_stats_tooltips: Query<Entity, With<PlayerStatsTooltip>>,
+    mut tooltip_manager: ResMut<TooltipsManager>,
 ) {
     for item in updates.iter() {
+        tooltip_manager.stats_respawn_delay = None;
         for t in old_tooltips.iter() {
             commands.entity(t).despawn_recursive();
         }
-        let parent_inv_size = match cur_inv_state.0 {
-            UIState::Inventory => INVENTORY_UI_SIZE,
+        // Standard "right of inventory UI" tooltip anchor — used for normal inventory
+        // items in both `Inventory` and `InventoryCrafting` modes.
+        let right_side_offset = Vec2::new(
+            ((INVENTORY_UI_SIZE.x
+                + TOOLTIP_UI_SIZE.x
+                + INVENTORY_UPGRADE_UI_SIZE.x
+                + INVENTORY_EQUIPMENT_UI_SIZE.x
+                + 8.)
+                / 2.)
+                .floor(),
+            0.,
+        );
+        let parent_offset = match cur_inv_state.0 {
+            UIState::Inventory => right_side_offset,
+            // In `InventoryCrafting` mode:
+            //   - Recipe tooltips (hovering a blueprint row) render on the LEFT, anchored
+            //     on top of the main inventory panel. The BlueprintsPanel occupies the
+            //     right side, so this is the only free space.
+            //   - Normal item tooltips (hovering an inventory/hotbar slot) keep the same
+            //     right-side position as `UIState::Inventory`.
+            // The inventory panel center is at `(-185, INVENTORY_Y_OFFSET)` (see
+            // `setup_inv_ui` `pos_offset`). We bias the recipe tooltip slightly right of
+            // the panel center so its left edge doesn't hug the screen edge.
+            UIState::InventoryCrafting => {
+                if item.is_recipe {
+                    Vec2::new(0., INVENTORY_Y_OFFSET)
+                } else {
+                    right_side_offset
+                }
+            }
             UIState::Chest => CHEST_INVENTORY_UI_SIZE,
             UIState::Crafting => CRAFTING_INVENTORY_UI_SIZE,
             UIState::Furnace => FURNACE_INVENTORY_UI_SIZE,
@@ -163,6 +233,13 @@ pub fn handle_spawn_inv_item_tooltip(
             UIState::ItemChest => SKILLS_CHOICE_UI_SIZE,
             _ => continue,
         };
+
+        if cur_inv_state.0 == UIState::Inventory {
+            for t in player_stats_tooltips.iter() {
+                commands.entity(t).despawn_recursive();
+            }
+        }
+
         let obj_type = item.item_stack.obj_type;
         let raw_base_attributes = proto.get_component::<RawItemBaseAttributes, _>(obj_type);
         let raw_bonus_attributes = proto.get_component::<RawItemBonusAttributes, _>(obj_type);
@@ -192,7 +269,7 @@ pub fn handle_spawn_inv_item_tooltip(
                     texture: graphics
                         .get_ui_element_texture(item_rarity.clone().get_tooltip_ui_element()),
                     transform: Transform {
-                        translation: Vec3::new(-(parent_inv_size.x + size.x + 2.) / 2., 0.5, 4.),
+                        translation: Vec3::new(parent_offset.x, parent_offset.y, 10.),
                         scale: Vec3::new(1., 1., 1.),
                         ..Default::default()
                     },
@@ -218,6 +295,17 @@ pub fn handle_spawn_inv_item_tooltip(
             tooltip,
             &item.item_stack,
         );
+        if item.is_recipe {
+            // spawn_recipe_ingredients_tooltip_row(
+            //     &mut commands,
+            //     &graphics,
+            //     &asset_server,
+            //     tooltip,
+            //     obj_type,
+            //     &recipes,
+            //     &item_stacks,
+            // );
+        }
         let mut is_item_action = false;
         let is_upgrade_material =
             obj_type == WorldObject::UpgradeTome || obj_type == WorldObject::OrbOfTransformation;
@@ -268,7 +356,7 @@ pub fn handle_spawn_inv_item_tooltip(
                     ),
                     text_anchor: Anchor::CenterLeft,
                     transform: Transform {
-                        translation: Vec3::new(-16., 62., 1.),
+                        translation: Vec3::new(-16., 76., 1.),
                         scale: Vec3::new(1., 1., 1.),
                         ..Default::default()
                     },
@@ -280,38 +368,58 @@ pub fn handle_spawn_inv_item_tooltip(
             .set_parent(tooltip)
             .id();
 
-        // ======== header ========
-        let header_text = if should_show_attributes {
-            "Base Stats".to_string()
-        } else if item.is_recipe {
-            "Recipe".to_string()
-        } else {
-            "Description".to_string()
-        };
-        let _header_text = commands
-            .spawn((
-                Text2dBundle {
-                    text: Text::from_section(
-                        header_text,
-                        TextStyle {
-                            font: asset_server.load("fonts/slkscrbold.ttf"),
-                            font_size: 8.5,
-                            color: TOOLTIP_BLACK,
+        // ======== header (Base Stats / Description — recipe uses ingredient row instead) ========
+        if should_show_attributes {
+            let _header_text = commands
+                .spawn((
+                    Text2dBundle {
+                        text: Text::from_section(
+                            "Base Stats",
+                            TextStyle {
+                                font: asset_server.load("fonts/slkscrbold.ttf"),
+                                font_size: 8.5,
+                                color: YELLOW_2,
+                            },
+                        ),
+                        text_anchor: Anchor::CenterLeft,
+                        transform: Transform {
+                            translation: Vec3::new(-57., 20., 1.),
+                            scale: Vec3::new(1., 1., 1.),
+                            ..Default::default()
                         },
-                    ),
-                    text_anchor: Anchor::CenterLeft,
-                    transform: Transform {
-                        translation: Vec3::new(-57., 5., 1.),
-                        scale: Vec3::new(1., 1., 1.),
-                        ..Default::default()
+                        ..default()
                     },
-                    ..default()
-                },
-                Name::new("TOOLTIP Rarity TEXT"),
-                RenderLayers::from_layers(&[3]),
-            ))
-            .set_parent(tooltip)
-            .id();
+                    Name::new("TOOLTIP Rarity TEXT"),
+                    RenderLayers::from_layers(&[3]),
+                ))
+                .set_parent(tooltip)
+                .id();
+        } else if !item.is_recipe {
+            let _header_text = commands
+                .spawn((
+                    Text2dBundle {
+                        text: Text::from_section(
+                            "Description",
+                            TextStyle {
+                                font: asset_server.load("fonts/slkscrbold.ttf"),
+                                font_size: 8.5,
+                                color: YELLOW_2,
+                            },
+                        ),
+                        text_anchor: Anchor::CenterLeft,
+                        transform: Transform {
+                            translation: Vec3::new(-57., 20., 1.),
+                            scale: Vec3::new(1., 1., 1.),
+                            ..Default::default()
+                        },
+                        ..default()
+                    },
+                    Name::new("TOOLTIP Rarity TEXT"),
+                    RenderLayers::from_layers(&[3]),
+                ))
+                .set_parent(tooltip)
+                .id();
+        }
         // ======== rarity ========
         let _rarity_text = commands
             .spawn((
@@ -328,7 +436,7 @@ pub fn handle_spawn_inv_item_tooltip(
                     transform: Transform {
                         translation: Vec3::new(
                             -16.,
-                            if is_upgrade_material { 58. } else { 52. },
+                            if is_upgrade_material { 68. } else { 62. },
                             1.,
                         ),
                         scale: Vec3::new(1., 1., 1.),
@@ -348,6 +456,8 @@ pub fn handle_spawn_inv_item_tooltip(
             "Magic Weapon"
         } else if obj_type.is_ranged_weapon() {
             "Ranged Weapon"
+        } else if equip_type.is_some_and(|e| e.is_tool()) {
+            "Tool"
         } else if obj_type.is_armor() {
             "Armor"
         } else if obj_type.is_accessory() {
@@ -372,7 +482,7 @@ pub fn handle_spawn_inv_item_tooltip(
                     ),
                     text_anchor: Anchor::CenterLeft,
                     transform: Transform {
-                        translation: Vec3::new(-16., 42., 1.),
+                        translation: Vec3::new(-16., 52., 1.),
                         scale: Vec3::new(1., 1., 1.),
                         ..Default::default()
                     },
@@ -395,12 +505,12 @@ pub fn handle_spawn_inv_item_tooltip(
                             TextStyle {
                                 font: asset_server.load("fonts/slkscrbold.ttf"),
                                 font_size: 8.5,
-                                color: TOOLTIP_BLACK,
+                                color: YELLOW_2,
                             },
                         ),
                         text_anchor: Anchor::CenterLeft,
                         transform: Transform {
-                            translation: Vec3::new(-58., -25., 1.),
+                            translation: Vec3::new(-58., -34., 1.),
                             scale: Vec3::new(1., 1., 1.),
                             ..Default::default()
                         },
@@ -413,7 +523,7 @@ pub fn handle_spawn_inv_item_tooltip(
                 .id();
 
             for (i, (a, range, q)) in attributes.iter().enumerate().clone() {
-                let d = if i >= 2 { 12. } else { 0. };
+                let d = if i >= 2 { 36. } else { 0. };
                 tooltip_text.push(TooltipTextProps::new(
                     vec![a.to_string(), range.to_string()],
                     d,
@@ -429,7 +539,7 @@ pub fn handle_spawn_inv_item_tooltip(
                 &graphics,
                 &ItemStack::crate_icon_stack(WorldObject::TooltipInspect),
                 &asset_server,
-                Vec2::new(-7.5, -118.5),
+                Vec2::new(TOOLTIP_UI_SIZE.x + 16., 0.),
                 Vec2::new(0., 0.),
                 3,
             );
@@ -448,20 +558,7 @@ pub fn handle_spawn_inv_item_tooltip(
                 .set_parent(tooltip_icon);
         } else {
             if item.is_recipe {
-                tooltip_text.push(TooltipTextProps::new(
-                    vec![proto
-                        .get_item_data(item.item_stack.obj_type)
-                        .unwrap()
-                        .metadata
-                        .desc
-                        .join("\n")
-                        .to_string()],
-                    50.,
-                    AttributeQuality::Low,
-                    Anchor::TopLeft,
-                    "fonts/slkscr.ttf".to_string(),
-                ));
-                //======== Header 2 ========
+                //======== "Description" sub-header (body text is white below) ========
                 let _text = commands
                     .spawn((
                         Text2dBundle {
@@ -475,7 +572,7 @@ pub fn handle_spawn_inv_item_tooltip(
                             ),
                             text_anchor: Anchor::CenterLeft,
                             transform: Transform {
-                                translation: Vec3::new(-58., -50., 1.),
+                                translation: Vec3::new(-58., -36., 1.),
                                 scale: Vec3::new(1., 1., 1.),
                                 ..Default::default()
                             },
@@ -495,15 +592,19 @@ pub fn handle_spawn_inv_item_tooltip(
                     "fonts/slkscr.ttf".to_string(),
                 ));
             }
-            for (i, desc_string) in item.item_stack.metadata.desc.iter().enumerate().clone() {
+            for (i, desc_string) in item.item_stack.metadata.desc.iter().enumerate() {
                 tooltip_text.push(TooltipTextProps::new(
                     vec![desc_string.to_string()],
                     -10. + if item.is_recipe {
-                        3. + 6. * (i) as f32
+                        65. + 6. * (i) as f32
                     } else {
                         0.
                     },
-                    AttributeQuality::Average,
+                    if item.is_recipe {
+                        AttributeQuality::Low
+                    } else {
+                        AttributeQuality::Average
+                    },
                     Anchor::CenterLeft,
                     "fonts/slkscr.ttf".to_string(),
                 ));
@@ -512,8 +613,8 @@ pub fn handle_spawn_inv_item_tooltip(
 
         for (i, props) in tooltip_text.iter().enumerate() {
             let text_pos = Vec3::new(
-                -size.x / 2. + 13. + if item.is_recipe && i != 0 { 16. } else { 0. },
-                size.y / 2. - 98. - (i as f32 * 9.) - props.offset,
+                -size.x / 2. + 28.,
+                size.y / 2. - 126. - (i as f32 * 9.) - props.offset,
                 2.,
             );
 
@@ -530,11 +631,11 @@ pub fn handle_spawn_inv_item_tooltip(
                                     font: asset_server.load(props.font.as_str()),
                                     font_size: props.font_size,
                                     color: if j == 1 {
-                                        LIGHT_GREY
+                                        WHITE
                                     } else {
                                         match props.quality {
-                                            AttributeQuality::Low => GREY,
-                                            AttributeQuality::Average => TOOLTIP_BLACK_2,
+                                            AttributeQuality::Low => WHITE,
+                                            AttributeQuality::Average => YELLOW,
                                             AttributeQuality::High => props.quality.get_color(),
                                         }
                                     },
@@ -655,12 +756,30 @@ pub fn handle_spawn_inv_item_tooltip(
                 let tooltip_index = num_base_attrs + filtered_buff_line_index;
                 if i == tooltip_index && i > 0 {
                     let box_x = 0.0;
-                    let box_y = size.y / 2. - 99. - (i as f32 * 9.) - props.offset;
+                    let box_y = size.y / 2. - 126. - (i as f32 * 9.) - props.offset;
                     let box_pos = Vec3::new(box_x, box_y, 1.);
-                    let anim = AsepriteAnimation::from(InventoryStatHighlight::tags::IDLE);
+                    let (path, idle_tag) = match item.item_stack.rarity {
+                        ItemRarity::Common => (
+                            InventoryStatHighlightCommon::PATH,
+                            InventoryStatHighlightCommon::tags::IDLE,
+                        ),
+                        ItemRarity::Uncommon => (
+                            InventoryStatHighlightUncommon::PATH,
+                            InventoryStatHighlightUncommon::tags::IDLE,
+                        ),
+                        ItemRarity::Rare => (
+                            InventoryStatHighlightRare::PATH,
+                            InventoryStatHighlightRare::tags::IDLE,
+                        ),
+                        ItemRarity::Legendary => (
+                            InventoryStatHighlightLegendary::PATH,
+                            InventoryStatHighlightLegendary::tags::IDLE,
+                        ),
+                    };
+                    let anim = AsepriteAnimation::from(idle_tag);
                     commands
                         .spawn(AsepriteBundle {
-                            aseprite: asset_server.load(InventoryStatHighlight::PATH),
+                            aseprite: asset_server.load(path),
                             animation: anim,
                             transform: Transform::from_translation(box_pos),
                             ..Default::default()
@@ -669,54 +788,14 @@ pub fn handle_spawn_inv_item_tooltip(
                         .set_parent(tooltip);
                 }
             }
-
-            if item.is_recipe && i > 0 {
-                let ingredient_world_obj: Vec<WorldObject> = recipes
-                    .crafting_list
-                    .get(&obj_type)
-                    .unwrap()
-                    .0
-                    .iter()
-                    .map(|r| r.item)
-                    .collect();
-                if i <= ingredient_world_obj.len() {
-                    let icon_e = spawn_item_stack_icon(
-                        &mut commands,
-                        &graphics,
-                        &ItemStack {
-                            obj_type: ingredient_world_obj[i - 1],
-                            count: 1,
-                            ..Default::default()
-                        },
-                        &asset_server,
-                        Vec2::ZERO,
-                        Vec2::new(0., 0.),
-                        3,
-                    );
-                    commands
-                        .entity(icon_e)
-                        .insert(RecipeIngredientTooltipIcon)
-                        .insert(Transform {
-                            translation: text_pos + Vec3::new(-8., 0., 1.),
-                            ..Default::default()
-                        });
-                    commands.entity(tooltip).add_child(icon_e);
-
-                    for (e, stack) in item_stacks.iter() {
-                        if stack.obj_type == ingredient_world_obj[i - 1] {
-                            if let Some(mut entity_commands) = commands.get_entity(e) {
-                                entity_commands.insert(BounceOnHit::new());
-                            }
-                        }
-                    }
-                }
-            }
         }
         for i in 0..num_stars {
             let star = spawn_sprite(
                 &mut commands,
-                Vec3::new(-12.5 + i as f32 * 9., size.y / 2. - 62., 1.),
-                graphics.get_ui_element_texture(UIElement::StarIcon),
+                Vec3::new(-56. + i as f32 * 12., size.y / 2. - 97., 1.),
+                graphics.get_ui_element_texture(get_star_icon_from_rarity(
+                    item.item_stack.rarity.clone(),
+                )),
                 3,
             );
             commands.entity(star).set_parent(tooltip);
@@ -729,6 +808,14 @@ pub fn handle_spawn_inv_item_tooltip(
         } else if let Ok(chest) = item_chest.get_single() {
             commands.entity(chest).add_child(tooltip);
         }
+    }
+}
+pub fn get_star_icon_from_rarity(rarity: ItemRarity) -> UIElement {
+    match rarity {
+        ItemRarity::Common => UIElement::StarIconCommon,
+        ItemRarity::Uncommon => UIElement::StarIconUncommon,
+        ItemRarity::Rare => UIElement::StarIconRare,
+        ItemRarity::Legendary => UIElement::StarIconLegendary,
     }
 }
 
@@ -770,6 +857,7 @@ pub fn handle_spawn_inv_player_stats(
     ui_state: Res<State<UIState>>,
     mut tooltip_manager: ResMut<TooltipsManager>,
     old_tooltips: Query<Entity, With<PlayerStatsTooltip>>,
+    item_or_recipe_tooltips: Query<Entity, With<ItemOrRecipeTooltip>>,
 ) {
     if ui_state.0 == UIState::Closed {
         let d = tooltip_manager.timer.duration();
@@ -779,6 +867,12 @@ pub fn handle_spawn_inv_player_stats(
     if updates.iter().len() > 0
         && (tooltip_manager.timer.finished() || updates.iter().next().unwrap().ignore_timer)
     {
+        // Inventory attribute refreshes send this event in PostUpdate; do not respawn the stats
+        // panel while an item tooltip is showing (e.g. furnace upgrade slot persistence).
+        if curr_ui_state.0 == UIState::Inventory && item_or_recipe_tooltips.iter().next().is_some()
+        {
+            return;
+        }
         for t in old_tooltips.iter() {
             commands.entity(t).despawn_recursive();
         }
@@ -786,7 +880,16 @@ pub fn handle_spawn_inv_player_stats(
         let (Ok(parent_e), translation) = (if curr_ui_state.0 == UIState::Inventory {
             (
                 inv.get_single(),
-                Vec3::new(-(INVENTORY_UI_SIZE.x + TOOLTIP_UI_SIZE.x + 2.) / 2., 0., 2.),
+                Vec3::new(
+                    (INVENTORY_UI_SIZE.x
+                        + TOOLTIP_UI_SIZE.x
+                        + INVENTORY_UPGRADE_UI_SIZE.x
+                        + INVENTORY_EQUIPMENT_UI_SIZE.x
+                        + 8.)
+                        / 2.,
+                    0.,
+                    2.,
+                ),
             )
         } else {
             return;
@@ -867,7 +970,7 @@ pub fn spawn_stats_tooltip_at(
     attributes: &[(String, String)],
 ) -> Entity {
     let mut tooltip_text: Vec<((String, String), f32)> = vec![];
-    tooltip_text.push((("Stats".to_string(), "".to_string()), 0.));
+    tooltip_text.push((("STATS".to_string(), "".to_string()), 0.));
     for a in attributes {
         tooltip_text.push(((a.0.clone(), a.1.clone()), 0.));
     }
@@ -894,17 +997,23 @@ pub fn spawn_stats_tooltip_at(
         ))
         .id();
 
+    // Horizontal inset from the tooltip sprite edges to the start of text.
+    // The `StatTooltip.png` art has a ~14 px wooden frame on each side; text inside this inset
+    // keeps labels and values within the inner (striped) content area instead of spilling onto
+    // or past the frame.
+    const STAT_TOOLTIP_INNER_PAD_X: f32 = 22.;
+
     for (i, (text, d)) in tooltip_text.iter().enumerate() {
         let text_pos = if i == 0 {
             Vec3::new(
-                -(f32::ceil((text.0.chars().count() * 6 - 1) as f32 / 2.)) + 0.5,
-                TOOLTIP_UI_SIZE.y / 2. - 12.,
+                -(f32::ceil((text.0.chars().count() * 6 - 1) as f32 / 2.)) - 10.,
+                TOOLTIP_UI_SIZE.y / 2. - 11.,
                 1.,
             )
         } else {
             Vec3::new(
-                -TOOLTIP_UI_SIZE.x / 2. + 8.,
-                TOOLTIP_UI_SIZE.y / 2. - 12. - (i as f32 * 8.) - d - 2.,
+                -TOOLTIP_UI_SIZE.x / 2. + STAT_TOOLTIP_INNER_PAD_X,
+                TOOLTIP_UI_SIZE.y / 2. - 23. - (i as f32 * 13.) - d - 2.,
                 1.,
             )
         };
@@ -916,12 +1025,12 @@ pub fn spawn_stats_tooltip_at(
                         text.0.to_string(),
                         TextStyle {
                             font: if i == 0 {
-                                asset_server.load("fonts/slkscrbold.ttf")
+                                asset_server.load("fonts/alagard.ttf")
                             } else {
                                 asset_server.load("fonts/slkscr.ttf")
                             },
-                            font_size: 8.4,
-                            color: if i == 0 { BLACK } else { GREY },
+                            font_size: if i == 0 { 15. } else { 8.4 },
+                            color: if i == 0 { STATS_TITLE } else { YELLOW_2 },
                         },
                     ),
                     text_anchor: Anchor::CenterLeft,
@@ -943,14 +1052,19 @@ pub fn spawn_stats_tooltip_at(
                     text: Text::from_section(
                         text.1.to_string(),
                         TextStyle {
-                            font: asset_server.load("fonts/slkscr.ttf"),
+                            font: asset_server.load("fonts/slkscrbold.ttf"),
                             font_size: 8.4,
-                            color: LIGHT_RED,
+                            color: YELLOW_2,
                         },
                     ),
                     text_anchor: Anchor::CenterRight,
                     transform: Transform {
-                        translation: text_pos + Vec3::new(TOOLTIP_UI_SIZE.x - 16., 0., 0.),
+                        translation: text_pos
+                            + Vec3::new(
+                                TOOLTIP_UI_SIZE.x - 2. * STAT_TOOLTIP_INNER_PAD_X - 6.,
+                                0.,
+                                0.,
+                            ),
                         scale: Vec3::new(1., 1., 1.),
                         ..Default::default()
                     },
@@ -994,7 +1108,13 @@ pub fn spawn_damage_tracker_in_inventory(
         return;
     };
 
-    let panel_x = (INVENTORY_UI_SIZE.x + 82. + 2.) / 2.;
+    let panel_x = (INVENTORY_UI_SIZE.x
+        + TOOLTIP_UI_SIZE.x
+        + INVENTORY_UPGRADE_UI_SIZE.x
+        + INVENTORY_EQUIPMENT_UI_SIZE.x
+        + TOOLTIP_UI_SIZE.x
+        + 86.)
+        / 2.;
     let start_y = INVENTORY_UI_SIZE.y / 2. - 8.;
 
     if let Some(entities) = spawn_damage_tracker_ui(
@@ -1009,6 +1129,81 @@ pub fn spawn_damage_tracker_in_inventory(
         if let Some(panel) = entities.first() {
             commands.entity(*panel).insert(DamageTrackerPanel);
             commands.entity(inv_entity).add_child(*panel);
+        }
+    }
+}
+
+/// Recipe result item: ingredient icons in a horizontal row at the top of the card, with required
+/// counts (always shown — `spawn_item_stack_icon` only draws stack text when count > 1).
+fn spawn_recipe_ingredients_tooltip_row(
+    commands: &mut Commands,
+    graphics: &Graphics,
+    asset_server: &AssetServer,
+    tooltip: Entity,
+    result_obj: WorldObject,
+    recipes: &Recipes,
+    item_stacks: &Query<(Entity, &ItemStack), Without<RecipeIngredientTooltipIcon>>,
+) {
+    let Some((ingredients, _, _)) = recipes.crafting_list.get(&result_obj) else {
+        return;
+    };
+    if ingredients.is_empty() {
+        return;
+    }
+
+    let n = ingredients.len() as f32;
+    let span = (n - 1.).max(0.) * RECIPE_TOOLTIP_INGREDIENT_SPACING_X;
+    let x_start = -span / 2.;
+
+    for (j, ing) in ingredients.iter().enumerate() {
+        let x = x_start + j as f32 * RECIPE_TOOLTIP_INGREDIENT_SPACING_X;
+        let stack = ItemStack {
+            obj_type: ing.item,
+            count: 1,
+            ..Default::default()
+        };
+        let icon_e = spawn_item_stack_icon(
+            commands,
+            graphics,
+            &stack,
+            asset_server,
+            Vec2::new(x, RECIPE_TOOLTIP_INGREDIENT_ROW_Y),
+            Vec2::ZERO,
+            3,
+        );
+        commands.entity(icon_e).insert(RecipeIngredientTooltipIcon);
+        commands.entity(tooltip).add_child(icon_e);
+
+        commands
+            .spawn((
+                Text2dBundle {
+                    text: Text::from_section(
+                        format!("{}", ing.count),
+                        TextStyle {
+                            font: asset_server.load("fonts/4x5.ttf"),
+                            font_size: 5.0,
+                            color: WHITE,
+                        },
+                    ),
+                    text_anchor: Anchor::Center,
+                    transform: Transform::from_translation(Vec3::new(
+                        x,
+                        RECIPE_TOOLTIP_INGREDIENT_ROW_Y - RECIPE_TOOLTIP_INGREDIENT_COUNT_Y_OFFSET,
+                        4.,
+                    )),
+                    ..default()
+                },
+                Name::new("RECIPE INGREDIENT COUNT"),
+                RenderLayers::from_layers(&[3]),
+            ))
+            .set_parent(tooltip);
+
+        for (e, inv_stack) in item_stacks.iter() {
+            if inv_stack.obj_type == ing.item {
+                if let Some(mut ec) = commands.get_entity(e) {
+                    ec.insert(BounceOnHit::new());
+                }
+            }
         }
     }
 }
@@ -1036,7 +1231,7 @@ pub fn spawn_item_tooltip_icon_name_header(
         3,
     );
     commands.entity(icon_e).insert(Transform {
-        translation: Vec3::new(-42., 46., 2.),
+        translation: Vec3::new(-45., 65., 2.),
         scale: Vec3::new(2., 2., 1.),
         ..Default::default()
     });
@@ -1058,9 +1253,9 @@ pub fn spawn_item_tooltip_icon_name_header(
                         color: item_stack.rarity.get_color(),
                     },
                 ),
-                text_anchor: Anchor::CenterLeft,
+                text_anchor: Anchor::Center,
                 transform: Transform {
-                    translation: Vec3::new(-60., 75., 1.),
+                    translation: Vec3::new(-ITEM_TOOLTIP_LARGE_CARD_SIZE.x / 2. + 85., 101., 1.),
                     scale: Vec3::new(1., 1., 1.),
                     ..Default::default()
                 },
@@ -1087,11 +1282,7 @@ pub fn spawn_world_item_tooltip_for_stack(
 
     // Panel center offset was tuned for 130×120; shift up when using the tall card so the bottom clears the icon.
     let legacy_panel_h = 120.;
-    let panel_center_offset = Vec3::new(
-        -size.x / 2.,
-        55. + (size.y - legacy_panel_h) / 2.,
-        20.,
-    );
+    let panel_center_offset = Vec3::new(-size.x / 2., 55. + (size.y - legacy_panel_h) / 2., 20.);
 
     let tooltip = commands
         .spawn((
@@ -1144,7 +1335,7 @@ pub fn spawn_world_item_tooltip_for_stack(
                         },
                     ),
                     text_anchor: Anchor::CenterLeft,
-                    transform: Transform::from_translation(Vec3::new(-16., 62., 2.)),
+                    transform: Transform::from_translation(Vec3::new(-16., 78., 2.)),
                     ..default()
                 },
                 RenderLayers::from_layers(&[3]),

@@ -103,14 +103,125 @@ use self::{
     tile_hover::spawn_tile_hover_on_cursor_move,
 };
 
-pub const INVENTORY_UI_SIZE: Vec2 = Vec2::new(218., 145.);
+/// Full inventory panel sprite size (match background art).
+pub const INVENTORY_UI_SIZE: Vec2 = Vec2::new(162., 312.);
+pub const INVENTORY_UPGRADE_UI_SIZE: Vec2 = Vec2::new(134., 166.);
+/// Side panel art shown in `UIState::InventoryCrafting` in place of the upgrade panel.
+pub const INVENTORY_CRAFTING_PANEL_UI_SIZE: Vec2 = Vec2::new(126., 184.);
+pub const INVENTORY_EQUIPMENT_UI_SIZE: Vec2 = Vec2::new(130., 140.);
+/// Side panel that replaces the stats tooltip in `UIState::InventoryCrafting`.
+/// Matches the art height of the stats panel so it occupies the same slot on-screen.
+pub const INVENTORY_BLUEPRINT_UI_SIZE: Vec2 = Vec2::new(192., 312.);
+pub const INVENTORY_Y_OFFSET: f32 =  8.;
+/// Pixel extent of the main item slot grid (4 columns × 7 rows).
+pub const INVENTORY_GRID_COLS: usize = 4;
 pub const SKILLS_CHOICE_UI_SIZE: Vec2 = Vec2::new(164., 191.);
 pub const ESSENCE_UI_SIZE: Vec2 = Vec2::new(157., 130.5);
-pub const TOOLTIP_UI_SIZE: Vec2 = Vec2::new(117., 160.5);
+pub const TOOLTIP_UI_SIZE: Vec2 = Vec2::new(172., 312.);
 pub const CHEST_INVENTORY_UI_SIZE: Vec2 = Vec2::new(127., 142.);
 pub const CRAFTING_INVENTORY_UI_SIZE: Vec2 = Vec2::new(171., 166.);
 pub const FURNACE_INVENTORY_UI_SIZE: Vec2 = Vec2::new(171., 166.);
-pub const UI_SLOT_SIZE: f32 = 20.0;
+pub const UI_SLOT_SIZE: Vec2 = Vec2::new(24., 24.);
+pub const UI_UPGRADE_SLOT_SIZE: Vec2 = Vec2::new(34., 34.);
+
+// --- Main inventory item grid (panel local space; parent = inventory sprite center) ---
+/// Horizontal / vertical distance between slot **centers** in the main grid.
+pub const INV_SLOT_SPACING_X: f32 = UI_SLOT_SIZE.x + 6.;
+pub const INV_SLOT_SPACING_Y: f32 = UI_SLOT_SIZE.y + 6.;
+/// Inset from the panel’s left edge (−half width) to the **left** edge of column 0.
+pub const INV_GRID_INSET_LEFT: f32 = 26.0;
+/// Inset from the panel’s bottom edge (−half height) to the **bottom** edge of row 0.
+pub const INV_GRID_INSET_BOTTOM: f32 = 49.0;
+pub const INV_GRID_FIRST_ROW_NUDGE_Y: f32 = -29.0;
+
+/// After computing the same grid as `Normal`, chest/scrapper UIs shift the stack down (shared panel layout).
+pub const INV_CHEST_SCRAPPER_GRID_OFFSET_Y: f32 = 4.0 * INV_SLOT_SPACING_Y + 11.0;
+
+// --- Equipment panel 3×3 grid (panel-local; aligned to built-in slot art in `EquipmentPanel.png`) ---
+/// Offset from the inventory panel center to the equipment panel center (kept in sync with the
+/// `equip_panel` sprite spawn in `setup_inv_ui`).
+pub const INV_EQUIP_PANEL_OFFSET_X: f32 = 150.0;
+pub const INV_EQUIP_PANEL_OFFSET_Y: f32 = 86.0;
+/// Spacing between 3×3 grid columns / rows (centers).
+pub const INV_EQUIP_GRID_SPACING: f32 = 30.0;
+/// Panel-local y of the three grid rows (top, middle, bottom).
+pub const INV_EQUIP_GRID_ROW_TOP_Y: f32 = 26.0;
+pub const INV_EQUIP_GRID_ROW_MID_Y: f32 = -4.0;
+pub const INV_EQUIP_GRID_ROW_BOT_Y: f32 = -34.0;
+
+/// Trash slot (bottom of panel).
+pub const INV_TRASH_OFFSET_X: f32 = -20.0 + 0.5 * UI_SLOT_SIZE.x;
+pub const INV_TRASH_OFFSET_Y: f32 = -0.5 * UI_SLOT_SIZE.y - 12.0;
+
+/// Crafting grid inside crafting/furnace-style panels (8 columns).
+pub const INV_CRAFTING_COLS: usize = 8;
+pub const INV_CRAFTING_ROW_GAP: f32 = 1.0;
+/// Added to −half width for crafting column 0 center: `+ INV_CRAFTING_X_ANCHOR + 0.5 * UI_SLOT_SIZE.x`.
+pub const INV_CRAFTING_X_ANCHOR: f32 = 6.0;
+/// Row 0 baseline: `−half_height + 7 * slot_y + 16`.
+pub const INV_CRAFTING_BASE_Y: f32 = 7.0 * UI_SLOT_SIZE.y - 160.0;
+/// Nudge when `UIState::Inventory` (crafting strip on main inventory screen).
+pub const INV_CRAFTING_NUDGE_IN_MAIN_INV: Vec2 = Vec2::new(-2., -29.);
+
+/// Furnace special slots (panel-local).
+pub const INV_FURNACE_SLOT_1: Vec2 = Vec2::new(121., -46.);
+pub const INV_FURNACE_SLOT_0: Vec2 = Vec2::new(176., -46.);
+
+/// Number of hotbar slots shown in the on-screen HUD (bound to keys 1-4).
+/// The underlying `Inventory::items` container still has slots 4-5 for passive storage,
+/// but they are not rendered in the HUD.
+pub const HUD_HOTBAR_SLOTS: usize = 4;
+
+/// Shared y (offset from the screen bottom) for the single HUD action row that holds
+/// both the class-skill icons and the hotbar slots.
+pub const HUD_ACTION_ROW_Y_FROM_BOTTOM: f32 = 6.0;
+
+/// Center x of the 4-slot hotbar group (left side of the action row).
+pub const HUD_HOTBAR_CENTER_X: f32 = -65.0;
+
+/// Center x of the class-skill icon group (right side of the action row).
+pub const HUD_SKILLS_CENTER_X: f32 = 65.0;
+
+/// Center-to-center spacing between class-skill icons.
+pub const HUD_SKILL_SPACING_X: f32 = 31.0;
+
+/// Parent offset when the inventory UI is in crafting mode (whole panel nudge).
+pub const INV_UI_PARENT_OFFSET_CRAFTING: Vec2 = Vec2::new(0., -4.);
+
+// --- Upgrade / Crafting side panel layout overrides for `UIState::InventoryCrafting` ---
+/// Inventory-panel-local Y of the upgrade panel when the CRAFT toggle swaps us into crafting mode.
+/// Moves the panel up from the default `-75` so the three crafting-input slots line up mid-inventory.
+pub const INV_UPGRADE_PANEL_OFFSET_Y_CRAFTING: f32 = 10.0;
+/// Horizontal spacing (centers) of the three crafting input slots in `InventoryCrafting` mode.
+pub const INV_CRAFTING_INPUT_SLOT_SPACING_X: f32 = INV_SLOT_SPACING_X;
+/// Inventory-panel-local Y of the three crafting input slots in `InventoryCrafting` mode
+/// (aligns them slightly above the crafting panel's vertical center, matching the reference mock).
+pub const INV_CRAFTING_INPUT_SLOTS_Y_LOCAL: f32 = INV_UPGRADE_PANEL_OFFSET_Y_CRAFTING + 20.0;
+
+// --- Blueprint row + crafting panel slot layout (InventoryCrafting mode) ---
+/// A single blueprint row on the blueprints panel. Matches the art sprite size.
+pub const INV_BLUEPRINT_SLOT_SIZE: Vec2 = Vec2::new(144., 22.);
+/// Vertical gap between blueprint rows (edge-to-edge).
+pub const INV_BLUEPRINT_SLOT_ROW_GAP: f32 = 4.0;
+/// Panel-local Y of the top-most blueprint row (row 0 center) relative to the blueprints panel center.
+pub const INV_BLUEPRINT_SLOT_TOP_Y: f32 = INVENTORY_BLUEPRINT_UI_SIZE.y * 0.5 - 45.0;
+/// Panel-local X anchor for blueprint rows (centered under the panel title).
+pub const INV_BLUEPRINT_SLOT_CENTER_X: f32 = -3.0;
+/// Max number of blueprint rows that fit inside the blueprints panel art.
+pub const MAX_BLUEPRINT_ROWS: usize = 10;
+/// X offset (from the row's left edge) where the recipe result icon is centered.
+pub const INV_BLUEPRINT_SLOT_ICON_X_OFFSET: f32 = 12.0;
+/// X offset (from the row's left edge) where the recipe name label starts (anchored left).
+pub const INV_BLUEPRINT_SLOT_LABEL_X_OFFSET: f32 = 36.0;
+
+/// Panel-local Y (crafting panel) of the three ingredient display slots.
+pub const INV_CRAFTING_PANEL_INGREDIENT_ROW_Y: f32 = -6.0;
+/// Horizontal center-to-center spacing of the three ingredient display slots on the crafting panel.
+pub const INV_CRAFTING_PANEL_INGREDIENT_SPACING_X: f32 = 32.;
+/// Panel-local Y (crafting panel) of the result slot (sits above the ingredient row).
+pub const INV_CRAFTING_PANEL_RESULT_Y: f32 = 41.0;
+/// Amount text offset beneath each ingredient icon (e.g. "2/3").
+pub const INV_CRAFTING_PANEL_INGREDIENT_COUNT_Y_OFFSET: f32 = -11.0;
 
 pub struct UIPlugin;
 //TODO: extract out ui darken overlay into a helper function
@@ -118,6 +229,7 @@ impl Plugin for UIPlugin {
     fn build(&self, app: &mut App) {
         app.add_state::<UIState>()
             .insert_resource(InventoryState::default())
+            .init_resource::<SelectedCraftingRecipe>()
             .insert_resource(ClassSelectionState::default())
             .init_resource::<ClassUnlockHoverState>()
             .init_resource::<ClassUnlockConfirmState>()
@@ -131,6 +243,7 @@ impl Plugin for UIPlugin {
             .insert_resource(FloatingTextQueue::new(0.8))
             .insert_resource(TooltipsManager {
                 timer: Timer::from_seconds(0.7, TimerMode::Once),
+                stats_respawn_delay: None,
             })
             .add_event::<ActionSuccessEvent>()
             .add_event::<ScrapperEvent>()
@@ -193,6 +306,9 @@ impl Plugin for UIPlugin {
                 setup_inv_ui
                     .before(CustomFlush)
                     .run_if(state_changed::<UIState>().and_then(in_state(UIState::Inventory))),
+                setup_inv_ui
+                    .before(CustomFlush)
+                    .run_if(state_changed::<UIState>().and_then(in_state(UIState::InventoryCrafting))),
                 setup_inv_ui
                     .before(CustomFlush)
                     .run_if(state_changed::<UIState>().and_then(in_state(UIState::Chest))),
@@ -267,12 +383,9 @@ impl Plugin for UIPlugin {
                     handle_interaction_clicks
                         .before(handle_item_drop_clicks)
                         .run_if(not(in_state(UIState::Closed))),
-                    handle_hotbar_slot_clicks_when_inv_closed
-                        .run_if(in_state(UIState::Closed)),
                     handle_spawn_inv_item_tooltip,
                     update_inventory_ui.after(CustomFlush),
                     handle_update_inv_item_entities,
-                    update_hotbar_ammo_bar,
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
@@ -482,6 +595,10 @@ impl Plugin for UIPlugin {
                     .in_set(OnUpdate(GameState::Main)),
             )
             .add_system(
+                update_hotbar_keybind_text
+                    .in_set(OnUpdate(GameState::Main)),
+            )
+            .add_system(
                 handle_essence_heirloom_tooltip
                     .in_set(OnUpdate(GameState::Main)),
             )
@@ -572,9 +689,23 @@ impl Plugin for UIPlugin {
                     update_skill_choice_button_states.run_if(in_state(UIState::Skills)),
                     update_skill_choice_count_text.run_if(in_state(UIState::Skills)),
                     handle_cursor_inventory_upgrade_button.run_if(in_state(UIState::Inventory)),
+                    handle_cursor_inventory_craft_toggle_button.run_if(
+                        in_state(UIState::Inventory)
+                            .or_else(in_state(UIState::InventoryCrafting)),
+                    ),
+                    update_upgrade_material_prompt_text.run_if(in_state(UIState::Inventory)),
                     handle_dev_button_clicks.run_if(in_state(UIState::Inventory)),
                     apply_grant_heirloom_dev.run_if(in_state(UIState::Inventory)),
                     setup_furnace_slots_ui.run_if(in_state(UIState::Furnace)),
+                    handle_blueprint_slot_interaction
+                        .run_if(in_state(UIState::InventoryCrafting)),
+                    refresh_crafting_ingredient_display
+                        .run_if(in_state(UIState::InventoryCrafting)),
+                    // Runs before `handle_item_drop_clicks` so a click on the result slot is
+                    // consumed for crafting instead of being treated as a drop.
+                    handle_crafting_result_slot_click
+                        .before(handle_item_drop_clicks)
+                        .run_if(in_state(UIState::InventoryCrafting)),
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )

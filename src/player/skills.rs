@@ -1283,7 +1283,7 @@ impl Heirloom {
             ],
             Heirloom::CritHeal => vec![
                 "Critical hits".to_string(),
-                "have a 25% chance".to_string(),
+                "have a 15% chance".to_string(),
                 "to heal 1 HP.".to_string(),
             ],
             Heirloom::LowHPDamage => vec![

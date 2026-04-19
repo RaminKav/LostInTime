@@ -31,7 +31,7 @@ use crate::{
         CheatSettings, MenuButton, UIElement, UIState,
     },
     world::{dimension::EraManager, portal::UIPortal},
-    FairyPetSprite, Pet, RenderLayers, ScreenResolution, SlimePetSprite, GAME_HEIGHT,
+    FairyPetSprite, Pet, RenderLayers, ScreenResolution, SlimePetSprite,
 };
 
 use super::{
@@ -179,7 +179,7 @@ pub fn setup_class_selection_ui(
 ) {
     let overlay = spawn_ui_overlay(
         &mut commands,
-        Vec2::new(res.game_width + 10., GAME_HEIGHT + 100.),
+        Vec2::new(res.game_width + 10., res.game_height + 100.),
         1.,
         9.,
     );
@@ -287,10 +287,16 @@ pub fn setup_class_selection_ui(
         .cloned()
         .unwrap_or(SkillClass::Warrior);
 
-    // Initialize the selection state with first unlocked class
+    let default_pet = Pet::iter().find(|pet| {
+        achievements_ref
+            .map(|a| is_pet_unlocked(pet, a))
+            .unwrap_or(false)
+    });
+
+    // Initialize the selection state with first unlocked class and first unlocked pet (if any)
     commands.insert_resource(ClassSelectionState {
         selected_class: Some(default_class.clone()),
-        selected_pet: None,
+        selected_pet: default_pet.clone(),
     });
 
     let _class_select_bg = commands
@@ -432,6 +438,8 @@ pub fn setup_class_selection_ui(
         let pet_unlocked = achievements_ref
             .map(|a| is_pet_unlocked(&pet, a))
             .unwrap_or(false);
+        let pet_selected =
+            pet_unlocked && default_pet.as_ref().is_some_and(|d| *d == pet);
 
         // Pet option background
         let x_offset = (i as f32 - 1.0) * 29.0 + 149.; // Center the options
@@ -457,7 +465,7 @@ pub fn setup_class_selection_ui(
             .insert(PetOption)
             .insert(PetSelectSlot {
                 is_hovered: false,
-                is_selected: false,
+                is_selected: pet_selected,
                 pet: pet.clone(),
             })
             .insert(RenderLayers::from_layers(&[3]))
@@ -1939,7 +1947,7 @@ pub fn handle_portal_animation(
                                     color: Color::rgba(0., 0., 0., 0.),
                                     custom_size: Some(Vec2::new(
                                         screen_res.game_width + 10.,
-                                        crate::GAME_HEIGHT + 20.,
+                                        screen_res.game_height + 20.,
                                     )),
                                     ..default()
                                 },

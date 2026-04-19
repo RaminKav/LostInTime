@@ -9,6 +9,10 @@ fn format_score(score: i32) -> String {
     super::ui_helpers::format_number(score as i64)
 }
 
+/// Must match the leaderboard panel sprite and `setup_leaderboard_ui` placement math.
+const LEADERBOARD_PANEL_WIDTH: f32 = 160.0;
+const LEADERBOARD_PANEL_HEIGHT: f32 = 135.0;
+
 #[derive(Component)]
 pub struct LeaderboardUI;
 
@@ -38,12 +42,9 @@ pub fn setup_leaderboard_ui(
         cache.last_error.is_some()
     );
 
-    let panel_width = 120.0;
-    let panel_height = 75.0;
-
     // Position in top left corner
-    let panel_x = -resolution.game_width / 2. + panel_width / 2. + 5.;
-    let panel_y = resolution.game_height / 2. - panel_height / 2. - 5.;
+    let panel_x = -resolution.game_width / 2. + LEADERBOARD_PANEL_WIDTH / 2. + 5.;
+    let panel_y = resolution.game_height / 2. - LEADERBOARD_PANEL_HEIGHT / 2. - 15.;
     info!("LEADER BOARD {:?}", panel_x);
 
     // Background panel
@@ -51,7 +52,7 @@ pub fn setup_leaderboard_ui(
         SpriteBundle {
             sprite: Sprite {
                 color: Color::rgba(0.15, 0.12, 0.10, 0.95),
-                custom_size: Some(Vec2::new(panel_width, panel_height)),
+                custom_size: Some(Vec2::new(LEADERBOARD_PANEL_WIDTH, LEADERBOARD_PANEL_HEIGHT)),
                 ..Default::default()
             },
             transform: Transform::from_translation(Vec3::new(panel_x, panel_y, 9.)),
@@ -78,7 +79,7 @@ pub fn setup_leaderboard_ui(
             text_anchor: bevy::sprite::Anchor::Center,
             transform: Transform::from_translation(Vec3::new(
                 panel_x + 0.5,
-                panel_y + panel_height / 2. - 8.5,
+                panel_y + LEADERBOARD_PANEL_HEIGHT / 2. - 8.5,
                 12.,
             )),
             ..Default::default()
@@ -96,8 +97,8 @@ pub fn setup_leaderboard_ui(
         &cache,
         panel_x,
         panel_y,
-        panel_width,
-        panel_height,
+        LEADERBOARD_PANEL_WIDTH,
+        LEADERBOARD_PANEL_HEIGHT,
     );
 }
 
@@ -111,7 +112,7 @@ fn spawn_leaderboard_entries(
     panel_width: f32,
     panel_height: f32,
 ) {
-    let text_x = panel_x - panel_width / 2. + 5.;
+    let text_x = panel_x - panel_width / 2. + 4.;
     let start_y = panel_y + panel_height / 2. - 18.5;
     let row_spacing = -12.0;
 
@@ -194,12 +195,12 @@ fn spawn_leaderboard_entries(
             Name::new("Empty Text"),
         ));
     } else {
-        // Display entries (only top 5)
+        // Display entries (only top )
         info!(
             "Spawning {} leaderboard entries",
-            cache.entries.len().min(5)
+            cache.entries.len().min(10)
         );
-        for (i, entry) in cache.entries.iter().enumerate().take(5) {
+        for (i, entry) in cache.entries.iter().enumerate().take(10) {
             let y = start_y + row_spacing * i as f32;
 
             // Rank
@@ -214,8 +215,8 @@ fn spawn_leaderboard_entries(
                         },
                     )
                     .with_alignment(TextAlignment::Left),
-                    text_anchor: bevy::sprite::Anchor::CenterLeft,
-                    transform: Transform::from_translation(Vec3::new(text_x, y, 15.)),
+                    text_anchor: bevy::sprite::Anchor::CenterRight,
+                    transform: Transform::from_translation(Vec3::new(text_x + 9., y, 15.)),
                     ..Default::default()
                 },
                 RenderLayers::from_layers(&[3]),
@@ -225,11 +226,7 @@ fn spawn_leaderboard_entries(
             ));
 
             // Truncate name if too long
-            let name = if entry.player_name.len() > 9 {
-                format!("{}...", &entry.player_name[..9])
-            } else {
-                entry.player_name.clone()
-            };
+            let name = entry.player_name.clone();
 
             // Player name
             commands.spawn((
@@ -244,7 +241,7 @@ fn spawn_leaderboard_entries(
                     )
                     .with_alignment(TextAlignment::Left),
                     text_anchor: bevy::sprite::Anchor::CenterLeft,
-                    transform: Transform::from_translation(Vec3::new(text_x + 8., y, 15.)),
+                    transform: Transform::from_translation(Vec3::new(text_x + 12., y, 15.)),
                     ..Default::default()
                 },
                 RenderLayers::from_layers(&[3]),
@@ -266,7 +263,7 @@ fn spawn_leaderboard_entries(
                     )
                     .with_alignment(TextAlignment::Left),
                     text_anchor: bevy::sprite::Anchor::CenterLeft,
-                    transform: Transform::from_translation(Vec3::new(text_x + 48., y, 15.)),
+                    transform: Transform::from_translation(Vec3::new(text_x + 94., y, 15.)),
                     ..Default::default()
                 },
                 RenderLayers::from_layers(&[3]),
@@ -287,7 +284,7 @@ fn spawn_leaderboard_entries(
                     )
                     .with_alignment(TextAlignment::Left),
                     text_anchor: bevy::sprite::Anchor::CenterLeft,
-                    transform: Transform::from_translation(Vec3::new(text_x + 78., y, 15.)),
+                    transform: Transform::from_translation(Vec3::new(text_x + 122., y, 15.)),
                     ..Default::default()
                 },
                 RenderLayers::from_layers(&[3]),
@@ -325,8 +322,6 @@ pub fn update_leaderboard_display(
 
     // Get panel position
     if let Ok(panel_transform) = panel_query.get_single() {
-        let panel_width = 120.0;
-        let panel_height = 75.0;
         let panel_x = panel_transform.translation.x;
         let panel_y = panel_transform.translation.y;
 
@@ -337,8 +332,8 @@ pub fn update_leaderboard_display(
             &cache,
             panel_x,
             panel_y,
-            panel_width,
-            panel_height,
+            LEADERBOARD_PANEL_WIDTH,
+            LEADERBOARD_PANEL_HEIGHT,
         );
     }
 }
@@ -368,8 +363,6 @@ pub fn ensure_leaderboard_entries(
             cache.entries.len()
         );
 
-        let panel_width = 90.0;
-        let panel_height = 75.0;
         let panel_x = panel_transform.translation.x;
         let panel_y = panel_transform.translation.y;
 
@@ -379,8 +372,8 @@ pub fn ensure_leaderboard_entries(
             &cache,
             panel_x,
             panel_y,
-            panel_width,
-            panel_height,
+            LEADERBOARD_PANEL_WIDTH,
+            LEADERBOARD_PANEL_HEIGHT,
         );
     }
 }

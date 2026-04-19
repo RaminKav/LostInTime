@@ -1,12 +1,12 @@
-use crate::{cursor::CursorPos, world, Game};
+use crate::{assets::Graphics, cursor::CursorPos, keybinds::InputBinding, world, Game};
 use bevy::{prelude::*, render::view::RenderLayers};
 use bevy_ecs_tilemap::tiles::TilePos;
 
-use super::{Interactable, UIState};
+use super::{Interactable, UIElement, UIState};
 
 /// Typical full-screen UI overlays (inventory, shrines, class select, etc.) use z ≈ 9–15.
 /// Active skill hotbar: above those modals, below the heirloom pick screen.
-pub const Z_DEPTH_HUD_ACTIVE_SKILLS: f32 = 48.0;
+pub const Z_DEPTH_HUD_ACTIVE_SKILLS: f32 = 4.0;
 /// “Choose an Heirloom” screen only: backdrop above active skills, below HUD heirloom row.
 pub const Z_DEPTH_HEIRLOOM_SKILL_CHOICE_OVERLAY: f32 = 52.0;
 /// Root depth for title bar, cards, reroll/banish buttons on that screen.
@@ -96,6 +96,86 @@ pub fn format_number(value: i64) -> String {
             trimmed.to_string()
         }
     }
+}
+
+/// Looks up the UI "key cap" sprite + width for a given input binding. Letters / digits
+/// use the small key, modifiers (Shift/Ctrl/Alt/Tab/…) use the medium key, and Space / Enter
+/// / Esc use the large key.
+pub fn get_key_size_and_element(key: InputBinding) -> (UIElement, f32) {
+    match key {
+        InputBinding::KeyBinding(KeyCode::Space)
+        | InputBinding::KeyBinding(KeyCode::Return)
+        | InputBinding::KeyBinding(KeyCode::Escape) => (UIElement::LargeKey, 30.0),
+
+        InputBinding::KeyBinding(KeyCode::LShift)
+        | InputBinding::KeyBinding(KeyCode::RShift)
+        | InputBinding::KeyBinding(KeyCode::LControl)
+        | InputBinding::KeyBinding(KeyCode::RControl)
+        | InputBinding::KeyBinding(KeyCode::LAlt)
+        | InputBinding::KeyBinding(KeyCode::RAlt)
+        | InputBinding::KeyBinding(KeyCode::Tab)
+        | InputBinding::KeyBinding(KeyCode::Capital)
+        | InputBinding::KeyBinding(KeyCode::Back)
+        | InputBinding::MouseBinding(_) => (UIElement::MediumKey, 26.0),
+
+        _ => (UIElement::SmallKey, 10.0),
+    }
+}
+
+/// Spawn a "key cap" badge (background sprite + centered label text) as a child of `parent`.
+///
+/// Used above active-skill icons, the inventory bag icon, and hotbar slots. Pass marker
+/// components via the returned `(key_bg, key_text)` entities if callers need to update the
+/// badge later (e.g. user rebinds the key — see `update_active_skill_keybind_text`).
+///
+/// `bg_offset` is local-space relative to `parent`. `text_offset` is local-space relative to
+/// `bg_offset` (the text entity is parented to the background so they move together).
+pub fn spawn_keybind_badge(
+    commands: &mut Commands,
+    graphics: &Graphics,
+    asset_server: &AssetServer,
+    key: InputBinding,
+    parent: Entity,
+    bg_offset: Vec3,
+    text_offset: Vec3,
+    render_layer: u8,
+) -> (Entity, Entity) {
+    let (key_element, key_width) = get_key_size_and_element(key);
+
+    let key_bg = commands
+        .spawn(SpriteBundle {
+            texture: graphics.get_ui_element_texture(key_element),
+            transform: Transform::from_translation(bg_offset),
+            sprite: Sprite {
+                custom_size: Some(Vec2::new(key_width, 10.)),
+                ..Default::default()
+            },
+            ..Default::default()
+        })
+        .insert(RenderLayers::from_layers(&[render_layer]))
+        .set_parent(parent)
+        .id();
+
+    let key_text = commands
+        .spawn(Text2dBundle {
+            text: Text::from_section(
+                crate::keybinds::get_key_display_name(key),
+                TextStyle {
+                    font: asset_server.load("fonts/slkscr.ttf"),
+                    font_size: 8.4,
+                    color: crate::colors::DARK_WOOD_BROWN,
+                },
+            )
+            .with_alignment(TextAlignment::Center),
+            text_anchor: bevy::sprite::Anchor::Center,
+            transform: Transform::from_translation(text_offset),
+            ..Default::default()
+        })
+        .insert(RenderLayers::from_layers(&[render_layer]))
+        .set_parent(key_bg)
+        .id();
+
+    (key_bg, key_text)
 }
 
 pub fn spawn_ui_overlay(commands: &mut Commands, size: Vec2, alpha: f32, depth: f32) -> Entity {

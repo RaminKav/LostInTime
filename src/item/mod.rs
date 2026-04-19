@@ -136,6 +136,8 @@ impl EquipmentType {
             EquipmentType::Ring => vec![2, 1],
             EquipmentType::Pendant => vec![0],
             EquipmentType::Trinket => vec![3],
+            // Weapon slot (and pet slot) are single-slot containers; only index 0 is valid.
+            EquipmentType::Weapon => vec![0],
             _ => vec![],
         }
     }
@@ -148,6 +150,10 @@ impl EquipmentType {
             EquipmentType::Ring => InventorySlotType::Accessory,
             EquipmentType::Pendant => InventorySlotType::Accessory,
             EquipmentType::Trinket => InventorySlotType::Accessory,
+            // Weapons route to the Weapon slot. The Pet slot accepts the same item
+            // category at validate-time (see `InventoryItemStack::validate`), so
+            // dragging a weapon to either slot is permitted.
+            EquipmentType::Weapon => InventorySlotType::Weapon,
             _ => InventorySlotType::Normal,
         }
     }
@@ -427,6 +433,9 @@ pub enum WorldObject {
     AlchemyTable,
     AlchemyTableBlock,
     RedStew,
+    PinkFlowerStew,
+    YellowFlowerStew,
+    BerryJam,
     UpgradeTome,
     OrbOfTransformation,
     UpgradeStation,
