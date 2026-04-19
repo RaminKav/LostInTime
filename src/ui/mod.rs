@@ -112,7 +112,7 @@ pub const INVENTORY_EQUIPMENT_UI_SIZE: Vec2 = Vec2::new(130., 140.);
 /// Side panel that replaces the stats tooltip in `UIState::InventoryCrafting`.
 /// Matches the art height of the stats panel so it occupies the same slot on-screen.
 pub const INVENTORY_BLUEPRINT_UI_SIZE: Vec2 = Vec2::new(192., 312.);
-pub const INVENTORY_Y_OFFSET: f32 =  8.;
+pub const INVENTORY_Y_OFFSET: f32 =  -2.;
 /// Pixel extent of the main item slot grid (4 columns × 7 rows).
 pub const INVENTORY_GRID_COLS: usize = 4;
 pub const SKILLS_CHOICE_UI_SIZE: Vec2 = Vec2::new(164., 191.);

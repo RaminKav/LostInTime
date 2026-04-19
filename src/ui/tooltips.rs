@@ -226,11 +226,17 @@ pub fn handle_spawn_inv_item_tooltip(
                     right_side_offset
                 }
             }
-            UIState::Chest => CHEST_INVENTORY_UI_SIZE,
+            UIState::Chest => Vec2::new(
+                -CHEST_INVENTORY_UI_SIZE.x - 20.,
+                -CHEST_INVENTORY_UI_SIZE.y / 2. + 40.,
+            ),
             UIState::Crafting => CRAFTING_INVENTORY_UI_SIZE,
             UIState::Furnace => FURNACE_INVENTORY_UI_SIZE,
             UIState::Essence => ESSENCE_UI_SIZE,
-            UIState::ItemChest => SKILLS_CHOICE_UI_SIZE,
+            UIState::ItemChest => Vec2::new(
+                -CHEST_INVENTORY_UI_SIZE.x - 20.,
+                -CHEST_INVENTORY_UI_SIZE.y / 2. + 40.,
+            ),
             _ => continue,
         };
 

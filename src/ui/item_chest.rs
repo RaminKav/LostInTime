@@ -230,7 +230,7 @@ pub fn setup_item_chest_ui(
             texture_atlas: graphics.texture_atlas.as_ref().unwrap().clone(),
 
             transform: Transform {
-                translation: Vec2::new(0., 18.).extend(4.),
+                translation: Vec2::new(0., 50.).extend(4.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
@@ -370,7 +370,7 @@ pub fn shuffle_items(
                             .clone(),
                         texture_atlas: graphics.texture_atlas.as_ref().unwrap().clone(),
                         transform: Transform {
-                            translation: Vec3::new(0., 25., 15.),
+                            translation: Vec3::new(0., 57., 15.),
                             scale: Vec3::new(1., 1., 1.),
                             ..Default::default()
                         },
@@ -439,7 +439,7 @@ pub fn shuffle_items(
                         sprite: graphics.get_heirloom_icon(picked_heirloom),
                         texture_atlas: graphics.texture_atlas.as_ref().unwrap().clone(),
                         transform: Transform {
-                            translation: Vec3::new(0., 25., 15.),
+                            translation: Vec3::new(0., 57., 15.),
                             scale: Vec3::new(1., 1., 1.),
                             ..Default::default()
                         },
@@ -556,7 +556,7 @@ pub fn handle_anim_events(
                     rarity.clone(),
                     &mut commands,
                     &asset_server,
-                    Vec3::new(0., 25., 16.),
+                    Vec3::new(0., 57., 16.),
                 );
 
                 let ui_element = match item_chest_state.chest_type {
@@ -581,7 +581,7 @@ pub fn handle_anim_events(
                             ..Default::default()
                         },
                         transform: Transform {
-                            translation: Vec3::new(0., 26., 14.),
+                            translation: Vec3::new(0., 58., 14.),
                             scale: Vec3::new(1., 1., 1.),
                             ..Default::default()
                         },
@@ -614,7 +614,7 @@ pub fn handle_anim_events(
                                     ..default()
                                 },
                                 transform: Transform {
-                                    translation: Vec3::new(0., 25., 15.),
+                                    translation: Vec3::new(0., 57., 15.),
                                     scale: Vec3::new(1., 1., 1.),
                                     ..Default::default()
                                 },
@@ -649,13 +649,15 @@ pub fn handle_anim_events(
                                         ..default()
                                     },
                                     transform: Transform {
-                                        translation: Vec3::new(0., 25., 15.),
+                                        translation: Vec3::new(0., 57., 15.),
                                         scale: Vec3::new(1., 1., 1.),
                                         ..Default::default()
                                     },
                                     ..Default::default()
                                 })
-                                .insert(graphics.get_heirloom_icon(picked_heirloom.heirloom.clone()))
+                                .insert(
+                                    graphics.get_heirloom_icon(picked_heirloom.heirloom.clone()),
+                                )
                                 .insert(graphics.texture_atlas.as_ref().unwrap().clone())
                                 .insert(UIState::ItemChest)
                                 .insert(RenderLayers::from_layers(&[3]))
