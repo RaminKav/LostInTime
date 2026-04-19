@@ -421,21 +421,34 @@ pub fn bgm_audio(
         bgm_update_events.clear();
         return;
     }
+    // Sinks are only inserted in `play_queued_audio_system` (PostUpdate). If several events
+    // fire in one Update (e.g. night tick + peaceful transition, or duplicate day requests on
+    // era load), stopping the "previous" sink fails because it is not in `Assets` yet, and we
+    // queue multiple loops — so overlapping BGM. Coalesce to the last requested track per frame.
+    let mut coalesced_path: Option<String> = None;
     for event in bgm_update_events.iter() {
-        if let Some(prev_handle) = bgm_tracker.current_handle.as_ref() {
-            if let Some(prev_audio) = audio_handles.get(prev_handle) {
-                prev_audio.stop();
-            }
+        coalesced_path = Some(event.asset_path.clone());
+    }
+    let Some(path) = coalesced_path else {
+        return;
+    };
+
+    if path == bgm_tracker.current_track && bgm_tracker.current_handle.is_some() {
+        return;
+    }
+
+    if let Some(prev_handle) = bgm_tracker.current_handle.as_ref() {
+        if let Some(prev_audio) = audio_handles.get(prev_handle) {
+            prev_audio.stop();
         }
-        let path = event.asset_path.clone();
-        bgm_tracker.current_track = path.clone();
-        if let Some(bgm_handle) = cache.get_or_load(&path, &asset_server) {
-            let new_handle = audio_handles.get_handle(audio.play_with_settings(
-                bgm_handle,
-                PlaybackSettings::LOOP.with_volume(0.75 * volume.music_fraction()),
-            ));
-            bgm_tracker.current_handle = Some(new_handle);
-        }
+    }
+    bgm_tracker.current_track = path.clone();
+    if let Some(bgm_handle) = cache.get_or_load(&path, &asset_server) {
+        let new_handle = audio_handles.get_handle(audio.play_with_settings(
+            bgm_handle,
+            PlaybackSettings::LOOP.with_volume(0.75 * volume.music_fraction()),
+        ));
+        bgm_tracker.current_handle = Some(new_handle);
     }
 }
 

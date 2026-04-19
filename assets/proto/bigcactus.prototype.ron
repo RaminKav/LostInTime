@@ -5,7 +5,7 @@
     "survival_rogue_like::enemy::Mob": BigCactus,
     "survival_rogue_like::enemy::CombatAlignment": Hostile,
     "survival_rogue_like::enemy::FollowSpeed": (0.25),
-    "survival_rogue_like::enemy::MultiLeapAttack": (activation_distance: 38., duration_per_hit: 0.3, cooldown: 1.8, startup: 0.5, speed: 85., num_hits: 3, pause_between_hits: 0.1, lunge_delay: 0.01, attack_anim_duration: 1.6),
+    "survival_rogue_like::enemy::MultiLeapAttack": (activation_distance: 72., duration_per_hit: 0.3, cooldown: 1.3, startup: 0.5, speed: 105., num_hits: 3, pause_between_hits: 0.1, lunge_delay: 0.01, attack_anim_duration: 1.6),
     "survival_rogue_like::proto::ColliderCapsulProto": (x1: 0., y1: -1., x2: 0., y2: -1.5, r: 12.),
     "survival_rogue_like::attributes::MaxHealth": (20),
     "survival_rogue_like::attributes::Attack": (7),
