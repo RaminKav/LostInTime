@@ -12,7 +12,7 @@ use crate::{
     },
     audio::{AudioSoundEffect, SoundSpawner},
     combat::{
-        status_effects::{Burning, Frail, StatusEffect, StatusEffectEvent},
+        status_effects::{Burning, MobStatusEffects, StatusEffect, StatusEffectEvent},
         EnemyDeathEvent, HitEvent, ObjBreakEvent,
     },
     custom_commands::CommandsExt,
@@ -566,7 +566,7 @@ pub fn update_summon_ring(
         (Without<Mob>, Without<ItemDrop>),
     >,
     player_entity: Query<Entity, With<Player>>,
-    frail_query: Query<&Frail>,
+    frail_query: Query<&MobStatusEffects>,
     mut hit_events: EventWriter<HitEvent>,
     game: GameParam,
 ) {
@@ -611,7 +611,7 @@ pub fn update_summon_ring(
                     }
                     ring.hit_entities.insert(other);
                     let dir = (snapshot.position - new_pos).normalize_or_zero();
-                    let frail_stacks = frail_query.get(other).map(|f| f.num_stacks).unwrap_or(0);
+                    let frail_stacks = frail_query.get(other).map(|s| s.frail_stacks()).unwrap_or(0);
                     let (damage, was_crit, was_overcrit) =
                         calculate_summon_damage(&mut commands, &game, other, frail_stacks);
                     hit_events.send(HitEvent {
@@ -659,7 +659,7 @@ pub fn update_summon_ring(
                 }
                 ring.hit_entities.insert(other);
                 let dir = (snapshot.position - new_pos).normalize_or_zero();
-                let frail_stacks = frail_query.get(other).map(|f| f.num_stacks).unwrap_or(0);
+                let frail_stacks = frail_query.get(other).map(|s| s.frail_stacks()).unwrap_or(0);
                 let (damage, was_crit, was_overcrit) =
                     calculate_summon_damage(&mut commands, &game, other, frail_stacks);
                 hit_events.send(HitEvent {
@@ -742,7 +742,7 @@ pub fn update_ant_farm_ants(
     time: Res<Time>,
     mut ants: Query<(Entity, &mut Transform, &mut AntFarmAnt)>,
     mobs: Query<(Entity, &GlobalTransform, &CurrentHealth, &MaxHealth, &Mob), With<Mob>>,
-    frail_query: Query<&Frail>,
+    frail_query: Query<&MobStatusEffects>,
     mut hit_events: EventWriter<HitEvent>,
     game: GameParam,
 ) {
@@ -795,7 +795,7 @@ pub fn update_ant_farm_ants(
         if transform.translation.truncate().distance(snapshot.position) <= ANT_CONTACT_DISTANCE {
             let frail_stacks = frail_query
                 .get(snapshot.entity)
-                .map(|f| f.num_stacks)
+                .map(|s| s.frail_stacks())
                 .unwrap_or(0);
             let (damage, was_crit, was_overcrit) =
                 calculate_summon_damage(&mut commands, &game, snapshot.entity, frail_stacks);
@@ -837,7 +837,7 @@ pub fn update_stone_tooth(
         Option<&mut StoneToothRockLifetime>,
     )>,
     mobs: Query<(Entity, &GlobalTransform, &CurrentHealth, &MaxHealth, &Mob), With<Mob>>,
-    frail_query: Query<&Frail>,
+    frail_query: Query<&MobStatusEffects>,
     mut hit_events: EventWriter<HitEvent>,
     graphics: Res<Graphics>,
     mut game: GameParam,
@@ -924,7 +924,7 @@ pub fn update_stone_tooth(
                 let dir = (mob_pos - stone_pos).normalize_or_zero();
                 let frail_stacks = frail_query
                     .get(snapshot.entity)
-                    .map(|f| f.num_stacks)
+                    .map(|s| s.frail_stacks())
                     .unwrap_or(0);
                 let (damage, was_crit, was_overcrit) =
                     calculate_summon_damage(&mut commands, &game, snapshot.entity, frail_stacks);
@@ -1217,7 +1217,7 @@ pub fn update_reaper_souls(
     time: Res<Time>,
     mut souls: Query<(Entity, &mut Transform, &mut ReaperSoul)>,
     mobs: Query<(Entity, &GlobalTransform, &CurrentHealth, &MaxHealth, &Mob), With<Mob>>,
-    frail_query: Query<&Frail>,
+    frail_query: Query<&MobStatusEffects>,
     mut hit_events: EventWriter<HitEvent>,
     game: GameParam,
 ) {
@@ -1268,7 +1268,7 @@ pub fn update_reaper_souls(
         if transform.translation.truncate().distance(snapshot.position) <= REAPER_CONTACT_DISTANCE {
             let frail_stacks = frail_query
                 .get(snapshot.entity)
-                .map(|f| f.num_stacks)
+                .map(|s| s.frail_stacks())
                 .unwrap_or(0);
             let (damage, was_crit, was_overcrit) =
                 calculate_summon_damage(&mut commands, &game, snapshot.entity, frail_stacks);
@@ -1984,9 +1984,8 @@ impl ManaRegenPoisonTracker {
 pub fn handle_mana_regen_poison(
     mut mana_events: EventReader<ModifyManaEvent>,
     mut player_query: Query<(&PlayerSkills, Option<&mut ManaRegenPoisonTracker>), With<Player>>,
-    mut commands: Commands,
     enemies: Query<Entity, (With<Mob>, Without<Player>)>,
-    mut burning_enemies: Query<&mut Burning>,
+    mut mob_status: Query<&mut MobStatusEffects, With<Mob>>,
     player_skills: Query<&PlayerSkills, With<Player>>,
     mut status_event: EventWriter<StatusEffectEvent>,
     mut trigger_counts: ResMut<HeirloomTriggerCounts>,
@@ -2019,16 +2018,20 @@ pub fn handle_mana_regen_poison(
             for _ in 0..poison_count {
                 trigger_counts.increment(Heirloom::ManaRegenPoison);
                 for enemy_entity in enemies.iter() {
-                    if let Ok(mut burning) = burning_enemies.get_mut(enemy_entity) {
+                    let Ok(mut status) = mob_status.get_mut(enemy_entity) else {
+                        continue;
+                    };
+                    if let Some(burning) = status.burning.as_mut() {
                         burning.stacks = burning.stacks.saturating_add(heirloom_count as u8);
                         burning.duration_timer.reset();
+                        let stacks = burning.stacks as i32;
                         status_event.send(StatusEffectEvent {
                             entity: enemy_entity,
                             effect: StatusEffect::Poison,
-                            num_stacks: burning.stacks as i32,
+                            num_stacks: stacks,
                         });
                     } else {
-                        commands.entity(enemy_entity).insert(Burning {
+                        status.burning = Some(Burning {
                             tick_timer: Timer::from_seconds(0.5, TimerMode::Repeating),
                             duration_timer: Timer::from_seconds(
                                 3.0 * poison_duration_bonus,

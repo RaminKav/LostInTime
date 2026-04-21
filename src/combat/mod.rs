@@ -784,8 +784,7 @@ pub fn cleanup_marked_for_death_entities(
         (
             Entity,
             &Mob,
-            Option<&Slow>,
-            Option<&Burning>,
+            Option<&crate::combat::status_effects::MobStatusEffects>,
             &GlobalTransform,
             Option<&KilledByHeirloomEffect>,
         ),
@@ -801,14 +800,22 @@ pub fn cleanup_marked_for_death_entities(
     )>,
     graphics: Res<Graphics>,
     mut modify_mana_event: EventWriter<ModifyManaEvent>,
-    neaby_mobs: Query<(Entity, &GlobalTransform), (With<Mob>, Without<MarkedForDeath>)>,
+    mut neaby_mobs: Query<
+        (Entity, &GlobalTransform, &mut crate::combat::status_effects::MobStatusEffects),
+        (With<Mob>, Without<MarkedForDeath>),
+    >,
     mut status_event: EventWriter<StatusEffectEvent>,
     spike_attack_states: Query<&SpikeAttackState>,
     aoe_attack_states: Query<&AoEAttackState>,
     spike_warnings: Query<(Entity, &SpikeWarning)>,
     mut trigger_counts: ResMut<HeirloomTriggerCounts>,
 ) {
-    for (e, mob, slow_option, poison_option, mob_pos, killed_by_heirloom) in dead_query.iter() {
+    // Collect boss/non-boss deaths first to avoid overlapping mutable borrows
+    // of `neaby_mobs` from inside the loop.
+    let mut nearby_venom_targets: Vec<(Entity, Vec2, crate::combat::status_effects::Burning)> =
+        Vec::new();
+
+    for (e, mob, status_option, mob_pos, killed_by_heirloom) in dead_query.iter() {
         if mob.is_boss() {
             // Clean up preview entities before removing attack states
             // StoneGolem spike attack warnings - despawn all warnings for this golem
@@ -833,7 +840,6 @@ pub fn cleanup_marked_for_death_entities(
             commands
                 .entity(e)
                 .insert(DeathState)
-                .remove::<Burning>()
                 .remove::<FollowState>()
                 .remove::<SummonAttackState>()
                 .remove::<LeapAttackState>()
@@ -850,7 +856,8 @@ pub fn cleanup_marked_for_death_entities(
             let can_trigger_heirloom_effects = killed_by_heirloom.is_none();
 
             if can_trigger_heirloom_effects {
-                if let Some(_) = slow_option {
+                let was_slowed = status_option.map(|s| s.is_slowed()).unwrap_or(false);
+                if was_slowed {
                     let heirloomc_count = skills.get_count(Heirloom::FrozenAoE) as f64;
                     let mut rng = rand::thread_rng();
                     if heirloomc_count > 0. && rng.gen_bool((heirloomc_count * 0.25).clamp(0., 1.))
@@ -875,31 +882,19 @@ pub fn cleanup_marked_for_death_entities(
                         trigger_counts.increment(Heirloom::FrozenMPRegen);
                     }
                 }
-                if let Some(p) = poison_option {
+                if let Some(p) = status_option.and_then(|s| s.burning.as_ref()) {
                     if skills.has(Heirloom::ViralVenum) {
                         let mana_cost = Heirloom::ViralVenum.get_mana_cost();
                         if current_mana.0 >= mana_cost {
                             current_mana.0 -= mana_cost;
                             trigger_counts.increment(Heirloom::ViralVenum);
-                            for (mob_e, txfm) in neaby_mobs.iter() {
-                                if mob_pos.translation().distance(txfm.translation())
-                                    < 3. * TILE_SIZE.x
-                                {
-                                    commands.entity(mob_e).insert(Burning {
-                                        stacks: p.stacks,
-                                        duration_timer: Timer::from_seconds(
-                                            p.duration_timer.duration().as_secs_f32(),
-                                            TimerMode::Once,
-                                        ),
-                                        tick_timer: p.tick_timer.clone(),
-                                    });
-                                    status_event.send(StatusEffectEvent {
-                                        entity: mob_e,
-                                        effect: StatusEffect::Poison,
-                                        num_stacks: p.stacks as i32,
-                                    });
-                                }
-                            }
+                            // Defer nearby-mob status mutation out of this loop
+                            // so we don't take overlapping borrows of `neaby_mobs`.
+                            nearby_venom_targets.push((
+                                e,
+                                mob_pos.translation().truncate(),
+                                p.clone(),
+                            ));
                         }
                     }
                 }
@@ -909,6 +904,29 @@ pub fn cleanup_marked_for_death_entities(
         analytics.send(AnalyticsUpdateEvent {
             update_type: AnalyticsTrigger::MobKilled(mob.clone()),
         });
+    }
+
+    // Apply deferred ViralVenum spreads after we've released read access above.
+    if !nearby_venom_targets.is_empty() {
+        for (_source_e, source_pos, source_burning) in nearby_venom_targets.into_iter() {
+            for (mob_e, txfm, mut status) in neaby_mobs.iter_mut() {
+                if source_pos.distance(txfm.translation().truncate()) < 3. * TILE_SIZE.x {
+                    status.burning = Some(crate::combat::status_effects::Burning {
+                        stacks: source_burning.stacks,
+                        duration_timer: Timer::from_seconds(
+                            source_burning.duration_timer.duration().as_secs_f32(),
+                            TimerMode::Once,
+                        ),
+                        tick_timer: source_burning.tick_timer.clone(),
+                    });
+                    status_event.send(StatusEffectEvent {
+                        entity: mob_e,
+                        effect: StatusEffect::Poison,
+                        num_stacks: source_burning.stacks as i32,
+                    });
+                }
+            }
+        }
     }
 }
 

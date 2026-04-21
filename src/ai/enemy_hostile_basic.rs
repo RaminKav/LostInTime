@@ -12,7 +12,7 @@ use crate::{
     animations::enemy_sprites::{
         spawn_attack_warning_aseprite, CharacterAnimationSpriteSheetData, EnemyAnimationState,
     },
-    combat::{status_effects::Frozen, HitEvent},
+    combat::{status_effects::MobStatusEffects, HitEvent},
     enemy::{FollowSpeed, Mob, MobIsAttacking},
     inputs::FacingDirection,
     item::projectile::{Projectile, RangedAttackEvent},
@@ -21,7 +21,6 @@ use crate::{
         melee_skills::Parried,
         skills::{Heirloom, PlayerSkills},
     },
-    status_effects::Slow,
     world::TILE_SIZE,
     PLAYER_MOVE_SPEED,
 };
@@ -337,11 +336,9 @@ pub fn follow(
         &CharacterAnimationSpriteSheetData,
         &EnemyAnimationState,
         Option<&EnemyAttackCooldown>,
-        Option<&Slow>,
+        Option<&MobStatusEffects>,
         Option<&Parried>,
         Option<&crate::player::combat_heirlooms::DeathDefianceFrozen>,
-        Option<&Frozen>,
-        Option<&crate::combat::status_effects::RapidfireSlow>,
     )>,
     mut commands: Commands,
     time: Res<Time>,
@@ -354,15 +351,15 @@ pub fn follow(
         anim_data,
         anim_state,
         att_cooldown,
-        slowed_option,
+        status_option,
         parried_option,
         defiance_frozen_option,
-        blessing_frozen_option,
-        rapidfire_slow_option,
     ) in follows.iter_mut()
     {
         // Skip movement if frozen by Death Defiance or Freeze blessing
-        if defiance_frozen_option.is_some() || blessing_frozen_option.is_some() {
+        if defiance_frozen_option.is_some()
+            || status_option.map(|s| s.is_frozen()).unwrap_or(false)
+        {
             continue;
         }
         if att_cooldown.is_some() && att_cooldown.unwrap().0.percent() <= 0.5 {
@@ -443,12 +440,9 @@ pub fn follow(
                 * follow.speed
                 * PLAYER_MOVE_SPEED
                 * time.delta_seconds()
-                * (1. - slowed_option.map_or(0., |s| s.num_stacks as f32 * 0.15))
-                * if rapidfire_slow_option.is_some() {
-                    0.5
-                } else {
-                    1.0
-                }
+                * status_option
+                    .map(|s| s.movement_speed_multiplier())
+                    .unwrap_or(1.0)
                 * if night_tracker.is_night() { 2. } else { 1. },
         );
         commands
@@ -474,10 +468,9 @@ pub fn leap_attack(
         &mut TextureAtlasSprite,
         &CharacterAnimationSpriteSheetData,
         &EnemyAnimationState,
-        Option<&Slow>,
+        Option<&MobStatusEffects>,
         Option<&mut Parried>,
         Option<&crate::player::combat_heirlooms::DeathDefianceFrozen>,
-        Option<&Frozen>,
     )>,
     mut commands: Commands,
     time: Res<Time>,
@@ -493,14 +486,15 @@ pub fn leap_attack(
         sprite,
         anim_data,
         anim_state,
-        slow_option,
+        status_option,
         mut parried_option,
         defiance_frozen_option,
-        blessing_frozen_option,
     ) in attacks.iter_mut()
     {
         // Skip if frozen by Death Defiance or Freeze blessing
-        if defiance_frozen_option.is_some() || blessing_frozen_option.is_some() {
+        if defiance_frozen_option.is_some()
+            || status_option.map(|s| s.is_frozen()).unwrap_or(false)
+        {
             continue;
         }
         // Get the positions of the attacker and target
@@ -515,7 +509,9 @@ pub fn leap_attack(
                     delta.normalize_or_zero().truncate()
                         * attack.speed
                         * time.delta_seconds()
-                        * (1. - slow_option.map_or(0., |s| s.num_stacks as f32 * 0.15)),
+                        * status_option
+                            .map(|s| 1.0 - s.slow_stacks() as f32 * 0.15)
+                            .unwrap_or(1.0),
                 );
             }
             if let Some(ref mut parried) = parried_option {
@@ -582,22 +578,18 @@ pub fn projectile_attack(
         &mut ProjectileAttackState,
         &EnemyAnimationState,
         Option<&crate::player::combat_heirlooms::DeathDefianceFrozen>,
-        Option<&crate::combat::status_effects::Frozen>,
+        Option<&MobStatusEffects>,
     )>,
     mut events: EventWriter<RangedAttackEvent>,
     time: Res<Time>,
 ) {
-    for (
-        entity,
-        follow_speed,
-        mut attack,
-        anim_state,
-        defiance_frozen_option,
-        blessing_frozen_option,
-    ) in attacks.iter_mut()
+    for (entity, follow_speed, mut attack, anim_state, defiance_frozen_option, status_option) in
+        attacks.iter_mut()
     {
         // Skip if frozen by Death Defiance or Freeze blessing
-        if defiance_frozen_option.is_some() || blessing_frozen_option.is_some() {
+        if defiance_frozen_option.is_some()
+            || status_option.map(|s| s.is_frozen()).unwrap_or(false)
+        {
             continue;
         }
         // Get the positions of the attacker and target
@@ -648,16 +640,18 @@ pub fn idle(
             Entity,
             &mut IdleState,
             Option<&crate::player::combat_heirlooms::DeathDefianceFrozen>,
-            Option<&Frozen>,
+            Option<&MobStatusEffects>,
         ),
         With<EnemyAnimationState>,
     >,
     mut commands: Commands,
     time: Res<Time>,
 ) {
-    for (entity, mut idle, defiance_frozen_option, blessing_frozen_option) in idles.iter_mut() {
+    for (entity, mut idle, defiance_frozen_option, status_option) in idles.iter_mut() {
         // Skip if frozen by Death Defiance or Freeze blessing
-        if defiance_frozen_option.is_some() || blessing_frozen_option.is_some() {
+        if defiance_frozen_option.is_some()
+            || status_option.map(|s| s.is_frozen()).unwrap_or(false)
+        {
             continue;
         }
         // Get the positions of the follower and target

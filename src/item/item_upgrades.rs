@@ -15,7 +15,7 @@ use crate::item::WorldObject;
 use crate::player::mage_skills::spawn_ice_explosion_hitbox;
 use crate::player::skills::{Heirloom, PlayerSkills};
 use crate::status_effects::{
-    try_add_slow_stacks, Burning, Frail, Poisoned, Slow, StatusEffect, StatusEffectEvent,
+    try_add_slow_stacks, Burning, Frail, MobStatusEffects, StatusEffect, StatusEffectEvent,
 };
 use crate::Game;
 use crate::{
@@ -191,12 +191,7 @@ pub fn handle_on_hit_upgrades(
     mut proto_commands: ProtoCommands,
     game: Res<Game>,
     mobs: Query<(Entity, &GlobalTransform), With<Mob>>,
-    mut burn_or_venom_mobs: Query<(
-        Option<&mut Burning>,
-        Option<&mut Poisoned>,
-        Option<&mut Frail>,
-        Option<&mut Slow>,
-    )>,
+    mut burn_or_venom_mobs: Query<&mut MobStatusEffects>,
     mut elec_count: Local<u8>,
     graphics: Res<Graphics>,
     player_att_blessings: Query<(&ItemAttributes, &OwnedBlessings, &CurrentHealth), With<Player>>,
@@ -312,9 +307,7 @@ pub fn handle_on_hit_upgrades(
                 }
             }
         }
-        let Ok((burning_option, _poisoned_option, frailed_option, mut slowed_option)) =
-            burn_or_venom_mobs.get_mut(hit.hit_entity)
-        else {
+        let Ok(mut status) = burn_or_venom_mobs.get_mut(hit.hit_entity) else {
             continue;
         };
         // Calculate poison chance with blessing bonus
@@ -324,19 +317,20 @@ pub fn handle_on_hit_upgrades(
         if (hit.hit_with_projectile.clone().unwrap_or_default() == Projectile::Dart)
             || rng.gen_bool(total_poison_chance)
         {
-            if let Some(mut burning) = burning_option {
+            if let Some(burning) = status.burning.as_mut() {
                 // Increment stacks and reset duration
                 burning.stacks = burning.stacks.saturating_add(1 + bonus_stack);
                 burning.duration_timer.reset();
+                let stacks = burning.stacks as i32;
                 events.p1().send(StatusEffectEvent {
                     entity: hit_e,
                     effect: StatusEffect::Poison,
-                    num_stacks: burning.stacks as i32,
+                    num_stacks: stacks,
                 });
             } else if Heirloom::PoisonStacks.is_obj_valid(main_hand.get_obj()) {
                 let duration_bonus = skills.get_count(Heirloom::PoisonDuration) as f32 * 0.5 + 1.;
                 // Start with 1 stack
-                commands.entity(hit_e).insert(Burning {
+                status.burning = Some(Burning {
                     tick_timer: Timer::from_seconds(0.5, TimerMode::Repeating),
                     duration_timer: Timer::from_seconds(3.0 * duration_bonus, TimerMode::Once),
                     stacks: 1,
@@ -354,20 +348,21 @@ pub fn handle_on_hit_upgrades(
                     (skills.get_count(Heirloom::FrailStacks) as f64 * 0.25).clamp(0.0, 0.99),
                 ))
         {
-            if let Some(mut frail_stacks) = frailed_option {
+            if let Some(frail_stacks) = status.frail.as_mut() {
                 if frail_stacks.num_stacks < 3
                     && Heirloom::FrailStacks.is_obj_valid(main_hand.get_obj())
                 {
                     frail_stacks.num_stacks += 1;
                     frail_stacks.timer.reset();
+                    let stacks = frail_stacks.num_stacks as i32;
                     events.p1().send(StatusEffectEvent {
                         entity: hit_e,
                         effect: StatusEffect::Frail,
-                        num_stacks: frail_stacks.num_stacks as i32,
+                        num_stacks: stacks,
                     });
                 }
             } else {
-                commands.entity(hit_e).insert(Frail {
+                status.frail = Some(Frail {
                     num_stacks: 1,
                     timer: Timer::from_seconds(1.2, TimerMode::Repeating),
                 });
@@ -381,12 +376,7 @@ pub fn handle_on_hit_upgrades(
         if main_hand.get_obj() == WorldObject::IceStaff
             || rng.gen_bool(skills.calculate_freeze_chance().clamp(0., 1.))
         {
-            try_add_slow_stacks(
-                hit_e,
-                &mut commands,
-                &mut events.p1(),
-                slowed_option.as_deref_mut(),
-            );
+            try_add_slow_stacks(hit_e, status.as_mut(), &mut events.p1());
         }
 
         events.p2().send(LifestealEvent {

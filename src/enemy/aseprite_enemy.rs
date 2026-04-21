@@ -12,7 +12,7 @@ use crate::{
     },
     animations::enemy_sprites::spawn_attack_warning_aseprite,
     attributes::Attack,
-    combat::{combat_helpers::spawn_temp_collider, status_effects::Frozen},
+    combat::{combat_helpers::spawn_temp_collider, status_effects::MobStatusEffects},
     enemy::{
         BullChargeAttack, CircleAttack, CombatAlignment, FollowSpeed, LeapAttack, Mob,
         MobIsAttacking, MultiLeapAttack, ProjectileAttack,
@@ -24,7 +24,6 @@ use crate::{
         melee_skills::Parried,
         skills::{Heirloom, PlayerSkills},
     },
-    status_effects::Slow,
     world::dungeon::Dungeon,
     GameParam, PLAYER_MOVE_SPEED,
 };
@@ -419,11 +418,9 @@ pub fn aseprite_follow(
             &mut FollowState,
             &mut AsepriteAnimation,
             &mut CurrentAsepriteTag,
-            Option<&Slow>,
+            Option<&MobStatusEffects>,
             Option<&Parried>,
             Option<&crate::player::combat_heirlooms::DeathDefianceFrozen>,
-            Option<&Frozen>,
-            Option<&crate::combat::status_effects::RapidfireSlow>,
         ),
         With<AsepriteBasicEnemy>,
     >,
@@ -436,14 +433,14 @@ pub fn aseprite_follow(
         mut follow,
         mut anim,
         mut current_tag,
-        slowed_option,
+        status_option,
         parried_option,
         defiance_frozen_option,
-        blessing_frozen_option,
-        rapidfire_slow_option,
     ) in follows.iter_mut()
     {
-        if defiance_frozen_option.is_some() || blessing_frozen_option.is_some() {
+        if defiance_frozen_option.is_some()
+            || status_option.map(|s| s.is_frozen()).unwrap_or(false)
+        {
             continue;
         }
         if parried_option.is_some() {
@@ -468,12 +465,9 @@ pub fn aseprite_follow(
                 * follow.speed
                 * PLAYER_MOVE_SPEED
                 * time.delta_seconds()
-                * (1. - slowed_option.map_or(0., |s| s.num_stacks as f32 * 0.15))
-                * if rapidfire_slow_option.is_some() {
-                    0.5
-                } else {
-                    1.0
-                }
+                * status_option
+                    .map(|s| s.movement_speed_multiplier())
+                    .unwrap_or(1.0)
                 * if night_tracker.is_night() { 2. } else { 1. },
         );
 
@@ -519,7 +513,7 @@ pub fn aseprite_idle(
             &mut AsepriteAnimation,
             &mut CurrentAsepriteTag,
             Option<&crate::player::combat_heirlooms::DeathDefianceFrozen>,
-            Option<&Frozen>,
+            Option<&MobStatusEffects>,
         ),
         With<AsepriteBasicEnemy>,
     >,
@@ -532,10 +526,12 @@ pub fn aseprite_idle(
         mut anim,
         mut current_tag,
         defiance_frozen_option,
-        blessing_frozen_option,
+        status_option,
     ) in idles.iter_mut()
     {
-        if defiance_frozen_option.is_some() || blessing_frozen_option.is_some() {
+        if defiance_frozen_option.is_some()
+            || status_option.map(|s| s.is_frozen()).unwrap_or(false)
+        {
             continue;
         }
 
@@ -591,10 +587,9 @@ pub fn aseprite_leap_attack(
             &FollowSpeed,
             &mut AsepriteAnimation,
             &mut CurrentAsepriteTag,
-            Option<&Slow>,
+            Option<&MobStatusEffects>,
             Option<&mut Parried>,
             Option<&crate::player::combat_heirlooms::DeathDefianceFrozen>,
-            Option<&Frozen>,
         ),
         With<AsepriteBasicEnemy>,
     >,
@@ -611,13 +606,14 @@ pub fn aseprite_leap_attack(
         follow_speed,
         mut anim,
         mut current_tag,
-        slow_option,
+        status_option,
         mut parried_option,
         defiance_frozen_option,
-        blessing_frozen_option,
     ) in attacks.iter_mut()
     {
-        if defiance_frozen_option.is_some() || blessing_frozen_option.is_some() {
+        if defiance_frozen_option.is_some()
+            || status_option.map(|s| s.is_frozen()).unwrap_or(false)
+        {
             continue;
         }
 
@@ -632,7 +628,9 @@ pub fn aseprite_leap_attack(
                     delta_xy.normalize_or_zero()
                         * attack.speed
                         * time.delta_seconds()
-                        * (1. - slow_option.map_or(0., |s| s.num_stacks as f32 * 0.15)),
+                        * status_option
+                            .map(|s| 1.0 - s.slow_stacks() as f32 * 0.15)
+                            .unwrap_or(1.0),
                 );
             }
             if let Some(ref mut parried) = parried_option {
@@ -715,7 +713,7 @@ pub fn aseprite_projectile_attack(
             &mut CurrentAsepriteTag,
             Option<&AsepriteProjectileFired>,
             Option<&crate::player::combat_heirlooms::DeathDefianceFrozen>,
-            Option<&Frozen>,
+            Option<&MobStatusEffects>,
         ),
         With<AsepriteBasicEnemy>,
     >,
@@ -736,10 +734,12 @@ pub fn aseprite_projectile_attack(
         mut current_tag,
         fired_option,
         defiance_frozen_option,
-        blessing_frozen_option,
+        status_option,
     ) in attacks.iter_mut()
     {
-        if defiance_frozen_option.is_some() || blessing_frozen_option.is_some() {
+        if defiance_frozen_option.is_some()
+            || status_option.map(|s| s.is_frozen()).unwrap_or(false)
+        {
             continue;
         }
 
@@ -878,7 +878,7 @@ pub fn aseprite_circle_attack(
             &mut AsepriteAnimation,
             &mut CurrentAsepriteTag,
             Option<&crate::player::combat_heirlooms::DeathDefianceFrozen>,
-            Option<&Frozen>,
+            Option<&MobStatusEffects>,
         ),
         With<AsepriteBasicEnemy>,
     >,
@@ -896,10 +896,12 @@ pub fn aseprite_circle_attack(
         mut anim,
         mut current_tag,
         defiance_frozen_option,
-        blessing_frozen_option,
+        status_option,
     ) in attacks.iter_mut()
     {
-        if defiance_frozen_option.is_some() || blessing_frozen_option.is_some() {
+        if defiance_frozen_option.is_some()
+            || status_option.map(|s| s.is_frozen()).unwrap_or(false)
+        {
             continue;
         }
 
@@ -991,9 +993,8 @@ pub fn aseprite_multi_leap_attack(
             &FollowSpeed,
             &mut AsepriteAnimation,
             &mut CurrentAsepriteTag,
-            Option<&Slow>,
+            Option<&MobStatusEffects>,
             Option<&crate::player::combat_heirlooms::DeathDefianceFrozen>,
-            Option<&Frozen>,
         ),
         With<AsepriteBasicEnemy>,
     >,
@@ -1011,12 +1012,13 @@ pub fn aseprite_multi_leap_attack(
         follow_speed,
         mut anim,
         mut current_tag,
-        slow_option,
+        status_option,
         defiance_frozen_option,
-        blessing_frozen_option,
     ) in attacks.iter_mut()
     {
-        if defiance_frozen_option.is_some() || blessing_frozen_option.is_some() {
+        if defiance_frozen_option.is_some()
+            || status_option.map(|s| s.is_frozen()).unwrap_or(false)
+        {
             continue;
         }
 
@@ -1071,7 +1073,9 @@ pub fn aseprite_multi_leap_attack(
                         delta_xy
                             * attack.speed
                             * time.delta_seconds()
-                            * (1. - slow_option.map_or(0., |s| s.num_stacks as f32 * 0.15)),
+                            * status_option
+                                .map(|s| 1.0 - s.slow_stacks() as f32 * 0.15)
+                                .unwrap_or(1.0),
                     );
                 }
 
@@ -1141,9 +1145,8 @@ pub fn aseprite_bull_charge(
             &FollowSpeed,
             &mut AsepriteAnimation,
             &mut CurrentAsepriteTag,
-            Option<&Slow>,
+            Option<&MobStatusEffects>,
             Option<&crate::player::combat_heirlooms::DeathDefianceFrozen>,
-            Option<&Frozen>,
         ),
         With<AsepriteBasicEnemy>,
     >,
@@ -1161,12 +1164,13 @@ pub fn aseprite_bull_charge(
         follow_speed,
         mut anim,
         mut current_tag,
-        slow_option,
+        status_option,
         defiance_frozen_option,
-        blessing_frozen_option,
     ) in attacks.iter_mut()
     {
-        if defiance_frozen_option.is_some() || blessing_frozen_option.is_some() {
+        if defiance_frozen_option.is_some()
+            || status_option.map(|s| s.is_frozen()).unwrap_or(false)
+        {
             continue;
         }
 
@@ -1239,7 +1243,9 @@ pub fn aseprite_bull_charge(
                 } else {
                     let speed = charge.charge_speed
                         * time.delta_seconds()
-                        * (1. - slow_option.map_or(0., |s| s.num_stacks as f32 * 0.15));
+                        * status_option
+                            .map(|s| 1.0 - s.slow_stacks() as f32 * 0.15)
+                            .unwrap_or(1.0);
                     kcc.translation = Some(dir * speed);
                     kcc.filter_groups = Some(bevy_rapier2d::prelude::CollisionGroups::new(
                         bevy_rapier2d::prelude::Group::NONE,

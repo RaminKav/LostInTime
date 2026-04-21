@@ -36,7 +36,7 @@ use crate::{
     combat::{
         combat_helpers::SpawnAsepriteAnimationCollider,
         pickup_radius::BeingPulledToPlayer,
-        status_effects::{Burning, StatusEffect, StatusEffectEvent},
+        status_effects::{Burning, MobStatusEffects, StatusEffect, StatusEffectEvent},
         MarkedForDeath,
     },
     custom_commands::CommandsExt,
@@ -645,12 +645,11 @@ fn particle_load_test_burst(
 // =============================================================================
 
 fn poison_load_test_tick(
-    mut commands: Commands,
     time: Res<Time>,
     mut state: ResMut<PoisonLoadTestState>,
     active: Res<PoisonLoadTestActive>,
     enemies: Query<Entity, (With<Mob>, Without<Player>)>,
-    mut burning_enemies: Query<&mut Burning>,
+    mut mob_status: Query<&mut MobStatusEffects, With<Mob>>,
     mut status_event: EventWriter<StatusEffectEvent>,
 ) {
     if !active.active {
@@ -667,16 +666,20 @@ fn poison_load_test_tick(
     }
 
     for enemy_entity in enemies.iter() {
-        if let Ok(mut burning) = burning_enemies.get_mut(enemy_entity) {
+        let Ok(mut status) = mob_status.get_mut(enemy_entity) else {
+            continue;
+        };
+        if let Some(burning) = status.burning.as_mut() {
             burning.stacks = burning.stacks.saturating_add(1);
             burning.duration_timer.reset();
+            let stacks = burning.stacks as i32;
             status_event.send(StatusEffectEvent {
                 entity: enemy_entity,
                 effect: StatusEffect::Poison,
-                num_stacks: burning.stacks as i32,
+                num_stacks: stacks,
             });
         } else {
-            commands.entity(enemy_entity).insert(Burning {
+            status.burning = Some(Burning {
                 tick_timer: Timer::from_seconds(0.5, TimerMode::Repeating),
                 duration_timer: Timer::from_seconds(3.0, TimerMode::Once),
                 stacks: 1,
@@ -852,7 +855,11 @@ pub fn diagnostics_tick(
     sound_spawners: Query<(), With<SoundSpawner>>,
     particle_effects: Query<(), With<ParticleEffect>>,
     marked_for_death: Query<(), With<MarkedForDeath>>,
-    burning_and_pulled: Query<(), Or<(With<Burning>, With<BeingPulledToPlayer>)>>,
+    // NOTE: post-archetype-refactor `Burning` is no longer a Component (it
+    // lives as a field on `MobStatusEffects`). The diagnostic now only counts
+    // entities currently being pulled to the player — still the most useful
+    // churn signal on the item side.
+    burning_and_pulled: Query<(), With<BeingPulledToPlayer>>,
     queued_texts: Query<(), With<QueueFloatingText>>,
     rapier: Res<RapierContext>,
 ) {

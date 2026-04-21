@@ -1,5 +1,5 @@
 use super::{
-    try_add_slow_stacks, Burning, Frail, HitEvent, HitMarker, InvincibilityTimer, Slow,
+    try_add_slow_stacks, HitEvent, HitMarker, InvincibilityTimer,
     StatusEffectEvent,
 };
 use crate::attributes::ManaRegen;
@@ -150,15 +150,7 @@ fn check_melee_hit_collisions(
     mut hit_event: EventWriter<HitEvent>,
     game: GameParam,
     world_obj: Query<Entity, (With<WorldObject>, Without<MainHand>)>,
-    mobs: Query<
-        (
-            &GlobalTransform,
-            Option<&Burning>,
-            Option<&mut Slow>,
-            Option<&Frail>,
-        ),
-        With<Mob>,
-    >,
+    mobs: Query<(&GlobalTransform, Option<&crate::combat::status_effects::MobStatusEffects>), With<Mob>>,
     anim: Query<&PlayerAnimation>,
     mut hit_tracker: Local<Vec<Entity>>,
 ) {
@@ -182,12 +174,11 @@ fn check_melee_hit_collisions(
             }
 
             hit_tracker.push(hit_entity);
-            let Ok((mob_txfm, burning_option, slow_option, frail_option)) = mobs.get(hit_entity)
-            else {
+            let Ok((mob_txfm, status_option)) = mobs.get(hit_entity) else {
                 continue;
             };
 
-            let frail_stacks = frail_option.map(|f| f.num_stacks).unwrap_or(0);
+            let frail_stacks = status_option.map(|s| s.frail_stacks()).unwrap_or(0);
             let (mut damage, was_crit, was_overcrit) = game.calculate_player_damage(
                 &mut commands,
                 hit_entity,
@@ -198,8 +189,9 @@ fn check_melee_hit_collisions(
                 frail_stacks,
             );
 
-            let is_status_effected =
-                burning_option.is_some() || slow_option.is_some() || frail_option.is_some();
+            let is_status_effected = status_option
+                .map(|s| s.is_burning() || s.is_slowed() || s.frail.is_some())
+                .unwrap_or(false);
 
             if is_status_effected && game.has_skill(Heirloom::TeleportStatusDMG) {
                 damage = f32::ceil(damage as f32 * 1.2) as u32;
@@ -253,7 +245,7 @@ fn check_projectile_hit_mob_collisions(
     >,
     proj_transforms: Query<&GlobalTransform, Without<EnemyProjectile>>,
     mut children: Query<&Parent>,
-    mut status_check: Query<(Option<&Burning>, Option<&mut Slow>, Option<&Frail>)>,
+    mut status_check: Query<&mut crate::combat::status_effects::MobStatusEffects>,
     nearby_mobs: Query<(Entity, &GlobalTransform), With<Mob>>,
     mut game: GameParam,
     mut status_event: EventWriter<StatusEffectEvent>,
@@ -300,10 +292,15 @@ fn check_projectile_hit_mob_collisions(
                 continue;
             }
             state.hit_entities.push(*e2);
-            let (burning, mut slow, frail) = status_check.get_mut(*e2).unwrap();
-            let is_slowed = slow.is_some();
-            let is_status_effected = burning.is_some() || is_slowed || frail.is_some();
-            let frail_stacks = frail.map(|f| f.num_stacks).unwrap_or(0);
+            let status_result = status_check.get_mut(*e2).ok();
+            let (is_slowed, is_status_effected, frail_stacks) = match &status_result {
+                Some(status) => (
+                    status.is_slowed(),
+                    status.is_burning() || status.is_slowed() || status.frail.is_some(),
+                    status.frail_stacks(),
+                ),
+                None => (false, false, 0),
+            };
 
             let crit_bonus = if is_slowed && game.has_skill(Heirloom::FrozenCrit) {
                 15
@@ -331,7 +328,9 @@ fn check_projectile_hit_mob_collisions(
             // Note: SpearAttack gravity pull is now handled proactively in handle_spear_pull_delay
             // The SpearAttack component is still used to identify the damage source
             if ice_aoe.is_some() {
-                try_add_slow_stacks(*e2, &mut commands, &mut status_event, slow.as_deref_mut());
+                if let Some(mut status) = status_result {
+                    try_add_slow_stacks(*e2, status.as_mut(), &mut status_event);
+                }
             }
 
             // Calculate knockback direction
@@ -438,7 +437,7 @@ fn check_multihit_projectile_ongoing_collisions(
     >,
     proj_transforms: Query<&GlobalTransform, Without<EnemyProjectile>>,
     children: Query<&Children>,
-    mut status_check: Query<(Option<&Burning>, Option<&mut Slow>, Option<&Frail>)>,
+    mut status_check: Query<&mut crate::combat::status_effects::MobStatusEffects>,
     nearby_mobs: Query<(Entity, &GlobalTransform), With<Mob>>,
     game: GameParam,
     mut status_event: EventWriter<StatusEffectEvent>,
@@ -490,10 +489,17 @@ fn check_multihit_projectile_ongoing_collisions(
                     // Add to hit_entities to prevent duplicate processing
                     state.hit_entities.push(target_e);
 
-                    let (burning, mut slow, frail) = status_check.get_mut(target_e).unwrap();
-                    let is_slowed = slow.is_some();
-                    let is_status_effected = burning.is_some() || is_slowed || frail.is_some();
-                    let frail_stacks = frail.map(|f| f.num_stacks).unwrap_or(0);
+                    let status_result = status_check.get_mut(target_e).ok();
+                    let (is_slowed, is_status_effected, frail_stacks) = match &status_result {
+                        Some(status) => (
+                            status.is_slowed(),
+                            status.is_burning()
+                                || status.is_slowed()
+                                || status.frail.is_some(),
+                            status.frail_stacks(),
+                        ),
+                        None => (false, false, 0),
+                    };
 
                     let crit_bonus =
                         if is_slowed && game.has_skill(Heirloom::FrozenCrit) {
@@ -527,12 +533,9 @@ fn check_multihit_projectile_ongoing_collisions(
                     // The SpearAttack component is still used to identify the damage source
 
                     if ice_aoe.is_some() {
-                        try_add_slow_stacks(
-                            target_e,
-                            &mut commands,
-                            &mut status_event,
-                            slow.as_deref_mut(),
-                        );
+                        if let Some(mut status) = status_result {
+                            try_add_slow_stacks(target_e, status.as_mut(), &mut status_event);
+                        }
                     }
 
                     // For multi-hit projectiles, calculate direction from projectile to enemy

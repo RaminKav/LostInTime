@@ -5,7 +5,7 @@ use crate::{
     enemy::{FollowSpeed, Mob},
     item::projectile::Projectile,
     player::Player,
-    status_effects::Slow,
+    status_effects::MobStatusEffects,
     ui::{boss_warning_indicator_color, CheatSettings},
     GameParam, PLAYER_MOVE_SPEED,
 };
@@ -459,12 +459,12 @@ pub fn stone_golem_follow(
     mut transforms: Query<&mut Transform>,
     mut mover: Query<&mut KinematicCharacterController>,
     mut follows: Query<
-        (Entity, &FollowState, &Mob, Option<&Slow>),
+        (Entity, &FollowState, &Mob, Option<&MobStatusEffects>),
         Without<crate::combat::MarkedForDeath>,
     >,
     time: Res<Time>,
 ) {
-    for (entity, follow, mob, slowed_option) in follows.iter_mut() {
+    for (entity, follow, mob, status_option) in follows.iter_mut() {
         // Only handle StoneGolem
         if mob != &Mob::StoneGolem {
             continue;
@@ -489,7 +489,9 @@ pub fn stone_golem_follow(
                 * follow.speed
                 * PLAYER_MOVE_SPEED
                 * time.delta_seconds()
-                * (1. - slowed_option.map_or(0., |s| s.num_stacks as f32 * 0.15)),
+                * status_option
+                    .map(|s| s.movement_speed_multiplier())
+                    .unwrap_or(1.0),
         );
     }
 }

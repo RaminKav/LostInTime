@@ -21,8 +21,8 @@ use crate::proto::proto_param::ProtoParam;
 
 use crate::schematic::loot_chests::get_random_loot_chest_type;
 use crate::status_effects::{
-    check_freeze_on_slow_stacks, handle_burning_ticks, handle_frail_stack_ticks,
-    handle_frozen_ticks, handle_slow_stack_ticks,
+    check_freeze_on_slow_stacks, ensure_mob_status_effects, handle_burning_ticks,
+    handle_frail_stack_ticks, handle_frozen_ticks, handle_slow_stack_ticks,
 };
 use crate::ui::minimap::UpdateMiniMapEvent;
 use crate::ui::{ChestContainer, FlashExpBarEvent, InventorySlotType};
@@ -1340,6 +1340,7 @@ impl Plugin for ItemsPlugin {
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
+            .add_system(ensure_mob_status_effects.in_set(OnUpdate(GameState::Main)))
             .add_systems(
                 (
                     handle_on_hit_upgrades.run_if(is_not_paused),

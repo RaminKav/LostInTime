@@ -20,7 +20,7 @@ use crate::{
         projectile::{Projectile, RangedAttackEvent},
         WorldObject,
     },
-    status_effects::Frail,
+    status_effects::MobStatusEffects,
     ui::damage_numbers::{spawn_floating_text_with_shadow, PreviousHealth},
     world::TILE_SIZE,
     GameParam, HitEvent,
@@ -41,7 +41,7 @@ pub struct SecondHitDelay {
 // so that all sources of HP loss trigger the echo, not just combat hits.
 
 pub fn handle_second_split_attack(
-    mobs: Query<Option<&Frail>, With<Mob>>,
+    mobs: Query<Option<&MobStatusEffects>, With<Mob>>,
     game: GameParam,
     mut second_hit_query: Query<(Entity, &mut SecondHitDelay)>,
     mut hit_event: EventWriter<HitEvent>,
@@ -52,11 +52,11 @@ pub fn handle_second_split_attack(
         if !second_hit.delay.tick(time.delta()).just_finished() {
             continue;
         }
-        let Ok(frail_option) = mobs.get(e) else {
+        let Ok(status_option) = mobs.get(e) else {
             continue;
         };
 
-        let frail_stacks = frail_option.map(|f| f.num_stacks).unwrap_or(0);
+        let frail_stacks = status_option.map(|s| s.frail_stacks()).unwrap_or(0);
         let (damage, was_crit, was_overcrit) = game.calculate_player_damage(
             &mut commands,
             e,

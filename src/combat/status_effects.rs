@@ -43,39 +43,110 @@ pub struct StatusEffectEvent {
     pub entity: Entity,
 }
 
-#[derive(Component, Clone)]
+// -----------------------------------------------------------------------------
+// Per-mob status state.
+//
+// These USED to each be separate `#[derive(Component)]` types that were
+// inserted/removed on mobs as effects applied and expired. That insert/remove
+// churn was the primary driver of archetype fragmentation: with 5+ independent
+// toggleable components, mobs could traverse 2^5 = 32 archetype variants per
+// mob type, and every empty variant still costs per-query iteration time.
+//
+// They are now plain `Debug + Clone` state structs that live as `Option`
+// fields on a single always-present [`MobStatusEffects`] component. Every mob
+// keeps the same ECS archetype for its entire lifetime regardless of which
+// status effects are active — adding/removing a status is now a field
+// mutation, not a structural change.
+#[derive(Debug, Clone)]
 pub struct Burning {
     pub tick_timer: Timer,
     pub duration_timer: Timer,
     pub stacks: u8,
 }
-#[derive(Component)]
+#[derive(Debug, Clone)]
 pub struct Poisoned {
     pub tick_timer: Timer,
     pub duration_timer: Timer,
     pub damage: u8,
 }
-#[derive(Component, Debug)]
+#[derive(Debug, Clone)]
 pub struct Frail {
     pub num_stacks: u8,
     pub timer: Timer,
 }
-#[derive(Component, Debug)]
+#[derive(Debug, Clone)]
 pub struct Slow {
     pub num_stacks: u8,
     pub timer: Timer,
 }
 
 /// Frozen status effect from Freeze blessing - mob is completely frozen when at 3 stacks
-#[derive(Component, Debug)]
+#[derive(Debug, Clone)]
 pub struct Frozen {
     pub timer: Timer,
     pub original_color: Color,
 }
 
-/// Component to mark enemies slowed by RapidFire skill (50% speed reduction)
-#[derive(Component, Debug)]
-pub struct RapidfireSlow;
+/// Consolidated per-mob status state. Always present on mobs; mutate the
+/// `Option` fields instead of inserting/removing status-effect components to
+/// avoid archetype fragmentation. See the module-level comment above.
+#[derive(Component, Default, Debug)]
+pub struct MobStatusEffects {
+    pub burning: Option<Burning>,
+    pub poisoned: Option<Poisoned>,
+    pub frail: Option<Frail>,
+    pub slow: Option<Slow>,
+    pub frozen: Option<Frozen>,
+    /// 50% speed reduction applied by the RapidFire skill. Was a marker
+    /// component before consolidation.
+    pub rapidfire_slow: bool,
+}
+
+impl MobStatusEffects {
+    #[inline]
+    pub fn is_burning(&self) -> bool {
+        self.burning.is_some()
+    }
+    #[inline]
+    pub fn is_slowed(&self) -> bool {
+        self.slow.is_some()
+    }
+    #[inline]
+    pub fn is_frozen(&self) -> bool {
+        self.frozen.is_some()
+    }
+    #[inline]
+    pub fn frail_stacks(&self) -> u8 {
+        self.frail.as_ref().map(|f| f.num_stacks).unwrap_or(0)
+    }
+    #[inline]
+    pub fn slow_stacks(&self) -> u8 {
+        self.slow.as_ref().map(|s| s.num_stacks).unwrap_or(0)
+    }
+    /// Multiplicative movement-speed modifier from all slow-type effects
+    /// (Slow stacks, RapidfireSlow). Returns 1.0 when nothing is slowing the
+    /// mob.
+    #[inline]
+    pub fn movement_speed_multiplier(&self) -> f32 {
+        let slow_mult = 1.0 - self.slow_stacks() as f32 * 0.15;
+        let rapidfire_mult = if self.rapidfire_slow { 0.5 } else { 1.0 };
+        slow_mult * rapidfire_mult
+    }
+}
+
+/// Ensures every mob entity has a [`MobStatusEffects`] component. Protos
+/// don't attach it directly (adding `Timer`s via reflection is painful), so
+/// this runs every frame and fills it in for any newly-spawned mob that
+/// doesn't have it yet. This causes exactly one archetype transition per mob
+/// type at the point of first spawn, and then zero thereafter.
+pub fn ensure_mob_status_effects(
+    mut commands: Commands,
+    mobs: Query<Entity, (With<crate::enemy::Mob>, Without<MobStatusEffects>)>,
+) {
+    for e in mobs.iter() {
+        commands.entity(e).insert(MobStatusEffects::default());
+    }
+}
 
 pub fn handle_new_status_effect_event(
     mut query: Query<&mut StatusEffectTracker>,
@@ -209,11 +280,10 @@ pub fn update_status_effect_icons(
 
 pub fn handle_burning_ticks(
     mut burning: Query<
-        (Entity, &mut Burning, Option<&Frail>),
+        (Entity, &mut MobStatusEffects),
         (Without<DeathState>, Without<MarkedForDeath>),
     >,
     time: Res<Time>,
-    mut commands: Commands,
     mut status_event: EventWriter<StatusEffectEvent>,
     mut hit_event: EventWriter<HitEvent>,
     player_skills: Query<(&PlayerSkills, &BonusDamage, &CritChance, &CritDamage), With<Player>>,
@@ -234,7 +304,11 @@ pub fn handle_burning_ticks(
 
     let mut rng = rand::thread_rng();
 
-    for (e, mut burning, frail_option) in burning.iter_mut() {
+    for (e, mut status) in burning.iter_mut() {
+        let frail_stacks = status.frail_stacks();
+        let Some(burning) = status.burning.as_mut() else {
+            continue;
+        };
         burning.duration_timer.tick(time.delta());
         if !burning.duration_timer.just_finished() {
             burning.tick_timer.tick(time.delta());
@@ -244,7 +318,6 @@ pub fn handle_burning_ticks(
                 let mut damage = base_damage * poison_strength_bonus.round() as i32;
 
                 // Frail multiplier: 1.1x per stack (same as other damage)
-                let frail_stacks = frail_option.map(|f| f.num_stacks).unwrap_or(0);
                 if frail_stacks > 0 {
                     damage = (damage as f32 * 1.1_f32.powi(frail_stacks as i32)).round() as i32;
                 }
@@ -272,123 +345,132 @@ pub fn handle_burning_ticks(
             }
         } else {
             // Reduce half the stacks and reset the timer instead of clearing all
-            burning.stacks = (burning.stacks / 2).max(0);
+            burning.stacks = burning.stacks / 2;
             burning.duration_timer.reset();
 
             if burning.stacks == 0 {
-                commands.entity(e).remove::<Burning>();
+                status.burning = None;
                 status_event.send(StatusEffectEvent {
                     entity: e,
                     effect: StatusEffect::Poison,
                     num_stacks: 0,
                 });
             } else {
+                let stacks = burning.stacks as i32;
                 status_event.send(StatusEffectEvent {
                     entity: e,
                     effect: StatusEffect::Poison,
-                    num_stacks: burning.stacks as i32,
+                    num_stacks: stacks,
                 });
             }
         }
     }
 }
 pub fn handle_frail_stack_ticks(
-    mut frailed: Query<(Entity, &mut Frail)>,
-    mut commands: Commands,
+    mut frailed: Query<(Entity, &mut MobStatusEffects)>,
     time: Res<Time>,
     mut status_event: EventWriter<StatusEffectEvent>,
 ) {
-    for (e, mut frail) in frailed.iter_mut() {
+    for (e, mut status) in frailed.iter_mut() {
+        let Some(frail) = status.frail.as_mut() else {
+            continue;
+        };
         frail.timer.tick(time.delta());
         if frail.timer.just_finished() {
-            frail.num_stacks -= 1;
+            frail.num_stacks = frail.num_stacks.saturating_sub(1);
+            let remaining = frail.num_stacks as i32;
             if frail.num_stacks == 0 {
-                commands.entity(e).remove::<Frail>();
+                status.frail = None;
             }
             status_event.send(StatusEffectEvent {
                 entity: e,
                 effect: StatusEffect::Frail,
-                num_stacks: frail.num_stacks as i32,
+                num_stacks: remaining,
             });
         }
     }
 }
 pub fn handle_slow_stack_ticks(
-    mut slowed: Query<(Entity, &mut Slow)>,
-    mut commands: Commands,
+    mut slowed: Query<(Entity, &mut MobStatusEffects)>,
     time: Res<Time>,
     mut status_event: EventWriter<StatusEffectEvent>,
 ) {
-    for (e, mut slow) in slowed.iter_mut() {
+    for (e, mut status) in slowed.iter_mut() {
+        let Some(slow) = status.slow.as_mut() else {
+            continue;
+        };
         slow.timer.tick(time.delta());
         if slow.timer.just_finished() {
-            slow.num_stacks -= 1;
+            slow.num_stacks = slow.num_stacks.saturating_sub(1);
+            let remaining = slow.num_stacks as i32;
             if slow.num_stacks == 0 {
-                commands.entity(e).remove::<Slow>();
+                status.slow = None;
             }
             status_event.send(StatusEffectEvent {
                 entity: e,
                 effect: StatusEffect::Slow,
-                num_stacks: slow.num_stacks as i32,
+                num_stacks: remaining,
             });
         }
     }
 }
 
+/// Adds a slow stack (up to 3) via mutating [`MobStatusEffects`] in-place.
+/// Replaces the previous insert-component path; no archetype transitions.
 pub fn try_add_slow_stacks(
     hit_e: Entity,
-    commands: &mut Commands,
+    status: &mut MobStatusEffects,
     status_event: &mut EventWriter<StatusEffectEvent>,
-    slowed_option: Option<&mut Slow>,
 ) {
-    if let Some(slow_stacks) = slowed_option {
-        if slow_stacks.num_stacks < 3 {
-            slow_stacks.num_stacks += 1;
-            slow_stacks.timer.reset();
+    if let Some(slow) = status.slow.as_mut() {
+        if slow.num_stacks < 3 {
+            slow.num_stacks += 1;
+            slow.timer.reset();
             status_event.send(StatusEffectEvent {
                 entity: hit_e,
                 effect: StatusEffect::Slow,
-                num_stacks: slow_stacks.num_stacks as i32,
+                num_stacks: slow.num_stacks as i32,
             });
         }
     } else {
-        // Check if entity still exists before inserting Slow
-        if let Some(mut hit_entity_commands) = commands.get_entity(hit_e) {
-            hit_entity_commands.insert(Slow {
-                num_stacks: 1,
-                timer: Timer::from_seconds(1.7, TimerMode::Repeating),
-            });
-            status_event.send(StatusEffectEvent {
-                entity: hit_e,
-                effect: StatusEffect::Slow,
-                num_stacks: 1,
-            });
-        }
+        status.slow = Some(Slow {
+            num_stacks: 1,
+            timer: Timer::from_seconds(1.7, TimerMode::Repeating),
+        });
+        status_event.send(StatusEffectEvent {
+            entity: hit_e,
+            effect: StatusEffect::Slow,
+            num_stacks: 1,
+        });
     }
 }
 
 /// Handle frozen status effect ticks - mobs are frozen with blue tint
 pub fn handle_frozen_ticks(
-    mut commands: Commands,
     time: Res<Time>,
-    mut frozen_mobs: Query<(Entity, &mut Frozen, &mut TextureAtlasSprite)>,
+    mut frozen_mobs: Query<(&mut MobStatusEffects, &mut TextureAtlasSprite)>,
 ) {
-    for (entity, mut frozen, mut sprite) in frozen_mobs.iter_mut() {
+    for (mut status, mut sprite) in frozen_mobs.iter_mut() {
+        let Some(frozen) = status.frozen.as_mut() else {
+            continue;
+        };
         frozen.timer.tick(time.delta());
 
         if frozen.timer.just_finished() {
-            // Restore original color and remove freeze
+            // Restore original color and clear freeze
             sprite.color = frozen.original_color;
-            commands.entity(entity).remove::<Frozen>();
+            status.frozen = None;
         }
     }
 }
 
 /// Check if a mob should become frozen when reaching 3 slow stacks (Freeze blessing)
 pub fn check_freeze_on_slow_stacks(
-    mut commands: Commands,
     blessings: Query<&crate::blessings::OwnedBlessings>,
-    slow_query: Query<(Entity, &Slow, &TextureAtlasSprite), (Changed<Slow>, Without<Frozen>)>,
+    mut slow_query: Query<
+        (Entity, &mut MobStatusEffects, &mut TextureAtlasSprite),
+        Changed<MobStatusEffects>,
+    >,
     mut status_event: EventWriter<StatusEffectEvent>,
 ) {
     let has_freeze_blessing = blessings
@@ -400,24 +482,29 @@ pub fn check_freeze_on_slow_stacks(
         return;
     }
 
-    for (entity, slow, sprite) in slow_query.iter() {
-        if slow.num_stacks >= 3 {
-            // Freeze the mob with a blue tint
-            commands.entity(entity).insert(Frozen {
-                timer: Timer::from_seconds(2.0, TimerMode::Once),
-                original_color: sprite.color,
-            });
-            // Apply blue tint
-            commands.entity(entity).insert(TextureAtlasSprite {
-                color: Color::rgba(0.5, 0.7, 1.0, 1.0),
-                ..sprite.clone()
-            });
-            // Send frozen status event
-            status_event.send(StatusEffectEvent {
-                entity,
-                effect: StatusEffect::Frozen,
-                num_stacks: 1,
-            });
+    for (entity, mut status, mut sprite) in slow_query.iter_mut() {
+        if status.frozen.is_some() {
+            continue;
         }
+        let should_freeze = status
+            .slow
+            .as_ref()
+            .map(|s| s.num_stacks >= 3)
+            .unwrap_or(false);
+        if !should_freeze {
+            continue;
+        }
+        let original_color = sprite.color;
+        status.frozen = Some(Frozen {
+            timer: Timer::from_seconds(2.0, TimerMode::Once),
+            original_color,
+        });
+        // Apply blue tint directly to the sprite
+        sprite.color = Color::rgba(0.5, 0.7, 1.0, 1.0);
+        status_event.send(StatusEffectEvent {
+            entity,
+            effect: StatusEffect::Frozen,
+            num_stacks: 1,
+        });
     }
 }

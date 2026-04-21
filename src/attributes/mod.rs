@@ -668,7 +668,7 @@ impl ItemAttributes {
             self.size.value + skills.get_count(Heirloom::Gigantify) * 10,
         ));
         entity.insert(PickupRange(
-            self.pickup_range.value + skills.get_count(Heirloom::ItemPickupRadius) * 25,
+            self.pickup_range.value + skills.get_count(Heirloom::ItemPickupRadius) * 25 * 45,
         ));
         entity.insert(SkillPower(
             self.skill_power.value

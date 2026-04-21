@@ -16,7 +16,7 @@ use crate::{
     audio::{AudioSoundEffect, SoundSpawner},
     blessings::{Blessing, OwnedBlessings},
     combat::{
-        status_effects::{RapidfireSlow, StatusEffect, StatusEffectEvent},
+        status_effects::{StatusEffect, StatusEffectEvent},
         EnemyDeathEvent, HitEvent,
     },
     cursor::CursorPos,
@@ -1063,15 +1063,19 @@ pub fn tick_stealth_and_buffs(
 
 /// Apply RapidfireSlow to all enemies when RapidFire is active
 pub fn handle_rapidfire_slow_enemies(
-    mut commands: Commands,
     rapidfire_states: Query<&RapidfireState, With<Player>>,
-    enemies: Query<Entity, (With<Mob>, Without<RapidfireSlow>)>,
+    mut enemies: Query<
+        &mut crate::combat::status_effects::MobStatusEffects,
+        With<Mob>,
+    >,
 ) {
     // Check if RapidFire is active
     if let Ok(state) = rapidfire_states.get_single() {
         if !state.duration.finished() && state.duration.percent() > 0. {
-            for enemy_entity in enemies.iter() {
-                commands.entity(enemy_entity).insert(RapidfireSlow);
+            for mut status in enemies.iter_mut() {
+                if !status.rapidfire_slow {
+                    status.rapidfire_slow = true;
+                }
             }
         }
     }
@@ -1079,15 +1083,19 @@ pub fn handle_rapidfire_slow_enemies(
 
 /// Remove RapidfireSlow from all enemies when RapidFire ends
 pub fn handle_rapidfire_slow_remove(
-    mut commands: Commands,
     rapidfire_states: Query<&RapidfireState, With<Player>>,
-    enemies_with_slow: Query<Entity, (With<Mob>, With<RapidfireSlow>)>,
+    mut enemies: Query<
+        &mut crate::combat::status_effects::MobStatusEffects,
+        With<Mob>,
+    >,
 ) {
     // Check if RapidFire is no longer active
     if let Ok(state) = rapidfire_states.get_single() {
         if state.duration.finished() {
-            for enemy_entity in enemies_with_slow.iter() {
-                commands.entity(enemy_entity).remove::<RapidfireSlow>();
+            for mut status in enemies.iter_mut() {
+                if status.rapidfire_slow {
+                    status.rapidfire_slow = false;
+                }
             }
         }
     }
@@ -1738,6 +1746,7 @@ pub fn handle_bomb_explosion(
     projectiles: Query<&Projectile>,
     mut ranged_attack_events: EventWriter<RangedAttackEvent>,
     enemies: Query<(Entity, &GlobalTransform), With<Mob>>,
+    mut mob_status: Query<&mut crate::combat::status_effects::MobStatusEffects, With<Mob>>,
     player_skills: Query<(&SkillPower, &Attack, &OwnedBlessings, &Attack), With<Player>>,
     mut status_event: EventWriter<StatusEffectEvent>,
 ) {
@@ -1779,10 +1788,12 @@ pub fn handle_bomb_explosion(
                     let enemy_pos = enemy_transform.translation().truncate();
                     let distance = bomb_target.target_pos.distance(enemy_pos);
                     if distance <= explosion_radius {
-                        commands.entity(enemy_entity).insert(Frail {
-                            num_stacks: 3,
-                            timer: Timer::from_seconds(1.2, TimerMode::Repeating),
-                        });
+                        if let Ok(mut status) = mob_status.get_mut(enemy_entity) {
+                            status.frail = Some(Frail {
+                                num_stacks: 3,
+                                timer: Timer::from_seconds(1.2, TimerMode::Repeating),
+                            });
+                        }
 
                         status_event.send(StatusEffectEvent {
                             entity: enemy_entity,
