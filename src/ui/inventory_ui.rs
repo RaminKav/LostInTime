@@ -35,7 +35,7 @@ use crate::{
     inventory::{Inventory, InventoryItemStack, ItemStack},
     item::{CraftedItemEvent, Recipes, WorldObject},
     ui::{crafting_ui::UpgradeButton, FurnaceState, CHEST_INVENTORY_UI_SIZE, INVENTORY_UI_SIZE},
-    ScreenResolution, GAME_HEIGHT,
+    ScreenResolution,
 };
 
 use super::{
@@ -913,6 +913,7 @@ pub fn setup_inv_slots_ui(
     asset_server: Res<AssetServer>,
     mut inv: Query<&mut Inventory>,
     crafting_container: Option<Res<CraftingContainer>>,
+    resolution: Res<ScreenResolution>,
 ) {
     if inv_spawn_check.get_single().is_err() {
         return;
@@ -938,6 +939,7 @@ pub fn setup_inv_slots_ui(
             &asset_server,
             InventorySlotType::Normal,
             item.clone(),
+            &resolution,
         );
 
         // equipment slots
@@ -953,6 +955,7 @@ pub fn setup_inv_slots_ui(
                 &asset_server,
                 InventorySlotType::Equipment,
                 None,
+                &resolution,
             );
         }
         // accessoyr slots
@@ -968,6 +971,7 @@ pub fn setup_inv_slots_ui(
                 &asset_server,
                 InventorySlotType::Accessory,
                 None,
+                &resolution,
             );
         }
     }
@@ -994,6 +998,7 @@ pub fn setup_inv_slots_ui(
             &asset_server,
             InventorySlotType::Weapon,
             weapon_item,
+            &resolution,
         );
         let pet_item = inv
             .single_mut()
@@ -1012,6 +1017,7 @@ pub fn setup_inv_slots_ui(
             &asset_server,
             InventorySlotType::Pet,
             pet_item,
+            &resolution,
         );
     }
     if inv_state.0 != UIState::Scrapper {
@@ -1031,6 +1037,7 @@ pub fn setup_inv_slots_ui(
                         &asset_server,
                         InventorySlotType::Furnace,
                         item.to_owned(),
+                        &resolution,
                     );
                 }
             }
@@ -1058,10 +1065,11 @@ pub fn setup_inv_slots_ui(
                 Interaction::None,
                 &inv_state_res,
                 &inv_query,
-                &asset_server,
-                InventorySlotType::Trash,
-                trash_item,
-            );
+            &asset_server,
+            InventorySlotType::Trash,
+            trash_item,
+            &resolution,
+        );
         }
     }
 }
@@ -1130,11 +1138,18 @@ fn equipment_grid_position(slot_type: InventorySlotType, slot_index: usize) -> V
 }
 
 /// Panel-local position for a slot’s center (before optional crafting-mode parent nudge).
+///
+/// `game_height` should be the current `ScreenResolution::game_height`, not the
+/// `GAME_HEIGHT` constant — the constant is only a *target* height; the actual
+/// game-space height is derived from the window size and an integer scale, so
+/// anchoring HUD slots to the bottom of the screen requires the runtime value
+/// or the hotbar will drift on non-matching monitor resolutions.
 fn inv_slot_local_position(
     slot_type: InventorySlotType,
     slot_index: usize,
     inv_size: Vec2,
     ui_state: &UIState,
+    game_height: f32,
 ) -> Vec2 {
     match slot_type {
         InventorySlotType::Hotbar => {
@@ -1145,7 +1160,7 @@ fn inv_slot_local_position(
             let half_span = (HUD_HOTBAR_SLOTS as f32 - 1.0) * 0.5;
             Vec2::new(
                 HUD_HOTBAR_CENTER_X + (slot_index as f32 - half_span) * INV_SLOT_SPACING_X,
-                -GAME_HEIGHT * 0.5 + HUD_ACTION_ROW_Y_FROM_BOTTOM,
+                -game_height * 0.5 + HUD_ACTION_ROW_Y_FROM_BOTTOM,
             )
         }
         InventorySlotType::Crafting => {
@@ -1211,6 +1226,7 @@ pub fn spawn_inv_slot(
     asset_server: &AssetServer,
     slot_type: InventorySlotType,
     item_stack: Option<InventoryItemStack>,
+    resolution: &ScreenResolution,
 ) -> Entity {
     // spawns an inv slot, with an item icon as its child if an item exists in that inv slot.
     // the slot's parent is set to the inv ui entity.
@@ -1219,7 +1235,13 @@ pub fn spawn_inv_slot(
         _ => Vec2::ZERO,
     };
 
-    let local = inv_slot_local_position(slot_type, slot_index, inv_state.inv_size, &inv_ui_state.0);
+    let local = inv_slot_local_position(
+        slot_type,
+        slot_index,
+        inv_state.inv_size,
+        &inv_ui_state.0,
+        resolution.game_height,
+    );
     let translation = (local + inv_slot_offset).extend(1.);
     let mut item_icon_option = None;
     let mut item_type_option = None;
@@ -1447,6 +1469,7 @@ pub fn update_inventory_ui(
     inv: Query<&mut Inventory>,
     cont_param: UIContainersParam,
     keybinds: Res<crate::keybinds::InputMappings>,
+    resolution: Res<ScreenResolution>,
 ) {
     for (e, mut slot_state) in ui_elements.iter_mut() {
         // check current inventory state against that slot's state
@@ -1515,6 +1538,7 @@ pub fn update_inventory_ui(
                 &asset_server,
                 slot_state.r#type,
                 item_option.clone(),
+                &resolution,
             );
 
             // Re-attach the hotbar keybind badge (it lives as a child of the slot entity,

@@ -326,7 +326,7 @@ pub fn handle_on_hit_upgrades(
         {
             if let Some(mut burning) = burning_option {
                 // Increment stacks and reset duration
-                burning.stacks += 1 + bonus_stack;
+                burning.stacks = burning.stacks.saturating_add(1 + bonus_stack);
                 burning.duration_timer.reset();
                 events.p1().send(StatusEffectEvent {
                     entity: hit_e,

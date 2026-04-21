@@ -5,6 +5,7 @@ use crate::{
     container::{Container, ContainerRegistry},
     item::WorldObject,
     world::world_helpers::world_pos_to_tile_pos,
+    ScreenResolution,
 };
 
 use super::{
@@ -30,6 +31,7 @@ pub fn setup_chest_slots_ui(
 
     asset_server: Res<AssetServer>,
     inv: Res<ChestContainer>,
+    resolution: Res<ScreenResolution>,
 ) {
     if inv_spawn_check.get_single().is_err() {
         return;
@@ -49,6 +51,7 @@ pub fn setup_chest_slots_ui(
             &asset_server,
             InventorySlotType::Chest,
             item.clone(),
+            &resolution,
         );
     }
 }

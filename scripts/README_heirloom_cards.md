@@ -12,7 +12,7 @@ Generates one PNG per heirloom card by composing:
 
 3. **Title and description** text using `assets/fonts/4x5.ttf` at size 5, at the same positions as in-game (`skill_choice_ui.rs` / `spawn_heirloom_tooltip_card`).
 
-Card size is 96×120 (`SKILLS_CHOICE_UI_SIZE`).
+Card size is **164×191** (`SKILLS_CHOICE_UI_SIZE` in `src/ui/mod.rs`).
 
 ## Usage
 
@@ -33,7 +33,11 @@ From the **project root**:
    python3 scripts/build_heirloom_cards.py
    ```
 
-   Output: `assets/ui/heirloom_cards/<HeirloomId>.png` (e.g. `Defence.png`, `Health.png`).
+   Outputs:
+   - `assets/ui/heirloom_cards/<HeirloomId>.png` (e.g. `Defence.png`, `Health.png`)
+   - `assets/ui/heirloom_cards/heirloom_cards_atlas.png` — all cards in one grid (**8 columns** by default), sorted by **rarity** (Common → Legendary) then **title** A–Z.
+
+   Atlas-only (no per-card files): `python3 scripts/build_heirloom_cards.py --atlas-only`. Change column count: `--columns 8`.
 
 ## Requirements
 

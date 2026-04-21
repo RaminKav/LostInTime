@@ -894,3 +894,117 @@ pub fn diagnostics_tick(
         rapier_colliders,
     );
 }
+
+// =============================================================================
+// Archetype / component diagnostics — Bevy ECS fragmentation check.
+//
+// Runs regardless of `GameState` so you can watch the numbers persist across
+// MainMenu <-> Main <-> GameOver transitions. Archetypes are never freed for
+// the lifetime of the process in Bevy 0.10, so a monotonically-climbing
+// `archetypes` count while `total_entities` stays flat is strong evidence of
+// archetype fragmentation driving query-iteration overhead.
+// =============================================================================
+
+pub fn archetype_diagnostics_tick(world: &mut World, mut elapsed: Local<f32>) {
+    use std::collections::HashMap;
+
+    let dt = world.resource::<Time>().delta_seconds();
+    *elapsed += dt;
+    if *elapsed < 5.0 {
+        return;
+    }
+    *elapsed = 0.0;
+
+    let archetypes = world.archetypes();
+    let components = world.components();
+    let entities = world.entities();
+
+    let archetype_count = archetypes.len();
+    let component_count = components.len();
+    let entity_total = entities.total_count();
+    let entity_live = entities.len();
+
+    // Archetype-size histogram + per-component appearance counts.
+    // A component that appears in many *empty* archetypes is one whose
+    // insert/remove pattern caused archetype fragmentation — those are the
+    // refactor targets.
+    let mut empty_archetypes = 0usize;
+    let mut largest_archetype_len = 0usize;
+    let mut size_buckets = [0usize; 5]; // [0, 1-9, 10-99, 100-999, 1000+]
+    // (total archetype count, empty archetype count) per component
+    let mut per_component: HashMap<bevy::ecs::component::ComponentId, (usize, usize)> =
+        HashMap::new();
+
+    for a in archetypes.iter() {
+        let n = a.len();
+        let is_empty = n == 0;
+        if is_empty {
+            empty_archetypes += 1;
+        }
+        if n > largest_archetype_len {
+            largest_archetype_len = n;
+        }
+        let bucket = match n {
+            0 => 0,
+            1..=9 => 1,
+            10..=99 => 2,
+            100..=999 => 3,
+            _ => 4,
+        };
+        size_buckets[bucket] += 1;
+        for cid in a.components() {
+            let entry = per_component.entry(cid).or_insert((0, 0));
+            entry.0 += 1;
+            if is_empty {
+                entry.1 += 1;
+            }
+        }
+    }
+
+    // Rank components by how many empty archetypes they appear in (primary)
+    // then by total archetype appearance (secondary). This surfaces the
+    // components whose insert/remove churn is producing dead archetypes.
+    let mut ranked: Vec<_> = per_component
+        .into_iter()
+        .map(|(cid, (total, empty))| {
+            let name = components
+                .get_info(cid)
+                .map(|i| i.name())
+                .unwrap_or("<unknown>");
+            (name.to_string(), total, empty)
+        })
+        .collect();
+    ranked.sort_by(|a, b| b.2.cmp(&a.2).then_with(|| b.1.cmp(&a.1)));
+
+    let mut top = String::new();
+    for (name, total, empty) in ranked.iter().take(25) {
+        // Trim bevy path prefixes for readability, keep the final component name
+        let short = name.rsplit("::").next().unwrap_or(name.as_str());
+        top.push_str(&format!(
+            "[ARCH]   empty={:<5} total={:<5} {}\n",
+            empty, total, short
+        ));
+    }
+
+    info!(
+        "\n[ARCH] === Archetype / Component Snapshot ===\n\
+         [ARCH] archetypes={:<5} empty={:<5} largest_archetype_len={}\n\
+         [ARCH] archetype_size_hist: 0={} 1-9={} 10-99={} 100-999={} 1000+={}\n\
+         [ARCH] components={:<5} entities_live={:<6} entities_total_ever={}\n\
+         [ARCH] --- top 25 components by empty-archetype appearance ---\n\
+{}\
+         [ARCH] ==========================================",
+        archetype_count,
+        empty_archetypes,
+        largest_archetype_len,
+        size_buckets[0],
+        size_buckets[1],
+        size_buckets[2],
+        size_buckets[3],
+        size_buckets[4],
+        component_count,
+        entity_live,
+        entity_total,
+        top,
+    );
+}

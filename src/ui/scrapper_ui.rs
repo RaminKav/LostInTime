@@ -11,6 +11,7 @@ use crate::{
     item::WorldObject,
     proto::proto_param::ProtoParam,
     world::world_helpers::world_pos_to_tile_pos,
+    ScreenResolution,
 };
 
 use super::{
@@ -53,6 +54,7 @@ pub fn setup_scrapper_slots_ui(
 
     asset_server: Res<AssetServer>,
     inv: Res<ScrapperContainer>,
+    resolution: Res<ScreenResolution>,
 ) {
     if inv_spawn_check.get_single().is_err() {
         return;
@@ -72,6 +74,7 @@ pub fn setup_scrapper_slots_ui(
             &asset_server,
             InventorySlotType::Scrapper,
             item.clone(),
+            &resolution,
         );
     }
     let parent = inv_spawn_check.single();

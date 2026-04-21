@@ -174,7 +174,7 @@ pub const HUD_HOTBAR_SLOTS: usize = 4;
 
 /// Shared y (offset from the screen bottom) for the single HUD action row that holds
 /// both the class-skill icons and the hotbar slots.
-pub const HUD_ACTION_ROW_Y_FROM_BOTTOM: f32 = 6.0;
+pub const HUD_ACTION_ROW_Y_FROM_BOTTOM: f32 = 10.0;
 
 /// Center x of the 4-slot hotbar group (left side of the action row).
 pub const HUD_HOTBAR_CENTER_X: f32 = -65.0;

@@ -60,8 +60,7 @@ use crate::{
     proto::proto_param::ProtoParam,
     ui::damage_numbers::spawn_floating_text_with_shadow,
     world::{world_helpers::world_pos_to_tile_pos, y_sort::YSort, TileMapPosition, TILE_SIZE},
-    AppExt, CustomFlush, GameParam, GameState, Player, SlimeTempShield, SlimeTempShieldSprite,
-    DEBUG,
+    CustomFlush, GameParam, GameState, Player, SlimeTempShield, SlimeTempShieldSprite, DEBUG,
 };
 
 use self::collisions::CollisionPlugion;
@@ -131,15 +130,22 @@ pub struct JustGotHit;
 pub struct CombatPlugin;
 impl Plugin for CombatPlugin {
     fn build(&self, app: &mut App) {
-        app.with_default_schedule(CoreSchedule::FixedUpdate, |app| {
-            app.add_event::<HitEvent>()
-                .add_event::<EnemyDeathEvent>()
-                .add_event::<StatusEffectEvent>()
-                .add_event::<LifestealEvent>();
-        })
-        .add_event::<ObjBreakEvent>()
-        .init_resource::<damage_tracker::DamageTracker>()
-        .init_resource::<damage_tracker::PetAbilityStats>()
+        // NOTE: These events are intentionally registered on the default (Main/Update) schedule
+        // rather than FixedUpdate. Their writers (e.g. `handle_hits`) and all current readers
+        // (`handle_enemy_death`, `track_mob_kills`, currency/portal/particles/heirloom hooks, etc.)
+        // run on Update. Registering the events on FixedUpdate would attach
+        // `Events::<T>::update_system` (the double-buffer rotation) to FixedUpdate; when FPS drops
+        // below ~30 the FixedUpdate catch-up loop runs that rotation multiple times per render
+        // frame and silently drops events that Update-side readers hadn't observed yet. This
+        // caused mob-kill scoring (and other on-kill effects that weren't strictly ordered
+        // `.after(handle_hits)`) to be lost during late-game slowdown.
+        app.add_event::<HitEvent>()
+            .add_event::<EnemyDeathEvent>()
+            .add_event::<StatusEffectEvent>()
+            .add_event::<LifestealEvent>()
+            .add_event::<ObjBreakEvent>()
+            .init_resource::<damage_tracker::DamageTracker>()
+            .init_resource::<damage_tracker::PetAbilityStats>()
         .add_plugin(CollisionPlugion)
         .add_systems(
             (

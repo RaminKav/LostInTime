@@ -1,0 +1,402 @@
+[
+  {
+    "name": "Anvil ",
+    "description": "Gain +10% Damage, permanently.",
+    "rarity": "Common"
+  },
+  {
+    "name": "Blue Book",
+    "description": "Gain +5 Mana  regeneration, permanently.",
+    "rarity": "Common"
+  },
+  {
+    "name": "Blue Mushroom",
+    "description": "Gain +25 Mana, permanently.",
+    "rarity": "Common"
+  },
+  {
+    "name": "Blue Scroll",
+    "description": "Increases skill power by +15%",
+    "rarity": "Common"
+  },
+  {
+    "name": "Bushling Scales",
+    "description": "Gain +15% Thorns,  permanently.",
+    "rarity": "Common"
+  },
+  {
+    "name": "Coal",
+    "description": "Gain +10 Defence, permanently.",
+    "rarity": "Common"
+  },
+  {
+    "name": "Feather",
+    "description": "Gain +10 Speed, permanently.",
+    "rarity": "Common"
+  },
+  {
+    "name": "Flint",
+    "description": "Gain +15% Critical Damage, permanently",
+    "rarity": "Common"
+  },
+  {
+    "name": "Horse Shoe",
+    "description": "Your attacks knockback enemies further. ",
+    "rarity": "Common"
+  },
+  {
+    "name": "Leather",
+    "description": "Gain +7% Dodge Chance, permanently.",
+    "rarity": "Common"
+  },
+  {
+    "name": "Lucky Penny",
+    "description": "Picking up coins has a 25% chance to heal 1 HP.",
+    "rarity": "Common"
+  },
+  {
+    "name": "Magnet",
+    "description": "Increases item pickup radius by +25%.",
+    "rarity": "Common"
+  },
+  {
+    "name": "Mana Dust",
+    "description": "Mana Orbs drop from mobs with a. +10% chance. They trigger mana regen.",
+    "rarity": "Common"
+  },
+  {
+    "name": "Microchip",
+    "description": "Gain +7% XP permanently. ",
+    "rarity": "Common"
+  },
+  {
+    "name": "Red Book ",
+    "description": "Gain +5 Health regeneration,  permanently.",
+    "rarity": "Common"
+  },
+  {
+    "name": "Red Mushroom",
+    "description": "Gain +25 Health, permanently.",
+    "rarity": "Common"
+  },
+  {
+    "name": "Rose",
+    "description": "Gain +2% Lifesteal, permanently.",
+    "rarity": "Common"
+  },
+  {
+    "name": "Sappling",
+    "description": "Your Attacks gain +10% Size permanently.",
+    "rarity": "Common"
+  },
+  {
+    "name": "Stanley",
+    "description": "Reduce skill cooldowns by 15%.",
+    "rarity": "Common"
+  },
+  {
+    "name": "Tusk",
+    "description": "Gain +7% Critical Chance,  permanantly.",
+    "rarity": "Common"
+  },
+  {
+    "name": "Ant Farm",
+    "description": "Spawn ants that rush towards enemies, dealing damage. Costs 4 mana.",
+    "rarity": "Uncommon"
+  },
+  {
+    "name": "Blue Phone",
+    "description": "Your Mana regeneration cooldown is. reduced.",
+    "rarity": "Uncommon"
+  },
+  {
+    "name": "CDz",
+    "description": "Gain +10 Shield, permanently.",
+    "rarity": "Uncommon"
+  },
+  {
+    "name": "Cursed Mask",
+    "description": "Increases chaos, making enemies stronger and more rewarding.",
+    "rarity": "Uncommon"
+  },
+  {
+    "name": "Dark Blade",
+    "description": "Lose 5 HP Regen, gain 5% Lifesteal.",
+    "rarity": "Uncommon"
+  },
+  {
+    "name": "Grandma's Recipe",
+    "description": "Your Attacks have a chance to apply Poison to enemies. Poisoned enemies lose health over time.",
+    "rarity": "Uncommon"
+  },
+  {
+    "name": "Jam",
+    "description": "You get hungry at a slower rate.",
+    "rarity": "Uncommon"
+  },
+  {
+    "name": "Lightning Ring",
+    "description": "Killing an enemy has a 3% chance to spawn a lightning strike on a random nearby enemy. Costs 5 mana.",
+    "rarity": "Uncommon"
+  },
+  {
+    "name": "Loaded Dice",
+    "description": "Gain +7 Luck, permanently.",
+    "rarity": "Uncommon"
+  },
+  {
+    "name": "Loot Bag",
+    "description": "Gain a Loot Chest",
+    "rarity": "Uncommon"
+  },
+  {
+    "name": "Red Phone",
+    "description": "Your Health regeneration cooldown is. reduced.",
+    "rarity": "Uncommon"
+  },
+  {
+    "name": "Red Soda",
+    "description": "Gain +15% Attack Speed, permanently. ",
+    "rarity": "Uncommon"
+  },
+  {
+    "name": "Sea Shell",
+    "description": "Your Attacks have a chance to apply a Slow stack to enemies, reducing speed by 15%.",
+    "rarity": "Uncommon"
+  },
+  {
+    "name": "Skull",
+    "description": "Your Attacks have a chance to apply a Frail stack that gives +10% Damage on hits.",
+    "rarity": "Uncommon"
+  },
+  {
+    "name": "Spiked Club",
+    "description": "Taking damage shoots out 2 spikes. Damage scales with thorns stat.",
+    "rarity": "Uncommon"
+  },
+  {
+    "name": "Spiked Ring",
+    "description": "Your thorns damage has +25% lifesteal.",
+    "rarity": "Uncommon"
+  },
+  {
+    "name": "Stone Tooth",
+    "description": "Spawn rocks on a timer that orbit you for 2s. Pierce enemies (hit each once). Costs 4 mana.",
+    "rarity": "Uncommon"
+  },
+  {
+    "name": "Thread",
+    "description": "Your Projectiles move faster.",
+    "rarity": "Uncommon"
+  },
+  {
+    "name": "Vampiric Ring",
+    "description": "Critical hits have a 25% chance to heal 1 HP.",
+    "rarity": "Uncommon"
+  },
+  {
+    "name": "Wizard Hat",
+    "description": "Mana regeneration shoots a mana orb at an enemy. It does damage equal to the",
+    "rarity": "Uncommon"
+  },
+  {
+    "name": "Ancient Fossil ",
+    "description": "After taking  damage, trigger  an echo that damages enemies  around you. Costs 10 mana.",
+    "rarity": "Rare"
+  },
+  {
+    "name": "Beer!",
+    "description": "Deal more damage the lower your HP is (up to +75% at 0 HP).",
+    "rarity": "Rare"
+  },
+  {
+    "name": "Bob's Bell",
+    "description": "Landing a critical hit reduces your active skill cooldown by 0.1 seconds.",
+    "rarity": "Rare"
+  },
+  {
+    "name": "Chaotic Candle",
+    "description": "+2 Chaos. +10 HP, +10 MP, +10% dmg, +10 def, +10% crit +10 spd, +10 dodge",
+    "rarity": "Rare"
+  },
+  {
+    "name": "Credit Card",
+    "description": "Gain 1 Coin when you use your active skill.",
+    "rarity": "Rare"
+  },
+  {
+    "name": "Crusader Shield",
+    "description": "Gain +10% Damage for every 100 Max HP you have.",
+    "rarity": "Rare"
+  },
+  {
+    "name": "Cursed Belt",
+    "description": "Your poison effect lasts longer. +25% poison chance.",
+    "rarity": "Rare"
+  },
+  {
+    "name": "Diamond",
+    "description": "Attacking frozen enemies gives you +15% critical hit chance. +25% freeze chance.",
+    "rarity": "Rare"
+  },
+  {
+    "name": "Dragon Eye",
+    "description": "Using a skill summons an echo. Costs 5 mana.",
+    "rarity": "Rare"
+  },
+  {
+    "name": "Gravitation Tome",
+    "description": "Periodically pulls all item drops on the map to you. Cooldown reduces with more copies.",
+    "rarity": "Rare"
+  },
+  {
+    "name": "Green Ring",
+    "description": "Your poison effect does more damage. +25% poison chance.",
+    "rarity": "Rare"
+  },
+  {
+    "name": "Hero Sword",
+    "description": "Your Attacks have a chance to send a sonic wave attack that travels a short distance. Costs 5 mana.",
+    "rarity": "Rare"
+  },
+  {
+    "name": "Lightning Cape",
+    "description": "Mana regeneration has a 10% chance to spawn a lightning strike on a random nearby enemy. Costs 5 mana.",
+    "rarity": "Rare"
+  },
+  {
+    "name": "Venomous Tome",
+    "description": "Every time you regenerate 100 mana, apply a poison stack to all enemies.",
+    "rarity": "Rare"
+  },
+  {
+    "name": "Mirror",
+    "description": "Killing a frozen enemy has a 20% chance to trigger mana regeneration. +25% freeze chance.",
+    "rarity": "Rare"
+  },
+  {
+    "name": "Purple Card",
+    "description": "Mana regeneration is stored, adding bonus damage on your next attack.",
+    "rarity": "Rare"
+  },
+  {
+    "name": "Red Envelope",
+    "description": "Gain +1% Damage for every 10 coins you have.",
+    "rarity": "Rare"
+  },
+  {
+    "name": "Scales",
+    "description": "You gain Defence the more speed you have lost. Lose 5 speed. ",
+    "rarity": "Rare"
+  },
+  {
+    "name": "Sceptor",
+    "description": "Attacks have a. chance to trigger another attack. Costs 5 mana.",
+    "rarity": "Rare"
+  },
+  {
+    "name": "Spiked Helmet",
+    "description": "Gain +1 Thorns each time you take damage",
+    "rarity": "Rare"
+  },
+  {
+    "name": "Spikey Shield",
+    "description": "Gain +20% Thorns for every 10 Defence you have. Gain +10 Defence.",
+    "rarity": "Rare"
+  },
+  {
+    "name": "Telescope",
+    "description": "Dodging grants +30% atk speed, +30 speed, next hit does 2x dmg.",
+    "rarity": "Rare"
+  },
+  {
+    "name": "Ancient Tome",
+    "description": "Upgrade Tomes level up gear an extra time.",
+    "rarity": "Legendary"
+  },
+  {
+    "name": "Chalice",
+    "description": "Healing triggers an echo that damages enemies  around you. +20 Health regen. Costs 5 mana.",
+    "rarity": "Legendary"
+  },
+  {
+    "name": "Vital Totem",
+    "description": "Healing has a 20% chance to trigger all summons once (Ant Farm, Stone Orbit).",
+    "rarity": "Rare"
+  },
+  {
+    "name": "Cooked Cross",
+    "description": "Survive death once, restore 50% HP, freeze all enemies for 3 seconds.",
+    "rarity": "Legendary"
+  },
+  {
+    "name": "Cursed Crown",
+    "description": "Lifesteal triggers give you a coin. Gain +5% Lifesteal.",
+    "rarity": "Legendary"
+  },
+  {
+    "name": "Deadly Mushroom",
+    "description": "0.5% chance to execute enemies. Executes cause hallucinations, granting random stat buffs.",
+    "rarity": "Legendary"
+  },
+  {
+    "name": "Frozen Tear",
+    "description": "Your Attacks have a chance to  trigger an ice explosion that damages enemies.  Costs 5 mana.",
+    "rarity": "Legendary"
+  },
+  {
+    "name": "Ice Lantern",
+    "description": "Killing a frozen enemy triggers an ice explosion that damages enemies. +25% freeze chance. Costs 5 mana.",
+    "rarity": "Legendary"
+  },
+  {
+    "name": "Ice Wand",
+    "description": "Your Attacks have a chance to leave a trail of ice that damages enemies.  +25% freeze chance. Costs 3 mana.",
+    "rarity": "Legendary"
+  },
+  {
+    "name": "Lightning Belt",
+    "description": "Picking up coins spawns a lightning strike on a random nearby enemy. Costs 5 mana.",
+    "rarity": "Legendary"
+  },
+  {
+    "name": "Lost Dagger",
+    "description": "Attacks chained together build  Combo, increasing  your critical  damage.",
+    "rarity": "Legendary"
+  },
+  {
+    "name": "Paintbrush",
+    "description": "Gain +1 extra charge of your active class skill.",
+    "rarity": "Legendary"
+  },
+  {
+    "name": "Poison Sceptor",
+    "description": "Killing a poisoned enemy spreads it's poison to nearby enemies. +25% poison chance. Costs 5 mana.",
+    "rarity": "Legendary"
+  },
+  {
+    "name": "Reaper",
+    "description": "Soul fragments chase enemies after each kill, damaging them. Costs 5 mana.",
+    "rarity": "Legendary"
+  },
+  {
+    "name": "Ripe Tomato",
+    "description": "Every 5 kills gain +1 Max HP.",
+    "rarity": "Legendary"
+  },
+  {
+    "name": "Sturdy Crate",
+    "description": "Breaking crates permanently gives +1% damage.",
+    "rarity": "Legendary"
+  },
+  {
+    "name": "Tent",
+    "description": "Standing still increases damage rapidly.",
+    "rarity": "Legendary"
+  },
+  {
+    "name": "Whip",
+    "description": "Increase all weapon projectile count by 1. Costs 5 mana.",
+    "rarity": "Legendary"
+  }
+]

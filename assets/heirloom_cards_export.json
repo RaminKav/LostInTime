@@ -451,15 +451,6 @@
   },
   {
     "description_lines": [
-      "You get hungry",
-      "at a slower rate."
-    ],
-    "id": "FullStomach",
-    "rarity": "Uncommon",
-    "title": "Jam"
-  },
-  {
-    "description_lines": [
       "Attacks chained",
       "together build ",
       "Combo, increasing ",
@@ -543,7 +534,7 @@
       "active class skill."
     ],
     "id": "SkillChargeIncrease",
-    "rarity": "Legendary",
+    "rarity": "Rare",
     "title": "Paintbrush"
   },
   {
@@ -711,7 +702,7 @@
   {
     "description_lines": [
       "Critical hits",
-      "have a 25% chance",
+      "have a 15% chance",
       "to heal 1 HP."
     ],
     "id": "CritHeal",

@@ -46,7 +46,7 @@ use crate::{
     },
     proto::proto_param::ProtoParam,
     ui::Interactable,
-    GameState, InputMappings, ScreenResolution, GAME_HEIGHT,
+    GameState, InputMappings, ScreenResolution,
 };
 use bevy::utils::Duration;
 aseprite!(pub Clock, "ui/Clock.aseprite");
@@ -1854,7 +1854,7 @@ pub fn handle_update_player_skills(
                         translation: Vec3::new(
                             HUD_SKILLS_CENTER_X
                                 + (i as f32 - skill_half_span) * HUD_SKILL_SPACING_X,
-                            -GAME_HEIGHT / 2. + HUD_ACTION_ROW_Y_FROM_BOTTOM,
+                            -res.game_height / 2. + HUD_ACTION_ROW_Y_FROM_BOTTOM,
                             Z_DEPTH_HUD_ACTIVE_SKILLS,
                         ),
                         scale: Vec3::new(1., 1., 1.),
@@ -2053,6 +2053,7 @@ pub fn setup_hotbar_hud(
     mut inv: Query<&mut Inventory>,
     inv_ui_state: Res<State<UIState>>,
     keybinds: Res<crate::keybinds::InputMappings>,
+    resolution: Res<ScreenResolution>,
 ) {
     for (slot_index, item) in inv
         .single_mut()
@@ -2073,6 +2074,7 @@ pub fn setup_hotbar_hud(
             &asset_server,
             InventorySlotType::Hotbar,
             item.clone(),
+            &resolution,
         );
 
         spawn_hotbar_keybind_badge_for_slot(
@@ -2646,6 +2648,7 @@ pub fn sync_consumable_buff_hud(
     asset_server: Res<AssetServer>,
     mut last_keys: Local<Option<Vec<(usize, WorldObject)>>>,
     existing: Query<Entity, With<ConsumableBuffHudMarker>>,
+    res: Res<ScreenResolution>,
 ) {
     let Ok(buffs) = player.get_single() else {
         return;
@@ -2674,7 +2677,7 @@ pub fn sync_consumable_buff_hud(
             - 2.
             - (CONSUMABLE_BUFF_HUD_ICON_PX / 2.)
             - i * (CONSUMABLE_BUFF_HUD_ICON_PX + 2.);
-        let y = -GAME_HEIGHT / 2. + 14.;
+        let y = -res.game_height / 2. + 14.;
 
         let icon_root = commands
             .spawn((

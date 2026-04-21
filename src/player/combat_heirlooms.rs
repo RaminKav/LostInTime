@@ -2020,7 +2020,7 @@ pub fn handle_mana_regen_poison(
                 trigger_counts.increment(Heirloom::ManaRegenPoison);
                 for enemy_entity in enemies.iter() {
                     if let Ok(mut burning) = burning_enemies.get_mut(enemy_entity) {
-                        burning.stacks += heirloom_count as u8;
+                        burning.stacks = burning.stacks.saturating_add(heirloom_count as u8);
                         burning.duration_timer.reset();
                         status_event.send(StatusEffectEvent {
                             entity: enemy_entity,

@@ -284,8 +284,8 @@ impl Plugin for PlayerPlugin {
                     handle_spear.after(player_move_inputs).run_if(is_not_paused),
                     tick_parried_timer.run_if(is_not_paused),
                     handle_parry_success,
-                    score::track_mob_kills,
-                    score::track_item_destruction,
+                    score::track_mob_kills.after(handle_hits),
+                    score::track_item_destruction.after(handle_hits),
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )

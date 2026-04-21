@@ -344,6 +344,9 @@ fn main() {
 
     if *DIAGNOSTICS {
         app.add_system(gameplay_load_tests::diagnostics_tick.in_set(OnUpdate(GameState::Main)));
+        // Archetype diagnostic runs in every state so we can see whether
+        // archetype counts persist across MainMenu <-> Main transitions.
+        app.add_system(gameplay_load_tests::archetype_diagnostics_tick);
     }
 
     if *COLLIDERS {
