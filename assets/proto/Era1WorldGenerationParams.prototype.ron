@@ -63,11 +63,11 @@
       // WorldObjects spawned per-chunk with given probability
       schematic_frequencies: {
         CombatShrine: 0.05,
-        GambleShrine: 0.025,
+        GambleShrine: 0.027,
         MicrowaveShrine: 0.026,
         // ActiveSkillShrine: 0.1,
         HeirloomShrine: 0.10,
-        BlacksmithMerchant: 0.07,
+        BlacksmithMerchant: 0.06,
       },
       obj_allowed_tiles_map: {
         SmallGreenTree: [GrassTile],

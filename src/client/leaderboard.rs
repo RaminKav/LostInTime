@@ -8,9 +8,15 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     assets::Graphics,
-    player::{score::RunScore, skills::PlayerClass},
+    combat::damage_tracker::DamageTracker,
+    player::{
+        score::{RunScore, RunTimer},
+        skills::{PlayerClass, PlayerSkills},
+        Player,
+    },
     ui::CheatSettings,
-    GameState,
+    world::dimension::{Era, EraManager},
+    Game, GameState,
 };
 
 /// Configuration for leaderboard server
@@ -27,7 +33,12 @@ const LEADERBOARD_API_URL: &str =
 // Alternative: Use environment variable with fallback
 // const LEADERBOARD_API_URL: &str = env!("LEADERBOARD_URL", "http://localhost:3000/api/leaderboard");
 
-/// Request to submit a score
+/// Request to submit a score.
+///
+/// The fields at the top are required. The `Option<_>` fields below are the
+/// run-detail metadata added alongside the `002_add_run_details` migration on
+/// the server; older clients that don't send them are still accepted and the
+/// columns are stored as NULL.
 #[derive(Debug, Serialize)]
 pub struct SubmitScoreRequest {
     pub user_id: String,
@@ -37,6 +48,33 @@ pub struct SubmitScoreRequest {
     pub chaos_level: i32,
     pub mobs_killed: i32,
     pub objs_destroyed: i32,
+
+    /// Structured breakdown of damage sources / amounts dealt during the run
+    /// (serialized from the `DamageTracker` run resource).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub damage_tracker: Option<serde_json::Value>,
+
+    /// Snapshot of the `PlayerSkills` component at time of death (includes all
+    /// heirlooms the player picked up along with their rarities).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub player_heirlooms: Option<serde_json::Value>,
+
+    /// Total seconds the player spent in the run.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub time_in_run: Option<f64>,
+
+    /// The furthest era the player reached.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub era_reached: Option<String>,
+
+    /// Whether endless mode was triggered during the run.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub endless_triggered: Option<bool>,
+
+    /// Identifier / name of the weapon in the main weapon slot at the moment
+    /// of death.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub main_weapon: Option<String>,
 }
 
 /// Response from submitting a score
@@ -57,6 +95,19 @@ pub struct LeaderboardEntry {
     pub class: String,
     pub chaos_level: i32,
     pub submitted_at: DateTime<Utc>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub damage_tracker: Option<serde_json::Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub player_heirlooms: Option<serde_json::Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub time_in_run: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub era_reached: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub endless_triggered: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub main_weapon: Option<String>,
 }
 
 /// Response from fetching the leaderboard
@@ -93,6 +144,13 @@ pub struct SubmitScoreEvent {
     pub chaos_level: i32,
     pub mobs_killed: i32,
     pub objs_destroyed: i32,
+
+    pub damage_tracker: Option<serde_json::Value>,
+    pub player_heirlooms: Option<serde_json::Value>,
+    pub time_in_run: Option<f64>,
+    pub era_reached: Option<String>,
+    pub endless_triggered: Option<bool>,
+    pub main_weapon: Option<String>,
 }
 
 /// Event to trigger leaderboard fetch
@@ -177,6 +235,12 @@ pub fn handle_submit_score_event(
             chaos_level: event.chaos_level,
             mobs_killed: event.mobs_killed,
             objs_destroyed: event.objs_destroyed,
+            damage_tracker: event.damage_tracker.clone(),
+            player_heirlooms: event.player_heirlooms.clone(),
+            time_in_run: event.time_in_run,
+            era_reached: event.era_reached.clone(),
+            endless_triggered: event.endless_triggered,
+            main_weapon: event.main_weapon.clone(),
         };
 
         info!("Submitting score to leaderboard: {}", event.score);
@@ -314,11 +378,16 @@ pub fn auto_submit_score_on_game_over(
     mut game_over_events: EventReader<crate::client::GameOverEvent>,
     mut submit_events: EventWriter<SubmitScoreEvent>,
     run_score: Res<RunScore>,
+    run_timer: Res<RunTimer>,
     game_data: Res<crate::client::GameData>,
     chaos: Res<crate::chaos::ChaosTracker>,
     infinite_mode: Res<crate::night::InfiniteMode>,
     class: Res<PlayerClass>,
     graphics: Res<Graphics>,
+    damage_tracker: Res<DamageTracker>,
+    era_manager: Res<EraManager>,
+    game: Res<Game>,
+    player_skills_q: Query<&PlayerSkills, With<Player>>,
     mut last_submitted: ResMut<LastSubmittedScore>,
     cheat_settings: Option<Res<CheatSettings>>,
 ) {
@@ -346,6 +415,28 @@ pub fn auto_submit_score_on_game_over(
         last_submitted.score = score;
         last_submitted.rank = None; // Clear previous rank
         last_submitted.is_personal_best = false;
+
+        let damage_tracker_json = serde_json::to_value(&*damage_tracker)
+            .map_err(|e| warn!("Failed to serialize DamageTracker: {}", e))
+            .ok();
+
+        let player_heirlooms_json = player_skills_q
+            .get_single()
+            .ok()
+            .and_then(|skills| {
+                serde_json::to_value(skills)
+                    .map_err(|e| warn!("Failed to serialize PlayerSkills: {}", e))
+                    .ok()
+            });
+
+        let main_weapon = game
+            .player_state
+            .main_hand_slot
+            .as_ref()
+            .map(|slot| slot.get_obj().to_string());
+
+        let era_reached = Some(era_display_name(&era_manager.current_era).to_string());
+
         if !dev_mode {
             submit_events.send(SubmitScoreEvent {
                 user_id: game_data.user_id.to_string(),
@@ -355,8 +446,25 @@ pub fn auto_submit_score_on_game_over(
                 chaos_level: total_chaos.trunc() as i32,
                 mobs_killed: run_score.mobs_killed as i32,
                 objs_destroyed: run_score.objs_destroyed as i32,
+                damage_tracker: damage_tracker_json,
+                player_heirlooms: player_heirlooms_json,
+                time_in_run: Some(run_timer.elapsed_seconds),
+                era_reached,
+                endless_triggered: Some(infinite_mode.active),
+                main_weapon,
             });
         }
+    }
+}
+
+/// Human-readable name for the `Era` a run reached, used when submitting
+/// scores to the leaderboard.
+fn era_display_name(era: &Era) -> &'static str {
+    match era {
+        Era::Main => "Era 1",
+        Era::Second => "Era 2",
+        Era::Third => "Era 3",
+        Era::DungeonMain => "Dungeon",
     }
 }
 

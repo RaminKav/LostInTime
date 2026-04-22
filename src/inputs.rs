@@ -59,8 +59,7 @@ use crate::world::world_helpers::world_pos_to_tile_pos;
 use crate::player::ice_slide::{clear_ice_slide_when_stuck, tick_ice_slide_movement};
 use crate::{
     bounce_player, update_bounce_effect, update_shadow, BounceEffect, BounceEvent, Game,
-    InputMappings, Player, ScreenResolution, DEBUG, PLAYER_DASH_SPEED,
-    TIME_STEP,
+    InputMappings, Player, ScreenResolution, DEBUG, PLAYER_DASH_SPEED, TIME_STEP,
 };
 use crate::{
     custom_commands::CommandsExt, AppExt, CustomFlush, GameParam, GameState, MainCamera,
@@ -304,8 +303,7 @@ pub fn player_move_inputs(
         * time.delta_seconds()
         * (1. + speed.0 as f32 / 100.)
         * (if hunger.is_starving() { 0.7 } else { 1. })
-        * movement_speed_multiplier
-        * curr_anim.action_movement_restriction(player.main_hand_slot.clone().map(|s| s.get_obj()));
+        * movement_speed_multiplier;
 
     if key_input.pressed(KeyCode::A) || key_input.pressed(KeyCode::Left) {
         d_raw.x -= 1.;
@@ -742,7 +740,7 @@ pub fn toggle_inventory(
             // proto_commands.spawn_from_proto(Mob::SmallCactus, &proto.prototypes, pos);
             // proto_commands.spawn_from_proto(Mob::Bull, &proto.prototypes, pos);
             // proto_commands.spawn_from_proto(Mob::Fairy, &proto.prototypes, pos);
-            // proto_commands.spawn_from_proto(Mob::FurDevil, &proto.prototypes, pos);
+            proto_commands.spawn_from_proto(Mob::FurDevil, &proto.prototypes, pos);
             // commands.entity(t.unwrap()).insert(MobLevel(10));
             // proto_commands.spawn_from_proto(Mob::RedMushking, &proto.prototypes, pos);
             // let f = proto_commands.spawn_from_proto(Mob::SpikeSlime, &proto.prototypes, pos);
@@ -1104,10 +1102,7 @@ pub fn move_camera_with_player(
             Without<UICamera>,
         ),
     >,
-    mut game_camera: Query<
-        (&mut Transform, &mut RawPosition),
-        (With<TextureCamera>,),
-    >,
+    mut game_camera: Query<(&mut Transform, &mut RawPosition), (With<TextureCamera>,)>,
     time: Res<Time>,
     resolution: Res<ScreenResolution>,
 ) {

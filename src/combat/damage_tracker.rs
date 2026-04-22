@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use serde::Serialize;
 use std::collections::HashMap;
 
 use super::{HitEvent, InvincibilityTimer};
@@ -31,7 +32,7 @@ impl DamageSourceCategory {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
 pub enum DamageSource {
     // Weapons (melee)
     Sword,
@@ -255,7 +256,7 @@ impl DamageSource {
 }
 
 /// Resource that accumulates all damage dealt by the player during a run
-#[derive(Resource, Default, Debug)]
+#[derive(Resource, Default, Debug, Serialize)]
 pub struct DamageTracker {
     pub totals: HashMap<DamageSource, i64>,
 }

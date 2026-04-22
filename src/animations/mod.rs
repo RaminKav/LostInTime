@@ -276,14 +276,20 @@ fn animate_hit(
         }
 
         if hit.timer.finished() {
-            hit.is_active = false;
-            if mob_option.is_some() {
+            if let Some(state) = mob_option {
+                // For mobs we keep `is_active = true` (and keep the system ticking
+                // this entity each frame) until the sprite has cycled back to the
+                // starting frame of the Hit animation. Only then do we transition
+                // back to Walk and deactivate.
                 let (anim_data, sprite) = anim_state.get(e).unwrap();
-                if sprite.index == anim_data.get_starting_frame_for_animation(mob_option.unwrap())
-                    && mob_option.unwrap() == &EnemyAnimationState::Hit
+                if sprite.index == anim_data.get_starting_frame_for_animation(state)
+                    && state == &EnemyAnimationState::Hit
                 {
                     commands.entity(e).insert(EnemyAnimationState::Walk);
+                    hit.is_active = false;
                 }
+            } else {
+                hit.is_active = false;
             }
         }
     }

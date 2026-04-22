@@ -1,10 +1,12 @@
 use crate::{
-    combat::combat_helpers::DespawnTimer,
+    combat::{combat_helpers::DespawnTimer, pickup_radius::BeingPulledToPlayer},
     custom_commands::CommandsExt,
     enemy::{spawn_helpers::can_spawn_mob_here, spawner::MobSpawningPaused},
-    item::{LootTable, WorldObject},
+    inventory::{player_can_accept_ground_item_pickup, Inventory, ItemStack},
+    item::{ItemDrop, LootTable, WorldObject},
     juice::ShakeEffect,
     night::{EraTimer, InfiniteModeStartedEvent},
+    pets::state::Pet,
     player::levels::ExperienceReward,
     world::{
         dimension::{Era, EraManager},
@@ -516,6 +518,9 @@ pub fn handle_death(
     mut boss_kill_tracker: ResMut<BossKillTracker>,
     era_timer: Res<EraTimer>,
     mut mob_spawning_paused: ResMut<MobSpawningPaused>,
+    item_drop_query: Query<(Entity, &ItemStack), (With<ItemDrop>, Without<BeingPulledToPlayer>)>,
+    inv: Query<&Inventory, With<Player>>,
+    pets: Query<(), With<Pet>>,
 ) {
     for (entity, mut anim, mob) in death.iter_mut() {
         // Only handle RedMushking death animations
@@ -548,6 +553,21 @@ pub fn handle_death(
                     mob_spawning_paused.paused = true;
                 }
             }
+
+            // Map-wide loot pull: pull all eligible ground items to the player,
+            // mirroring the behavior of `handle_gamble_shrine_rewards`.
+            if let Ok(inv) = inv.get_single() {
+                let player_has_pet = pets.iter().next().is_some();
+                for (item_entity, item_stack) in item_drop_query.iter() {
+                    if !player_can_accept_ground_item_pickup(item_stack, inv, player_has_pet) {
+                        continue;
+                    }
+                    commands
+                        .entity(item_entity)
+                        .insert(BeingPulledToPlayer::default());
+                }
+            }
+
             commands.entity(entity).despawn_recursive();
         }
     }

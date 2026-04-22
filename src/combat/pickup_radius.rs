@@ -11,7 +11,7 @@ use crate::{
 #[derive(Component, Debug, Clone)]
 pub struct PickupRadius(pub f32);
 
-pub const BASE_PICKUP_RADIUS: f32 = 30.0;
+pub const BASE_PICKUP_RADIUS: f32 = 36.0;
 
 /// System that updates pickup radius based on ItemPickupRadius heirloom stacks and equipment
 pub fn update_pickup_radius(
@@ -93,12 +93,7 @@ pub fn mark_items_in_pickup_range(
 
 pub fn handle_item_pickup_radius(
     mut item_query: Query<
-        (
-            Entity,
-            &mut Transform,
-            &mut BeingPulledToPlayer,
-            &ItemStack,
-        ),
+        (Entity, &mut Transform, &mut BeingPulledToPlayer, &ItemStack),
         With<BeingPulledToPlayer>,
     >,
     player_query: Query<&Transform, (With<Player>, Without<BeingPulledToPlayer>)>,

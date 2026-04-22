@@ -217,6 +217,11 @@ pub struct ProjectileSpawnMarker {
     pub from_entity: Option<Entity>,
     pub was_mana_bar_full: bool,
     pub is_followup_proj: bool,
+    /// When true, the projectile should spawn at the player's *current* position
+    /// once the spawn delay elapses rather than the position captured at event
+    /// time. Prevents arrows/bolts from spawning behind a moving player when
+    /// there is a non-trivial `spawn_delay`.
+    pub track_player_pos: bool,
 }
 
 #[derive(Component)]
@@ -327,6 +332,14 @@ fn handle_ranged_attack_event(
         } else {
             1.
         };
+        // Track the player's live position at spawn time only for unanchored,
+        // player-fired projectiles with a delay (e.g. bow arrows). Anything
+        // using `pos_override`, coming from an enemy/pet/entity, or anchored to
+        // the player keeps its original positioning semantics.
+        let track_player_pos = !proj_event.from_enemy
+            && proj_event.from_entity.is_none()
+            && proj_event.pos_override.is_none()
+            && !proj_event.projectile.is_anchored_to_player_pos();
         commands.spawn(ProjectileSpawnMarker {
             timer: Timer::from_seconds(proj_event.spawn_delay, TimerMode::Once),
             proj: proj_event.projectile.clone(),
@@ -340,6 +353,7 @@ fn handle_ranged_attack_event(
             from_entity: proj_event.from_entity,
             was_mana_bar_full: current_mana.0 == max_mana.0,
             is_followup_proj: proj_event.is_followup_proj,
+            track_player_pos,
         });
 
         if proj_event.projectile == Projectile::DaggerProjectile1 {
@@ -356,6 +370,7 @@ fn handle_ranged_attack_event(
                 from_entity: proj_event.from_entity,
                 was_mana_bar_full: current_mana.0 == max_mana.0,
                 is_followup_proj: false,
+                track_player_pos,
             });
         }
 
@@ -398,10 +413,17 @@ fn handle_spawn_projectiles_after_delay(
     for (e, mut proj) in projectiles.iter_mut() {
         proj.timer.tick(time.delta());
         if proj.timer.just_finished() {
+            // For delayed player-fired projectiles, use the player's current
+            // position so the projectile doesn't spawn back where they clicked.
+            let spawn_pos = if proj.track_player_pos {
+                game.player().position.truncate()
+            } else {
+                proj.pos
+            };
             let p = proto_commands.spawn_projectile_from_proto(
                 proj.proj.clone(),
                 &proto,
-                proj.pos,
+                spawn_pos,
                 proj.direction,
                 proj.was_mana_bar_full,
                 &asset_server,

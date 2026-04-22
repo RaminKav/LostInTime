@@ -27,7 +27,7 @@
   "survival_rogue_like::inventory::ItemStack": (
         obj_type: WoodBow,
         attributes: (
-            attack_cooldown: 0.85
+            attack_cooldown: 1.
         ),
         metadata: (
             name: "Wood Bow", 

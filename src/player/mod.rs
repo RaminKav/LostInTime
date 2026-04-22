@@ -158,6 +158,7 @@ impl Plugin for PlayerPlugin {
             .init_resource::<CoinCurrency>()
             .init_resource::<TimeFragmentCurrency>()
             .init_resource::<skills::HeirloomTriggerCounts>()
+            .init_resource::<score::RunTimer>()
             .with_default_schedule(CoreSchedule::FixedUpdate, |app| {
                 app.add_event::<MovePlayerEvent>()
                     .add_event::<ModifyCurencyEvent>()
@@ -334,6 +335,16 @@ impl Plugin for PlayerPlugin {
                 score::reset_run_score
                     .run_if(run_once_per_run())
                     .in_schedule(OnEnter(GameState::Main)),
+            )
+            .add_system(
+                score::reset_run_timer
+                    .run_if(run_once_per_run())
+                    .in_schedule(OnEnter(GameState::Main)),
+            )
+            .add_system(
+                score::tick_run_timer
+                    .run_if(is_not_paused)
+                    .in_set(OnUpdate(GameState::Main)),
             )
             .add_system(
                 give_player_starting_items

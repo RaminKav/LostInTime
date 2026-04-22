@@ -11,6 +11,14 @@ pub struct RunScore {
     pub objs_destroyed: u32,
 }
 
+/// Tracks the total elapsed seconds the player has spent in the current run.
+/// Ticks only while `GameState::Main` is active (i.e. excludes menus, pauses,
+/// game-over screens) and is reset back to 0 whenever a new run begins.
+#[derive(Resource, Debug, Clone, Copy, Default, Serialize, Deserialize)]
+pub struct RunTimer {
+    pub elapsed_seconds: f64,
+}
+
 impl RunScore {
     pub fn new() -> Self {
         Self {
@@ -61,6 +69,16 @@ pub struct StartingWeapon {
 pub fn reset_run_score(mut run_score: ResMut<RunScore>) {
     info!("Resetting run score from {} to 0", run_score.score);
     *run_score = RunScore::new();
+}
+
+/// System to reset the run timer when starting a new run
+pub fn reset_run_timer(mut run_timer: ResMut<RunTimer>) {
+    *run_timer = RunTimer::default();
+}
+
+/// Tick the run timer while the player is actively in `GameState::Main`.
+pub fn tick_run_timer(time: Res<Time>, mut run_timer: ResMut<RunTimer>) {
+    run_timer.elapsed_seconds += time.delta_seconds_f64();
 }
 
 /// System to track mob kills and update score

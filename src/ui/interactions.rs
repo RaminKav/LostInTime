@@ -1,6 +1,7 @@
 use std::time::Duration;
 
 use crate::{
+    attributes::MAX_GEAR_LEVEL,
     blessings::{Blessing, HeirloomStatsBonuses},
     chaos::ChaosTracker,
     player::Player,
@@ -25,7 +26,9 @@ use crate::{
     blessings::OwnedBlessings,
     colors::{DARK_GREEN, RED},
     cursor::CursorPos,
-    inventory::{sort_main_inventory, Inventory, InventoryItemStack, ItemStack, SortInventoryButton},
+    inventory::{
+        sort_main_inventory, Inventory, InventoryItemStack, ItemStack, SortInventoryButton,
+    },
     item::{heirloom_shrine::HeirloomShrineState, CraftedItemEvent, EquipmentType},
     player::{
         combat_heirlooms::HallucinationStatType,
@@ -1433,7 +1436,7 @@ pub fn handle_cursor_inventory_upgrade_button(
                                 .map(|f| f.item_stack.obj_type);
 
                             if fuel_type == Some(crate::item::WorldObject::UpgradeTome)
-                                && gear_level >= 30
+                                && gear_level >= MAX_GEAR_LEVEL
                             {
                                 let btn_pos = button_transform.translation();
                                 let text = spawn_floating_text_with_shadow(

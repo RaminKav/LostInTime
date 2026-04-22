@@ -57,7 +57,7 @@ pub mod item_abilities;
 
 use self::health_regen::{handle_health_regen, handle_mana_regen};
 pub struct AttributesPlugin;
-
+pub const MAX_GEAR_LEVEL: u8 = 10;
 aseprite!(pub RarityGlows, "textures/effects/RarityGlows.aseprite");
 #[derive(
     Component,
@@ -668,7 +668,7 @@ impl ItemAttributes {
             self.size.value + skills.get_count(Heirloom::Gigantify) * 10,
         ));
         entity.insert(PickupRange(
-            self.pickup_range.value + skills.get_count(Heirloom::ItemPickupRadius) * 25 * 45,
+            self.pickup_range.value + skills.get_count(Heirloom::ItemPickupRadius) * 25,
         ));
         entity.insert(SkillPower(
             self.skill_power.value
