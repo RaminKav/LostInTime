@@ -3,7 +3,7 @@
   templates: ["world_object.prototype.ron"],
   schematics: {
   "survival_rogue_like::item::WorldObject": Bridge,
-  "survival_rogue_like::item::RequiredEquipmentType": (Axe),
+  "survival_rogue_like::item::RequiredEquipmentType": (None),
   "survival_rogue_like::attributes::MaxHealth": (1),
   "survival_rogue_like::world::y_sort::YSort": (-0.2),
   "survival_rogue_like::item::loot_table::LootTable": (

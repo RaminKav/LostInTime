@@ -227,6 +227,8 @@ pub struct GameData {
     #[serde(default)]
     pub keybindings: Option<crate::keybinds::InputMappings>,
     #[serde(default)]
+    pub audio_volume: Option<crate::audio::AudioVolume>,
+    #[serde(default)]
     pub player_name: Option<String>,
     #[serde(default)]
     pub bounce_tracker: crate::player::achievements::BounceAchievementTracker,

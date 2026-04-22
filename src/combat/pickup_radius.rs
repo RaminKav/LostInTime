@@ -2,7 +2,9 @@ use bevy::prelude::*;
 
 use crate::{
     attributes::PickupRange,
+    inventory::{player_can_accept_ground_item_pickup, Inventory, ItemStack},
     item::{object_actions::TouchTriggerObjectAction, ItemDrop},
+    pets::state::Pet,
     player::{skills::PlayerSkills, Player},
 };
 
@@ -51,7 +53,7 @@ pub const PULL_ACCELERATION: f32 = 200.0;
 pub fn mark_items_in_pickup_range(
     mut commands: Commands,
     item_query: Query<
-        (Entity, &Transform),
+        (Entity, &Transform, &ItemStack),
         (
             With<ItemDrop>,
             Without<Player>,
@@ -60,15 +62,24 @@ pub fn mark_items_in_pickup_range(
         ),
     >,
     player_query: Query<(&Transform, &PickupRadius), With<Player>>,
+    inv: Query<&Inventory, With<Player>>,
+    pets: Query<(), With<Pet>>,
 ) {
     let Ok((player_transform, pickup_radius)) = player_query.get_single() else {
         return;
     };
+    let Ok(inv) = inv.get_single() else {
+        return;
+    };
+    let player_has_pet = pets.iter().next().is_some();
 
     let player_pos = player_transform.translation.truncate();
     let pickup_range = pickup_radius.0;
 
-    for (item_entity, item_transform) in item_query.iter() {
+    for (item_entity, item_transform, item_stack) in item_query.iter() {
+        if !player_can_accept_ground_item_pickup(item_stack, inv, player_has_pet) {
+            continue;
+        }
         let item_pos = item_transform.translation.truncate();
         let distance = player_pos.distance(item_pos);
 
@@ -82,20 +93,35 @@ pub fn mark_items_in_pickup_range(
 
 pub fn handle_item_pickup_radius(
     mut item_query: Query<
-        (Entity, &mut Transform, &mut BeingPulledToPlayer),
+        (
+            Entity,
+            &mut Transform,
+            &mut BeingPulledToPlayer,
+            &ItemStack,
+        ),
         With<BeingPulledToPlayer>,
     >,
     player_query: Query<&Transform, (With<Player>, Without<BeingPulledToPlayer>)>,
+    inv: Query<&Inventory, With<Player>>,
+    pets: Query<(), With<Pet>>,
     mut commands: Commands,
     time: Res<Time>,
 ) {
     let Ok(player_transform) = player_query.get_single() else {
         return;
     };
+    let Ok(inv) = inv.get_single() else {
+        return;
+    };
+    let player_has_pet = pets.iter().next().is_some();
 
     let player_pos = player_transform.translation.truncate();
 
-    for (item_entity, mut item_transform, mut pull_state) in item_query.iter_mut() {
+    for (item_entity, mut item_transform, mut pull_state, item_stack) in item_query.iter_mut() {
+        if !player_can_accept_ground_item_pickup(item_stack, inv, player_has_pet) {
+            commands.entity(item_entity).remove::<BeingPulledToPlayer>();
+            continue;
+        }
         let item_pos = item_transform.translation.truncate();
         let distance = player_pos.distance(item_pos);
 
@@ -131,7 +157,7 @@ pub const MIN_MAGNET_COOLDOWN: f32 = 5.0;
 pub fn handle_magnet_pull(
     mut magnet_timer_query: Query<(&mut MagnetPullTimer, &PlayerSkills), With<Player>>,
     item_query: Query<
-        Entity,
+        (Entity, &ItemStack),
         (
             With<ItemDrop>,
             Without<Player>,
@@ -139,12 +165,18 @@ pub fn handle_magnet_pull(
             Without<TouchTriggerObjectAction>,
         ),
     >,
+    inv: Query<&Inventory, With<Player>>,
+    pets: Query<(), With<Pet>>,
     mut commands: Commands,
     time: Res<Time>,
 ) {
     let Ok((mut magnet_timer, player_skills)) = magnet_timer_query.get_single_mut() else {
         return;
     };
+    let Ok(inv) = inv.get_single() else {
+        return;
+    };
+    let player_has_pet = pets.iter().next().is_some();
 
     let stacks = player_skills.get_count(crate::player::skills::Heirloom::MagnetPull);
 
@@ -158,7 +190,10 @@ pub fn handle_magnet_pull(
         magnet_timer.cooldown_timer.reset();
         magnet_timer.duration_timer.reset();
 
-        for item_entity in item_query.iter() {
+        for (item_entity, item_stack) in item_query.iter() {
+            if !player_can_accept_ground_item_pickup(item_stack, inv, player_has_pet) {
+                continue;
+            }
             commands
                 .entity(item_entity)
                 .insert(BeingPulledToPlayer::default());

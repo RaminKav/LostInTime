@@ -178,6 +178,7 @@ impl DimensionPlugin {
                 continue;
             }
             processed_one = true;
+            let mut sent_dungeon_spawn = false;
 
             info!("SPAWNING NEW DIMENSION {:?}", new_dim.new_era);
 
@@ -216,6 +217,7 @@ impl DimensionPlugin {
                     if let Some(pos) = get_player_spawn_tile(grid.clone()) {
                         info!("MOVING PLAYER TO {:?}", pos);
                         move_player_event.send(MovePlayerEvent { pos });
+                        sent_dungeon_spawn = true;
                     } else {
                         error!("Failed to find valid player spawn position in dungeon! This should not happen.");
                     }
@@ -304,9 +306,11 @@ impl DimensionPlugin {
                 }
             }
 
-            if let Ok((e, cached_pos)) = player_cache_pos.get_single() {
-                move_player_event.send(MovePlayerEvent { pos: cached_pos.0 });
-                commands.entity(e).remove::<CachedPlayerPos>();
+            if !sent_dungeon_spawn {
+                if let Ok((e, cached_pos)) = player_cache_pos.get_single() {
+                    move_player_event.send(MovePlayerEvent { pos: cached_pos.0 });
+                    commands.entity(e).remove::<CachedPlayerPos>();
+                }
             }
         }
     }

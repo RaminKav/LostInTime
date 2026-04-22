@@ -198,7 +198,11 @@ pub fn handle_new_status_effect_event(
 pub fn update_status_effect_icons(
     mut query: Query<
         (Entity, Option<&Children>, &StatusEffectTracker),
-        Changed<StatusEffectTracker>,
+        (
+            Changed<StatusEffectTracker>,
+            Without<DeathState>,
+            Without<MarkedForDeath>,
+        ),
     >,
     mut commands: Commands,
     graphics: Res<Graphics>,
@@ -384,7 +388,10 @@ pub fn handle_burning_ticks(
     }
 }
 pub fn handle_frail_stack_ticks(
-    mut frailed: Query<(Entity, &mut MobStatusEffects)>,
+    mut frailed: Query<
+        (Entity, &mut MobStatusEffects),
+        (Without<DeathState>, Without<MarkedForDeath>),
+    >,
     time: Res<Time>,
     mut status_event: EventWriter<StatusEffectEvent>,
 ) {
@@ -408,7 +415,10 @@ pub fn handle_frail_stack_ticks(
     }
 }
 pub fn handle_slow_stack_ticks(
-    mut slowed: Query<(Entity, &mut MobStatusEffects)>,
+    mut slowed: Query<
+        (Entity, &mut MobStatusEffects),
+        (Without<DeathState>, Without<MarkedForDeath>),
+    >,
     time: Res<Time>,
     mut status_event: EventWriter<StatusEffectEvent>,
 ) {
@@ -465,7 +475,10 @@ pub fn try_add_slow_stacks(
 /// Handle frozen status effect ticks - mobs are frozen with blue tint
 pub fn handle_frozen_ticks(
     time: Res<Time>,
-    mut frozen_mobs: Query<(&mut MobStatusEffects, &mut TextureAtlasSprite)>,
+    mut frozen_mobs: Query<
+        (&mut MobStatusEffects, &mut TextureAtlasSprite),
+        (Without<DeathState>, Without<MarkedForDeath>),
+    >,
 ) {
     for (mut status, mut sprite) in frozen_mobs.iter_mut() {
         let Some(frozen) = status.frozen.as_mut() else {
@@ -486,7 +499,11 @@ pub fn check_freeze_on_slow_stacks(
     blessings: Query<&crate::blessings::OwnedBlessings>,
     mut slow_query: Query<
         (Entity, &mut MobStatusEffects, &mut TextureAtlasSprite),
-        Changed<MobStatusEffects>,
+        (
+            Changed<MobStatusEffects>,
+            Without<DeathState>,
+            Without<MarkedForDeath>,
+        ),
     >,
     mut status_event: EventWriter<StatusEffectEvent>,
 ) {

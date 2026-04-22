@@ -4,9 +4,10 @@ use std::cmp::min;
 use crate::{
     animations::{AnimationPosTracker, AnimationTimer, DoneAnimation},
     attributes::{add_item_glows, AttributeModifier, ItemAttributes, ItemRarity, RarityGlows},
-    container::Container,
+    container::{main_inv_bag_slot_indices_top_to_bottom, Container},
     inputs::FacingDirection,
     item::{
+        item_actions::{ItemAction, ItemActions},
         ActiveMainHandState, Equipment, EquipmentType, ItemDisplayMetaData, ItemDrop, MainHand,
         WorldObject, PLAYER_EQUIPMENT_POSITIONS,
     },
@@ -583,6 +584,142 @@ impl ItemStack {
     }
 }
 
+/// Marker tag for the "Sort" button rendered under the trash slot in the inventory UI.
+/// Click handler lives in `ui::interactions::handle_sort_inventory_button_click`.
+#[derive(Component, Default, Clone, Debug)]
+pub struct SortInventoryButton;
+
+/// Sort priority bucket for the inventory-sort button. Lower values sort first.
+/// Sub-field ordering is alphabetical on the item's display name.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum SortBucket {
+    Weapon,
+    Chestplate,
+    Pants,
+    Shoes,
+    Head,
+    Ring,
+    Pendant,
+    Trinket,
+    Cape,
+    Consumable,
+    Material,
+}
+
+/// Returns true if an item's [`ItemActions`] list represents a consumable-style usable
+/// (food / potion / magic gem / key / etc.) — i.e. an item whose primary purpose is to be
+/// *used* from the inventory rather than placed in the world. Items whose only actions
+/// place a block (`PlacesInto`) fall through to the `Material` bucket.
+fn item_actions_are_consumable(actions: &ItemActions) -> bool {
+    actions.actions.iter().len() > 0
+}
+
+fn sort_bucket_for_item(stack: &ItemStack, proto: &ProtoParam) -> SortBucket {
+    let obj = stack.obj_type;
+    let equip_type = proto.get_component::<EquipmentType, _>(obj).cloned();
+    match equip_type {
+        Some(EquipmentType::Weapon) => return SortBucket::Weapon,
+        Some(EquipmentType::Chest) => return SortBucket::Chestplate,
+        Some(EquipmentType::Legs) => return SortBucket::Pants,
+        Some(EquipmentType::Feet) => return SortBucket::Shoes,
+        Some(EquipmentType::Head) => return SortBucket::Head,
+        Some(EquipmentType::Ring) => return SortBucket::Ring,
+        Some(EquipmentType::Pendant) => return SortBucket::Pendant,
+        Some(EquipmentType::Trinket) => return SortBucket::Trinket,
+        Some(EquipmentType::Cape) => return SortBucket::Cape,
+        _ => {}
+    }
+    // Fallback on hardcoded weapon list (items that predate EquipmentType metadata).
+    if obj.is_weapon() {
+        return SortBucket::Weapon;
+    }
+    if let Some(actions) = proto.get_component::<ItemActions, _>(obj) {
+        if item_actions_are_consumable(actions) {
+            return SortBucket::Consumable;
+        }
+    }
+    SortBucket::Material
+}
+
+/// Alphabetical sub-key for items within the same [`SortBucket`]. Uses the display name when
+/// present, falling back to the `WorldObject` debug name so sorts are stable across saves even
+/// before an item's prototype has been inspected (and metadata.name populated).
+fn sort_sub_key(stack: &ItemStack) -> String {
+    let name = stack.metadata.name.trim();
+    if name.is_empty() {
+        format!("{:?}", stack.obj_type)
+    } else {
+        name.to_ascii_lowercase()
+    }
+}
+
+/// Sorts the player's main inventory grid in place. Hotbar slots
+/// (`0..INVENTORY_HOTBAR_SLOTS`) are left untouched so the player's quickbar layout is
+/// preserved. Bag slots are re-packed in **visual** top-to-bottom order (row-major indices are
+/// bottom-up in memory; see [`crate::container::main_inv_bag_slot_indices_top_to_bottom`]) using
+/// the ordering defined by [`SortBucket`] and then by display name. Stackable duplicates are
+/// merged (up to [`MAX_STACK_SIZE`]) so the bag shrinks as much as possible. All affected
+/// inventory + hotbar slots are marked dirty so the UI respawns them.
+pub fn sort_main_inventory(
+    inv: &mut Inventory,
+    proto: &ProtoParam,
+    inv_slots: &mut Query<&mut InventorySlotState>,
+) {
+    let len = inv.items.items.len();
+    if len <= INVENTORY_HOTBAR_SLOTS {
+        return;
+    }
+
+    // Collect and clear the bag slots (keep hotbar indices intact).
+    let mut stacks: Vec<ItemStack> = inv.items.items[INVENTORY_HOTBAR_SLOTS..len]
+        .iter_mut()
+        .filter_map(|s| s.take().map(|is| is.item_stack))
+        .collect();
+
+    // Merge stackable duplicates before sorting so repeated bucket/name pairs collapse.
+    let mut merged: Vec<ItemStack> = Vec::with_capacity(stacks.len());
+    'outer: for stack in stacks.drain(..) {
+        for existing in merged.iter_mut() {
+            if existing.is_stackable(&stack) && existing.count < MAX_STACK_SIZE {
+                let space = MAX_STACK_SIZE - existing.count;
+                let take = stack.count.min(space);
+                existing.count += take;
+                let leftover = stack.count - take;
+                if leftover > 0 {
+                    merged.push(stack.copy_with_count(leftover));
+                }
+                continue 'outer;
+            }
+        }
+        merged.push(stack);
+    }
+
+    merged.sort_by(|a, b| {
+        let ba = sort_bucket_for_item(a, proto);
+        let bb = sort_bucket_for_item(b, proto);
+        ba.cmp(&bb)
+            .then_with(|| sort_sub_key(a).cmp(&sort_sub_key(b)))
+    });
+
+    let fill_order = main_inv_bag_slot_indices_top_to_bottom(len);
+    for (i, stack) in merged.into_iter().enumerate() {
+        let Some(&slot) = fill_order.get(i) else {
+            break;
+        };
+        inv.items.items[slot] = Some(InventoryItemStack {
+            item_stack: stack,
+            slot,
+        });
+    }
+
+    // Mark every visible inventory slot (Normal + Hotbar) dirty so the UI respawns icons.
+    for mut state in inv_slots.iter_mut() {
+        if state.r#type.is_inventory() || state.r#type.is_hotbar() {
+            state.dirty = true;
+        }
+    }
+}
+
 /// True if a weapon pickup could go into an empty main-weapon or pet slot (so we should not
 /// reject the pickup when the main grid is full). See [`try_auto_equip_weapon_on_pickup`].
 pub fn can_auto_equip_weapon_on_pickup(
@@ -607,6 +744,33 @@ pub fn can_auto_equip_weapon_on_pickup(
             .items
             .get(0)
             .map_or(true, |s| s.is_none())
+}
+
+/// Whether [`check_item_drop_collisions`] would accept this stack (currency / XP / mana bypass
+/// inventory; otherwise same empty-slot / merge / weapon-auto-equip rules).
+pub fn player_can_accept_ground_item_pickup(
+    item_stack: &ItemStack,
+    inventory: &Inventory,
+    player_has_pet: bool,
+) -> bool {
+    let obj = item_stack.obj_type;
+    if obj == WorldObject::TimeFragment
+        || obj == WorldObject::Coin
+        || obj == WorldObject::ManaOrb
+        || obj == WorldObject::XPShard
+        || obj == WorldObject::XPShardMedium
+        || obj == WorldObject::XPShardLarge
+    {
+        return true;
+    }
+    if can_auto_equip_weapon_on_pickup(item_stack, inventory, player_has_pet) {
+        return true;
+    }
+    let inv_container = &inventory.items;
+    inv_container.get_first_empty_slot().is_some()
+        || inv_container
+            .get_slot_for_item_in_container_with_space(item_stack, None)
+            .is_some()
 }
 
 /// Places a weapon stack into the main weapon slot if empty, else into the pet slot if the
@@ -653,4 +817,103 @@ pub fn try_auto_equip_weapon_on_pickup(
         return true;
     }
     false
+}
+
+/// Slot index on [`Inventory::furnace_items`] that accepts the equipment piece being upgraded
+/// (tomes / orbs live at index 0). Kept here so UI glue and auto-equip logic stay in sync.
+pub const UPGRADE_EQUIPMENT_SLOT_INDEX: usize = 1;
+
+/// Cape occupies equipment grid index 3 (see [`crate::ui::inventory_ui::equipment_grid_cell`]);
+/// [`EquipmentType::get_valid_slots`] does not list it, so auto-equip handles it explicitly.
+const CAPE_EQUIPMENT_SLOT_INDEX: usize = 3;
+
+fn resolve_equipment_type_for_auto_equip(
+    obj: WorldObject,
+    proto: &ProtoParam,
+) -> Option<EquipmentType> {
+    match proto.get_component::<EquipmentType, _>(obj).cloned() {
+        Some(EquipmentType::None) | None => {
+            if obj.is_weapon() {
+                Some(EquipmentType::Weapon)
+            } else if obj.is_cape() {
+                Some(EquipmentType::Cape)
+            } else {
+                match obj {
+                    WorldObject::Ring => Some(EquipmentType::Ring),
+                    WorldObject::Pendant => Some(EquipmentType::Pendant),
+                    _ => None,
+                }
+            }
+        }
+        Some(t) => Some(t),
+    }
+}
+
+/// If the player left gear in the upgrade slot (`furnace_items[1]`) and then toggles to the
+/// crafting panel (which hides the upgrade slots), move that item into the first empty weapon /
+/// armor / accessory slot it fits. If no appropriate slot is empty the item stays so the player
+/// still sees it when they toggle back.
+///
+/// Returns `true` if the item was moved; both the source and destination slots are marked dirty
+/// so the UI respawns their icons on the next `update_inventory_ui` tick.
+pub fn try_auto_equip_from_upgrade_slot(
+    inv: &mut Inventory,
+    proto: &ProtoParam,
+    inv_slots: &mut Query<&mut InventorySlotState>,
+) -> bool {
+    let Some(stack_entry) = inv
+        .furnace_items
+        .items
+        .get(UPGRADE_EQUIPMENT_SLOT_INDEX)
+        .cloned()
+        .flatten()
+    else {
+        return false;
+    };
+
+    let item_stack = stack_entry.item_stack;
+    let obj = item_stack.obj_type;
+    let Some(eq_type) = resolve_equipment_type_for_auto_equip(obj, proto) else {
+        return false;
+    };
+
+    // [`EquipmentType::is_equipment`] only means armor (Head/Chest/Legs/Feet); weapons and
+    // accessories must still auto-equip here.
+
+    let target_slot_type = eq_type.get_valid_slot_type();
+    if target_slot_type == InventorySlotType::Normal {
+        return false;
+    }
+    let valid_slots = eq_type.get_valid_slots();
+    if valid_slots.is_empty() {
+        return false;
+    }
+
+    let Some(dest_slot) = valid_slots.into_iter().find(|&i| {
+        inv.get_items_from_slot_type(target_slot_type)
+            .items
+            .get(i)
+            .is_some_and(|s| s.is_none())
+    }) else {
+        return false;
+    };
+
+    inv.furnace_items.items[UPGRADE_EQUIPMENT_SLOT_INDEX] = None;
+    mark_slot_dirty(
+        UPGRADE_EQUIPMENT_SLOT_INDEX,
+        InventorySlotType::Furnace,
+        inv_slots,
+    );
+
+    InventoryItemStack {
+        item_stack,
+        slot: dest_slot,
+    }
+    .add_to_container(
+        inv.get_mut_items_from_slot_type(target_slot_type),
+        target_slot_type,
+        inv_slots,
+    );
+
+    true
 }

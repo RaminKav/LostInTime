@@ -25,7 +25,7 @@ use crate::{
     blessings::OwnedBlessings,
     colors::{DARK_GREEN, RED},
     cursor::CursorPos,
-    inventory::{Inventory, InventoryItemStack, ItemStack},
+    inventory::{sort_main_inventory, Inventory, InventoryItemStack, ItemStack, SortInventoryButton},
     item::{heirloom_shrine::HeirloomShrineState, CraftedItemEvent, EquipmentType},
     player::{
         combat_heirlooms::HallucinationStatType,
@@ -1864,6 +1864,64 @@ pub fn handle_cursor_main_menu_buttons(
                     }
                     commands.entity(e).remove::<UIElement>();
                     commands.entity(e).remove::<Handle<Image>>();
+                }
+            }
+        }
+    }
+}
+
+/// Handles hover + left-click on the inventory SORT button (rendered under the trash slot).
+/// Swaps between the normal and hover inventory-slot sprites based on cursor hit-test state,
+/// and on click re-orders the player's main inventory grid via [`sort_main_inventory`].
+pub fn handle_sort_inventory_button_click(
+    cursor_pos: Res<CursorPos>,
+    mouse_input: Res<Input<MouseButton>>,
+    ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
+    mut sort_button: Query<
+        (Entity, &mut Interactable),
+        (With<SortInventoryButton>, Without<InventorySlotState>),
+    >,
+    mut commands: Commands,
+    graphics: Res<Graphics>,
+    mut inv: Query<&mut Inventory>,
+    mut inv_slots: Query<&mut InventorySlotState>,
+    proto: ProtoParam,
+    ui_state: Res<State<UIState>>,
+) {
+    // Button is only spawned for inventory-family UI states; guarding here avoids doing any work
+    // when the button entity temporarily lingers during a state transition.
+    if !ui_state.0.is_inv_open() {
+        return;
+    }
+    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
+
+    for (e, mut interactable) in sort_button.iter_mut() {
+        match hit_test {
+            Some(hit_ent) if hit_ent.0 == e => match interactable.current() {
+                Interaction::None => {
+                    interactable.change(Interaction::Hovering);
+                    commands
+                        .entity(e)
+                        .insert(graphics.get_ui_element_texture(UIElement::InventorySlotHover));
+                    commands.spawn(SoundSpawner::new(AudioSoundEffect::UISlotHover, 0.2));
+                }
+                Interaction::Hovering => {
+                    if left_mouse_pressed {
+                        if let Ok(mut inv) = inv.get_single_mut() {
+                            sort_main_inventory(&mut inv, &proto, &mut inv_slots);
+                        }
+                        commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.25));
+                    }
+                }
+                _ => (),
+            },
+            _ => {
+                if matches!(interactable.current(), Interaction::Hovering) {
+                    interactable.change(Interaction::None);
+                    commands
+                        .entity(e)
+                        .insert(graphics.get_ui_element_texture(UIElement::InventorySlot));
                 }
             }
         }

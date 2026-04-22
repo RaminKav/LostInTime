@@ -1275,6 +1275,7 @@ pub fn handle_volume_button_click(
                                 *val = (*val + 1).min(10);
                             }
                         }
+                        audio_volume.save();
                         commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.2));
                     }
                 }

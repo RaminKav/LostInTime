@@ -254,15 +254,28 @@ Heirlooms:
 
 ## 0.17.0
 
-- Remove Jam
-- nerf crit ring (25% -> 15%)
-- Add volume buttons to settings
-- Add auto attack keybind (auto casts weapon attack in direction of cursor)
+- Remove [Jam] Heirloom (hunger no longer a thing)
+- Nerf [Vampiric Ring] heirloom (25% -> 15% heal on crit)
+- Add volume buttons in options menu
+- Add auto attack keybind in options (default T) (auto casts weapon attack in direction of cursor)
 - Nerf Chaos increase from Era 2 and 3 (they should feel easier)
 - Nerf boss and stone golem hp
-- New desert enemies
-- Performance improvements (hopfully)
-- New inventory and crafting system
+- New desert enemies! Small cactus, Big cactus and Bull
+- Performance improvements (hopfully, but after some testing i might have made it worse lol, lmk)
+- New inventory and crafting system, new tooltips, new art, all new
 - New hotbar system and keybinds
-- new food items/recipes
+- new food items/recipes (just a quick palceholder, will add better art and tons more food items soon)
 - Pet auto selects in class selection
+
+## 0.17.2
+
+- Fix bridges breaking on attack
+- Fix getting stuck in dungeon walls bug,
+- Drops dont follow the player anymore when inventory is full
+- Added Sort button in inventory
+- Fix boss despawn bug
+- Auto equip gear when left in upgrade slot,
+- Audio settings persist Now
+- Fix score getting stuck/not updating
+- Fix crash when killing mushking boss
+- Fix HUD slots/skills UI being too low

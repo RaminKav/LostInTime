@@ -82,6 +82,7 @@ use crate::{
     attributes::clamp_health,
     client::{is_not_paused, leaderboard::auto_fetch_leaderboard_on_menu, load_state, ClientState},
     handle_hits,
+    inventory::{try_auto_equip_from_upgrade_slot, Inventory},
     item::{
         active_skill_shrine::ActiveSkillShrineOverwrite,
         heirloom_shrine::handle_heirloom_shrine_ui_setup, item_actions::ActionSuccessEvent,
@@ -90,6 +91,7 @@ use crate::{
     player::skills::HeirloomChoiceQueue,
     player::unlocks::RunUnlockState,
     player::RunScore,
+    proto::proto_param::ProtoParam,
     CustomFlush, Game, GameState, DEBUG,
 };
 
@@ -152,6 +154,11 @@ pub const INV_EQUIP_GRID_ROW_BOT_Y: f32 = -34.0;
 /// Trash slot (bottom of panel).
 pub const INV_TRASH_OFFSET_X: f32 = -20.0 + 0.5 * UI_SLOT_SIZE.x;
 pub const INV_TRASH_OFFSET_Y: f32 = -0.5 * UI_SLOT_SIZE.y - 12.0;
+
+/// Sort button — sits directly under the trash slot on the left edge of the inventory panel.
+/// Shares the x-position of the trash slot so the two slot-sized tiles line up vertically.
+pub const INV_SORT_BUTTON_OFFSET_X: f32 = INV_TRASH_OFFSET_X;
+pub const INV_SORT_BUTTON_OFFSET_Y: f32 = INV_TRASH_OFFSET_Y - UI_SLOT_SIZE.y - 6.0;
 
 /// Crafting grid inside crafting/furnace-style panels (8 columns).
 pub const INV_CRAFTING_COLS: usize = 8;
@@ -709,9 +716,12 @@ impl Plugin for UIPlugin {
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
-            .add_system(
-                handle_new_ui_state.in_base_set(CoreSet::PostUpdate), // .run_if(in_state(GameState::Main)),
-            )
+            .add_systems((
+                auto_equip_upgrade_slot_on_inv_close
+                    .before(handle_new_ui_state)
+                    .in_base_set(CoreSet::PostUpdate),
+                handle_new_ui_state.in_base_set(CoreSet::PostUpdate),
+            ))
             .add_systems((
                 handle_class_selection.run_if(in_state(UIState::ClassSelection)),
                 handle_slot_deselection.run_if(in_state(UIState::ClassSelection)),
@@ -732,6 +742,15 @@ impl Plugin for UIPlugin {
                     handle_goal_reset_on_era_change,
                     display_goal_text,
                 )
+                    .in_set(OnUpdate(GameState::Main)),
+            )
+            .add_system(
+                handle_sort_inventory_button_click
+                    .run_if(
+                        in_state(UIState::Inventory)
+                            .or_else(in_state(UIState::InventoryCrafting))
+                            .or_else(in_state(UIState::Crafting)),
+                    )
                     .in_set(OnUpdate(GameState::Main)),
             )
             .add_system(handle_hovering.run_if(ui_hover_interactions_condition))
@@ -757,6 +776,32 @@ impl Plugin for UIPlugin {
 
 fn ui_hover_interactions_condition(state: Res<State<GameState>>) -> bool {
     state.0 == GameState::Main || state.0 == GameState::MainMenu
+}
+
+/// Runs just before [`handle_new_ui_state`] in `PostUpdate`. When the main inventory is being
+/// closed (Esc / toggle key / any `Closed` transition), tries to move the item in the upgrade
+/// slot into the first matching empty equipment slot so it doesn't get hidden behind the closed
+/// panel. Kept in its own system to avoid a query conflict with `handle_new_ui_state`'s
+/// `hotbar_slots` query, which also borrows `InventorySlotState` mutably.
+pub fn auto_equip_upgrade_slot_on_inv_close(
+    next_ui_state: Res<NextState<UIState>>,
+    curr_ui_state: Res<State<UIState>>,
+    mut inv: Query<&mut Inventory>,
+    mut inv_slots: Query<&mut InventorySlotState>,
+    proto: ProtoParam,
+) {
+    if !curr_ui_state.0.is_main_inventory() {
+        return;
+    }
+    let Some(next_ui) = &next_ui_state.0 else {
+        return;
+    };
+    if !matches!(next_ui, UIState::Closed) && *next_ui != curr_ui_state.0 {
+        return;
+    }
+    if let Ok(mut inv) = inv.get_single_mut() {
+        try_auto_equip_from_upgrade_slot(&mut inv, &proto, &mut inv_slots);
+    }
 }
 
 pub fn handle_new_ui_state(

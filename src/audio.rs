@@ -1,4 +1,6 @@
 use std::collections::HashSet;
+use std::fs::File;
+use std::io::BufReader;
 
 use bevy::{
     asset::{HandleId, LoadState},
@@ -6,11 +8,13 @@ use bevy::{
     utils::HashMap,
 };
 use rand::seq::IteratorRandom;
+use serde::{Deserialize, Serialize};
 use strum_macros::Display;
 
 use crate::{
     animations::player_sprite::PlayerAnimation,
     combat::{AttackTimer, HitEvent, ObjBreakEvent},
+    datafiles,
     enemy::Mob,
     handle_attack_cooldowns,
     item::WorldObject,
@@ -25,7 +29,7 @@ const SFX_CLEANUP_DELAY_SECS: f32 = 5.0;
 
 /// Controls the global volume for music and sound effects independently.
 /// Values range from 0 (muted) to 10 (full volume).
-#[derive(Resource, Debug, Clone)]
+#[derive(Resource, Debug, Clone, Serialize, Deserialize)]
 pub struct AudioVolume {
     pub music: u8,
     pub sfx: u8,
@@ -44,6 +48,33 @@ impl AudioVolume {
 
     pub fn sfx_fraction(&self) -> f32 {
         self.sfx as f32 / 10.0
+    }
+
+    pub fn load() -> Self {
+        let path = datafiles::game_data();
+        if let Ok(file) = File::open(&path) {
+            let reader = BufReader::new(file);
+            if let Ok(game_data) = serde_json::from_reader::<_, crate::client::GameData>(reader) {
+                return game_data.audio_volume.unwrap_or_default();
+            }
+        }
+        Self::default()
+    }
+
+    pub fn save(&self) {
+        let path = datafiles::game_data();
+        let mut game_data = if let Ok(file) = File::open(&path) {
+            let reader = BufReader::new(file);
+            serde_json::from_reader::<_, crate::client::GameData>(reader).unwrap_or_default()
+        } else {
+            crate::client::GameData::default()
+        };
+
+        game_data.audio_volume = Some(self.clone());
+
+        if let Ok(file) = File::create(&path) {
+            let _ = serde_json::to_writer_pretty(file, &game_data);
+        }
     }
 }
 
@@ -196,7 +227,7 @@ impl Plugin for AudioPlugin {
             current_track: "sounds/bgm_day.ogg".to_owned(),
             current_handle: None,
         })
-        .init_resource::<AudioVolume>()
+        .insert_resource(AudioVolume::load())
         .init_resource::<SoundCooldowns>()
         .init_resource::<SoundCache>()
         .init_resource::<SinkCleanupTracker>()

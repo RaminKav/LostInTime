@@ -35,6 +35,12 @@ fn player_main_inv_bag_slots_top_to_bottom(len: usize) -> impl Iterator<Item = u
     })
 }
 
+/// `INVENTORY_HOTBAR_SLOTS..len` in **visual** order: top row of the main grid first, then each
+/// row downward (same order as [`player_main_inv_bag_slots_top_to_bottom`] / empty-slot picking).
+pub fn main_inv_bag_slot_indices_top_to_bottom(len: usize) -> Vec<usize> {
+    player_main_inv_bag_slots_top_to_bottom(len).collect()
+}
+
 fn first_empty_player_main_inventory(c: &Container) -> Option<usize> {
     let len = c.items.len();
     (0..INVENTORY_HOTBAR_SLOTS.min(len))

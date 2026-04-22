@@ -32,7 +32,10 @@ use crate::{
         add_item_glows, attribute_helpers::create_new_random_item_stack_with_attributes,
         AttributeChangeEvent,
     },
-    inventory::{Inventory, InventoryItemStack, ItemStack},
+    inventory::{
+        try_auto_equip_from_upgrade_slot, Inventory, InventoryItemStack, ItemStack,
+        SortInventoryButton,
+    },
     item::{CraftedItemEvent, Recipes, WorldObject},
     ui::{crafting_ui::UpgradeButton, FurnaceState, CHEST_INVENTORY_UI_SIZE, INVENTORY_UI_SIZE},
     ScreenResolution,
@@ -51,8 +54,8 @@ use super::{
     INV_EQUIP_GRID_ROW_BOT_Y, INV_EQUIP_GRID_ROW_MID_Y, INV_EQUIP_GRID_ROW_TOP_Y,
     INV_EQUIP_GRID_SPACING, INV_EQUIP_PANEL_OFFSET_X, INV_EQUIP_PANEL_OFFSET_Y, INV_FURNACE_SLOT_0,
     INV_FURNACE_SLOT_1, INV_GRID_FIRST_ROW_NUDGE_Y, INV_GRID_INSET_BOTTOM, INV_GRID_INSET_LEFT,
-    INV_SLOT_SPACING_X, INV_SLOT_SPACING_Y, INV_TRASH_OFFSET_X, INV_TRASH_OFFSET_Y,
-    INV_UI_PARENT_OFFSET_CRAFTING, UI_SLOT_SIZE,
+    INV_SLOT_SPACING_X, INV_SLOT_SPACING_Y, INV_SORT_BUTTON_OFFSET_X, INV_SORT_BUTTON_OFFSET_Y,
+    INV_TRASH_OFFSET_X, INV_TRASH_OFFSET_Y, INV_UI_PARENT_OFFSET_CRAFTING, UI_SLOT_SIZE,
 };
 
 #[derive(Clone, Eq, PartialEq, Debug, Hash, Default, States, Component)]
@@ -1070,7 +1073,88 @@ pub fn setup_inv_slots_ui(
             trash_item,
             &resolution,
         );
+
+            // Sort button — slot-sized tile sitting directly under the trash slot. Clicking
+            // sorts the main inventory grid (see `handle_sort_inventory_button_click`).
+            spawn_sort_inventory_button(
+                &mut commands,
+                &graphics,
+                &asset_server,
+                &inv_query,
+                inv_state_res.inv_size,
+            );
         }
+    }
+}
+
+/// Spawns the "Sort" button directly under the trash slot on the left edge of the inventory
+/// panel. The button is a slot-sized `InventorySlot` sprite with a `SORT` label so it visually
+/// matches the trash slot. Clicks are handled by `handle_sort_inventory_button_click`.
+fn spawn_sort_inventory_button(
+    commands: &mut Commands,
+    graphics: &Graphics,
+    asset_server: &AssetServer,
+    inv_query: &Query<Entity, With<InventoryUI>>,
+    inv_size: Vec2,
+) {
+    let hw = inv_size.x * 0.5;
+    let hh = inv_size.y * 0.5;
+    let translation = Vec3::new(
+        -hw + INV_SORT_BUTTON_OFFSET_X,
+        hh + INV_SORT_BUTTON_OFFSET_Y,
+        1.,
+    );
+
+    let button = commands
+        .spawn(SpriteBundle {
+            texture: graphics.get_ui_element_texture(UIElement::InventorySlot),
+            transform: Transform {
+                translation,
+                scale: Vec3::new(1., 1., 1.),
+                ..Default::default()
+            },
+            sprite: Sprite {
+                custom_size: Some(UI_SLOT_SIZE),
+                ..Default::default()
+            },
+            ..Default::default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        // Deliberately do NOT insert `UIElement::InventorySlot` — `handle_hovering` assumes
+        // any entity tagged with that element also has an `InventorySlotState` component and
+        // unwraps it. The sort button owns its own hover state in
+        // `handle_sort_inventory_button_click`.
+        .insert(Interactable::default())
+        .insert(SortInventoryButton)
+        .insert(Name::new("SORT INVENTORY BUTTON"))
+        .id();
+
+    let label = commands
+        .spawn(Text2dBundle {
+            text: Text::from_section(
+                "SORT",
+                TextStyle {
+                    font: asset_server.load("fonts/4x5.ttf"),
+                    font_size: 5.0,
+                    color: YELLOW_2,
+                },
+            )
+            .with_alignment(TextAlignment::Center),
+            text_anchor: Anchor::Center,
+            transform: Transform {
+                translation: Vec3::new(0., 0., 1.),
+                scale: Vec3::new(1., 1., 1.),
+                ..Default::default()
+            },
+            ..default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(Name::new("SORT LABEL"))
+        .id();
+    commands.entity(button).push_children(&[label]);
+
+    if let Ok(inv_e) = inv_query.get_single() {
+        commands.entity(button).set_parent(inv_e);
     }
 }
 
@@ -1799,6 +1883,9 @@ pub fn handle_cursor_inventory_craft_toggle_button(
     mut commands: Commands,
     curr_ui_state: Res<State<UIState>>,
     mut next_ui_state: ResMut<NextState<UIState>>,
+    mut inv: Query<&mut Inventory>,
+    mut inv_slots: Query<&mut InventorySlotState>,
+    proto: ProtoParam,
 ) {
     let hit_test = super::ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
@@ -1816,6 +1903,20 @@ pub fn handle_cursor_inventory_craft_toggle_button(
                             UIState::InventoryCrafting => UIState::Inventory,
                             _ => continue,
                         };
+                        // Leaving the upgrade panel: if an equipment piece is sitting in the
+                        // upgrade slot and an appropriate equipment slot is empty, auto-equip
+                        // it so the player doesn't lose sight of it behind the crafting panel.
+                        if curr_ui_state.0 == UIState::Inventory
+                            && target == UIState::InventoryCrafting
+                        {
+                            if let Ok(mut inv) = inv.get_single_mut() {
+                                try_auto_equip_from_upgrade_slot(
+                                    &mut inv,
+                                    &proto,
+                                    &mut inv_slots,
+                                );
+                            }
+                        }
                         next_ui_state.set(target);
                         commands.spawn(crate::audio::SoundSpawner::new(
                             crate::audio::AudioSoundEffect::ButtonClick,

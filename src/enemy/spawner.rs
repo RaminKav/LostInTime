@@ -556,7 +556,9 @@ fn tick_enemy_despawn_timer(
     };
     let mut eligible: Vec<(Entity, f32)> = mobs
         .iter()
-        .filter(|(_, _, m)| m != &&Mob::RedMushling && m != &&Mob::Hog && m != &&Mob::Fairy)
+        .filter(|(_, _, m)| {
+            m != &&Mob::RedMushling && m != &&Mob::Hog && m != &&Mob::Fairy && !m.is_boss()
+        })
         .map(|(e, t, _)| {
             let dist = t.translation().truncate().distance(player_pos);
             (e, dist)

@@ -7,8 +7,10 @@ use crate::{
     assets::{Graphics, SpriteAnchor},
     combat::pickup_radius::BeingPulledToPlayer,
     custom_commands::CommandsExt,
-    inventory::ItemStack,
+    inventory::{player_can_accept_ground_item_pickup, Inventory, ItemStack},
+    pets::state::Pet,
     item::{object_actions::ObjectAction, ItemDrop},
+    player::Player,
     proto::proto_param::ProtoParam,
     ui::{
         key_input_guide::InteractionGuideTrigger, minimap::UpdateMiniMapEvent, BlacksmithMerchant,
@@ -48,7 +50,12 @@ pub fn handle_gamble_shrine_rewards(
     mut commands: Commands,
     mut game: GameParam,
     mut minimap_event: EventWriter<UpdateMiniMapEvent>,
-    item_drop_query: Query<Entity, (With<ItemDrop>, Without<BeingPulledToPlayer>)>,
+    item_drop_query: Query<
+        (Entity, &ItemStack),
+        (With<ItemDrop>, Without<BeingPulledToPlayer>),
+    >,
+    inv: Query<&Inventory, With<Player>>,
+    pets: Query<(), With<Pet>>,
 ) {
     for (e, t, shrine, mut anim) in shrines.iter_mut() {
         if shrine.success {
@@ -72,11 +79,17 @@ pub fn handle_gamble_shrine_rewards(
                 //     Some(game.get_player_level()),
                 // );
 
-                // Pull all items on the map by adding BeingPulledToPlayer component
-                for item_entity in item_drop_query.iter() {
-                    commands
-                        .entity(item_entity)
-                        .insert(BeingPulledToPlayer::default());
+                // Pull items on the map by adding BeingPulledToPlayer (skip if inv can't accept)
+                if let Ok(inv) = inv.get_single() {
+                    let player_has_pet = pets.iter().next().is_some();
+                    for (item_entity, item_stack) in item_drop_query.iter() {
+                        if !player_can_accept_ground_item_pickup(item_stack, inv, player_has_pet) {
+                            continue;
+                        }
+                        commands
+                            .entity(item_entity)
+                            .insert(BeingPulledToPlayer::default());
+                    }
                 }
 
                 commands
