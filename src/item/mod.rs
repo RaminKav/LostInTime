@@ -591,6 +591,8 @@ pub enum WorldObject {
     Tumbleweed2,
     Tumbleweed3,
     Tumbleweed4,
+    DesertCrate,
+    DesertCrate2,
 
     // SNOW
     SnowGrass1,
@@ -924,6 +926,8 @@ impl WorldObject {
             WorldObject::SnowBerryBushMed2 => true,
             WorldObject::SnowMushroom1 => true,
             WorldObject::SnowMushroom2 => true,
+            WorldObject::DesertCrate => true,
+            WorldObject::DesertCrate2 => true,
             WorldObject::SnowCrate1 => true,
             WorldObject::SnowCrate2 => true,
             WorldObject::SnowCrate3 => true,

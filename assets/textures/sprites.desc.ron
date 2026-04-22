@@ -281,13 +281,13 @@
             anchor: None,
         ),
         ChestBlock: WorldObjectData(
-            texture_pos: (0., 8.),
-            size: (16., 16.),
+            texture_pos: (12., 14.),
+            size: (23., 18.),
             anchor: None,
         ),
         HeirloomChest: WorldObjectData(
-            texture_pos: (1., 8.),
-            size: (16., 16.),
+                texture_pos: (14., 15.),
+            size: (23., 18.),
             anchor: None,
         ),
         HeirloomChestBlock: WorldObjectData(
@@ -950,6 +950,16 @@
         Era2Boulder2: WorldObjectData(
             texture_pos: (6., 16.),
             size: (32., 32.),
+            anchor: None,
+        ),
+        DesertCrate: WorldObjectData(
+            texture_pos: (14., 13.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        DesertCrate2: WorldObjectData(
+            texture_pos: (15., 13.),
+            size: (16., 19.),
             anchor: None,
         ),
         DesertBones1: WorldObjectData(
