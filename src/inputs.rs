@@ -352,7 +352,7 @@ pub fn player_move_inputs(
     clear_ice_slide_when_stuck(&mut player, on_ice, d_raw, kcc_output);
 
     let is_dashing = player.is_dashing;
-    let hit_active = hit_tracker_option.is_some();
+    let hit_active = hit_tracker_option.map_or(false, |h| h.is_active);
     let mut d = tick_ice_slide_movement(
         &mut player,
         on_ice,
@@ -415,7 +415,7 @@ pub fn player_move_inputs(
     }
     mv.0 = d;
     // Don't overwrite KCC translation while knockback is active (set by animate_hit)
-    if hit_tracker_option.is_none() && (d.x != 0. || d.y != 0.) {
+    if !hit_active && (d.x != 0. || d.y != 0.) {
         player_kcc.translation = Some(Vec2::new(d.x, d.y));
 
         if curr_anim == &PlayerAnimation::Idle {

@@ -875,9 +875,9 @@ impl<'w, 's> GameParam<'w, 's> {
         let total_dmg_bonus = dmg_bonus as i32 + mana_charge_bonus;
 
         if did_crit {
-            commands.entity(hit_entity).insert(WasHitWithCrit);
+            commands.entity(hit_entity).insert(WasHitWithCrit(true));
             if did_overcrit {
-                commands.entity(hit_entity).insert(WasHitWithOvercrit);
+                commands.entity(hit_entity).insert(WasHitWithOvercrit(true));
             }
             // Base crit damage (includes overflow from crit chance > 200% at 1:1 ratio)
             let crit_multiplier =

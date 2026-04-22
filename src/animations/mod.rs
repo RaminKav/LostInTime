@@ -58,11 +58,33 @@ pub struct AnimationFrameTracker(pub i32, pub i32);
 #[derive(Component, Clone, Deref, DerefMut, Schematic, Reflect, FromReflect)]
 #[reflect(Schematic)]
 pub struct AnimationTimer(pub Timer);
+/// Per-entity hit-reaction state.
+///
+/// Used to be a transient component inserted on hit and removed when the
+/// animation finished. That insert/remove churn was a major contributor to
+/// archetype fragmentation on mobs (every mob cycled through ~2 archetype
+/// variants per hit, combining with every other transient component). It's
+/// now always-present on mobs (added by `ensure_mob_components`) and driven
+/// by the `is_active` flag: set to `true` when a hit lands, flipped back to
+/// `false` when the timer finishes. Non-mob entities (player, world objects)
+/// may still have it inserted on demand; once present it's never removed.
 #[derive(Component, Debug, Clone)]
 pub struct HitAnimationTracker {
+    pub is_active: bool,
     pub timer: Timer,
     pub knockback: f32,
     pub dir: Vec2,
+}
+
+impl Default for HitAnimationTracker {
+    fn default() -> Self {
+        Self {
+            is_active: false,
+            timer: Timer::from_seconds(0.0, TimerMode::Once),
+            knockback: 0.0,
+            dir: Vec2::ZERO,
+        }
+    }
 }
 
 #[derive(Component, Reflect, FromReflect, Schematic, Debug)]
@@ -234,6 +256,9 @@ fn animate_hit(
 ) {
     let (p_e, mut kcc, _mv) = player.single_mut();
     for (e, mut hit, mob_option) in hit_tracker.iter_mut() {
+        if !hit.is_active {
+            continue;
+        }
         if let Some(state) = mob_option {
             if state != &EnemyAnimationState::Hit && state != &EnemyAnimationState::Attack {
                 commands.entity(e).insert(EnemyAnimationState::Hit);
@@ -251,18 +276,14 @@ fn animate_hit(
         }
 
         if hit.timer.finished() {
+            hit.is_active = false;
             if mob_option.is_some() {
                 let (anim_data, sprite) = anim_state.get(e).unwrap();
                 if sprite.index == anim_data.get_starting_frame_for_animation(mob_option.unwrap())
                     && mob_option.unwrap() == &EnemyAnimationState::Hit
                 {
-                    commands
-                        .entity(e)
-                        .remove::<HitAnimationTracker>()
-                        .insert(EnemyAnimationState::Walk);
+                    commands.entity(e).insert(EnemyAnimationState::Walk);
                 }
-            } else {
-                commands.entity(e).remove::<HitAnimationTracker>();
             }
         }
     }

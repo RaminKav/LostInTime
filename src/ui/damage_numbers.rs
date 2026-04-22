@@ -104,8 +104,8 @@ pub fn handle_add_damage_numbers_after_hit(
             &CurrentHealth,
             &mut PreviousHealth,
             Option<&MaxHealth>,
-            Option<&WasHitWithCrit>,
-            Option<&WasHitWithOvercrit>,
+            Option<&mut WasHitWithCrit>,
+            Option<&mut WasHitWithOvercrit>,
             Option<&Mob>,
         ),
         Changed<CurrentHealth>,
@@ -121,8 +121,8 @@ pub fn handle_add_damage_numbers_after_hit(
         changed_health,
         mut prev_health,
         max_health,
-        crit_option,
-        overcrit_option,
+        mut crit_option,
+        mut overcrit_option,
         mob_option,
     ) in changed_health.iter_mut()
     {
@@ -154,8 +154,9 @@ pub fn handle_add_damage_numbers_after_hit(
             2.,
         );
         let dmg = raw_dmg.get(game.player).unwrap().0 .0 + raw_dmg.get(game.player).unwrap().1 .0;
-        let is_crit = crit_option.is_some() || (!is_player && delta.abs() > dmg && dmg != 0);
-        let is_overcrit = overcrit_option.is_some();
+        let crit_flag = crit_option.as_deref().map(|c| c.0).unwrap_or(false);
+        let is_crit = crit_flag || (!is_player && delta.abs() > dmg && dmg != 0);
+        let is_overcrit = overcrit_option.as_deref().map(|c| c.0).unwrap_or(false);
         spawn_floating_text_with_shadow(
             &mut commands,
             &asset_server,
@@ -187,11 +188,14 @@ pub fn handle_add_damage_numbers_after_hit(
                 format!("+{}", delta)
             },
         );
-        if is_crit {
-            commands.entity(e).remove::<WasHitWithCrit>();
+        // Consume the crit/overcrit flags in place instead of removing the
+        // component, to avoid archetype churn on mobs. See the doc comment on
+        // `WasHitWithCrit`.
+        if let Some(ref mut crit) = crit_option {
+            crit.0 = false;
         }
-        if is_overcrit {
-            commands.entity(e).remove::<WasHitWithOvercrit>();
+        if let Some(ref mut overcrit) = overcrit_option {
+            overcrit.0 = false;
         }
     }
 }

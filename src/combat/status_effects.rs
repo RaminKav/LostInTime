@@ -134,17 +134,34 @@ impl MobStatusEffects {
     }
 }
 
-/// Ensures every mob entity has a [`MobStatusEffects`] component. Protos
-/// don't attach it directly (adding `Timer`s via reflection is painful), so
-/// this runs every frame and fills it in for any newly-spawned mob that
-/// doesn't have it yet. This causes exactly one archetype transition per mob
-/// type at the point of first spawn, and then zero thereafter.
+/// Ensures every mob entity has the bundle of "always-present" mob state
+/// components that we use to avoid archetype fragmentation from transient
+/// on-hit/status components.
+///
+/// Components added:
+///   * [`MobStatusEffects`] — consolidated Burning/Frail/Slow/Frozen/...
+///   * [`HitAnimationTracker`] — hit-react timer+knockback (was transient)
+///   * [`BounceOnHit`] — bounce animation state (was transient)
+///   * [`WasHitWithCrit`] / [`WasHitWithOvercrit`] — crit flags consumed by
+///     the damage-numbers system (were marker components)
+///
+/// Protos don't attach these directly because several contain `Timer`s that
+/// are awkward to reflect. This system runs every frame and fills them in
+/// for any newly-spawned mob that doesn't have them yet. That causes
+/// exactly one archetype transition per mob at the point of first spawn,
+/// then zero thereafter — insertions from combat become pure value updates.
 pub fn ensure_mob_status_effects(
     mut commands: Commands,
     mobs: Query<Entity, (With<crate::enemy::Mob>, Without<MobStatusEffects>)>,
 ) {
     for e in mobs.iter() {
-        commands.entity(e).insert(MobStatusEffects::default());
+        commands.entity(e).insert((
+            MobStatusEffects::default(),
+            crate::animations::HitAnimationTracker::default(),
+            crate::juice::bounce::BounceOnHit::default(),
+            crate::combat::WasHitWithCrit::default(),
+            crate::combat::WasHitWithOvercrit::default(),
+        ));
     }
 }
 

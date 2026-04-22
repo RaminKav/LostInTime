@@ -110,11 +110,21 @@ pub struct LifestealEvent {
     pub thorns_lifesteal_stacks: i32,
 }
 
-#[derive(Component)]
-pub struct WasHitWithCrit;
+/// Flags set on an entity by `calculate_player_damage` so that
+/// `handle_add_damage_numbers_after_hit` can render yellow/orange crit
+/// numbers on the next `Changed<CurrentHealth>` tick.
+///
+/// Always-present on mobs (see `ensure_mob_components`). Inserting
+/// `WasHitWithCrit(true)` on a mob is a value update and causes no archetype
+/// change. After the damage-number system reads the flag it sets it back to
+/// `false` (rather than removing the component), so the entity never leaves
+/// its current archetype. Non-mob entities (world objects the player crits
+/// on) may still have the component inserted on demand — it stays thereafter.
+#[derive(Component, Debug, Default)]
+pub struct WasHitWithCrit(pub bool);
 
-#[derive(Component)]
-pub struct WasHitWithOvercrit;
+#[derive(Component, Debug, Default)]
+pub struct WasHitWithOvercrit(pub bool);
 
 #[derive(Component, Debug, Clone)]
 pub struct AttackTimer(pub Timer);
@@ -124,9 +134,6 @@ pub struct InvincibilityTimer(pub Timer);
 #[derive(Component, Debug, Clone)]
 
 pub struct HitMarker;
-
-#[derive(Component, Debug)]
-pub struct JustGotHit;
 pub struct CombatPlugin;
 impl Plugin for CombatPlugin {
     fn build(&self, app: &mut App) {
@@ -706,6 +713,7 @@ pub fn handle_hits(
                 };
 
                 commands.entity(hit.hit_entity).insert(HitAnimationTracker {
+                    is_active: true,
                     timer: Timer::from_seconds(
                         //TODO: once we create builders for creatures, add this as a default to all creatures that can be hit
                         0.2,
@@ -772,7 +780,7 @@ pub fn handle_hits(
             // (avoids queuing commands for entities that will be despawned by cleanup this frame)
             if hit_health.0 > 0 {
                 if let Some(mut hit_e) = commands.get_entity(hit.hit_entity) {
-                    hit_e.insert(JustGotHit).insert(BounceOnHit::new());
+                    hit_e.insert(BounceOnHit::new());
                 }
             }
         }
