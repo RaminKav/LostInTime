@@ -279,3 +279,11 @@ Heirlooms:
 - Fix score getting stuck/not updating
 - Fix crash when killing mushking boss
 - Fix HUD slots/skills UI being too low
+- New desert Crates
+- New Chest sprites
+- Tweak spawn rates of shrines
+- Increase pickup range a bit
+- Reduce max gear lvl from 30 -> 10
+- Defeating the era boss now pulls all loot on the map to the player
+- Remove movement penalty on weapon attacks (nerf bow slightly to compensate)
+- Attempt once again to fix performance
