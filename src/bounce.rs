@@ -13,8 +13,12 @@ use crate::{
     GameParam, MainCamera, PLAYER_MOVE_SPEED,
 };
 
-/// Component that holds bounce state
+/// Component that holds bounce state. Inserted on the player when a bounce is
+/// triggered (e.g. IceWall, skills that dash) and removed when the bounce
+/// timer finishes. Stored `SparseSet` to avoid moving the player between
+/// archetypes on every bounce.
 #[derive(Component)]
+#[component(storage = "SparseSet")]
 pub struct BounceEffect {
     pub start_pos: Vec2,
     pub direction: Vec2,

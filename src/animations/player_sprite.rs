@@ -20,8 +20,12 @@ use crate::{
     FairyPetSprite, SlimePetSprite,
 };
 
-/// Timer to track how long an attack animation has been playing
+/// Timer to track how long an attack animation has been playing. Added
+/// whenever the player triggers an attack animation and removed when the
+/// animation finishes — stored `SparseSet` so attack animations don't move
+/// the player to a new archetype on every swing.
 #[derive(Component)]
+#[component(storage = "SparseSet")]
 pub struct AttackAnimationTimer(pub Timer);
 
 aseprite!(pub PlayerRedAseprite, "textures/player/player_red.aseprite");

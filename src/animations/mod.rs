@@ -87,8 +87,13 @@ impl Default for HitAnimationTracker {
     }
 }
 
+/// Marker inserted on one-shot animation entities so the cleanup system can
+/// tear them down after the animation finishes. Highly transient — stored
+/// `SparseSet` so attaching/detaching doesn't move the animation entity
+/// through extra archetypes every time an effect plays.
 #[derive(Component, Reflect, FromReflect, Schematic, Debug)]
 #[reflect(Schematic)]
+#[component(storage = "SparseSet")]
 pub struct DoneAnimation;
 
 #[derive(Debug, Clone, Default)]

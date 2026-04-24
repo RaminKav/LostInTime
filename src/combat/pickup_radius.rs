@@ -32,9 +32,15 @@ pub fn update_pickup_radius(
     pickup_radius.0 = BASE_PICKUP_RADIUS * pickup_range_bonus;
 }
 
-/// Component that marks an item drop as being pulled to the player
-/// Tracks how long it's been pulled to increase speed over time
+/// Component that marks an item drop as being pulled to the player.
+/// Tracks how long it's been pulled to increase speed over time.
+///
+/// Stored as `SparseSet` because item drops churn in and out of pickup range
+/// every frame (especially with wide pickup radius heirlooms / magnet pulls).
+/// Keeping item drops in their original archetype avoids a full
+/// archetype/table move per item per frame.
 #[derive(Component, Debug, Clone)]
+#[component(storage = "SparseSet")]
 pub struct BeingPulledToPlayer {
     /// Time elapsed since the item started being pulled
     pub time_pulled: f32,
@@ -137,7 +143,11 @@ pub fn handle_item_pickup_radius(
     }
 }
 
+/// MagnetPull heirloom cooldown/duration timers on the player. Only present
+/// while the heirloom is equipped — stored `SparseSet` to keep the player
+/// in a single archetype across (un)equips.
 #[derive(Component)]
+#[component(storage = "SparseSet")]
 pub struct MagnetPullTimer {
     pub cooldown_timer: Timer,
     pub duration_timer: Timer,

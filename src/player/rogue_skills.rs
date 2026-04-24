@@ -23,19 +23,30 @@ use super::{ActiveSkill, ActiveSkillUsedEvent, Heirloom, Player, PlayerSkills};
 
 aseprite!(pub Combo, "textures/effects/Combo.aseprite");
 
+/// Player sprint active-skill state. Lives on the player only while the sprint
+/// skill is running, so it churns on every use — `SparseSet` avoids moving the
+/// player between its "base" and "+SprintState" archetypes every activation.
 #[derive(Debug, Component)]
+#[component(storage = "SparseSet")]
 pub struct SprintState {
     pub startup_timer: Timer,
     pub sprint_duration_timer: Timer,
     pub speed_bonus: f32,
 }
+
+/// Player lunge active-skill state; same churn profile as `SprintState`.
 #[derive(Debug, Component)]
+#[component(storage = "SparseSet")]
 pub struct LungeState {
     pub lunge_duration: Timer,
     pub lunge_speed: f32,
 }
 
+/// Marker present only while the player is actively sprinting. Toggled on/off
+/// on every sprint activation, so `SparseSet` prevents the player moving
+/// between archetype variants each time.
 #[derive(Debug, Component)]
+#[component(storage = "SparseSet")]
 pub struct Sprinting;
 // Sprint is now activated via ActiveSkillUsedEvent in skill_heirlooms.rs
 // This function is kept for compatibility but no longer handles toggle/release
@@ -292,13 +303,20 @@ pub fn handle_dodge_crit(dodges: EventReader<DodgeEvent>, mut game: GameParam) {
     }
 }
 
+/// Combo-counter state on the player, only present while the combo-using
+/// class/skill is equipped. Stored `SparseSet` to keep the player in a single
+/// archetype across combo (un)equips.
 #[derive(Debug, Component)]
+#[component(storage = "SparseSet")]
 pub struct ComboCounter {
     pub counter: u32,
     pub reset_timer: Timer,
 }
 
+/// Short-lived marker on the combo-animation entity. Cleaned up when the
+/// animation finishes, so stored `SparseSet` to avoid archetype churn.
 #[derive(Debug, Component)]
+#[component(storage = "SparseSet")]
 pub struct ComboAnim;
 
 pub fn handle_add_combo_counter(

@@ -121,7 +121,11 @@ pub struct LineOfSight {
     pub target: Entity,
     pub range: f32,
 }
+/// Post-attack cooldown timer inserted on a mob after each attack and removed
+/// when it elapses. Very high churn (every mob, every attack), so stored
+/// `SparseSet` to keep mobs in their base archetype across attack cycles.
 #[derive(Component)]
+#[component(storage = "SparseSet")]
 pub struct EnemyAttackCooldown(pub Timer);
 
 impl Trigger for LineOfSight {

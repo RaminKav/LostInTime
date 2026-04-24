@@ -694,8 +694,11 @@ pub fn aseprite_leap_attack(
 }
 
 /// Tracks whether the projectile has already been fired during this attack cycle,
-/// so we only fire once but let the animation play to completion.
+/// so we only fire once but let the animation play to completion. Stored
+/// `SparseSet` because it toggles on and off every ranged-attack cycle on
+/// every aseprite mob.
 #[derive(Component, Default)]
+#[component(storage = "SparseSet")]
 pub struct AsepriteProjectileFired;
 
 /// Projectile attack for aseprite basic enemies. Uses same attack tags (AttackUp / AttackDown / AttackSide).

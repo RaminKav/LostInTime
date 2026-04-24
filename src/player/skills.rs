@@ -200,67 +200,107 @@ impl ActiveSkill {
     }
 }
 
+// -----------------------------------------------------------------------------
+// Active-skill state markers on the player.
+//
+// Every one of these toggles on the *single* player entity as that skill is
+// cast/used. With table storage each insert/remove moves the player to a new
+// archetype, and combinations of concurrently-active skills multiply the
+// number of archetype variants the player cycles through every run (this was
+// one of the biggest sources of empty archetypes the user was seeing).
+//
+// Stored as `SparseSet` so the player entity stays in one archetype regardless
+// of which skill markers/state components are currently present; queries that
+// use them as filters (`With<...>`) are still fast via the sparse set.
+// -----------------------------------------------------------------------------
 #[derive(Component, Clone)]
+#[component(storage = "SparseSet")]
 pub struct StealthState {
     pub duration: Timer,
 }
 #[derive(Component, Clone)]
+#[component(storage = "SparseSet")]
 pub struct RapidfireState {
     pub duration: Timer,
     pub attack_speed_bonus: f32,
 }
 #[derive(Component, Clone)]
+#[component(storage = "SparseSet")]
 pub struct FirePillarState {
     pub hit_clear_timer: Timer,
 }
 #[derive(Component, Clone)]
+#[component(storage = "SparseSet")]
 pub struct LaserBeamState {
     pub hit_clear_timer: Timer,
 }
 #[derive(Component, Clone)]
+#[component(storage = "SparseSet")]
 pub struct HealSkillState;
 #[derive(Component, Clone)]
+#[component(storage = "SparseSet")]
 pub struct BuckshotSkillState;
 #[derive(Component, Clone)]
+#[component(storage = "SparseSet")]
 pub struct IceWallSkillState;
 #[derive(Component, Clone)]
+#[component(storage = "SparseSet")]
 pub struct DruidTreeSkillState;
 #[derive(Component, Clone)]
+#[component(storage = "SparseSet")]
 pub struct ShoutSkillState;
 #[derive(Component, Clone)]
+#[component(storage = "SparseSet")]
 pub struct PiercingStarSkillState;
 #[derive(Component, Clone)]
+#[component(storage = "SparseSet")]
 pub struct LightningState;
 #[derive(Component, Clone)]
+#[component(storage = "SparseSet")]
 pub struct DaggerThrowState;
 
-/// Tracks kills since last dagger throw cast (max 10)
-/// Kills from dagger throw projectiles themselves don't count
+/// Tracks kills since last dagger throw cast (max 10).
+/// Kills from dagger throw projectiles themselves don't count.
+/// Stored `SparseSet` because it's only present on the player while the
+/// DaggerThrow skill is equipped.
 #[derive(Component, Default)]
+#[component(storage = "SparseSet")]
 pub struct DaggerThrowKillTracker {
     pub kill_count: i32,
 }
 
-/// Tracks the last projectile that hit an enemy (used to exclude dagger throw kills)
+/// Tracks the last projectile that hit an enemy (used to exclude dagger throw
+/// kills). Stored `SparseSet` because it's only present on the player while
+/// the relevant skill is equipped.
 #[derive(Component)]
+#[component(storage = "SparseSet")]
 pub struct LastHitProjectile {
     pub projectile: Option<Projectile>,
 }
 #[derive(Component, Clone)]
+#[component(storage = "SparseSet")]
 pub struct SlashState;
 #[derive(Component, Clone)]
+#[component(storage = "SparseSet")]
 pub struct TripleThrowState;
 #[derive(Component, Clone)]
+#[component(storage = "SparseSet")]
 pub struct FuryState {
     pub duration: Timer,
     pub throw_timer: Timer,
 }
 #[derive(Component, Clone)]
+#[component(storage = "SparseSet")]
 pub struct BombState;
 #[derive(Component, Clone)]
+#[component(storage = "SparseSet")]
 pub struct SpinAttackState;
 
+/// Transient phasing buff on the player that disables collisions with mobs.
+/// Added on specific skill casts and removed when its timer expires — stored
+/// `SparseSet` to keep the player in one archetype while the effect toggles.
 #[derive(Component, Clone)]
+#[component(storage = "SparseSet")]
 pub struct PhasingThroughEnemies {
     pub timer: Timer,
 }

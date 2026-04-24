@@ -67,7 +67,11 @@ struct MobSnapshot {
     kind: Mob,
 }
 
+/// Tracks the AntFarm heirloom's spawn cooldown on the player. Added when the
+/// heirloom is granted and removed when it's cleared — stored `SparseSet` so
+/// granting/clearing doesn't move the player between archetypes.
 #[derive(Component)]
+#[component(storage = "SparseSet")]
 pub struct AntFarmState {
     pub timer: Timer,
 }
@@ -89,7 +93,11 @@ pub struct AntFarmAnt {
     pub spawn_delay: Timer,
 }
 
+/// Tracks the StoneTooth heirloom's spawn cooldown on the player. Same
+/// (un)equip churn profile as other heirloom state components — stored
+/// `SparseSet`.
 #[derive(Component, Default)]
+#[component(storage = "SparseSet")]
 pub struct StoneToothState {
     pub elapsed: f32,
 }
@@ -112,7 +120,10 @@ pub struct StoneToothRockLifetime {
 /// Fired when healing triggers "all summons once" (e.g. HealSummons heirloom).
 pub struct TriggerSummonsEvent(pub Entity);
 
+/// Marker on the player while the Reaper heirloom is equipped. Stored
+/// `SparseSet` so (un)equipping doesn't move the player between archetypes.
 #[derive(Component, Default)]
+#[component(storage = "SparseSet")]
 pub struct ReaperState;
 
 #[derive(Component)]
@@ -124,7 +135,10 @@ pub struct ReaperSoul {
     pub drift_phase: f32,
 }
 
+/// SummonRing heirloom cooldown on the player. Stored `SparseSet` for the
+/// same reasons as the other heirloom state components.
 #[derive(Component)]
+#[component(storage = "SparseSet")]
 pub struct SummonRingState {
     pub timer: Timer,
 }
@@ -1341,15 +1355,21 @@ pub fn break_crates_with_roll(
 // MaxHPHunt - Every 3 kills grants +1 max hp per stack
 // ============================================================================
 
-/// Tracks kills for the MaxHPHunt heirloom
+/// Tracks kills for the MaxHPHunt heirloom. Present on the player only when
+/// the heirloom is equipped — stored `SparseSet` so granting/clearing the
+/// heirloom doesn't move the player between archetypes.
 #[derive(Component, Default)]
+#[component(storage = "SparseSet")]
 pub struct MaxHPHuntTracker {
     pub kill_count: u32,
     pub total_hp_gained: i32, // Total max HP gained from this heirloom
 }
 
-/// Tracks bonus skill power for the SkillPowerHunt heirloom (3% on skill use to gain +1)
+/// Tracks bonus skill power for the SkillPowerHunt heirloom (3% on skill use to
+/// gain +1). Stored `SparseSet` for the same reasons as the other per-heirloom
+/// player state components.
 #[derive(Component, Default)]
+#[component(storage = "SparseSet")]
 pub struct SkillPowerHuntTracker {
     pub bonus_skill_power: i32,
 }
@@ -1427,8 +1447,10 @@ pub fn handle_skill_power_hunt(
 // StandStill - Standing still increases damage
 // ============================================================================
 
-/// Tracks standing still time for the StandStill heirloom
+/// Tracks standing still time for the StandStill heirloom. Stored `SparseSet`
+/// because it's only present when the heirloom is equipped.
 #[derive(Component)]
+#[component(storage = "SparseSet")]
 pub struct StandStillState {
     pub time_still: f32,
     pub was_moving: bool,
@@ -1492,8 +1514,12 @@ impl StandStillState {
 // DeathDefiance - Survive death, freeze all enemies
 // ============================================================================
 
-/// Marker component for mobs frozen by Death Defiance
+/// Marker component for mobs frozen by Death Defiance. Inserted briefly on
+/// every mob in range when the heirloom procs, removed when the freeze timer
+/// elapses. Stored `SparseSet` so the freeze doesn't move a bunch of mobs to
+/// a new archetype and back each proc.
 #[derive(Component)]
+#[component(storage = "SparseSet")]
 pub struct DeathDefianceFrozen {
     pub timer: Timer,
     pub original_color: Color,
@@ -1519,14 +1545,18 @@ pub fn handle_death_defiance_freeze(
 // CrateBreakDamage - Breaking crates gives permanent damage bonus
 // ============================================================================
 
-/// Tracks total damage bonus from breaking crates
+/// Tracks total damage bonus from breaking crates. Only present on the player
+/// while the CrateBreakDamage heirloom is equipped — stored `SparseSet`.
 #[derive(Component, Default)]
+#[component(storage = "SparseSet")]
 pub struct CrateBreakDamageTracker {
     pub bonus_damage_percent: f32,
 }
 
-/// Tracks thorns gained from taking damage
+/// Tracks thorns gained from taking damage (ThornsOnDamage heirloom). Stored
+/// `SparseSet` for the same reason as the other heirloom trackers.
 #[derive(Component, Default)]
+#[component(storage = "SparseSet")]
 pub struct ThornsOnDamageTracker {
     pub thorns_gained: i32,
 }
@@ -1562,8 +1592,10 @@ pub fn handle_crate_break_damage(
 // DodgeCrit - Dodging gives speed/attack speed buff and next hit does 2x damage
 // ============================================================================
 
-/// State for the DodgeCrit heirloom buff
+/// State for the DodgeCrit heirloom buff. Stored `SparseSet` because it's
+/// only present on the player while the heirloom is equipped.
 #[derive(Component)]
+#[component(storage = "SparseSet")]
 pub struct DodgeCritState {
     pub buff_active: bool,
     pub buff_timer: Timer,
@@ -1648,10 +1680,12 @@ pub fn handle_dodge_crit_next_hit_reset(
 // LethalBlow Hallucination Stats - Tracks stat bonuses from execute procs
 // ============================================================================
 
-/// Tracks accumulated stat bonuses from LethalBlow hallucinations
-/// Tracks stat bonuses from LethalBlow hallucination executes.
-/// Wraps ItemAttributes so it can be combined with player attributes using combine().
+/// Tracks accumulated stat bonuses from LethalBlow hallucinations.
+/// Wraps ItemAttributes so it can be combined with player attributes using
+/// combine(). Stored `SparseSet` because this is only present while the
+/// LethalBlow heirloom is equipped.
 #[derive(Component, Default, Debug, Clone)]
+#[component(storage = "SparseSet")]
 pub struct HallucinationStats(pub crate::attributes::ItemAttributes);
 
 /// List of stats that can be buffed by hallucinations
@@ -1782,7 +1816,10 @@ impl HallucinationStats {
 /// Tracks accumulated mana regen for the MPBarDMG heirloom.
 /// When mana is regenerated, the amount is stored here.
 /// The next weapon attack consumes the stored mana as bonus flat damage.
+/// Stored `SparseSet` because it's only on the player while the heirloom is
+/// equipped.
 #[derive(Component, Default)]
+#[component(storage = "SparseSet")]
 pub struct ManaChargeDamageState {
     pub stored_mana_damage: f32,
 }
@@ -1957,7 +1994,10 @@ pub fn handle_mana_orb_attack(
 /// Tracks accumulated mana regen for the ManaRegenPoison heirloom.
 /// When mana is regenerated, the amount is accumulated here.
 /// When it reaches 100, poison is applied to all enemies and the tracker resets with the remainder.
+/// Stored `SparseSet` because it's only on the player while the heirloom is
+/// equipped.
 #[derive(Component, Default)]
+#[component(storage = "SparseSet")]
 pub struct ManaRegenPoisonTracker {
     pub accumulated_mana: f32,
 }

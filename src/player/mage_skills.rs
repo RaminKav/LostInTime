@@ -26,9 +26,18 @@ use super::{
 aseprite!(pub IceExplosion, "textures/effects/IceExplosion.aseprite");
 aseprite!(pub Electricity, "textures/effects/Electricity.aseprite");
 aseprite!(pub IceFloor, "textures/effects/IceFloor.aseprite");
+/// Brief marker set on the player right after teleporting; removed once the
+/// post-teleport shock timer expires. Stored `SparseSet` so the player entity
+/// stays in a single archetype across teleports.
 #[derive(Component)]
+#[component(storage = "SparseSet")]
 pub struct JustTeleported;
+
+/// Active teleport cooldown/shock timers held on the player while the
+/// Teleport skill is equipped. Inserted on skill equip and removed when
+/// unequipped — stored `SparseSet` to avoid archetype moves on (un)equip.
 #[derive(Component)]
+#[component(storage = "SparseSet")]
 pub struct TeleportState {
     pub just_teleported_timer: Timer,
     pub timer: Timer,

@@ -229,8 +229,12 @@ pub struct AoEAttackState {
     pub second_cloud_position: Option<Vec2>,   // Position for second cloud (when below half health)
 }
 
+/// Warning/preview marker on boss-attack telegraph entities; removed once the
+/// real attack resolves. `SparseSet` so telegraph entities don't occupy an
+/// extra archetype variant every attack cycle.
 #[derive(Component)]
-pub struct BossAttackPreview; // Component for warning preview visualization
+#[component(storage = "SparseSet")]
+pub struct BossAttackPreview;
 
 #[derive(Component)]
 pub struct AttackCollider(pub Option<Entity>);

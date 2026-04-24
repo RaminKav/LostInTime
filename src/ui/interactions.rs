@@ -295,7 +295,11 @@ pub enum Interaction {
     },
 }
 
+/// Marker on the currently-dragged inventory icon. Added/removed every time
+/// the player picks up or drops an item — stored `SparseSet` so dragging
+/// doesn't bounce the drag icon between archetypes.
 #[derive(Component)]
+#[component(storage = "SparseSet")]
 pub struct DraggedItem;
 
 #[derive(Debug, Clone)]

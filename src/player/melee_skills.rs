@@ -30,7 +30,12 @@ use super::combat_heirlooms::TriggerSummonsEvent;
 use super::{ActiveSkill, ActiveSkillUsedEvent, Heirloom, Player, PlayerSkills};
 aseprite!(pub Echo, "textures/effects/OnHitAoE.aseprite");
 
+/// Brief marker on a mob that was just hit and is queued for a follow-up
+/// split-damage hit a few frames later. Removed as soon as the follow-up
+/// fires — stored `SparseSet` so split attacks don't move mobs through extra
+/// archetypes every swing.
 #[derive(Component)]
+#[component(storage = "SparseSet")]
 pub struct SecondHitDelay {
     pub delay: Timer,
     pub dir: Vec2,
@@ -194,32 +199,50 @@ pub fn handle_echo_after_heal(
         }
     }
 }
+/// Component on spear projectiles that are being pulled toward a target; it
+/// is added on spear cast and removed when the pull is released. `SparseSet`
+/// so spears don't occupy a new archetype variant per active pull.
 #[derive(Component)]
-
+#[component(storage = "SparseSet")]
 pub struct SpearGravity {
     pub target: Vec2,
     pub timer: Timer,
 }
+/// Parry-skill timers held on the player only while the Parry skill is
+/// equipped. Stored `SparseSet` so the player stays in one archetype when
+/// the skill is (un)equipped.
 #[derive(Component)]
+#[component(storage = "SparseSet")]
 pub struct ParryState {
     pub parry_timer: Timer,
     pub cooldown_timer: Timer,
     pub success: bool,
     pub active: bool,
 }
+
+/// Spear-skill cooldown timer on the player. Same churn profile as
+/// `ParryState` — stored `SparseSet`.
 #[derive(Component)]
+#[component(storage = "SparseSet")]
 pub struct SpearState {
     pub spear_timer: Timer,
 }
 
+/// Short delay timer on the player before the spear pull actually resolves.
+/// Added on spear cast and removed when the delay elapses — `SparseSet` so
+/// the player stays in one archetype during spear casts.
 #[derive(Component)]
+#[component(storage = "SparseSet")]
 pub struct SpearPullDelay {
     pub delay_timer: Timer,
     pub epicenter: Vec2,
 }
 
+/// Brief knockback/stun state applied to a mob that just got parried.
+/// Removed as soon as its timer elapses (a few hundred ms) — `SparseSet` so
+/// parrying does not move the mob between archetypes on every parry.
 #[derive(Component)]
-
+#[component(storage = "SparseSet")]
 pub struct Parried {
     pub timer: Timer,
     pub kb_applied: bool,

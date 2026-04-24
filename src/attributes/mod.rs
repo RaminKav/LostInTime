@@ -1318,7 +1318,13 @@ impl Plugin for AttributesPlugin {
     }
 }
 
+/// One-shot flag set on the player when the game-over event has been sent so
+/// the clamp-health system doesn't re-trigger it. `SparseSet` since it's
+/// inserted once near end-of-run on an entity (the player) that has many
+/// other components — avoids creating a one-off "player + GameOverSent"
+/// archetype variant.
 #[derive(Component)]
+#[component(storage = "SparseSet")]
 pub struct GameOverSent;
 
 pub fn clamp_health(

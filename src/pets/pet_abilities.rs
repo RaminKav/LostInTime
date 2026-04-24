@@ -29,10 +29,18 @@ pub struct PorkipineDamageTimer(pub Timer);
 #[derive(Component, Debug)]
 pub struct GoldenPigCoinTimer(pub Timer);
 
-/// Marker added to the player when we temporarily grant a 1-point shield from the Slime pet.
+/// Marker added to the player when we temporarily grant a 1-point shield from
+/// the Slime pet. Cycles on/off as shields generate and break — stored
+/// `SparseSet` to keep the player in one archetype.
 #[derive(Component, Debug)]
+#[component(storage = "SparseSet")]
 pub struct SlimeTempShield;
+
+/// Marker on the slime shield sprite entity; tracked alongside
+/// [`SlimeTempShield`] and paired with it one-to-one. `SparseSet` for the
+/// same reason as [`SlimeTempShield`].
 #[derive(Component, Debug)]
+#[component(storage = "SparseSet")]
 pub struct SlimeTempShieldSprite;
 
 /// Slime pet ability: periodically grants the player a temporary 1-point shield if they have none.

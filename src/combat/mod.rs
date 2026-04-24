@@ -82,10 +82,19 @@ pub struct HitEvent {
     pub from_heirloom_effect: Option<Heirloom>,
 }
 
+/// Brief marker set on a mob at the moment of death so follow-up systems can
+/// react before the entity is despawned. Stored as `SparseSet` because it is
+/// inserted on every kill and removed/despawned immediately after — archetype
+/// moves here would otherwise churn every combat archetype every kill.
 #[derive(Component, Debug, Clone)]
+#[component(storage = "SparseSet")]
 pub struct MarkedForDeath;
 
+/// Transient marker set on an enemy killed by an heirloom-effect damage source
+/// (used to suppress on-kill heirloom loops). Same churn profile as
+/// `MarkedForDeath`, so also stored as `SparseSet`.
 #[derive(Component, Debug, Clone)]
+#[component(storage = "SparseSet")]
 pub struct KilledByHeirloomEffect;
 #[derive(Debug, Clone)]
 
@@ -126,13 +135,25 @@ pub struct WasHitWithCrit(pub bool);
 #[derive(Component, Debug, Default)]
 pub struct WasHitWithOvercrit(pub bool);
 
+/// Per-attack cooldown timer on the player. Inserted when an attack fires and
+/// removed the frame the timer finishes — this cycle happens several times a
+/// second in combat, so `SparseSet` storage avoids moving the player entity
+/// through two archetype variants per swing.
 #[derive(Component, Debug, Clone)]
+#[component(storage = "SparseSet")]
 pub struct AttackTimer(pub Timer);
 
+/// Per-hit i-frame timer. Inserted on any entity that takes damage and removed
+/// when the timer finishes — very high churn across mobs and the player, so
+/// `SparseSet` storage keeps the entity in its original archetype.
 #[derive(Component, Debug, Clone)]
+#[component(storage = "SparseSet")]
 pub struct InvincibilityTimer(pub Timer);
-#[derive(Component, Debug, Clone)]
 
+/// Marker set on the currently-swinging tool entity; removed on the next
+/// attack cooldown reset. `SparseSet` because it toggles every attack.
+#[derive(Component, Debug, Clone)]
+#[component(storage = "SparseSet")]
 pub struct HitMarker;
 pub struct CombatPlugin;
 impl Plugin for CombatPlugin {

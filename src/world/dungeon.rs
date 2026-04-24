@@ -29,7 +29,12 @@ pub struct Dungeontimer(pub Timer);
 #[derive(Component)]
 pub struct DungeonText;
 
+/// Brief marker storing the player's previous position across a dimension
+/// swap. Inserted when leaving a dimension and removed shortly after — stored
+/// `SparseSet` so dimension swaps don't churn the persisted dimension entity
+/// through extra archetypes.
 #[derive(Component, Default)]
+#[component(storage = "SparseSet")]
 pub struct CachedPlayerPos(pub TileMapPosition);
 
 fn tick_dungeon_timer(

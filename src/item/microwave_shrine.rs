@@ -11,7 +11,11 @@ use crate::{
 
 use super::WorldObject;
 
+/// Per-shrine state; only present on an un-consumed microwave shrine and
+/// removed on use. Stored `SparseSet` because lots of shrines get spawned
+/// per run and each cycles through the state component when interacted.
 #[derive(Component)]
+#[component(storage = "SparseSet")]
 pub struct MicrowaveShrineState {
     pub is_used: bool,
     pub tile_pos: TileMapPosition,

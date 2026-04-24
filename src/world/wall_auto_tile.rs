@@ -13,9 +13,19 @@ use super::{
     world_helpers::{get_neighbour_tile, get_neighbour_wall_data, world_pos_to_tile_pos},
     TileMapPosition,
 };
+/// Marker set on a wall entity whenever its auto-tile neighbors change so it
+/// gets re-evaluated in the next auto-tile pass. Very high churn while the
+/// player places/breaks walls — stored `SparseSet` so re-tiling a wall
+/// doesn't move it through an extra archetype every neighbor update.
 #[derive(Component)]
+#[component(storage = "SparseSet")]
 pub struct Dirty;
+
+/// Marker set on a wall entity after it has finished its auto-tile pass, so
+/// neighbouring updates can short-circuit the work. Also `SparseSet` for the
+/// same reason as `Dirty`.
 #[derive(Component)]
+#[component(storage = "SparseSet")]
 pub struct AutoTileComplete;
 
 #[derive(Component)]

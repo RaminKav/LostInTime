@@ -60,7 +60,11 @@ fn start_slot_cooldown_for_cast(
 }
 
 // Temporary marker components for active effects
+/// Set on the player only while the Stealth buff is active. Cycles on/off on
+/// every stealth proc — stored `SparseSet` to keep the player in a single
+/// archetype regardless of stealth state.
 #[derive(Component)]
+#[component(storage = "SparseSet")]
 pub struct Stealthed;
 
 /// If Stealth still needs charges back (extra heirloom charges), start the next regen on the slot.

@@ -206,7 +206,11 @@ impl EquipmentType {
         }
     }
 }
+/// Marker set on the currently-equipped weapon entity. Cycles whenever the
+/// player swaps weapons/tools in the hotbar — stored `SparseSet` so weapon
+/// swaps don't move every other tool through a duplicated archetype variant.
 #[derive(Component)]
+#[component(storage = "SparseSet")]
 pub struct MainHand;
 
 //TODO: Convert attributes to a vec of attributes?

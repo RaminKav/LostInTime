@@ -225,7 +225,12 @@ pub struct LeapAttack {
     pub speed: f32,
 }
 
+/// Inserted on a mob for the short window between "attack started" and
+/// "attack ended" so other systems can detect the in-progress attack. Every
+/// mob cycles through this on every attack; stored `SparseSet` so that
+/// attacking does not move the mob between archetypes each time.
 #[derive(Component)]
+#[component(storage = "SparseSet")]
 pub struct MobIsAttacking(pub Mob);
 
 /// Small Cactus attack config: spawns a circle hitbox in front of itself.

@@ -260,7 +260,11 @@ impl BoolTrigger for MushkingSummoned {
     }
 }
 
+/// Short-lived warning marker on the rush hitbox entity before it deals
+/// damage. `SparseSet` so the rush-entity archetype isn't duplicated for
+/// every swing.
 #[derive(Component)]
+#[component(storage = "SparseSet")]
 pub struct MushlingRushWarning;
 
 pub fn handle_mushling_rush_warnings(

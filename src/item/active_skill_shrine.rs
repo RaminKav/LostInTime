@@ -11,7 +11,11 @@ use crate::{
 
 use super::WorldObject;
 
+/// Per-shrine state; only present on an un-consumed active-skill shrine and
+/// removed on use. `SparseSet` for the same reason as the other shrine state
+/// components.
 #[derive(Component)]
+#[component(storage = "SparseSet")]
 pub struct ActiveSkillShrineState {
     pub is_used: bool,
     pub tile_pos: TileMapPosition,

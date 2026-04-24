@@ -38,7 +38,11 @@ pub struct GenerationSeed {
     pub seed: u64,
 }
 
+/// Marker inserted on the dimension entity to trigger a one-shot spawn pass,
+/// then removed when spawning completes. `SparseSet` so dimension transitions
+/// don't move the dimension entity through an extra archetype each time.
 #[derive(Component, Debug)]
+#[component(storage = "SparseSet")]
 pub struct SpawnDimension;
 pub struct DimensionSpawnEvent {
     pub swap_to_dim_now: bool,

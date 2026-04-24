@@ -4,7 +4,12 @@ use rand::Rng;
 
 use crate::{TextureCamera, DEBUG};
 
+/// Per-entity screen-shake driver. Added when a shake is triggered (hits,
+/// explosions, etc.), removed when the shake timer elapses. Stored `SparseSet`
+/// so shakes don't cycle the camera/target entity through extra archetypes on
+/// every kill / explosion.
 #[derive(Component)]
+#[component(storage = "SparseSet")]
 pub struct ShakeEffect {
     pub timer: Timer,
     pub speed: f32,

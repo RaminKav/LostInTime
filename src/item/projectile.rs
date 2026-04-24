@@ -227,8 +227,12 @@ pub struct ProjectileSpawnMarker {
 #[derive(Component)]
 pub struct PetProjectileMarker;
 
-/// Component to track the target position for bomb projectiles
+/// Component to track the target position for bomb projectiles. Inserted on
+/// the player/projectile when a bomb is thrown and removed when it lands —
+/// `SparseSet` so bombs don't move the player through extra archetypes each
+/// cast.
 #[derive(Component)]
+#[component(storage = "SparseSet")]
 pub struct BombTarget {
     pub target_pos: Vec2,
 }
