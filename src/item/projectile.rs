@@ -497,9 +497,8 @@ fn handle_spawn_projectiles_after_delay(
     }
 }
 
-//TODO: make global timer resource for this
 pub fn handle_reset_proj_hit_enemies_state(
-    mut query: Query<&mut ProjectileState>,
+    mut query: Query<(&mut ProjectileState, &Projectile)>,
     mut timer: Local<Timer>,
     time: Res<Time>,
 ) {
@@ -509,7 +508,10 @@ pub fn handle_reset_proj_hit_enemies_state(
     timer.tick(time.delta());
     if timer.just_finished() {
         timer.reset();
-        for mut state in query.iter_mut() {
+        for (mut state, proj) in query.iter_mut() {
+            if matches!(proj, Projectile::FireRing | Projectile::LaserBeam) {
+                continue;
+            }
             state.hit_entities.clear();
         }
     }

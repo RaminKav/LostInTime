@@ -580,7 +580,7 @@ fn juice_up_spawned_mobs_per_day(
             1.45 * chaos_factor
         };
 
-        let attack_multiplier = chaos_factor.powf(0.4);
+        let attack_multiplier = chaos_factor.powf(0.47);
 
         hp.0 = (hp.0 as f32 * hp_multiplier) as i32;
         att.0 = (att.0 as f32 * attack_multiplier) as i32;

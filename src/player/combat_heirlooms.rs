@@ -1389,16 +1389,19 @@ pub fn handle_max_hp_hunt(
         return;
     }
 
-    // Count kills from events (each event is one kill)
+    let max_hp_cap = stacks * 250;
+
     let mut hp_was_gained = false;
     for _death_event in death_events.iter() {
+        if tracker.total_hp_gained >= max_hp_cap {
+            continue;
+        }
         tracker.kill_count += 1;
 
-        // Every 3 kills grants +1 max hp per stack
         if tracker.kill_count >= 25 {
             tracker.kill_count -= 25;
-            let hp_gained = stacks; // Each stack gives +1 hp per trigger
-            tracker.total_hp_gained += hp_gained; // Track total HP gained
+            let hp_gained = stacks;
+            tracker.total_hp_gained = (tracker.total_hp_gained + hp_gained).min(max_hp_cap);
             hp_was_gained = true;
             trigger_counts.increment(Heirloom::MaxHPHunt);
         }
@@ -1433,10 +1436,15 @@ pub fn handle_skill_power_hunt(
         return;
     };
 
+    let sp_cap = count * 1000;
+
     let mut rng = rand::thread_rng();
     for _ in skill_events.iter() {
+        if tracker.bonus_skill_power >= sp_cap {
+            continue;
+        }
         if rng.gen_ratio((count * 7).min(100) as u32, 100) {
-            tracker.bonus_skill_power += 1;
+            tracker.bonus_skill_power = (tracker.bonus_skill_power + 1).min(sp_cap);
             attribute_events.send_default();
             trigger_counts.increment(Heirloom::SkillPowerHunt);
         }

@@ -280,10 +280,19 @@ fn handle_enemy_death(
                 .iter()
                 .filter(|d| {
                     if elite_option.is_some() && d.obj_type == WorldObject::XPShard {
-                        false
-                    } else {
-                        true
+                        return false;
                     }
+                    if is_infinite_mode {
+                        return matches!(
+                            d.obj_type,
+                            WorldObject::ChestBlock
+                                | WorldObject::Coin
+                                | WorldObject::XPShard
+                                | WorldObject::XPShardMedium
+                                | WorldObject::XPShardLarge
+                        );
+                    }
+                    true
                 })
                 .collect::<Vec<_>>()
                 {

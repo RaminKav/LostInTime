@@ -282,7 +282,7 @@ pub fn handle_on_hit_upgrades(
         if hit.hit_with_projectile.clone().unwrap_or_default() != Projectile::IceExplosionAOE
             && hit.hit_with_projectile.clone().unwrap_or_default() != Projectile::IceFloor
             && skills.has(Heirloom::IceStaffAoE)
-            && rng.gen_bool((skills.get_count(Heirloom::IceStaffAoE) as f64 * 0.03).clamp(0., 1.))
+            && rng.gen_bool((skills.get_count(Heirloom::IceStaffAoE) as f64 * 0.07).clamp(0., 1.))
         {
             let mana_cost = Heirloom::IceStaffAoE.get_mana_cost();
             if current_mana.0 >= mana_cost {

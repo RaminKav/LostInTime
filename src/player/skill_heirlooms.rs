@@ -342,7 +342,7 @@ pub fn handle_active_skill_event(
                             }
                         }
                         commands.entity(player_e).insert(FirePillarState {
-                            hit_clear_timer: Timer::from_seconds(0.75, TimerMode::Repeating),
+                            hit_clear_timer: Timer::from_seconds(1.0, TimerMode::Repeating),
                         });
                         start_slot_cooldown_for_cast(
                             &mut class_slots,
@@ -1068,10 +1068,7 @@ pub fn tick_stealth_and_buffs(
 /// Apply RapidfireSlow to all enemies when RapidFire is active
 pub fn handle_rapidfire_slow_enemies(
     rapidfire_states: Query<&RapidfireState, With<Player>>,
-    mut enemies: Query<
-        &mut crate::combat::status_effects::MobStatusEffects,
-        With<Mob>,
-    >,
+    mut enemies: Query<&mut crate::combat::status_effects::MobStatusEffects, With<Mob>>,
 ) {
     // Check if RapidFire is active
     if let Ok(state) = rapidfire_states.get_single() {
@@ -1088,10 +1085,7 @@ pub fn handle_rapidfire_slow_enemies(
 /// Remove RapidfireSlow from all enemies when RapidFire ends
 pub fn handle_rapidfire_slow_remove(
     rapidfire_states: Query<&RapidfireState, With<Player>>,
-    mut enemies: Query<
-        &mut crate::combat::status_effects::MobStatusEffects,
-        With<Mob>,
-    >,
+    mut enemies: Query<&mut crate::combat::status_effects::MobStatusEffects, With<Mob>>,
 ) {
     // Check if RapidFire is no longer active
     if let Ok(state) = rapidfire_states.get_single() {
@@ -1305,19 +1299,16 @@ pub fn tick_druid_tree_dummy_timers(
     }
 }
 
-/// Clear hit_entities for FireRing projectiles every 1.0s while FirePillar is active
+/// Clear hit_entities for FireRing projectiles on the FirePillarState timer interval
 pub fn handle_fire_pillar_hit_clear(
     mut fire_pillar_states: Query<&mut FirePillarState>,
     mut fire_ring_projectiles: Query<(&mut ProjectileState, &Projectile), With<Projectile>>,
 ) {
     for mut pillar_state in fire_pillar_states.iter_mut() {
         if pillar_state.hit_clear_timer.just_finished() {
-            info!("Clearing hit_entities for FireRing projectiles due to FirePillar effect");
             for (mut proj_state, proj) in fire_ring_projectiles.iter_mut() {
                 if matches!(proj, Projectile::FireRing) {
-                    info!("Clearing hit_entities for FireRing projectile");
                     proj_state.hit_entities.clear();
-                    pillar_state.hit_clear_timer.reset();
                 }
             }
         }
