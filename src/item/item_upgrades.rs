@@ -10,6 +10,7 @@ use crate::audio::{AudioSoundEffect, SoundSpawner};
 use crate::blessings::OwnedBlessings;
 use crate::custom_commands::CommandsExt;
 use crate::enemy::Mob;
+use crate::inputs::AutoAttackState;
 use crate::item::ammo::Ammo;
 use crate::item::WorldObject;
 use crate::player::mage_skills::spawn_ice_explosion_hitbox;
@@ -57,6 +58,7 @@ pub fn handle_delayed_ranged_attack(
     mut ranged_attack_event: EventWriter<RangedAttackEvent>,
     game: GameParam,
     mouse_button_input: Res<Input<MouseButton>>,
+    auto_attack: Res<AutoAttackState>,
     cursor_pos: Res<CursorPos>,
     time: Res<Time>,
     mut att_cooldown_query: Query<(&mut ClawUpgradeMultiThrow, Option<&AttackTimer>), With<Player>>,
@@ -92,7 +94,10 @@ pub fn handle_delayed_ranged_attack(
     if num_bonus_projs == 0 {
         return;
     }
-    if mouse_button_input.pressed(MouseButton::Left) || delayed_ranged_attack.0.percent() != 0. {
+    if mouse_button_input.pressed(MouseButton::Left)
+        || auto_attack.0
+        || delayed_ranged_attack.0.percent() != 0.
+    {
         delayed_ranged_attack.0.tick(time.delta());
         if delayed_ranged_attack.0.just_finished() {
             *count += 1;
@@ -121,6 +126,7 @@ pub fn handle_spread_arrows_attack(
     mut ranged_attack_event: EventWriter<RangedAttackEvent>,
     game: GameParam,
     mouse_button_input: Res<Input<MouseButton>>,
+    auto_attack: Res<AutoAttackState>,
     cursor_pos: Res<CursorPos>,
     att_cooldown_query: Query<
         (&BowUpgradeSpread, &PlayerAnimation, Option<&AttackTimer>),
@@ -141,7 +147,7 @@ pub fn handle_spread_arrows_attack(
         *count = 0;
     }
     if anim.is_shooting_bow()
-        && mouse_button_input.pressed(MouseButton::Left)
+        && (mouse_button_input.pressed(MouseButton::Left) || auto_attack.0)
         && *count < spread_attack.0
     {
         let rotate = |val: Vec2, angle: f32| -> Vec2 {
