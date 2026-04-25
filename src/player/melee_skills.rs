@@ -5,6 +5,7 @@ use rand::Rng;
 
 use crate::{
     animations::player_sprite::PlayerAnimation,
+    assets::Graphics,
     attributes::{
         attribute_helpers::skill_power_multiplier, modifiers::ModifyHealthEvent, Attack,
         CurrentHealth, CurrentMana, HealthRegen, ProjectileSize, SkillPower,
@@ -20,6 +21,7 @@ use crate::{
         projectile::{Projectile, RangedAttackEvent},
         WorldObject,
     },
+    player::mage_skills::spawn_ice_explosion_hitbox,
     status_effects::MobStatusEffects,
     ui::damage_numbers::{spawn_floating_text_with_shadow, PreviousHealth},
     world::TILE_SIZE,
@@ -524,4 +526,71 @@ pub fn handle_spear_gravity(
 
         kcc.translation = Some(delta * 300. * time.delta_seconds());
     }
+}
+
+#[derive(Clone)]
+pub enum DelayedCastType {
+    IceExplosion {
+        pos: Vec3,
+        dmg: i32,
+        size_multiplier: f32,
+    },
+    Echo {
+        player: Entity,
+        dmg: i32,
+        size_multiplier: f32,
+    },
+}
+
+#[derive(Component)]
+pub struct DelayedHeirloomCast {
+    pub delay: Timer,
+    pub cast_type: DelayedCastType,
+}
+
+pub const HEIRLOOM_EXTRA_CAST_DELAY: f32 = 0.3;
+
+pub fn handle_delayed_heirloom_casts(
+    mut commands: Commands,
+    mut query: Query<(Entity, &mut DelayedHeirloomCast)>,
+    time: Res<Time>,
+    graphics: Res<Graphics>,
+    asset_server: Res<AssetServer>,
+) {
+    for (entity, mut cast) in query.iter_mut() {
+        cast.delay.tick(time.delta());
+        if !cast.delay.just_finished() {
+            continue;
+        }
+        match &cast.cast_type {
+            DelayedCastType::IceExplosion {
+                pos,
+                dmg,
+                size_multiplier,
+            } => {
+                spawn_ice_explosion_hitbox(
+                    &mut commands,
+                    &graphics,
+                    *pos,
+                    *dmg,
+                    *size_multiplier,
+                );
+            }
+            DelayedCastType::Echo {
+                player,
+                dmg,
+                size_multiplier,
+            } => {
+                spawn_echo_hitbox(&mut commands, &asset_server, *player, *dmg, *size_multiplier);
+            }
+        }
+        commands.entity(entity).despawn();
+    }
+}
+
+pub fn spawn_delayed_heirloom_cast(commands: &mut Commands, delay_secs: f32, cast_type: DelayedCastType) {
+    commands.spawn(DelayedHeirloomCast {
+        delay: Timer::from_seconds(delay_secs, TimerMode::Once),
+        cast_type,
+    });
 }

@@ -28,7 +28,8 @@ use crate::{
     },
     player::{
         melee_skills::{
-            spawn_echo_hitbox, HeirloomTriggerCooldowns, ParryState, SpearState,
+            spawn_delayed_heirloom_cast, spawn_echo_hitbox, DelayedCastType,
+            HeirloomTriggerCooldowns, ParryState, SpearState, HEIRLOOM_EXTRA_CAST_DELAY,
             HEIRLOOM_TRIGGER_COOLDOWN_SECS,
         },
         rogue_skills::{LungeState, SprintState},
@@ -1010,27 +1011,42 @@ pub fn handle_active_skill_event(
                     }
                     _ => {}
                 }
-                // Skill Echo trigger: spawn an echo AoE at player position when using any skill
-                if active.active_skill != ActiveSkill::Roll
-                    && skills.has(crate::player::skills::Heirloom::SkillEcho)
-                {
+                if active.active_skill != ActiveSkill::Roll {
+                    let echo_count = skills.get_count(Heirloom::SkillEcho);
                     let mana_cost = Heirloom::SkillEcho.get_mana_cost();
-                    if current_mana.0 >= mana_cost {
+                    let echo_dmg = attack_opt.map(|a| (a.0 as f32 * 1.) as i32).unwrap_or(15);
+                    let size_mult = skill_states
+                        .player_projectile_size
+                        .get_single()
+                        .map(|s| s.get_multiplier())
+                        .unwrap_or(1.0);
+
+                    for i in 0..echo_count {
+                        if current_mana.0 < mana_cost {
+                            break;
+                        }
                         current_mana.0 -= mana_cost;
-                        let echo_dmg = attack_opt.map(|a| (a.0 as f32 * 1.) as i32).unwrap_or(15);
-                        let size_mult = skill_states
-                            .player_projectile_size
-                            .get_single()
-                            .map(|s| s.get_multiplier())
-                            .unwrap_or(1.0);
-                        spawn_echo_hitbox(
-                            &mut commands,
-                            &asset_server,
-                            player_e,
-                            echo_dmg,
-                            size_mult,
-                        );
                         trigger_counts.increment(Heirloom::SkillEcho);
+
+                        if i == 0 {
+                            spawn_echo_hitbox(
+                                &mut commands,
+                                &asset_server,
+                                player_e,
+                                echo_dmg,
+                                size_mult,
+                            );
+                        } else {
+                            spawn_delayed_heirloom_cast(
+                                &mut commands,
+                                HEIRLOOM_EXTRA_CAST_DELAY * i as f32,
+                                DelayedCastType::Echo {
+                                    player: player_e,
+                                    dmg: echo_dmg,
+                                    size_multiplier: size_mult,
+                                },
+                            );
+                        }
                     }
                 }
             }

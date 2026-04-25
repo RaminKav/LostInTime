@@ -21,7 +21,9 @@ pub mod combat_helpers;
 use crate::blessings::OwnedBlessings;
 use crate::enemy::EliteMob;
 use crate::night::InfiniteMode;
-use crate::player::melee_skills::spawn_echo_hitbox;
+use crate::player::melee_skills::{
+    spawn_delayed_heirloom_cast, spawn_echo_hitbox, DelayedCastType, HEIRLOOM_EXTRA_CAST_DELAY,
+};
 use crate::{
     ai::{FollowState, LeapAttackState},
     animations::{AttackEvent, HitAnimationTracker},
@@ -697,23 +699,45 @@ pub fn handle_hits(
                         hit_health.0 -= damage_to_apply;
                     }
 
-                    if is_player && game.has_skill(Heirloom::OnHitEcho) {
-                        if let Ok((_, mut current_mana, _)) =
-                            player_blessing_mana_query.get_single_mut()
-                        {
-                            let mana_cost = Heirloom::OnHitEcho.get_mana_cost();
-                            if current_mana.0 >= mana_cost {
-                                current_mana.0 -= mana_cost;
-                                game.heirloom_trigger_counts.increment(Heirloom::OnHitEcho);
-                                spawn_echo_hitbox(
-                                    &mut commands,
-                                    &asset_server,
-                                    e,
-                                    attack.unwrap_or(&Attack(0)).0,
-                                    proj_size.unwrap_or(&ProjectileSize(0)).get_multiplier(),
-                                );
-                            }
-                        };
+                    if is_player {
+                        let echo_count = game.skill_count(Heirloom::OnHitEcho);
+                        if echo_count > 0 {
+                            if let Ok((_, mut current_mana, _)) =
+                                player_blessing_mana_query.get_single_mut()
+                            {
+                                let mana_cost = Heirloom::OnHitEcho.get_mana_cost();
+                                let dmg = attack.unwrap_or(&Attack(0)).0;
+                                let size_mult = proj_size.unwrap_or(&ProjectileSize(0)).get_multiplier();
+
+                                for i in 0..echo_count {
+                                    if current_mana.0 < mana_cost {
+                                        break;
+                                    }
+                                    current_mana.0 -= mana_cost;
+                                    game.heirloom_trigger_counts.increment(Heirloom::OnHitEcho);
+
+                                    if i == 0 {
+                                        spawn_echo_hitbox(
+                                            &mut commands,
+                                            &asset_server,
+                                            e,
+                                            dmg,
+                                            size_mult,
+                                        );
+                                    } else {
+                                        spawn_delayed_heirloom_cast(
+                                            &mut commands,
+                                            HEIRLOOM_EXTRA_CAST_DELAY * i as f32,
+                                            DelayedCastType::Echo {
+                                                player: e,
+                                                dmg,
+                                                size_multiplier: size_mult,
+                                            },
+                                        );
+                                    }
+                                }
+                            };
+                        }
                     }
                     if *DEBUG {
                         info!("HP {:?}", hit_health.0);
@@ -897,20 +921,48 @@ pub fn cleanup_marked_for_death_entities(
                 let was_slowed = status_option.map(|s| s.is_slowed()).unwrap_or(false);
                 if was_slowed {
                     let heirloomc_count = skills.get_count(Heirloom::FrozenAoE) as f64;
-                    let mut rng = rand::thread_rng();
-                    if heirloomc_count > 0. && rng.gen_bool((heirloomc_count * 0.25).clamp(0., 1.))
-                    {
+                    if heirloomc_count > 0. {
+                        let trigger_chance = heirloomc_count * 0.25;
+                        let guaranteed_casts = trigger_chance as u32;
+                        let remainder = trigger_chance - guaranteed_casts as f64;
+                        let mut rng = rand::thread_rng();
+                        let bonus = if remainder > 0. && rng.gen_bool(remainder.clamp(0., 1.)) {
+                            1u32
+                        } else {
+                            0
+                        };
+                        let total_casts = guaranteed_casts + bonus;
                         let mana_cost = Heirloom::FrozenAoE.get_mana_cost();
-                        if current_mana.0 >= mana_cost {
+                        let pos = mob_pos.translation();
+                        let dmg = attack.0 / 4;
+                        let size_mult = projectile_size.get_multiplier();
+
+                        for i in 0..total_casts {
+                            if current_mana.0 < mana_cost {
+                                break;
+                            }
                             current_mana.0 -= mana_cost;
-                            spawn_ice_explosion_hitbox(
-                                &mut commands,
-                                &graphics,
-                                mob_pos.translation(),
-                                attack.0 / 4,
-                                projectile_size.get_multiplier(),
-                            );
                             trigger_counts.increment(Heirloom::FrozenAoE);
+
+                            if i == 0 {
+                                spawn_ice_explosion_hitbox(
+                                    &mut commands,
+                                    &graphics,
+                                    pos,
+                                    dmg,
+                                    size_mult,
+                                );
+                            } else {
+                                spawn_delayed_heirloom_cast(
+                                    &mut commands,
+                                    HEIRLOOM_EXTRA_CAST_DELAY * i as f32,
+                                    DelayedCastType::IceExplosion {
+                                        pos,
+                                        dmg,
+                                        size_multiplier: size_mult,
+                                    },
+                                );
+                            }
                         }
                     }
                     let rng = &mut rand::thread_rng();

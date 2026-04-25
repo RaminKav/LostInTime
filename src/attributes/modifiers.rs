@@ -1,7 +1,10 @@
 use crate::{
     colors::BLUE,
     player::{
-        melee_skills::spawn_echo_hitbox,
+        melee_skills::{
+            spawn_delayed_heirloom_cast, spawn_echo_hitbox, DelayedCastType,
+            HEIRLOOM_EXTRA_CAST_DELAY,
+        },
         skills::{Heirloom, HeirloomTriggerCounts, PlayerSkills},
         Player,
     },
@@ -55,20 +58,38 @@ pub fn handle_modify_health_event(
 
         health.0 += final_delta;
 
-        // OnHitEcho: Trigger echo when taking damage (any HP loss)
-        if final_delta < 0 && skills.has(Heirloom::OnHitEcho) {
+        if final_delta < 0 {
+            let echo_count = skills.get_count(Heirloom::OnHitEcho);
             let mana_cost = Heirloom::OnHitEcho.get_mana_cost();
-            if current_mana.0 >= mana_cost {
+            let dmg = attack.0;
+            let size_mult = projectile_size.get_multiplier();
+
+            for i in 0..echo_count {
+                if current_mana.0 < mana_cost {
+                    break;
+                }
                 current_mana.0 -= mana_cost;
                 trigger_counts.increment(Heirloom::OnHitEcho);
 
-                spawn_echo_hitbox(
-                    &mut commands,
-                    &asset_server,
-                    player_entity,
-                    attack.0,
-                    projectile_size.get_multiplier(),
-                );
+                if i == 0 {
+                    spawn_echo_hitbox(
+                        &mut commands,
+                        &asset_server,
+                        player_entity,
+                        dmg,
+                        size_mult,
+                    );
+                } else {
+                    spawn_delayed_heirloom_cast(
+                        &mut commands,
+                        HEIRLOOM_EXTRA_CAST_DELAY * i as f32,
+                        DelayedCastType::Echo {
+                            player: player_entity,
+                            dmg,
+                            size_multiplier: size_mult,
+                        },
+                    );
+                }
             }
         }
     }

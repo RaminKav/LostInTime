@@ -20,9 +20,9 @@ use combat_heirlooms::{
     TriggerSummonsEvent,
 };
 use melee_skills::{
-    handle_echo_after_heal, handle_parry, handle_parry_success, handle_second_split_attack,
-    handle_spear, handle_spear_gravity, handle_spear_pull_delay, tick_heirloom_trigger_cooldowns,
-    tick_parried_timer, ParrySuccessEvent,
+    handle_delayed_heirloom_casts, handle_echo_after_heal, handle_parry, handle_parry_success,
+    handle_second_split_attack, handle_spear, handle_spear_gravity, handle_spear_pull_delay,
+    tick_heirloom_trigger_cooldowns, tick_parried_timer, ParrySuccessEvent,
 };
 use rand::seq::SliceRandom;
 use rogue_skills::{
@@ -321,6 +321,7 @@ impl Plugin for PlayerPlugin {
                         .after(handle_modify_health_event)
                         .before(handle_add_damage_numbers_after_hit),
                     handle_trigger_summons_on_heal.after(handle_echo_after_heal),
+                    handle_delayed_heirloom_casts,
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
