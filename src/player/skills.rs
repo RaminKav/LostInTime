@@ -890,7 +890,7 @@ impl Heirloom {
                 "Damage, permanently".to_string(),
             ],
             Heirloom::SkillCDReduction => {
-                vec!["Reduce skill".to_string(), "cooldowns by 15%.".to_string()]
+                vec!["Reduce skill".to_string(), "cooldowns by 8%.".to_string()]
             }
             Heirloom::LoadedDice => {
                 vec!["Gain +7 Luck,".to_string(), "permanently.".to_string()]
@@ -2123,7 +2123,7 @@ impl PlayerSkills {
     }
     pub fn skill_cooldown_multiplier(&self) -> f32 {
         let count = self.get_count(Heirloom::SkillCDReduction).max(0) as i32;
-        (0..count).fold(1.0f32, |acc, _| acc * 0.85)
+        (0..count).fold(1.0f32, |acc, _| acc * 0.92)
     }
     pub fn effective_skill_cooldown(
         &self,
