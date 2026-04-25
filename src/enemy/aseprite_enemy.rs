@@ -704,7 +704,7 @@ pub struct AsepriteProjectileFired;
 /// Projectile attack for aseprite basic enemies. Uses same attack tags (AttackUp / AttackDown / AttackSide).
 /// Flow: startup timer (with attack warning) -> switch to attack anim -> fire when projectile_delay elapses -> wait for `just_finished()` -> back to follow.
 pub fn aseprite_projectile_attack(
-    mut transforms: Query<&GlobalTransform>,
+    transforms: Query<&GlobalTransform>,
     mut attacks: Query<
         (
             Entity,
@@ -870,7 +870,7 @@ fn apply_horizontal_sprite_flip_for_dir(transform: &mut Transform, dir: Vec2) {
 // Small Cactus: circle attack (spawn hitbox in front of self)
 // ---------------------------------------------------------------------------
 pub fn aseprite_circle_attack(
-    mut transforms: Query<&GlobalTransform>,
+    transforms: Query<&GlobalTransform>,
     mut attacks: Query<
         (
             Entity,
@@ -986,7 +986,8 @@ pub fn aseprite_circle_attack(
 // Big Cactus: multi-hit leap (3 successive lunges)
 // ---------------------------------------------------------------------------
 pub fn aseprite_multi_leap_attack(
-    mut transforms: Query<&mut GlobalTransform>,
+    global_transforms: Query<&GlobalTransform>,
+    mut local_transforms: Query<&mut Transform>,
     mut attacks: Query<
         (
             Entity,
@@ -1001,10 +1002,8 @@ pub fn aseprite_multi_leap_attack(
         ),
         With<AsepriteBasicEnemy>,
     >,
-    multi_configs: Query<&MultiLeapAttack>,
     mut commands: Commands,
     time: Res<Time>,
-    skills: Query<&PlayerSkills>,
     asset_server: Res<AssetServer>,
 ) {
     for (
@@ -1025,8 +1024,8 @@ pub fn aseprite_multi_leap_attack(
             continue;
         }
 
-        let target_pos = transforms.get(attack.target).unwrap().translation();
-        let my_pos = transforms.get_mut(entity).unwrap().translation();
+        let target_pos = global_transforms.get(attack.target).unwrap().translation();
+        let my_pos = global_transforms.get(entity).unwrap().translation();
 
         let delta_xy = (target_pos.truncate() - my_pos.truncate()).normalize_or_zero();
 
@@ -1042,6 +1041,9 @@ pub fn aseprite_multi_leap_attack(
                     // Switch to attack anim facing the player, wait for lunge_delay before moving.
                     let attack_tag = direction_to_attack_tag(delta_xy);
                     set_animation_tag(&mut anim, &mut current_tag, attack_tag);
+                    if let Ok(mut tf) = local_transforms.get_mut(entity) {
+                        apply_horizontal_sprite_flip_for_dir(&mut tf, delta_xy);
+                    }
                     spawn_attack_warning_aseprite(
                         &mut commands,
                         &asset_server,
@@ -1060,6 +1062,9 @@ pub fn aseprite_multi_leap_attack(
                 // Switch to attack anim facing the player, wait for lunge_delay before moving.
                 let attack_tag = direction_to_attack_tag(delta_xy);
                 set_animation_tag(&mut anim, &mut current_tag, attack_tag);
+                if let Ok(mut tf) = local_transforms.get_mut(entity) {
+                    apply_horizontal_sprite_flip_for_dir(&mut tf, delta_xy);
+                }
                 commands.entity(entity).insert(MobIsAttacking(mob.clone()));
 
                 attack.lunge_delay_timer.tick(time.delta());
@@ -1087,6 +1092,12 @@ pub fn aseprite_multi_leap_attack(
 
                 let attack_tag = direction_to_attack_tag(attack.dir.unwrap_or(delta_xy));
                 set_animation_tag(&mut anim, &mut current_tag, attack_tag);
+                if let Ok(mut tf) = local_transforms.get_mut(entity) {
+                    apply_horizontal_sprite_flip_for_dir(
+                        &mut tf,
+                        attack.dir.unwrap_or(delta_xy),
+                    );
+                }
 
                 if attack.attack_duration_timer.finished() {
                     attack.hits_remaining = attack.hits_remaining.saturating_sub(1);

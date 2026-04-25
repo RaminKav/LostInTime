@@ -154,6 +154,7 @@ impl Plugin for SpawnerPlugin {
                     // handle_add_fairy_spawners,
                     test_mob_count,
                     spawn_stone_golem_timer.run_if(is_not_paused),
+                    spawn_endless_stone_golem_timer.run_if(is_not_paused),
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
@@ -342,7 +343,21 @@ pub struct StoneGolemSpawnTimer {
 impl Default for StoneGolemSpawnTimer {
     fn default() -> Self {
         Self {
-            timer: Timer::from_seconds(240.0, TimerMode::Once), // 4 minutes
+            timer: Timer::from_seconds(240.0, TimerMode::Once), // 4 minutes (base mode)
+        }
+    }
+}
+
+/// Resource to track Stone Golem spawn timer specifically for endless mode.
+#[derive(Resource)]
+pub struct EndlessStoneGolemSpawnTimer {
+    pub timer: Timer,
+}
+
+impl Default for EndlessStoneGolemSpawnTimer {
+    fn default() -> Self {
+        Self {
+            timer: Timer::from_seconds(480.0, TimerMode::Repeating), // 8 minutes
         }
     }
 }
@@ -351,10 +366,11 @@ impl Default for StoneGolemSpawnTimer {
 /// Called when entering Main Menu to ensure it resets between runs
 fn initialize_stone_golem_timer(mut commands: Commands) {
     commands.insert_resource(StoneGolemSpawnTimer::default());
+    commands.insert_resource(EndlessStoneGolemSpawnTimer::default());
     info!("Stone Golem spawn timer initialized");
 }
 
-/// System to spawn Stone Golem every 4 minutes in main eras (not dungeons)
+/// System to spawn Stone Golem in base mode cadence (4 minutes, one-time per era)
 fn spawn_stone_golem_timer(
     time: Res<Time>,
     golem_timer: Option<ResMut<StoneGolemSpawnTimer>>,
@@ -364,6 +380,7 @@ fn spawn_stone_golem_timer(
     player_query: Query<&GlobalTransform, With<Player>>,
     maybe_dungeon: Query<&Dungeon, With<ActiveDimension>>,
     game: GameParam,
+    infinite_mode: Res<InfiniteMode>,
     existing_golems: Query<&Mob>,
 ) {
     if *NO_SPAWN {
@@ -377,6 +394,11 @@ fn spawn_stone_golem_timer(
     let Some(mut golem_timer) = golem_timer else {
         return;
     };
+
+    // Base-mode golem logic should not run during endless mode.
+    if infinite_mode.active {
+        return;
+    }
 
     // Tick the timer
     golem_timer.timer.tick(time.delta());
@@ -419,16 +441,96 @@ fn spawn_stone_golem_timer(
     }
 }
 
+/// System to spawn Stone Golem every 8 minutes during endless mode only.
+fn spawn_endless_stone_golem_timer(
+    time: Res<Time>,
+    endless_golem_timer: Option<ResMut<EndlessStoneGolemSpawnTimer>>,
+    mut commands: Commands,
+    mut proto_commands: ProtoCommands,
+    prototypes: Prototypes,
+    proto_param: ProtoParam,
+    player_query: Query<&GlobalTransform, With<Player>>,
+    maybe_dungeon: Query<&Dungeon, With<ActiveDimension>>,
+    game: GameParam,
+    infinite_mode: Res<InfiniteMode>,
+    existing_golems: Query<&Mob>,
+) {
+    if *NO_SPAWN {
+        return;
+    }
+    if maybe_dungeon.get_single().is_ok() {
+        return;
+    }
+
+    let Some(mut endless_golem_timer) = endless_golem_timer else {
+        return;
+    };
+
+    // Only tick while in endless mode; reset while inactive so endless gets a fresh 8-minute timer.
+    if !infinite_mode.active {
+        if endless_golem_timer.timer.elapsed_secs() > 0.0 {
+            endless_golem_timer.timer.reset();
+        }
+        return;
+    }
+
+    endless_golem_timer.timer.tick(time.delta());
+    if !endless_golem_timer.timer.just_finished() {
+        return;
+    }
+
+    // Don't spawn if a Stone Golem already exists.
+    let golem_exists = existing_golems.iter().any(|m| m == &Mob::StoneGolem);
+    if golem_exists {
+        info!("Stone Golem already exists, skipping endless spawn");
+        return;
+    }
+
+    if let Ok(player_txfm) = player_query.get_single() {
+        let player_pos = player_txfm.translation().truncate();
+        let mut rng = rand::thread_rng();
+        let mut pos = player_pos;
+        let mut attempts = 20;
+        let spawn_distance = TILE_SIZE.x * 12.0;
+
+        while attempts > 0 {
+            let angle = rng.gen_range(0.0..std::f32::consts::TAU);
+            let offset = Vec2::new(angle.cos(), angle.sin()) * spawn_distance;
+            pos = player_pos + offset;
+
+            if can_spawn_mob_here(pos, &game, &proto_param, false) {
+                break;
+            }
+            attempts -= 1;
+        }
+
+        if attempts > 0 {
+            if let Some(spawned_golem) =
+                proto_commands.spawn_from_proto(Mob::StoneGolem, &prototypes, pos)
+            {
+                commands.entity(spawned_golem).insert(InfiniteModeMob);
+                info!("Spawned Stone Golem in endless mode at {:?}", pos);
+            }
+        } else {
+            info!("Failed to find valid spawn location for endless Stone Golem");
+        }
+    }
+}
+
 /// Reset Stone Golem spawn timer when changing eras/dimensions
 fn reset_stone_golem_timer_on_era_change(
     mut golem_timer: Option<ResMut<StoneGolemSpawnTimer>>,
+    mut endless_golem_timer: Option<ResMut<EndlessStoneGolemSpawnTimer>>,
     dimension_spawn_events: EventReader<DimensionSpawnEvent>,
 ) {
     if !dimension_spawn_events.is_empty() {
         if let Some(ref mut timer) = golem_timer {
             timer.timer.reset();
-            info!("Stone Golem spawn timer reset due to era/dimension change");
         }
+        if let Some(ref mut timer) = endless_golem_timer {
+            timer.timer.reset();
+        }
+        info!("Stone Golem spawn timers reset due to era/dimension change");
     }
 }
 
