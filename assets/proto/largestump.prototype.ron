@@ -8,7 +8,7 @@
   "survival_rogue_like::item::RequiredEquipmentType": (Axe),
   "survival_rogue_like::proto::ColliderProto": (x: 9., y: 9),
   "survival_rogue_like::attributes::MaxHealth": (45),
-  "survival_rogue_like::player::levels::ExperienceReward": (75),
+  "survival_rogue_like::player::levels::ExperienceReward": (10),
   "survival_rogue_like::item::loot_table::LootTable": (
         drops: [(
             item: Log,

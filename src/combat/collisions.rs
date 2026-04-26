@@ -1,7 +1,4 @@
-use super::{
-    try_add_slow_stacks, HitEvent, HitMarker, InvincibilityTimer,
-    StatusEffectEvent,
-};
+use super::{try_add_slow_stacks, HitEvent, HitMarker, InvincibilityTimer, StatusEffectEvent};
 use crate::attributes::ManaRegen;
 use crate::blessings::OwnedBlessings;
 use crate::client::is_not_paused;
@@ -150,7 +147,13 @@ fn check_melee_hit_collisions(
     mut hit_event: EventWriter<HitEvent>,
     game: GameParam,
     world_obj: Query<Entity, (With<WorldObject>, Without<MainHand>)>,
-    mobs: Query<(&GlobalTransform, Option<&crate::combat::status_effects::MobStatusEffects>), With<Mob>>,
+    mobs: Query<
+        (
+            &GlobalTransform,
+            Option<&crate::combat::status_effects::MobStatusEffects>,
+        ),
+        With<Mob>,
+    >,
     anim: Query<&PlayerAnimation>,
     mut hit_tracker: Local<Vec<Entity>>,
 ) {
@@ -493,9 +496,7 @@ fn check_multihit_projectile_ongoing_collisions(
                     let (is_slowed, is_status_effected, frail_stacks) = match &status_result {
                         Some(status) => (
                             status.is_slowed(),
-                            status.is_burning()
-                                || status.is_slowed()
-                                || status.frail.is_some(),
+                            status.is_burning() || status.is_slowed() || status.frail.is_some(),
                             status.frail_stacks(),
                         ),
                         None => (false, false, 0),
@@ -804,8 +805,8 @@ pub fn check_item_drop_collisions(
             || obj == WorldObject::XPShardLarge
         {
             let mut xp_amount = match obj {
-                WorldObject::XPShard => 20,
-                WorldObject::XPShardMedium => 100,
+                WorldObject::XPShard => 10,
+                WorldObject::XPShardMedium => 45,
                 WorldObject::XPShardLarge => 500,
                 _ => 0,
             };

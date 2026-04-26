@@ -9,7 +9,7 @@
   "survival_rogue_like::proto::ColliderCapsulProto": (x1: -2., y1: -1., x2: 3., y2: -2., r: 8.),
   "survival_rogue_like::assets::SpriteAnchor": ((x: 8., y: 8.)),
   "survival_rogue_like::attributes::MaxHealth": (50),
-  "survival_rogue_like::player::levels::ExperienceReward": (150),
+  "survival_rogue_like::player::levels::ExperienceReward": (20),
   "survival_rogue_like::world::y_sort::YSort": (-0.015),
   "survival_rogue_like::item::loot_table::LootTable": (
         drops: [

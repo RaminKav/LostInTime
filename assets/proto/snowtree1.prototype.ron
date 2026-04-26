@@ -10,7 +10,7 @@
   "survival_rogue_like::proto::ColliderCapsulProto": (x1: 0., y1: -30., x2: 0., y2: -23.5, r: 4.),
   "survival_rogue_like::attributes::MaxHealth": (25),
   "survival_rogue_like::world::y_sort::YSort": (0.),
-  "survival_rogue_like::player::levels::ExperienceReward": (15),
+  "survival_rogue_like::player::levels::ExperienceReward": (5),
   "bevy_proto::custom::VisibilityBundle": (),
   "bevy_proto::custom::SpriteBundle": (
       texture: AssetPath("SnowTree1.png")
