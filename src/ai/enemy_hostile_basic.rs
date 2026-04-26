@@ -8,6 +8,7 @@ use seldom_state::prelude::*;
 
 use crate::Game;
 use crate::{
+    attributes::Attack,
     ai::pathfinding::{world_pos_to_AIPos, AIPos_to_world_pos},
     animations::enemy_sprites::{
         spawn_attack_warning_aseprite, CharacterAnimationSpriteSheetData, EnemyAnimationState,
@@ -578,6 +579,7 @@ pub fn projectile_attack(
     mut transforms: Query<&mut Transform>,
     mut attacks: Query<(
         Entity,
+        &Attack,
         &FollowSpeed,
         &mut ProjectileAttackState,
         &EnemyAnimationState,
@@ -587,8 +589,15 @@ pub fn projectile_attack(
     mut events: EventWriter<RangedAttackEvent>,
     time: Res<Time>,
 ) {
-    for (entity, follow_speed, mut attack, anim_state, defiance_frozen_option, status_option) in
-        attacks.iter_mut()
+    for (
+        entity,
+        mob_attack,
+        follow_speed,
+        mut attack,
+        anim_state,
+        defiance_frozen_option,
+        status_option,
+    ) in attacks.iter_mut()
     {
         // Skip if frozen by Death Defiance or Freeze blessing
         if defiance_frozen_option.is_some()
@@ -616,7 +625,7 @@ pub fn projectile_attack(
                 from_enemy: true,
                 is_followup_proj: false,
                 mana_cost: None,
-                dmg_override: None,
+                dmg_override: Some(mob_attack.0),
                 pos_override: None,
                 spawn_delay: 0.1,
             });

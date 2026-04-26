@@ -467,7 +467,11 @@ fn handle_spawn_projectiles_after_delay(
                 proj.direction,
                 proj.was_mana_bar_full,
                 &asset_server,
-                player_att.get_multiplier(),
+                if proj.from_enemy {
+                    1.0
+                } else {
+                    player_att.get_multiplier()
+                },
             );
 
             if let Some(p) = p {
