@@ -28,7 +28,7 @@ use rand::seq::SliceRandom;
 use rogue_skills::{
     handle_add_combo_counter, handle_dodge_crit, handle_enemy_death_sprint_reset, handle_lunge,
     handle_lunge_cooldown, handle_sprint_timer, handle_sprinting_cooldown, handle_toggle_sprinting,
-    pause_combo_anim_when_done, tick_combo_counter, tick_lunge_shadows,
+    pause_combo_anim_when_done, tick_combo_counter,
 };
 use serde::Deserialize;
 use strum_macros::{Display, EnumIter};
@@ -255,13 +255,6 @@ impl Plugin for PlayerPlugin {
                     skill_heirlooms::tick_druid_tree_dummy_timers.run_if(is_not_paused),
                     skill_heirlooms::handle_fire_pillar_hit_clear.run_if(is_not_paused),
                     skill_heirlooms::handle_laser_beam_hit_clear.run_if(is_not_paused),
-                )
-                    .in_set(OnUpdate(GameState::Main)),
-            )
-            .add_systems(
-                (
-                    skill_heirlooms::update_stealth_color.run_if(is_not_paused),
-                    tick_lunge_shadows.run_if(is_not_paused),
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
