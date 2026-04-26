@@ -278,6 +278,15 @@ impl DimensionPlugin {
                         transition_state
                             .mob_unlock_timers
                             .insert(Mob::SpikeSlime, Timer::from_seconds(160.0, TimerMode::Once));
+                        transition_state
+                            .mob_unlock_timers
+                            .insert(Mob::SmallCactus, Timer::from_seconds(45.0, TimerMode::Once));
+                        transition_state
+                            .mob_unlock_timers
+                            .insert(Mob::BigCactus, Timer::from_seconds(100.0, TimerMode::Once));
+                        transition_state
+                            .mob_unlock_timers
+                            .insert(Mob::Bull, Timer::from_seconds(180.0, TimerMode::Once));
 
                         info!(
                             "Initialized era transition for {:?}: mobs will unlock gradually",

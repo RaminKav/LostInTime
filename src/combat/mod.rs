@@ -39,17 +39,17 @@ use crate::{
         is_not_paused,
     },
     custom_commands::CommandsExt,
-    inventory::Inventory,
     enemy::{
         red_mushking::{AoEAttackState, DeathState, ReturnToShrineState, SummonAttackState},
         stone_golem::{SpikeAttackState, SpikeWarning},
         Mob, MobLevel,
     },
+    inventory::Inventory,
     item::projectile::RangedAttackEvent,
     item::{
         combat_shrine::{CombatShrineMob, CombatShrineMobDeathEvent},
         dungeon_shrine::{DungeonShrineMob, DungeonShrineMobDeathEvent},
-        projectile::Projectile,
+        projectile::{AnimVisualCategory, Projectile},
         EquipmentType, LootTable, LootTablePlugin, MainHand, RequiredEquipmentType, WorldObject,
     },
     juice::bounce::BounceOnHit,
@@ -60,7 +60,7 @@ use crate::{
         skills::{Heirloom, HeirloomTriggerCounts, PlayerSkills},
     },
     proto::proto_param::ProtoParam,
-    ui::damage_numbers::spawn_floating_text_with_shadow,
+    ui::{damage_numbers::spawn_floating_text_with_shadow, CheatSettings},
     world::{world_helpers::world_pos_to_tile_pos, y_sort::YSort, TileMapPosition, TILE_SIZE},
     CustomFlush, GameParam, GameState, Player, SlimeTempShield, SlimeTempShieldSprite, DEBUG,
 };
@@ -176,44 +176,81 @@ impl Plugin for CombatPlugin {
             .add_event::<ObjBreakEvent>()
             .init_resource::<damage_tracker::DamageTracker>()
             .init_resource::<damage_tracker::PetAbilityStats>()
-        .add_plugin(CollisionPlugion)
-        .add_systems(
-            (
-                pickup_radius::update_pickup_radius.run_if(is_not_paused),
-                pickup_radius::mark_items_in_pickup_range.run_if(is_not_paused),
-                pickup_radius::handle_item_pickup_radius.run_if(is_not_paused),
-                pickup_radius::handle_magnet_pull.run_if(is_not_paused),
+            .add_plugin(CollisionPlugion)
+            .add_systems(
+                (
+                    pickup_radius::update_pickup_radius.run_if(is_not_paused),
+                    pickup_radius::mark_items_in_pickup_range.run_if(is_not_paused),
+                    pickup_radius::handle_item_pickup_radius.run_if(is_not_paused),
+                    pickup_radius::handle_magnet_pull.run_if(is_not_paused),
+                )
+                    .in_set(OnUpdate(GameState::Main))
+                    .chain()
+                    .before(collisions::check_item_drop_collisions),
             )
-                .in_set(OnUpdate(GameState::Main))
-                .chain()
-                .before(collisions::check_item_drop_collisions),
-        )
-        // Process deferred Aseprite spawns in PreUpdate to ensure frame 0 initialization
-        .add_system(
-            handle_deferred_aseprite_spawns
-                .in_base_set(CoreSet::PreUpdate)
-                .run_if(in_state(GameState::Main)),
-        )
-        .add_systems(
-            (
-                handle_hits,
-                tick_despawn_timer,
-                cleanup_marked_for_death_entities.after(handle_enemy_death),
-                handle_attack_cooldowns
-                    .before(CustomFlush)
-                    .run_if(is_not_paused),
-                update_status_effect_icons,
-                handle_new_status_effect_event,
-                // spawn_hit_spark_effect.after(handle_hits),
-                handle_invincibility_frames.after(handle_hits),
-                handle_enemy_death.after(handle_hits),
-                handle_lifesteal,
-                handle_thorns_on_damage_tracker.after(handle_hits),
-                damage_tracker::track_player_damage,
+            // Process deferred Aseprite spawns in PreUpdate to ensure frame 0 initialization
+            .add_system(
+                handle_deferred_aseprite_spawns
+                    .in_base_set(CoreSet::PreUpdate)
+                    .run_if(in_state(GameState::Main)),
             )
-                .in_set(OnUpdate(GameState::Main)),
-        )
-        .add_system(apply_system_buffers.in_set(CustomFlush));
+            .add_systems(
+                (
+                    handle_hits,
+                    tick_despawn_timer,
+                    cleanup_marked_for_death_entities.after(handle_enemy_death),
+                    handle_attack_cooldowns
+                        .before(CustomFlush)
+                        .run_if(is_not_paused),
+                    update_status_effect_icons,
+                    handle_new_status_effect_event,
+                    // spawn_hit_spark_effect.after(handle_hits),
+                    handle_invincibility_frames.after(handle_hits),
+                    handle_enemy_death.after(handle_hits),
+                    handle_lifesteal,
+                    handle_thorns_on_damage_tracker.after(handle_hits),
+                    damage_tracker::track_player_damage,
+                )
+                    .in_set(OnUpdate(GameState::Main)),
+            )
+            .add_system(apply_system_buffers.in_set(CustomFlush))
+            .add_system(update_anim_visibility.in_set(OnUpdate(GameState::Main)));
+    }
+}
+
+pub fn update_anim_visibility(
+    settings: Res<CheatSettings>,
+    mut all: Query<(&AnimVisualCategory, &mut Visibility)>,
+    added: Query<Entity, Added<AnimVisualCategory>>,
+) {
+    if settings.is_changed() {
+        for (category, mut vis) in all.iter_mut() {
+            let should_hide = match category {
+                AnimVisualCategory::Attack => settings.hide_attack_anims,
+                AnimVisualCategory::Skill => settings.hide_skill_anims,
+                AnimVisualCategory::Heirloom => settings.hide_heirloom_anims,
+            };
+            *vis = if should_hide {
+                Visibility::Hidden
+            } else {
+                Visibility::Inherited
+            };
+        }
+    } else if !added.is_empty() {
+        for e in added.iter() {
+            if let Ok((category, mut vis)) = all.get_mut(e) {
+                let should_hide = match category {
+                    AnimVisualCategory::Attack => settings.hide_attack_anims,
+                    AnimVisualCategory::Skill => settings.hide_skill_anims,
+                    AnimVisualCategory::Heirloom => settings.hide_heirloom_anims,
+                };
+                *vis = if should_hide {
+                    Visibility::Hidden
+                } else {
+                    Visibility::Inherited
+                };
+            }
+        }
     }
 }
 
@@ -707,7 +744,8 @@ pub fn handle_hits(
                             {
                                 let mana_cost = Heirloom::OnHitEcho.get_mana_cost();
                                 let dmg = attack.unwrap_or(&Attack(0)).0;
-                                let size_mult = proj_size.unwrap_or(&ProjectileSize(0)).get_multiplier();
+                                let size_mult =
+                                    proj_size.unwrap_or(&ProjectileSize(0)).get_multiplier();
 
                                 for i in 0..echo_count {
                                     if current_mana.0 < mana_cost {
@@ -863,7 +901,11 @@ pub fn cleanup_marked_for_death_entities(
     graphics: Res<Graphics>,
     mut modify_mana_event: EventWriter<ModifyManaEvent>,
     mut neaby_mobs: Query<
-        (Entity, &GlobalTransform, &mut crate::combat::status_effects::MobStatusEffects),
+        (
+            Entity,
+            &GlobalTransform,
+            &mut crate::combat::status_effects::MobStatusEffects,
+        ),
         (With<Mob>, Without<MarkedForDeath>),
     >,
     mut status_event: EventWriter<StatusEffectEvent>,

@@ -370,6 +370,71 @@ fn initialize_stone_golem_timer(mut commands: Commands) {
     info!("Stone Golem spawn timer initialized");
 }
 
+#[derive(Clone, Copy)]
+enum StoneGolemSpawnMode {
+    Base,
+    Endless,
+}
+
+impl StoneGolemSpawnMode {
+    fn tag_infinite_mode(self) -> bool {
+        matches!(self, Self::Endless)
+    }
+}
+
+fn stone_golem_spawn_blocked_by_existing(existing_golems: &Query<&Mob>) -> bool {
+    existing_golems.iter().any(|m| m == &Mob::StoneGolem)
+}
+
+fn pick_valid_stone_golem_spawn_near_player(
+    player_query: &Query<&GlobalTransform, With<Player>>,
+    game: &GameParam,
+    proto_param: &ProtoParam,
+) -> Option<Vec2> {
+    let player_txfm = player_query.get_single().ok()?;
+    let player_pos = player_txfm.translation().truncate();
+    let mut rng = rand::thread_rng();
+    let mut pos = player_pos;
+    let mut attempts = 20usize;
+    let spawn_distance = TILE_SIZE.x * 12.0;
+
+    while attempts > 0 {
+        let angle = rng.gen_range(0.0..std::f32::consts::TAU);
+        let offset = Vec2::new(angle.cos(), angle.sin()) * spawn_distance;
+        pos = player_pos + offset;
+
+        if can_spawn_mob_here(pos, game, proto_param, false) {
+            return Some(pos);
+        }
+        attempts -= 1;
+    }
+    None
+}
+
+fn try_spawn_stone_golem(
+    mode: StoneGolemSpawnMode,
+    proto_commands: &mut ProtoCommands,
+    prototypes: &Prototypes,
+    commands: &mut Commands,
+    player_query: &Query<&GlobalTransform, With<Player>>,
+    game: &GameParam,
+    proto_param: &ProtoParam,
+    existing_golems: &Query<&Mob>,
+) {
+    if stone_golem_spawn_blocked_by_existing(existing_golems) {
+        return;
+    }
+    let Some(pos) = pick_valid_stone_golem_spawn_near_player(player_query, game, proto_param)
+    else {
+        return;
+    };
+    if let Some(spawned) = proto_commands.spawn_from_proto(Mob::StoneGolem, prototypes, pos) {
+        if mode.tag_infinite_mode() {
+            commands.entity(spawned).insert(InfiniteModeMob);
+        }
+    }
+}
+
 /// System to spawn Stone Golem in base mode cadence (4 minutes, one-time per era)
 fn spawn_stone_golem_timer(
     time: Res<Time>,
@@ -382,6 +447,7 @@ fn spawn_stone_golem_timer(
     game: GameParam,
     infinite_mode: Res<InfiniteMode>,
     existing_golems: Query<&Mob>,
+    mut commands: Commands,
 ) {
     if *NO_SPAWN {
         return;
@@ -405,39 +471,16 @@ fn spawn_stone_golem_timer(
 
     // Spawn golem when timer finishes
     if golem_timer.timer.just_finished() {
-        // Don't spawn if a Stone Golem already exists
-        let golem_exists = existing_golems.iter().any(|m| m == &Mob::StoneGolem);
-        if golem_exists {
-            info!("Stone Golem already exists, skipping spawn");
-            return;
-        }
-
-        // Find a spawn position near the player
-        if let Ok(player_txfm) = player_query.get_single() {
-            let player_pos = player_txfm.translation().truncate();
-            let mut rng = rand::thread_rng();
-            let mut pos = player_pos;
-            let mut attempts = 20;
-            let spawn_distance = TILE_SIZE.x * 12.0; // Spawn 12 tiles away
-
-            while attempts > 0 {
-                let angle = rng.gen_range(0.0..std::f32::consts::TAU);
-                let offset = Vec2::new(angle.cos(), angle.sin()) * spawn_distance;
-                pos = player_pos + offset;
-
-                if can_spawn_mob_here(pos, &game, &proto_param, false) {
-                    break;
-                }
-                attempts -= 1;
-            }
-
-            if attempts > 0 {
-                proto_commands.spawn_from_proto(Mob::StoneGolem, &prototypes, pos);
-                info!("Spawned Stone Golem at {:?}", pos);
-            } else {
-                info!("Failed to find valid spawn location for Stone Golem");
-            }
-        }
+        try_spawn_stone_golem(
+            StoneGolemSpawnMode::Base,
+            &mut proto_commands,
+            &prototypes,
+            &mut commands,
+            &player_query,
+            &game,
+            &proto_param,
+            &existing_golems,
+        );
     }
 }
 
@@ -479,42 +522,16 @@ fn spawn_endless_stone_golem_timer(
         return;
     }
 
-    // Don't spawn if a Stone Golem already exists.
-    let golem_exists = existing_golems.iter().any(|m| m == &Mob::StoneGolem);
-    if golem_exists {
-        info!("Stone Golem already exists, skipping endless spawn");
-        return;
-    }
-
-    if let Ok(player_txfm) = player_query.get_single() {
-        let player_pos = player_txfm.translation().truncate();
-        let mut rng = rand::thread_rng();
-        let mut pos = player_pos;
-        let mut attempts = 20;
-        let spawn_distance = TILE_SIZE.x * 12.0;
-
-        while attempts > 0 {
-            let angle = rng.gen_range(0.0..std::f32::consts::TAU);
-            let offset = Vec2::new(angle.cos(), angle.sin()) * spawn_distance;
-            pos = player_pos + offset;
-
-            if can_spawn_mob_here(pos, &game, &proto_param, false) {
-                break;
-            }
-            attempts -= 1;
-        }
-
-        if attempts > 0 {
-            if let Some(spawned_golem) =
-                proto_commands.spawn_from_proto(Mob::StoneGolem, &prototypes, pos)
-            {
-                commands.entity(spawned_golem).insert(InfiniteModeMob);
-                info!("Spawned Stone Golem in endless mode at {:?}", pos);
-            }
-        } else {
-            info!("Failed to find valid spawn location for endless Stone Golem");
-        }
-    }
+    try_spawn_stone_golem(
+        StoneGolemSpawnMode::Endless,
+        &mut proto_commands,
+        &prototypes,
+        &mut commands,
+        &player_query,
+        &game,
+        &proto_param,
+        &existing_golems,
+    );
 }
 
 /// Reset Stone Golem spawn timer when changing eras/dimensions

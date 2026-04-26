@@ -30,12 +30,13 @@ use crate::{
     Pet,
 };
 
-pub const ICE_EXPLOSION_DMG_MULT: f32 = 0.6;
-
 use super::{mage_skills::TeleportState, rogue_skills::ComboCounter};
 
-#[derive(Component, Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Hash, EnumIter)]
+#[derive(
+    Component, Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Hash, EnumIter, Default,
+)]
 pub enum SkillClass {
+    #[default]
     None,
 
     Warrior, // Sword, Spear, Hammer - +5 HP per level
@@ -45,7 +46,7 @@ pub enum SkillClass {
     Hunter,  // Bow, Gun - +3% crit dmg per level
 }
 
-#[derive(Component, Debug, Clone, Serialize, Deserialize, Resource)]
+#[derive(Component, Debug, Clone, Serialize, Deserialize, Resource, Default)]
 pub struct PlayerClass {
     pub class: SkillClass,
     pub pets: Vec<Pet>,

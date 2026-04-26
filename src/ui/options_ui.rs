@@ -26,6 +26,9 @@ pub struct CheatSettings {
     pub show_enemy_damage_numbers: bool,
     /// When true, the tile under the cursor is highlighted during gameplay
     pub show_tile_hover: bool,
+    pub hide_attack_anims: bool,
+    pub hide_skill_anims: bool,
+    pub hide_heirloom_anims: bool,
 }
 
 impl Default for CheatSettings {
@@ -36,6 +39,9 @@ impl Default for CheatSettings {
             dev_mode: false,
             show_enemy_damage_numbers: true,
             show_tile_hover: true,
+            hide_attack_anims: false,
+            hide_skill_anims: false,
+            hide_heirloom_anims: false,
         }
     }
 }
@@ -48,6 +54,9 @@ pub enum OptionsCheckboxType {
     DevMode,
     ShowEnemyDamageNumbers,
     ShowTileHover,
+    HideAttackAnims,
+    HideSkillAnims,
+    HideHeirloomAnims,
 }
 
 #[derive(Component)]
@@ -649,8 +658,68 @@ pub fn setup_options_ui(
         cheat_settings.show_tile_hover,
     );
 
+    let hide_attack_y = tile_hover_checkbox_y - 16.;
+    spawn_options_checkbox(
+        &mut commands,
+        &graphics,
+        &asset_server,
+        "Hide Attack Anims:",
+        Vec3::new(
+            right_side_x,
+            hide_attack_y,
+            ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
+        ),
+        Vec3::new(
+            right_side_x + 100.5,
+            hide_attack_y + 0.5,
+            ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
+        ),
+        OptionsCheckboxType::HideAttackAnims,
+        cheat_settings.hide_attack_anims,
+    );
+
+    let hide_skill_y = hide_attack_y - 16.;
+    spawn_options_checkbox(
+        &mut commands,
+        &graphics,
+        &asset_server,
+        "Hide Skill Anims:",
+        Vec3::new(
+            right_side_x,
+            hide_skill_y,
+            ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
+        ),
+        Vec3::new(
+            right_side_x + 100.5,
+            hide_skill_y + 0.5,
+            ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
+        ),
+        OptionsCheckboxType::HideSkillAnims,
+        cheat_settings.hide_skill_anims,
+    );
+
+    let hide_heirloom_y = hide_skill_y - 16.;
+    spawn_options_checkbox(
+        &mut commands,
+        &graphics,
+        &asset_server,
+        "Hide Heirloom Anims:",
+        Vec3::new(
+            right_side_x,
+            hide_heirloom_y,
+            ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
+        ),
+        Vec3::new(
+            right_side_x + 100.5,
+            hide_heirloom_y + 0.5,
+            ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
+        ),
+        OptionsCheckboxType::HideHeirloomAnims,
+        cheat_settings.hide_heirloom_anims,
+    );
+
     // Volume section
-    let volume_section_y = tile_hover_checkbox_y - 28.;
+    let volume_section_y = hide_heirloom_y - 28.;
     commands.spawn((
         Text2dBundle {
             text: Text::from_section(
@@ -1010,6 +1079,41 @@ pub fn handle_cheat_checkbox_click(
                                     },
                                 )
                             }
+                            OptionsCheckboxType::HideAttackAnims => {
+                                cheat_settings.hide_attack_anims =
+                                    !cheat_settings.hide_attack_anims;
+                                (
+                                    cheat_settings.hide_attack_anims,
+                                    if cheat_settings.hide_attack_anims {
+                                        UIElement::CheckBoxSelected
+                                    } else {
+                                        UIElement::CheckBox
+                                    },
+                                )
+                            }
+                            OptionsCheckboxType::HideSkillAnims => {
+                                cheat_settings.hide_skill_anims = !cheat_settings.hide_skill_anims;
+                                (
+                                    cheat_settings.hide_skill_anims,
+                                    if cheat_settings.hide_skill_anims {
+                                        UIElement::CheckBoxSelected
+                                    } else {
+                                        UIElement::CheckBox
+                                    },
+                                )
+                            }
+                            OptionsCheckboxType::HideHeirloomAnims => {
+                                cheat_settings.hide_heirloom_anims =
+                                    !cheat_settings.hide_heirloom_anims;
+                                (
+                                    cheat_settings.hide_heirloom_anims,
+                                    if cheat_settings.hide_heirloom_anims {
+                                        UIElement::CheckBoxSelected
+                                    } else {
+                                        UIElement::CheckBox
+                                    },
+                                )
+                            }
                         };
                         *texture = graphics.get_ui_element_texture(checkbox_ui).clone();
                         commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.2));
@@ -1069,6 +1173,27 @@ pub fn update_cheat_checkbox_visual(
             }
             OptionsCheckboxType::ShowTileHover => {
                 if cheat_settings.show_tile_hover {
+                    UIElement::CheckBoxSelected
+                } else {
+                    UIElement::CheckBox
+                }
+            }
+            OptionsCheckboxType::HideAttackAnims => {
+                if cheat_settings.hide_attack_anims {
+                    UIElement::CheckBoxSelected
+                } else {
+                    UIElement::CheckBox
+                }
+            }
+            OptionsCheckboxType::HideSkillAnims => {
+                if cheat_settings.hide_skill_anims {
+                    UIElement::CheckBoxSelected
+                } else {
+                    UIElement::CheckBox
+                }
+            }
+            OptionsCheckboxType::HideHeirloomAnims => {
+                if cheat_settings.hide_heirloom_anims {
                     UIElement::CheckBoxSelected
                 } else {
                     UIElement::CheckBox

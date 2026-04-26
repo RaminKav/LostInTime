@@ -15,7 +15,7 @@
                 item: SmallPotion,
                 min: 1,
                 max: 1,
-                rate: 0.0006
+                rate: 0.00045
             ),
             (
                 item: LargePotion,
@@ -51,7 +51,7 @@
                 item: UpgradeTome,
                 min: 1,
                 max: 1,
-                rate: 0.003
+                rate: 0.002
             ),
             (
                 item: OrbOfTransformation,
@@ -63,7 +63,7 @@
                 item: Key,
                 min: 1,
                 max: 1,
-                rate: 0.0005
+                rate: 0.00035
             ),
             (
                 item: TimeFragment,

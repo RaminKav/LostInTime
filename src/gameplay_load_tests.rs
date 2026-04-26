@@ -547,6 +547,7 @@ fn heirloom_load_test_burst(
                     rng.gen_range(6..14),
                     &mut mana_none,
                     0,
+                    1.0,
                 );
             }
         }

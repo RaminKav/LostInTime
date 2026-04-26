@@ -9,6 +9,7 @@ use crate::{
     assets::Graphics,
     attributes::{
         modifiers::ModifyManaEvent, Attack, CurrentHealth, CurrentMana, ManaRegen, MaxHealth,
+        ProjectileSize,
     },
     audio::{AudioSoundEffect, SoundSpawner},
     combat::{
@@ -18,7 +19,7 @@ use crate::{
     custom_commands::CommandsExt,
     enemy::{EliteMob, Mob},
     item::{
-        projectile::{Projectile, RangedAttackEvent},
+        projectile::{AnimVisualCategory, Projectile, RangedAttackEvent},
         ItemDrop, WorldObject,
     },
     player::{
@@ -91,6 +92,8 @@ pub struct AntFarmAnt {
     pub speed: f32,
     pub lifetime: Timer,
     pub spawn_delay: Timer,
+    /// Matches player projectile size (size stat + Gigantify, etc.).
+    pub size_multiplier: f32,
 }
 
 /// Tracks the StoneTooth heirloom's spawn cooldown on the player. Same
@@ -108,6 +111,8 @@ pub struct OrbitingStone {
     pub base_angle: f32,
     /// If true, rock is visible and can deal damage. Always true for pierce rocks; lifespan controls despawn.
     pub active: bool,
+    /// Matches player projectile size for hit radius and sprite.
+    pub size_multiplier: f32,
 }
 
 /// Tracks lifetime and which enemies this rock has already hit (pierce: hit each once).
@@ -164,6 +169,8 @@ pub struct SummonRingProjectile {
     pub returning: bool,
     /// Cooldown before the ring can bounce again (starts at 0 so first bounce is immediate).
     pub bounce_cooldown: Timer,
+    /// Scaled collider radius (matches Rapier ball + bounce nudge).
+    pub collider_radius: f32,
 }
 
 /// World objects that projectiles pass through (no bounce). Ring bounces off everything else that has a collider.
@@ -274,6 +281,7 @@ pub fn spawn_ant_farm_ants(
     count: usize,
     mana_value: &mut Option<&mut i32>,
     mana_cost_per: i32,
+    size_multiplier: f32,
 ) -> usize {
     let mut rng = rand::thread_rng();
     let mut spawned = 0;
@@ -289,7 +297,7 @@ pub fn spawn_ant_farm_ants(
         let distance = rng.gen_range(0.0..6.0);
         let offset = Vec2::from_angle(angle) * distance;
         let mut sprite = graphics.get_heirloom_icon(Heirloom::AntFarm);
-        sprite.custom_size = Some(Vec2::splat(12.0));
+        sprite.custom_size = Some(Vec2::splat(12.0 * size_multiplier));
         commands.spawn((
             SpriteSheetBundle {
                 texture_atlas: texture_atlas.clone(),
@@ -305,7 +313,9 @@ pub fn spawn_ant_farm_ants(
                 speed: ANT_SPEED,
                 lifetime: Timer::from_seconds(ANT_LIFETIME, TimerMode::Once),
                 spawn_delay: Timer::from_seconds(i as f32 * ANT_CHAIN_DELAY, TimerMode::Once),
+                size_multiplier,
             },
+            AnimVisualCategory::Heirloom,
             YSort(-0.2),
             Name::new("AntFarmAnt"),
         ));
@@ -325,6 +335,7 @@ pub fn spawn_stone_tooth_rocks(
     count: usize,
     mana_value: &mut Option<&mut i32>,
     mana_cost_per: i32,
+    size_multiplier: f32,
 ) -> usize {
     let mut spawned = 0;
     for index in 0..count {
@@ -343,9 +354,8 @@ pub fn spawn_stone_tooth_rocks(
         // Rocks start at player and expand outward (offset applied in update_stone_tooth).
         let offset = Vec2::ZERO;
         let mut sprite = graphics.get_heirloom_icon(Heirloom::StoneTooth);
-        if sprite.custom_size.is_none() {
-            sprite.custom_size = Some(Vec2::splat(16.0));
-        }
+        let base_icon = sprite.custom_size.unwrap_or(Vec2::splat(16.0));
+        sprite.custom_size = Some(base_icon * size_multiplier);
         let transform =
             Transform::from_translation(player_pos + Vec3::new(offset.x, offset.y, 0.25));
         commands.spawn((
@@ -359,11 +369,13 @@ pub fn spawn_stone_tooth_rocks(
                 owner: player_e,
                 base_angle,
                 active: true,
+                size_multiplier,
             },
             StoneToothRockLifetime {
                 lifetime: Timer::from_seconds(STONE_TOOTH_ROCK_LIFETIME, TimerMode::Once),
                 hit_entities: HashSet::new(),
             },
+            AnimVisualCategory::Heirloom,
             YSort(-0.1),
             Name::new("StoneToothRock"),
         ));
@@ -382,10 +394,12 @@ pub fn spawn_summon_ring_rings(
     count: usize,
     mana_value: &mut Option<&mut i32>,
     mana_cost_per: i32,
+    size_multiplier: f32,
 ) -> usize {
     let mut rng = rand::thread_rng();
     let mut spawned = 0;
     let count_float = count.max(1) as f32;
+    let collider_radius = SUMMON_RING_COLLIDER_RADIUS * size_multiplier;
     for index in 0..count {
         if let Some(mana) = mana_value.as_mut() {
             let current = **mana;
@@ -399,7 +413,7 @@ pub fn spawn_summon_ring_rings(
         let angle = index as f32 * segment + rng.gen_range(0.0..segment);
         let direction = Vec2::from_angle(angle);
         let mut sprite = graphics.get_heirloom_icon(Heirloom::SummonRing);
-        sprite.custom_size = Some(Vec2::splat(16.0));
+        sprite.custom_size = Some(Vec2::splat(16.0 * size_multiplier));
         let rotation = Quat::from_rotation_z(angle);
         commands.spawn((
             SpriteSheetBundle {
@@ -419,10 +433,12 @@ pub fn spawn_summon_ring_rings(
                 hit_entities: HashSet::new(),
                 returning: false,
                 bounce_cooldown: Timer::from_seconds(0.0, TimerMode::Once),
+                collider_radius,
             },
+            AnimVisualCategory::Heirloom,
             RigidBody::KinematicPositionBased,
             Sensor,
-            Collider::ball(SUMMON_RING_COLLIDER_RADIUS),
+            Collider::ball(collider_radius),
             YSort(-0.1),
             Name::new("SummonRing"),
         ));
@@ -439,6 +455,7 @@ pub fn handle_ant_farm_state(
             Entity,
             &GlobalTransform,
             &PlayerSkills,
+            &ProjectileSize,
             Option<&mut AntFarmState>,
             &mut CurrentMana,
         ),
@@ -447,11 +464,12 @@ pub fn handle_ant_farm_state(
     graphics: Res<Graphics>,
     mut trigger_counts: ResMut<HeirloomTriggerCounts>,
 ) {
-    let Ok((player_e, player_txfm, skills, mut state_option, mut curr_mana)) =
+    let Ok((player_e, player_txfm, skills, projectile_size, mut state_option, mut curr_mana)) =
         player_query.get_single_mut()
     else {
         return;
     };
+    let size_mult = projectile_size.get_multiplier();
     let stacks = skills.get_count(Heirloom::AntFarm);
     let player_pos = player_txfm.translation();
     let had_state = state_option.is_some();
@@ -492,6 +510,7 @@ pub fn handle_ant_farm_state(
         count_usize,
         &mut mana_opt,
         Heirloom::AntFarm.get_mana_cost(),
+        size_mult,
     );
     if spawned > 0 {
         trigger_counts.increment(Heirloom::AntFarm);
@@ -506,6 +525,7 @@ pub fn handle_summon_ring_state(
             Entity,
             &GlobalTransform,
             &PlayerSkills,
+            &ProjectileSize,
             Option<&mut SummonRingState>,
             &mut CurrentMana,
         ),
@@ -514,11 +534,12 @@ pub fn handle_summon_ring_state(
     graphics: Res<Graphics>,
     mut trigger_counts: ResMut<HeirloomTriggerCounts>,
 ) {
-    let Ok((player_e, player_txfm, skills, mut state_option, mut curr_mana)) =
+    let Ok((player_e, player_txfm, skills, projectile_size, mut state_option, mut curr_mana)) =
         player_query.get_single_mut()
     else {
         return;
     };
+    let size_mult = projectile_size.get_multiplier();
     let stacks = skills.get_count(Heirloom::SummonRing);
     let player_pos = player_txfm.translation();
     let had_state = state_option.is_some();
@@ -560,6 +581,7 @@ pub fn handle_summon_ring_state(
         count_usize,
         &mut mana_opt,
         Heirloom::SummonRing.get_mana_cost(),
+        size_mult,
     );
     if spawned > 0 {
         trigger_counts.increment(Heirloom::SummonRing);
@@ -737,7 +759,8 @@ pub fn update_summon_ring(
                     } else {
                         Vec2::new(0.0, delta.y.signum())
                     };
-                    let nudge = SUMMON_RING_COLLIDER_RADIUS - 4.0;
+                    let nudge = (SUMMON_RING_COLLIDER_RADIUS - 4.0)
+                        * (ring.collider_radius / SUMMON_RING_COLLIDER_RADIUS);
                     transform.translation += (push_dir * nudge).extend(0.0);
                     // Only one bounce per frame to avoid double-reflection from multiple
                     // intersections (e.g. same wall reported twice or corner with two colliders).
@@ -806,7 +829,8 @@ pub fn update_ant_farm_ants(
         let step = (ant.speed * time.delta_seconds()).min(distance);
         transform.translation += (direction * step).extend(0.0);
 
-        if transform.translation.truncate().distance(snapshot.position) <= ANT_CONTACT_DISTANCE {
+        let contact_dist = ANT_CONTACT_DISTANCE * ant.size_multiplier;
+        if transform.translation.truncate().distance(snapshot.position) <= contact_dist {
             let frail_stacks = frail_query
                 .get(snapshot.entity)
                 .map(|s| s.frail_stacks())
@@ -839,6 +863,7 @@ pub fn update_stone_tooth(
             Entity,
             &GlobalTransform,
             &PlayerSkills,
+            &ProjectileSize,
             Option<&mut StoneToothState>,
             &mut CurrentMana,
         ),
@@ -856,11 +881,12 @@ pub fn update_stone_tooth(
     graphics: Res<Graphics>,
     mut game: GameParam,
 ) {
-    let Ok((player_e, player_txfm, skills, mut state_option, mut curr_mana)) =
+    let Ok((player_e, player_txfm, skills, projectile_size, mut state_option, mut curr_mana)) =
         player_query.get_single_mut()
     else {
         return;
     };
+    let size_mult = projectile_size.get_multiplier();
 
     let stacks = skills.get_count(Heirloom::StoneTooth);
     let player_pos = player_txfm.translation();
@@ -932,9 +958,8 @@ pub fn update_stone_tooth(
                 continue;
             }
             let mob_pos = snapshot.position;
-            if mob_pos.distance_squared(stone_pos)
-                <= STONE_CONTACT_DISTANCE * STONE_CONTACT_DISTANCE
-            {
+            let contact = STONE_CONTACT_DISTANCE * stone.size_multiplier;
+            if mob_pos.distance_squared(stone_pos) <= contact * contact {
                 let dir = (mob_pos - stone_pos).normalize_or_zero();
                 let frail_stacks = frail_query
                     .get(snapshot.entity)
@@ -977,6 +1002,7 @@ pub fn update_stone_tooth(
         stacks as usize,
         &mut mana_opt,
         Heirloom::StoneTooth.get_mana_cost(),
+        size_mult,
     );
     if spawned > 0 {
         game.heirloom_trigger_counts.increment(Heirloom::StoneTooth);
@@ -991,6 +1017,7 @@ pub fn handle_trigger_summons_on_heal(
             Entity,
             &GlobalTransform,
             &PlayerSkills,
+            &ProjectileSize,
             &mut CurrentMana,
             Option<&mut AntFarmState>,
             Option<&mut StoneToothState>,
@@ -1009,6 +1036,7 @@ pub fn handle_trigger_summons_on_heal(
             player_e,
             player_txfm,
             skills,
+            projectile_size,
             mut curr_mana,
             mut ant_state,
             mut stone_state,
@@ -1017,6 +1045,7 @@ pub fn handle_trigger_summons_on_heal(
         else {
             continue;
         };
+        let size_mult = projectile_size.get_multiplier();
         let player_pos = player_txfm.translation();
         trigger_counts.increment(Heirloom::HealSummons);
 
@@ -1032,6 +1061,7 @@ pub fn handle_trigger_summons_on_heal(
                 ant_stacks,
                 &mut mana_opt,
                 0,
+                size_mult,
             );
             if let Some(ref mut state) = ant_state {
                 state.timer.reset();
@@ -1050,6 +1080,7 @@ pub fn handle_trigger_summons_on_heal(
                 stone_stacks,
                 &mut mana_opt,
                 0,
+                size_mult,
             );
             if let Some(ref mut state) = stone_state {
                 state.elapsed = 0.0;
@@ -1069,6 +1100,7 @@ pub fn handle_trigger_summons_on_heal(
                 ring_stacks,
                 &mut mana_opt,
                 0,
+                size_mult,
             );
             if let Some(ref mut state) = ring_state {
                 state.timer.reset();
@@ -1146,6 +1178,7 @@ pub fn handle_reaper_soul_spawns(
                     lifetime: Timer::from_seconds(REAPER_SOUL_LIFETIME, TimerMode::Once),
                     drift_phase: rng.gen_range(0.0..TAU),
                 },
+                AnimVisualCategory::Heirloom,
                 YSort(-0.15),
                 Name::new("ReaperSoul"),
             ));

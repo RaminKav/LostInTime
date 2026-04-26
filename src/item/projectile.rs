@@ -152,6 +152,42 @@ impl Projectile {
             _ => false,
         }
     }
+    pub fn animation_category(&self) -> AnimVisualCategory {
+        match self {
+            Projectile::Lightning
+            | Projectile::ManaOrbProjectile
+            | Projectile::ThornsProjectile
+            | Projectile::Arc
+            | Projectile::Echo
+            | Projectile::IceExplosionAOE
+            | Projectile::IceFloor => AnimVisualCategory::Heirloom,
+
+            Projectile::FireRing
+            | Projectile::IceWall
+            | Projectile::Shout
+            | Projectile::LaserBeam
+            | Projectile::BombExplosion
+            | Projectile::Bomb
+            | Projectile::DaggerSlash
+            | Projectile::DaggerThrow
+            | Projectile::FuryKunai
+            | Projectile::SpinAttack
+            | Projectile::SpearGravity
+            | Projectile::TeleportShock
+            | Projectile::PoisonCloud
+            | Projectile::HealHearts
+            | Projectile::AttackSpeed
+            | Projectile::Smoke => AnimVisualCategory::Skill,
+            _ => AnimVisualCategory::Attack,
+        }
+    }
+}
+
+#[derive(Component, Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AnimVisualCategory {
+    Attack,
+    Skill,
+    Heirloom,
 }
 #[derive(Deserialize, FromReflect, Default, Reflect, Clone, Serialize, Component, Schematic)]
 #[reflect(Component, Schematic, Default)]
@@ -435,6 +471,9 @@ fn handle_spawn_projectiles_after_delay(
             );
 
             if let Some(p) = p {
+                if !proj.from_enemy {
+                    commands.entity(p).insert(proj.proj.animation_category());
+                }
                 if proj.proj.is_anchored_to_player_pos() && !proj.is_followup_proj {
                     let entity = proj.from_entity.unwrap_or(player.single());
                     // Check if parent entity still exists before adding child

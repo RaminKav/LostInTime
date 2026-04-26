@@ -10,10 +10,10 @@
       sand_frequency: 0.32,
       dirt_frequency: 0.0,
       forest_params: (
-        tree_spacing_radius: 96.,
+        tree_spacing_radius: 68.,
         tree_density: 0.01,
         forest_radius: 6.,
-        max_trees_per_forest: 6,
+        max_trees_per_forest: 8,
         tree_weights: {
           SnowLeaflessTree1: 7.0,
           SnowLeaflessTree2: 7.0,

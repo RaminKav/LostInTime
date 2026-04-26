@@ -407,8 +407,14 @@ fn spawn_player(
     mut game: ResMut<Game>,
     mut exp_sync_event: EventWriter<FlashExpBarEvent>,
     proto: ProtoParam,
+    player_class: Option<Res<PlayerClass>>,
 ) {
     let cape_stack = proto.get_item_data(WorldObject::GreyCape).unwrap();
+    let class = if let Some(class) = player_class {
+        class.clone()
+    } else {
+        PlayerClass::default()
+    };
     let p = commands
         .spawn((
             TransformBundle::from_transform(Transform::from_translation(Vec3::new(0., 0., 1.))),
@@ -429,16 +435,7 @@ fn spawn_player(
                 crafting_inputs_items: Container::with_size(3),
             },
             //TODO: remove itematt and construct from components?
-            ItemAttributes {
-                health: AttributeValue::new(100, AttributeQuality::Low, 0.),
-                mana: AttributeValue::new(100, AttributeQuality::Low, 0.),
-                attack: AttributeValue::new(0, AttributeQuality::Low, 0.),
-                health_regen: AttributeValue::new(2, AttributeQuality::Low, 0.),
-                mana_regen: AttributeValue::new(10, AttributeQuality::Low, 0.),
-                crit_chance: AttributeValue::new(5, AttributeQuality::Low, 0.),
-                crit_damage: AttributeValue::new(150, AttributeQuality::Low, 0.),
-                ..default()
-            },
+            get_class_starting_stats(class.class),
             Hunger::new(100),
             HungerTracker::new(7., 8),
             InvincibilityCooldown(0.5),
@@ -752,4 +749,69 @@ pub fn force_player_autopick(game: &mut GameParam) {
     }
 
     game.player_mut().is_moving = true;
+}
+
+pub fn get_class_starting_stats(class: SkillClass) -> ItemAttributes {
+    match class {
+        SkillClass::Warrior => ItemAttributes {
+            health: AttributeValue::new(150, AttributeQuality::Low, 0.),
+            mana: AttributeValue::new(60, AttributeQuality::Low, 0.),
+            attack: AttributeValue::new(0, AttributeQuality::Low, 0.),
+            health_regen: AttributeValue::new(5, AttributeQuality::Low, 0.),
+            mana_regen: AttributeValue::new(10, AttributeQuality::Low, 0.),
+            crit_chance: AttributeValue::new(5, AttributeQuality::Low, 0.),
+            crit_damage: AttributeValue::new(150, AttributeQuality::Low, 0.),
+            ..default()
+        },
+        SkillClass::Wizard => ItemAttributes {
+            health: AttributeValue::new(70, AttributeQuality::Low, 0.),
+            mana: AttributeValue::new(150, AttributeQuality::Low, 0.),
+            attack: AttributeValue::new(0, AttributeQuality::Low, 0.),
+            health_regen: AttributeValue::new(2, AttributeQuality::Low, 0.),
+            mana_regen: AttributeValue::new(15, AttributeQuality::Low, 0.),
+            crit_chance: AttributeValue::new(5, AttributeQuality::Low, 0.),
+            crit_damage: AttributeValue::new(150, AttributeQuality::Low, 0.),
+            ..default()
+        },
+        SkillClass::Rogue => ItemAttributes {
+            health: AttributeValue::new(80, AttributeQuality::Low, 0.),
+            mana: AttributeValue::new(100, AttributeQuality::Low, 0.),
+            attack: AttributeValue::new(0, AttributeQuality::Low, 0.),
+            health_regen: AttributeValue::new(2, AttributeQuality::Low, 0.),
+            mana_regen: AttributeValue::new(10, AttributeQuality::Low, 0.),
+            crit_chance: AttributeValue::new(15, AttributeQuality::Low, 0.),
+            crit_damage: AttributeValue::new(150, AttributeQuality::Low, 0.),
+            ..default()
+        },
+        SkillClass::Thief => ItemAttributes {
+            health: AttributeValue::new(100, AttributeQuality::Low, 0.),
+            mana: AttributeValue::new(100, AttributeQuality::Low, 0.),
+            attack: AttributeValue::new(0, AttributeQuality::Low, 0.),
+            health_regen: AttributeValue::new(2, AttributeQuality::Low, 0.),
+            mana_regen: AttributeValue::new(10, AttributeQuality::Low, 0.),
+            crit_chance: AttributeValue::new(10, AttributeQuality::Low, 0.),
+            crit_damage: AttributeValue::new(150, AttributeQuality::Low, 0.),
+            ..default()
+        },
+        SkillClass::Hunter => ItemAttributes {
+            health: AttributeValue::new(120, AttributeQuality::Low, 0.),
+            mana: AttributeValue::new(100, AttributeQuality::Low, 0.),
+            attack: AttributeValue::new(0, AttributeQuality::Low, 0.),
+            health_regen: AttributeValue::new(2, AttributeQuality::Low, 0.),
+            mana_regen: AttributeValue::new(10, AttributeQuality::Low, 0.),
+            crit_chance: AttributeValue::new(20, AttributeQuality::Low, 0.),
+            crit_damage: AttributeValue::new(150, AttributeQuality::Low, 0.),
+            ..default()
+        },
+        SkillClass::None => ItemAttributes {
+            health: AttributeValue::new(100, AttributeQuality::Low, 0.),
+            mana: AttributeValue::new(100, AttributeQuality::Low, 0.),
+            attack: AttributeValue::new(0, AttributeQuality::Low, 0.),
+            health_regen: AttributeValue::new(2, AttributeQuality::Low, 0.),
+            mana_regen: AttributeValue::new(10, AttributeQuality::Low, 0.),
+            crit_chance: AttributeValue::new(5, AttributeQuality::Low, 0.),
+            crit_damage: AttributeValue::new(150, AttributeQuality::Low, 0.),
+            ..default()
+        },
+    }
 }

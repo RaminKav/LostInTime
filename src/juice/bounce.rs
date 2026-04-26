@@ -53,6 +53,7 @@ pub fn bounce_on_hit(
         if !bounce_on_hit.is_active {
             continue;
         }
+        let mut max_bounce = 2.5;
         let modifier = if let Some(obj) = obj_option {
             if obj.is_medium_size(&proto_param) {
                 // large objects
@@ -65,6 +66,7 @@ pub fn bounce_on_hit(
                 1.
             }
         } else if mob_option.is_some() && mob_option.unwrap().is_boss() {
+            max_bounce = 1.35;
             // bosses
             0.5
         } else {
@@ -84,7 +86,7 @@ pub fn bounce_on_hit(
             t.scale.y = 1.0;
             bounce_on_hit.is_active = false;
         }
-        t.scale.x = t.scale.x.clamp(1., 2.5);
-        t.scale.y = t.scale.y.clamp(1., 2.5);
+        t.scale.x = t.scale.x.clamp(1., max_bounce);
+        t.scale.y = t.scale.y.clamp(1., max_bounce);
     }
 }

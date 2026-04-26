@@ -856,6 +856,7 @@ pub fn handle_spawn_inv_player_stats(
             &Lifesteal,
             &PickupRange,
             &AttackSpeed,
+            &HealthRegen,
         ),
         With<Player>,
     >,
@@ -927,6 +928,7 @@ pub fn handle_spawn_inv_player_stats(
             lifesteal,
             pickup_range,
             attack_speed,
+            health_regen,
         ) = player_stats.single();
 
         let attributes = ItemAttributes {
@@ -949,6 +951,7 @@ pub fn handle_spawn_inv_player_stats(
             lifesteal: AttributeValue::new(lifesteal.0, AttributeQuality::Low, 0.),
             pickup_range: AttributeValue::new(pickup_range.0, AttributeQuality::Low, 0.),
             attack_speed: AttributeValue::new(attack_speed.0, AttributeQuality::Low, 0.),
+            health_regen: AttributeValue::new(health_regen.0, AttributeQuality::Low, 0.),
             ..Default::default()
         }
         .get_stats_summary(curr_health.0, curr_mana.0);

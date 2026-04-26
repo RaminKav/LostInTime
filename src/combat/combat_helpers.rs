@@ -48,6 +48,7 @@ pub fn spawn_temp_collider(
     collider: Collider,
     projectile: Projectile,
 ) -> Entity {
+    let category = projectile.animation_category();
     commands
         .spawn(TransformBundle {
             local: transform,
@@ -56,6 +57,7 @@ pub fn spawn_temp_collider(
         .insert(DespawnTimer(Timer::from_seconds(duration, TimerMode::Once)))
         .insert(Attack(attack))
         .insert(projectile)
+        .insert(category)
         .insert(Sensor)
         .insert(ActiveEvents::COLLISION_EVENTS)
         .insert(ActiveCollisionTypes::all())

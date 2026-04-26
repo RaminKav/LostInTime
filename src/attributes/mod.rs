@@ -436,8 +436,9 @@ impl ItemAttributes {
         tooltips.push((
             "Attack             ".to_string(),
             format!(
-                "{}",
-                f32::floor(self.attack.value as f32 * (1. + self.bonus_damage.value as f32 / 100.))
+                "{} ({:.2}x)",
+                f32::floor(self.attack.value as f32 * (1. + self.bonus_damage.value as f32 / 100.)),
+                1. + self.bonus_damage.value as f32 / 100.
             ),
         ));
         tooltips.push(("Defence        ".to_string(), format!("{}", self.defence)));
@@ -454,6 +455,10 @@ impl ItemAttributes {
             format!("{}", self.skill_power),
         ));
         tooltips.push(("Mana Regen  ".to_string(), format!("{}", self.mana_regen)));
+        tooltips.push((
+            "Health Regen  ".to_string(),
+            format!("{}", self.health_regen),
+        ));
         tooltips.push(("Thorns           ".to_string(), format!("{}", self.thorns)));
         tooltips.push(("Dodge            ".to_string(), format!("{}", self.dodge)));
         tooltips.push(("Speed          ".to_string(), format!("{}", self.speed)));

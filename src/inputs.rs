@@ -949,7 +949,7 @@ pub fn mouse_click_system(
                     from_enemy: false,
                     is_followup_proj: false,
                     from_entity: None,
-                    mana_cost: mana_cost_option.map(|m| -m.0),
+                    mana_cost: mana_cost_option.map(|m| m.0),
                     dmg_override: None,
                     pos_override: if ranged_tool.0.is_anchored_to_player_pos() {
                         Some(Vec2::ZERO)
