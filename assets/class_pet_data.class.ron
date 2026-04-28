@@ -36,7 +36,7 @@
             ],
             class_icon: GreenPlayerSelectIcon,
             skill_icon: CritChanceIcon,
-            active_skills: (SprintLunge, PossessedBlade, Stealth, DaggerSlash),
+            active_skills: (SprintLunge, PossessedBlade, RapidFire, DaggerSlash),
             starting_weapons: [Dagger],
         ),
         Thief: (
