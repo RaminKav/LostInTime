@@ -22,7 +22,11 @@ use crate::{
     client::is_not_paused,
     colors::{BLACK, DARK_GREEN, GREY, LIGHT_BROWN, LIGHT_GREEN, PINK, RED},
     inputs::FacingDirection,
-    item::{projectile::Projectile, Loot, LootTable},
+    item::{
+        boss_shrine::{BossSummonIndex, BossSummonTracker},
+        projectile::Projectile,
+        Loot, LootTable,
+    },
     night::{InfiniteModeMob, NightTracker},
     player::levels::{ExperienceReward, PlayerLevel},
     proto::{proto_param::ProtoParam, ColliderCapsulProto},
@@ -66,6 +70,9 @@ impl Plugin for EnemyPlugin {
                     red_mushling::handle_mushling_rush_warnings.run_if(is_not_paused),
                     juice_up_spawned_elite_mobs.before(add_current_health_with_max_health),
                     juice_up_spawned_mobs_per_day.before(add_current_health_with_max_health),
+                    scale_boss_summon_stats
+                        .after(juice_up_spawned_mobs_per_day)
+                        .before(add_current_health_with_max_health),
                     enhance_infinite_mode_mobs.before(add_current_health_with_max_health),
                     enhance_infinite_mode_leap_attack_startup,
                 )
@@ -92,7 +99,8 @@ impl Plugin for EnemyPlugin {
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
-            .add_plugin(SpawnerPlugin);
+            .add_plugin(SpawnerPlugin)
+            .add_system(apply_pending_tint.in_set(OnUpdate(GameState::Main)));
     }
 }
 
@@ -600,6 +608,60 @@ fn juice_up_spawned_mobs_per_day(
     }
 }
 
+/// Pending tint to apply once the TextureAtlasSprite is available (needed for
+/// Aseprite mobs whose sprite sheet is inserted asynchronously by bevy_aseprite).
+#[derive(Component)]
+pub struct PendingTint(pub Color);
+
+/// Extra HP/attack scaling for bosses summoned multiple times per era.
+/// The first summon (index 0) gets no bonus; each subsequent one scales up.
+fn scale_boss_summon_stats(
+    mut bosses: Query<
+        (Entity, &mut MaxHealth, &mut Attack, &BossSummonIndex, &Mob),
+        Added<BossSummonIndex>,
+    >,
+    tracker: Res<BossSummonTracker>,
+    mut commands: Commands,
+) {
+    for (e, mut hp, mut att, summon_idx, mob) in bosses.iter_mut() {
+        let idx = summon_idx.0;
+        if idx == 0 {
+            continue;
+        }
+        let hp_scale = tracker.get_health_scale();
+        let att_scale = tracker.get_damage_scale();
+        hp.0 = (hp.0 as f32 * hp_scale) as i32;
+        att.0 = (att.0 as f32 * att_scale) as i32;
+        commands
+            .entity(e)
+            .insert(PendingTint(tracker.get_boss_tint()));
+        info!(
+            "[{}] Boss summon #{}: hp_scale={:.2} att_scale={:.2} -> hp={} att={} tint={:?}",
+            mob,
+            idx,
+            hp_scale,
+            att_scale,
+            hp.0,
+            att.0,
+            tracker.get_boss_tint()
+        );
+    }
+}
+
+/// Applies a PendingTint once the TextureAtlasSprite becomes available.
+/// Works for both legacy sprite-sheet mobs and Aseprite mobs (whose
+/// SpriteSheetBundle is inserted asynchronously after the atlas loads).
+/// Catches both cases: sprite added after tint, or tint added after sprite.
+fn apply_pending_tint(
+    mut query: Query<(Entity, &mut TextureAtlasSprite, &PendingTint)>,
+    mut commands: Commands,
+) {
+    for (entity, mut sprite, pending) in query.iter_mut() {
+        sprite.color = pending.0;
+        commands.entity(entity).remove::<PendingTint>();
+    }
+}
+
 impl Material2d for EnemyMaterial {
     fn fragment_shader() -> ShaderRef {
         "shaders/enemy_attack.wgsl".into()
@@ -631,23 +693,20 @@ fn enhance_infinite_mode_mobs(
         let speed_multiplier = infinite_mode.get_speed_multiplier();
         follow_speed.0 *= speed_multiplier;
 
-        // Apply tint based on tier: Tier 1 = Purple, Tier 2 = Red
         let tint_alpha = infinite_mode.get_tint_alpha();
         let tier = infinite_mode.get_tier();
+        let tint_color = if tier == 1 {
+            let r = 1.0 - (tint_alpha * 0.2);
+            let g = 1.0 - (tint_alpha * 0.6);
+            Color::rgba(r, g, 1.0, 1.0)
+        } else {
+            let green_blue = 1.0 - (tint_alpha * 0.5);
+            Color::rgba(1.0, green_blue, green_blue, 1.0)
+        };
         if let Some(mut sprite) = maybe_sprite {
-            if tier == 1 {
-                // Tier 1: Purple tint (interpolate from white to purple based on alpha)
-                // Purple RGB: (0.8, 0.4, 1.0) - bright purple
-                let r = 1.0 - (tint_alpha * 0.2); // 1.0 to 0.8
-                let g = 1.0 - (tint_alpha * 0.6); // 1.0 to 0.4
-                let b = 1.0; // Always 1.0 for purple
-                sprite.color = Color::rgba(r, g, b, 1.0);
-            } else {
-                // Tier 2: Red tint (always full red, alpha is always 1.0)
-                // Interpolate from white (1.0, 1.0, 1.0) to red (1.0, 0.5, 0.5)
-                let green_blue = 1.0 - (tint_alpha * 0.5); // Goes from 1.0 to 0.5
-                sprite.color = Color::rgba(1.0, green_blue, green_blue, 1.0);
-            }
+            sprite.color = tint_color;
+        } else {
+            commands.entity(entity).insert(PendingTint(tint_color));
         }
 
         // Store the difficulty level this mob was spawned at for reference

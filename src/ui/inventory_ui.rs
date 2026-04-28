@@ -4,7 +4,7 @@ use bevy_proto::prelude::ProtoCommands;
 
 use crate::chaos::ChaosTracker;
 use crate::colors::{
-    CRAFT_BUTTON_TEXT, DARK_WOOD_BROWN, EQUIP_TITLE, HOTBAR_TITLE, STATS_TITLE, YELLOW_2,
+    CRAFT_BUTTON_TEXT, DARK_WOOD_BROWN, EQUIP_TITLE, HOTBAR_TITLE, RED, STATS_TITLE, YELLOW_2,
 };
 use crate::cursor::CursorPos;
 use crate::custom_commands::CommandsExt;
@@ -34,7 +34,8 @@ use crate::{
     },
     inventory::{
         try_auto_equip_from_upgrade_slot, Inventory, InventoryItemStack, ItemStack,
-        SortInventoryButton,
+        MaterialDropsToggleButton, MaterialDropsToggleXOverlay, SortInventoryButton,
+        SuppressNonMobBreakDrops,
     },
     item::{CraftedItemEvent, Recipes, WorldObject},
     ui::{crafting_ui::UpgradeButton, FurnaceState, CHEST_INVENTORY_UI_SIZE, INVENTORY_UI_SIZE},
@@ -54,8 +55,9 @@ use super::{
     INV_EQUIP_GRID_ROW_BOT_Y, INV_EQUIP_GRID_ROW_MID_Y, INV_EQUIP_GRID_ROW_TOP_Y,
     INV_EQUIP_GRID_SPACING, INV_EQUIP_PANEL_OFFSET_X, INV_EQUIP_PANEL_OFFSET_Y, INV_FURNACE_SLOT_0,
     INV_FURNACE_SLOT_1, INV_GRID_FIRST_ROW_NUDGE_Y, INV_GRID_INSET_BOTTOM, INV_GRID_INSET_LEFT,
-    INV_SLOT_SPACING_X, INV_SLOT_SPACING_Y, INV_SORT_BUTTON_OFFSET_X, INV_SORT_BUTTON_OFFSET_Y,
-    INV_TRASH_OFFSET_X, INV_TRASH_OFFSET_Y, INV_UI_PARENT_OFFSET_CRAFTING, UI_SLOT_SIZE,
+    INV_MATERIAL_DROPS_TOGGLE_OFFSET_X, INV_MATERIAL_DROPS_TOGGLE_OFFSET_Y, INV_SLOT_SPACING_X,
+    INV_SLOT_SPACING_Y, INV_SORT_BUTTON_OFFSET_X, INV_SORT_BUTTON_OFFSET_Y, INV_TRASH_OFFSET_X,
+    INV_TRASH_OFFSET_Y, INV_UI_PARENT_OFFSET_CRAFTING, UI_SLOT_SIZE,
 };
 
 #[derive(Clone, Eq, PartialEq, Debug, Hash, Default, States, Component)]
@@ -917,6 +919,7 @@ pub fn setup_inv_slots_ui(
     mut inv: Query<&mut Inventory>,
     crafting_container: Option<Res<CraftingContainer>>,
     resolution: Res<ScreenResolution>,
+    suppress_non_mob_break_drops: Res<SuppressNonMobBreakDrops>,
 ) {
     if inv_spawn_check.get_single().is_err() {
         return;
@@ -1083,6 +1086,14 @@ pub fn setup_inv_slots_ui(
                 &inv_query,
                 inv_state_res.inv_size,
             );
+            spawn_material_drops_toggle_button(
+                &mut commands,
+                &graphics,
+                &asset_server,
+                &inv_query,
+                inv_state_res.inv_size,
+                suppress_non_mob_break_drops.0,
+            );
         }
     }
 }
@@ -1152,6 +1163,113 @@ fn spawn_sort_inventory_button(
         .insert(Name::new("SORT LABEL"))
         .id();
     commands.entity(button).push_children(&[label]);
+
+    if let Ok(inv_e) = inv_query.get_single() {
+        commands.entity(button).set_parent(inv_e);
+    }
+}
+
+/// Toggle under the sort button: plant-fibre icon, red Alagard "X" when non-mob drops are suppressed.
+fn spawn_material_drops_toggle_button(
+    commands: &mut Commands,
+    graphics: &Graphics,
+    asset_server: &AssetServer,
+    inv_query: &Query<Entity, With<InventoryUI>>,
+    inv_size: Vec2,
+    suppress_drops: bool,
+) {
+    let hw = inv_size.x * 0.5;
+    let hh = inv_size.y * 0.5;
+    let translation = Vec3::new(
+        -hw + INV_MATERIAL_DROPS_TOGGLE_OFFSET_X,
+        hh + INV_MATERIAL_DROPS_TOGGLE_OFFSET_Y,
+        1.,
+    );
+
+    let plant_sprite = graphics
+        .icons
+        .as_ref()
+        .and_then(|m| m.get(&WorldObject::PlantFibre).cloned())
+        .or_else(|| {
+            graphics
+                .spritesheet_map
+                .as_ref()
+                .and_then(|m| m.get(&WorldObject::PlantFibre).cloned())
+        })
+        .unwrap_or_else(|| {
+            graphics
+                .spritesheet_map
+                .as_ref()
+                .unwrap()
+                .get(&WorldObject::Stick)
+                .cloned()
+                .expect("fallback world object sprite for material toggle")
+        });
+
+    let button = commands
+        .spawn(SpriteBundle {
+            texture: graphics.get_ui_element_texture(UIElement::InventorySlot),
+            transform: Transform {
+                translation,
+                scale: Vec3::new(1., 1., 1.),
+                ..Default::default()
+            },
+            sprite: Sprite {
+                custom_size: Some(UI_SLOT_SIZE),
+                ..Default::default()
+            },
+            ..Default::default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(Interactable::default())
+        .insert(MaterialDropsToggleButton)
+        .insert(Name::new("MATERIAL DROPS TOGGLE BUTTON"))
+        .id();
+
+    let icon = commands
+        .spawn(SpriteSheetBundle {
+            sprite: {
+                let mut s = plant_sprite;
+                s.custom_size = Some(Vec2::splat(18.));
+                s
+            },
+            texture_atlas: graphics.texture_atlas.as_ref().unwrap().clone(),
+            transform: Transform::from_translation(Vec3::new(0., 0., 0.5)),
+            ..Default::default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(Name::new("MATERIAL DROPS TOGGLE ICON"))
+        .id();
+
+    let x_vis = if suppress_drops {
+        Visibility::Visible
+    } else {
+        Visibility::Hidden
+    };
+    let x_overlay = commands
+        .spawn(Text2dBundle {
+            text: Text::from_section(
+                "X",
+                TextStyle {
+                    font: asset_server.load("fonts/alagard.ttf"),
+                    font_size: 15.0,
+                    color: RED,
+                },
+            )
+            .with_alignment(TextAlignment::Center),
+            text_anchor: Anchor::Center,
+            visibility: x_vis,
+            transform: Transform::from_translation(Vec3::new(0., 0., 2.)),
+            ..default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(MaterialDropsToggleXOverlay)
+        .insert(Name::new("MATERIAL DROPS TOGGLE X"))
+        .id();
+
+    commands
+        .entity(button)
+        .push_children(&[icon, x_overlay]);
 
     if let Ok(inv_e) = inv_query.get_single() {
         commands.entity(button).set_parent(inv_e);

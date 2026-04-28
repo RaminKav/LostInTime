@@ -1,4 +1,4 @@
-use crate::assets::{SpriteAnchor, SpriteSize, WorldObjectData};
+use crate::assets::{SpriteSize, WorldObjectData};
 use crate::attributes::item_abilities::ItemAbility;
 use crate::chaos::ChaosTracker;
 use crate::client::analytics::{AnalyticsTrigger, AnalyticsUpdateEvent};
@@ -12,7 +12,7 @@ use crate::combat::ObjBreakEvent;
 use crate::container::ContainerRegistry;
 use crate::enemy::Mob;
 
-use crate::inventory::ItemStack;
+use crate::inventory::{ItemStack, SuppressNonMobBreakDrops};
 use crate::item::ammo::AmmoMemory;
 use crate::juice::{spawn_obj_death_particles, spawn_xp_particles};
 use crate::player::levels::ExperienceReward;
@@ -542,6 +542,8 @@ pub enum WorldObject {
     Bomb,
     FuryKunai,
     CrowFeather,
+    PossessedBlade,
+    ArrowVolleyShot,
 
     // Desert
     MedCactus1,
@@ -1279,6 +1281,30 @@ impl WorldObject {
             _ => BLACK,
         }
     }
+    pub fn override_material_drop_toggle(&self) -> bool {
+        match self {
+            WorldObject::Crate => true,
+            WorldObject::Crate2 => true,
+            WorldObject::DesertCrate => true,
+            WorldObject::DesertCrate2 => true,
+            WorldObject::SnowCrate1 => true,
+            WorldObject::SnowCrate2 => true,
+            WorldObject::SnowCrate3 => true,
+            WorldObject::SnowCrate4 => true,
+            WorldObject::XPJug => true,
+            WorldObject::SnowCrystalMed1 => true,
+            WorldObject::SnowCrystalMed2 => true,
+            WorldObject::SnowCrystalSml1 => true,
+            WorldObject::SnowCrystalSml2 => true,
+            WorldObject::SnowCrystalSml3 => true,
+            WorldObject::SnowCrystalSml4 => true,
+            WorldObject::DesertSkull1 => true,
+            WorldObject::DesertSkull2 => true,
+            WorldObject::DesertSkull3 => true,
+            WorldObject::DesertSkull4 => true,
+            _ => false,
+        }
+    }
 }
 
 pub struct PlaceItemEvent {
@@ -1306,6 +1332,8 @@ pub struct ItemsPlugin;
 impl Plugin for ItemsPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(WorldObjectResource::new())
+            .init_resource::<BossSummonTracker>()
+            .init_resource::<SuppressNonMobBreakDrops>()
             .insert_resource(AmmoMemory::default())
             .add_event::<PlaceItemEvent>()
             .add_event::<UpdateObjectEvent>()
@@ -1351,6 +1379,7 @@ impl Plugin for ItemsPlugin {
             .add_system(ensure_mob_status_effects.in_set(OnUpdate(GameState::Main)))
             .add_systems(
                 (
+                    update_boss_shrine_guide_cost,
                     handle_on_hit_upgrades.run_if(is_not_paused),
                     handle_reset_proj_hit_enemies_state.run_if(is_not_paused),
                 )
@@ -1531,31 +1560,23 @@ pub fn handle_break_object(
     mut minimap_event: EventWriter<UpdateMiniMapEvent>,
     mut wall_break_event: EventWriter<WallBreakEvent>,
     loot_tables: Query<&LootTable>,
-    chest_containers: Query<&ChestContainer>,
     xp: Query<&ExperienceReward>,
     mut analytics_events: EventWriter<AnalyticsUpdateEvent>,
     water_colliders: Query<
         (Entity, &Collider, &GlobalTransform),
         (Without<WorldObject>, Without<Mob>, Without<Player>),
     >,
-    anchor: Query<&SpriteAnchor>,
     mut chaos_tracker: ResMut<ChaosTracker>,
     mut flash_event: EventWriter<FlashExpBarEvent>,
+    suppress_non_mob_drops: Res<SuppressNonMobBreakDrops>,
+    mobs: Query<&Mob>,
 ) {
     for broken in obj_break_events.iter() {
         let mut rng = rand::thread_rng();
         let world_pos = tile_pos_to_world_pos(broken.pos, false);
+        let is_mob = mobs.get(broken.entity).is_ok();
+        let block_non_mob_drops = suppress_non_mob_drops.0 && !is_mob;
         // Chest
-        if broken.obj == WorldObject::Chest {
-            if let Ok(chest) = chest_containers.get(broken.entity) {
-                for item_option in chest.items.items.iter() {
-                    if let Some(item) = item_option {
-                        item.item_stack
-                            .spawn_as_drop(&mut commands, &mut game, world_pos);
-                    }
-                }
-            }
-        }
 
         // Water Placeable Objs
         if let Some(tile_data) = game.get_tile_data(broken.pos) {
@@ -1600,31 +1621,35 @@ pub fn handle_break_object(
         if !broken.give_drops_and_xp {
             continue;
         }
-        // Item Drops
-        if let Ok(loot_table) = loot_tables.get(broken.entity) {
-            for drop in LootTablePlugin::get_drops(loot_table, &proto_param, 0, None, false) {
-                let pos = if broken.obj.is_medium_size(&proto_param) {
-                    tile_pos_to_world_pos(
-                        TileMapPosition::new(broken.pos.chunk_pos, broken.pos.tile_pos),
-                        true,
-                    )
-                } else {
-                    world_pos
-                };
-                let drop_spread = 10.;
+        // Item Drops (skipped for non-mobs when [`SuppressNonMobBreakDrops`] is enabled)
+        if !block_non_mob_drops || broken.obj.override_material_drop_toggle() {
+            if let Ok(loot_table) = loot_tables.get(broken.entity) {
+                for drop in
+                    LootTablePlugin::get_drops(loot_table, &proto_param, 0, None, false, false)
+                {
+                    let pos = if broken.obj.is_medium_size(&proto_param) {
+                        tile_pos_to_world_pos(
+                            TileMapPosition::new(broken.pos.chunk_pos, broken.pos.tile_pos),
+                            true,
+                        )
+                    } else {
+                        world_pos
+                    };
+                    let drop_spread = 10.;
 
-                let pos = Vec3::new(
-                    pos.x + rng.gen_range(-drop_spread..drop_spread),
-                    pos.y + rng.gen_range(-drop_spread..drop_spread),
-                    0.,
-                );
-                proto_commands.spawn_item_from_proto(
-                    drop.obj_type,
-                    &proto_param,
-                    pos.truncate(),
-                    drop.count,
-                    Some(game.get_player_level()),
-                );
+                    let pos = Vec3::new(
+                        pos.x + rng.gen_range(-drop_spread..drop_spread),
+                        pos.y + rng.gen_range(-drop_spread..drop_spread),
+                        0.,
+                    );
+                    proto_commands.spawn_item_from_proto(
+                        drop.obj_type,
+                        &proto_param,
+                        pos.truncate(),
+                        drop.count,
+                        Some(game.get_player_level()),
+                    );
+                }
             }
         }
 

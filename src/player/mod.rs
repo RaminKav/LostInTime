@@ -266,11 +266,17 @@ impl Plugin for PlayerPlugin {
             )
             .add_systems(
                 (
+                    skill_heirlooms::tick_arrow_volley.run_if(is_not_paused),
                     skill_heirlooms::handle_fury_skill.run_if(is_not_paused),
                     skill_heirlooms::handle_attach_bomb_target.run_if(is_not_paused),
                     skill_heirlooms::handle_bomb_explosion.run_if(is_not_paused),
                     skill_heirlooms::handle_rapidfire_slow_enemies.run_if(is_not_paused),
                     skill_heirlooms::handle_rapidfire_slow_remove.run_if(is_not_paused),
+                    skill_heirlooms::handle_attach_possessed_blade_return.run_if(is_not_paused),
+                    skill_heirlooms::tick_possessed_blade_movement.run_if(is_not_paused),
+                    skill_heirlooms::handle_possessed_blade_kill_lifesteal
+                        .after(handle_hits)
+                        .run_if(is_not_paused),
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
@@ -774,6 +780,7 @@ pub fn get_class_starting_stats(class: SkillClass) -> ItemAttributes {
             mana_regen: AttributeValue::new(10, AttributeQuality::Low, 0.),
             crit_chance: AttributeValue::new(15, AttributeQuality::Low, 0.),
             crit_damage: AttributeValue::new(150, AttributeQuality::Low, 0.),
+            speed: AttributeValue::new(20, AttributeQuality::Low, 0.),
             ..default()
         },
         SkillClass::Thief => ItemAttributes {
@@ -784,6 +791,7 @@ pub fn get_class_starting_stats(class: SkillClass) -> ItemAttributes {
             mana_regen: AttributeValue::new(10, AttributeQuality::Low, 0.),
             crit_chance: AttributeValue::new(10, AttributeQuality::Low, 0.),
             crit_damage: AttributeValue::new(150, AttributeQuality::Low, 0.),
+            speed: AttributeValue::new(7, AttributeQuality::Low, 0.),
             ..default()
         },
         SkillClass::Hunter => ItemAttributes {

@@ -3,7 +3,7 @@ use crate::{
     custom_commands::CommandsExt,
     enemy::{spawn_helpers::can_spawn_mob_here, spawner::MobSpawningPaused},
     inventory::{player_can_accept_ground_item_pickup, Inventory, ItemStack},
-    item::{ItemDrop, LootTable, WorldObject},
+    item::{boss_shrine::BossSummonIndex, ItemDrop, LootTable, WorldObject},
     juice::ShakeEffect,
     night::{EraTimer, InfiniteModeStartedEvent},
     pets::state::Pet,
@@ -64,13 +64,16 @@ pub fn handle_new_red_mushking_state_machine(
             &FollowSpeed,
             &LeapAttack,
             &mut KinematicCharacterController,
+            &BossSummonIndex,
         ),
         Added<Mob>,
     >,
     asset_server: Res<AssetServer>,
     game: GameParam,
 ) {
-    for (e, mob, transform, follow_speed, leap_attack, mut mover) in spawn_events.iter_mut() {
+    for (e, mob, transform, follow_speed, leap_attack, mut mover, boss_summon_index) in
+        spawn_events.iter_mut()
+    {
         if mob != &Mob::RedMushking {
             continue;
         }
@@ -117,14 +120,14 @@ pub fn handle_new_red_mushking_state_machine(
             .trans::<FollowState>(
                 HealthTrigger(0.65),
                 SummonAttackState {
-                    num_summons_left: 8,
+                    num_summons_left: boss_summon_index.num_spawns(),
                     timer: Timer::from_seconds(0.2, TimerMode::Repeating),
                 },
             )
             .trans::<LeapAttackState>(
                 HealthTrigger(0.65),
                 SummonAttackState {
-                    num_summons_left: 8,
+                    num_summons_left: boss_summon_index.num_spawns(),
                     timer: Timer::from_seconds(0.2, TimerMode::Repeating),
                 },
             )
@@ -150,20 +153,22 @@ pub fn handle_new_red_mushking_state_machine(
                 AoEAttackTimerTrigger,
                 AoEAttackState {
                     delay_timer: Timer::from_seconds(0.85, TimerMode::Once),
-                    target_position: None,
-                    preview_entity: None,
-                    second_preview_entity: None,
-                    second_cloud_position: None,
+                    num_bombs: boss_summon_index.num_poison_bombs(),
+                    spawn_radius_min: 10.0 * (boss_summon_index.0 as f32 * 0.5).max(1.),
+                    spawn_radius_max: 70.0 * (boss_summon_index.0 as f32 * 0.5).max(1.),
+                    cloud_positions: Vec::new(),
+                    preview_entities: Vec::new(),
                 },
             )
             .trans::<LeapAttackState>(
                 AoEAttackTimerTrigger,
                 AoEAttackState {
                     delay_timer: Timer::from_seconds(0.85, TimerMode::Once),
-                    target_position: None,
-                    preview_entity: None,
-                    second_preview_entity: None,
-                    second_cloud_position: None,
+                    num_bombs: boss_summon_index.num_poison_bombs(),
+                    spawn_radius_min: 10.0 * (boss_summon_index.0 as f32 * 0.5).max(1.),
+                    spawn_radius_max: 70.0 * (boss_summon_index.0 as f32 * 0.5).max(1.),
+                    cloud_positions: Vec::new(),
+                    preview_entities: Vec::new(),
                 },
             );
         // .trans::<FollowState>(
@@ -218,15 +223,17 @@ pub struct LeapAttackTimer {
     pub random_timer: Timer, // Timer for random interval (2-5s)
 }
 
-/// State that is active during the AoE attack
+/// State that is active during the AoE attack.
+/// Supports N poison bombs (scaled by `BossSummonIndex`), doubled when below half health.
 #[derive(Clone, Component, Reflect)]
 #[component(storage = "SparseSet")]
 pub struct AoEAttackState {
-    pub delay_timer: Timer,                    // Timer for 1s delay before damage
-    pub target_position: Option<Vec2>,         // Player position when attack starts
-    pub preview_entity: Option<Entity>,        // Entity for warning preview (first cloud)
-    pub second_preview_entity: Option<Entity>, // Entity for second cloud preview (when below half health)
-    pub second_cloud_position: Option<Vec2>,   // Position for second cloud (when below half health)
+    pub delay_timer: Timer,
+    pub num_bombs: usize,
+    pub spawn_radius_min: f32,
+    pub spawn_radius_max: f32,
+    pub cloud_positions: Vec<Vec2>,
+    pub preview_entities: Vec<Entity>,
 }
 
 /// Warning/preview marker on boss-attack telegraph entities; removed once the
@@ -908,103 +915,73 @@ pub fn handle_aoe_attack(
     cheat_settings: Res<CheatSettings>,
 ) {
     for (boss_entity, mut aoe_state, attack, _boss_txfm) in aoe_attacks.iter_mut() {
-        // If target position not set yet, capture player position when attack starts
-        if aoe_state.target_position.is_none() {
-            if let Ok(player_txfm) = player_query.get_single() {
-                let target_pos = player_txfm.translation.truncate();
-                aoe_state.target_position = Some(target_pos);
+        // First frame: generate all cloud positions (doubled when below half health)
+        if aoe_state.cloud_positions.is_empty() {
+            let Ok(player_txfm) = player_query.get_single() else {
+                continue;
+            };
+            let target_pos = player_txfm.translation.truncate();
 
-                // Check if boss is below half health and calculate second cloud position
-                let is_below_half_health = boss_health
-                    .get(boss_entity)
-                    .map(|(current, max)| (current.0 as f32 / max.0 as f32) < 0.5)
-                    .unwrap_or(false);
+            let is_below_half_health = boss_health
+                .get(boss_entity)
+                .map(|(current, max)| (current.0 as f32 / max.0 as f32) < 0.5)
+                .unwrap_or(false);
 
-                if is_below_half_health {
-                    // Calculate second cloud position with minimum distance (64px) from player
-                    let mut rng = rand::thread_rng();
-                    let min_distance = 64.0;
-                    let max_distance = 96.0;
-                    let distance = rng.gen_range(min_distance..max_distance);
-                    let angle = rng.gen_range(0.0..std::f32::consts::TAU);
-                    let offset = Vec2::new(angle.cos(), angle.sin()) * distance;
-                    let second_pos = target_pos + offset + Vec2::new(0., 16.);
-                    aoe_state.second_cloud_position = Some(second_pos);
-                }
+            let total_bombs = if is_below_half_health {
+                aoe_state.num_bombs * 2
+            } else {
+                aoe_state.num_bombs
+            };
+
+            let mut rng = rand::thread_rng();
+            for _ in 0..total_bombs {
+                let distance =
+                    rng.gen_range(aoe_state.spawn_radius_min..aoe_state.spawn_radius_max);
+                let angle = rng.gen_range(0.0..std::f32::consts::TAU);
+                let offset = Vec2::new(angle.cos(), angle.sin()) * distance;
+                aoe_state
+                    .cloud_positions
+                    .push(target_pos + offset + Vec2::new(0., 16.));
             }
         }
 
-        // Tick the delay timer
         aoe_state.delay_timer.tick(time.delta());
 
-        // Show warning preview during delay at the captured position
-        if let Some(target_pos) = aoe_state.target_position {
-            // Spawn first preview if it doesn't exist
-            if aoe_state.preview_entity.is_none() {
-                let preview_entity = commands
-                    .spawn((
-                        MaterialMesh2dBundle {
-                            mesh: meshes
-                                .add(
-                                    shape::Circle {
-                                        radius: 16.0, // 32px diameter
-                                        ..Default::default()
-                                    }
-                                    .into(),
-                                )
+        // Spawn preview circles for any positions that don't have one yet
+        while aoe_state.preview_entities.len() < aoe_state.cloud_positions.len() {
+            let idx = aoe_state.preview_entities.len();
+            let pos = aoe_state.cloud_positions[idx];
+            let preview = commands
+                .spawn((
+                    MaterialMesh2dBundle {
+                        mesh: meshes
+                            .add(
+                                shape::Circle {
+                                    radius: 16.0,
+                                    ..Default::default()
+                                }
                                 .into(),
-                            material: materials.add(ColorMaterial::from(
-                                boss_warning_indicator_color(&cheat_settings),
-                            )),
-                            transform: Transform {
-                                translation: target_pos.extend(990.0), // High Z to be visible
-                                ..default()
-                            },
+                            )
+                            .into(),
+                        material: materials.add(ColorMaterial::from(boss_warning_indicator_color(
+                            &cheat_settings,
+                        ))),
+                        transform: Transform {
+                            translation: pos.extend(990.0),
                             ..default()
                         },
-                        BossAttackPreview,
-                        DespawnTimer(Timer::from_seconds(2.0, TimerMode::Once)),
-                    ))
-                    .id();
-                aoe_state.preview_entity = Some(preview_entity);
-            }
-
-            // Spawn second preview if below half health and it doesn't exist
-            if let Some(second_pos) = aoe_state.second_cloud_position {
-                if aoe_state.second_preview_entity.is_none() {
-                    let second_preview_entity = commands
-                        .spawn((
-                            MaterialMesh2dBundle {
-                                mesh: meshes
-                                    .add(
-                                        shape::Circle {
-                                            radius: 16.0, // 32px diameter
-                                            ..Default::default()
-                                        }
-                                        .into(),
-                                    )
-                                    .into(),
-                                material: materials.add(ColorMaterial::from(
-                                    boss_warning_indicator_color(&cheat_settings),
-                                )),
-                                transform: Transform {
-                                    translation: second_pos.extend(990.0), // High Z to be visible
-                                    ..default()
-                                },
-                                ..default()
-                            },
-                            BossAttackPreview,
-                        ))
-                        .id();
-                    aoe_state.second_preview_entity = Some(second_preview_entity);
-                }
-            }
+                        ..default()
+                    },
+                    BossAttackPreview,
+                    DespawnTimer(Timer::from_seconds(2.0, TimerMode::Once)),
+                ))
+                .id();
+            aoe_state.preview_entities.push(preview);
         }
 
-        // When delay timer finishes, spawn the actual damage at the captured position
         if aoe_state.delay_timer.just_finished() {
-            if let Some(target_pos) = aoe_state.target_position {
-                // Always spawn first cloud on player position
+            // Spawn a poison cloud at every position
+            for pos in &aoe_state.cloud_positions {
                 ranged_attack_events.send(RangedAttackEvent {
                     projectile: Projectile::PoisonCloud,
                     direction: Vec2::ZERO,
@@ -1013,73 +990,46 @@ pub fn handle_aoe_attack(
                     from_entity: Some(boss_entity),
                     is_followup_proj: false,
                     dmg_override: Some(attack.0),
-                    pos_override: Some(target_pos + Vec2::new(0., 16.)), // Centered on target position
+                    pos_override: Some(*pos),
                     spawn_delay: 0.0,
                 });
+            }
 
-                // If below half health, spawn a second cloud at the pre-calculated position
-                if let Some(second_pos) = aoe_state.second_cloud_position {
-                    ranged_attack_events.send(RangedAttackEvent {
-                        projectile: Projectile::PoisonCloud,
-                        direction: Vec2::ZERO,
-                        mana_cost: None,
-                        from_enemy: true,
-                        from_entity: Some(boss_entity),
-                        is_followup_proj: false,
-                        dmg_override: Some(attack.0),
-                        pos_override: Some(second_pos),
-                        spawn_delay: 0.0,
-                    });
+            for preview_e in &aoe_state.preview_entities {
+                if let Some(entity_commands) = commands.get_entity(*preview_e) {
+                    entity_commands.despawn_recursive();
                 }
+            }
 
-                // Despawn previews (they may already be despawned by DespawnTimer or elsewhere)
-                if let Some(preview_e) = aoe_state.preview_entity {
-                    if let Some(entity_commands) = commands.get_entity(preview_e) {
-                        entity_commands.despawn_recursive();
-                    }
-                }
-                if let Some(second_preview_e) = aoe_state.second_preview_entity {
-                    if let Some(entity_commands) = commands.get_entity(second_preview_e) {
-                        entity_commands.despawn_recursive();
-                    }
-                }
+            if let Some(mut entity_commands) = commands.get_entity(boss_entity) {
+                let mut rng = rand::thread_rng();
 
-                // Return to FollowState and reset random timer for next attack (only if boss still exists)
-                if let Some(mut entity_commands) = commands.get_entity(boss_entity) {
-                    let mut rng = rand::thread_rng();
+                let is_below_half_health = boss_health
+                    .get(boss_entity)
+                    .map(|(current, max)| (current.0 as f32 / max.0 as f32) < 0.5)
+                    .unwrap_or(false);
 
-                    // Check if boss is below half health - if so, use half the timer range (twice as fast)
-                    let is_below_half_health = boss_health
-                        .get(boss_entity)
-                        .map(|(current, max)| (current.0 as f32 / max.0 as f32) < 0.5)
-                        .unwrap_or(false);
+                let random_duration = if is_below_half_health {
+                    rng.gen_range(0.15..1.25)
+                } else {
+                    rng.gen_range(0.3..2.5)
+                };
 
-                    let random_duration = if is_below_half_health {
-                        // Half the normal range: 0.15..1.25 (twice as fast)
-                        rng.gen_range(0.15..1.25)
-                    } else {
-                        // Normal range: 0.3..2.5
-                        rng.gen_range(0.3..2.5)
-                    };
+                entity_commands
+                    .remove::<AoEAttackState>()
+                    .insert(FollowState {
+                        target: game.game.player,
+                        curr_delta: None,
+                        curr_path: None,
+                        speed: 1.0,
+                    })
+                    .insert(EnemyAttackCooldown(Timer::from_seconds(
+                        1.0,
+                        TimerMode::Once,
+                    )));
 
-                    entity_commands
-                        .remove::<AoEAttackState>() // Remove current state first
-                        .insert(FollowState {
-                            target: game.game.player,
-                            curr_delta: None,
-                            curr_path: None,
-                            speed: 1.0, // Default speed, will be overridden by FollowSpeed
-                        })
-                        .insert(EnemyAttackCooldown(Timer::from_seconds(
-                            1.0,
-                            TimerMode::Once,
-                        )));
-
-                    // Reset the timer component for next attack
-                    if let Ok(mut aoe_timer) = aoe_timers.get_mut(boss_entity) {
-                        aoe_timer.random_timer =
-                            Timer::from_seconds(random_duration, TimerMode::Once);
-                    }
+                if let Ok(mut aoe_timer) = aoe_timers.get_mut(boss_entity) {
+                    aoe_timer.random_timer = Timer::from_seconds(random_duration, TimerMode::Once);
                 }
             }
         }

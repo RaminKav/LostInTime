@@ -169,6 +169,8 @@ pub enum ActiveSkill {
     Fury,        // Thief - NEW
     Bomb,        // Hunter - NEW
     SpinAttack,
+    ArrowVolley,    // Hunter - NEW
+    PossessedBlade, // Rogue - NEW
 }
 
 impl ActiveSkill {
@@ -199,6 +201,8 @@ impl ActiveSkill {
             ActiveSkill::Fury => 13.0,
             ActiveSkill::Bomb => 5.5,
             ActiveSkill::SpinAttack => 2.5,
+            ActiveSkill::ArrowVolley => 8.0,
+            ActiveSkill::PossessedBlade => 6.0,
         }
     }
 }
@@ -298,6 +302,15 @@ pub struct BombState;
 #[derive(Component, Clone)]
 #[component(storage = "SparseSet")]
 pub struct SpinAttackState;
+#[derive(Component, Clone)]
+#[component(storage = "SparseSet")]
+pub struct ArrowVolleyState {
+    pub waves_remaining: u32,
+    pub wave_timer: Timer,
+}
+#[derive(Component, Clone)]
+#[component(storage = "SparseSet")]
+pub struct PossessedBladeSkillState;
 
 /// Transient phasing buff on the player that disables collisions with mobs.
 /// Added on specific skill casts and removed when its timer expires — stored
@@ -343,6 +356,8 @@ impl ActiveSkill {
             ActiveSkill::Fury => "Fury".to_string(),
             ActiveSkill::Bomb => "Bomb".to_string(),
             ActiveSkill::SpinAttack => "Spin Attack".to_string(),
+            ActiveSkill::ArrowVolley => "Arrow Volley".to_string(),
+            ActiveSkill::PossessedBlade => "Possessed Blade".to_string(),
         }
     }
 
@@ -395,10 +410,9 @@ impl ActiveSkill {
                 format!("dealing {:.1}% damage in an area.", skill_power * 175.0),
             ],
             ActiveSkill::Stealth => vec![
-                "Dissapear for a short duration,".to_string(),
-                "ignoring all damage. Attacks used".to_string(),
-                "during Stealth will always crit. Attacks".to_string(),
-                "or other skills end Stealth early.".to_string(),
+                "Dissapear for a short duration".to_string(),
+                "Attacks used during Stealth will".to_string(),
+                "always crit but end Stealth early.".to_string(),
             ],
             ActiveSkill::Teleport => vec![
                 format!("Teleport forwards, dealing {:.1}%", skill_power * 33.0),
@@ -468,6 +482,18 @@ impl ActiveSkill {
                     skill_power * 60.0
                 ),
             ],
+            ActiveSkill::ArrowVolley => vec![
+                "Send out waves of arrows,".to_string(),
+                format!("dealing 9x{:.1}% damage.", skill_power * 75.0),
+            ],
+            ActiveSkill::PossessedBlade => vec![
+                "Throw a blade that returns back to".to_string(),
+                format!(
+                    "you. Deals {:.1}% damage, and triggers",
+                    skill_power * 115.0
+                ),
+                "lifesteal on kill, up to 3 times.".to_string(),
+            ],
         }
     }
     //TODO: Grav spear, teleport, and lunge skills rely on this, we should remove the reliance
@@ -487,7 +513,7 @@ impl ActiveSkill {
                 commands
                     .entity(entity)
                     .insert(crate::player::rogue_skills::LungeState {
-                        lunge_duration: Timer::from_seconds(0.42, TimerMode::Once),
+                        lunge_duration: Timer::from_seconds(0.64, TimerMode::Once),
                         lunge_speed: 9.5,
                     });
             }
@@ -572,7 +598,9 @@ impl ActiveSkill {
             | ActiveSkill::TripleThrow
             | ActiveSkill::Fury
             | ActiveSkill::SpinAttack
-            | ActiveSkill::Bomb => {}
+            | ActiveSkill::Bomb
+            | ActiveSkill::ArrowVolley
+            | ActiveSkill::PossessedBlade => {}
         }
     }
 
@@ -1303,7 +1331,7 @@ impl Heirloom {
             ],
             Heirloom::LifestealCoins => vec![
                 "Lifesteal triggers".to_string(),
-                "have a 20% chance to".to_string(),
+                "have a 10% chance to".to_string(),
                 "give you a coin.".to_string(),
                 "Gain +5% Lifesteal.".to_string(),
             ],

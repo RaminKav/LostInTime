@@ -160,6 +160,10 @@ pub const INV_TRASH_OFFSET_Y: f32 = -0.5 * UI_SLOT_SIZE.y - 12.0;
 pub const INV_SORT_BUTTON_OFFSET_X: f32 = INV_TRASH_OFFSET_X;
 pub const INV_SORT_BUTTON_OFFSET_Y: f32 = INV_TRASH_OFFSET_Y - UI_SLOT_SIZE.y - 6.0;
 
+/// Material-drops toggle — directly under the sort button, same x as trash/sort column.
+pub const INV_MATERIAL_DROPS_TOGGLE_OFFSET_X: f32 = INV_SORT_BUTTON_OFFSET_X;
+pub const INV_MATERIAL_DROPS_TOGGLE_OFFSET_Y: f32 = INV_SORT_BUTTON_OFFSET_Y - UI_SLOT_SIZE.y - 6.0;
+
 /// Crafting grid inside crafting/furnace-style panels (8 columns).
 pub const INV_CRAFTING_COLS: usize = 8;
 pub const INV_CRAFTING_ROW_GAP: f32 = 1.0;
@@ -746,6 +750,15 @@ impl Plugin for UIPlugin {
             )
             .add_system(
                 handle_sort_inventory_button_click
+                    .run_if(
+                        in_state(UIState::Inventory)
+                            .or_else(in_state(UIState::InventoryCrafting))
+                            .or_else(in_state(UIState::Crafting)),
+                    )
+                    .in_set(OnUpdate(GameState::Main)),
+            )
+            .add_system(
+                handle_material_drops_toggle_button_click
                     .run_if(
                         in_state(UIState::Inventory)
                             .or_else(in_state(UIState::InventoryCrafting))

@@ -175,6 +175,11 @@
             size: (16., 16.),
             anchor: Some((0.2,0.0)),
         ),
+        ArrowVolleyShot: WorldObjectData(
+            texture_pos: (9., 5.),
+            size: (16., 16.),
+            anchor: Some((0.2,0.0)),
+        ),
         Claw: WorldObjectData(
             texture_pos: (4., 7.),
             size: (16., 16.),
@@ -268,6 +273,11 @@
         DaggerThrow: WorldObjectData(
             texture_pos: (3., 6.),
             size: (16., 16.),
+            anchor: None,
+        ),
+        PossessedBlade: WorldObjectData(
+            texture_pos: (3., 6.),
+            size: (32., 16.),
             anchor: None,
         ),
         OrbOfTransformation: WorldObjectData(

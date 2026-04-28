@@ -811,7 +811,7 @@ fn loot_cycle_load_test_burst(
     let loot_table = make_test_loot_table();
 
     for _ in 0..LOOT_CYCLE_DROPS_PER_WAVE {
-        let drops = LootTablePlugin::get_drops(&loot_table, &proto_param, 0, Some(1), false);
+        let drops = LootTablePlugin::get_drops(&loot_table, &proto_param, 0, Some(1), false, false);
 
         for drop in drops.iter() {
             let drop_offset = Vec2::new(rng.gen_range(-10.0..10.0), rng.gen_range(-10.0..10.0));
@@ -939,7 +939,7 @@ pub fn archetype_diagnostics_tick(world: &mut World, mut elapsed: Local<f32>) {
     let mut empty_archetypes = 0usize;
     let mut largest_archetype_len = 0usize;
     let mut size_buckets = [0usize; 5]; // [0, 1-9, 10-99, 100-999, 1000+]
-    // (total archetype count, empty archetype count) per component
+                                        // (total archetype count, empty archetype count) per component
     let mut per_component: HashMap<bevy::ecs::component::ComponentId, (usize, usize)> =
         HashMap::new();
 

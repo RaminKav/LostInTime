@@ -315,6 +315,7 @@ fn handle_enemy_death(
                     0,
                     Some(mob_lvl.0),
                     is_infinite_mode,
+                    mob.is_boss(),
                 )
                 .iter()
                 .filter(|d| {
@@ -933,11 +934,10 @@ pub fn cleanup_marked_for_death_entities(
 
             // RedMushking AoE attack previews
             if let Ok(aoe_state) = aoe_attack_states.get(e) {
-                if let Some(preview_entity) = aoe_state.preview_entity {
-                    commands.entity(preview_entity).despawn_recursive();
-                }
-                if let Some(second_preview_entity) = aoe_state.second_preview_entity {
-                    commands.entity(second_preview_entity).despawn_recursive();
+                for preview_e in &aoe_state.preview_entities {
+                    if let Some(entity_commands) = commands.get_entity(*preview_e) {
+                        entity_commands.despawn_recursive();
+                    }
                 }
             }
 
@@ -1109,7 +1109,7 @@ pub fn handle_lifesteal(
 
                 // LifestealCoins: Spawn a coin for each lifesteal proc
                 let count = skills.get_count(Heirloom::LifestealCoins) as f64;
-                if count > 0. && rng.gen_bool((count * 0.2).min(1.)) {
+                if count > 0. && rng.gen_bool((count * 0.1).min(1.)) {
                     let d = 32.0;
                     let drop_offset = Vec2::new(rng.gen_range(-d..d), rng.gen_range(-d..d));
                     proto_commands.spawn_item_from_proto(

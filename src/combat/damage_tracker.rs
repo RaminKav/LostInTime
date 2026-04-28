@@ -68,6 +68,8 @@ pub enum DamageSource {
     FuryKunai,
     SpinAttack,
     SpearGravity,
+    ArrowVolley,
+    PossessedBlade,
 
     // Heirloom effects
     Echo,
@@ -113,7 +115,9 @@ impl DamageSource {
             | DamageSource::FuryKunai
             | DamageSource::SpinAttack
             | DamageSource::TeleportShock
-            | DamageSource::SpearGravity => DamageSourceCategory::Skill,
+            | DamageSource::SpearGravity
+            | DamageSource::ArrowVolley
+            | DamageSource::PossessedBlade => DamageSourceCategory::Skill,
 
             DamageSource::Echo
             | DamageSource::IceExplosion
@@ -157,6 +161,8 @@ impl DamageSource {
             DamageSource::FuryKunai => "Fury Kunai",
             DamageSource::SpinAttack => "Spin Attack",
             DamageSource::SpearGravity => "Grav. Spear",
+            DamageSource::ArrowVolley => "Arrow Volley",
+            DamageSource::PossessedBlade => "Possessed Blade",
             DamageSource::Echo => "Echo",
             DamageSource::IceExplosion => "Ice Explosion",
             DamageSource::IceFloor => "Ice Floor",
@@ -240,6 +246,8 @@ impl DamageSource {
             Projectile::FuryKunai => Some(DamageSource::FuryKunai),
             Projectile::SpinAttack => Some(DamageSource::SpinAttack),
             Projectile::SpearGravity => Some(DamageSource::SpearGravity),
+            Projectile::ArrowVolleyShot => Some(DamageSource::ArrowVolley),
+            Projectile::PossessedBlade => Some(DamageSource::PossessedBlade),
 
             Projectile::Echo => Some(DamageSource::Echo),
             Projectile::IceExplosionAOE => Some(DamageSource::IceExplosion),

@@ -13,7 +13,7 @@ use crate::{
     item::projectile::Projectile,
     ui::damage_numbers::{spawn_text, DodgeEvent},
     world::TILE_SIZE,
-    AttackTimer, EnemyDeathEvent, GameParam, HitEvent, InputMappings,
+    AttackTimer, EnemyDeathEvent, GameParam, HitEvent, InputMappings, PLAYER_MOVE_SPEED,
 };
 use bevy::{prelude::*, sprite::Anchor};
 use bevy_aseprite::{anim::AsepriteAnimation, aseprite, AsepriteBundle};
@@ -221,7 +221,12 @@ pub fn handle_lunge(
                     .entity(e)
                     .insert(CollisionGroups::new(Group::GROUP_2, Group::GROUP_2));
                 kcc.filter_groups = Some(CollisionGroups::new(Group::GROUP_2, Group::GROUP_2));
-                mv.0 = mv.0 * lunge_state.lunge_speed;
+                // Lunge distance must stay constant: take only the direction
+                // from `mv` and rebuild magnitude from the base move speed,
+                // so Speed stat / hunger / consumable buffs don't scale it.
+                let lunge_dir = mv.0.normalize_or_zero();
+                mv.0 =
+                    lunge_dir * PLAYER_MOVE_SPEED * time.delta_seconds() * lunge_state.lunge_speed;
             } else if lunge_state.lunge_duration.percent() < 0.20 {
                 mv.0 = mv.0 * 0.;
             } else {

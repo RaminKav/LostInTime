@@ -35,11 +35,12 @@ use crate::{
         rogue_skills::{LungeState, SprintState},
         skills::{
             grant_skill_charge_after_cooldown_complete, ActiveSkill, ActiveSkillUsedEvent,
-            BombState, BuckshotSkillState, ClassSkillSlots, DaggerThrowKillTracker,
-            DaggerThrowState, DruidTreeSkillState, FirePillarState, FuryState, HealSkillState,
-            Heirloom, IceWallSkillState, LaserBeamState, LastHitProjectile, LightningState,
-            PhasingThroughEnemies, PiercingStarSkillState, PlayerSkills, RapidfireState,
-            ShoutSkillState, SlashState, SpinAttackState, StealthState, TripleThrowState,
+            ArrowVolleyState, BombState, BuckshotSkillState, ClassSkillSlots,
+            DaggerThrowKillTracker, DaggerThrowState, DruidTreeSkillState, FirePillarState,
+            FuryState, HealSkillState, Heirloom, IceWallSkillState, LaserBeamState,
+            LastHitProjectile, LightningState, PhasingThroughEnemies, PiercingStarSkillState,
+            PlayerSkills, PossessedBladeSkillState, RapidfireState, ShoutSkillState, SlashState,
+            SpinAttackState, StealthState, TripleThrowState,
         },
         Player,
     },
@@ -133,6 +134,8 @@ pub struct SkillStateQueries<'w, 's> {
     pub fury_states: Query<'w, 's, &'static FuryState, With<Player>>,
     pub bomb_states: Query<'w, 's, &'static BombState, With<Player>>,
     pub spinattack_states: Query<'w, 's, &'static SpinAttackState, With<Player>>,
+    pub arrowvolley_states: Query<'w, 's, &'static ArrowVolleyState, With<Player>>,
+    pub possessed_blade_states: Query<'w, 's, &'static PossessedBladeSkillState, With<Player>>,
 }
 
 pub fn handle_active_skill_event(
@@ -222,6 +225,8 @@ pub fn handle_active_skill_event(
             let fury_state = skill_states.fury_states.get(player_e).ok();
             let bomb_state = skill_states.bomb_states.get(player_e).ok();
             let spinattack_state = skill_states.spinattack_states.get(player_e).ok();
+            let arrowvolley_state = skill_states.arrowvolley_states.get(player_e).ok();
+            let possessed_blade_state = skill_states.possessed_blade_states.get(player_e).ok();
             // Apply multiplicative cooldown logic is handled in skills when inserted
             let slot_skill = match ev.slot {
                 0 => skills.active_skill_slot_0.as_ref(),
@@ -707,7 +712,7 @@ pub fn handle_active_skill_event(
                             commands.entity(player_e).remove::<LungeState>();
                         }
                         commands.entity(player_e).insert(LungeState {
-                            lunge_duration: Timer::from_seconds(0.42, TimerMode::Once)
+                            lunge_duration: Timer::from_seconds(0.64, TimerMode::Once)
                                 .tick(Duration::from_secs_f32(0.1))
                                 .clone(),
                             lunge_speed: 9.5,
@@ -1009,6 +1014,85 @@ pub fn handle_active_skill_event(
 
                         commands.spawn(SoundSpawner::new(AudioSoundEffect::SwordSwing, 0.2));
                     }
+                    ActiveSkill::ArrowVolley => {
+                        if !should_start_cooldown {
+                            if arrowvolley_state.is_some() {
+                                commands.entity(player_e).remove::<ArrowVolleyState>();
+                            }
+                        }
+                        commands.entity(player_e).insert(ArrowVolleyState {
+                            waves_remaining: 2,
+                            wave_timer: Timer::from_seconds(0.4, TimerMode::Repeating),
+                        });
+                        start_slot_cooldown_for_cast(
+                            &mut class_slots,
+                            ev.slot,
+                            skill_cd,
+                            should_start_cooldown,
+                        );
+
+                        let player_pos = player_txfm.translation().truncate();
+                        let cursor_pos = cursor.world_coords.truncate();
+                        let base_direction = (cursor_pos - player_pos).normalize_or_zero();
+                        let base_angle = base_direction.y.atan2(base_direction.x);
+
+                        let spread_angle = 15.0_f32.to_radians();
+                        let base_dmg: i32 = attack_opt.map(|a| a.0).unwrap_or(10);
+                        let dmg = (base_dmg as f32 * power_mult * 0.75) as i32;
+
+                        for i in 0..3 {
+                            let angle_offset = (i as f32 - 1.0) * spread_angle;
+                            let direction = Vec2::from_angle(base_angle + angle_offset);
+                            ranged_attack_events.send(RangedAttackEvent {
+                                projectile: Projectile::ArrowVolleyShot,
+                                direction,
+                                mana_cost: None,
+                                from_enemy: false,
+                                from_entity: Some(player_e),
+                                is_followup_proj: false,
+                                dmg_override: Some(dmg),
+                                pos_override: None,
+                                spawn_delay: 0.0,
+                            });
+                        }
+                        commands.spawn(SoundSpawner::new(AudioSoundEffect::Bow, 0.3));
+                    }
+                    ActiveSkill::PossessedBlade => {
+                        if !should_start_cooldown {
+                            if possessed_blade_state.is_some() {
+                                commands
+                                    .entity(player_e)
+                                    .remove::<PossessedBladeSkillState>();
+                            }
+                        }
+                        commands.entity(player_e).insert(PossessedBladeSkillState);
+                        start_slot_cooldown_for_cast(
+                            &mut class_slots,
+                            ev.slot,
+                            skill_cd,
+                            should_start_cooldown,
+                        );
+
+                        let player_pos = player_txfm.translation().truncate();
+                        let cursor_pos = cursor.world_coords.truncate();
+                        let direction = (cursor_pos - player_pos).normalize_or_zero();
+
+                        let base_dmg: i32 = attack_opt.map(|a| a.0).unwrap_or(10);
+                        let dmg = (base_dmg as f32 * power_mult * 1.15) as i32;
+
+                        ranged_attack_events.send(RangedAttackEvent {
+                            projectile: Projectile::PossessedBlade,
+                            direction,
+                            mana_cost: None,
+                            from_enemy: false,
+                            from_entity: Some(player_e),
+                            is_followup_proj: false,
+                            dmg_override: Some(dmg),
+                            pos_override: None,
+                            spawn_delay: 0.0,
+                        });
+                        commands.spawn(SoundSpawner::new(AudioSoundEffect::Claw, 0.3));
+                    }
                     _ => {}
                 }
                 if active.active_skill != ActiveSkill::Roll {
@@ -1172,6 +1256,12 @@ fn remove_skill_state_after_slot_cooldown(
         ActiveSkill::SpinAttack => {
             commands.entity(entity).remove::<SpinAttackState>();
         }
+        ActiveSkill::ArrowVolley => {
+            commands.entity(entity).remove::<ArrowVolleyState>();
+        }
+        ActiveSkill::PossessedBlade => {
+            commands.entity(entity).remove::<PossessedBladeSkillState>();
+        }
         ActiveSkill::Rapidfire | ActiveSkill::Fury => {}
         ActiveSkill::Teleport
         | ActiveSkill::Sprint
@@ -1247,6 +1337,211 @@ pub fn tick_fury_duration_and_throw(
         };
         let scaled_delta = time.delta().mul_f32(attack_speed_mult);
         f.throw_timer.tick(scaled_delta);
+    }
+}
+
+/// Attach return-flight component to newly spawned PossessedBlade projectiles.
+pub fn handle_attach_possessed_blade_return(
+    mut commands: Commands,
+    new_blades: Query<
+        (
+            Entity,
+            &Projectile,
+            &crate::item::projectile::ProjectileState,
+        ),
+        Added<Projectile>,
+    >,
+    player: Query<Entity, With<Player>>,
+) {
+    let Ok(player_e) = player.get_single() else {
+        return;
+    };
+    for (entity, proj, proj_state) in new_blades.iter() {
+        if *proj != Projectile::PossessedBlade {
+            continue;
+        }
+        commands.entity(entity).insert(PossessedBladeReturn {
+            phase: PossessedBladePhase::Outgoing,
+            elapsed: 0.0,
+            outgoing_duration: 1.0,
+            base_speed: proj_state.speed,
+            kill_lifesteal_remaining: 3,
+            owner: player_e,
+        });
+    }
+}
+
+/// Phases of the possessed blade flight path.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum PossessedBladePhase {
+    Outgoing,
+    Returning,
+}
+
+/// Attached to the PossessedBlade *projectile entity* to drive its decel/return arc.
+#[derive(Component)]
+pub struct PossessedBladeReturn {
+    pub phase: PossessedBladePhase,
+    pub elapsed: f32,
+    pub outgoing_duration: f32,
+    pub base_speed: f32,
+    pub kill_lifesteal_remaining: i32,
+    pub owner: Entity,
+}
+
+pub fn tick_possessed_blade_movement(
+    mut commands: Commands,
+    time: Res<Time>,
+    mut blades: Query<(
+        Entity,
+        &mut Transform,
+        &mut PossessedBladeReturn,
+        &mut crate::item::projectile::ProjectileState,
+    )>,
+    player_pos_q: Query<&GlobalTransform, With<Player>>,
+) {
+    let dt = time.delta_seconds();
+    let Ok(player_txfm) = player_pos_q.get_single() else {
+        return;
+    };
+    let player_pos = player_txfm.translation().truncate();
+
+    for (entity, mut transform, mut blade, mut proj_state) in blades.iter_mut() {
+        blade.elapsed += dt;
+
+        // Spin the blade
+        transform.rotate_z(-12.0 * dt);
+
+        match blade.phase {
+            PossessedBladePhase::Outgoing => {
+                let t = (blade.elapsed / blade.outgoing_duration).min(1.0);
+                // Ease-out deceleration: speed = base * (1 - t)^2
+                let speed = blade.base_speed * (1.0 - t) * (1.0 - t);
+                proj_state.speed = speed;
+
+                if t >= 1.0 {
+                    blade.phase = PossessedBladePhase::Returning;
+                    blade.elapsed = 0.0;
+                    proj_state.speed = 0.0;
+                    proj_state.hit_entities.clear();
+                }
+            }
+            PossessedBladePhase::Returning => {
+                let blade_pos = transform.translation.truncate();
+                let to_player = player_pos - blade_pos;
+                let dist = to_player.length();
+
+                if dist < 10.0 {
+                    commands.entity(entity).despawn_recursive();
+                    continue;
+                }
+
+                let dir = to_player.normalize_or_zero();
+                // Accelerate over time toward player
+                let speed = (blade.base_speed * 0.3 + blade.elapsed * 400.0).min(600.0);
+                let movement = dir * speed * dt;
+                transform.translation += movement.extend(0.0);
+                // Override the normal projectile movement
+                proj_state.speed = 0.0;
+                proj_state.direction = dir;
+            }
+        }
+    }
+}
+
+/// Cross-references `HitEvent` and `EnemyDeathEvent` in the same frame to
+/// detect kills by PossessedBlade projectiles. Heals the player directly
+/// (guaranteed 1 HP per kill, up to 3) rather than going through the
+/// `LifestealEvent` system which requires the player to already have a
+/// lifesteal stat.
+pub fn handle_possessed_blade_kill_lifesteal(
+    mut hit_events: EventReader<HitEvent>,
+    mut death_events: EventReader<EnemyDeathEvent>,
+    mut blades: Query<(Entity, &mut PossessedBladeReturn)>,
+    mut modify_health: EventWriter<crate::attributes::modifiers::ModifyHealthEvent>,
+) {
+    let dead_entities: Vec<Entity> = death_events.iter().map(|d| d.entity).collect();
+
+    let blade_count = blades.iter().count();
+
+    if dead_entities.is_empty() {
+        hit_events.iter().last();
+        return;
+    }
+
+    for hit in hit_events.iter() {
+        if hit.hit_with_projectile != Some(Projectile::PossessedBlade) {
+            continue;
+        }
+        let is_kill = dead_entities.contains(&hit.hit_entity);
+
+        if !is_kill {
+            continue;
+        }
+        let mut healed = false;
+        for (blade_e, mut blade) in blades.iter_mut() {
+            if blade.kill_lifesteal_remaining > 0 {
+                blade.kill_lifesteal_remaining -= 1;
+                modify_health.send(crate::attributes::modifiers::ModifyHealthEvent(1));
+                healed = true;
+                break;
+            }
+        }
+    }
+}
+
+pub fn tick_arrow_volley(
+    time: Res<Time>,
+    mut commands: Commands,
+    mut volley_q: Query<(Entity, &mut ArrowVolleyState, &GlobalTransform), With<Player>>,
+    player_skills: Query<(&SkillPower, &Attack, &OwnedBlessings), With<Player>>,
+    cursor: Res<CursorPos>,
+    mut ranged_attack_events: EventWriter<RangedAttackEvent>,
+) {
+    for (player_e, mut state, player_txfm) in volley_q.iter_mut() {
+        state.wave_timer.tick(time.delta());
+        if !state.wave_timer.just_finished() {
+            continue;
+        }
+        if state.waves_remaining == 0 {
+            commands.entity(player_e).remove::<ArrowVolleyState>();
+            continue;
+        }
+        state.waves_remaining -= 1;
+
+        let Ok((skill_power, attack, blessings)) = player_skills.get_single() else {
+            continue;
+        };
+        let power_mult = crate::attributes::attribute_helpers::skill_power_multiplier(
+            skill_power,
+            blessings.get_skill_power_bonus(),
+        );
+
+        let player_pos = player_txfm.translation().truncate();
+        let cursor_pos = cursor.world_coords.truncate();
+        let base_direction = (cursor_pos - player_pos).normalize_or_zero();
+        let base_angle = base_direction.y.atan2(base_direction.x);
+
+        let spread_angle = 5.0_f32.to_radians();
+        let base_dmg: i32 = attack.0;
+        let dmg = (base_dmg as f32 * power_mult * 0.75) as i32;
+
+        for i in 0..3 {
+            let angle_offset = (i as f32 - 1.0) * spread_angle;
+            let direction = Vec2::from_angle(base_angle + angle_offset);
+            ranged_attack_events.send(RangedAttackEvent {
+                projectile: Projectile::ArrowVolleyShot,
+                direction,
+                mana_cost: None,
+                from_enemy: false,
+                from_entity: Some(player_e),
+                is_followup_proj: false,
+                dmg_override: Some(dmg),
+                pos_override: None,
+                spawn_delay: 0.0,
+            });
+        }
+        commands.spawn(SoundSpawner::new(AudioSoundEffect::Bow, 0.3));
     }
 }
 

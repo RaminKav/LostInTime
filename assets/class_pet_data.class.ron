@@ -36,7 +36,7 @@
             ],
             class_icon: GreenPlayerSelectIcon,
             skill_icon: CritChanceIcon,
-            active_skills: (SprintLunge, DaggerThrow, Stealth, DaggerSlash),
+            active_skills: (SprintLunge, PossessedBlade, Stealth, DaggerSlash),
             starting_weapons: [Dagger],
         ),
         Thief: (
@@ -62,7 +62,7 @@
             ],
             class_icon: GreenPlayerSelectIcon,
             skill_icon: CritDamageIcon,
-            active_skills: (Buckshot, Bomb, DruidTree, Rapidfire),
+            active_skills: (Buckshot, Bomb, DruidTree, ArrowVolley),
             starting_weapons: [WoodBow, Gun],
         ),
     },

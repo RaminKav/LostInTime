@@ -27,7 +27,8 @@ use crate::{
     colors::{DARK_GREEN, RED},
     cursor::CursorPos,
     inventory::{
-        sort_main_inventory, Inventory, InventoryItemStack, ItemStack, SortInventoryButton,
+        sort_main_inventory, Inventory, InventoryItemStack, ItemStack, MaterialDropsToggleButton,
+        MaterialDropsToggleXOverlay, SortInventoryButton, SuppressNonMobBreakDrops,
     },
     item::{heirloom_shrine::HeirloomShrineState, CraftedItemEvent, EquipmentType},
     player::{
@@ -1917,6 +1918,71 @@ pub fn handle_sort_inventory_button_click(
                     if left_mouse_pressed {
                         if let Ok(mut inv) = inv.get_single_mut() {
                             sort_main_inventory(&mut inv, &proto, &mut inv_slots);
+                        }
+                        commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.25));
+                    }
+                }
+                _ => (),
+            },
+            _ => {
+                if matches!(interactable.current(), Interaction::Hovering) {
+                    interactable.change(Interaction::None);
+                    commands
+                        .entity(e)
+                        .insert(graphics.get_ui_element_texture(UIElement::InventorySlot));
+                }
+            }
+        }
+    }
+}
+
+/// Hover + click on the material-drops toggle (under SORT). Toggles [`SuppressNonMobBreakDrops`]
+/// and shows or hides the red Alagard "X" overlay on the button.
+pub fn handle_material_drops_toggle_button_click(
+    cursor_pos: Res<CursorPos>,
+    mouse_input: Res<Input<MouseButton>>,
+    ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
+    mut toggle_button: Query<
+        (Entity, &mut Interactable),
+        (With<MaterialDropsToggleButton>, Without<InventorySlotState>),
+    >,
+    children: Query<&Children>,
+    mut commands: Commands,
+    graphics: Res<Graphics>,
+    mut suppress: ResMut<SuppressNonMobBreakDrops>,
+    mut x_overlays: Query<&mut Visibility, With<MaterialDropsToggleXOverlay>>,
+    ui_state: Res<State<UIState>>,
+) {
+    if !ui_state.0.is_inv_open() {
+        return;
+    }
+    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
+
+    for (e, mut interactable) in toggle_button.iter_mut() {
+        match hit_test {
+            Some(hit_ent) if hit_ent.0 == e => match interactable.current() {
+                Interaction::None => {
+                    interactable.change(Interaction::Hovering);
+                    commands
+                        .entity(e)
+                        .insert(graphics.get_ui_element_texture(UIElement::InventorySlotHover));
+                    commands.spawn(SoundSpawner::new(AudioSoundEffect::UISlotHover, 0.2));
+                }
+                Interaction::Hovering => {
+                    if left_mouse_pressed {
+                        suppress.0 = !suppress.0;
+                        let vis = if suppress.0 {
+                            Visibility::Visible
+                        } else {
+                            Visibility::Hidden
+                        };
+                        if let Ok(kids) = children.get(e) {
+                            for &child in kids.iter() {
+                                if let Ok(mut v) = x_overlays.get_mut(child) {
+                                    *v = vis;
+                                }
+                            }
                         }
                         commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.25));
                     }

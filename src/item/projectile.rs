@@ -96,6 +96,8 @@ pub enum Projectile {
     IceFloor,
     CrowFeather,
     CactusSlam,
+    PossessedBlade,
+    ArrowVolleyShot,
 }
 
 impl Projectile {
@@ -127,8 +129,9 @@ impl Projectile {
     pub fn get_custom_rotation(&self) -> Option<f32> {
         match self {
             Projectile::FuryKunai => Some(-0.7853982),   // -45°
-            Projectile::DaggerThrow => Some(-0.7853982), // -45°
-            Projectile::CrowFeather => Some(-0.7853982), // -45°
+            Projectile::DaggerThrow => Some(-0.7853982),   // -45°
+            Projectile::PossessedBlade => Some(-0.7853982), // -45°
+            Projectile::CrowFeather => Some(-0.7853982),    // -45°
             _ => None,
         }
     }
@@ -149,6 +152,8 @@ impl Projectile {
             Projectile::FuryKunai => true,
             Projectile::SpinAttack => true,
             Projectile::SpearGravity => true,
+            Projectile::PossessedBlade => true,
+            Projectile::ArrowVolleyShot => true,
             _ => false,
         }
     }
@@ -173,6 +178,8 @@ impl Projectile {
             | Projectile::FuryKunai
             | Projectile::SpinAttack
             | Projectile::SpearGravity
+            | Projectile::PossessedBlade
+            | Projectile::ArrowVolleyShot
             | Projectile::TeleportShock
             | Projectile::PoisonCloud
             | Projectile::HealHearts

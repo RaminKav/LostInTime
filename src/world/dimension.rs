@@ -169,6 +169,7 @@ impl DimensionPlugin {
         mut infinite_mode: ResMut<crate::night::InfiniteMode>,
         mut mob_spawning_paused: ResMut<MobSpawningPaused>,
         mut transition_state: ResMut<EraTransitionState>,
+        mut boss_summon_tracker: ResMut<crate::item::boss_shrine::BossSummonTracker>,
     ) {
         // Process only the first dimension spawn per frame to avoid double-firing when the portal
         // is triggered by both click and interact key (F), or by rapid double input.
@@ -238,12 +239,12 @@ impl DimensionPlugin {
                         night.time = 0.;
                         info!("Era {:?} starting at day {}", new_era, era_starting_day);
 
-                        // Reset era timer and infinite mode for the new era (12 minutes to find the boss and portal)
                         crate::night::reset_era_timer_and_infinite_mode(
                             &mut era_timer,
                             &mut infinite_mode,
                             &mut mob_spawning_paused,
                         );
+                        boss_summon_tracker.reset();
                     } else {
                         info!("Returning from dungeon to {:?}, keeping era timer", new_era);
                     }

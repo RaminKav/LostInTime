@@ -47,12 +47,17 @@ impl LootTablePlugin {
         loot_bonus: i32,
         level: Option<u8>,
         is_infinite_mode: bool,
+        is_boss: bool,
     ) -> Vec<ItemStack> {
         let mut rng = rand::thread_rng();
         let mut loot = vec![];
         for drop in loot_table.drops.iter() {
             let r: f32 = rng.gen();
-            let infinite_mode_drop_multiplier = if is_infinite_mode { 0.25 } else { 1.0 };
+            let infinite_mode_drop_multiplier = if is_infinite_mode && !is_boss {
+                0.25
+            } else {
+                1.0
+            };
             if r <= (drop.rate * infinite_mode_drop_multiplier) * (1.0 + loot_bonus as f32 / 100.0)
             {
                 let mut stack = proto.get_item_data(drop.item).unwrap().clone();

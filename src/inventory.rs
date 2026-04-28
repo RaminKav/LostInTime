@@ -589,6 +589,20 @@ impl ItemStack {
 #[derive(Component, Default, Clone, Debug)]
 pub struct SortInventoryButton;
 
+/// Toggles whether breakable world entities without [`crate::enemy::Mob`] spawn loot (chest
+/// contents and loot-table item drops). XP from [`crate::player::levels::ExperienceReward`]
+/// is unchanged. Read in `item::handle_break_object`; toggled from the inventory UI.
+#[derive(Resource, Default, Clone, Copy, Debug)]
+pub struct SuppressNonMobBreakDrops(pub bool);
+
+/// Marker for the material-drops toggle slot under the sort button (`handle_material_drops_toggle_button_click`).
+#[derive(Component, Clone, Debug)]
+pub struct MaterialDropsToggleButton;
+
+/// Red "X" overlay child; visible when [`SuppressNonMobBreakDrops`] is true.
+#[derive(Component, Clone, Debug)]
+pub struct MaterialDropsToggleXOverlay;
+
 /// Sort priority bucket for the inventory-sort button. Lower values sort first.
 /// Sub-field ordering is alphabetical on the item's display name.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
