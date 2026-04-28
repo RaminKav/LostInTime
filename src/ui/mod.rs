@@ -81,6 +81,7 @@ use loading_screen::*;
 use crate::{
     attributes::clamp_health,
     client::{is_not_paused, leaderboard::auto_fetch_leaderboard_on_menu, load_state, ClientState},
+    combat::InvincibilityTimer,
     handle_hits,
     inventory::{try_auto_equip_from_upgrade_slot, Inventory},
     item::{
@@ -92,7 +93,7 @@ use crate::{
     player::unlocks::RunUnlockState,
     player::RunScore,
     proto::proto_param::ProtoParam,
-    CustomFlush, Game, GameState, DEBUG,
+    CustomFlush, Game, GameState, Player, DEBUG,
 };
 
 use self::{
@@ -339,6 +340,13 @@ impl Plugin for UIPlugin {
                     .run_if(in_state(GameState::Main))
                     .run_if(state_changed::<UIState>())
                     .run_if(in_state(UIState::Closed))
+            )
+            // Grant brief i-frames after exiting chest reward / level-up screens
+            .add_system(
+                grant_iframes_after_chest_or_levelup_ui_close
+                    .run_if(in_state(GameState::Main))
+                    .run_if(state_changed::<UIState>())
+                    .after(check_pending_levelup_rewards_on_menu_close)
             )
             .add_systems(
                 (
@@ -929,4 +937,40 @@ pub fn check_pending_levelup_rewards_on_menu_close(
         // Override the transition to Closed - go to Skills instead
         next_inv_state.set(UIState::Skills);
     }
+}
+
+/// Grant the player a brief invulnerability window when they finish interacting with a chest
+/// reward (`UIState::ItemChest`) or a level-up screen (`UIState::Skills` /
+/// `UIState::ActiveSkills`). This avoids the player taking an instant hit on the frame the menu
+/// closes when an enemy has walked on top of them while time was paused.
+pub fn grant_iframes_after_chest_or_levelup_ui_close(
+    mut commands: Commands,
+    mut prev_ui_state: Local<UIState>,
+    curr_ui_state: Res<State<UIState>>,
+    player: Query<Entity, With<Player>>,
+) {
+    let prev = prev_ui_state.clone();
+    *prev_ui_state = curr_ui_state.0.clone();
+
+    if curr_ui_state.0 == prev || curr_ui_state.0 != UIState::Closed {
+        return;
+    }
+
+    let was_reward_ui = matches!(
+        prev,
+        UIState::ItemChest | UIState::Skills | UIState::ActiveSkills
+    );
+    if !was_reward_ui {
+        return;
+    }
+
+    let Ok(player_e) = player.get_single() else {
+        return;
+    };
+    commands
+        .entity(player_e)
+        .insert(InvincibilityTimer(Timer::from_seconds(
+            0.3,
+            TimerMode::Once,
+        )));
 }
