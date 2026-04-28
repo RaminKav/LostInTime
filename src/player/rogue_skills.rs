@@ -12,14 +12,17 @@ use crate::{
     inputs::{FacingDirection, MovementVector},
     item::projectile::Projectile,
     ui::damage_numbers::{spawn_text, DodgeEvent},
-    world::TILE_SIZE,
+    world::{y_sort::YSort, TILE_SIZE},
     AttackTimer, EnemyDeathEvent, GameParam, HitEvent, InputMappings, PLAYER_MOVE_SPEED,
 };
 use bevy::{prelude::*, sprite::Anchor};
 use bevy_aseprite::{anim::AsepriteAnimation, aseprite, AsepriteBundle};
 use bevy_rapier2d::prelude::{Collider, CollisionGroups, Group, KinematicCharacterController};
 
-use super::{ActiveSkill, ActiveSkillUsedEvent, Heirloom, Player, PlayerSkills};
+use super::{
+    melee_skills::{spawn_delayed_heirloom_cast, DelayedCastType, HEIRLOOM_EXTRA_CAST_DELAY},
+    ActiveSkill, ActiveSkillUsedEvent, Heirloom, Player, PlayerSkills,
+};
 
 aseprite!(pub Combo, "textures/effects/Combo.aseprite");
 
@@ -40,6 +43,79 @@ pub struct SprintState {
 pub struct LungeState {
     pub lunge_duration: Timer,
     pub lunge_speed: f32,
+}
+
+/// Direction of the active dash plus a counter of tracer shadows already spawned
+/// this lunge. Stored as a separate component (rather than fields on
+/// [`LungeState`]) because `handle_active_skill_event` re-inserts `LungeState`
+/// at the end of the activation frame, which would otherwise clobber the
+/// direction captured by `handle_lunge` and leave subsequent tracers oriented
+/// incorrectly.
+#[derive(Debug, Component)]
+#[component(storage = "SparseSet")]
+pub struct LungeDashInfo {
+    pub direction: Vec2,
+    pub tracers_spawned: u8,
+}
+
+/// World-space "ghost" sprite left behind during a lunge. Fades out then despawns.
+#[derive(Debug, Component)]
+#[component(storage = "SparseSet")]
+pub struct LungeShadow {
+    pub timer: Timer,
+}
+
+/// Source art for [`LungeShadow`] points straight down.
+const LUNGE_SHADOW_DEFAULT_DIR: Vec2 = Vec2::NEG_Y;
+/// How long a tracer stays on-screen before being despawned.
+const LUNGE_SHADOW_LIFETIME_SECS: f32 = 0.2;
+/// Alpha the tracer starts at. Fades linearly to 0 over its lifetime.
+const LUNGE_SHADOW_START_ALPHA: f32 = 1.;
+
+fn spawn_lunge_shadow(
+    commands: &mut Commands,
+    asset_server: &AssetServer,
+    world_pos: Vec3,
+    direction: Vec2,
+) {
+    let angle = if direction.length_squared() > 0.0 {
+        LUNGE_SHADOW_DEFAULT_DIR.angle_between(direction)
+    } else {
+        0.0
+    };
+    commands
+        .spawn(SpriteBundle {
+            texture: asset_server.load("textures/player/PlayerLungeShadow.png"),
+            sprite: Sprite {
+                color: Color::rgba(1.0, 1.0, 1.0, LUNGE_SHADOW_START_ALPHA),
+                ..Default::default()
+            },
+            transform: Transform::from_translation(Vec3::new(world_pos.x, world_pos.y, 0.9))
+                .with_rotation(Quat::from_rotation_z(angle)),
+            ..Default::default()
+        })
+        .insert(LungeShadow {
+            timer: Timer::from_seconds(LUNGE_SHADOW_LIFETIME_SECS, TimerMode::Once),
+        })
+        .insert(YSort(-0.01))
+        .insert(Name::new("LungeShadow"));
+}
+
+pub fn tick_lunge_shadows(
+    time: Res<Time>,
+    mut query: Query<(Entity, &mut LungeShadow, &mut Sprite)>,
+    mut commands: Commands,
+) {
+    for (e, mut shadow, mut sprite) in query.iter_mut() {
+        shadow.timer.tick(time.delta());
+        let remaining = 1.0 - shadow.timer.percent();
+        sprite
+            .color
+            .set_a(LUNGE_SHADOW_START_ALPHA * remaining.max(0.0));
+        if shadow.timer.finished() {
+            commands.entity(e).despawn_recursive();
+        }
+    }
 }
 
 /// Marker present only while the player is actively sprinting. Toggled on/off
@@ -140,6 +216,8 @@ pub fn handle_lunge(
         &OwnedBlessings,
         &mut CurrentMana,
         &SkillPower,
+        &GlobalTransform,
+        Option<&mut LungeDashInfo>,
     )>,
     mut commands: Commands,
     asset_server: Res<AssetServer>,
@@ -158,6 +236,8 @@ pub fn handle_lunge(
         blessings,
         mut current_mana,
         skill_power,
+        global_transform,
+        dash_info_opt,
     ) in query.iter_mut()
     {
         let lunge_slot = skills.has_active_skill(ActiveSkill::SprintLunge);
@@ -170,6 +250,29 @@ pub fn handle_lunge(
             // Execute lunge mechanics without directly resetting the cooldown timer.
             commands.entity(e).insert(PlayerAnimation::Lunge);
             commands.spawn(SoundSpawner::new(AudioSoundEffect::Lunge, 0.2));
+
+            // Prefer the active movement input direction (mv.0 reflects this frame's WASD
+            // input since `handle_lunge` runs after `player_move_inputs`). Fall back to the
+            // player's facing direction when they activated the lunge while standing still.
+            let dash_direction = if mv.0.length_squared() > 0.0 {
+                mv.0.normalize()
+            } else {
+                dir.get_dir_vec()
+            };
+            // Tracer #1 fires immediately at the activation position. Subsequent tracers
+            // are gated on `LungeDashInfo` which lives in its own component so it isn't
+            // wiped by the `LungeState` re-insert that happens later this frame in
+            // `handle_active_skill_event`.
+            spawn_lunge_shadow(
+                &mut commands,
+                &asset_server,
+                global_transform.translation(),
+                dash_direction,
+            );
+            commands.entity(e).insert(LungeDashInfo {
+                direction: dash_direction,
+                tracers_spawned: 1,
+            });
 
             let angle = match dir {
                 FacingDirection::Up => 0.,
@@ -190,23 +293,40 @@ pub fn handle_lunge(
             );
             commands.entity(lunge_e).set_parent(e);
 
-            if skills.has(Heirloom::SkillEcho) {
+            {
+                let echo_count = skills.get_count(Heirloom::SkillEcho);
                 let mana_cost = Heirloom::SkillEcho.get_mana_cost();
-                if current_mana.0 >= mana_cost {
+                let echo_dmg = (dmg.0 as f32 * 1.) as i32;
+                let size_mult = projectile_size
+                    .get_single()
+                    .map(|s| s.get_multiplier())
+                    .unwrap_or(1.0);
+
+                for i in 0..echo_count {
+                    if current_mana.0 < mana_cost {
+                        break;
+                    }
                     current_mana.0 -= mana_cost;
 
-                    let echo_dmg = (dmg.0 as f32 * 1.) as i32;
-                    let size_mult = projectile_size
-                        .get_single()
-                        .map(|s| s.get_multiplier())
-                        .unwrap_or(1.0);
-                    crate::player::melee_skills::spawn_echo_hitbox(
-                        &mut commands,
-                        &asset_server,
-                        e,
-                        echo_dmg,
-                        size_mult,
-                    );
+                    if i == 0 {
+                        crate::player::melee_skills::spawn_echo_hitbox(
+                            &mut commands,
+                            &asset_server,
+                            e,
+                            echo_dmg,
+                            size_mult,
+                        );
+                    } else {
+                        spawn_delayed_heirloom_cast(
+                            &mut commands,
+                            HEIRLOOM_EXTRA_CAST_DELAY * i as f32,
+                            DelayedCastType::Echo {
+                                player: e,
+                                dmg: echo_dmg,
+                                size_multiplier: size_mult,
+                            },
+                        );
+                    }
                 }
             }
 
@@ -214,6 +334,27 @@ pub fn handle_lunge(
             mv.0 = mv.0 * 0.;
         } else if lunge_state.lunge_duration.percent() != 0. {
             lunge_state.lunge_duration.tick(time.delta());
+            let percent = lunge_state.lunge_duration.percent();
+            if let Some(mut dash_info) = dash_info_opt {
+                if percent >= 0.40 && dash_info.tracers_spawned < 2 {
+                    spawn_lunge_shadow(
+                        &mut commands,
+                        &asset_server,
+                        global_transform.translation(),
+                        dash_info.direction,
+                    );
+                    dash_info.tracers_spawned = 2;
+                }
+                if percent >= 0.80 && dash_info.tracers_spawned < 3 {
+                    spawn_lunge_shadow(
+                        &mut commands,
+                        &asset_server,
+                        global_transform.translation(),
+                        dash_info.direction,
+                    );
+                    dash_info.tracers_spawned = 3;
+                }
+            }
             if lunge_state.lunge_duration.percent() >= 0.20
                 && lunge_state.lunge_duration.percent() <= 0.45
             {
@@ -239,6 +380,7 @@ pub fn handle_lunge(
             if lunge_state.lunge_duration.finished() {
                 lunge_state.lunge_duration.reset();
                 commands.entity(e).insert(PlayerAnimation::Walk);
+                commands.entity(e).remove::<LungeDashInfo>();
             }
 
             kcc.translation = Some(Vec2::new(mv.0.x, mv.0.y));
@@ -274,6 +416,7 @@ pub fn handle_lunge_cooldown(
         if anim.is_lunging() && aseprite_anim.just_finished() {
             lunge_state.lunge_duration.reset();
             commands.entity(e).insert(PlayerAnimation::Walk);
+            commands.entity(e).remove::<LungeDashInfo>();
         }
     }
 }

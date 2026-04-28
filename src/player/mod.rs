@@ -73,6 +73,7 @@ use crate::{
     inventory::{Inventory, INVENTORY_SIZE},
     item::{item_upgrades::ClawUpgradeMultiThrow, ActiveMainHandState, WorldObject},
     juice::RunDustTimer,
+    player::rogue_skills::tick_lunge_shadows,
     proto::proto_param::ProtoParam,
     ui::{damage_numbers::handle_add_damage_numbers_after_hit, FlashExpBarEvent},
     world::{world_helpers::tile_pos_to_world_pos, y_sort::YSort, TileMapPosition},
@@ -255,6 +256,13 @@ impl Plugin for PlayerPlugin {
                     skill_heirlooms::tick_druid_tree_dummy_timers.run_if(is_not_paused),
                     skill_heirlooms::handle_fire_pillar_hit_clear.run_if(is_not_paused),
                     skill_heirlooms::handle_laser_beam_hit_clear.run_if(is_not_paused),
+                )
+                    .in_set(OnUpdate(GameState::Main)),
+            )
+            .add_systems(
+                (
+                    skill_heirlooms::update_stealth_color.run_if(is_not_paused),
+                    tick_lunge_shadows.run_if(is_not_paused),
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
