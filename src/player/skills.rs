@@ -187,7 +187,7 @@ impl ActiveSkill {
             ActiveSkill::Rapidfire => 12.0,
             ActiveSkill::FirePillar => 12.0,
             ActiveSkill::Heal => 45.0,
-            ActiveSkill::Buckshot => 3.0,
+            ActiveSkill::Buckshot => 2.3,
             ActiveSkill::IceWall => 10.0,
             ActiveSkill::DruidTree => 11.0,
             ActiveSkill::Shout => 7.0,
@@ -514,7 +514,7 @@ impl ActiveSkill {
                     .entity(entity)
                     .insert(crate::player::rogue_skills::LungeState {
                         lunge_duration: Timer::from_seconds(0.64, TimerMode::Once),
-                        lunge_speed: 9.5,
+                        lunge_speed: 7.5,
                     });
             }
             ActiveSkill::Teleport => {
@@ -787,6 +787,7 @@ impl Heirloom {
             Heirloom::CoinLightning => 5,
             Heirloom::KillLightning => 7,
             Heirloom::ManaRegenLightning => 5,
+            Heirloom::ManaOrbAttack => 2,
             _ => 0,
         }
     }
@@ -1381,6 +1382,7 @@ impl Heirloom {
                 "at an enemy. It does".to_string(),
                 "damage equal to the".to_string(),
                 "amount regenerated.".to_string(),
+                format!("Costs {} mana.", Heirloom::ManaOrbAttack.get_mana_cost()),
             ],
             Heirloom::ItemPickupRadius => vec![
                 "Increases item".to_string(),

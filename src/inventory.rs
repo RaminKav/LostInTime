@@ -336,7 +336,7 @@ impl InventoryItemStack {
         container.items[self.slot] = Some(inv_stack.clone());
         inv_stack
     }
-    pub fn modify_count(&mut self, amount: i8) -> Option<Self> {
+    pub fn modify_count(&mut self, amount: i32) -> Option<Self> {
         self.item_stack.modify_count(amount);
         if self.item_stack.count == 0 {
             return None;
@@ -549,7 +549,7 @@ impl ItemStack {
         let inv_or_crafting = container.items[slot].clone();
         if let Some(mut existing_stack) = inv_or_crafting {
             if existing_stack.get_obj() == &self.obj_type {
-                existing_stack.modify_count(self.count as i8);
+                existing_stack.modify_count(self.count as i32);
                 return Ok(());
             }
             Err(InventoryError::FailedToMerge(
@@ -574,12 +574,13 @@ impl ItemStack {
         self.clone()
             .copy_with_attributes(self.attributes.clone().change_attribute(modifier))
     }
-    pub fn modify_count(&mut self, amount: i8) -> Self {
-        if (self.count as i8) + amount <= 0 {
-            self.count = 0;
-        } else {
-            self.count = ((self.count as i8) + amount) as usize;
-        }
+    pub fn modify_count(&mut self, amount: i32) -> Self {
+        // NOTE: Do all math in i64 to avoid silently truncating `self.count`.
+        // The previous implementation cast `self.count` (usize, up to MAX_STACK_SIZE = 9999)
+        // down to `i8`, which wiped large stacks during crafting (e.g. 256 logs → 0 left
+        // when crafting a bridge that should only consume 4).
+        let new_count = (self.count as i64) + (amount as i64);
+        self.count = new_count.max(0) as usize;
         self.clone()
     }
 }

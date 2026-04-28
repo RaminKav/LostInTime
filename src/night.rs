@@ -95,10 +95,10 @@ impl InfiniteMode {
     pub fn get_speed_multiplier(&self) -> f32 {
         if self.difficulty_level <= 5 {
             // Tier 1: 50% per level
-            1.0 + (self.difficulty_level as f32 * 0.5)
+            2.5 + (self.difficulty_level as f32 * 0.5)
         } else {
             // Tier 2: 70% per level, starting from tier 1 max (3.5x at level 5)
-            let tier1_max = 1.0 + (5.0 * 0.5); // 3.5x
+            let tier1_max = 2.5 + (5.0 * 0.5); // 3.5x
             let tier2_levels = self.difficulty_level - 5;
             tier1_max + (tier2_levels as f32 * 0.7)
         }

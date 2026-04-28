@@ -225,7 +225,7 @@ pub fn handle_crafted_item(
                     .expect("player crafted item but does not have the required ingredients?");
                 let stack = inv.items.items[ingredient_slot].as_mut().unwrap();
                 if stack.item_stack.count >= item.count {
-                    inv.items.items[ingredient_slot] = stack.modify_count(-(item.count as i8));
+                    inv.items.items[ingredient_slot] = stack.modify_count(-(item.count as i32));
                     remaining_cost.retain(|x| x != item);
                 } else {
                     let count = stack.item_stack.count;

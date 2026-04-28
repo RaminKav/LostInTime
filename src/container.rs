@@ -150,18 +150,18 @@ impl Container {
                 let space_left = MAX_STACK_SIZE - existing_item.item_stack.count;
                 if space_left < container_a_item_count {
                     target_container.items[existing_item.slot] =
-                        existing_item.modify_count(space_left as i8);
+                        existing_item.modify_count(space_left as i32);
                     self.items[container_a_item.slot] =
-                        container_a_item.modify_count(-(space_left as i8));
+                        container_a_item.modify_count(-(space_left as i32));
                     if let Some(next_avail_slot) = Self::get_first_empty_slot(target_container) {
                         target_container.items[next_avail_slot] = container_a_item
                             .modify_slot(next_avail_slot)
-                            .modify_count(-(space_left as i8));
+                            .modify_count(-(space_left as i32));
                         self.items[container_a_item.slot] = None;
                     }
                 } else {
                     target_container.items[existing_item.slot] =
-                        existing_item.modify_count(container_a_item_count as i8);
+                        existing_item.modify_count(container_a_item_count as i32);
                     self.items[slot] = None;
                 }
             } else if let Some(next_avail_slot) = Self::get_first_empty_slot(target_container) {
@@ -201,17 +201,17 @@ impl Container {
                 let mut existing_item = self.items[existing_item_slot].as_ref().unwrap().clone();
                 let space_left = MAX_STACK_SIZE - existing_item.item_stack.count;
                 if space_left < stack_count {
-                    self.items[existing_item.slot] = existing_item.modify_count(space_left as i8);
+                    self.items[existing_item.slot] = existing_item.modify_count(space_left as i32);
                     self.items[inv_item_stack.slot] =
-                        inv_item_stack.modify_count(-(space_left as i8));
+                        inv_item_stack.modify_count(-(space_left as i32));
                     if let Some(next_avail_slot) = Self::get_first_empty_slot(self) {
                         self.items[next_avail_slot] = inv_item_stack
                             .modify_slot(next_avail_slot)
-                            .modify_count(-(space_left as i8));
+                            .modify_count(-(space_left as i32));
                         self.items[inv_item_stack.slot] = None;
                     }
                 } else {
-                    self.items[existing_item.slot] = existing_item.modify_count(stack_count as i8);
+                    self.items[existing_item.slot] = existing_item.modify_count(stack_count as i32);
                     self.items[slot] = None;
                 }
             } else if !is_from_hotbar {
@@ -324,7 +324,7 @@ impl Container {
                 .expect("player crafted item but does not have the required ingredients?");
             let stack = self.items[ingredient_slot].as_mut().unwrap();
             if stack.item_stack.count >= amount {
-                self.items[ingredient_slot] = stack.modify_count(-(amount as i8));
+                self.items[ingredient_slot] = stack.modify_count(-(amount as i32));
                 remaining_cost = 0_usize;
             } else {
                 let count = stack.item_stack.count;

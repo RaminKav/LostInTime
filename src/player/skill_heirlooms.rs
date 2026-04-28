@@ -501,7 +501,7 @@ pub fn handle_active_skill_event(
                         // Insert BounceEffect directly with opposite direction
                         use crate::bounce::BounceEffect;
                         let bounce_direction = -direction_to_cursor;
-                        let bounce_speed = 300.0; // placeholder speed
+                        let bounce_speed = 400.0; // placeholder speed
                         commands.entity(player_e).insert(BounceEffect::new(
                             player_pos,
                             bounce_direction,
@@ -715,7 +715,7 @@ pub fn handle_active_skill_event(
                             lunge_duration: Timer::from_seconds(0.64, TimerMode::Once)
                                 .tick(Duration::from_secs_f32(0.1))
                                 .clone(),
-                            lunge_speed: 9.5,
+                            lunge_speed: 7.5,
                         });
                         start_slot_cooldown_for_cast(
                             &mut class_slots,
