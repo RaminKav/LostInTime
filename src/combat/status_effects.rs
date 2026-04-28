@@ -61,7 +61,7 @@ pub struct StatusEffectEvent {
 pub struct Burning {
     pub tick_timer: Timer,
     pub duration_timer: Timer,
-    pub stacks: u8,
+    pub stacks: u128,
 }
 #[derive(Debug, Clone)]
 pub struct Poisoned {

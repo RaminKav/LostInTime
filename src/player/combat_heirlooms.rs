@@ -2116,7 +2116,7 @@ pub fn handle_mana_regen_poison(
                         continue;
                     };
                     if let Some(burning) = status.burning.as_mut() {
-                        burning.stacks = burning.stacks.saturating_add(heirloom_count as u8);
+                        burning.stacks = burning.stacks.saturating_add(heirloom_count as u128);
                         burning.duration_timer.reset();
                         let stacks = burning.stacks as i32;
                         status_event.send(StatusEffectEvent {
