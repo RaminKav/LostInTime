@@ -4,7 +4,11 @@ use bevy_aseprite::{anim::AsepriteAnimation, aseprite, AsepriteBundle};
 use crate::{
     assets::Graphics,
     item::object_actions::ObjectAction,
-    ui::{key_input_guide::InteractionGuideTrigger, minimap::UpdateMiniMapEvent},
+    ui::{
+        key_input_guide::InteractionGuideTrigger,
+        minimap::UpdateMiniMapEvent,
+        UIState,
+    },
     world::TileMapPosition,
     GameParam,
 };
@@ -101,21 +105,40 @@ pub fn handle_active_skill_shrine_completion(
     }
 }
 
-/// Handle ESC closing the active skill shrine UI - mark shrine as done
+fn restore_active_skill_shrine_interactivity(commands: &mut Commands, shrine_entity: Entity) {
+    commands
+        .entity(shrine_entity)
+        .remove::<ActiveSkillShrineState>()
+        .insert(ObjectAction::ActiveSkillShrine)
+        .insert(InteractionGuideTrigger {
+            key: Some("F".to_string()),
+            text: Some("Get Skill".to_string()),
+            activation_distance: 32.,
+            icon_stack: None,
+        });
+}
+
+/// When gameplay UI is closed, clear an abandoned active skill shrine flow and make the
+/// shrine interactable again. The shrine is only consumed in `handle_active_skill_shrine_completion`
+/// after a successful swap (`is_used` in `handle_active_skill_shrine_overwrite_interaction`).
+///
+/// Only reacts in `UIState::Closed` so we never restore during the transition from the skill
+/// list to the slot-overwrite screen (`ActiveSkillShrine` → `ActiveSkills`).
 pub fn handle_active_skill_shrine_esc(
     shrine_selection: Option<Res<ActiveSkillShrineSelection>>,
-    mut shrine_query: Query<&mut ActiveSkillShrineState>,
+    shrine_overwrite: Option<Res<ActiveSkillShrineOverwrite>>,
     mut commands: Commands,
-    curr_ui_state: Res<State<crate::ui::UIState>>,
+    curr_ui_state: Res<State<UIState>>,
 ) {
-    // If we have a selection resource but we're not in the ActiveSkillShrine UI state,
-    // it means the player ESC'd without making a choice
-    if curr_ui_state.0 != crate::ui::UIState::ActiveSkillShrine {
-        if let Some(selection) = shrine_selection {
-            if let Ok(mut shrine_state) = shrine_query.get_mut(selection.shrine_entity) {
-                shrine_state.is_used = true;
-            }
-            commands.remove_resource::<ActiveSkillShrineSelection>();
-        }
+    if curr_ui_state.0 != UIState::Closed {
+        return;
+    }
+    if let Some(selection) = shrine_selection.as_ref() {
+        restore_active_skill_shrine_interactivity(&mut commands, selection.shrine_entity);
+        commands.remove_resource::<ActiveSkillShrineSelection>();
+    }
+    if let Some(overwrite) = shrine_overwrite.as_ref() {
+        restore_active_skill_shrine_interactivity(&mut commands, overwrite.shrine_entity);
+        commands.remove_resource::<ActiveSkillShrineOverwrite>();
     }
 }
