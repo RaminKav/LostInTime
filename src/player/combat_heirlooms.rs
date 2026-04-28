@@ -647,7 +647,10 @@ pub fn update_summon_ring(
                     }
                     ring.hit_entities.insert(other);
                     let dir = (snapshot.position - new_pos).normalize_or_zero();
-                    let frail_stacks = frail_query.get(other).map(|s| s.frail_stacks()).unwrap_or(0);
+                    let frail_stacks = frail_query
+                        .get(other)
+                        .map(|s| s.frail_stacks())
+                        .unwrap_or(0);
                     let (damage, was_crit, was_overcrit) =
                         calculate_summon_damage(&mut commands, &game, other, frail_stacks);
                     hit_events.send(HitEvent {
@@ -695,7 +698,10 @@ pub fn update_summon_ring(
                 }
                 ring.hit_entities.insert(other);
                 let dir = (snapshot.position - new_pos).normalize_or_zero();
-                let frail_stacks = frail_query.get(other).map(|s| s.frail_stacks()).unwrap_or(0);
+                let frail_stacks = frail_query
+                    .get(other)
+                    .map(|s| s.frail_stacks())
+                    .unwrap_or(0);
                 let (damage, was_crit, was_overcrit) =
                     calculate_summon_damage(&mut commands, &game, other, frail_stacks);
                 hit_events.send(HitEvent {
@@ -1620,7 +1626,14 @@ pub fn handle_crate_break_damage(
         // Check if this was a crate
         if matches!(
             event.obj,
-            crate::item::WorldObject::Crate | crate::item::WorldObject::Crate2
+            WorldObject::Crate
+                | WorldObject::Crate2
+                | WorldObject::DesertCrate
+                | WorldObject::DesertCrate2
+                | WorldObject::SnowCrate1
+                | WorldObject::SnowCrate2
+                | WorldObject::SnowCrate3
+                | WorldObject::SnowCrate4
         ) {
             // Each crate gives 1% damage per stack
             tracker.bonus_damage_percent += 1.5 * stacks as f32;
