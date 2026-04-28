@@ -69,21 +69,23 @@ fn start_slot_cooldown_for_cast(
 #[component(storage = "SparseSet")]
 pub struct Stealthed;
 
-/// If Stealth still needs charges back (extra heirloom charges), start the next regen on the slot.
-fn try_queue_stealth_charge_regen_after_grant(
-    skills: &PlayerSkills,
-    blessings: &OwnedBlessings,
-    slots: &mut ClassSkillSlots,
+/// If a slot still has missing charges after a cooldown completed and granted +1, queue
+/// the next regen by restarting the cooldown. Without this, skills with `max_charges > 1`
+/// (e.g. via the Paintbrush heirloom) only ever regen a single charge per "burst" of casts
+/// and end up stuck below max forever.
+fn restart_charge_regen_if_below_max(
+    skills: Option<&PlayerSkills>,
+    blessings: Option<&OwnedBlessings>,
+    slot: &mut crate::player::skills::SlotSkillRuntime,
 ) {
-    for slot in &mut slots.0 {
-        if slot.tracked_skill == ActiveSkill::Stealth && slot.current_charges < slot.max_charges {
-            let cd = skills
-                .effective_skill_cooldown(&ActiveSkill::Stealth, blessings)
-                .max(0.0);
-            slot.start_cooldown_seconds(cd, true);
-            return;
-        }
+    if slot.current_charges >= slot.max_charges {
+        return;
     }
+    let cd = match (skills, blessings) {
+        (Some(sk), Some(bl)) => sk.effective_skill_cooldown(&slot.tracked_skill, bl).max(0.0),
+        _ => slot.base_cooldown.max(0.0),
+    };
+    slot.start_cooldown_seconds(cd, true);
 }
 
 /// Ends stealth visuals and starts the skill cooldown (call when attack/skill breaks stealth).
@@ -1279,6 +1281,8 @@ pub fn tick_class_skill_slots(
     blessings: Query<&OwnedBlessings, With<Player>>,
     mut q: Query<(Entity, &mut ClassSkillSlots, Option<&Stealthed>), With<Player>>,
 ) {
+    let skills_single = player_skills.get_single().ok();
+    let blessings_single = blessings.get_single().ok();
     for (entity, mut slots, stealthed) in q.iter_mut() {
         for i in 0..4 {
             let skill = slots.0[i].tracked_skill;
@@ -1294,11 +1298,10 @@ pub fn tick_class_skill_slots(
             }
             grant_skill_charge_after_cooldown_complete(entity, skill, slots.as_mut());
             remove_skill_state_after_slot_cooldown(&mut commands, entity, skill);
-            if skill == ActiveSkill::Stealth {
-                if let (Ok(sk), Ok(bl)) = (player_skills.get_single(), blessings.get_single()) {
-                    try_queue_stealth_charge_regen_after_grant(sk, bl, slots.as_mut());
-                }
-            }
+            // Restart regen for the next charge if we're still below max. Without this,
+            // skills boosted past 1 max charge (e.g. via Paintbrush) only ever regen one
+            // charge after a burst of casts, leaving them stuck below max indefinitely.
+            restart_charge_regen_if_below_max(skills_single, blessings_single, &mut slots.0[i]);
         }
     }
 }
@@ -1871,6 +1874,7 @@ pub fn reduce_skill_cooldown_on_crit(
             let reduction = (0.1 * heirloom_count as f32).max(0.0);
 
             if let Ok(mut slots) = class_slots.get_mut(player_e) {
+                let blessings_ref = blessings.get(player_e).ok();
                 for i in 0..4 {
                     if !slots.0[i].cooldown_timer.finished() {
                         slots.0[i]
@@ -1886,11 +1890,11 @@ pub fn reduce_skill_cooldown_on_crit(
                     }
                     grant_skill_charge_after_cooldown_complete(player_e, skill, slots.as_mut());
                     remove_skill_state_after_slot_cooldown(&mut commands, player_e, skill);
-                    if skill == ActiveSkill::Stealth {
-                        if let Ok(bl) = blessings.get(player_e) {
-                            try_queue_stealth_charge_regen_after_grant(skills, bl, slots.as_mut());
-                        }
-                    }
+                    restart_charge_regen_if_below_max(
+                        Some(skills),
+                        blessings_ref,
+                        &mut slots.0[i],
+                    );
                 }
             }
 

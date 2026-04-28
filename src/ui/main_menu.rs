@@ -730,6 +730,7 @@ pub fn cleanup_run_state(
     commands.insert_resource(EssenceShopCache::default());
     commands.insert_resource(FogOfWarData::default());
     commands.insert_resource(MinimapTileCache::default());
+    commands.insert_resource(crate::item::boss_shrine::BossSummonTracker::default());
 
     // Reset Rapier physics world to free accumulated internal arena allocations
     commands.insert_resource(RapierContext::default());
