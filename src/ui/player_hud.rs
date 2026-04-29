@@ -1704,7 +1704,7 @@ pub fn handle_update_player_skills(
 
             // Spawn all icons in one consolidated loop
             for (i, (heirloom, count)) in ordered_heirlooms.iter().enumerate() {
-                const MAX_ICONS_PER_ROW: usize = 18;
+                const MAX_ICONS_PER_ROW: usize = 28;
                 const ICON_SPACING: f32 = 16.;
                 const ROW_SPACING: f32 = 16.;
 

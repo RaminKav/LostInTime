@@ -47,6 +47,18 @@ impl ChaosTracker {
     }
 }
 
+/// Max HP multiplier from total chaos (global chaos tracker + infinite mode bonus),
+/// matching `juice_up_spawned_mobs_per_day` in `crate::enemy`.
+pub fn hp_multiplier_for_total_chaos(total_chaos: f32) -> f32 {
+    let chaos_factor = 1. + total_chaos;
+    let early_cutoff = 20.0_f32;
+    if chaos_factor <= early_cutoff {
+        chaos_factor.powf(0.7)
+    } else {
+        1.1 * chaos_factor
+    }
+}
+
 pub struct IncreaseChaosEvent {
     pub amount: f32,
 }

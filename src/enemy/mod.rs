@@ -18,17 +18,20 @@ use crate::{
         LeapAttackState, NightTimeAggro, ProjectileAttackState,
     },
     attributes::{add_current_health_with_max_health, Attack, MaxHealth},
-    chaos::ChaosTracker,
+    chaos::{hp_multiplier_for_total_chaos, ChaosTracker},
     client::is_not_paused,
     colors::{BLACK, DARK_GREEN, GREY, LIGHT_BROWN, LIGHT_GREEN, PINK, RED},
     inputs::FacingDirection,
     item::{
         boss_shrine::{BossSummonIndex, BossSummonTracker},
         projectile::Projectile,
-        Loot, LootTable,
+        Loot, LootTable, Wall, WorldObject,
     },
-    night::{InfiniteModeMob, NightTracker},
-    player::levels::{ExperienceReward, PlayerLevel},
+    night::{InfiniteMode, InfiniteModeMob, NightTracker},
+    player::{
+        levels::{ExperienceReward, PlayerLevel},
+        Player,
+    },
     proto::{proto_param::ProtoParam, ColliderCapsulProto},
     ui::minimap::UpdateMiniMapEvent,
     world::{dungeon::Dungeon, TileMapPosition},
@@ -70,6 +73,7 @@ impl Plugin for EnemyPlugin {
                     red_mushling::handle_mushling_rush_warnings.run_if(is_not_paused),
                     juice_up_spawned_elite_mobs.before(add_current_health_with_max_health),
                     juice_up_spawned_mobs_per_day.before(add_current_health_with_max_health),
+                    juice_up_world_object_max_health_by_chaos.before(add_current_health_with_max_health),
                     scale_boss_summon_stats
                         .after(juice_up_spawned_mobs_per_day)
                         .before(add_current_health_with_max_health),
@@ -562,7 +566,7 @@ fn juice_up_spawned_mobs_per_day(
     mut elites: Query<(Entity, &mut MaxHealth, &mut Attack, &Mob), Added<Mob>>,
     night_tracker: Res<NightTracker>,
     chaos_tracker: Option<Res<ChaosTracker>>,
-    infinite_mode: Res<crate::night::InfiniteMode>,
+    infinite_mode: Res<InfiniteMode>,
     player_level: Query<&PlayerLevel>,
     mut commands: Commands,
 ) {
@@ -578,15 +582,7 @@ fn juice_up_spawned_mobs_per_day(
         // 1. per day, 0.2 per level, 1 per heirloom, 1 per totem,
         let chaos_factor = 1. + total_chaos;
 
-        let early_cutoff = 20.0_f32;
-
-        let hp_multiplier = if chaos_factor <= early_cutoff {
-            // Early game: keep current scaling (similar difficulty)
-            chaos_factor.powf(0.7)
-        } else {
-            // Late game: exponential scaling
-            1.1 * chaos_factor
-        };
+        let hp_multiplier = hp_multiplier_for_total_chaos(total_chaos);
 
         let attack_multiplier = chaos_factor.powf(0.56);
 
@@ -605,6 +601,28 @@ fn juice_up_spawned_mobs_per_day(
             att.0
         );
         commands.entity(e).insert(MobLevel(night_tracker.days + 1));
+    }
+}
+
+/// Scale breakable world objects' max HP (trees, rocks, stumps, etc.) with chaos, same formula as mobs.
+fn juice_up_world_object_max_health_by_chaos(
+    mut q: Query<
+        &mut MaxHealth,
+        (
+            Added<WorldObject>,
+            Without<Mob>,
+            Without<Player>,
+            Without<Wall>,
+        ),
+    >,
+    chaos_tracker: Option<Res<ChaosTracker>>,
+    infinite_mode: Res<InfiniteMode>,
+) {
+    let global_chaos = chaos_tracker.as_ref().map(|c| c.get_chaos()).unwrap_or(0.0);
+    let total_chaos = global_chaos + infinite_mode.get_chaos_bonus();
+    let hp_multiplier = hp_multiplier_for_total_chaos(total_chaos);
+    for mut hp in q.iter_mut() {
+        hp.0 = (hp.0 as f32 * hp_multiplier) as i32;
     }
 }
 
@@ -685,7 +703,7 @@ fn enhance_infinite_mode_mobs(
         (Entity, &mut FollowSpeed, Option<&mut TextureAtlasSprite>),
         Added<InfiniteModeMob>,
     >,
-    infinite_mode: Res<crate::night::InfiniteMode>,
+    infinite_mode: Res<InfiniteMode>,
     mut commands: Commands,
 ) {
     for (entity, mut follow_speed, maybe_sprite) in mobs.iter_mut() {
@@ -736,7 +754,7 @@ fn enhance_infinite_mode_leap_attack_startup(
         &mut LeapAttackState,
         (Added<LeapAttackState>, With<InfiniteModeMob>),
     >,
-    infinite_mode: Res<crate::night::InfiniteMode>,
+    infinite_mode: Res<InfiniteMode>,
 ) {
     if !infinite_mode.active {
         return;
