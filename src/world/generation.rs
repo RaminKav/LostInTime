@@ -11,8 +11,8 @@ use crate::assets::{Graphics, SpriteAnchor};
 use crate::enemy::spawn_helpers::is_tile_water;
 use crate::item::{handle_break_object, object_actions::ObjectAction, PlaceItemEvent, WorldObject};
 use crate::pets::state::{Pet, PetSpawner};
+use crate::player::skills::ActiveSkill;
 use crate::proto::proto_param::ProtoParam;
-use crate::schematic::SchematicSpawnEvent;
 use crate::ui::key_input_guide::InteractionGuideTrigger;
 use crate::world::chunk::DoneCreateChunkEvent;
 use bevy_aseprite::{anim::AsepriteAnimation, AsepriteBundle};
@@ -53,12 +53,14 @@ const UNIQUE_OBJECTS_DATA: [(WorldObject, Vec2, i32); 3] = [
 pub struct WorldObjectCache {
     pub objects: HashMap<TileMapPosition, WorldObject>,
     pub unique_objs: HashMap<WorldObject, TileMapPosition>,
+    pub shrines: HashMap<TileMapPosition, WorldObject>,
+    pub shrines_rolled: bool,
     pub dungeon_objects: HashMap<TileMapPosition, WorldObject>,
     pub generated_chunks: Vec<IVec2>,
     pub generated_dungeon_chunks: Vec<IVec2>,
     pub tile_data_cache: HashMap<TileMapPosition, TileSpriteData>,
     /// Rolled once per active skill shrine tile (world-unique spawn or first interact). Survives chunk despawn.
-    pub active_skill_shrine_offers: HashMap<TileMapPosition, Vec<crate::player::skills::ActiveSkill>>,
+    pub active_skill_shrine_offers: HashMap<TileMapPosition, Vec<ActiveSkill>>,
 }
 pub struct GenerationPlugin;
 
@@ -310,6 +312,99 @@ impl GenerationPlugin {
         }
     }
 
+    fn pre_roll_shrines(game: &mut GameParam) {
+        let mut rng = rand::thread_rng();
+
+        // Build a flat list of every shrine instance we want in the world by
+        // rolling each shrine type's count independently.
+        let mut shrines_to_place: Vec<WorldObject> = Vec::new();
+        let mut log_lines: Vec<String> = Vec::new();
+        for (shrine_obj, count_range) in game.world_generation_params.shrine_counts.clone().iter() {
+            let min = count_range.min;
+            let max = count_range.max.max(min);
+            let rolled = if min == max {
+                min
+            } else {
+                rng.gen_range(min..=max)
+            };
+            log_lines.push(format!(
+                "  {:?} -> {} (range {}..={})",
+                shrine_obj, rolled, min, max
+            ));
+            for _ in 0..rolled {
+                shrines_to_place.push(*shrine_obj);
+            }
+        }
+
+        let max_chunk = ((ISLAND_SIZE / CHUNK_SIZE as f32) as i32) - 1;
+        let center_excluded = [
+            IVec2::ZERO,
+            IVec2::new(-1, 0),
+            IVec2::new(0, -1),
+            IVec2::new(-1, -1),
+        ];
+        let mut chunk_pool: Vec<IVec2> = Vec::new();
+        for cx in -max_chunk..=max_chunk {
+            for cy in -max_chunk..=max_chunk {
+                let c = IVec2::new(cx, cy);
+                if center_excluded.contains(&c) {
+                    continue;
+                }
+                chunk_pool.push(c);
+            }
+        }
+
+        // Shuffle so the placement order isn't biased by iteration order of the
+        // shrine map or the chunk grid scan.
+        shrines_to_place.shuffle(&mut rng);
+        chunk_pool.shuffle(&mut rng);
+
+        let mut placed = 0_usize;
+        for shrine_obj in shrines_to_place.iter() {
+            let Some(chunk_pos) = chunk_pool.pop() else {
+                warn!(
+                    "Ran out of chunks while placing shrines; {} {:?} could not be placed",
+                    shrines_to_place.len() - placed,
+                    shrine_obj,
+                );
+                break;
+            };
+
+            const TILE_RETRIES: u32 = 8;
+            let mut chosen: Option<TileMapPosition> = None;
+            for _ in 0..TILE_RETRIES {
+                let tx = rng.gen_range(4..13);
+                let ty = rng.gen_range(4..13);
+                let candidate = TileMapPosition::new(chunk_pos, TilePos::new(tx, ty));
+                let world_pos = tile_pos_to_world_pos(candidate, false);
+                let is_water = is_tile_water(world_pos, &*game).unwrap_or(false);
+                if is_water {
+                    continue;
+                }
+                chosen = Some(candidate);
+                break;
+            }
+
+            let pos = chosen.unwrap_or_else(|| {
+                TileMapPosition::new(
+                    chunk_pos,
+                    TilePos::new(rng.gen_range(4..13), rng.gen_range(4..13)),
+                )
+            });
+
+            game.world_obj_cache.shrines.insert(pos, *shrine_obj);
+            placed += 1;
+        }
+
+        game.world_obj_cache.shrines_rolled = true;
+        info!("=== Pre-rolled Shrine Placements ===");
+        for line in log_lines {
+            info!("{}", line);
+        }
+        info!("  Placed {} shrines across the world", placed);
+        info!("====================================");
+    }
+
     //TODO: do the same shit w graphcis resource loading, but w GameData and pkvStore
     pub fn generate_unique_objects_for_new_world(
         mut game: GameParam,
@@ -452,6 +547,11 @@ impl GenerationPlugin {
                 }
             }
         }
+
+        if !game.world_obj_cache.shrines_rolled {
+            Self::pre_roll_shrines(&mut game);
+        }
+
         if dungeon_check.get_single().is_err() && !*NO_GEN {
             info!("SPAWN PORTAL");
             // summon portal
@@ -525,7 +625,6 @@ impl GenerationPlugin {
         mut chunk_wall_cache: Query<&mut ChunkWallCache>,
         proto_param: ProtoParam,
         mut done_event: EventWriter<DoneGeneratingEvent>,
-        mut schematic_spawn_event: EventWriter<SchematicSpawnEvent>,
         mut place_item_event: EventWriter<PlaceItemEvent>,
     ) {
         if *NO_GEN {
@@ -761,6 +860,12 @@ impl GenerationPlugin {
                             }
                         }
                     }
+
+                    for (pos, shrine_obj) in game.world_obj_cache.shrines.clone() {
+                        if pos.chunk_pos == chunk_pos {
+                            objs.insert(pos, shrine_obj);
+                        }
+                    }
                 }
                 if dungeon_check_result.is_err() && game.era.current_era == Era::Third {
                     extend_ice_patches_from_seeds(&mut objs, &game);
@@ -806,9 +911,6 @@ impl GenerationPlugin {
                 }
 
                 game.set_chunk_generated(chunk_pos);
-
-                // send schematic event to spawn structures
-                schematic_spawn_event.send(SchematicSpawnEvent(chunk_pos));
             } else {
                 let objs = game.get_objects_from_chunk_cache(chunk_pos);
                 for (pos, obj_to_spawn) in objs {

@@ -36,7 +36,7 @@ use self::{
 
 pub const TILE_SIZE: TilemapTileSize = TilemapTileSize { x: 16., y: 16. };
 pub const CHUNK_SIZE: u32 = 16;
-pub const ISLAND_SIZE: f32 = CHUNK_SIZE as f32 * 5.; // Increased from 6 to 12 for larger island
+pub const ISLAND_SIZE: f32 = CHUNK_SIZE as f32 * 6.; // Increased from 6 to 12 for larger island
 pub const MAX_VISIBILITY: u32 = (2.8 * (CHUNK_SIZE as f32 / 2.) * TILE_SIZE.x) as u32;
 pub const NUM_CHUNKS_AROUND_CAMERA: i32 = 2;
 
@@ -124,7 +124,7 @@ pub struct WorldGeneration {
     pub dirt_frequency: f64,
     pub forest_params: ForestGenerationParams,
     pub stone_wall_frequency: f64,
-    pub schematic_frequencies: HashMap<WorldObject, f64>,
+    pub shrine_counts: HashMap<WorldObject, ShrineCount>,
     pub object_generation_frequencies: HashMap<WorldObject, f64>,
     pub obj_allowed_tiles_map: HashMap<WorldObject, Vec<WorldObject>>,
 }
@@ -137,6 +137,15 @@ pub struct ForestGenerationParams {
     pub forest_radius: f32,
     pub max_trees_per_forest: usize,
     pub tree_weights: HashMap<WorldObject, f32>,
+}
+
+/// Inclusive [min, max] count range used to roll how many of a given shrine
+/// will exist in the world for a single era.
+#[derive(Component, Schematic, Reflect, FromReflect, Default, Debug, Clone)]
+#[reflect(Schematic)]
+pub struct ShrineCount {
+    pub min: u32,
+    pub max: u32,
 }
 pub struct WorldPlugin;
 impl Plugin for WorldPlugin {

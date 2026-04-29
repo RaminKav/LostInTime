@@ -583,7 +583,7 @@ fn give_player_starting_items(
         commands.spawn((
             pet,
             YSort(0.001),
-            Collider::capsule(Vec2::new(0., -6.), Vec2::new(0., -6.), 5.0),
+            // Collider::capsule(Vec2::new(0., -6.), Vec2::new(0., -6.), 5.0),
             Transform::from_xyz(40.0, -40.0, 1.0),
             Name::new("Pet"),
         ));

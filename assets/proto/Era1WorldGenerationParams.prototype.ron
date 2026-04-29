@@ -60,14 +60,15 @@
         WaterBoulder: 0.02,
         WaterBoulder2: 0.02,
       },
-      // WorldObjects spawned per-chunk with given probability
-      schematic_frequencies: {
-        CombatShrine: 0.05,
-        GambleShrine: 0.027,
-        MicrowaveShrine: 0.026,
-        // ActiveSkillShrine: 0.1,
-        HeirloomShrine: 0.10,
-        BlacksmithMerchant: 0.06,
+      // Pre-rolled shrine counts (inclusive [min, max]) for the era. One shrine
+      // is placed per chunk, chosen from the rolled total and distributed across
+      // non-center, in-island chunks at world init.
+      shrine_counts: {
+        CombatShrine: (min: 2, max: 4),
+        GambleShrine: (min: 1, max: 2),
+        MicrowaveShrine: (min: 1, max: 2),
+        HeirloomShrine: (min: 7, max: 7),
+        BlacksmithMerchant: (min: 1, max: 3),
       },
       obj_allowed_tiles_map: {
         SmallGreenTree: [GrassTile],

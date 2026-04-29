@@ -8,6 +8,7 @@ use crate::ui::tips::{SeenTips, Tip, TipEvent};
 use crate::world::y_sort::YSort;
 use crate::GameParam;
 use bevy::prelude::*;
+use bevy_rapier2d::prelude::Collider;
 
 pub fn handle_pet_spawner_interaction(
     mut commands: Commands,
@@ -88,7 +89,7 @@ pub fn handle_pet_spawner_interaction(
                         pet_type.clone(),
                         PetState::default(),
                         YSort(0.001),
-                        // Collider::capsule(Vec2::new(0., -6.), Vec2::new(0., -6.), 5.0),
+                        Collider::capsule(Vec2::new(0., -6.), Vec2::new(0., -6.), 5.0),
                         Transform::from_translation(spawner_t.translation()),
                         Name::new(format!("{:?} Pet", pet_type)),
                     ));

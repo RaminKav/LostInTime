@@ -9,25 +9,16 @@ use bevy::{
 };
 
 pub mod loot_chests;
-mod schematic_spawner;
 use crate::{
     assets::SpriteSize,
     inventory::ItemStack,
     item::{Foliage, PlaceItemEvent, Wall, WorldObject},
     player::Player,
     proto::proto_param::ProtoParam,
-    world::{
-        generation::{get_radial_tile_positions, GenerationPlugin},
-        world_helpers::world_pos_to_tile_pos,
-    },
+    world::{generation::get_radial_tile_positions, world_helpers::world_pos_to_tile_pos},
     CustomFlush, GameParam, GameState, DEBUG,
 };
 use loot_chests::*;
-
-use self::schematic_spawner::{
-    attempt_to_spawn_schematic_in_chunk, clear_schematic_tracker, give_chunks_schematic_spawners,
-    log_schematic_spawn_stats, SchematicSpawnTracker,
-};
 #[derive(Component)]
 pub struct SchematicBuilderObject;
 
@@ -37,14 +28,11 @@ pub struct SchematicToggle {
     chest_type: LootChestType,
 }
 
-pub struct SchematicSpawnEvent(pub IVec2);
 pub struct SchematicPlugin;
 impl Plugin for SchematicPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(SchematicToggle::default())
-            .init_resource::<SchematicSpawnTracker>()
             .register_type::<SchematicToggle>()
-            .add_event::<SchematicSpawnEvent>()
             .add_systems(
                 (
                     save_schematic_scene,
@@ -54,16 +42,7 @@ impl Plugin for SchematicPlugin {
                     mark_new_world_obj_as_schematic,
                 )
                     .in_set(OnUpdate(GameState::Main)),
-            )
-            .add_systems((
-                attempt_to_spawn_schematic_in_chunk
-                    .run_if(in_state(GameState::Main).or_else(in_state(GameState::Initializing))),
-                give_chunks_schematic_spawners
-                    .after(GenerationPlugin::generate_and_cache_objects)
-                    .run_if(in_state(GameState::Main).or_else(in_state(GameState::Initializing))),
-            ))
-            .add_system(clear_schematic_tracker.in_schedule(OnEnter(GameState::Initializing)))
-            .add_system(log_schematic_spawn_stats.in_schedule(OnExit(GameState::Initializing)));
+            );
     }
 }
 fn mark_new_world_obj_as_schematic(

@@ -16,10 +16,7 @@
               tree_weights: {},
       ),
       stone_wall_frequency: 1.0,
-      schematic_frequencies: {
-        CombatShrine: 0.0,
-        GambleShrine: 0.0,
-      },
+      shrine_counts: {},
       object_generation_frequencies: {
         Grass: 0.0,
         DeadSapling: 0.0,

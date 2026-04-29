@@ -10,10 +10,10 @@
   },
   {
     "description_lines": [
-      "Mana Orbs drop",
-      "from mobs with a.",
-      "+10% chance. They",
-      "trigger mana regen."
+      "Each Mana Orb",
+      "pickup restores",
+      "10 mana, +5",
+      "per copy."
     ],
     "id": "ManaOrbs",
     "rarity": "Common",

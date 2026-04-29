@@ -51,9 +51,8 @@ use crate::{
     ui::{
         crafting_ui::CraftingContainerType,
         scrapper_ui::{Scrap, ScrapsInto},
-        EssenceOption, EssenceShopChoices,
     },
-    world::{ForestGenerationParams, WallTextureData},
+    world::{ForestGenerationParams, ShrineCount, WallTextureData},
     CustomFlush, GameState, Pet, PetState, YSort,
 };
 pub struct ProtoPlugin;
@@ -125,6 +124,8 @@ impl Plugin for ProtoPlugin {
             .register_type::<PetState>()
             .register_type::<FacingDirection>()
             .register_type::<ForestGenerationParams>()
+            .register_type::<ShrineCount>()
+            .register_type::<HashMap<WorldObject, ShrineCount>>()
             .register_type::<CraftingContainerType>()
             .register_type::<LeapAttack>()
             .register_type::<ProjectileAttack>()
