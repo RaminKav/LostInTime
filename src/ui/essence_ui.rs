@@ -5,13 +5,14 @@ use rand::Rng;
 
 use crate::{
     assets::Graphics,
-    attributes::AttributeChangeEvent,
+    attributes::{AttributeChangeEvent, LootRateBonus},
     colors::DARK_WOOD_BROWN,
     custom_commands::CommandsExt,
     inventory::ItemStack,
     item::WorldObject,
     player::{
-        skills::{Heirloom, HeirloomRarity, HeirloomWithRarity, PlayerSkills},
+        levels::PlayerLevel,
+        skills::{Heirloom, HeirloomChoiceQueue, HeirloomRarity, HeirloomWithRarity, PlayerSkills},
         ModifyCurencyEvent, Player,
     },
     proto::proto_param::ProtoParam,
@@ -459,9 +460,8 @@ pub fn handle_populate_essence_shop_on_new_spawn(
         (Entity, &mut EssenceShopChoices, &GlobalTransform),
         Added<EssenceShopChoices>,
     >,
-    player_atts: Query<&crate::attributes::LootRateBonus, With<crate::player::Player>>,
-    heirloom_queue: Res<crate::player::skills::HeirloomChoiceQueue>,
-    purchase_tracker: Res<BlacksmithPurchaseTracker>,
+    player_atts: Query<(&LootRateBonus, &PlayerLevel), With<crate::player::Player>>,
+    heirloom_queue: Res<HeirloomChoiceQueue>,
     mut shop_cache: ResMut<EssenceShopCache>,
 ) {
     for (entity, mut shop, transform) in new_spawns.iter_mut() {
@@ -471,7 +471,8 @@ pub fn handle_populate_essence_shop_on_new_spawn(
         let tile_pos = crate::world::world_helpers::world_pos_to_tile_pos(world_pos);
         shop.tile_pos = Some(tile_pos);
 
-        let purchase_multiplier = purchase_tracker.get_price_multiplier();
+        let purchase_multiplier =
+            1.0 + player_atts.get_single().map(|a| a.1.level).unwrap_or(1) as f32 * 0.75;
 
         // Start from cache: keep non-banished items, reroll slots that contained banished heirlooms.
         // Re-apply current purchase_multiplier to cached options so prices scale after purchases.
@@ -482,10 +483,10 @@ pub fn handle_populate_essence_shop_on_new_spawn(
                     .filter(|opt| !heirloom_queue.banned.contains(&opt.heirloom))
                     .cloned()
                     .collect();
-                let mult = purchase_tracker.get_price_multiplier();
+
                 for opt in opts.iter_mut() {
                     if opt.base_coin_cost > 0.0 {
-                        opt.coin_cost = (opt.base_coin_cost * mult).trunc() as u32;
+                        opt.coin_cost = (opt.base_coin_cost * purchase_multiplier).trunc() as u32;
                     }
                 }
                 opts
@@ -496,7 +497,7 @@ pub fn handle_populate_essence_shop_on_new_spawn(
         let mut attempts = 0;
         while shop_choices.len() < 3 && attempts < 30 {
             attempts += 1;
-            let loot_bonus = player_atts.get_single().map(|a| a.0).unwrap_or(0);
+            let loot_bonus = player_atts.get_single().map(|a| a.0 .0).unwrap_or(0);
             let rarity =
                 crate::player::skills::HeirloomChoiceQueue::gen_rarity(&mut rng, loot_bonus);
 
