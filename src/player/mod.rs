@@ -443,7 +443,7 @@ fn spawn_player(
                 crafting_inputs_items: Container::with_size(3),
             },
             //TODO: remove itematt and construct from components?
-            get_class_starting_stats(class.class),
+            get_class_starting_stats(class.class.clone()),
             Hunger::new(100),
             HungerTracker::new(7., 8),
             InvincibilityCooldown(0.5),
@@ -469,8 +469,8 @@ fn spawn_player(
         })
         .insert(RawPosition::default())
         .insert(PlayerAttributeBundle {
-            health: MaxHealth(100),
-            mana: MaxMana(100),
+            health: MaxHealth(get_max_health_for_class(class.class.clone())),
+            mana: MaxMana(get_max_mana_for_class(class.class.clone())),
             attack: Attack(0),
             health_regen: HealthRegen(2),
             mana_regen: ManaRegen(10),
@@ -479,7 +479,7 @@ fn spawn_player(
             attack_cooldown: AttackCooldown(0.4),
             ..default()
         })
-        .insert(CurrentMana(100))
+        .insert(CurrentMana(get_max_mana_for_class(class.class.clone())))
         .insert(VisibilityBundle::default())
         .insert(FacingDirection::Down)
         .insert(ActiveEvents::COLLISION_EVENTS)
@@ -758,12 +758,39 @@ pub fn force_player_autopick(game: &mut GameParam) {
 
     game.player_mut().is_moving = true;
 }
-
+pub fn get_max_health_for_class(class: SkillClass) -> i32 {
+    match class {
+        SkillClass::Warrior => 150,
+        SkillClass::Wizard => 70,
+        SkillClass::Rogue => 125,
+        SkillClass::Thief => 100,
+        SkillClass::Hunter => 120,
+        SkillClass::None => 100,
+    }
+}
+pub fn get_max_mana_for_class(class: SkillClass) -> i32 {
+    match class {
+        SkillClass::Warrior => 60,
+        SkillClass::Wizard => 150,
+        SkillClass::Rogue => 100,
+        SkillClass::Thief => 100,
+        SkillClass::Hunter => 100,
+        SkillClass::None => 100,
+    }
+}
 pub fn get_class_starting_stats(class: SkillClass) -> ItemAttributes {
     match class {
         SkillClass::Warrior => ItemAttributes {
-            health: AttributeValue::new(150, AttributeQuality::Low, 0.),
-            mana: AttributeValue::new(60, AttributeQuality::Low, 0.),
+            health: AttributeValue::new(
+                get_max_health_for_class(class.clone()),
+                AttributeQuality::Low,
+                0.,
+            ),
+            mana: AttributeValue::new(
+                get_max_mana_for_class(class.clone()),
+                AttributeQuality::Low,
+                0.,
+            ),
             attack: AttributeValue::new(0, AttributeQuality::Low, 0.),
             health_regen: AttributeValue::new(5, AttributeQuality::Low, 0.),
             mana_regen: AttributeValue::new(10, AttributeQuality::Low, 0.),
@@ -772,8 +799,16 @@ pub fn get_class_starting_stats(class: SkillClass) -> ItemAttributes {
             ..default()
         },
         SkillClass::Wizard => ItemAttributes {
-            health: AttributeValue::new(70, AttributeQuality::Low, 0.),
-            mana: AttributeValue::new(150, AttributeQuality::Low, 0.),
+            health: AttributeValue::new(
+                get_max_health_for_class(class.clone()),
+                AttributeQuality::Low,
+                0.,
+            ),
+            mana: AttributeValue::new(
+                get_max_mana_for_class(class.clone()),
+                AttributeQuality::Low,
+                0.,
+            ),
             attack: AttributeValue::new(0, AttributeQuality::Low, 0.),
             health_regen: AttributeValue::new(2, AttributeQuality::Low, 0.),
             mana_regen: AttributeValue::new(15, AttributeQuality::Low, 0.),
@@ -782,8 +817,16 @@ pub fn get_class_starting_stats(class: SkillClass) -> ItemAttributes {
             ..default()
         },
         SkillClass::Rogue => ItemAttributes {
-            health: AttributeValue::new(80, AttributeQuality::Low, 0.),
-            mana: AttributeValue::new(100, AttributeQuality::Low, 0.),
+            health: AttributeValue::new(
+                get_max_health_for_class(class.clone()),
+                AttributeQuality::Low,
+                0.,
+            ),
+            mana: AttributeValue::new(
+                get_max_mana_for_class(class.clone()),
+                AttributeQuality::Low,
+                0.,
+            ),
             attack: AttributeValue::new(0, AttributeQuality::Low, 0.),
             health_regen: AttributeValue::new(2, AttributeQuality::Low, 0.),
             mana_regen: AttributeValue::new(10, AttributeQuality::Low, 0.),
@@ -793,8 +836,16 @@ pub fn get_class_starting_stats(class: SkillClass) -> ItemAttributes {
             ..default()
         },
         SkillClass::Thief => ItemAttributes {
-            health: AttributeValue::new(100, AttributeQuality::Low, 0.),
-            mana: AttributeValue::new(100, AttributeQuality::Low, 0.),
+            health: AttributeValue::new(
+                get_max_health_for_class(class.clone()),
+                AttributeQuality::Low,
+                0.,
+            ),
+            mana: AttributeValue::new(
+                get_max_mana_for_class(class.clone()),
+                AttributeQuality::Low,
+                0.,
+            ),
             attack: AttributeValue::new(0, AttributeQuality::Low, 0.),
             health_regen: AttributeValue::new(2, AttributeQuality::Low, 0.),
             mana_regen: AttributeValue::new(10, AttributeQuality::Low, 0.),
@@ -804,8 +855,16 @@ pub fn get_class_starting_stats(class: SkillClass) -> ItemAttributes {
             ..default()
         },
         SkillClass::Hunter => ItemAttributes {
-            health: AttributeValue::new(120, AttributeQuality::Low, 0.),
-            mana: AttributeValue::new(100, AttributeQuality::Low, 0.),
+            health: AttributeValue::new(
+                get_max_health_for_class(class.clone()),
+                AttributeQuality::Low,
+                0.,
+            ),
+            mana: AttributeValue::new(
+                get_max_mana_for_class(class.clone()),
+                AttributeQuality::Low,
+                0.,
+            ),
             attack: AttributeValue::new(0, AttributeQuality::Low, 0.),
             health_regen: AttributeValue::new(2, AttributeQuality::Low, 0.),
             mana_regen: AttributeValue::new(10, AttributeQuality::Low, 0.),
@@ -814,8 +873,16 @@ pub fn get_class_starting_stats(class: SkillClass) -> ItemAttributes {
             ..default()
         },
         SkillClass::None => ItemAttributes {
-            health: AttributeValue::new(100, AttributeQuality::Low, 0.),
-            mana: AttributeValue::new(100, AttributeQuality::Low, 0.),
+            health: AttributeValue::new(
+                get_max_health_for_class(class.clone()),
+                AttributeQuality::Low,
+                0.,
+            ),
+            mana: AttributeValue::new(
+                get_max_mana_for_class(class.clone()),
+                AttributeQuality::Low,
+                0.,
+            ),
             attack: AttributeValue::new(0, AttributeQuality::Low, 0.),
             health_regen: AttributeValue::new(2, AttributeQuality::Low, 0.),
             mana_regen: AttributeValue::new(10, AttributeQuality::Low, 0.),
