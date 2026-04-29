@@ -7,7 +7,7 @@
         obj_type: ManaOrb,
         metadata: (
             name: "Mana Orb",
-            desc: ["Restores mana when collected."],
+            desc: ["Restores mana on pickup (10, +5 per Mana Dust)."],
         ),
         rarity: Common,
         count: 1,

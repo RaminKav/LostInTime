@@ -585,15 +585,15 @@ fn juice_up_spawned_mobs_per_day(
             chaos_factor.powf(0.7)
         } else {
             // Late game: exponential scaling
-            1.45 * chaos_factor
+            1.1 * chaos_factor
         };
 
-        let attack_multiplier = chaos_factor.powf(0.47);
+        let attack_multiplier = chaos_factor.powf(0.56);
 
         hp.0 = (hp.0 as f32 * hp_multiplier) as i32;
         att.0 = (att.0 as f32 * attack_multiplier) as i32;
         // exp.0 = (exp.0 as f32 * 1. * infinite_mode_xp_scaling) as u32;
-        info!(
+        debug!(
             "[{}] chaos_factor: {} (days: {}, level: {}, global_chaos: {:.1}, infinite_chaos: {:.1}) |||| {:?} {:?}",
             mob,
             chaos_factor,

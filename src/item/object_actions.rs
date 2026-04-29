@@ -1,4 +1,6 @@
-use super::active_skill_shrine::{ActiveSkillShrineSelection, ActiveSkillShrineState};
+use super::active_skill_shrine::{
+    skill_choices_from_offer_skills, ActiveSkillShrineSelection, ActiveSkillShrineState,
+};
 use super::combat_shrine::{CombatShrine, CombatShrineAnim};
 use super::dungeon_shrine::{DungeonShrine, DungeonShrineType};
 use super::gamble_shrine::{GambleShrine, GambleShrineAnim};
@@ -15,7 +17,6 @@ use crate::custom_commands::CommandsExt;
 use crate::inventory::Inventory;
 use crate::item::dungeon_shrine::NUM_DUNGEON_SHRINE_MOBS;
 use crate::juice::ShakeEffect;
-use crate::player::skills::{ActiveSkill, ActiveSkillChoiceState, HeirloomRarity};
 use crate::player::ModifyCurencyEvent;
 use crate::proto::proto_param::ProtoParam;
 use crate::ui::crafting_ui::{CraftingContainer, CraftingContainerType};
@@ -32,8 +33,6 @@ use crate::world::dimension::{DimensionSpawnEvent, Era};
 use crate::world::world_helpers;
 use crate::world::world_helpers::tile_pos_to_world_pos;
 use itertools::Itertools;
-use rand::seq::IteratorRandom;
-use strum::IntoEnumIterator;
 
 use crate::world::TileMapPosition;
 use crate::{
@@ -393,61 +392,24 @@ impl ObjectAction {
                     ));
             }
             ObjectAction::ActiveSkillShrine => {
-                // Generate a random active skill choice
-                let mut rng = rand::thread_rng();
+                let offer_skills = game
+                    .world_obj_cache
+                    .active_skill_shrine_offers
+                    .get(&obj_pos)
+                    .cloned()
+                    .unwrap_or_else(|| {
+                        let rolled = super::active_skill_shrine::roll_active_skill_shrine_offer_skills(
+                            item_action_param.player_skills.get_single().ok(),
+                        );
+                        if !rolled.is_empty() {
+                            game.world_obj_cache
+                                .active_skill_shrine_offers
+                                .insert(obj_pos, rolled.clone());
+                        }
+                        rolled
+                    });
 
-                // Get player's current skills to exclude them
-                let player_current_skills: Vec<ActiveSkill> = item_action_param
-                    .player_skills
-                    .get_single()
-                    .ok()
-                    .map(|skills| {
-                        let mut current = Vec::new();
-                        if let Some(slot0) = &skills.active_skill_slot_0 {
-                            current.push(slot0.active_skill.clone());
-                        }
-                        if let Some(slot1) = &skills.active_skill_slot_1 {
-                            current.push(slot1.active_skill.clone());
-                        }
-                        if let Some(slot2) = &skills.active_skill_slot_2 {
-                            current.push(slot2.active_skill.clone());
-                        }
-                        if let Some(slot3) = &skills.active_skill_slot_3 {
-                            current.push(slot3.active_skill.clone());
-                        }
-                        if let Some(slot4) = &skills.active_skill_slot_4 {
-                            current.push(slot4.active_skill.clone());
-                        }
-                        current
-                    })
-                    .unwrap_or_default();
-
-                // Get all active skills from ActiveSkill enum, excluding Roll and skills the player already has
-                let active_skills: Vec<ActiveSkill> = ActiveSkill::iter()
-                    .filter(|skill| {
-                        *skill != ActiveSkill::Parry
-                            && *skill != ActiveSkill::Sprint
-                            && *skill != ActiveSkill::LaserBeam
-                            && !player_current_skills.contains(skill)
-                    })
-                    .collect();
-
-                let mut available_skills = active_skills;
-                let mut chosen_skills = Vec::new();
-                for _ in 0..2 {
-                    if available_skills.is_empty() {
-                        break;
-                    }
-                    let chosen = available_skills.iter().choose(&mut rng).unwrap().clone();
-                    chosen_skills.push(chosen.clone());
-                    available_skills.retain(|s| *s != chosen);
-                }
-
-                // Create skill choices
-                let skill_choices: Vec<ActiveSkillChoiceState> = chosen_skills
-                    .iter()
-                    .map(|skill| ActiveSkillChoiceState::new(skill.clone(), HeirloomRarity::Common))
-                    .collect();
+                let skill_choices = skill_choices_from_offer_skills(&offer_skills);
 
                 commands.insert_resource(ActiveSkillShrineSelection {
                     skill_choices: skill_choices.clone(),

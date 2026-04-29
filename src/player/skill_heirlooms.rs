@@ -34,6 +34,12 @@ use crate::{
         },
         rogue_skills::{LungeState, SprintState},
         skills::{
+            active_skill_scaling::{
+                attack_damage_multiplier, ARROW_VOLLEY, BOMB, BUCKSHOT_PELLET, DAGGER_SLASH,
+                DAGGER_THROW, FIRE_PILLAR, FURY, HEAL_MAX_HEALTH_PERCENT, ICE_WALL, LASER_BEAM,
+                LIGHTNING, PIERCING_STAR, POSSESSED_BLADE, RAPIDFIRE_ATTACK_SPEED_BONUS_PERCENT,
+                SHOUT, SPIN_ATTACK, TRIPLE_THROW,
+            },
             grant_skill_charge_after_cooldown_complete, ActiveSkill, ActiveSkillUsedEvent,
             ArrowVolleyState, BombState, BuckshotSkillState, ClassSkillSlots,
             DaggerThrowKillTracker, DaggerThrowState, DruidTreeSkillState, FirePillarState,
@@ -318,7 +324,9 @@ pub fn handle_active_skill_event(
                         info!("dur: {:?}", dur);
                         commands.entity(player_e).insert(RapidfireState {
                             duration: dur,
-                            attack_speed_bonus: 0.8 * power_mult,
+                            attack_speed_bonus: attack_damage_multiplier(
+                                RAPIDFIRE_ATTACK_SPEED_BONUS_PERCENT,
+                            ) * power_mult,
                         });
                         start_slot_cooldown_for_cast(
                             &mut class_slots,
@@ -360,7 +368,10 @@ pub fn handle_active_skill_event(
                         );
                         // spawn fire ring projectile at cursor world position with player's attack as damage
                         let base_dmg: i32 = attack_opt.map(|a| a.0).unwrap_or(10);
-                        let dmg = (base_dmg as f32 * power_mult * 0.95) as i32;
+                        let dmg = (base_dmg as f32
+                            * power_mult
+                            * attack_damage_multiplier(FIRE_PILLAR))
+                            as i32;
                         let pos = cursor.world_coords.truncate();
                         ranged_attack_events.send(RangedAttackEvent {
                             projectile: Projectile::FireRing,
@@ -391,7 +402,10 @@ pub fn handle_active_skill_event(
                             should_start_cooldown,
                         );
                         let base_dmg: i32 = attack_opt.map(|a| a.0).unwrap_or(10);
-                        let dmg = (base_dmg as f32 * power_mult * 0.6) as i32;
+                        let dmg = (base_dmg as f32
+                            * power_mult
+                            * attack_damage_multiplier(LASER_BEAM))
+                            as i32;
                         let player_pos = player_txfm.translation().truncate();
                         let direction =
                             (cursor.world_coords.truncate() - player_pos).normalize_or_zero();
@@ -422,8 +436,9 @@ pub fn handle_active_skill_event(
                             skill_cd,
                             should_start_cooldown,
                         );
-                        // Heal for 30% of max health (placeholder value), increased by skill power
-                        let heal_amount = (max_health.0 as f32 * 0.3 * power_mult) as i32;
+                        let heal_amount = (max_health.0 as f32
+                            * attack_damage_multiplier(HEAL_MAX_HEALTH_PERCENT)
+                            * power_mult) as i32;
                         health.0 = (health.0 + heal_amount).min(max_health.0);
 
                         // Spawn cosmetic heal hearts effect on top of player
@@ -485,7 +500,12 @@ pub fn handle_active_skill_event(
                                 (i as f32 - (bullet_count - 1) as f32 / 2.0) * spread_angle;
                             let bullet_dir = Vec2::from_angle(base_angle + angle_offset);
 
-                            let bullet_dmg = attack_opt.map(|a| (a.0 as f32 * power_mult) as i32);
+                            let bullet_dmg = attack_opt.map(|a| {
+                                (a.0 as f32
+                                    * power_mult
+                                    * attack_damage_multiplier(BUCKSHOT_PELLET))
+                                    as i32
+                            });
                             ranged_attack_events.send(RangedAttackEvent {
                                 projectile: Projectile::Bullet,
                                 direction: bullet_dir,
@@ -532,7 +552,10 @@ pub fn handle_active_skill_event(
                         );
                         // Placeholder: spawn ice explosion at cursor for now
                         let base_dmg: i32 = attack_opt.map(|a| a.0).unwrap_or(10);
-                        let dmg = (base_dmg as f32 * power_mult * 3.) as i32; // ice wall does double base dmg
+                        let dmg = (base_dmg as f32
+                            * power_mult
+                            * attack_damage_multiplier(ICE_WALL))
+                            as i32;
                         let pos = cursor.world_coords.truncate() + Vec2::new(0., 32.); // slight offset so it appears below cursor
 
                         ranged_attack_events.send(RangedAttackEvent {
@@ -595,7 +618,8 @@ pub fn handle_active_skill_event(
                         );
 
                         let base_dmg: i32 = attack_opt.map(|a| a.0).unwrap_or(10);
-                        let dmg = (base_dmg as f32 * power_mult * 1.6) as i32;
+                        let dmg = (base_dmg as f32 * power_mult * attack_damage_multiplier(SHOUT))
+                            as i32;
 
                         ranged_attack_events.send(RangedAttackEvent {
                             projectile: Projectile::Shout,
@@ -638,7 +662,10 @@ pub fn handle_active_skill_event(
                         );
 
                         let base_dmg: i32 = attack_opt.map(|a| a.0).unwrap_or(10);
-                        let dmg = (base_dmg as f32 * power_mult * 1.5) as i32;
+                        let dmg = (base_dmg as f32
+                            * power_mult
+                            * attack_damage_multiplier(PIERCING_STAR))
+                            as i32;
 
                         ranged_attack_events.send(RangedAttackEvent {
                             projectile: Projectile::ThrowingStarLarge,
@@ -755,7 +782,10 @@ pub fn handle_active_skill_event(
 
                         // Spawn lightning at each enemy (using IceExplosionAOE as placeholder)
                         let base_dmg: i32 = attack_opt.map(|a| a.0).unwrap_or(10);
-                        let dmg = (base_dmg as f32 * power_mult * 0.85) as i32;
+                        let dmg = (base_dmg as f32
+                            * power_mult
+                            * attack_damage_multiplier(LIGHTNING))
+                            as i32;
                         for (_, enemy_pos, _) in enemy_distances {
                             ranged_attack_events.send(RangedAttackEvent {
                                 projectile: Projectile::Lightning,
@@ -813,7 +843,10 @@ pub fn handle_active_skill_event(
                         // Throw 1 dagger at a random enemy, plus extra daggers based on kill count
                         let total_daggers = 1 + kill_count;
                         let base_dmg: i32 = attack_opt.map(|a| a.0).unwrap_or(10);
-                        let dmg = (base_dmg as f32 * power_mult * 1.15) as i32;
+                        let dmg = (base_dmg as f32
+                            * power_mult
+                            * attack_damage_multiplier(DAGGER_THROW))
+                            as i32;
                         let mut rng = rand::thread_rng();
 
                         for i in 0..total_daggers {
@@ -856,7 +889,10 @@ pub fn handle_active_skill_event(
 
                         // Spawn sword projectile in front of player
                         let base_dmg: i32 = attack_opt.map(|a| a.0).unwrap_or(10);
-                        let dmg = (base_dmg as f32 * power_mult * 1.75) as i32;
+                        let dmg = (base_dmg as f32
+                            * power_mult
+                            * attack_damage_multiplier(DAGGER_SLASH))
+                            as i32;
                         ranged_attack_events.send(RangedAttackEvent {
                             projectile: Projectile::DaggerSlash,
                             direction,
@@ -892,7 +928,10 @@ pub fn handle_active_skill_event(
                         // Throw 3 throwing stars in a cone (15 degree spread)
                         let spread_angle = 15.0_f32.to_radians();
                         let base_dmg: i32 = attack_opt.map(|a| a.0).unwrap_or(10);
-                        let dmg = (base_dmg as f32 * power_mult * 1.35) as i32;
+                        let dmg = (base_dmg as f32
+                            * power_mult
+                            * attack_damage_multiplier(TRIPLE_THROW))
+                            as i32;
                         for i in 0..3 {
                             let angle_offset = (i as f32 - 1.0) * spread_angle;
                             let angle = base_angle + angle_offset;
@@ -951,7 +990,8 @@ pub fn handle_active_skill_event(
 
                         // Spawn bomb projectile toward cursor position
                         let base_dmg: i32 = attack_opt.map(|a| a.0).unwrap_or(10);
-                        let dmg = (base_dmg as f32 * power_mult * 2.2) as i32;
+                        let dmg = (base_dmg as f32 * power_mult * attack_damage_multiplier(BOMB))
+                            as i32;
 
                         // Store the target position for later attachment to the bomb projectile
                         // We'll attach it after the projectile spawns
@@ -997,7 +1037,10 @@ pub fn handle_active_skill_event(
                             .insert(PhasingThroughEnemies::new(0.45));
 
                         let base_dmg: i32 = attack_opt.map(|a| a.0).unwrap_or(10);
-                        let dmg = (base_dmg as f32 * power_mult * 0.8) as i32;
+                        let dmg = (base_dmg as f32
+                            * power_mult
+                            * attack_damage_multiplier(SPIN_ATTACK))
+                            as i32;
                         commands
                             .entity(player_e)
                             .insert(PlayerAnimation::SpinAttack);
@@ -1040,7 +1083,10 @@ pub fn handle_active_skill_event(
 
                         let spread_angle = 15.0_f32.to_radians();
                         let base_dmg: i32 = attack_opt.map(|a| a.0).unwrap_or(10);
-                        let dmg = (base_dmg as f32 * power_mult * 0.75) as i32;
+                        let dmg = (base_dmg as f32
+                            * power_mult
+                            * attack_damage_multiplier(ARROW_VOLLEY))
+                            as i32;
 
                         for i in 0..3 {
                             let angle_offset = (i as f32 - 1.0) * spread_angle;
@@ -1080,7 +1126,10 @@ pub fn handle_active_skill_event(
                         let direction = (cursor_pos - player_pos).normalize_or_zero();
 
                         let base_dmg: i32 = attack_opt.map(|a| a.0).unwrap_or(10);
-                        let dmg = (base_dmg as f32 * power_mult * 1.15) as i32;
+                        let dmg = (base_dmg as f32
+                            * power_mult
+                            * attack_damage_multiplier(POSSESSED_BLADE))
+                            as i32;
 
                         ranged_attack_events.send(RangedAttackEvent {
                             projectile: Projectile::PossessedBlade,
@@ -1527,7 +1576,10 @@ pub fn tick_arrow_volley(
 
         let spread_angle = 5.0_f32.to_radians();
         let base_dmg: i32 = attack.0;
-        let dmg = (base_dmg as f32 * power_mult * 0.75) as i32;
+        let dmg = (base_dmg as f32
+            * power_mult
+            * attack_damage_multiplier(ARROW_VOLLEY))
+            as i32;
 
         for i in 0..3 {
             let angle_offset = (i as f32 - 1.0) * spread_angle;
@@ -1980,7 +2032,7 @@ pub fn handle_fury_skill(
 
             let power_mult = skill_power_multiplier(skill_power, blessings.get_skill_power_bonus());
             let base_dmg: i32 = attack.0;
-            let dmg = (base_dmg as f32 * power_mult * 1.65) as i32;
+            let dmg = (base_dmg as f32 * power_mult * attack_damage_multiplier(FURY)) as i32;
 
             let range = 10.0 * TILE_SIZE.x;
             let nearby_enemies: Vec<(Entity, Vec2, f32)> = enemies
@@ -2066,7 +2118,7 @@ pub fn handle_bomb_explosion(
     let power_mult = skill_power_multiplier(skill_power, blessings.get_skill_power_bonus());
 
     let base_dmg: i32 = attack.0;
-    let dmg = (base_dmg as f32 * power_mult) as i32;
+    let dmg = (base_dmg as f32 * power_mult * attack_damage_multiplier(BOMB)) as i32;
 
     for (bomb_entity, bomb_txfm, bomb_target_opt) in bomb_projectiles.iter_mut() {
         if let Ok(proj) = projectiles.get(bomb_entity) {

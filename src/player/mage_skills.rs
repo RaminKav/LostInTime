@@ -19,7 +19,10 @@ use crate::{
 };
 
 use super::{
-    skills::ActiveSkill,
+    skills::{
+        active_skill_scaling::{attack_damage_multiplier, TELEPORT_SHOCK_ATTACK_PERCENT},
+        ActiveSkill,
+    },
     ActiveSkillUsedEvent, Heirloom, MovePlayerEvent, Player, PlayerSkills,
 };
 
@@ -131,7 +134,10 @@ pub fn handle_teleport(
         }
 
         let angle = f32::atan2(direction.y, direction.x) - PI / 2.;
-        let shock_dmg = (dmg.0 as f32 / 3.0 * power_mult) as i32;
+        let shock_dmg = (dmg.0 as f32
+            * power_mult
+            * attack_damage_multiplier(TELEPORT_SHOCK_ATTACK_PERCENT))
+            as i32;
         let shock_e = spawn_temp_collider(
             &mut commands,
             Transform::from_translation(Vec3::new(

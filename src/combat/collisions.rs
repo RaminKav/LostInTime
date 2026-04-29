@@ -1,5 +1,4 @@
 use super::{try_add_slow_stacks, HitEvent, HitMarker, InvincibilityTimer, StatusEffectEvent};
-use crate::attributes::ManaRegen;
 use crate::blessings::OwnedBlessings;
 use crate::client::is_not_paused;
 use crate::combat::LifestealEvent;
@@ -738,7 +737,7 @@ pub const ITEM_PICKUP_DISTANCE: f32 = 6.0;
 
 pub fn check_item_drop_collisions(
     mut commands: Commands,
-    player: Query<(&Transform, &ManaRegen), With<Player>>,
+    player: Query<&Transform, With<Player>>,
     pets: Query<(), With<Pet>>,
     item_drops: Query<
         (Entity, &Transform, &ItemStack),
@@ -759,7 +758,7 @@ pub fn check_item_drop_collisions(
     mut chaos_tracker: ResMut<ChaosTracker>,
     mut flash_event: EventWriter<FlashExpBarEvent>,
 ) {
-    let (player_txfm, mana_regen) = player.single();
+    let player_txfm = player.single();
     let player_pos = player_txfm.translation.truncate();
 
     for (e2, item_txfm, item_stack) in item_drops.iter() {
@@ -793,7 +792,9 @@ pub fn check_item_drop_collisions(
             text_timer.add_item(obj);
             continue;
         } else if obj == WorldObject::ManaOrb {
-            modify_mana_event.send(ModifyManaEvent(mana_regen.0));
+            let player_skills = game.get_player_skills();
+            let mana_from_orb = 10 + player_skills.get_count(Heirloom::ManaOrbs) as i32 * 5;
+            modify_mana_event.send(ModifyManaEvent(mana_from_orb));
             analytics.send(AnalyticsUpdateEvent {
                 update_type: AnalyticsTrigger::ItemCollected(obj),
             });
@@ -805,8 +806,8 @@ pub fn check_item_drop_collisions(
             || obj == WorldObject::XPShardLarge
         {
             let mut xp_amount = match obj {
-                WorldObject::XPShard => 10,
-                WorldObject::XPShardMedium => 45,
+                WorldObject::XPShard => 8,
+                WorldObject::XPShardMedium => 32,
                 WorldObject::XPShardLarge => 500,
                 _ => 0,
             };

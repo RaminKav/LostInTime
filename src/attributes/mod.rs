@@ -1315,7 +1315,7 @@ impl Plugin for AttributesPlugin {
                 (
                     add_current_shield_with_max_shield,
                     handle_cape_att_increase_on_level_up.before(handle_level_up),
-                    regen_shield,
+                    regen_shield.run_if(is_not_paused),
                     update_player_health_percent,
                 )
                     .in_set(OnUpdate(GameState::Main)),

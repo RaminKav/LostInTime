@@ -173,6 +173,40 @@ pub enum ActiveSkill {
     PossessedBlade, // Rogue - NEW
 }
 
+/// Percent of base attack for UI (`skill_power_mult * VALUE`) and for damage
+/// `attack * skill_power_mult * attack_damage_multiplier(VALUE)`, except
+/// [`HEAL_MAX_HEALTH_PERCENT`] which scales max HP healed the same way.
+pub mod active_skill_scaling {
+    pub const SPIN_ATTACK: f32 = 80.0;
+    pub const SHOUT: f32 = 160.0;
+    /// Fraction of max health (same numeric as percent for heal formula).
+    pub const HEAL_MAX_HEALTH_PERCENT: f32 = 30.0;
+    pub const PARRY_SPEAR: f32 = 95.0;
+    pub const SPRINT_LUNGE: f32 = 85.0;
+    pub const DAGGER_THROW: f32 = 115.0;
+    pub const DAGGER_SLASH: f32 = 175.0;
+    /// Teleport shock deals one-third of attack (percent = 100/3 for display).
+    pub const TELEPORT_SHOCK_ATTACK_PERCENT: f32 = 80.0;
+    pub const LIGHTNING: f32 = 120.0;
+    pub const FIRE_PILLAR: f32 = 95.0;
+    pub const ICE_WALL: f32 = 300.0;
+    pub const BUCKSHOT_PELLET: f32 = 100.0;
+    pub const BOMB: f32 = 220.0;
+    pub const PIERCING_STAR: f32 = 150.0;
+    pub const TRIPLE_THROW: f32 = 95.0;
+    pub const FURY: f32 = 125.0;
+    pub const LASER_BEAM: f32 = 60.0;
+    pub const ARROW_VOLLEY: f32 = 75.0;
+    pub const POSSESSED_BLADE: f32 = 115.0;
+    /// Added as [`crate::player::skills::RapidfireState::attack_speed_bonus`] multiplier base.
+    pub const RAPIDFIRE_ATTACK_SPEED_BONUS_PERCENT: f32 = 80.0;
+
+    #[inline]
+    pub fn attack_damage_multiplier(percent_of_attack: f32) -> f32 {
+        percent_of_attack * 0.01
+    }
+}
+
 impl ActiveSkill {
     /// Returns the base cooldown in seconds for this skill
     pub fn get_base_cooldown(&self) -> f32 {
@@ -186,7 +220,7 @@ impl ActiveSkill {
             ActiveSkill::Stealth => 13.0,
             ActiveSkill::Rapidfire => 12.0,
             ActiveSkill::FirePillar => 12.0,
-            ActiveSkill::Heal => 45.0,
+            ActiveSkill::Heal => 20.0,
             ActiveSkill::Buckshot => 2.3,
             ActiveSkill::IceWall => 10.0,
             ActiveSkill::DruidTree => 11.0,
@@ -362,6 +396,13 @@ impl ActiveSkill {
     }
 
     pub fn get_desc(&self, skill_power: f32) -> Vec<String> {
+        use active_skill_scaling::{
+            ARROW_VOLLEY, BOMB, BUCKSHOT_PELLET, DAGGER_SLASH, DAGGER_THROW, FIRE_PILLAR, FURY,
+            HEAL_MAX_HEALTH_PERCENT, ICE_WALL, LASER_BEAM, LIGHTNING, PARRY_SPEAR, PIERCING_STAR,
+            POSSESSED_BLADE, RAPIDFIRE_ATTACK_SPEED_BONUS_PERCENT, SHOUT, SPIN_ATTACK,
+            SPRINT_LUNGE, TELEPORT_SHOCK_ATTACK_PERCENT, TRIPLE_THROW,
+        };
+
         match self {
             ActiveSkill::Roll => vec![
                 "Roll to dodge attacks. You are".to_string(),
@@ -370,14 +411,20 @@ impl ActiveSkill {
             ActiveSkill::SpinAttack => vec![
                 "Gain a burst of speed and dash".to_string(),
                 "forwards while spinning a sword".to_string(),
-                format!("dealing {:.1}% damage around you.", skill_power * 80.0),
+                format!(
+                    "dealing {:.1}% damage around you.",
+                    skill_power * SPIN_ATTACK
+                ),
             ],
             ActiveSkill::Shout => vec![
                 "SCREAM, releasing a shockwave".to_string(),
-                format!("around you, dealing {:.1}% damage.", skill_power * 160.0),
+                format!("around you, dealing {:.1}% damage.", skill_power * SHOUT),
             ],
             ActiveSkill::Heal => vec![
-                format!("Heal yourself for {:.1}% of your", skill_power * 30.0),
+                format!(
+                    "Heal yourself for {:.1}% of your",
+                    skill_power * HEAL_MAX_HEALTH_PERCENT
+                ),
                 "max health.".to_string(),
             ],
             ActiveSkill::Parry => vec![
@@ -389,7 +436,7 @@ impl ActiveSkill {
                 "".to_string(),
                 "Launch a spear that pulls nearby".to_string(),
                 "enemies towards the impact area".to_string(),
-                format!("and deals {:.1}% damage.", skill_power * 185.0),
+                format!("and deals {:.1}% damage.", skill_power * PARRY_SPEAR),
             ],
             ActiveSkill::Sprint => vec![
                 "You are imbued with a burst of speed.".to_string(),
@@ -397,17 +444,26 @@ impl ActiveSkill {
             ],
             ActiveSkill::SprintLunge => vec![
                 "Lunge quickly through enemies in a".to_string(),
-                format!("line dealing {:.1}% damage. You are", skill_power * 85.0),
+                format!(
+                    "line dealing {:.1}% damage. You are",
+                    skill_power * SPRINT_LUNGE
+                ),
                 "invulnerable during the attack.".to_string(),
             ],
             ActiveSkill::DaggerThrow => vec![
                 "Throw a dagger at a nearby enemy".to_string(),
-                format!("dealing {:.1}% damage. Throw one more", skill_power * 115.0),
+                format!(
+                    "dealing {:.1}% damage. Throw one more",
+                    skill_power * DAGGER_THROW
+                ),
                 "per mob killed since the last cast.".to_string(),
             ],
             ActiveSkill::DaggerSlash => vec![
                 "Quickly slash in front of you,".to_string(),
-                format!("dealing {:.1}% damage in an area.", skill_power * 175.0),
+                format!(
+                    "dealing {:.1}% damage in an area.",
+                    skill_power * DAGGER_SLASH
+                ),
             ],
             ActiveSkill::Stealth => vec![
                 "Dissapear for a short duration".to_string(),
@@ -415,7 +471,10 @@ impl ActiveSkill {
                 "always crit but end Stealth early.".to_string(),
             ],
             ActiveSkill::Teleport => vec![
-                format!("Teleport forwards, dealing {:.1}%", skill_power * 33.0),
+                format!(
+                    "Teleport forwards, dealing {:.1}%",
+                    skill_power * TELEPORT_SHOCK_ATTACK_PERCENT
+                ),
                 "damage to enemies you pass through.".to_string(),
                 // "through.".to_string(),
             ],
@@ -423,29 +482,35 @@ impl ActiveSkill {
                 "Call down lighning on 3 nearby".to_string(),
                 format!(
                     "enemies, dealing {:.1}% damage to each.",
-                    skill_power * 85.0
+                    skill_power * LIGHTNING
                 ),
             ],
             ActiveSkill::FirePillar => {
                 vec![
                     "Scorch the earth at target area,".to_string(),
-                    format!("dealing {:.1}% damage continuously.", skill_power * 95.0),
+                    format!(
+                        "dealing {:.1}% damage continuously.",
+                        skill_power * FIRE_PILLAR
+                    ),
                 ]
             }
             ActiveSkill::IceWall => {
                 vec![
                     "Summon an ice pillar at target".to_string(),
-                    format!("area dealing {:.1}% damage.", skill_power * 300.0),
+                    format!("area dealing {:.1}% damage.", skill_power * ICE_WALL),
                 ]
             }
             ActiveSkill::Buckshot => vec![
                 "Fire a shotgun round dealing".to_string(),
-                format!("5x {:.1}% damage spread in a cone.", skill_power * 100.0),
+                format!(
+                    "5x {:.1}% damage spread in a cone.",
+                    skill_power * BUCKSHOT_PELLET
+                ),
                 "Knocks you back a moderate amount.".to_string(),
             ],
             ActiveSkill::Bomb => vec![
                 "Throw a bomb at target area that".to_string(),
-                format!("explodes on impact, dealing {:.1}%", skill_power * 220.0),
+                format!("explodes on impact, dealing {:.1}%", skill_power * BOMB),
                 "damage and applying frail.".to_string(),
             ],
             ActiveSkill::DruidTree => vec![
@@ -456,41 +521,44 @@ impl ActiveSkill {
             ActiveSkill::Rapidfire => vec![
                 "Concentrate deeply. Enemies around ".to_string(),
                 "you move 50% slower briefly. Gain".to_string(),
-                format!("{:.1}% attack speed and unlimited", skill_power * 80.0),
+                format!(
+                    "{:.1}% attack speed and unlimited",
+                    skill_power * RAPIDFIRE_ATTACK_SPEED_BONUS_PERCENT
+                ),
                 "ammo for the duration.".to_string(),
             ],
             ActiveSkill::PiercingStar => vec![
                 "Throw a large, piercing throwing".to_string(),
                 "star that travels in a line, dealing".to_string(),
-                format!("{:.1}% damage.", skill_power * 150.0),
+                format!("{:.1}% damage.", skill_power * PIERCING_STAR),
             ],
             ActiveSkill::TripleThrow => vec![
                 "Throw three small throwing stars".to_string(),
                 "in a cone shape in front, dealing".to_string(),
-                format!("{:.1}% damage each.", skill_power * 135.0),
+                format!("{:.1}% damage each.", skill_power * TRIPLE_THROW),
             ],
             ActiveSkill::Fury => vec![
                 "Enter fury for a short duration,".to_string(),
                 "throwing kunai rapidly at enemies".to_string(),
-                format!("around you, dealing {:.1}% damage.", skill_power * 165.0),
+                format!("around you, dealing {:.1}% damage.", skill_power * FURY),
                 "Kunai count scales with attack speed.".to_string(),
             ],
             ActiveSkill::LaserBeam => vec![
                 "Channel a powerful laser beam that deals".to_string(),
                 format!(
                     "{:.1}% damage rapidly to enemies in front.",
-                    skill_power * 60.0
+                    skill_power * LASER_BEAM
                 ),
             ],
             ActiveSkill::ArrowVolley => vec![
                 "Send out waves of arrows,".to_string(),
-                format!("dealing 9x{:.1}% damage.", skill_power * 75.0),
+                format!("dealing 9x{:.1}% damage.", skill_power * ARROW_VOLLEY),
             ],
             ActiveSkill::PossessedBlade => vec![
                 "Throw a blade that returns back to".to_string(),
                 format!(
                     "you. Deals {:.1}% damage, and triggers",
-                    skill_power * 115.0
+                    skill_power * POSSESSED_BLADE
                 ),
                 "lifesteal on kill, up to 3 times.".to_string(),
             ],
@@ -1370,12 +1438,7 @@ impl Heirloom {
                 "+10 def, +10% crit".to_string(),
                 "+10 spd, +10 dodge".to_string(),
             ],
-            Heirloom::ManaOrbs => vec![
-                "Mana Orbs drop".to_string(),
-                "from mobs with a.".to_string(),
-                "+10% chance. They".to_string(),
-                "trigger mana regen.".to_string(),
-            ],
+            Heirloom::ManaOrbs => vec!["Mana Orbs restore".to_string(), "5 more Mana.".to_string()],
             Heirloom::ManaOrbAttack => vec![
                 "Mana regeneration".to_string(),
                 "shoots a mana orb".to_string(),
@@ -1858,7 +1921,7 @@ impl Default for HeirloomChoiceQueue {
                 HeirloomChoiceState::new(Heirloom::CoinHeal, HeirloomRarity::Common),
                 HeirloomChoiceState::new(Heirloom::CrateBreakDamage, HeirloomRarity::Legendary),
                 HeirloomChoiceState::new(Heirloom::TomeDoubleUpgrade, HeirloomRarity::Legendary),
-                HeirloomChoiceState::new(Heirloom::CritHeal, HeirloomRarity::Uncommon),
+                HeirloomChoiceState::new(Heirloom::CritHeal, HeirloomRarity::Rare),
                 HeirloomChoiceState::new(Heirloom::LowHPDamage, HeirloomRarity::Rare),
                 HeirloomChoiceState::new(Heirloom::ChaosStats, HeirloomRarity::Rare),
                 HeirloomChoiceState::new(Heirloom::ItemPickupRadius, HeirloomRarity::Common),

@@ -21,7 +21,10 @@ use crate::{
         projectile::{Projectile, RangedAttackEvent},
         WorldObject,
     },
-    player::mage_skills::spawn_ice_explosion_hitbox,
+    player::{
+        mage_skills::spawn_ice_explosion_hitbox,
+        skills::active_skill_scaling::{attack_damage_multiplier, PARRY_SPEAR},
+    },
     status_effects::MobStatusEffects,
     ui::damage_numbers::{spawn_floating_text_with_shadow, PreviousHealth},
     world::TILE_SIZE,
@@ -490,7 +493,9 @@ pub fn handle_spear_pull_delay(
             &mut commands,
             Transform::from_translation(Vec3::new(epicenter.x, epicenter.y, 1.0)),
             0.5, // Very short duration, just for the hit
-            (attack.0 as f32 * skill_power_mult * 1.85) as i32,
+            (attack.0 as f32
+                * skill_power_mult
+                * attack_damage_multiplier(PARRY_SPEAR)) as i32,
             Collider::ball(18.0), // 20px radius
             Projectile::SpearGravity,
         );

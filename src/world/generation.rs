@@ -57,6 +57,8 @@ pub struct WorldObjectCache {
     pub generated_chunks: Vec<IVec2>,
     pub generated_dungeon_chunks: Vec<IVec2>,
     pub tile_data_cache: HashMap<TileMapPosition, TileSpriteData>,
+    /// Rolled once per active skill shrine tile (world-unique spawn or first interact). Survives chunk despawn.
+    pub active_skill_shrine_offers: HashMap<TileMapPosition, Vec<crate::player::skills::ActiveSkill>>,
 }
 pub struct GenerationPlugin;
 
@@ -435,6 +437,19 @@ impl GenerationPlugin {
                 }
                 debug!("set up a {obj_to_spawn:?} at {pos:?}");
                 game.world_obj_cache.unique_objs.insert(obj_to_spawn, pos);
+                if obj_to_spawn == WorldObject::ActiveSkillShrine {
+                    if let Ok((_, player_skills, _)) = game.player_query.get_single() {
+                        let skills =
+                            crate::item::active_skill_shrine::roll_active_skill_shrine_offer_skills(
+                                Some(player_skills),
+                            );
+                        if !skills.is_empty() {
+                            game.world_obj_cache
+                                .active_skill_shrine_offers
+                                .insert(pos, skills);
+                        }
+                    }
+                }
             }
         }
         if dungeon_check.get_single().is_err() && !*NO_GEN {

@@ -1196,15 +1196,12 @@ pub fn handle_mana_orb_drops(
     mut proto_commands: ProtoCommands,
     proto: ProtoParam,
     mut death_events: EventReader<EnemyDeathEvent>,
-    heirlooms: Query<&PlayerSkills>,
     mut trigger_counts: ResMut<HeirloomTriggerCounts>,
 ) {
     let mut rng = rand::thread_rng();
+    const MANA_ORB_DROP_CHANCE: f64 = 0.1;
     for event in death_events.iter() {
-        let skills = heirlooms.single();
-
-        let mana_orb_chance = skills.get_count(Heirloom::ManaOrbs) as f64 * 0.1;
-        if !rng.gen_bool(mana_orb_chance.clamp(0.0, 1.0)) {
+        if !rng.gen_bool(MANA_ORB_DROP_CHANCE) {
             continue;
         }
         let offset = Vec2::new(rng.gen_range(-10.0..10.0), rng.gen_range(-10.0..10.0));
@@ -1219,16 +1216,16 @@ pub fn handle_mana_orb_drops(
     }
 }
 
-/// Drop mana orbs at 30% chance when player attacks a boss with a staff in hotbar
+/// Drop mana orbs on boss/elite hits at the same flat rate as on kills.
 pub fn handle_boss_hit_mana_orb_drops(
     mut proto_commands: ProtoCommands,
     proto: ProtoParam,
     mut hit_events: EventReader<HitEvent>,
     mobs: Query<(&Mob, &GlobalTransform, Option<&EliteMob>)>,
-    heirlooms: Query<&PlayerSkills>,
     mut trigger_counts: ResMut<HeirloomTriggerCounts>,
 ) {
     let mut rng = rand::thread_rng();
+    const MANA_ORB_DROP_CHANCE: f64 = 0.01;
 
     for hit in hit_events.iter() {
         // Check if hit entity is a boss
@@ -1240,11 +1237,7 @@ pub fn handle_boss_hit_mana_orb_drops(
             continue;
         }
 
-        let skills = heirlooms.single();
-
-        // one fourth of the odds for boss/elites
-        let mana_orb_chance = skills.get_count(Heirloom::ManaOrbs) as f64 * 0.1 / 4.;
-        if !rng.gen_bool(mana_orb_chance.clamp(0.0, 1.0)) {
+        if !rng.gen_bool(MANA_ORB_DROP_CHANCE) {
             continue;
         }
 

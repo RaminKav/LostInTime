@@ -4,6 +4,9 @@ use bevy_aseprite::{anim::AsepriteAnimation, aseprite, AsepriteBundle};
 use crate::{
     assets::Graphics,
     item::object_actions::ObjectAction,
+    player::skills::{
+        ActiveSkill, ActiveSkillChoiceState, HeirloomRarity, PlayerSkills,
+    },
     ui::{
         key_input_guide::InteractionGuideTrigger,
         minimap::UpdateMiniMapEvent,
@@ -12,6 +15,8 @@ use crate::{
     world::TileMapPosition,
     GameParam,
 };
+use rand::seq::IteratorRandom;
+use strum::IntoEnumIterator;
 
 use super::WorldObject;
 
@@ -25,7 +30,56 @@ pub struct ActiveSkillShrineState {
     pub tile_pos: TileMapPosition,
 }
 
-use crate::player::skills::ActiveSkillChoiceState;
+/// Same filter as the shrine interaction: exclude these and anything the player already has.
+pub fn roll_active_skill_shrine_offer_skills(
+    player_skills: Option<&PlayerSkills>,
+) -> Vec<ActiveSkill> {
+    let mut rng = rand::thread_rng();
+    let player_current_skills = player_skills
+        .map(|skills| {
+            let mut current = Vec::new();
+            for slot in [
+                &skills.active_skill_slot_0,
+                &skills.active_skill_slot_1,
+                &skills.active_skill_slot_2,
+                &skills.active_skill_slot_3,
+                &skills.active_skill_slot_4,
+            ] {
+                if let Some(s) = slot {
+                    current.push(s.active_skill);
+                }
+            }
+            current
+        })
+        .unwrap_or_default();
+
+    let mut available_skills: Vec<ActiveSkill> = ActiveSkill::iter()
+        .filter(|skill| {
+            *skill != ActiveSkill::Parry
+                && *skill != ActiveSkill::Sprint
+                && *skill != ActiveSkill::LaserBeam
+                && !player_current_skills.contains(skill)
+        })
+        .collect();
+
+    let mut chosen_skills = Vec::new();
+    for _ in 0..2 {
+        if available_skills.is_empty() {
+            break;
+        }
+        let chosen = *available_skills.iter().choose(&mut rng).unwrap();
+        chosen_skills.push(chosen);
+        available_skills.retain(|s| *s != chosen);
+    }
+    chosen_skills
+}
+
+pub fn skill_choices_from_offer_skills(skills: &[ActiveSkill]) -> Vec<ActiveSkillChoiceState> {
+    skills
+        .iter()
+        .map(|skill| ActiveSkillChoiceState::new(*skill, HeirloomRarity::Common))
+        .collect()
+}
 
 /// Resource to hold the active skill choices from a shrine interaction
 #[derive(Resource, Clone, Debug)]
@@ -95,6 +149,9 @@ pub fn handle_active_skill_shrine_completion(
 
             // Update the world object cache so the shrine stays "Done" when chunk respawns
             game.add_object_to_chunk_cache(shrine.tile_pos, WorldObject::ActiveSkillShrineDone);
+            game.world_obj_cache
+                .active_skill_shrine_offers
+                .remove(&shrine.tile_pos);
 
             // Update minimap to reflect the shrine is now "Done"
             minimap_event.send(UpdateMiniMapEvent {

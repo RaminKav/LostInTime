@@ -21,6 +21,7 @@ use crate::{
 use super::{spawn_helpers::can_spawn_mob_here, CombatAlignment, EliteMob, Mob};
 
 pub const BASE_MAX_MOBS_TOTAL: i32 = 60;
+pub const INFINITE_MAX_MOBS_BONUS: i32 = 100;
 pub const ELITE_SPAWN_RATE: f32 = 0.06;
 
 /// Tracks which era the current [`GlobalSpawners::spawners`] list was built for (overworld only).
@@ -133,7 +134,7 @@ pub struct EnemyDespawnTimer {
 impl Default for EnemyDespawnTimer {
     fn default() -> Self {
         Self {
-            timer: Timer::from_seconds(5.0, TimerMode::Repeating),
+            timer: Timer::from_seconds(3.0, TimerMode::Repeating),
         }
     }
 }
@@ -581,7 +582,7 @@ fn tick_spawner_timers(
 
     // In endless mode use base cap (gauge damage output, not mobbing); otherwise scale with days
     let max_mobs = if infinite_mode.active {
-        BASE_MAX_MOBS_TOTAL + night_tracker.days as i32 * 10
+        INFINITE_MAX_MOBS_BONUS + BASE_MAX_MOBS_TOTAL + night_tracker.days as i32 * 10
     } else {
         BASE_MAX_MOBS_TOTAL + night_tracker.days as i32 * 10
     };
@@ -625,6 +626,11 @@ fn tick_spawner_timers(
             spawner.spawn_timer.tick(time.delta());
             spawner.spawn_timer.tick(time.delta());
             spawner.spawn_timer.tick(time.delta());
+            if infinite_mode.active {
+                for _ in 0..5 {
+                    spawner.spawn_timer.tick(time.delta());
+                }
+            }
         }
         if spawner.spawn_timer.finished() {
             spawner.spawn_timer.reset();
@@ -656,7 +662,8 @@ fn tick_enemy_despawn_timer(
     infinite_mode: Res<InfiniteMode>,
     maybe_dungeon: Query<&Dungeon, With<ActiveDimension>>,
 ) {
-    const NUM_TO_DESPAWN: usize = 10;
+    let NUM_TO_DESPAWN: usize = if infinite_mode.active { 20 } else { 10 };
+    let NUM_TO_SKIP: usize = 20;
     if maybe_dungeon.get_single().is_ok() {
         return;
     }
@@ -665,7 +672,7 @@ fn tick_enemy_despawn_timer(
         return;
     }
     let max_mobs = if infinite_mode.active {
-        BASE_MAX_MOBS_TOTAL + night_tracker.days as i32 * 10
+        INFINITE_MAX_MOBS_BONUS + BASE_MAX_MOBS_TOTAL + night_tracker.days as i32 * 10
     } else {
         BASE_MAX_MOBS_TOTAL + night_tracker.days as i32 * 10
     };
@@ -687,8 +694,8 @@ fn tick_enemy_despawn_timer(
     if count < max_mobs {
         return;
     }
-    eligible.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
-    for (entity, _) in eligible.into_iter().take(NUM_TO_DESPAWN) {
+    eligible.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+    for (entity, _) in eligible.into_iter().skip(NUM_TO_SKIP).take(NUM_TO_DESPAWN) {
         commands.entity(entity).despawn_recursive();
     }
 }
