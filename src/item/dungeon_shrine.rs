@@ -222,7 +222,7 @@ pub fn handle_dungeon_shrine_rewards(
 
 fn get_weapon_reward() -> WorldObject {
     let weapon_options = WorldObject::iter()
-        .filter(|obj| obj.is_weapon())
+        .filter(|obj| obj.is_weapon() && obj != &WorldObject::PlasmaStaff)
         .collect::<Vec<WorldObject>>();
     *weapon_options
         .iter()

@@ -107,6 +107,7 @@ pub fn handle_add_damage_numbers_after_hit(
             Option<&mut WasHitWithCrit>,
             Option<&mut WasHitWithOvercrit>,
             Option<&Mob>,
+            Option<&WorldObject>,
         ),
         Changed<CurrentHealth>,
     >,
@@ -124,13 +125,14 @@ pub fn handle_add_damage_numbers_after_hit(
         mut crit_option,
         mut overcrit_option,
         mob_option,
+        obj_option,
     ) in changed_health.iter_mut()
     {
         let delta = changed_health.0 - prev_health.0;
         let was_over_max = prev_health.0 > max_health.map_or(i32::MAX, |mh| mh.0);
 
         prev_health.0 = changed_health.0;
-        if mob_option.is_some() && delta > 0 {
+        if (mob_option.is_some() || obj_option.is_some()) && delta > 0 {
             continue;
         }
 

@@ -4,13 +4,18 @@ use bevy_aseprite::{anim::AsepriteAnimation, aseprite, AsepriteBundle};
 use crate::{
     assets::{asset_helpers::spawn_sprite, Graphics},
     attributes::{
-        add_item_glows, Attack, AttackSpeed, AttributeQuality, AttributeValue, BonusDamage,
-        CritChance, CritDamage, CurrentHealth, CurrentMana, Defence, Dodge, Healing, HealthRegen,
-        ItemAttributes, ItemRarity, Lifesteal, LootRateBonus, ManaRegen, MaxHealth, MaxMana,
-        PickupRange, ProjectileSize, RawItemBaseAttributes, RawItemBonusAttributes, SkillPower,
-        Speed, Thorns, XpRateBonus,
+        add_item_glows,
+        set_bonus::{EquipmentSet, SET_PIECES_REQUIRED},
+        Attack, AttackSpeed, AttributeQuality, AttributeValue, BonusDamage, CritChance, CritDamage,
+        CurrentHealth, CurrentMana, Defence, Dodge, Healing, HealthRegen, ItemAttributes,
+        ItemRarity, Lifesteal, LootRateBonus, ManaRegen, MaxHealth, MaxMana, PickupRange,
+        ProjectileSize, RawItemBaseAttributes, RawItemBonusAttributes, SkillPower, Speed, Thorns,
+        XpRateBonus,
     },
-    colors::{ORANGE, STATS_TITLE, TOOLTIP_BLACK, TOOLTIP_BLACK_2, WHITE, YELLOW, YELLOW_2},
+    colors::{
+        LIGHT_GREEN, LIGHT_GREY, ORANGE, STATS_TITLE, TOOLTIP_BLACK, TOOLTIP_BLACK_2, WHITE,
+        YELLOW, YELLOW_2,
+    },
     combat::damage_tracker::{spawn_damage_tracker_ui, DamageTracker, PetAbilityStats},
     inventory::{Inventory, ItemStack},
     item::{item_actions::ItemActions, EquipmentType, Recipes, WorldObject},
@@ -184,11 +189,10 @@ pub fn handle_spawn_inv_item_tooltip(
     essence: Query<Entity, With<EssenceUI>>,
     item_chest: Query<Entity, With<ItemChestUI>>,
     cur_inv_state: Res<State<UIState>>,
-    recipes: Res<Recipes>,
-    item_stacks: Query<(Entity, &ItemStack), Without<RecipeIngredientTooltipIcon>>,
     proto: ProtoParam,
     old_tooltips: Query<Entity, With<ItemOrRecipeTooltip>>,
     player_stats_tooltips: Query<Entity, With<PlayerStatsTooltip>>,
+    player_inv: Query<&Inventory, With<Player>>,
     mut tooltip_manager: ResMut<TooltipsManager>,
 ) {
     for item in updates.iter() {
@@ -795,6 +799,50 @@ pub fn handle_spawn_inv_item_tooltip(
                 }
             }
         }
+
+        // ======== Set Bonus line (gear sets like Leather/Metal/Forest) ========
+        if let Some(set) = EquipmentSet::from_world_object(obj_type) {
+            let count = if let Ok(player_inv) = player_inv.get_single() {
+                set.count_equipped(player_inv)
+            } else {
+                0
+            };
+            let active = count >= SET_PIECES_REQUIRED;
+            let label = format!(
+                "Set ({}/{}): {}",
+                count.min(SET_PIECES_REQUIRED),
+                SET_PIECES_REQUIRED,
+                set.bonus_description(),
+            );
+            // Place the line below the rendered tooltip rows. Mirrors the
+            // bonus-stat row offset (36) plus a small gap (8) for separation.
+            let row_count = tooltip_text.len() as f32;
+            let set_bonus_y = size.y / 2. - 126. - (row_count * 9.) - 44.;
+            commands
+                .spawn((
+                    Text2dBundle {
+                        text: Text::from_section(
+                            label,
+                            TextStyle {
+                                font: asset_server.load("fonts/slkscr.ttf"),
+                                font_size: 8.5,
+                                color: if active { LIGHT_GREEN } else { LIGHT_GREY },
+                            },
+                        ),
+                        text_anchor: Anchor::CenterLeft,
+                        transform: Transform {
+                            translation: Vec3::new(-size.x / 2. + 26., set_bonus_y, 2.),
+                            scale: Vec3::new(1., 1., 1.),
+                            ..Default::default()
+                        },
+                        ..default()
+                    },
+                    Name::new("TOOLTIP Set Bonus TEXT"),
+                    RenderLayers::from_layers(&[3]),
+                ))
+                .set_parent(tooltip);
+        }
+
         for i in 0..num_stars {
             let star = spawn_sprite(
                 &mut commands,

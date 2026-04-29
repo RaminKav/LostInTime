@@ -6,11 +6,11 @@
                 "Sword"
             ],
             stat_description: [
-                "Gain +3 Health per level"
+                "Gain +3 Health per level" // 8 lvls, +5 would be 5 
             ],
             class_icon: RedPlayerSelectIcon,
             skill_icon: HealthIcon,
-            active_skills: (SpinAttack, Shout, Heal, ParrySpear),
+            active_skills: (SpinAttack, Shout, Heal, ParrySpear), // consumes 5% hp, pulls in further distance per hp deducted
             starting_weapons: [Sword, Spear, Hammer],
         ),
         Wizard: (
@@ -19,11 +19,11 @@
                 "Fire Staff"
             ],
             stat_description: [
-                "Gain +0.5 Mana Regen per level"
+                "Gain +0.5 Mana Regen per level" // 10
             ],
             class_icon: BluePlayerSelectIcon,
             skill_icon: ManaIcon,
-            active_skills: (Teleport, Lightning, IceWall, FirePillar),
+            active_skills: (Teleport, Lightning, IceWall, FirePillar), // 
             starting_weapons: [FireStaff, IceStaff, BasicStaff],
         ),
         Rogue: (
@@ -32,11 +32,11 @@
                 "Daggers"
             ],
             stat_description: [
-                "Gain +1% Crit Chance per level"
+                "Gain +1 Speed per level" // 10
             ],
             class_icon: GreenPlayerSelectIcon,
             skill_icon: CritChanceIcon,
-            active_skills: (SprintLunge, PossessedBlade, Rapidfire, DaggerSlash),
+            active_skills: (SprintLunge, PossessedBlade, Rapidfire, DaggerSlash), // one extra slash per 25 speed
             starting_weapons: [Dagger],
         ),
         Thief: (
@@ -45,7 +45,7 @@
                 "Claw"
             ],
             stat_description: [
-                "Gain +2% Attack Speed per level"
+                "Gain +1% Attack Speed per level" // 7, but its a rare
             ],
             class_icon: GreyPlayerSelectIcon,
             skill_icon: AttackSpeedIcon,
@@ -58,11 +58,11 @@
                 "Bow"
             ],
             stat_description: [
-                "Gain +1% Crit Damage per level"
+                "Gain +1% Crit Chance per level" // 7
             ],
             class_icon: GreenPlayerSelectIcon,
             skill_icon: CritDamageIcon,
-            active_skills: (Buckshot, Bomb, DruidTree, ArrowVolley),
+            active_skills: (Buckshot, Bomb, DruidTree, ArrowVolley), // crit chance is added as crit dmg
             starting_weapons: [WoodBow, Gun],
         ),
     },
@@ -74,7 +74,7 @@
             ],
             skill_name: "Slime Shield",
             pet_icon: SlimePetIcon,
-            passive_description: ["Gain +1 Defence per\nlevel"],
+            passive_description: ["Gain +1 Defence per\nlevel"], //10
             skill_icon: SlimeShieldIcon,
 
         ),
@@ -84,7 +84,7 @@
                 "Heals you every once\nin a while."
             ],
             skill_name: "Healing Touch",
-            passive_description: ["Gain +1 Health Regen\nper level"],
+            passive_description: ["Gain +1 Health Regen\nper level"], // 5
             pet_icon: FairyPetIcon,
             skill_icon: HPRegenCooldownIcon,
         ),
@@ -94,7 +94,7 @@
                 "Damages you for 1 HP\nevery 1.5s when above\n30% health."
             ],
             skill_name: "Spiky Burden",
-            passive_description: ["Gain +1% Lifesteal\nper level"],
+            passive_description: ["Gain +0.5 Lifesteal\nper level"], // 4
             pet_icon: SlimePetIcon,
             skill_icon: SlimeShieldIcon,
         ),
@@ -104,7 +104,7 @@
                 "Drops coins every 15s.\n $$$"
             ],
             skill_name: "Coin Drop",
-            passive_description: ["Gain +1.5% Pickup Range\nper level"],
+            passive_description: ["Gain +2% Pickup Range\nper level"], 
             pet_icon: SlimePetIcon,
             skill_icon: SlimeShieldIcon,
         ),

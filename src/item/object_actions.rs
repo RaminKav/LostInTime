@@ -1,5 +1,6 @@
 use super::active_skill_shrine::{
-    skill_choices_from_offer_skills, ActiveSkillShrineSelection, ActiveSkillShrineState,
+    refresh_active_skill_shrine_offer_skills, skill_choices_from_offer_skills,
+    ActiveSkillShrineSelection, ActiveSkillShrineState,
 };
 use super::combat_shrine::{CombatShrine, CombatShrineAnim};
 use super::dungeon_shrine::{DungeonShrine, DungeonShrineType};
@@ -392,22 +393,32 @@ impl ObjectAction {
                     ));
             }
             ObjectAction::ActiveSkillShrine => {
-                let offer_skills = game
+                // Always re-validate the cached offer against the player's current
+                // active skills so anything they picked up since the world rolled
+                // this shrine (e.g. via another shrine) is filtered out, and any
+                // gaps are topped up with fresh rolls.
+                let cached_offer = game
                     .world_obj_cache
                     .active_skill_shrine_offers
                     .get(&obj_pos)
                     .cloned()
-                    .unwrap_or_else(|| {
-                        let rolled = super::active_skill_shrine::roll_active_skill_shrine_offer_skills(
-                            item_action_param.player_skills.get_single().ok(),
-                        );
-                        if !rolled.is_empty() {
-                            game.world_obj_cache
-                                .active_skill_shrine_offers
-                                .insert(obj_pos, rolled.clone());
-                        }
-                        rolled
-                    });
+                    .unwrap_or_default();
+                let offer_skills = refresh_active_skill_shrine_offer_skills(
+                    &cached_offer,
+                    item_action_param.player_skills.get_single().ok(),
+                );
+
+                if offer_skills != cached_offer {
+                    if offer_skills.is_empty() {
+                        game.world_obj_cache
+                            .active_skill_shrine_offers
+                            .remove(&obj_pos);
+                    } else {
+                        game.world_obj_cache
+                            .active_skill_shrine_offers
+                            .insert(obj_pos, offer_skills.clone());
+                    }
+                }
 
                 let skill_choices = skill_choices_from_offer_skills(&offer_skills);
 

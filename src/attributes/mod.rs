@@ -12,6 +12,7 @@ use bevy::{ecs::system::EntityCommands, prelude::*};
 use bevy_proto::prelude::{ReflectSchematic, Schematic};
 pub mod health_regen;
 pub mod modifiers;
+pub mod set_bonus;
 use crate::{
     animations::{AnimatedTextureMaterial, DoneAnimation},
     assets::Graphics,
@@ -19,8 +20,8 @@ use crate::{
     blessings::{Blessing, HeirloomStatsBonuses, OwnedBlessings},
     client::{is_not_paused, GameOverEvent},
     colors::{
-        COMMON_TOOLTIP_TITLE, GREY, LEGENDARY_TOOLTIP_TITLE, LIGHT_BLUE, LIGHT_GREY, LIGHT_RED,
-        ORANGE, RARE_TOOLTIP_TITLE, UNCOMMON_TOOLTIP_TITLE,
+        COMMON_TOOLTIP_TITLE, GREY, LEGENDARY_TOOLTIP_TITLE, LIGHT_GREY, ORANGE,
+        RARE_TOOLTIP_TITLE, UNCOMMON_TOOLTIP_TITLE,
     },
     inputs::player_move_inputs,
     inventory::{Inventory, ItemStack},
@@ -1576,6 +1577,9 @@ fn handle_player_item_attribute_change_events(
         // Calculate inventory buffs from items in inventory (not hotbar)
         let inventory_buffs = calculate_inventory_buffs(&inv, &proto);
         new_att = new_att.combine(&inventory_buffs);
+
+        // Apply equipment set bonuses (e.g. 3 leather/metal/forest pieces)
+        new_att = set_bonus::apply_set_bonuses(new_att, inv);
 
         if new_att.attack_cooldown == 0. {
             new_att.attack_cooldown = 0.4;

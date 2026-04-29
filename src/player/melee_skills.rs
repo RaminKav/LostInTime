@@ -8,7 +8,7 @@ use crate::{
     assets::Graphics,
     attributes::{
         attribute_helpers::skill_power_multiplier, modifiers::ModifyHealthEvent, Attack,
-        CurrentHealth, CurrentMana, HealthRegen, ProjectileSize, SkillPower,
+        CurrentHealth, CurrentMana, HealthRegen, MaxHealth, ProjectileSize, SkillPower,
     },
     audio::{AudioSoundEffect, SoundSpawner},
     blessings::OwnedBlessings,
@@ -75,6 +75,7 @@ pub fn handle_second_split_attack(
             0,
             None,
             frail_stacks,
+            0,
         );
 
         let split_damage = f32::floor(damage as f32 / 2.) as i32;
@@ -241,7 +242,17 @@ pub struct SpearState {
 pub struct SpearPullDelay {
     pub delay_timer: Timer,
     pub epicenter: Vec2,
+    /// Pull radius captured at cast time. Scales with the HP drained by the
+    /// 5% max-HP cast cost so a higher max-HP build pulls from further away.
+    pub pull_radius: f32,
 }
+
+/// Base ParrySpear pull radius (px) before HP-drain scaling.
+pub const PARRY_SPEAR_BASE_PULL_RADIUS: f32 = 64.0;
+/// Pull-radius (px) gained per 1 HP drained on cast.
+pub const PARRY_SPEAR_PULL_RADIUS_PER_HP: f32 = 4.0;
+/// Fraction of max HP drained on ParrySpear cast.
+pub const PARRY_SPEAR_HP_COST_FRACTION: f32 = 0.05;
 
 /// Brief knockback/stun state applied to a mob that just got parried.
 /// Removed as soon as its timer elapses (a few hundred ms) — `SparseSet` so
@@ -302,6 +313,7 @@ pub fn handle_spear(
             &GlobalTransform,
             &PlayerSkills,
             &Attack,
+            &MaxHealth,
             &mut SpearState,
             &mut KinematicCharacterController,
             &mut MovementVector,
@@ -312,8 +324,9 @@ pub fn handle_spear(
     time: Res<Time>,
     cursor_pos: Res<CursorPos>,
     mut ranged_attack_events: EventWriter<RangedAttackEvent>,
+    mut modify_health_event: EventWriter<ModifyHealthEvent>,
 ) {
-    let Ok((e, player_pos, skills, _dmg, mut spear_state, mut kcc, mut mv)) =
+    let Ok((e, player_pos, skills, _dmg, max_health, mut spear_state, mut kcc, mut mv)) =
         player.get_single_mut()
     else {
         return;
@@ -337,9 +350,19 @@ pub fn handle_spear(
         let direction = (cursor_pos.world_coords.truncate() - player_pos_2d).normalize_or_zero();
         let epicenter = player_pos_2d + direction * 1.7 * TILE_SIZE.x;
 
+        // Drain 5% of max HP and scale the pull radius with however much was drained.
+        let hp_drained =
+            ((max_health.0 as f32) * PARRY_SPEAR_HP_COST_FRACTION).max(0.0) as i32;
+        if hp_drained > 0 {
+            modify_health_event.send(ModifyHealthEvent(-hp_drained));
+        }
+        let pull_radius = PARRY_SPEAR_BASE_PULL_RADIUS
+            + PARRY_SPEAR_PULL_RADIUS_PER_HP * hp_drained as f32;
+
         commands.entity(e).insert(SpearPullDelay {
             delay_timer: Timer::from_seconds(0.45, TimerMode::Once),
             epicenter,
+            pull_radius,
         });
         ranged_attack_events.send(RangedAttackEvent {
             projectile: Projectile::SpearGravity,
@@ -473,7 +496,8 @@ pub fn handle_spear_pull_delay(
 
         // Pull all nearby enemies to the epicenter
         let epicenter = pull_delay.epicenter;
-        let pull_radius = 128.0; // Radius to find enemies to pull
+        // Captured at cast time; scales with HP drained by the 5% max-HP cost.
+        let pull_radius = pull_delay.pull_radius;
 
         for (mob_e, mob_transform) in mobs.iter() {
             let mob_pos = mob_transform.translation().truncate();

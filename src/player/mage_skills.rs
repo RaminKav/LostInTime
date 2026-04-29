@@ -119,7 +119,7 @@ pub fn handle_teleport(
         teleport_state.timer.reset();
         let direction = move_direction.0.normalize();
         let power_mult = skill_power_multiplier(skill_power, blessings.get_skill_power_bonus());
-        let base_distance = 4. * TILE_SIZE.x;
+        let base_distance = 4.5 * TILE_SIZE.x;
         let distance = direction * base_distance;
         let pos = world_pos_to_tile_pos(player_pos.truncate() + distance);
         if let Some(tile_data) = game.get_tile_data(pos) {
@@ -134,10 +134,9 @@ pub fn handle_teleport(
         }
 
         let angle = f32::atan2(direction.y, direction.x) - PI / 2.;
-        let shock_dmg = (dmg.0 as f32
-            * power_mult
-            * attack_damage_multiplier(TELEPORT_SHOCK_ATTACK_PERCENT))
-            as i32;
+        let shock_dmg =
+            (dmg.0 as f32 * power_mult * attack_damage_multiplier(TELEPORT_SHOCK_ATTACK_PERCENT))
+                as i32;
         let shock_e = spawn_temp_collider(
             &mut commands,
             Transform::from_translation(Vec3::new(
@@ -185,7 +184,6 @@ pub fn tick_just_teleported(
         }
     }
 }
-
 
 pub fn spawn_ice_explosion_hitbox(
     commands: &mut Commands,

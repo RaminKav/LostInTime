@@ -64,11 +64,11 @@ impl Pet {
             Pet::Fairy => FairyPetSprite::PATH,
         }
     }
-    
+
     /// Compute pet passive stats based on level (similar to SkillClass::compute_cape_stats)
     pub fn compute_pet_stats(&self, level: i32) -> crate::attributes::ItemAttributes {
         use crate::attributes::{AttributeQuality, AttributeValue, ItemAttributes};
-        
+
         let mut stats = ItemAttributes::default();
         let quality = if level > 10 {
             AttributeQuality::High
@@ -77,7 +77,7 @@ impl Pet {
         } else {
             AttributeQuality::Low
         };
-        
+
         match self {
             Pet::Slime => {
                 // +1 Defence per level
@@ -89,15 +89,16 @@ impl Pet {
             }
             Pet::Porkipine => {
                 // +1% Lifesteal per level
-                stats.lifesteal = AttributeValue::new(level * 1, quality, 1.);
+                stats.lifesteal =
+                    AttributeValue::new((level as f32 * 0.5).round() as i32, quality, 1.);
             }
             Pet::GoldenPig => {
                 // +1.5% Pickup Range per level
                 stats.pickup_range =
-                    AttributeValue::new((level as f32 * 1.5).round() as i32, quality, 1.5);
+                    AttributeValue::new((level as f32 * 2.).round() as i32, quality, 1.5);
             }
         }
-        
+
         stats
     }
 }
@@ -300,11 +301,12 @@ pub fn configure_pet_on_spawn(
                     ));
             }
             crate::pets::state::Pet::Porkipine => {
-                commands
-                    .entity(pet_entity)
-                    .insert(crate::pets::pet_abilities::PorkipineDamageTimer(
-                        Timer::from_seconds(1.5, TimerMode::Repeating),
-                    ));
+                commands.entity(pet_entity).insert(
+                    crate::pets::pet_abilities::PorkipineDamageTimer(Timer::from_seconds(
+                        1.5,
+                        TimerMode::Repeating,
+                    )),
+                );
             }
             crate::pets::state::Pet::GoldenPig => {
                 commands

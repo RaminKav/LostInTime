@@ -11,7 +11,7 @@ use crate::{
     attributes::{
         attribute_helpers::skill_power_multiplier, ActiveConsumableBuffs, Attack, AttackCooldown,
         AttributeChangeEvent, BonusAttackSpeed, ConsumableBuffEffect, ConsumableBuffEntry,
-        CurrentHealth, CurrentMana, MaxHealth, SkillPower,
+        CurrentHealth, CurrentMana, MaxHealth, SkillPower, Speed,
     },
     audio::{AudioSoundEffect, SoundSpawner},
     blessings::{Blessing, OwnedBlessings},
@@ -29,16 +29,18 @@ use crate::{
     player::{
         melee_skills::{
             spawn_delayed_heirloom_cast, spawn_echo_hitbox, DelayedCastType,
-            HeirloomTriggerCooldowns, ParryState, SpearState, HEIRLOOM_EXTRA_CAST_DELAY,
+            HeirloomTriggerCooldowns, SpearState, HEIRLOOM_EXTRA_CAST_DELAY,
             HEIRLOOM_TRIGGER_COOLDOWN_SECS,
         },
         rogue_skills::{LungeState, SprintState},
         skills::{
             active_skill_scaling::{
                 attack_damage_multiplier, ARROW_VOLLEY, BOMB, BUCKSHOT_PELLET, DAGGER_SLASH,
-                DAGGER_THROW, FIRE_PILLAR, FURY, HEAL_MAX_HEALTH_PERCENT, ICE_WALL, LASER_BEAM,
-                LIGHTNING, PIERCING_STAR, POSSESSED_BLADE, RAPIDFIRE_ATTACK_SPEED_BONUS_PERCENT,
-                SHOUT, SPIN_ATTACK, TRIPLE_THROW,
+                DAGGER_SLASH_BASE_SLASHES, DAGGER_SLASH_HIT_INTERVAL,
+                DAGGER_SLASH_SPEED_PER_EXTRA_SLASH, DAGGER_THROW, FIRE_PILLAR, FURY,
+                HEAL_MAX_HEALTH_PERCENT, ICE_WALL, LASER_BEAM, LIGHTNING, PIERCING_STAR,
+                POSSESSED_BLADE, RAPIDFIRE_ATTACK_SPEED_BONUS_PERCENT, SHOUT, SPIN_ATTACK,
+                TRIPLE_THROW,
             },
             grant_skill_charge_after_cooldown_complete, ActiveSkill, ActiveSkillUsedEvent,
             ArrowVolleyState, BombState, BuckshotSkillState, ClassSkillSlots,
@@ -88,7 +90,9 @@ fn restart_charge_regen_if_below_max(
         return;
     }
     let cd = match (skills, blessings) {
-        (Some(sk), Some(bl)) => sk.effective_skill_cooldown(&slot.tracked_skill, bl).max(0.0),
+        (Some(sk), Some(bl)) => sk
+            .effective_skill_cooldown(&slot.tracked_skill, bl)
+            .max(0.0),
         _ => slot.base_cooldown.max(0.0),
     };
     slot.start_cooldown_seconds(cd, true);
@@ -161,6 +165,7 @@ pub fn handle_active_skill_event(
             &mut CurrentMana,
             &SkillPower,
             Option<&Stealthed>,
+            &Speed,
         ),
         With<Player>,
     >,
@@ -190,6 +195,7 @@ pub fn handle_active_skill_event(
             mut current_mana,
             skill_power,
             stealthed_option,
+            speed,
         ) in players.iter_mut()
         {
             let Ok(mut class_slots) = skill_states.class_skill_slots.get_mut(player_e) else {
@@ -368,10 +374,9 @@ pub fn handle_active_skill_event(
                         );
                         // spawn fire ring projectile at cursor world position with player's attack as damage
                         let base_dmg: i32 = attack_opt.map(|a| a.0).unwrap_or(10);
-                        let dmg = (base_dmg as f32
-                            * power_mult
-                            * attack_damage_multiplier(FIRE_PILLAR))
-                            as i32;
+                        let dmg =
+                            (base_dmg as f32 * power_mult * attack_damage_multiplier(FIRE_PILLAR))
+                                as i32;
                         let pos = cursor.world_coords.truncate();
                         ranged_attack_events.send(RangedAttackEvent {
                             projectile: Projectile::FireRing,
@@ -402,10 +407,9 @@ pub fn handle_active_skill_event(
                             should_start_cooldown,
                         );
                         let base_dmg: i32 = attack_opt.map(|a| a.0).unwrap_or(10);
-                        let dmg = (base_dmg as f32
-                            * power_mult
-                            * attack_damage_multiplier(LASER_BEAM))
-                            as i32;
+                        let dmg =
+                            (base_dmg as f32 * power_mult * attack_damage_multiplier(LASER_BEAM))
+                                as i32;
                         let player_pos = player_txfm.translation().truncate();
                         let direction =
                             (cursor.world_coords.truncate() - player_pos).normalize_or_zero();
@@ -552,10 +556,9 @@ pub fn handle_active_skill_event(
                         );
                         // Placeholder: spawn ice explosion at cursor for now
                         let base_dmg: i32 = attack_opt.map(|a| a.0).unwrap_or(10);
-                        let dmg = (base_dmg as f32
-                            * power_mult
-                            * attack_damage_multiplier(ICE_WALL))
-                            as i32;
+                        let dmg =
+                            (base_dmg as f32 * power_mult * attack_damage_multiplier(ICE_WALL))
+                                as i32;
                         let pos = cursor.world_coords.truncate() + Vec2::new(0., 32.); // slight offset so it appears below cursor
 
                         ranged_attack_events.send(RangedAttackEvent {
@@ -618,8 +621,8 @@ pub fn handle_active_skill_event(
                         );
 
                         let base_dmg: i32 = attack_opt.map(|a| a.0).unwrap_or(10);
-                        let dmg = (base_dmg as f32 * power_mult * attack_damage_multiplier(SHOUT))
-                            as i32;
+                        let dmg =
+                            (base_dmg as f32 * power_mult * attack_damage_multiplier(SHOUT)) as i32;
 
                         ranged_attack_events.send(RangedAttackEvent {
                             projectile: Projectile::Shout,
@@ -782,10 +785,9 @@ pub fn handle_active_skill_event(
 
                         // Spawn lightning at each enemy (using IceExplosionAOE as placeholder)
                         let base_dmg: i32 = attack_opt.map(|a| a.0).unwrap_or(10);
-                        let dmg = (base_dmg as f32
-                            * power_mult
-                            * attack_damage_multiplier(LIGHTNING))
-                            as i32;
+                        let dmg =
+                            (base_dmg as f32 * power_mult * attack_damage_multiplier(LIGHTNING))
+                                as i32;
                         for (_, enemy_pos, _) in enemy_distances {
                             ranged_attack_events.send(RangedAttackEvent {
                                 projectile: Projectile::Lightning,
@@ -843,10 +845,9 @@ pub fn handle_active_skill_event(
                         // Throw 1 dagger at a random enemy, plus extra daggers based on kill count
                         let total_daggers = 1 + kill_count;
                         let base_dmg: i32 = attack_opt.map(|a| a.0).unwrap_or(10);
-                        let dmg = (base_dmg as f32
-                            * power_mult
-                            * attack_damage_multiplier(DAGGER_THROW))
-                            as i32;
+                        let dmg =
+                            (base_dmg as f32 * power_mult * attack_damage_multiplier(DAGGER_THROW))
+                                as i32;
                         let mut rng = rand::thread_rng();
 
                         for i in 0..total_daggers {
@@ -882,17 +883,20 @@ pub fn handle_active_skill_event(
                             should_start_cooldown,
                         );
 
-                        // Calculate direction to cursor (like dagger attack)
                         let player_pos = player_txfm.translation().truncate();
                         let cursor_pos = cursor.world_coords.truncate();
                         let direction = (cursor_pos - player_pos).normalize_or_zero();
 
-                        // Spawn sword projectile in front of player
                         let base_dmg: i32 = attack_opt.map(|a| a.0).unwrap_or(10);
-                        let dmg = (base_dmg as f32
-                            * power_mult
-                            * attack_damage_multiplier(DAGGER_SLASH))
-                            as i32;
+                        let dmg =
+                            (base_dmg as f32 * power_mult * attack_damage_multiplier(DAGGER_SLASH))
+                                as i32;
+
+                        let extra_slashes =
+                            (speed.0.max(0) / DAGGER_SLASH_SPEED_PER_EXTRA_SLASH) as u32;
+                        let total_slashes = DAGGER_SLASH_BASE_SLASHES + extra_slashes;
+
+                        // First slash fires immediately at the cast-time cursor direction.
                         ranged_attack_events.send(RangedAttackEvent {
                             projectile: Projectile::DaggerSlash,
                             direction,
@@ -905,6 +909,18 @@ pub fn handle_active_skill_event(
                             spawn_delay: 0.0,
                         });
                         commands.spawn(SoundSpawner::new(AudioSoundEffect::SwordSwing, 0.3));
+
+                        // Subsequent slashes are queued so each one re-aims at the
+                        // cursor's *current* position when its delay elapses.
+                        for i in 1..total_slashes {
+                            commands.spawn(PendingDaggerSlash {
+                                delay: Timer::from_seconds(
+                                    i as f32 * DAGGER_SLASH_HIT_INTERVAL,
+                                    TimerMode::Once,
+                                ),
+                                dmg,
+                            });
+                        }
                     }
                     ActiveSkill::TripleThrow => {
                         if !should_start_cooldown {
@@ -928,10 +944,9 @@ pub fn handle_active_skill_event(
                         // Throw 3 throwing stars in a cone (15 degree spread)
                         let spread_angle = 15.0_f32.to_radians();
                         let base_dmg: i32 = attack_opt.map(|a| a.0).unwrap_or(10);
-                        let dmg = (base_dmg as f32
-                            * power_mult
-                            * attack_damage_multiplier(TRIPLE_THROW))
-                            as i32;
+                        let dmg =
+                            (base_dmg as f32 * power_mult * attack_damage_multiplier(TRIPLE_THROW))
+                                as i32;
                         for i in 0..3 {
                             let angle_offset = (i as f32 - 1.0) * spread_angle;
                             let angle = base_angle + angle_offset;
@@ -990,8 +1005,8 @@ pub fn handle_active_skill_event(
 
                         // Spawn bomb projectile toward cursor position
                         let base_dmg: i32 = attack_opt.map(|a| a.0).unwrap_or(10);
-                        let dmg = (base_dmg as f32 * power_mult * attack_damage_multiplier(BOMB))
-                            as i32;
+                        let dmg =
+                            (base_dmg as f32 * power_mult * attack_damage_multiplier(BOMB)) as i32;
 
                         // Store the target position for later attachment to the bomb projectile
                         // We'll attach it after the projectile spawns
@@ -1037,10 +1052,9 @@ pub fn handle_active_skill_event(
                             .insert(PhasingThroughEnemies::new(0.45));
 
                         let base_dmg: i32 = attack_opt.map(|a| a.0).unwrap_or(10);
-                        let dmg = (base_dmg as f32
-                            * power_mult
-                            * attack_damage_multiplier(SPIN_ATTACK))
-                            as i32;
+                        let dmg =
+                            (base_dmg as f32 * power_mult * attack_damage_multiplier(SPIN_ATTACK))
+                                as i32;
                         commands
                             .entity(player_e)
                             .insert(PlayerAnimation::SpinAttack);
@@ -1083,10 +1097,9 @@ pub fn handle_active_skill_event(
 
                         let spread_angle = 15.0_f32.to_radians();
                         let base_dmg: i32 = attack_opt.map(|a| a.0).unwrap_or(10);
-                        let dmg = (base_dmg as f32
-                            * power_mult
-                            * attack_damage_multiplier(ARROW_VOLLEY))
-                            as i32;
+                        let dmg =
+                            (base_dmg as f32 * power_mult * attack_damage_multiplier(ARROW_VOLLEY))
+                                as i32;
 
                         for i in 0..3 {
                             let angle_offset = (i as f32 - 1.0) * spread_angle;
@@ -1576,10 +1589,7 @@ pub fn tick_arrow_volley(
 
         let spread_angle = 5.0_f32.to_radians();
         let base_dmg: i32 = attack.0;
-        let dmg = (base_dmg as f32
-            * power_mult
-            * attack_damage_multiplier(ARROW_VOLLEY))
-            as i32;
+        let dmg = (base_dmg as f32 * power_mult * attack_damage_multiplier(ARROW_VOLLEY)) as i32;
 
         for i in 0..3 {
             let angle_offset = (i as f32 - 1.0) * spread_angle;
@@ -1597,6 +1607,53 @@ pub fn tick_arrow_volley(
             });
         }
         commands.spawn(SoundSpawner::new(AudioSoundEffect::Bow, 0.3));
+    }
+}
+
+/// Queued follow-up DaggerSlash hit. Spawned as a transient entity per cast
+/// so each slash re-aims at the cursor when its delay elapses (rather than
+/// using the cast-time direction). `SparseSet` because these come and go
+/// in clusters of a few per cast.
+#[derive(Component)]
+#[component(storage = "SparseSet")]
+pub struct PendingDaggerSlash {
+    pub delay: Timer,
+    pub dmg: i32,
+}
+
+pub fn tick_pending_dagger_slashes(
+    mut commands: Commands,
+    time: Res<Time>,
+    mut pending: Query<(Entity, &mut PendingDaggerSlash)>,
+    player: Query<&GlobalTransform, With<Player>>,
+    cursor: Res<CursorPos>,
+    mut ranged_attack_events: EventWriter<RangedAttackEvent>,
+) {
+    for (e, mut p) in pending.iter_mut() {
+        p.delay.tick(time.delta());
+        if !p.delay.just_finished() {
+            continue;
+        }
+        let Ok(player_txfm) = player.get_single() else {
+            commands.entity(e).despawn();
+            continue;
+        };
+        let player_pos = player_txfm.translation().truncate();
+        let cursor_pos = cursor.world_coords.truncate();
+        let direction = (cursor_pos - player_pos).normalize_or_zero();
+        ranged_attack_events.send(RangedAttackEvent {
+            projectile: Projectile::DaggerSlash,
+            direction,
+            mana_cost: None,
+            from_enemy: false,
+            from_entity: None,
+            is_followup_proj: false,
+            dmg_override: Some(p.dmg),
+            pos_override: Some(Vec2::ZERO),
+            spawn_delay: 0.0,
+        });
+        commands.spawn(SoundSpawner::new(AudioSoundEffect::SwordSwing, 0.3));
+        commands.entity(e).despawn();
     }
 }
 
@@ -1942,11 +1999,7 @@ pub fn reduce_skill_cooldown_on_crit(
                     }
                     grant_skill_charge_after_cooldown_complete(player_e, skill, slots.as_mut());
                     remove_skill_state_after_slot_cooldown(&mut commands, player_e, skill);
-                    restart_charge_regen_if_below_max(
-                        Some(skills),
-                        blessings_ref,
-                        &mut slots.0[i],
-                    );
+                    restart_charge_regen_if_below_max(Some(skills), blessings_ref, &mut slots.0[i]);
                 }
             }
 

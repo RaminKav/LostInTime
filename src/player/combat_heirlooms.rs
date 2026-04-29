@@ -31,7 +31,7 @@ use crate::{
     GameParam,
 };
 
-const ANT_FARM_COOLDOWN: f32 = 2.2;
+const ANT_FARM_COOLDOWN: f32 = 1.5;
 const ANT_SPEED: f32 = 180.0;
 const ANT_CONTACT_DISTANCE: f32 = 8.0;
 const ANT_LIFETIME: f32 = 4.0;
@@ -40,7 +40,7 @@ const ANT_CHAIN_DELAY: f32 = 0.25;
 /// Time for one full orbit (rotation speed); faster = snappier feel.
 const STONE_TOOTH_ORBIT_PERIOD: f32 = 1.2;
 /// Delay between spawning the next batch.
-const STONE_TOOTH_SPAWN_INTERVAL: f32 = 4.5;
+const STONE_TOOTH_SPAWN_INTERVAL: f32 = 2.5;
 const STONE_TOOTH_ROCK_LIFETIME: f32 = 1.5;
 /// Distance rocks travel outward from the player over their lifetime.
 const STONE_TOOTH_TRAVEL_DISTANCE: f32 = 70.0;
@@ -48,14 +48,14 @@ const STONE_CONTACT_DISTANCE: f32 = 20.0;
 
 const REAPER_SOUL_SPEED: f32 = 220.0;
 const REAPER_SOUL_LIFETIME: f32 = 6.0;
-const REAPER_DAMAGE_PERCENT: f32 = 0.5;
+const REAPER_DAMAGE_PERCENT: f32 = 1.0;
 const REAPER_CONTACT_DISTANCE: f32 = 12.0;
 const REAPER_SOUL_MAX_SPAWN_RANGE: f32 = 320.0;
 const REAPER_SOUL_DRIFT_STRENGTH: f32 = 0.75;
 const REAPER_SOUL_DRIFT_FREQ: f32 = 10.5;
 
 /// Summon Ring: piercing ring that travels in a line and bounces off solid objects.
-const SUMMON_RING_COOLDOWN: f32 = 3.;
+const SUMMON_RING_COOLDOWN: f32 = 3.5;
 const SUMMON_RING_SPEED: f32 = 230.0;
 const SUMMON_RING_LIFETIME: f32 = 2.2;
 const SUMMON_RING_COLLIDER_RADIUS: f32 = 10.0;
@@ -257,7 +257,7 @@ fn calculate_summon_damage(
     frail_stacks: u8,
 ) -> (i32, bool, bool) {
     let (damage, was_crit, was_overcrit) =
-        game.calculate_player_damage(commands, target, 0, None, 0, None, frail_stacks);
+        game.calculate_player_damage(commands, target, 0, None, 0, None, frail_stacks, 0);
     (i32::max(1, damage as i32), was_crit, was_overcrit)
 }
 

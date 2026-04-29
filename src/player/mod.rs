@@ -275,6 +275,7 @@ impl Plugin for PlayerPlugin {
             .add_systems(
                 (
                     skill_heirlooms::tick_arrow_volley.run_if(is_not_paused),
+                    skill_heirlooms::tick_pending_dagger_slashes.run_if(is_not_paused),
                     skill_heirlooms::handle_fury_skill.run_if(is_not_paused),
                     skill_heirlooms::handle_attach_bomb_target.run_if(is_not_paused),
                     skill_heirlooms::handle_bomb_explosion.run_if(is_not_paused),
@@ -647,13 +648,13 @@ fn give_player_starting_items(
                     .unwrap_or(&WorldObject::RedMushroomBlock),
             );
         }
-        for _ in 0..run_state.pending_tomes {
-            upgrade_rewards.push(WorldObject::UpgradeTome);
-        }
+        // for _ in 0..run_state.pending_tomes {
+        //     upgrade_rewards.push(WorldObject::UpgradeTome);
+        // }
 
-        for _ in 0..run_state.pending_orbs {
-            upgrade_rewards.push(WorldObject::OrbOfTransformation);
-        }
+        // for _ in 0..run_state.pending_orbs {
+        //     upgrade_rewards.push(WorldObject::OrbOfTransformation);
+        // }
         upgrade_rewards.iter().for_each(|obj| {
             spawn_reward_drop(&mut proto_commands, &proto, player_pos, *obj, 1);
         });

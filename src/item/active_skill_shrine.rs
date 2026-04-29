@@ -34,6 +34,18 @@ pub struct ActiveSkillShrineState {
 pub fn roll_active_skill_shrine_offer_skills(
     player_skills: Option<&PlayerSkills>,
 ) -> Vec<ActiveSkill> {
+    refresh_active_skill_shrine_offer_skills(&[], player_skills)
+}
+
+/// Re-validate a cached shrine offer against the player's current active skills:
+/// drop any entries the player has acquired since the offer was rolled and top
+/// the result up to two distinct choices with fresh rolls. Used at interaction
+/// time so a previously rolled offer can't hand out duplicates of skills the
+/// player picked up between world-gen and visiting the shrine.
+pub fn refresh_active_skill_shrine_offer_skills(
+    cached_offer: &[ActiveSkill],
+    player_skills: Option<&PlayerSkills>,
+) -> Vec<ActiveSkill> {
     let mut rng = rand::thread_rng();
     let player_current_skills = player_skills
         .map(|skills| {
@@ -53,17 +65,26 @@ pub fn roll_active_skill_shrine_offer_skills(
         })
         .unwrap_or_default();
 
+    // Keep cached entries the player doesn't already own, dropping any
+    // duplicates that may have crept in.
+    let mut chosen_skills: Vec<ActiveSkill> = Vec::new();
+    for skill in cached_offer.iter().copied() {
+        if !player_current_skills.contains(&skill) && !chosen_skills.contains(&skill) {
+            chosen_skills.push(skill);
+        }
+    }
+
     let mut available_skills: Vec<ActiveSkill> = ActiveSkill::iter()
         .filter(|skill| {
             *skill != ActiveSkill::Parry
                 && *skill != ActiveSkill::Sprint
                 && *skill != ActiveSkill::LaserBeam
                 && !player_current_skills.contains(skill)
+                && !chosen_skills.contains(skill)
         })
         .collect();
 
-    let mut chosen_skills = Vec::new();
-    for _ in 0..2 {
+    while chosen_skills.len() < 2 {
         if available_skills.is_empty() {
             break;
         }

@@ -344,7 +344,11 @@ pub fn setup_unlocks_ui(
     let start_y = 86.5;
     let row_spacing = -27.0;
 
-    for (index, kind) in UNLOCK_ROWS.iter().enumerate() {
+    for (index, kind) in UNLOCK_ROWS
+        .iter()
+        .filter(|&&k| !k.is_disabled())
+        .enumerate()
+    {
         let y = start_y + row_spacing * index as f32;
         spawn_unlock_row(
             &mut commands,

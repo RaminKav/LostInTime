@@ -749,6 +749,8 @@ impl<'w, 's> GameParam<'w, 's> {
     /// Overcrit happens when crit chance > 100% and a second roll succeeds
     /// Overcrit does an additional 30% damage on top of crit damage
     /// frail_stacks: Number of frail stacks on target (each stack increases damage by 10%)
+    /// bonus_crit_damage: Extra crit damage % added on top of `crit_dmg` when the
+    /// hit crits (does not affect crit *chance*; non-crit damage is unaffected).
     pub fn calculate_player_damage(
         &self,
         commands: &mut Commands,
@@ -758,6 +760,7 @@ impl<'w, 's> GameParam<'w, 's> {
         dmg_bonus: u32,
         attack_override: Option<i32>,
         frail_stacks: u8,
+        bonus_crit_damage: i32,
     ) -> (u32, bool, bool) {
         let (attack, max_health, _, crit_chance, crit_dmg, bonus_dmg, combo_option, ..) =
             self.player_stats.single();
@@ -879,9 +882,10 @@ impl<'w, 's> GameParam<'w, 's> {
             if did_overcrit {
                 commands.entity(hit_entity).insert(WasHitWithOvercrit(true));
             }
-            // Base crit damage (includes overflow from crit chance > 200% at 1:1 ratio)
+            // Base crit damage (includes overflow from crit chance > 200% at 1:1 ratio
+            // and any per-skill bonus crit damage, e.g. ArrowVolley scaling with crit chance)
             let crit_multiplier =
-                f32::abs((crit_dmg.0 + crit_dmb_bonus + overflow_crit_damage) as f32) / 100.;
+                f32::abs((crit_dmg.0 + crit_dmb_bonus + overflow_crit_damage + bonus_crit_damage) as f32) / 100.;
             // Overcrit adds an extra 50% on top
             let overcrit_multiplier = if did_overcrit { 1.5 } else { 1.0 };
             (

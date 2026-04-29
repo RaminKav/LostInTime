@@ -123,16 +123,15 @@ impl SkillClass {
                 stats.mana_regen = AttributeValue::new((level as f32 * 0.5) as i32, quality, 1.);
             }
             SkillClass::Rogue => {
-                // +3% crit chance per level
-                stats.crit_chance = AttributeValue::new(level * 1, quality, 1.);
+                stats.speed = AttributeValue::new(level * 1, quality, 1.);
             }
             SkillClass::Thief => {
                 // +3% attack speed per level
-                stats.attack_speed = AttributeValue::new(level * 2, quality, 1.);
+                stats.attack_speed = AttributeValue::new(level * 1, quality, 1.);
             }
             SkillClass::Hunter => {
                 // +3% crit dmg per level
-                stats.crit_damage = AttributeValue::new(level * 1, quality, 1.);
+                stats.crit_chance = AttributeValue::new(level * 1, quality, 1.);
             }
             _ => (),
         }
@@ -184,7 +183,13 @@ pub mod active_skill_scaling {
     pub const PARRY_SPEAR: f32 = 95.0;
     pub const SPRINT_LUNGE: f32 = 85.0;
     pub const DAGGER_THROW: f32 = 115.0;
-    pub const DAGGER_SLASH: f32 = 175.0;
+    pub const DAGGER_SLASH: f32 = 60.0;
+    /// Base number of DaggerSlash hits per cast (before speed scaling).
+    pub const DAGGER_SLASH_BASE_SLASHES: u32 = 2;
+    /// Player Speed required to gain +1 extra DaggerSlash hit on cast.
+    pub const DAGGER_SLASH_SPEED_PER_EXTRA_SLASH: i32 = 35;
+    /// Delay (seconds) between successive DaggerSlash hits within a single cast.
+    pub const DAGGER_SLASH_HIT_INTERVAL: f32 = 0.25;
     /// Teleport shock deals one-third of attack (percent = 100/3 for display).
     pub const TELEPORT_SHOCK_ATTACK_PERCENT: f32 = 80.0;
     pub const LIGHTNING: f32 = 120.0;
@@ -230,7 +235,7 @@ impl ActiveSkill {
             // New skills - placeholder cooldowns
             ActiveSkill::Lightning => 5.0,
             ActiveSkill::DaggerThrow => 7.0,
-            ActiveSkill::DaggerSlash => 5.0,
+            ActiveSkill::DaggerSlash => 8.0,
             ActiveSkill::TripleThrow => 1.5,
             ActiveSkill::Fury => 13.0,
             ActiveSkill::Bomb => 5.5,
@@ -433,10 +438,11 @@ impl ActiveSkill {
                 "damage and stunning.".to_string(),
             ],
             ActiveSkill::ParrySpear => vec![
-                "".to_string(),
                 "Launch a spear that pulls nearby".to_string(),
                 "enemies towards the impact area".to_string(),
                 format!("and deals {:.1}% damage.", skill_power * PARRY_SPEAR),
+                "Costs 5% max HP. Pull radius".to_string(),
+                "scales with HP drained.".to_string(),
             ],
             ActiveSkill::Sprint => vec![
                 "You are imbued with a burst of speed.".to_string(),
@@ -459,10 +465,14 @@ impl ActiveSkill {
                 "per mob killed since the last cast.".to_string(),
             ],
             ActiveSkill::DaggerSlash => vec![
-                "Quickly slash in front of you,".to_string(),
                 format!(
-                    "dealing {:.1}% damage in an area.",
-                    skill_power * DAGGER_SLASH
+                    "Rapidly slash {} times,",
+                    active_skill_scaling::DAGGER_SLASH_BASE_SLASHES
+                ),
+                format!("each dealing {:.1}% damage.", skill_power * DAGGER_SLASH),
+                format!(
+                    "+1 slash per {} speed.",
+                    active_skill_scaling::DAGGER_SLASH_SPEED_PER_EXTRA_SLASH
                 ),
             ],
             ActiveSkill::Stealth => vec![
@@ -522,10 +532,9 @@ impl ActiveSkill {
                 "Concentrate deeply. Enemies around ".to_string(),
                 "you move 50% slower briefly. Gain".to_string(),
                 format!(
-                    "{:.1}% attack speed and unlimited",
+                    "{:.1}% attack speed",
                     skill_power * RAPIDFIRE_ATTACK_SPEED_BONUS_PERCENT
                 ),
-                "ammo for the duration.".to_string(),
             ],
             ActiveSkill::PiercingStar => vec![
                 "Throw a large, piercing throwing".to_string(),
@@ -553,6 +562,8 @@ impl ActiveSkill {
             ActiveSkill::ArrowVolley => vec![
                 "Send out waves of arrows,".to_string(),
                 format!("dealing 9x{:.1}% damage.", skill_power * ARROW_VOLLEY),
+                "Gains crit damage equal to".to_string(),
+                "your crit chance.".to_string(),
             ],
             ActiveSkill::PossessedBlade => vec![
                 "Throw a blade that returns back to".to_string(),

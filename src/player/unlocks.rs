@@ -98,6 +98,16 @@ impl UnlockUpgradeKind {
             UnlockUpgradeKind::StartingTools => "Starting Tools",
         }
     }
+    pub fn is_disabled(&self) -> bool {
+        match self {
+            UnlockUpgradeKind::Reroll => false,
+            UnlockUpgradeKind::Banish => false,
+            UnlockUpgradeKind::StartFood => false,
+            UnlockUpgradeKind::StartTome => true,
+            UnlockUpgradeKind::StartOrb => true,
+            UnlockUpgradeKind::StartingTools => false,
+        }
+    }
 }
 
 #[derive(Resource, Debug, Clone, Serialize, Deserialize, Default)]

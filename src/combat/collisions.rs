@@ -189,6 +189,7 @@ fn check_melee_hit_collisions(
                 0,
                 None,
                 frail_stacks,
+                0,
             );
 
             let is_status_effected = status_option
@@ -313,6 +314,16 @@ fn check_projectile_hit_mob_collisions(
             } else {
                 0
             };
+            // ArrowVolley: each arrow gains bonus crit damage equal to the player's
+            // current crit chance (e.g. 50% crit chance => +50% crit damage on volley arrows).
+            let bonus_crit_damage = if *proj == Projectile::ArrowVolleyShot {
+                game.player_stats
+                    .get_single()
+                    .map(|stats| stats.3 .0)
+                    .unwrap_or(0)
+            } else {
+                0
+            };
             let (mut damage, was_crit, was_overcrit) = game.calculate_player_damage(
                 &mut commands,
                 *e2,
@@ -321,6 +332,7 @@ fn check_projectile_hit_mob_collisions(
                 0,
                 Some(att.0),
                 frail_stacks,
+                bonus_crit_damage,
             );
             if is_status_effected && game.has_skill(Heirloom::TeleportStatusDMG) {
                 damage = f32::ceil(damage as f32 * 1.2) as u32;
@@ -520,6 +532,7 @@ fn check_multihit_projectile_ongoing_collisions(
                         0,
                         Some(att.0),
                         frail_stacks,
+                        0,
                     );
 
                     if is_status_effected && game.has_skill(Heirloom::TeleportStatusDMG) {
