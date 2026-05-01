@@ -247,7 +247,6 @@ impl Plugin for PlayerPlugin {
                         .after(handle_sprint_timer),
                     skill_heirlooms::handle_active_skill_event.run_if(is_not_paused),
                     skill_heirlooms::add_rapidfire_speed_to_bonus.run_if(is_not_paused),
-                    skill_heirlooms::remove_rapidfire_speed_from_bonus.run_if(is_not_paused),
                     skill_heirlooms::tick_stealth_and_buffs.run_if(is_not_paused),
                     skill_heirlooms::tick_class_skill_hit_clear_timers.run_if(is_not_paused),
                     skill_heirlooms::tick_class_skill_slots.run_if(is_not_paused),

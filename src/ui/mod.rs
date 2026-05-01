@@ -251,6 +251,7 @@ impl Plugin for UIPlugin {
             .init_resource::<MicrowaveShrineUsages>()
             .insert_resource(crate::keybinds::InputMappings::load())
             .init_resource::<CurrentNameInput>()
+            .init_resource::<ActiveSkillDragState>()
             .init_resource::<CursorBlinkTimer>()
             .insert_resource(FloatingTextQueue::new(0.8))
             .insert_resource(TooltipsManager {
@@ -593,6 +594,9 @@ impl Plugin for UIPlugin {
                     player_hud::handle_consumable_buff_hud_tooltip,
                     player_hud::handle_active_skill_hud_tooltip,
                     player_hud::update_skill_tooltip_cooldown.after(player_hud::handle_active_skill_hud_tooltip),
+                    player_hud::handle_active_skill_slot_drag_drop
+                        .after(player_hud::handle_active_skill_hud_tooltip)
+                        .after(crate::cursor::update_cursor_pos),
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
@@ -604,6 +608,10 @@ impl Plugin for UIPlugin {
             )
             .add_system(
                 player_hud::hide_xp_bar_in_game_over.in_set(OnUpdate(GameState::GameOver)),
+            )
+            .add_system(
+                player_hud::cancel_active_skill_drag_on_state_exit
+                    .in_schedule(OnExit(GameState::Main)),
             )
             .add_system(
                 update_active_skill_keybind_text

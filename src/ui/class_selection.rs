@@ -438,8 +438,7 @@ pub fn setup_class_selection_ui(
         let pet_unlocked = achievements_ref
             .map(|a| is_pet_unlocked(&pet, a))
             .unwrap_or(false);
-        let pet_selected =
-            pet_unlocked && default_pet.as_ref().is_some_and(|d| *d == pet);
+        let pet_selected = pet_unlocked && default_pet.as_ref().is_some_and(|d| *d == pet);
 
         // Pet option background
         let x_offset = (i as f32 - 1.0) * 29.0 + 149.; // Center the options
@@ -1534,6 +1533,11 @@ fn spawn_player_preview(
             None,
             skill_container,
             1.,
+            100,
+            100,
+            0.6,
+            10,
+            0,
         );
     }
 

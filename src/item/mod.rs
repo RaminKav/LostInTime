@@ -459,6 +459,7 @@ pub enum WorldObject {
     Essence,
     Key,
     MiracleSeed,
+    BoulderHeirloom,
 
     // Saplings
     RedSaplingBlock,

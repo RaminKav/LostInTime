@@ -19,7 +19,7 @@
                 "Fire Staff"
             ],
             stat_description: [
-                "Gain +0.5 Mana Regen per level" // 10
+                "Gain +3 Max Mana per level" // 8
             ],
             class_icon: BluePlayerSelectIcon,
             skill_icon: ManaIcon,

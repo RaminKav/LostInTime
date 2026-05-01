@@ -23,7 +23,10 @@ use crate::{
     },
     player::{
         mage_skills::spawn_ice_explosion_hitbox,
-        skills::active_skill_scaling::{attack_damage_multiplier, PARRY_SPEAR},
+        skills::{
+            active_skill_scaling::{attack_damage_multiplier, PARRY_SPEAR},
+            parry_spear_hp_drained, parry_spear_pull_radius_px,
+        },
     },
     status_effects::MobStatusEffects,
     ui::damage_numbers::{spawn_floating_text_with_shadow, PreviousHealth},
@@ -247,13 +250,6 @@ pub struct SpearPullDelay {
     pub pull_radius: f32,
 }
 
-/// Base ParrySpear pull radius (px) before HP-drain scaling.
-pub const PARRY_SPEAR_BASE_PULL_RADIUS: f32 = 64.0;
-/// Pull-radius (px) gained per 1 HP drained on cast.
-pub const PARRY_SPEAR_PULL_RADIUS_PER_HP: f32 = 4.0;
-/// Fraction of max HP drained on ParrySpear cast.
-pub const PARRY_SPEAR_HP_COST_FRACTION: f32 = 0.05;
-
 /// Brief knockback/stun state applied to a mob that just got parried.
 /// Removed as soon as its timer elapses (a few hundred ms) — `SparseSet` so
 /// parrying does not move the mob between archetypes on every parry.
@@ -350,14 +346,11 @@ pub fn handle_spear(
         let direction = (cursor_pos.world_coords.truncate() - player_pos_2d).normalize_or_zero();
         let epicenter = player_pos_2d + direction * 1.7 * TILE_SIZE.x;
 
-        // Drain 5% of max HP and scale the pull radius with however much was drained.
-        let hp_drained =
-            ((max_health.0 as f32) * PARRY_SPEAR_HP_COST_FRACTION).max(0.0) as i32;
+        let hp_drained = parry_spear_hp_drained(max_health.0);
         if hp_drained > 0 {
             modify_health_event.send(ModifyHealthEvent(-hp_drained));
         }
-        let pull_radius = PARRY_SPEAR_BASE_PULL_RADIUS
-            + PARRY_SPEAR_PULL_RADIUS_PER_HP * hp_drained as f32;
+        let pull_radius = parry_spear_pull_radius_px(max_health.0);
 
         commands.entity(e).insert(SpearPullDelay {
             delay_timer: Timer::from_seconds(0.45, TimerMode::Once),

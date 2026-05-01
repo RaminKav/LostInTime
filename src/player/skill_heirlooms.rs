@@ -35,13 +35,16 @@ use crate::{
         rogue_skills::{LungeState, SprintState},
         skills::{
             active_skill_scaling::{
-                attack_damage_multiplier, ARROW_VOLLEY, BOMB, BUCKSHOT_PELLET, DAGGER_SLASH,
-                DAGGER_SLASH_BASE_SLASHES, DAGGER_SLASH_HIT_INTERVAL,
-                DAGGER_SLASH_SPEED_PER_EXTRA_SLASH, DAGGER_THROW, FIRE_PILLAR, FURY,
+                attack_damage_multiplier, dagger_slash_hit_interval_seconds,
+                dagger_slash_total_slashes, ARROW_VOLLEY, BOMB, BUCKSHOT_PELLET, DAGGER_SLASH,
+                DAGGER_THROW, FIRE_PILLAR, FURY,
                 HEAL_MAX_HEALTH_PERCENT, ICE_WALL, LASER_BEAM, LIGHTNING, PIERCING_STAR,
                 POSSESSED_BLADE, RAPIDFIRE_ATTACK_SPEED_BONUS_PERCENT, SHOUT, SPIN_ATTACK,
                 TRIPLE_THROW,
             },
+            arrow_volley_scaling,
+            FURY_ATTACK_SPEED_REFERENCE_COOLDOWN_SECS, FURY_DURATION_SECS,
+            FURY_THROW_TIMER_EFFECTIVE_SECS,
             grant_skill_charge_after_cooldown_complete, ActiveSkill, ActiveSkillUsedEvent,
             ArrowVolleyState, BombState, BuckshotSkillState, ClassSkillSlots,
             DaggerThrowKillTracker, DaggerThrowState, DruidTreeSkillState, FirePillarState,
@@ -166,6 +169,7 @@ pub fn handle_active_skill_event(
             &SkillPower,
             Option<&Stealthed>,
             &Speed,
+            &mut BonusAttackSpeed,
         ),
         With<Player>,
     >,
@@ -196,6 +200,7 @@ pub fn handle_active_skill_event(
             skill_power,
             stealthed_option,
             speed,
+            mut bonus_attack_speed,
         ) in players.iter_mut()
         {
             let Ok(mut class_slots) = skill_states.class_skill_slots.get_mut(player_e) else {
@@ -321,13 +326,14 @@ pub fn handle_active_skill_event(
                         commands.spawn(SoundSpawner::new(AudioSoundEffect::GainExp, 0.12));
                     }
                     ActiveSkill::Rapidfire => {
-                        if !should_start_cooldown {
-                            if rapid_state.is_some() {
-                                commands.entity(player_e).remove::<RapidfireState>();
+                        if let Some(existing) = rapid_state {
+                            if !existing.duration.finished() {
+                                bonus_attack_speed.remove_multiplier(existing.attack_speed_bonus);
+                                attribute_change.send_default();
                             }
+                            commands.entity(player_e).remove::<RapidfireState>();
                         }
                         let dur = Timer::from_seconds(3.0, TimerMode::Once);
-                        info!("dur: {:?}", dur);
                         commands.entity(player_e).insert(RapidfireState {
                             duration: dur,
                             attack_speed_bonus: attack_damage_multiplier(
@@ -892,9 +898,8 @@ pub fn handle_active_skill_event(
                             (base_dmg as f32 * power_mult * attack_damage_multiplier(DAGGER_SLASH))
                                 as i32;
 
-                        let extra_slashes =
-                            (speed.0.max(0) / DAGGER_SLASH_SPEED_PER_EXTRA_SLASH) as u32;
-                        let total_slashes = DAGGER_SLASH_BASE_SLASHES + extra_slashes;
+                        let total_slashes = dagger_slash_total_slashes(speed.0);
+                        let hit_interval = dagger_slash_hit_interval_seconds(speed.0);
 
                         // First slash fires immediately at the cast-time cursor direction.
                         ranged_attack_events.send(RangedAttackEvent {
@@ -915,7 +920,7 @@ pub fn handle_active_skill_event(
                         for i in 1..total_slashes {
                             commands.spawn(PendingDaggerSlash {
                                 delay: Timer::from_seconds(
-                                    i as f32 * DAGGER_SLASH_HIT_INTERVAL,
+                                    i as f32 * hit_interval,
                                     TimerMode::Once,
                                 ),
                                 dmg,
@@ -973,8 +978,11 @@ pub fn handle_active_skill_event(
                             }
                         }
                         commands.entity(player_e).insert(FuryState {
-                            duration: Timer::from_seconds(2.5, TimerMode::Once),
-                            throw_timer: Timer::from_seconds(0.3, TimerMode::Repeating),
+                            duration: Timer::from_seconds(FURY_DURATION_SECS, TimerMode::Once),
+                            throw_timer: Timer::from_seconds(
+                                FURY_THROW_TIMER_EFFECTIVE_SECS,
+                                TimerMode::Repeating,
+                            ),
                         });
                         start_slot_cooldown_for_cast(
                             &mut class_slots,
@@ -1080,8 +1088,11 @@ pub fn handle_active_skill_event(
                             }
                         }
                         commands.entity(player_e).insert(ArrowVolleyState {
-                            waves_remaining: 2,
-                            wave_timer: Timer::from_seconds(0.4, TimerMode::Repeating),
+                            waves_remaining: arrow_volley_scaling::WAVE_COUNT - 1,
+                            wave_timer: Timer::from_seconds(
+                                arrow_volley_scaling::WAVE_INTERVAL_SECS,
+                                TimerMode::Repeating,
+                            ),
                         });
                         start_slot_cooldown_for_cast(
                             &mut class_slots,
@@ -1095,13 +1106,14 @@ pub fn handle_active_skill_event(
                         let base_direction = (cursor_pos - player_pos).normalize_or_zero();
                         let base_angle = base_direction.y.atan2(base_direction.x);
 
-                        let spread_angle = 15.0_f32.to_radians();
+                        let spread_angle =
+                            arrow_volley_scaling::FIRST_WAVE_SPREAD_DEG.to_radians();
                         let base_dmg: i32 = attack_opt.map(|a| a.0).unwrap_or(10);
                         let dmg =
                             (base_dmg as f32 * power_mult * attack_damage_multiplier(ARROW_VOLLEY))
                                 as i32;
 
-                        for i in 0..3 {
+                        for i in 0..arrow_volley_scaling::ARROWS_PER_WAVE {
                             let angle_offset = (i as f32 - 1.0) * spread_angle;
                             let direction = Vec2::from_angle(base_angle + angle_offset);
                             ranged_attack_events.send(RangedAttackEvent {
@@ -1389,10 +1401,9 @@ pub fn tick_fury_duration_and_throw(
     for mut f in fury.iter_mut() {
         f.duration.tick(time.delta());
         let attack_speed_mult = if let Ok(cooldown) = attack_cooldown.get_single() {
-            let reference_base_cooldown = 0.6;
-            let denom = 2. * cooldown.0 - reference_base_cooldown;
+            let denom = 2. * cooldown.0 - FURY_ATTACK_SPEED_REFERENCE_COOLDOWN_SECS;
             let raw = if denom > 0.001 {
-                reference_base_cooldown / denom
+                FURY_ATTACK_SPEED_REFERENCE_COOLDOWN_SECS / denom
             } else {
                 10.0
             };
@@ -1587,11 +1598,11 @@ pub fn tick_arrow_volley(
         let base_direction = (cursor_pos - player_pos).normalize_or_zero();
         let base_angle = base_direction.y.atan2(base_direction.x);
 
-        let spread_angle = 5.0_f32.to_radians();
+        let spread_angle = arrow_volley_scaling::FOLLOWUP_WAVE_SPREAD_DEG.to_radians();
         let base_dmg: i32 = attack.0;
         let dmg = (base_dmg as f32 * power_mult * attack_damage_multiplier(ARROW_VOLLEY)) as i32;
 
-        for i in 0..3 {
+        for i in 0..arrow_volley_scaling::ARROWS_PER_WAVE {
             let angle_offset = (i as f32 - 1.0) * spread_angle;
             let direction = Vec2::from_angle(base_angle + angle_offset);
             ranged_attack_events.send(RangedAttackEvent {
@@ -1927,22 +1938,6 @@ pub fn add_rapidfire_speed_to_bonus(
         if let Ok(mut bonus_speed) = player_query.get_single_mut() {
             bonus_speed.add_multiplier(buff.attack_speed_bonus);
             attribute_event.send_default();
-        }
-    }
-}
-
-pub fn remove_rapidfire_speed_from_bonus(
-    mut removed_rapidfire: RemovedComponents<RapidfireState>,
-    mut player_query: Query<&mut BonusAttackSpeed, With<Player>>,
-    rapidfire_query: Query<&RapidfireState>,
-    mut attribute_event: EventWriter<crate::attributes::AttributeChangeEvent>,
-) {
-    for entity in removed_rapidfire.iter() {
-        if let Ok(buff) = rapidfire_query.get(entity) {
-            if let Ok(mut bonus_speed) = player_query.get_single_mut() {
-                bonus_speed.remove_multiplier(buff.attack_speed_bonus);
-                attribute_event.send_default();
-            }
         }
     }
 }

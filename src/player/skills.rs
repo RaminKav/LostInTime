@@ -120,7 +120,7 @@ impl SkillClass {
             }
             SkillClass::Wizard => {
                 // +5 MP per level
-                stats.mana_regen = AttributeValue::new((level as f32 * 0.5) as i32, quality, 1.);
+                stats.mana = AttributeValue::new(level * 3, quality, 1.);
             }
             SkillClass::Rogue => {
                 stats.speed = AttributeValue::new(level * 1, quality, 1.);
@@ -188,8 +188,31 @@ pub mod active_skill_scaling {
     pub const DAGGER_SLASH_BASE_SLASHES: u32 = 2;
     /// Player Speed required to gain +1 extra DaggerSlash hit on cast.
     pub const DAGGER_SLASH_SPEED_PER_EXTRA_SLASH: i32 = 35;
-    /// Delay (seconds) between successive DaggerSlash hits within a single cast.
-    pub const DAGGER_SLASH_HIT_INTERVAL: f32 = 0.25;
+    /// Delay (seconds) between successive DaggerSlash hits at 0 bonus cadence.
+    pub const DAGGER_SLASH_HIT_INTERVAL: f32 = 0.33;
+    /// Each +`this` movement Speed adds +100% slash cadence (shorter gaps), capped below.
+    pub const DAGGER_SLASH_CADENCE_SPEED_DIV: f32 = 100.0;
+    /// Max cadence multiplier from speed (`hit_interval = base / mult`).
+    pub const DAGGER_SLASH_CADENCE_MULT_MAX: f32 = 2.5;
+
+    /// Extra DaggerSlash hits from movement [`crate::attributes::Speed`].
+    #[inline]
+    pub fn dagger_slash_extra_slashes_from_speed(speed: i32) -> u32 {
+        (speed.max(0) / DAGGER_SLASH_SPEED_PER_EXTRA_SLASH) as u32
+    }
+
+    #[inline]
+    pub fn dagger_slash_total_slashes(speed: i32) -> u32 {
+        DAGGER_SLASH_BASE_SLASHES + dagger_slash_extra_slashes_from_speed(speed)
+    }
+
+    /// Seconds between follow-up DaggerSlash spawns; shrinks as Speed rises.
+    #[inline]
+    pub fn dagger_slash_hit_interval_seconds(speed: i32) -> f32 {
+        let mult = (1.0 + speed.max(0) as f32 / DAGGER_SLASH_CADENCE_SPEED_DIV)
+            .min(DAGGER_SLASH_CADENCE_MULT_MAX);
+        DAGGER_SLASH_HIT_INTERVAL / mult
+    }
     /// Teleport shock deals one-third of attack (percent = 100/3 for display).
     pub const TELEPORT_SHOCK_ATTACK_PERCENT: f32 = 80.0;
     pub const LIGHTNING: f32 = 120.0;
@@ -210,6 +233,74 @@ pub mod active_skill_scaling {
     pub fn attack_damage_multiplier(percent_of_attack: f32) -> f32 {
         percent_of_attack * 0.01
     }
+}
+
+/// Ground flame from [ActiveSkill::FirePillar]: base duration before max-mana scaling.
+pub const FIRE_RING_BASE_DURATION_SECS: f32 = 2.0;
+/// Max mana at or below this value gives no duration bonus (only the base).
+pub const FIRE_RING_MANA_BASELINE: f32 = 100.0;
+/// Extra seconds per 10 max mana above [`FIRE_RING_MANA_BASELINE`].
+pub const FIRE_RING_EXTRA_SECS_PER_10_MAX_MANA: f32 = 0.1;
+
+/// Duration (seconds) the Fire Pillar fire ring stays active; scales with [`crate::attributes::MaxMana`].
+pub fn fire_ring_duration_seconds(max_mana: i32) -> f32 {
+    let excess = (max_mana as f32 - FIRE_RING_MANA_BASELINE).max(0.0);
+    FIRE_RING_BASE_DURATION_SECS + (excess / 10.0) * FIRE_RING_EXTRA_SECS_PER_10_MAX_MANA
+}
+
+// --- ParrySpear (pull + HP cost; gameplay in `melee_skills::handle_spear`) ---
+
+pub mod parry_spear_scaling {
+    pub const BASE_PULL_RADIUS_PX: f32 = 64.0;
+    pub const PULL_RADIUS_PER_HP_DRAINED_PX: f32 = 4.0;
+    pub const HP_COST_FRACTION: f32 = 0.05;
+}
+
+pub fn parry_spear_hp_drained(max_health: i32) -> i32 {
+    ((max_health as f32) * parry_spear_scaling::HP_COST_FRACTION).max(0.0) as i32
+}
+
+pub fn parry_spear_pull_radius_px(max_health: i32) -> f32 {
+    let hp = parry_spear_hp_drained(max_health);
+    parry_spear_scaling::BASE_PULL_RADIUS_PX
+        + parry_spear_scaling::PULL_RADIUS_PER_HP_DRAINED_PX * hp as f32
+}
+
+// --- Arrow Volley (waves / timing; crit bonus in `combat/collisions`) ---
+
+pub mod arrow_volley_scaling {
+    pub const WAVE_COUNT: u32 = 3;
+    pub const ARROWS_PER_WAVE: u32 = 3;
+    pub const WAVE_INTERVAL_SECS: f32 = 0.4;
+    pub const FIRST_WAVE_SPREAD_DEG: f32 = 15.0;
+    pub const FOLLOWUP_WAVE_SPREAD_DEG: f32 = 15.0;
+}
+
+pub fn arrow_volley_total_arrows() -> u32 {
+    arrow_volley_scaling::WAVE_COUNT * arrow_volley_scaling::ARROWS_PER_WAVE
+}
+
+// --- Fury (throw cadence vs `AttackCooldown`; `skill_heirlooms::tick_fury_duration_and_throw`) ---
+
+pub const FURY_DURATION_SECS: f32 = 2.5;
+pub const FURY_THROW_TIMER_EFFECTIVE_SECS: f32 = 0.3;
+pub const FURY_ATTACK_SPEED_REFERENCE_COOLDOWN_SECS: f32 = 0.6;
+
+pub fn fury_throw_speed_multiplier(attack_cooldown_secs: f32) -> f32 {
+    let denom = 2. * attack_cooldown_secs - FURY_ATTACK_SPEED_REFERENCE_COOLDOWN_SECS;
+    if denom > 0.001 {
+        (FURY_ATTACK_SPEED_REFERENCE_COOLDOWN_SECS / denom).clamp(0.1, 10.0)
+    } else {
+        10.0
+    }
+}
+
+/// Approximate kunai spawned over one Fury (duration matches [`FURY_DURATION_SECS`]).
+pub fn fury_estimated_kunai_per_cast(attack_cooldown_secs: f32) -> f32 {
+    let m = fury_throw_speed_multiplier(attack_cooldown_secs);
+    (m * FURY_DURATION_SECS / FURY_THROW_TIMER_EFFECTIVE_SECS)
+        .floor()
+        .max(1.)
 }
 
 impl ActiveSkill {
@@ -400,12 +491,21 @@ impl ActiveSkill {
         }
     }
 
-    pub fn get_desc(&self, skill_power: f32) -> Vec<String> {
+    pub fn get_desc(
+        &self,
+        skill_power: f32,
+        max_mana: i32,
+        max_health: i32,
+        attack_cooldown_secs: f32,
+        crit_chance: i32,
+        speed: i32,
+    ) -> Vec<String> {
         use active_skill_scaling::{
-            ARROW_VOLLEY, BOMB, BUCKSHOT_PELLET, DAGGER_SLASH, DAGGER_THROW, FIRE_PILLAR, FURY,
-            HEAL_MAX_HEALTH_PERCENT, ICE_WALL, LASER_BEAM, LIGHTNING, PARRY_SPEAR, PIERCING_STAR,
-            POSSESSED_BLADE, RAPIDFIRE_ATTACK_SPEED_BONUS_PERCENT, SHOUT, SPIN_ATTACK,
-            SPRINT_LUNGE, TELEPORT_SHOCK_ATTACK_PERCENT, TRIPLE_THROW,
+            dagger_slash_total_slashes, ARROW_VOLLEY, BOMB, BUCKSHOT_PELLET, DAGGER_SLASH,
+            DAGGER_THROW, FIRE_PILLAR, FURY, HEAL_MAX_HEALTH_PERCENT, ICE_WALL, LASER_BEAM,
+            LIGHTNING, PARRY_SPEAR, PIERCING_STAR, POSSESSED_BLADE,
+            RAPIDFIRE_ATTACK_SPEED_BONUS_PERCENT, SHOUT, SPIN_ATTACK, SPRINT_LUNGE,
+            TELEPORT_SHOCK_ATTACK_PERCENT, TRIPLE_THROW,
         };
 
         match self {
@@ -437,13 +537,21 @@ impl ActiveSkill {
                 "to Parry attacks ignore".to_string(),
                 "damage and stunning.".to_string(),
             ],
-            ActiveSkill::ParrySpear => vec![
-                "Launch a spear that pulls nearby".to_string(),
-                "enemies towards the impact area".to_string(),
-                format!("and deals {:.1}% damage.", skill_power * PARRY_SPEAR),
-                "Costs 5% max HP. Pull radius".to_string(),
-                "scales with HP drained.".to_string(),
-            ],
+            ActiveSkill::ParrySpear => {
+                let pull_px = parry_spear_pull_radius_px(max_health);
+                vec![
+                    "Launch a spear that drains 5% hp".to_string(),
+                    format!(
+                        "to pull enemies from {} tiles towards",
+                        (pull_px / 16.).round()
+                    ),
+                    format!(
+                        "the impact area, dealing {:.1}% damage.",
+                        skill_power * PARRY_SPEAR
+                    ),
+                    "Pull distance scales with hp drained.".to_string(),
+                ]
+            }
             ActiveSkill::Sprint => vec![
                 "You are imbued with a burst of speed.".to_string(),
                 "Gain 60% speed temporarily.".to_string(),
@@ -464,17 +572,14 @@ impl ActiveSkill {
                 ),
                 "per mob killed since the last cast.".to_string(),
             ],
-            ActiveSkill::DaggerSlash => vec![
-                format!(
-                    "Rapidly slash {} times,",
-                    active_skill_scaling::DAGGER_SLASH_BASE_SLASHES
-                ),
-                format!("each dealing {:.1}% damage.", skill_power * DAGGER_SLASH),
-                format!(
-                    "+1 slash per {} speed.",
-                    active_skill_scaling::DAGGER_SLASH_SPEED_PER_EXTRA_SLASH
-                ),
-            ],
+            ActiveSkill::DaggerSlash => {
+                let slashes = dagger_slash_total_slashes(speed);
+                vec![
+                    format!("Rapidly slash {} times, each", slashes),
+                    format!("dealing {:.1}% damage. Number", skill_power * DAGGER_SLASH),
+                    "slashes scales with speed.".to_string(),
+                ]
+            }
             ActiveSkill::Stealth => vec![
                 "Dissapear for a short duration".to_string(),
                 "Attacks used during Stealth will".to_string(),
@@ -496,12 +601,14 @@ impl ActiveSkill {
                 ),
             ],
             ActiveSkill::FirePillar => {
+                let ring_secs = fire_ring_duration_seconds(max_mana);
                 vec![
                     "Scorch the earth at target area,".to_string(),
                     format!(
-                        "dealing {:.1}% damage continuously.",
+                        "dealing {:.1}% damage continuously",
                         skill_power * FIRE_PILLAR
                     ),
+                    format!("for {:.1}s (scales with max mana).", ring_secs),
                 ]
             }
             ActiveSkill::IceWall => {
@@ -546,12 +653,15 @@ impl ActiveSkill {
                 "in a cone shape in front, dealing".to_string(),
                 format!("{:.1}% damage each.", skill_power * TRIPLE_THROW),
             ],
-            ActiveSkill::Fury => vec![
-                "Enter fury for a short duration,".to_string(),
-                "throwing kunai rapidly at enemies".to_string(),
-                format!("around you, dealing {:.1}% damage.", skill_power * FURY),
-                "Kunai count scales with attack speed.".to_string(),
-            ],
+            ActiveSkill::Fury => {
+                let kunai_n = fury_estimated_kunai_per_cast(attack_cooldown_secs);
+                vec![
+                    "Enter fury for a short duration,".to_string(),
+                    format!("throwing {:.0} kunai rapidly at enemies", kunai_n),
+                    format!("around you, dealing {:.1}% damage.", skill_power * FURY),
+                    "Kunai count scales with attack speed.".to_string(),
+                ]
+            }
             ActiveSkill::LaserBeam => vec![
                 "Channel a powerful laser beam that deals".to_string(),
                 format!(
@@ -559,12 +669,20 @@ impl ActiveSkill {
                     skill_power * LASER_BEAM
                 ),
             ],
-            ActiveSkill::ArrowVolley => vec![
-                "Send out waves of arrows,".to_string(),
-                format!("dealing 9x{:.1}% damage.", skill_power * ARROW_VOLLEY),
-                "Gains crit damage equal to".to_string(),
-                "your crit chance.".to_string(),
-            ],
+            ActiveSkill::ArrowVolley => {
+                let total = arrow_volley_total_arrows();
+                vec![
+                    "Send out waves of arrows,".to_string(),
+                    format!(
+                        "dealing {}x {:.1}% damage. Gains +{}%",
+                        total,
+                        skill_power * ARROW_VOLLEY,
+                        crit_chance
+                    ),
+                    "bonus crit dmg per arrow, scaling".to_string(),
+                    "with crit chance.".to_string(),
+                ]
+            }
             ActiveSkill::PossessedBlade => vec![
                 "Throw a blade that returns back to".to_string(),
                 format!(

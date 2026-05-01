@@ -40,11 +40,11 @@ const ANT_CHAIN_DELAY: f32 = 0.25;
 /// Time for one full orbit (rotation speed); faster = snappier feel.
 const STONE_TOOTH_ORBIT_PERIOD: f32 = 1.2;
 /// Delay between spawning the next batch.
-const STONE_TOOTH_SPAWN_INTERVAL: f32 = 2.5;
+const STONE_TOOTH_SPAWN_INTERVAL: f32 = 2.8;
 const STONE_TOOTH_ROCK_LIFETIME: f32 = 1.5;
 /// Distance rocks travel outward from the player over their lifetime.
 const STONE_TOOTH_TRAVEL_DISTANCE: f32 = 70.0;
-const STONE_CONTACT_DISTANCE: f32 = 20.0;
+const STONE_CONTACT_DISTANCE: f32 = 28.0;
 
 const REAPER_SOUL_SPEED: f32 = 220.0;
 const REAPER_SOUL_LIFETIME: f32 = 6.0;
@@ -353,33 +353,36 @@ pub fn spawn_stone_tooth_rocks(
         };
         // Rocks start at player and expand outward (offset applied in update_stone_tooth).
         let offset = Vec2::ZERO;
-        let mut sprite = graphics.get_heirloom_icon(Heirloom::StoneTooth);
-        let base_icon = sprite.custom_size.unwrap_or(Vec2::splat(16.0));
-        sprite.custom_size = Some(base_icon * size_multiplier);
-        let transform =
-            Transform::from_translation(player_pos + Vec3::new(offset.x, offset.y, 0.25));
-        commands.spawn((
-            SpriteSheetBundle {
-                texture_atlas: texture_atlas.clone(),
-                sprite,
-                transform,
-                ..default()
-            },
-            OrbitingStone {
-                owner: player_e,
-                base_angle,
-                active: true,
-                size_multiplier,
-            },
-            StoneToothRockLifetime {
-                lifetime: Timer::from_seconds(STONE_TOOTH_ROCK_LIFETIME, TimerMode::Once),
-                hit_entities: HashSet::new(),
-            },
-            AnimVisualCategory::Heirloom,
-            YSort(-0.1),
-            Name::new("StoneToothRock"),
-        ));
-        spawned += 1;
+        if let Some(sprite_sheet) = &graphics.spritesheet_map {
+            if let Some(sprite) = sprite_sheet.get(&WorldObject::BoulderHeirloom) {
+                let mut scaled_sprite = sprite.clone();
+                scaled_sprite.custom_size = Some(Vec2::splat(32.0) * size_multiplier);
+                let transform =
+                    Transform::from_translation(player_pos + Vec3::new(offset.x, offset.y, 0.25));
+                commands.spawn((
+                    SpriteSheetBundle {
+                        texture_atlas: texture_atlas.clone(),
+                        sprite: scaled_sprite.clone(),
+                        transform,
+                        ..default()
+                    },
+                    OrbitingStone {
+                        owner: player_e,
+                        base_angle,
+                        active: true,
+                        size_multiplier,
+                    },
+                    StoneToothRockLifetime {
+                        lifetime: Timer::from_seconds(STONE_TOOTH_ROCK_LIFETIME, TimerMode::Once),
+                        hit_entities: HashSet::new(),
+                    },
+                    AnimVisualCategory::Heirloom,
+                    YSort(-0.1),
+                    Name::new("StoneToothRock"),
+                ));
+                spawned += 1;
+            }
+        }
     }
     spawned
 }
@@ -951,7 +954,7 @@ pub fn update_stone_tooth(
         let elapsed = lifetime.lifetime.elapsed().as_secs_f32();
         let angle = stone.base_angle + (elapsed / STONE_TOOTH_ORBIT_PERIOD) * TAU;
         // Expand outward from player over lifetime (0 -> STONE_TOOTH_TRAVEL_DISTANCE).
-        let radius = (elapsed / STONE_TOOTH_ROCK_LIFETIME) * STONE_TOOTH_TRAVEL_DISTANCE;
+        let radius = (elapsed / STONE_TOOTH_ROCK_LIFETIME) * STONE_TOOTH_TRAVEL_DISTANCE + 24.;
         let offset = Vec2::from_angle(angle) * radius;
         transform.translation = Vec3::new(
             player_xy.x + offset.x,

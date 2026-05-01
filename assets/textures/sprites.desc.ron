@@ -1214,6 +1214,11 @@
             size: (32., 32.),
             anchor: None,
         ),
+        BoulderHeirloom: WorldObjectData(
+            texture_pos: (0., 16.),
+            size: (32., 32.),
+            anchor: None,
+        ),
 
         //snow
         SnowSmlBoulder1: WorldObjectData(

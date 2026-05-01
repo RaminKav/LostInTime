@@ -5,7 +5,7 @@ use std::collections::HashMap;
 
 use super::{
     damage_numbers::spawn_text,
-    interactions::Interaction,
+    interactions::{DraggedItem, Interaction},
     spawn_heirloom_tooltip_card, spawn_inv_slot, spawn_item_stack_icon,
     tooltips::spawn_world_item_tooltip_for_stack,
     tooltips::ConsumableBuffHudTooltip,
@@ -20,7 +20,8 @@ use crate::{
     assets::Graphics,
     attributes::{
         attribute_helpers::skill_power_multiplier, hunger::Hunger, ActiveConsumableBuffs,
-        CurrentHealth, CurrentMana, CurrentShield, MaxHealth, MaxMana, MaxShield, SkillPower,
+        AttackCooldown, CritChance, CurrentHealth, CurrentMana, CurrentShield, MaxHealth, MaxMana,
+        MaxShield, SkillPower, Speed,
     },
     audio::{AudioSoundEffect, SoundSpawner},
     blessings::OwnedBlessings,
@@ -39,8 +40,8 @@ use crate::{
         combat_heirlooms::{CrateBreakDamageTracker, MaxHPHuntTracker, SkillPowerHuntTracker},
         levels::PlayerLevel,
         skills::{
-            ActiveSkill, ActiveSkillUsedEvent, ClassSkillSlots, Heirloom, HeirloomRarity,
-            PlayerSkills,
+            ActiveSkill, ActiveSkillChoiceState, ActiveSkillUsedEvent, ClassSkillSlots,
+            FURY_ATTACK_SPEED_REFERENCE_COOLDOWN_SECS, Heirloom, HeirloomRarity, PlayerSkills,
         },
         CoinCurrency, Player, RunScore, TimeFragmentCurrency,
     },
@@ -110,6 +111,29 @@ pub struct EndlessElapsedText;
 pub struct ActiveSkillIcon {
     pub skill: crate::player::skills::ActiveSkill,
     pub slot_index: usize,
+}
+
+/// Marker placed on the (20×20) active skill slot background sprite. Used as the drop
+/// target during HUD skill drag-and-drop reordering — the icon child entity (with
+/// `UIElement::HeirloomHudIcon` + `Interactable`) is the drag *source*, while the bg
+/// is what the cursor must overlap to land a drop.
+#[derive(Component)]
+pub struct ActiveSkillSlotBg {
+    pub slot_index: usize,
+}
+
+/// Marker for the floating drag preview sprite that follows the cursor while the
+/// player is reordering skill slots. Despawned on drop / cancel.
+#[derive(Component)]
+pub struct ActiveSkillDragIcon;
+
+/// Tracks the in-progress drag of an active skill HUD icon (if any). Drag starts on
+/// left-click of a populated slot icon and ends on left-release; releasing onto a
+/// different slot bg swaps the two slots, releasing anywhere else cancels.
+#[derive(Resource, Default)]
+pub struct ActiveSkillDragState {
+    pub origin_slot: Option<usize>,
+    pub drag_icon_entity: Option<Entity>,
 }
 
 #[derive(Component)]
@@ -1329,6 +1353,11 @@ pub fn spawn_skill_tooltip_content(
     slot_index: Option<usize>,
     parent_entity: Entity,
     skill_power: f32,
+    max_mana: i32,
+    max_health: i32,
+    attack_cooldown_secs: f32,
+    crit_chance: i32,
+    speed: i32,
 ) {
     const ICONS_X_OFFSET: f32 = -24.;
     const TEXT_Y_OFFSET: f32 = 12.;
@@ -1340,7 +1369,16 @@ pub fn spawn_skill_tooltip_content(
     const TITLE_Y: f32 = TEXT_Y_OFFSET + 6.;
 
     let active_skill_icon = graphics.get_active_skill_icon(active_skill.clone());
-    let active_skill_desc = active_skill.get_desc(skill_power).join("\n");
+    let active_skill_desc = active_skill
+        .get_desc(
+            skill_power,
+            max_mana,
+            max_health,
+            attack_cooldown_secs,
+            crit_chance,
+            speed,
+        )
+        .join("\n");
     let active_skill_name = active_skill.get_title();
 
     let _active_skill_icon = commands
@@ -1454,7 +1492,18 @@ pub fn handle_active_skill_hud_tooltip(
     )>,
     existing_tooltips: Query<Entity, With<ActiveSkillHudTooltip>>,
     mut last_hovered: Local<Option<ActiveSkill>>,
-    skill_power: Query<(&SkillPower, &OwnedBlessings)>,
+    skill_power: Query<
+        (
+            &SkillPower,
+            &OwnedBlessings,
+            &MaxMana,
+            &MaxHealth,
+            Option<&AttackCooldown>,
+            &CritChance,
+            &Speed,
+        ),
+        With<Player>,
+    >,
 ) {
     use Interaction;
 
@@ -1531,7 +1580,11 @@ pub fn handle_active_skill_hud_tooltip(
             .set_parent(container)
             .id();
 
-        let (skill_power, blessings) = skill_power.single();
+        let (skill_power, blessings, max_mana, max_health, atk_cd, crit, spd) =
+            skill_power.single();
+        let atk_secs = atk_cd
+            .map(|c| c.0)
+            .unwrap_or(FURY_ATTACK_SPEED_REFERENCE_COOLDOWN_SECS);
         spawn_skill_tooltip_content(
             &mut commands,
             &graphics,
@@ -1540,6 +1593,11 @@ pub fn handle_active_skill_hud_tooltip(
             Some(slot_index),
             container,
             skill_power_multiplier(skill_power, blessings.get_skill_power_bonus()),
+            max_mana.0,
+            max_health.0,
+            atk_secs,
+            crit.0,
+            spd.0,
         );
     }
 
@@ -1871,6 +1929,9 @@ pub fn handle_update_player_skills(
                         .clone(),
                     slot_index: *slot_index,
                 })
+                .insert(ActiveSkillSlotBg {
+                    slot_index: *slot_index,
+                })
                 .id();
             let keybind = keybinds.get_active_skill_key(*slot_index);
             let (key_bg, key_text) = spawn_keybind_badge(
@@ -2003,6 +2064,190 @@ pub fn update_skill_charge_text(
         } else {
             // No tracker for this slot, hide text
             text.sections[0].value = String::new();
+        }
+    }
+}
+
+/// Z for the floating skill preview while dragging. Kept in sync with
+/// `interactions::handle_dragging` (inventory drag icons): the UI orthographic camera
+/// uses `far = 1000.0`, and values at/above the far plane can clip or depth-sort badly.
+const ACTIVE_SKILL_DRAG_PREVIEW_Z: f32 = 998.;
+
+/// Drag-and-drop reordering for the four (or five) active skill HUD slots.
+///
+/// Behaviour:
+/// - Left-press on a populated slot icon starts a drag — the original icon stays in
+///   place but is faded to ~40% alpha, and a follow-the-cursor preview sprite is spawned.
+/// - Releasing left-click on a *different* slot bg swaps the two slot contents in
+///   `PlayerSkills` and (for slots 0–3) swaps the matching `ClassSkillSlots` runtime
+///   so cooldowns and charges follow the skill rather than the slot index.
+/// - Releasing on the same slot or on no slot cancels the drag — alpha is restored
+///   and no swap is applied.
+///
+/// The drop hit-test uses a direct AABB check on `ActiveSkillSlotBg` sprites instead
+/// of `pointcast_2d` so the bg is reliably picked even when the icon child is in the
+/// same screen position (`pointcast_2d` is order-dependent and would otherwise return
+/// the icon entity).
+pub fn handle_active_skill_slot_drag_drop(
+    mut commands: Commands,
+    cursor_pos: Res<CursorPos>,
+    mouse_input: Res<Input<MouseButton>>,
+    mut drag_state: ResMut<ActiveSkillDragState>,
+    mut skill_icons: Query<
+        (Entity, &ActiveSkillIcon, &UIElement, &mut Sprite, &Interactable),
+        Without<ActiveSkillSlotBg>,
+    >,
+    slot_bgs: Query<(&ActiveSkillSlotBg, &GlobalTransform, &Sprite), Without<UIElement>>,
+    mut player_skills: Query<&mut PlayerSkills, With<Player>>,
+    mut class_slots_q: Query<&mut ClassSkillSlots, With<Player>>,
+    mut drag_preview_t: Query<&mut Transform, With<ActiveSkillDragIcon>>,
+    graphics: Res<Graphics>,
+    inv_dragging: Query<(), With<DraggedItem>>,
+) {
+    let cursor = cursor_pos.ui_coords.truncate();
+
+    if drag_state.origin_slot.is_none() && !inv_dragging.is_empty() {
+        return;
+    }
+
+    let hovered_slot = slot_bgs.iter().find_map(|(bg, xform, sprite)| {
+        let size = sprite.custom_size?;
+        let pos = xform.translation();
+        let half = size * 0.5;
+        if cursor.x >= pos.x - half.x
+            && cursor.x <= pos.x + half.x
+            && cursor.y >= pos.y - half.y
+            && cursor.y <= pos.y + half.y
+        {
+            Some(bg.slot_index)
+        } else {
+            None
+        }
+    });
+
+    if drag_state.origin_slot.is_none() && mouse_input.just_pressed(MouseButton::Left) {
+        let mut start: Option<(usize, ActiveSkill)> = None;
+        for (_, icon, ui_elem, _, interactable) in skill_icons.iter() {
+            if *ui_elem != UIElement::HeirloomHudIcon {
+                continue;
+            }
+            if !matches!(interactable.current(), Interaction::Hovering) {
+                continue;
+            }
+            if let Ok(skills) = player_skills.get_single() {
+                if let Some(skill) = skills.get_active_skill_in_slot(icon.slot_index) {
+                    start = Some((icon.slot_index, skill));
+                    break;
+                }
+            }
+        }
+
+        if let Some((slot_index, skill)) = start {
+            let drag_e = commands
+                .spawn(SpriteBundle {
+                    texture: graphics.get_active_skill_icon(skill),
+                    sprite: Sprite {
+                        custom_size: Some(Vec2::new(16., 16.)),
+                        color: Color::rgba(1., 1., 1., 0.7),
+                        ..default()
+                    },
+                    transform: Transform::from_translation(Vec3::new(
+                        cursor.x,
+                        cursor.y,
+                        ACTIVE_SKILL_DRAG_PREVIEW_Z,
+                    )),
+                    ..default()
+                })
+                .insert(RenderLayers::from_layers(&[3]))
+                .insert(ActiveSkillDragIcon)
+                .insert(Name::new("ACTIVE SKILL DRAG ICON"))
+                .id();
+
+            drag_state.origin_slot = Some(slot_index);
+            drag_state.drag_icon_entity = Some(drag_e);
+        }
+    }
+
+    let Some(origin) = drag_state.origin_slot else {
+        return;
+    };
+
+    if let Some(drag_e) = drag_state.drag_icon_entity {
+        if let Ok(mut t) = drag_preview_t.get_mut(drag_e) {
+            t.translation = Vec3::new(cursor.x, cursor.y, ACTIVE_SKILL_DRAG_PREVIEW_Z);
+        }
+    }
+
+    for (_, icon, ui_elem, mut sprite, _) in skill_icons.iter_mut() {
+        if *ui_elem == UIElement::HeirloomHudIcon && icon.slot_index == origin {
+            sprite.color = Color::rgba(1., 1., 1., 0.4);
+        }
+    }
+
+    if mouse_input.just_released(MouseButton::Left) {
+        if let Some(drag_e) = drag_state.drag_icon_entity {
+            commands.entity(drag_e).despawn_recursive();
+        }
+
+        for (_, icon, ui_elem, mut sprite, _) in skill_icons.iter_mut() {
+            if *ui_elem == UIElement::HeirloomHudIcon && icon.slot_index == origin {
+                sprite.color = Color::WHITE;
+            }
+        }
+
+        if let Some(target) = hovered_slot {
+            if target != origin {
+                if let Ok(mut skills) = player_skills.get_single_mut() {
+                    let from = skills.get_active_skill_choice_in_slot(origin).cloned();
+                    let to = skills.get_active_skill_choice_in_slot(target).cloned();
+                    set_skill_slot(&mut skills, origin, to);
+                    set_skill_slot(&mut skills, target, from);
+                }
+                if origin < 4 && target < 4 {
+                    if let Ok(mut runtime) = class_slots_q.get_single_mut() {
+                        runtime.0.swap(origin, target);
+                    }
+                }
+            }
+        }
+
+        drag_state.origin_slot = None;
+        drag_state.drag_icon_entity = None;
+    }
+}
+
+/// Sets the chosen `ActiveSkillChoiceState` (or clears it) on the given slot index.
+/// Mirrors `PlayerSkills::insert_active_skill` but works with `Option` to support
+/// emptying slot 4 during a drag-swap.
+fn set_skill_slot(skills: &mut PlayerSkills, slot: usize, choice: Option<ActiveSkillChoiceState>) {
+    match slot {
+        0 => skills.active_skill_slot_0 = choice,
+        1 => skills.active_skill_slot_1 = choice,
+        2 => skills.active_skill_slot_2 = choice,
+        3 => skills.active_skill_slot_3 = choice,
+        4 => skills.active_skill_slot_4 = choice,
+        _ => {}
+    }
+}
+
+/// Cancels any in-progress active skill drag and despawns the floating preview. Called
+/// when the player exits `GameState::Main` (death, returning to menu) so the drag state
+/// resource never references stale entities on the next run.
+pub fn cancel_active_skill_drag_on_state_exit(
+    mut commands: Commands,
+    mut drag_state: ResMut<ActiveSkillDragState>,
+    mut skill_icons: Query<(&ActiveSkillIcon, &UIElement, &mut Sprite)>,
+) {
+    if let Some(drag_e) = drag_state.drag_icon_entity.take() {
+        if let Some(ec) = commands.get_entity(drag_e) {
+            ec.despawn_recursive();
+        }
+    }
+    if let Some(origin) = drag_state.origin_slot.take() {
+        for (icon, ui_elem, mut sprite) in skill_icons.iter_mut() {
+            if *ui_elem == UIElement::HeirloomHudIcon && icon.slot_index == origin {
+                sprite.color = Color::WHITE;
+            }
         }
     }
 }

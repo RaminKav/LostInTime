@@ -15,7 +15,10 @@ use crate::{
     item::ItemDropDespawnTimer,
     player::{
         mage_skills::JustTeleported,
-        skills::{Heirloom, PlayerSkills, RapidfireState},
+        skills::{
+            fire_ring_duration_seconds, Heirloom, PlayerSkills, RapidfireState,
+            FIRE_RING_BASE_DURATION_SECS,
+        },
         Player,
     },
     proto::proto_param::ProtoParam,
@@ -451,12 +454,17 @@ fn handle_spawn_projectiles_after_delay(
     game: GameParam,
     mut commands: Commands,
     player: Query<Entity, With<Player>>,
+    max_mana_q: Query<&MaxMana, With<Player>>,
     pet_check: Query<Entity, With<Pet>>,
     mobs: Query<&Mob>,
     asset_server: Res<AssetServer>,
     player_projectile_size: Query<&ProjectileSize, With<Player>>,
 ) {
     let player_att = player_projectile_size.single();
+    let max_mana = max_mana_q
+        .get_single()
+        .map(|m| m.0)
+        .unwrap_or(100);
     for (e, mut proj) in projectiles.iter_mut() {
         proj.timer.tick(time.delta());
         if proj.timer.just_finished() {
@@ -531,6 +539,12 @@ fn handle_spawn_projectiles_after_delay(
                 );
                 let despawn_secs = if proj.from_enemy && proj.proj == Projectile::CrowFeather {
                     0.3
+                } else if proj.proj == Projectile::FireRing {
+                    if proj.from_enemy {
+                        FIRE_RING_BASE_DURATION_SECS
+                    } else {
+                        fire_ring_duration_seconds(max_mana)
+                    }
                 } else {
                     5.0
                 };

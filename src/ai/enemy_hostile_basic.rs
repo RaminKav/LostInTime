@@ -8,11 +8,11 @@ use seldom_state::prelude::*;
 
 use crate::Game;
 use crate::{
-    attributes::Attack,
     ai::pathfinding::{world_pos_to_AIPos, AIPos_to_world_pos},
     animations::enemy_sprites::{
         spawn_attack_warning_aseprite, CharacterAnimationSpriteSheetData, EnemyAnimationState,
     },
+    attributes::Attack,
     combat::{status_effects::MobStatusEffects, HitEvent},
     enemy::{FollowSpeed, Mob, MobIsAttacking},
     inputs::FacingDirection,
@@ -362,8 +362,7 @@ pub fn follow(
     ) in follows.iter_mut()
     {
         // Skip movement if frozen by Death Defiance or Freeze blessing
-        if defiance_frozen_option.is_some()
-            || status_option.map(|s| s.is_frozen()).unwrap_or(false)
+        if defiance_frozen_option.is_some() || status_option.map(|s| s.is_frozen()).unwrap_or(false)
         {
             continue;
         }
@@ -497,8 +496,7 @@ pub fn leap_attack(
     ) in attacks.iter_mut()
     {
         // Skip if frozen by Death Defiance or Freeze blessing
-        if defiance_frozen_option.is_some()
-            || status_option.map(|s| s.is_frozen()).unwrap_or(false)
+        if defiance_frozen_option.is_some() || status_option.map(|s| s.is_frozen()).unwrap_or(false)
         {
             continue;
         }
@@ -600,8 +598,7 @@ pub fn projectile_attack(
     ) in attacks.iter_mut()
     {
         // Skip if frozen by Death Defiance or Freeze blessing
-        if defiance_frozen_option.is_some()
-            || status_option.map(|s| s.is_frozen()).unwrap_or(false)
+        if defiance_frozen_option.is_some() || status_option.map(|s| s.is_frozen()).unwrap_or(false)
         {
             continue;
         }
@@ -662,8 +659,7 @@ pub fn idle(
 ) {
     for (entity, mut idle, defiance_frozen_option, status_option) in idles.iter_mut() {
         // Skip if frozen by Death Defiance or Freeze blessing
-        if defiance_frozen_option.is_some()
-            || status_option.map(|s| s.is_frozen()).unwrap_or(false)
+        if defiance_frozen_option.is_some() || status_option.map(|s| s.is_frozen()).unwrap_or(false)
         {
             continue;
         }
