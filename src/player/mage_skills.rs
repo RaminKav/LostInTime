@@ -14,7 +14,10 @@ use crate::{
     inputs::MovementVector,
     item::{projectile::Projectile, WorldObject},
     proto::proto_param::ProtoParam,
-    world::{world_helpers::world_pos_to_tile_pos, TILE_SIZE},
+    world::{
+        world_helpers::{get_neighbour_tile, tile_pos_to_world_pos, world_pos_to_tile_pos},
+        TileMapPosition, TILE_SIZE,
+    },
     GameParam,
 };
 
@@ -51,6 +54,66 @@ pub struct TeleportShockDmg;
 
 #[derive(Component)]
 pub struct IceExplosionDmg;
+
+/// Same blocking rules as the previous teleport check: water tile, or tree/wall object.
+fn teleport_tile_blocked_by_collider(
+    pos: TileMapPosition,
+    game: &GameParam,
+    proto_param: &ProtoParam,
+) -> bool {
+    if let Some(tile_data) = game.get_tile_data(pos) {
+        if tile_data.block_type.contains(&WorldObject::WaterTile) {
+            return true;
+        }
+    }
+    if let Some((_, obj)) = game.get_obj_entity_at_tile(pos, proto_param) {
+        if obj.is_tree() || obj.is_wall() {
+            return true;
+        }
+    }
+    false
+}
+
+/// Intended landing tile, or the nearest open neighbor (by world distance to the player) among the 8 adjacent tiles.
+fn resolve_teleport_destination_tile(
+    intended_tile: TileMapPosition,
+    player_world: Vec2,
+    game: &GameParam,
+    proto_param: &ProtoParam,
+) -> Option<TileMapPosition> {
+    if !teleport_tile_blocked_by_collider(intended_tile, game, proto_param) {
+        return Some(intended_tile);
+    }
+
+    const NEIGHBOUR_OFFSETS: [(i8, i8); 8] = [
+        (-1, -1),
+        (-1, 0),
+        (-1, 1),
+        (0, -1),
+        (0, 1),
+        (1, -1),
+        (1, 0),
+        (1, 1),
+    ];
+
+    let mut neighbours: Vec<TileMapPosition> = NEIGHBOUR_OFFSETS
+        .map(|offset| get_neighbour_tile(intended_tile, offset))
+        .into();
+
+    let tile_center = |t: TileMapPosition| {
+        tile_pos_to_world_pos(t, false) + Vec2::new(TILE_SIZE.x * 0.5, TILE_SIZE.y * 0.5)
+    };
+
+    neighbours.sort_by(|a, b| {
+        let da = tile_center(*a).distance_squared(player_world);
+        let db = tile_center(*b).distance_squared(player_world);
+        da.total_cmp(&db)
+    });
+
+    neighbours
+        .into_iter()
+        .find(|&t| !teleport_tile_blocked_by_collider(t, game, proto_param))
+}
 
 pub fn handle_teleport(
     mut active_skill_events: EventReader<ActiveSkillUsedEvent>,
@@ -121,27 +184,29 @@ pub fn handle_teleport(
         let power_mult = skill_power_multiplier(skill_power, blessings.get_skill_power_bonus());
         let base_distance = 4.5 * TILE_SIZE.x;
         let distance = direction * base_distance;
-        let pos = world_pos_to_tile_pos(player_pos.truncate() + distance);
-        if let Some(tile_data) = game.get_tile_data(pos) {
-            if tile_data.block_type.contains(&WorldObject::WaterTile) {
-                return;
-            }
-        }
-        if let Some((_, obj)) = game.get_obj_entity_at_tile(pos, &proto_param) {
-            if obj.is_tree() || obj.is_wall() {
-                return;
-            }
-        }
+        let intended_tile = world_pos_to_tile_pos(player_pos.truncate() + distance);
+        let Some(dest_tile) = resolve_teleport_destination_tile(
+            intended_tile,
+            player_pos.truncate(),
+            &game,
+            &proto_param,
+        ) else {
+            return;
+        };
 
-        let angle = f32::atan2(direction.y, direction.x) - PI / 2.;
+        let dest_center = tile_pos_to_world_pos(dest_tile, false)
+            + Vec2::new(TILE_SIZE.x * 0.5, TILE_SIZE.y * 0.5);
+        let from_2d = player_pos.truncate();
+        let to_dest = dest_center - from_2d;
+        let angle = f32::atan2(to_dest.y, to_dest.x) - PI / 2.;
         let shock_dmg =
             (dmg.0 as f32 * power_mult * attack_damage_multiplier(TELEPORT_SHOCK_ATTACK_PERCENT))
                 as i32;
         let shock_e = spawn_temp_collider(
             &mut commands,
             Transform::from_translation(Vec3::new(
-                player_pos.x + (distance.x / 2.),
-                player_pos.y + (distance.y / 2.),
+                player_pos.x + to_dest.x * 0.5,
+                player_pos.y + to_dest.y * 0.5,
                 0.,
             ))
             .with_rotation(Quat::from_rotation_z(angle)),
@@ -157,7 +222,7 @@ pub fn handle_teleport(
             commands.entity(e).insert(JustTeleported);
         }
 
-        move_player.send(MovePlayerEvent { pos });
+        move_player.send(MovePlayerEvent { pos: dest_tile });
     }
 
     if teleport_state.timer.percent() != 0. {
