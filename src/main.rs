@@ -1181,7 +1181,9 @@ pub fn set_start_of_run_action_resource_false(mut res: ResMut<StartOfRunActionsH
 fn export_heirloom_cards_data() {
     use player::skills::HeirloomChoiceQueue;
 
-    let pool = HeirloomChoiceQueue::default().pool;
+    // Use the all-unlocks variant so the export tool dumps every heirloom regardless
+    // of the player's current TimeCrystals progress.
+    let pool = HeirloomChoiceQueue::with_all_unlocks().pool;
     let export: Vec<serde_json::Value> = pool
         .iter()
         .map(|s| {

@@ -24,6 +24,7 @@ use crate::{
         achievements::{Achievement, Achievements},
         currency::TimeFragmentCurrency,
         skills::{HeirloomChoiceQueue, PlayerClass, PlayerSkills},
+        time_crystals::TimeCrystals,
         unlocks::{RunUnlockState, UnlockUpgrades, UnlockedClasses},
     },
     ui::{
@@ -32,6 +33,7 @@ use crate::{
             persist_class_unlock_state, ClassSelectionState, ClassUnlockConfirmState,
             ClassUnlockHoverState, PendingGameStart, PlayerSelectSlot,
         },
+        options_ui::CheatSettings,
         ChestContainer, FurnaceContainer, UIState,
     },
     world::{
@@ -692,6 +694,8 @@ pub fn cleanup_run_state(
         )>,
     >,
     guide_hud: Query<Entity, With<crate::ui::key_input_guide::InteractGuide>>,
+    time_crystals: Res<TimeCrystals>,
+    cheat_settings: Res<CheatSettings>,
 ) {
     if event.is_empty() {
         return;
@@ -716,7 +720,10 @@ pub fn cleanup_run_state(
     commands.remove_resource::<ChestContainer>();
     commands.remove_resource::<FurnaceContainer>();
     commands.insert_resource(AnalyticsData::default());
-    commands.insert_resource(HeirloomChoiceQueue::default());
+    commands.insert_resource(HeirloomChoiceQueue::new_for_run(
+        &time_crystals,
+        cheat_settings.bypass_time_crystal_pool,
+    ));
     commands.insert_resource(Game::default());
     commands.insert_resource(NightTracker::default());
     commands.insert_resource(ContainerRegistry::default());

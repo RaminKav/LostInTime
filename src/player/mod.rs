@@ -44,12 +44,14 @@ pub mod rogue_skills;
 pub mod score;
 pub mod skill_heirlooms;
 pub mod skills;
+pub mod time_crystals;
 pub mod unlocks;
 pub use achievements::*;
 pub use class_rank::*;
 pub use currency::*;
 use mage_skills::{handle_teleport, tick_just_teleported};
 pub use score::*;
+pub use time_crystals::*;
 pub use unlocks::*;
 pub mod stats;
 use crate::{
@@ -160,6 +162,7 @@ impl Plugin for PlayerPlugin {
             .init_resource::<TimeFragmentCurrency>()
             .init_resource::<skills::HeirloomTriggerCounts>()
             .init_resource::<score::RunTimer>()
+            .init_resource::<time_crystals::TimeCrystals>()
             .with_default_schedule(CoreSchedule::FixedUpdate, |app| {
                 app.add_event::<MovePlayerEvent>()
                     .add_event::<ModifyCurencyEvent>()

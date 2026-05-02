@@ -23,12 +23,14 @@ use crate::{
         currency::TimeFragmentCurrency,
         score::HighScores,
         skills::{HeirloomChoiceQueue, PlayerClass, SkillClass},
+        time_crystals::TimeCrystals,
         unlocks::{persist_unlock_data, RunUnlockState, UnlockUpgrades},
         ClassUnlockData, UnlockedClasses,
     },
     ui::{
         main_menu::GameStartFadein, spawn_back_button, spawn_back_button_texture_only,
-        CheatSettings, MenuButton, UIElement, UIState,
+        options_ui::CheatSettings,
+        MenuButton, UIElement, UIState,
     },
     world::{dimension::EraManager, portal::UIPortal},
     FairyPetSprite, Pet, RenderLayers, ScreenResolution, SlimePetSprite,
@@ -1896,6 +1898,8 @@ pub fn handle_portal_animation(
     unlock_upgrades: Res<UnlockUpgrades>,
     mut run_unlock_state: ResMut<RunUnlockState>,
     screen_res: Res<ScreenResolution>,
+    time_crystals: Res<TimeCrystals>,
+    cheat_settings: Res<CheatSettings>,
 ) {
     for (_portal_entity, mut anim_state, mut anim) in portal_query.iter_mut() {
         // Check if we have a pending game start resource and are still in Idle state
@@ -1937,7 +1941,10 @@ pub fn handle_portal_animation(
                         commands.init_resource::<crate::Game>();
                         commands.init_resource::<NightTracker>();
                         commands.init_resource::<ChaosTracker>();
-                        commands.insert_resource(HeirloomChoiceQueue::default());
+                        commands.insert_resource(HeirloomChoiceQueue::new_for_run(
+                            &time_crystals,
+                            cheat_settings.bypass_time_crystal_pool,
+                        ));
                         commands.init_resource::<ContainerRegistry>();
                         commands.init_resource::<CraftingTracker>();
                         commands.init_resource::<EraManager>();

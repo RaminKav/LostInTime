@@ -26,6 +26,9 @@ pub struct CheatSettings {
     pub show_enemy_damage_numbers: bool,
     /// When true, the tile under the cursor is highlighted during gameplay
     pub show_tile_hover: bool,
+    /// When true, heirloom level-up / chest pools ignore time crystal progress and use
+    /// the full pool (same as completing every crystal).
+    pub bypass_time_crystal_pool: bool,
     pub hide_attack_anims: bool,
     pub hide_skill_anims: bool,
     pub hide_heirloom_anims: bool,
@@ -39,6 +42,7 @@ impl Default for CheatSettings {
             dev_mode: false,
             show_enemy_damage_numbers: true,
             show_tile_hover: true,
+            bypass_time_crystal_pool: false,
             hide_attack_anims: false,
             hide_skill_anims: false,
             hide_heirloom_anims: false,
@@ -54,6 +58,7 @@ pub enum OptionsCheckboxType {
     DevMode,
     ShowEnemyDamageNumbers,
     ShowTileHover,
+    BypassTimeCrystalPool,
     HideAttackAnims,
     HideSkillAnims,
     HideHeirloomAnims,
@@ -718,8 +723,28 @@ pub fn setup_options_ui(
         cheat_settings.hide_heirloom_anims,
     );
 
+    let bypass_time_crystal_y = hide_heirloom_y - 16.;
+    spawn_options_checkbox(
+        &mut commands,
+        &graphics,
+        &asset_server,
+        "Bypass Heirloom Pool:",
+        Vec3::new(
+            right_side_x,
+            bypass_time_crystal_y,
+            ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
+        ),
+        Vec3::new(
+            right_side_x + 100.5,
+            bypass_time_crystal_y + 0.5,
+            ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
+        ),
+        OptionsCheckboxType::BypassTimeCrystalPool,
+        cheat_settings.bypass_time_crystal_pool,
+    );
+
     // Volume section
-    let volume_section_y = hide_heirloom_y - 28.;
+    let volume_section_y = bypass_time_crystal_y - 28.;
     commands.spawn((
         Text2dBundle {
             text: Text::from_section(
@@ -803,7 +828,7 @@ pub fn setup_options_ui(
 
     // Back Button
     let back_button = spawn_back_button(
-        Vec3::new(240., -148., ui_helpers::Z_DEPTH_OPTIONS_CONTENT),
+        Vec3::new(240., -156., ui_helpers::Z_DEPTH_OPTIONS_CONTENT),
         &mut commands,
         &graphics,
         &asset_server,
@@ -1079,6 +1104,18 @@ pub fn handle_cheat_checkbox_click(
                                     },
                                 )
                             }
+                            OptionsCheckboxType::BypassTimeCrystalPool => {
+                                cheat_settings.bypass_time_crystal_pool =
+                                    !cheat_settings.bypass_time_crystal_pool;
+                                (
+                                    cheat_settings.bypass_time_crystal_pool,
+                                    if cheat_settings.bypass_time_crystal_pool {
+                                        UIElement::CheckBoxSelected
+                                    } else {
+                                        UIElement::CheckBox
+                                    },
+                                )
+                            }
                             OptionsCheckboxType::HideAttackAnims => {
                                 cheat_settings.hide_attack_anims =
                                     !cheat_settings.hide_attack_anims;
@@ -1173,6 +1210,13 @@ pub fn update_cheat_checkbox_visual(
             }
             OptionsCheckboxType::ShowTileHover => {
                 if cheat_settings.show_tile_hover {
+                    UIElement::CheckBoxSelected
+                } else {
+                    UIElement::CheckBox
+                }
+            }
+            OptionsCheckboxType::BypassTimeCrystalPool => {
+                if cheat_settings.bypass_time_crystal_pool {
                     UIElement::CheckBoxSelected
                 } else {
                     UIElement::CheckBox

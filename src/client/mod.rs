@@ -39,12 +39,14 @@ use crate::{
         class_rank::ClassRankSystem,
         currency::TimeFragmentCurrency,
         levels::PlayerLevel,
-        score::{HighScores, RunScore},
+        score::{HighScores, RunScore, RunTimer},
         skills::{HeirloomChoiceQueue, PlayerClass, PlayerSkills, SkillClass},
         stats::{PlayerStats, SkillPoints},
+        time_crystals::{TimeCrystals, SURVIVAL_SHARD_THRESHOLD_SECONDS},
         unlocks::{UnlockUpgrades, UnlockedClasses},
         Player,
     },
+    world::portal::BossKillTracker,
     ui::{
         tips::{SeenTips, Tip},
         ChestContainer, FurnaceContainer,
@@ -234,6 +236,8 @@ pub struct GameData {
     pub bounce_tracker: crate::player::achievements::BounceAchievementTracker,
     #[serde(default)]
     pub seen_tips: std::collections::HashSet<Tip>,
+    #[serde(default)]
+    pub time_crystals: TimeCrystals,
 }
 pub fn handle_append_run_data_after_death(
     night: Res<NightTracker>,
@@ -248,6 +252,9 @@ pub fn handle_append_run_data_after_death(
     unlocked_classes: Option<Res<UnlockedClasses>>,
     unlock_upgrades: Option<Res<UnlockUpgrades>>,
     bounce_tracker: Res<crate::player::achievements::BounceAchievementTracker>,
+    run_timer: Res<RunTimer>,
+    boss_kill_tracker: Option<Res<BossKillTracker>>,
+    time_crystals: Option<Res<TimeCrystals>>,
 ) {
     for _ in game_over.iter() {
         info!("GAME OVER! Storing run data in game_data.json...");
@@ -379,6 +386,42 @@ pub fn handle_append_run_data_after_death(
 
         // Save bounce tracker
         game_data.bounce_tracker = bounce_tracker.clone();
+
+        // --- Time Crystal shard awards ---
+        // Start from the in-memory resource if present so we don't lose any shards
+        // earned earlier in this session that weren't yet flushed to disk.
+        let mut crystals = time_crystals
+            .as_ref()
+            .map(|tc| (**tc).clone())
+            .unwrap_or_else(|| game_data.time_crystals.clone());
+
+        let mut shards_earned: u32 = 0;
+        // +1 shard for surviving at least the survival threshold (6 minutes)
+        if run_timer.elapsed_seconds >= SURVIVAL_SHARD_THRESHOLD_SECONDS {
+            shards_earned += 1;
+        }
+        // +1 shard per cleared era (Main, Second, Third). DungeonMain is excluded
+        // because it's a side dungeon, not a regular era progression.
+        if let Some(boss_kills) = boss_kill_tracker.as_ref() {
+            for era in [Era::Main, Era::Second, Era::Third] {
+                if boss_kills.is_boss_killed(&era) {
+                    shards_earned += 1;
+                }
+            }
+        }
+
+        if shards_earned > 0 {
+            info!(
+                "Awarding {} time crystal shard(s) for this run (survived {}s)",
+                shards_earned, run_timer.elapsed_seconds as u64
+            );
+            crystals.add_shards(shards_earned);
+        }
+
+        game_data.time_crystals = crystals.clone();
+        // Update the in-memory resource so the next run's heirloom pool reflects any
+        // newly completed crystals without requiring a game restart.
+        commands.insert_resource(crystals);
 
         let game_data_path = datafiles::game_data();
 

@@ -33,7 +33,7 @@ use crate::player::skills::SkillClass;
 use crate::player::skills::{ActiveSkill, Heirloom};
 use crate::player::{
     get_default_unlocked_classes, Achievements, ClassUnlockConfig, ClassUnlockData, CoinCurrency,
-    TimeFragmentCurrency, UnlockUpgrades, UnlockedClasses,
+    TimeCrystals, TimeFragmentCurrency, UnlockUpgrades, UnlockedClasses,
 };
 use crate::status_effects::StatusEffect;
 use crate::ui::tips::SeenTips;
@@ -390,6 +390,7 @@ impl GameAssetsPlugin {
                     let unlocked_classes_vec = game_data.unlocked_classes.clone();
                     let time_fragments = game_data.time_fragments;
                     let seen_tips_set = game_data.seen_tips.clone();
+                    let time_crystals = game_data.time_crystals.clone();
 
                     commands.insert_resource(class_ranks);
                     commands.insert_resource(high_scores);
@@ -408,6 +409,7 @@ impl GameAssetsPlugin {
                     commands.insert_resource(SeenTips {
                         seen: seen_tips_set,
                     });
+                    commands.insert_resource(time_crystals);
                 }
                 Err(err) => {
                     error!("Failed to load class ranks from game_data.json: {err:?}");
@@ -419,6 +421,7 @@ impl GameAssetsPlugin {
                     commands.insert_resource(Achievements::default());
                     commands.insert_resource(TimeFragmentCurrency::default());
                     commands.insert_resource(SeenTips::default());
+                    commands.insert_resource(TimeCrystals::default());
                 }
             }
         } else {
@@ -430,6 +433,7 @@ impl GameAssetsPlugin {
             commands.insert_resource(Achievements::default());
             commands.insert_resource(TimeFragmentCurrency::default());
             commands.insert_resource(SeenTips::default());
+            commands.insert_resource(TimeCrystals::default());
         }
         commands.insert_resource(CoinCurrency::default());
         let sprite_desc_handle: Handle<GraphicsDesc> = sprite_sheet.sprite_desc.clone();
