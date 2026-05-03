@@ -27,10 +27,13 @@ use crate::{
     colors::{DARK_GREEN, RED},
     cursor::CursorPos,
     inventory::{
-        sort_main_inventory, Inventory, InventoryItemStack, ItemStack, MaterialDropsToggleButton,
-        MaterialDropsToggleXOverlay, SortInventoryButton, SuppressNonMobBreakDrops,
+        sort_main_inventory, Inventory, InventoryItemStack, InventoryShiftClickSource, ItemStack,
+        MaterialDropsToggleButton, MaterialDropsToggleXOverlay, ShiftQuickEquipResult,
+        SortInventoryButton, SuppressNonMobBreakDrops, shift_move_equipped_slot_to_main_items,
+        try_shift_quick_equip_from_inventory_source,
     },
     item::{heirloom_shrine::HeirloomShrineState, CraftedItemEvent, EquipmentType},
+    pets::state::Pet,
     player::{
         combat_heirlooms::HallucinationStatType,
         levels::PlayerLevel,
@@ -53,7 +56,8 @@ use crate::{
 use super::{
     crafting_ui::CraftingContainer, scrapper_ui::ScrapperContainer, spawn_item_stack_icon,
     spawn_skill_choice_flash, stats_ui::StatsButtonState, ui_helpers, BanishButton, ChestContainer,
-    EssenceOption, InfoModal, InventorySlotState, MenuButton, MenuButtonClickEvent, RerollDice,
+    EssenceOption, InfoModal, InventorySlotState, InventorySlotType, MenuButton,
+    MenuButtonClickEvent, RerollDice,
     ShowInvPlayerStatsEvent, SkillChoiceUI, SubmitEssenceChoice, ToolTipUpdateEvent,
     TooltipTeardownEvent, UIContainersParam, UIState, SKILLS_CHOICE_UI_SIZE,
 };
@@ -803,6 +807,7 @@ pub fn handle_drop_dragged_items_on_inv_close(
         });
     }
 }
+
 pub fn handle_interaction_clicks(
     mut commands: Commands,
     cursor_pos: Res<CursorPos>,
@@ -814,7 +819,10 @@ pub fn handle_interaction_clicks(
     dragging_query: Query<&DraggedItem>,
     graphics: Res<Graphics>,
     asset_server: Res<AssetServer>,
-    mut inv: Query<&mut Inventory>,
+    mut inv_and_pet: ParamSet<(
+        Query<&mut Inventory>,
+        Query<(), With<Pet>>,
+    )>,
     mut inv_slot_events: InvSlotInteractionEvents,
     mut container_param: UIContainersParam,
     proto: ProtoParam,
@@ -829,7 +837,7 @@ pub fn handle_interaction_clicks(
 
     let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
-    let left_mouse_pressing = mouse_input.pressed(MouseButton::Left);
+    let _left_mouse_pressing = mouse_input.pressed(MouseButton::Left);
     let right_mouse_pressed = mouse_input.just_pressed(MouseButton::Right);
     let shift_key_pressed = key_input.pressed(KeyCode::LShift);
     let currently_dragging = dragging_query.iter().len() > 0;
@@ -870,7 +878,8 @@ pub fn handle_interaction_clicks(
                                     item: item_icon.0,
                                     origin_slot: state.slot_index,
                                 });
-                                let mut inv = inv.single_mut();
+                                let mut inv_q = inv_and_pet.p0();
+                                let mut inv = inv_q.single_mut();
                                 let container_items = if state.r#type.is_chest() {
                                     &mut container_param.chest_option.as_mut().unwrap().items
                                 } else if state.r#type.is_scrapper() {
@@ -910,7 +919,8 @@ pub fn handle_interaction_clicks(
                         }
                         if let Some(item) = state.item {
                             if let Ok(item_icon) = inv_item_icons.get_mut(item) {
-                                let mut inv = inv.single_mut();
+                                let mut inv_q = inv_and_pet.p0();
+                                let mut inv = inv_q.single_mut();
                                 let container = if state.r#type.is_chest() {
                                     &mut container_param.chest_option.as_mut().unwrap().items
                                 } else if state.r#type.is_scrapper() {
@@ -941,22 +951,25 @@ pub fn handle_interaction_clicks(
                                 mouse_input.clear();
                             }
                         }
-                    } else if shift_key_pressed && left_mouse_pressing {
+                    } else if shift_key_pressed && left_mouse_pressed {
                         if state.r#type.is_crafting() {
                             continue;
                         }
 
-                        let mut inv = inv.single_mut();
+                        let player_has_pet = {
+                            let pet_q = inv_and_pet.p1();
+                            pet_q.iter().next().is_some()
+                        };
+                        let mut inv_q = inv_and_pet.p0();
+                        let mut inv = inv_q.single_mut();
 
                         // Special handling for furnace slots (part of player inventory)
-                        // These are always visible when inventory is open (except in Scrapper mode)
                         if ui_state.0.is_inv_open() && ui_state.0 != UIState::Scrapper {
-                            if state.r#type.is_inventory() || state.r#type.is_hotbar() {
-                                // Shift-clicking from inventory/hotbar - check if item should go to furnace
+                            if state.r#type.is_inventory() {
+                                // `slot_index` indexes `inv.items` only for main-grid slots.
                                 if let Some(item) = &inv.items.items[state.slot_index] {
                                     let obj_type = item.item_stack.obj_type;
 
-                                    // Check if it's a tome/orb (goes to furnace slot 0)
                                     let is_tome_or_orb = matches!(
                                         obj_type,
                                         crate::item::WorldObject::UpgradeTome
@@ -964,7 +977,6 @@ pub fn handle_interaction_clicks(
                                     );
 
                                     if is_tome_or_orb && inv.furnace_items.items[0].is_none() {
-                                        // Move tome/orb to furnace slot 0
                                         let item_to_move = inv.items.items[state.slot_index].take();
                                         if let Some(mut moved_item) = item_to_move {
                                             moved_item.slot = 0;
@@ -974,8 +986,6 @@ pub fn handle_interaction_clicks(
                                         continue;
                                     }
 
-                                    // Check if it's equipment that can go to furnace slot 1
-                                    // Only if there's already a tome/orb in slot 0
                                     let has_tome_in_slot_0 = inv.furnace_items.items[0].is_some();
                                     let slot_map =
                                         &container_param.inv_state.furnace_state.slot_map;
@@ -986,7 +996,6 @@ pub fn handle_interaction_clicks(
                                         && is_valid_for_slot_1
                                         && inv.furnace_items.items[1].is_none()
                                     {
-                                        // Move equipment to furnace slot 1
                                         let item_to_move = inv.items.items[state.slot_index].take();
                                         if let Some(mut moved_item) = item_to_move {
                                             moved_item.slot = 1;
@@ -1006,11 +1015,8 @@ pub fn handle_interaction_clicks(
                                 }
                             } else if state.r#type.is_furnace() {
                                 let from_slot = state.slot_index;
-                                // Moving from furnace slots back to inventory
-                                // Take the item from furnace first to avoid double borrow
                                 let furnace_item = inv.furnace_items.items[from_slot].take();
                                 if let Some(mut moved_item) = furnace_item {
-                                    // Find first empty slot in inventory
                                     if let Some(empty_slot) = inv.items.get_first_empty_slot() {
                                         moved_item.slot = empty_slot;
                                         inv.items.items[empty_slot] = Some(moved_item);
@@ -1018,7 +1024,6 @@ pub fn handle_interaction_clicks(
                                             inv_slot_events.tooltip_teardown.send_default();
                                         }
                                     } else {
-                                        // No empty slot, put it back
                                         inv.furnace_items.items[from_slot] = Some(moved_item);
                                     }
                                 }
@@ -1027,24 +1032,114 @@ pub fn handle_interaction_clicks(
                             }
                         }
 
-                        // Default behavior for other containers
                         if let Some(active_container) =
                             container_param.get_active_ui_container_mut()
                         {
-                            if state.r#type.is_inventory() {
-                                inv.items.move_item_to_target_container(
-                                    active_container,
+                            if state.r#type.is_inventory()
+                                || state.r#type.is_crafting_input()
+                            {
+                                if state.r#type.is_crafting_input() {
+                                    inv.crafting_inputs_items.move_item_to_target_container(
+                                        active_container,
+                                        state.slot_index,
+                                    );
+                                } else {
+                                    inv.items.move_item_to_target_container(
+                                        active_container,
+                                        state.slot_index,
+                                    );
+                                }
+                                state.dirty = true;
+                            } else if state.r#type.is_chest()
+                                || state.r#type.is_scrapper()
+                                || state.r#type.is_crafting()
+                            {
+                                active_container.move_item_to_target_container(
+                                    &mut inv.items,
                                     state.slot_index,
-                                )
-                            } else if !state.r#type.is_inventory() {
-                                active_container
-                                    .move_item_to_target_container(&mut inv.items, state.slot_index)
+                                );
+                                state.dirty = true;
+                            } else if state.r#type.is_equipment()
+                                || state.r#type.is_accessory()
+                                || state.r#type.is_weapon_slot()
+                                || state.r#type.is_pet_slot()
+                            {
+                                if state.item.is_some() {
+                                    shift_move_equipped_slot_to_main_items(
+                                        &mut inv,
+                                        state.r#type,
+                                        state.slot_index,
+                                    );
+                                    state.dirty = true;
+                                }
                             }
+                            continue;
+                        }
+
+                        if state.r#type.is_equipment()
+                            || state.r#type.is_accessory()
+                            || state.r#type.is_weapon_slot()
+                            || state.r#type.is_pet_slot()
+                        {
+                            if state.item.is_some() {
+                                shift_move_equipped_slot_to_main_items(
+                                    &mut inv,
+                                    state.r#type,
+                                    state.slot_index,
+                                );
+                                state.dirty = true;
+                            }
+                            continue;
+                        }
+
+                        if !matches!(
+                            state.r#type,
+                            InventorySlotType::Normal
+                                | InventorySlotType::Hotbar
+                                | InventorySlotType::CraftingInput
+                        ) {
+                            continue;
+                        }
+
+                        let shift_source = if state.r#type.is_crafting_input() {
+                            InventoryShiftClickSource::CraftingInputs
+                        } else {
+                            InventoryShiftClickSource::MainGrid
+                        };
+
+                        let equip_result = try_shift_quick_equip_from_inventory_source(
+                            &mut inv,
+                            shift_source,
+                            state.slot_index,
+                            &proto,
+                            player_has_pet,
+                        );
+
+                        match equip_result {
+                            ShiftQuickEquipResult::Equipped => {
+                                state.dirty = true;
+                                continue;
+                            }
+                            ShiftQuickEquipResult::NoEmptyEquipSlot => {
+                                continue;
+                            }
+                            ShiftQuickEquipResult::NotEquippable => {}
+                        }
+
+                        if state.r#type.is_crafting_input() {
+                            let Inventory {
+                                ref mut crafting_inputs_items,
+                                ref mut items,
+                                ..
+                            } = &mut *inv;
+                            crafting_inputs_items.move_item_to_target_container(
+                                items,
+                                state.slot_index,
+                            );
                         } else {
                             inv.items
                                 .move_item_from_hotbar_to_inv_or_vice_versa(state.slot_index);
                         }
-                        // Mark source slot dirty after any shift-click move operation
                         state.dirty = true;
                     }
                 }

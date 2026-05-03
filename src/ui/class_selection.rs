@@ -290,9 +290,10 @@ pub fn setup_class_selection_ui(
         .unwrap_or(SkillClass::Warrior);
 
     let default_pet = Pet::iter().find(|pet| {
-        achievements_ref
-            .map(|a| is_pet_unlocked(pet, a))
-            .unwrap_or(false)
+        cheat_settings.bypass_class_unlocks
+            || achievements_ref
+                .map(|a| is_pet_unlocked(pet, a))
+                .unwrap_or(false)
     });
 
     // Initialize the selection state with first unlocked class and first unlocked pet (if any)
@@ -435,15 +436,17 @@ pub fn setup_class_selection_ui(
         }
     }
 
+    let pet_count = Pet::iter().count() as f32;
     for (i, pet) in Pet::iter().enumerate() {
         // Check if pet is unlocked
-        let pet_unlocked = achievements_ref
-            .map(|a| is_pet_unlocked(&pet, a))
-            .unwrap_or(false);
+        let pet_unlocked = cheat_settings.bypass_class_unlocks
+            || achievements_ref
+                .map(|a| is_pet_unlocked(&pet, a))
+                .unwrap_or(false);
         let pet_selected = pet_unlocked && default_pet.as_ref().is_some_and(|d| *d == pet);
 
         // Pet option background
-        let x_offset = (i as f32 - 1.0) * 29.0 + 149.; // Center the options
+        let x_offset = (i as f32 - (pet_count - 1.) * 0.5) * 29.0 + 149.;
         let mut slot_entity_commands = commands.spawn(SpriteBundle {
             texture: graphics
                 .get_ui_element_texture(UIElement::PlayerSelectSlot)
@@ -1555,7 +1558,7 @@ fn spawn_pet_preview(
 ) -> Entity {
     let (aseprite_path, animation_tag) = match selected_pet {
         Pet::Fairy => (sprite_handles.fairy_pet.clone(), FairyPetSprite::tags::IDLE),
-        Pet::Slime | Pet::Porkipine | Pet::GoldenPig => {
+        Pet::Slime | Pet::Porkipine | Pet::GoldenPig | Pet::Goliath => {
             (sprite_handles.slime_pet.clone(), SlimePetSprite::tags::IDLE)
         }
     };

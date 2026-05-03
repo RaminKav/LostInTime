@@ -37,7 +37,7 @@ pub struct CheatSettings {
 impl Default for CheatSettings {
     fn default() -> Self {
         Self {
-            bypass_class_unlocks: false,
+            bypass_class_unlocks: true,
             color_blind_mode: false,
             dev_mode: false,
             show_enemy_damage_numbers: true,

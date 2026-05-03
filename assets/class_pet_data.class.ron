@@ -108,5 +108,15 @@
             pet_icon: SlimePetIcon,
             skill_icon: SlimeShieldIcon,
         ),
+        Goliath: (
+            name: "Goliath",
+            skill_description: [
+                "Small chance for each weapon\nor skill to double in size."
+            ],
+            skill_name: "Giant",
+            passive_description: ["Gain +1% Size per\nlevel"],
+            pet_icon: SlimePetIcon,
+            skill_icon: SlimeShieldIcon,
+        ),
     },
 )

@@ -1,5 +1,6 @@
 use bevy::prelude::*;
 use bevy_proto::prelude::{ProtoCommands, ReflectSchematic, Schematic};
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 use strum_macros::{Display, IntoStaticStr};
 
@@ -16,7 +17,7 @@ use crate::{
     player::{
         mage_skills::JustTeleported,
         skills::{
-            fire_ring_duration_seconds, Heirloom, PlayerSkills, RapidfireState,
+            fire_ring_duration_seconds, Heirloom, PlayerClass, PlayerSkills, RapidfireState,
             FIRE_RING_BASE_DURATION_SECS,
         },
         Player,
@@ -131,8 +132,8 @@ impl Projectile {
     /// Rotation offset in radians for projectiles whose sprite is drawn at 45° in the sheet (e.g. kunai, feathers).
     pub fn get_custom_rotation(&self) -> Option<f32> {
         match self {
-            Projectile::FuryKunai => Some(-0.7853982),   // -45°
-            Projectile::DaggerThrow => Some(-0.7853982),   // -45°
+            Projectile::FuryKunai => Some(-0.7853982),      // -45°
+            Projectile::DaggerThrow => Some(-0.7853982),    // -45°
             Projectile::PossessedBlade => Some(-0.7853982), // -45°
             Projectile::CrowFeather => Some(-0.7853982),    // -45°
             _ => None,
@@ -268,10 +269,42 @@ pub struct ProjectileSpawnMarker {
     /// time. Prevents arrows/bolts from spawning behind a moving player when
     /// there is a non-trivial `spawn_delay`.
     pub track_player_pos: bool,
+    /// Extra scale on top of `ProjectileSize` (e.g. Goliath pet 1% double-size proc).
+    pub extra_scale: f32,
 }
 
 #[derive(Component)]
 pub struct PetProjectileMarker;
+
+/// Goliath pet: 1% chance to double spawn scale for player weapon/skill shots (not heirlooms).
+fn goliath_spawn_scale_multiplier(
+    player_class: &PlayerClass,
+    projectile: &Projectile,
+    from_enemy: bool,
+    from_entity: Option<Entity>,
+) -> f32 {
+    if from_enemy || from_entity.is_some() {
+        return 1.;
+    }
+    if matches!(projectile, Projectile::None) {
+        return 1.;
+    }
+    if !player_class.pets.contains(&Pet::Goliath) {
+        return 1.;
+    }
+    if !matches!(
+        projectile.animation_category(),
+        AnimVisualCategory::Attack | AnimVisualCategory::Skill,
+    ) {
+        return 1.;
+    }
+    let mut rng = rand::thread_rng();
+    if rng.gen_ratio(1, 50) {
+        2.
+    } else {
+        1.
+    }
+}
 
 /// Component to track the target position for bomb projectiles. Inserted on
 /// the player/projectile when a bomb is thrown and removed when it lands —
@@ -301,6 +334,7 @@ fn handle_ranged_attack_event(
     rapidfire_state: Query<&RapidfireState, With<Player>>,
     transforms: Query<&GlobalTransform>,
     game: Res<Game>,
+    player_class: Res<PlayerClass>,
     mut commands: Commands,
     mut modify_mana_event: EventWriter<ModifyManaEvent>,
     mut ammo_query: Query<&mut Ammo>,
@@ -390,6 +424,12 @@ fn handle_ranged_attack_event(
             && proj_event.from_entity.is_none()
             && proj_event.pos_override.is_none()
             && !proj_event.projectile.is_anchored_to_player_pos();
+        let goliath_extra = goliath_spawn_scale_multiplier(
+            &player_class,
+            &proj_event.projectile,
+            proj_event.from_enemy,
+            proj_event.from_entity,
+        );
         commands.spawn(ProjectileSpawnMarker {
             timer: Timer::from_seconds(proj_event.spawn_delay, TimerMode::Once),
             proj: proj_event.projectile.clone(),
@@ -404,9 +444,16 @@ fn handle_ranged_attack_event(
             was_mana_bar_full: current_mana.0 == max_mana.0,
             is_followup_proj: proj_event.is_followup_proj,
             track_player_pos,
+            extra_scale: goliath_extra,
         });
 
         if proj_event.projectile == Projectile::DaggerProjectile1 {
+            let goliath_extra_d2 = goliath_spawn_scale_multiplier(
+                &player_class,
+                &Projectile::DaggerProjectile2,
+                proj_event.from_enemy,
+                proj_event.from_entity,
+            );
             commands.spawn(ProjectileSpawnMarker {
                 timer: Timer::from_seconds(proj_event.spawn_delay + 0.2, TimerMode::Once),
                 proj: Projectile::DaggerProjectile2,
@@ -421,6 +468,7 @@ fn handle_ranged_attack_event(
                 was_mana_bar_full: current_mana.0 == max_mana.0,
                 is_followup_proj: false,
                 track_player_pos,
+                extra_scale: goliath_extra_d2,
             });
         }
 
@@ -461,10 +509,7 @@ fn handle_spawn_projectiles_after_delay(
     player_projectile_size: Query<&ProjectileSize, With<Player>>,
 ) {
     let player_att = player_projectile_size.single();
-    let max_mana = max_mana_q
-        .get_single()
-        .map(|m| m.0)
-        .unwrap_or(100);
+    let max_mana = max_mana_q.get_single().map(|m| m.0).unwrap_or(100);
     for (e, mut proj) in projectiles.iter_mut() {
         proj.timer.tick(time.delta());
         if proj.timer.just_finished() {
@@ -485,7 +530,7 @@ fn handle_spawn_projectiles_after_delay(
                 if proj.from_enemy {
                     1.0
                 } else {
-                    player_att.get_multiplier()
+                    player_att.get_multiplier() * proj.extra_scale
                 },
             );
 

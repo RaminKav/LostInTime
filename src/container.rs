@@ -215,9 +215,11 @@ impl Container {
                     self.items[slot] = None;
                 }
             } else if !is_from_hotbar {
-                if let Some(next_avail_slot) =
+                // Prefer keyed hotbar slots (0..INVENTORY_HOTBAR_SLOTS), then passive row slots 4–5.
+                let next_avail_slot = Self::get_first_empty_hotbar_slot(self).or_else(|| {
                     Self::get_first_empty_hotbar_slot_excluding_quick_use(self)
-                {
+                });
+                if let Some(next_avail_slot) = next_avail_slot {
                     self.items[next_avail_slot] = Some(inv_item_stack.modify_slot(next_avail_slot));
                     self.items[slot] = None;
                 }

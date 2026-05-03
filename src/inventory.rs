@@ -307,13 +307,17 @@ impl InventoryItemStack {
         self.item_stack.copy_with_count(amount_split)
     }
 
+    pub fn write_to_container(&self, container: &mut Container) {
+        container.items[self.slot] = Some(self.clone());
+    }
+
     pub fn add_to_container(
         &self,
         container: &mut Container,
         slot_type: InventorySlotType,
         inv_slots: &mut Query<&mut InventorySlotState>,
     ) {
-        container.items[self.slot] = Some(self.clone());
+        self.write_to_container(container);
         mark_slot_dirty(self.slot, slot_type, inv_slots);
     }
     pub fn remove_from_inventory(self, container: &mut Container) {
@@ -931,4 +935,175 @@ pub fn try_auto_equip_from_upgrade_slot(
     );
 
     true
+}
+
+/// Result of attempting a shift-click quick-equip from a container slot into weapon / armor /
+/// accessory slots (mirrors [`try_auto_equip_from_upgrade_slot`] destination rules).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum ShiftQuickEquipResult {
+    /// Not a weapon or equippable piece (caller may run hotbar / container moves).
+    NotEquippable,
+    /// Moved into an equip slot; source slot was cleared and marked dirty.
+    Equipped,
+    /// Weapon or gear, but every valid equip slot is full — do nothing else (no hotbar move).
+    NoEmptyEquipSlot,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum InventoryShiftClickSource {
+    MainGrid,
+    CraftingInputs,
+}
+
+fn take_item_from_shift_source(
+    inv: &mut Inventory,
+    source: InventoryShiftClickSource,
+    src_slot: usize,
+) -> Option<InventoryItemStack> {
+    match source {
+        InventoryShiftClickSource::MainGrid => inv.items.items.get_mut(src_slot).and_then(|s| s.take()),
+        InventoryShiftClickSource::CraftingInputs => inv
+            .crafting_inputs_items
+            .items
+            .get_mut(src_slot)
+            .and_then(|s| s.take()),
+    }
+}
+
+/// Shift-click: move gear from the main grid or crafting input slots into the first empty
+/// matching equip slot. Weapons prefer the main hand, then the pet slot when applicable.
+///
+/// Caller should set the source slot’s `InventorySlotState::dirty` when the result is not
+/// [`ShiftQuickEquipResult::NotEquippable`]; equip destinations refresh via `update_inventory_ui`
+/// when stored counts diverge from UI state.
+pub fn try_shift_quick_equip_from_inventory_source(
+    inv: &mut Inventory,
+    source: InventoryShiftClickSource,
+    src_slot: usize,
+    proto: &ProtoParam,
+    player_has_pet: bool,
+) -> ShiftQuickEquipResult {
+    let stack_entry = match source {
+        InventoryShiftClickSource::MainGrid => inv.items.items.get(src_slot).cloned().flatten(),
+        InventoryShiftClickSource::CraftingInputs => inv
+            .crafting_inputs_items
+            .items
+            .get(src_slot)
+            .cloned()
+            .flatten(),
+    };
+    let Some(stack_entry) = stack_entry else {
+        return ShiftQuickEquipResult::NotEquippable;
+    };
+    let item_stack = stack_entry.item_stack;
+
+    if item_stack.obj_type.is_weapon() {
+        if inv
+            .weapon_items
+            .items
+            .get(0)
+            .map_or(true, |s| s.is_none())
+        {
+            InventoryItemStack {
+                item_stack: item_stack.clone(),
+                slot: 0,
+            }
+            .write_to_container(&mut inv.weapon_items);
+            take_item_from_shift_source(inv, source, src_slot);
+            return ShiftQuickEquipResult::Equipped;
+        }
+        if player_has_pet
+            && inv
+                .pet_items
+                .items
+                .get(0)
+                .map_or(true, |s| s.is_none())
+        {
+            InventoryItemStack {
+                item_stack: item_stack.clone(),
+                slot: 0,
+            }
+            .write_to_container(&mut inv.pet_items);
+            take_item_from_shift_source(inv, source, src_slot);
+            return ShiftQuickEquipResult::Equipped;
+        }
+        return ShiftQuickEquipResult::NoEmptyEquipSlot;
+    }
+
+    let Some(eq_type) = resolve_equipment_type_for_auto_equip(item_stack.obj_type, proto) else {
+        return ShiftQuickEquipResult::NotEquippable;
+    };
+
+    if eq_type.is_cape() {
+        if inv
+            .equipment_items
+            .items
+            .get(CAPE_EQUIPMENT_SLOT_INDEX)
+            .is_some_and(|s| s.is_none())
+        {
+            let taken = take_item_from_shift_source(inv, source, src_slot).unwrap();
+            InventoryItemStack {
+                item_stack: taken.item_stack,
+                slot: CAPE_EQUIPMENT_SLOT_INDEX,
+            }
+            .write_to_container(&mut inv.equipment_items);
+            return ShiftQuickEquipResult::Equipped;
+        }
+        return ShiftQuickEquipResult::NoEmptyEquipSlot;
+    }
+
+    let target_slot_type = eq_type.get_valid_slot_type();
+    if target_slot_type == InventorySlotType::Normal {
+        return ShiftQuickEquipResult::NotEquippable;
+    }
+
+    let valid_slots = eq_type.get_valid_slots();
+    if valid_slots.is_empty() {
+        return ShiftQuickEquipResult::NoEmptyEquipSlot;
+    }
+
+    let Some(dest_slot) = valid_slots.into_iter().find(|&i| {
+        inv.get_items_from_slot_type(target_slot_type)
+            .items
+            .get(i)
+            .is_some_and(|s| s.is_none())
+    }) else {
+        return ShiftQuickEquipResult::NoEmptyEquipSlot;
+    };
+
+    let taken = take_item_from_shift_source(inv, source, src_slot).unwrap();
+    InventoryItemStack {
+        item_stack: taken.item_stack,
+        slot: dest_slot,
+    }
+    .write_to_container(inv.get_mut_items_from_slot_type(target_slot_type));
+    ShiftQuickEquipResult::Equipped
+}
+
+/// Shift-click from an equipment / accessory / weapon / pet slot into the main grid (`items`),
+/// merging with partial stacks or using the first empty slot when possible.
+pub fn shift_move_equipped_slot_to_main_items(
+    inv: &mut Inventory,
+    slot_type: InventorySlotType,
+    slot_index: usize,
+) {
+    match slot_type {
+        InventorySlotType::Equipment => {
+            inv.equipment_items
+                .move_item_to_target_container(&mut inv.items, slot_index);
+        }
+        InventorySlotType::Accessory => {
+            inv.accessory_items
+                .move_item_to_target_container(&mut inv.items, slot_index);
+        }
+        InventorySlotType::Weapon => {
+            inv.weapon_items
+                .move_item_to_target_container(&mut inv.items, slot_index);
+        }
+        InventorySlotType::Pet => {
+            inv.pet_items
+                .move_item_to_target_container(&mut inv.items, slot_index);
+        }
+        _ => {}
+    }
 }

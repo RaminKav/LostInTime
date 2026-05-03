@@ -45,26 +45,23 @@ pub fn handle_pet_spawner_interaction(
         if distance <= trigger.activation_distance {
             let pet_type = &spawner.pet_type;
 
+            let Some(achievement) = (match pet_type {
+                Pet::Slime => Some(Achievement::SlimePet),
+                Pet::Fairy => Some(Achievement::FairyPet),
+                Pet::Porkipine => Some(Achievement::PorkipinePet),
+                Pet::GoldenPig => Some(Achievement::GoldenPigPet),
+                Pet::Goliath => None,
+            }) else {
+                // Goliath is unlocked by completing Act III, not via world spawner.
+                continue;
+            };
+
             // Check if achievement is already unlocked
             if let Some(achievements) = item_action_param.achievements.as_ref() {
-                let achievement = match pet_type {
-                    Pet::Slime => Achievement::SlimePet,
-                    Pet::Fairy => Achievement::FairyPet,
-                    Pet::Porkipine => Achievement::PorkipinePet,
-                    Pet::GoldenPig => Achievement::GoldenPigPet,
-                };
                 if achievements.has(achievement) {
                     continue; // Already unlocked, skip
                 }
             }
-
-            // Unlock the achievement
-            let achievement = match pet_type {
-                Pet::Slime => Achievement::SlimePet,
-                Pet::Fairy => Achievement::FairyPet,
-                Pet::Porkipine => Achievement::PorkipinePet,
-                Pet::GoldenPig => Achievement::GoldenPigPet,
-            };
 
             if let Some(achievements) = item_action_param.achievements.as_mut() {
                 if achievements.unlock(achievement.clone()) {

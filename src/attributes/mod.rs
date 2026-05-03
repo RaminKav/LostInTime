@@ -2024,6 +2024,14 @@ fn item_attributes_to_bonus_stat_lines(attrs: &ItemAttributes) -> Vec<crate::ite
             range_percentage: attrs.pickup_range.range_percentage,
         });
     }
+    if attrs.size.value != 0 {
+        stat_lines.push(BonusStatLine {
+            attribute_name: "size".to_string(),
+            value: attrs.size.value,
+            quality: attrs.size.quality,
+            range_percentage: attrs.size.range_percentage,
+        });
+    }
 
     stat_lines
 }

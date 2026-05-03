@@ -38,6 +38,9 @@ pub enum Pet {
     Fairy,
     Porkipine,
     GoldenPig,
+    /// Passive: +1% projectile size per level (cape). Active: 1% chance to double
+    /// weapon/skill projectile spawn scale while this pet is in your party.
+    Goliath,
 }
 
 /// Marker component for pet spawners (pets that can be collected by the player)
@@ -48,19 +51,19 @@ pub struct PetSpawner {
 impl Pet {
     pub fn get_idle_anim(&self) -> &str {
         match self {
-            Pet::Slime | Pet::Porkipine | Pet::GoldenPig => SlimePetSprite::tags::IDLE,
+            Pet::Slime | Pet::Porkipine | Pet::GoldenPig | Pet::Goliath => SlimePetSprite::tags::IDLE,
             Pet::Fairy => FairyPetSprite::tags::IDLE,
         }
     }
     pub fn get_walk_anim(&self) -> &str {
         match self {
-            Pet::Slime | Pet::Porkipine | Pet::GoldenPig => SlimePetSprite::tags::WALK,
+            Pet::Slime | Pet::Porkipine | Pet::GoldenPig | Pet::Goliath => SlimePetSprite::tags::WALK,
             Pet::Fairy => FairyPetSprite::tags::WALK,
         }
     }
     pub fn get_aseprite_path(&self) -> &str {
         match self {
-            Pet::Slime | Pet::Porkipine | Pet::GoldenPig => SlimePetSprite::PATH,
+            Pet::Slime | Pet::Porkipine | Pet::GoldenPig | Pet::Goliath => SlimePetSprite::PATH,
             Pet::Fairy => FairyPetSprite::PATH,
         }
     }
@@ -96,6 +99,10 @@ impl Pet {
                 // +1.5% Pickup Range per level
                 stats.pickup_range =
                     AttributeValue::new((level as f32 * 2.).round() as i32, quality, 1.5);
+            }
+            Pet::Goliath => {
+                // +1% projectile size per level (same attribute as size on gear)
+                stats.size = AttributeValue::new(level * 1, quality, 1.);
             }
         }
 
@@ -315,6 +322,7 @@ pub fn configure_pet_on_spawn(
                         Timer::from_seconds(15.0, TimerMode::Repeating),
                     ));
             }
+            crate::pets::state::Pet::Goliath => {}
         }
 
         events.send(UpdatePetWeaponEvent);

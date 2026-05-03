@@ -591,6 +591,10 @@ pub fn is_class_unlocked(
 
 /// Check if a pet is unlocked based on achievements
 pub fn is_pet_unlocked(pet: &crate::pets::state::Pet, achievements: &Achievements) -> bool {
+    if matches!(pet, crate::pets::state::Pet::Goliath) {
+        return true;
+    }
+
     // Porkipine and GoldenPig are available to anyone who has completed Act 2
     if matches!(pet, crate::pets::state::Pet::Porkipine | crate::pets::state::Pet::GoldenPig)
         && achievements.has(Achievement::Act2)
