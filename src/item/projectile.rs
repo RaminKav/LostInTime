@@ -299,7 +299,7 @@ fn goliath_spawn_scale_multiplier(
         return 1.;
     }
     let mut rng = rand::thread_rng();
-    if rng.gen_ratio(1, 50) {
+    if rng.gen_ratio(1, 30) {
         2.
     } else {
         1.

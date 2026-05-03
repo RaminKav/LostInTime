@@ -125,9 +125,8 @@ fn spawn_heirloom_grid_overlay(
 
     let rows = (entries.len() + GRID_COLS - 1) / GRID_COLS;
     let grid_w = GRID_COLS as f32 * GRID_CELL;
-    let grid_h = rows as f32 * GRID_CELL;
     let backdrop_w = (inner_w * 0.92).min(grid_w + 36.);
-    let backdrop_h = (inner_h * 0.78);
+    let backdrop_h = (inner_h * 0.78).max(273.);
 
     commands.spawn((
         SpriteBundle {
