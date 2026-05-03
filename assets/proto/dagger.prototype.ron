@@ -5,7 +5,7 @@
   "survival_rogue_like::item::WorldObject": Dagger,
   "survival_rogue_like::item::EquipmentType": Weapon,
   "survival_rogue_like::attributes::RawItemBaseAttributes": (
-        attack: Some((start: 6, end: 8)),
+        attack: Some((start: 7, end: 9)),
   ),
   "survival_rogue_like::attributes::RawItemBonusAttributes": (
         crit_damage: Some((start: 10, end: 16)),
@@ -27,7 +27,7 @@
   "survival_rogue_like::inventory::ItemStack": (
         obj_type: Dagger,
         attributes: (
-            attack_cooldown: 0.6
+            attack_cooldown: 0.55
         ),
         metadata: (
             name: "Dagger", 

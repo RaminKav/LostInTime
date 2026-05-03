@@ -480,20 +480,21 @@ pub fn tick_game_over_overlay(
             *tip_check = true;
             // Try to load tips from save
             let tips = vec![
-                "Enemies get tougher every night. If you take too long, they will overpower you!",
-                "Stars represent the overall quality of the stat lines on equipment.",
-                "If your hunger bar is empty, you will move slower and lose health over time.",
-                "Press Shift while inspecting an item to view the range\n\n     of possible values for each stat line.",
-                "You can drop an item by dragging it out of your inventory.",
-                "Elite mobs are much tougher, but they give more exp and drop more loot.",
-                "At night, enemies will spawn much faster. Be prepared!",
-                "Item colors correspond to rarity:\n\n     Common (Grey), Uncommon (green), Rare (blue), Legendary (Red).",
-                "Press Shift + Left Click to quickly move items\n\n     between your hotbar and inventory.",
-                "Enemies drop higher level gear the higher level you are!\n\n      Higher level gear have better base stats.",
-                "Rolling through Crates instantly breaks them!",
-                "Increasing Chaos is dangerous, but grants more score!",
-                "Enemies drop mana orbs if you have a magic item!"
-              ];
+              "Enemies get tougher every night. If you take too long, they will overpower you!",
+              "Stars represent the overall quality of the stat lines on equipment.",
+              // "Press Shift while inspecting an item to view the range\n\n     of possible values for each stat line.",
+              "You can drop an item by dragging it out of your inventory.\n       Or put it in the trash slot in your inventory.",
+              "Elite mobs are much tougher, but they give more exp and drop more loot.",
+              "At night, enemies will spawn and move much faster. Be prepared!",
+              "Item colors correspond to rarity:\n\n     Common (Grey), Uncommon (blue), Rare (purple), Legendary (yellow).",
+              "Press Shift + Left Click to quickly move items\n\n     between your hotbar and inventory.",
+              "Enemies drop higher level gear the higher level you are!\n\n      Higher level gear has better base stats.",
+              // "Rolling through Crates instantly breaks them!",
+              "Increasing Chaos is dangerous, but grants more score!",
+              "Enemies drop mana orbs sometimes which recover 10 mana!",
+              "Pink Flowers will bounce forward if you walk over them!",
+              "Don't forget to upgrade your equipment in your inventory!\n        using Upgrade Tomes and Orbs.",
+            ];
 
             let picked_tip = tips.iter().choose(&mut rand::thread_rng()).unwrap();
             spawn_text(
@@ -520,7 +521,7 @@ pub fn tick_game_over_overlay(
                 let reader = BufReader::new(file_file);
 
                 // Read the JSON contents of the file as an instance of `GameData`.
-                match serde_json::from_reader::<_, GameData>(reader) {
+                match GameData::try_from_json_reader(reader) {
                     Ok(data) => total_currency = data.time_fragments,
                     Err(err) => error!(
                         "Failed to load data from game_data.json file to get currency {err:?}"

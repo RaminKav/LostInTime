@@ -88,6 +88,7 @@ pub enum MenuButton {
     Unlocks,
     Options,
     Achievements,
+    TimeCrystals,
     Quit,
     InfoOK,
     GameOverOK,
@@ -207,6 +208,12 @@ pub fn handle_menu_button_click_events(
                 }
                 next_ui_state.set(UIState::Achievements);
                 extras.pagination_state.page = 0;
+            }
+            MenuButton::TimeCrystals => {
+                if info_modal_open {
+                    continue;
+                }
+                next_ui_state.set(UIState::TimeCrystalsBrowser);
             }
             MenuButton::AchievementsPrev => {
                 let total_achievements = Achievement::iter().count();
@@ -532,9 +539,21 @@ pub fn spawn_menu_text_buttons(
         .entity(achievements_button)
         .insert(AchievementsButton);
 
+    spawn_menu_button(
+        Vec3::new(-34., -112., 1.),
+        Vec3::new(-50., -0., 1.),
+        "Time Crystals",
+        MenuButton::TimeCrystals,
+        Vec2::new(118., 18.),
+        &mut commands,
+        &graphics,
+        &asset_server,
+        UIElement::AchievementsButton,
+    );
+
     // Options Button
     spawn_menu_button(
-        Vec3::new(140., -109., 1.),
+        Vec3::new(140., -139., 1.),
         Vec3::new(-27., 0.0, 1.),
         "Options",
         MenuButton::Options,
@@ -547,7 +566,7 @@ pub fn spawn_menu_text_buttons(
 
     // Quit Button
     spawn_menu_button(
-        Vec3::new(-79.5, -109., 1.),
+        Vec3::new(-82., -139., 1.),
         Vec3::new(-14., -0., 1.),
         "Quit",
         MenuButton::Quit,

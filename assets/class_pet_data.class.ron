@@ -34,7 +34,7 @@
             stat_description: [
                 "Gain +1 Speed per level" // 10
             ],
-            class_icon: GreenPlayerSelectIcon,
+            class_icon: RoguePlayerSelectIcon,
             skill_icon: CritChanceIcon,
             active_skills: (SprintLunge, PossessedBlade, Rapidfire, DaggerSlash), // one extra slash per 25 speed
             starting_weapons: [Dagger],

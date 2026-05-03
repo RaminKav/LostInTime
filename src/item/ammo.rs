@@ -45,25 +45,13 @@ impl Ammo {
     }
 }
 
-pub fn tick_reload(
-    time: Res<Time>,
-    mut q: Query<&mut Ammo>,
-    mut tip_event: EventWriter<TipEvent>,
-    seen_tips: Res<SeenTips>,
-) {
+pub fn tick_reload(time: Res<Time>, mut q: Query<&mut Ammo>) {
     for mut ammo in q.iter_mut() {
         if ammo.reloading {
             ammo.reload.tick(time.delta());
             if ammo.reload.finished() {
                 ammo.current = ammo.max;
                 ammo.reloading = false;
-
-                if !seen_tips.has_seen(&Tip::ProjectileWeapons) {
-                    tip_event.send(TipEvent {
-                        tip: Tip::ProjectileWeapons,
-                        pos: Vec3::new(-184., -116., 60.),
-                    });
-                }
             }
         }
     }

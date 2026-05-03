@@ -813,7 +813,7 @@ pub fn setup_options_ui(
 
         // Exit to Menu button
         let exit_button = crate::ui::main_menu::spawn_menu_button(
-            Vec3::new(140., -148., ui_helpers::Z_DEPTH_OPTIONS_CONTENT),
+            Vec3::new(140., -156., ui_helpers::Z_DEPTH_OPTIONS_CONTENT),
             Vec3::new(-50., -1., 1.),
             "Exit to Menu",
             crate::ui::main_menu::MenuButton::OptionsExit,

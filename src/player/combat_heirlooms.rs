@@ -38,12 +38,12 @@ const ANT_LIFETIME: f32 = 4.0;
 const ANT_CHAIN_DELAY: f32 = 0.25;
 
 /// Time for one full orbit (rotation speed); faster = snappier feel.
-const STONE_TOOTH_ORBIT_PERIOD: f32 = 1.2;
+const STONE_TOOTH_ORBIT_PERIOD: f32 = 2.0;
 /// Delay between spawning the next batch.
-const STONE_TOOTH_SPAWN_INTERVAL: f32 = 2.8;
-const STONE_TOOTH_ROCK_LIFETIME: f32 = 1.5;
+const STONE_TOOTH_SPAWN_INTERVAL: f32 = 3.8;
+const STONE_TOOTH_ROCK_LIFETIME: f32 = 2.0;
 /// Distance rocks travel outward from the player over their lifetime.
-const STONE_TOOTH_TRAVEL_DISTANCE: f32 = 70.0;
+const STONE_TOOTH_TRAVEL_DISTANCE: f32 = 40.0;
 const STONE_CONTACT_DISTANCE: f32 = 28.0;
 
 const REAPER_SOUL_SPEED: f32 = 220.0;
@@ -57,7 +57,7 @@ const REAPER_SOUL_DRIFT_FREQ: f32 = 10.5;
 /// Summon Ring: piercing ring that travels in a line and bounces off solid objects.
 const SUMMON_RING_COOLDOWN: f32 = 3.5;
 const SUMMON_RING_SPEED: f32 = 230.0;
-const SUMMON_RING_LIFETIME: f32 = 2.2;
+const SUMMON_RING_LIFETIME: f32 = 3.0;
 const SUMMON_RING_COLLIDER_RADIUS: f32 = 10.0;
 
 #[derive(Clone)]

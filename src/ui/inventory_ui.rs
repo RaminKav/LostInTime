@@ -86,6 +86,9 @@ pub enum UIState {
     ClassSelection,
     EnterName,
     BlessingChoice,
+    TimeCrystalProgress,
+    /// Main-menu overview of all time crystals and their heirloom unlocks.
+    TimeCrystalsBrowser,
 }
 impl UIState {
     pub fn is_inv_open(&self) -> bool {

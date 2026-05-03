@@ -381,7 +381,7 @@ impl GameAssetsPlugin {
         let game_data_file_path = datafiles::game_data();
         if let Ok(file_file) = File::open(game_data_file_path) {
             let reader = BufReader::new(file_file);
-            match serde_json::from_reader::<_, GameData>(reader) {
+            match GameData::try_from_json_reader(reader) {
                 Ok(game_data) => {
                     let class_ranks = game_data.class_ranks.clone();
                     let high_scores = game_data.high_scores.clone();

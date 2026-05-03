@@ -63,6 +63,10 @@ mod leaderboard_ui;
 pub use leaderboard_ui::*;
 mod name_entry_ui;
 pub use name_entry_ui::*;
+mod time_crystal_progress_ui;
+pub use time_crystal_progress_ui::*;
+mod time_crystals_browser_ui;
+pub use time_crystals_browser_ui::*;
 mod achievements_ui;
 use crate::run_once_per_run;
 use crate::ui::achievement_banner::{
@@ -269,6 +273,7 @@ impl Plugin for UIPlugin {
             .init_resource::<BeaconGuidanceRegistry>()
             .init_resource::<BlacksmithPurchaseTracker>()
             .init_resource::<EssenceShopCache>()
+            .init_resource::<TimeCrystalsHeirloomGridOpen>()
             .add_event::<TooltipTeardownEvent>()
             .add_event::<ShowInvPlayerStatsEvent>()
             .add_event::<SubmitEssenceChoice>()
@@ -530,8 +535,34 @@ impl Plugin for UIPlugin {
                         .run_if(in_state(UIState::EnterName)),
                     handle_name_entry_ok_button
                         .run_if(in_state(UIState::EnterName)),
+                    setup_time_crystal_progress_ui
+                        .before(CustomFlush)
+                        .run_if(state_changed::<UIState>().and_then(in_state(UIState::TimeCrystalProgress))),
+                    cleanup_time_crystal_progress_ui
+                        .run_if(state_changed::<UIState>().and_then(not(in_state(UIState::TimeCrystalProgress)))),
+                    handle_time_crystal_progress_ok_button
+                        .run_if(in_state(UIState::TimeCrystalProgress)),
+                    handle_time_crystal_unlock_hover_tooltip
+                        .run_if(
+                            in_state(UIState::TimeCrystalProgress)
+                                .or_else(in_state(UIState::TimeCrystalsBrowser)),
+                        ),
+                    setup_time_crystals_browser_ui
+                        .before(CustomFlush)
+                        .run_if(state_changed::<UIState>().and_then(in_state(UIState::TimeCrystalsBrowser))),
+                    cleanup_time_crystals_browser_ui
+                        .run_if(state_changed::<UIState>().and_then(not(in_state(UIState::TimeCrystalsBrowser)))),
+                    handle_time_crystals_browser_done_button
+                        .run_if(in_state(UIState::TimeCrystalsBrowser)),
+                    handle_time_crystals_view_heirlooms_button
+                        .run_if(in_state(UIState::TimeCrystalsBrowser)),
                 )
                     .in_set(OnUpdate(GameState::MainMenu)),
+            )
+            .add_system(
+                check_show_time_crystal_progress_popup
+                    .after(crate::ui::check_show_name_entry_popup)
+                    .in_schedule(OnEnter(GameState::MainMenu)),
             )
             .add_systems((
                     handle_unlocks_clicks.run_if(in_state(UIState::Unlocks)),

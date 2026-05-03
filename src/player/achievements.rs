@@ -269,7 +269,7 @@ pub fn persist_achievements_state(achievements: &Achievements) {
     let path = datafiles::game_data();
     let mut game_data = if let Ok(file) = File::open(&path) {
         let reader = BufReader::new(file);
-        serde_json::from_reader::<_, GameData>(reader).unwrap_or_default()
+        GameData::try_from_json_reader(reader).unwrap_or_default()
     } else {
         GameData::default()
     };

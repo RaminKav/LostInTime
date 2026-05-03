@@ -12,7 +12,7 @@ use strum_macros::{Display, EnumIter};
 use crate::{
     animations::player_sprite::{
         PlayerBlueAseprite, PlayerGreenAseprite, PlayerGreyAseprite, PlayerRedAseprite,
-        PlayerSpriteHandles,
+        PlayerRogueAseprite, PlayerSpriteHandles,
     },
     attributes::{AttributeQuality, AttributeValue, ItemAttributes, ItemGlow},
     combat::pickup_radius::{
@@ -68,7 +68,7 @@ impl SkillClass {
         match self {
             SkillClass::Warrior => (sprites.red.clone(), PlayerRedAseprite::tags::IDLE_FRONT),
             SkillClass::Wizard => (sprites.blue.clone(), PlayerBlueAseprite::tags::IDLE_FRONT),
-            SkillClass::Rogue => (sprites.green.clone(), PlayerGreenAseprite::tags::IDLE_FRONT),
+            SkillClass::Rogue => (sprites.rogue.clone(), PlayerRogueAseprite::tags::IDLE_FRONT),
             SkillClass::Thief => (sprites.grey.clone(), PlayerGreyAseprite::tags::IDLE_FRONT),
             SkillClass::Hunter => (sprites.green.clone(), PlayerGreenAseprite::tags::IDLE_FRONT),
             _ => (sprites.grey.clone(), PlayerGreyAseprite::tags::IDLE_FRONT),
@@ -1883,7 +1883,7 @@ pub fn grant_skill_charge_after_cooldown_complete(
     }
 }
 
-#[derive(Clone, Eq, PartialEq, PartialOrd, Ord, Default, Debug, Serialize, Deserialize)]
+#[derive(Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Default, Debug, Serialize, Deserialize)]
 pub enum HeirloomRarity {
     #[default]
     Common,
@@ -1983,6 +1983,77 @@ impl Default for HeirloomChoiceQueue {
     }
 }
 
+/// Heirlooms unlocked by completing a single time crystal.
+///
+/// Single source of truth for both:
+/// - [`HeirloomChoiceQueue::new_for_player`] which conditionally appends them to the run pool, and
+/// - the post-run Time Crystal progress popup which shows the unlocks.
+///
+/// Indices outside the configured crystal range return an empty list.
+pub fn time_crystal_heirlooms(idx: usize) -> Vec<(Heirloom, HeirloomRarity)> {
+    match idx {
+        0 => vec![
+            (Heirloom::ManaOrbs, HeirloomRarity::Common),
+            (Heirloom::ManaOrbAttack, HeirloomRarity::Uncommon),
+            (Heirloom::SkillManaRegen, HeirloomRarity::Uncommon),
+        ],
+        1 => vec![
+            (Heirloom::FrailStacks, HeirloomRarity::Uncommon),
+            (Heirloom::WaveAttack, HeirloomRarity::Rare),
+            (Heirloom::ManaRegenPoison, HeirloomRarity::Rare),
+        ],
+        2 => vec![
+            (Heirloom::SkillCDReduction, HeirloomRarity::Common),
+            (Heirloom::Shield, HeirloomRarity::Uncommon),
+            (Heirloom::IncreaseProjectileCount, HeirloomRarity::Rare),
+        ],
+        3 => vec![
+            (Heirloom::CritChance, HeirloomRarity::Common),
+            (Heirloom::CritDamage, HeirloomRarity::Common),
+            (Heirloom::Lifesteal, HeirloomRarity::Common),
+        ],
+        4 => vec![
+            (Heirloom::MPBarDMG, HeirloomRarity::Rare),
+            (Heirloom::FrozenMPRegen, HeirloomRarity::Rare),
+            (Heirloom::IceStaffAoE, HeirloomRarity::Rare),
+        ],
+        5 => vec![
+            (Heirloom::CoinLightning, HeirloomRarity::Legendary),
+            (Heirloom::GoldIntoDamage, HeirloomRarity::Rare),
+            (Heirloom::LowHPDamage, HeirloomRarity::Rare),
+        ],
+        6 => vec![
+            (Heirloom::ThornsLifesteal, HeirloomRarity::Uncommon),
+            (Heirloom::ThornsOnDamage, HeirloomRarity::Rare),
+        ],
+        7 => vec![
+            (Heirloom::XPGain, HeirloomRarity::Common),
+            (Heirloom::BowArrowSpeed, HeirloomRarity::Uncommon),
+            (Heirloom::SkillPowerHunt, HeirloomRarity::Rare),
+        ],
+        8 => vec![
+            (Heirloom::SlowStacks, HeirloomRarity::Uncommon),
+            (Heirloom::FrozenAoE, HeirloomRarity::Uncommon),
+            (Heirloom::FrozenCrit, HeirloomRarity::Rare),
+        ],
+        9 => vec![
+            (Heirloom::IceStaffFloor, HeirloomRarity::Legendary),
+            (Heirloom::DaggerCombo, HeirloomRarity::Legendary),
+            (Heirloom::CreditCard, HeirloomRarity::Legendary),
+        ],
+        10 => vec![
+            (Heirloom::StandStill, HeirloomRarity::Legendary),
+            (Heirloom::TomeDoubleUpgrade, HeirloomRarity::Legendary),
+        ],
+        11 => vec![
+            (Heirloom::DodgeCrit, HeirloomRarity::Rare),
+            (Heirloom::ChaosBoost, HeirloomRarity::Uncommon),
+            (Heirloom::ChaosStats, HeirloomRarity::Rare),
+        ],
+        _ => vec![],
+    }
+}
+
 impl HeirloomChoiceQueue {
     /// Build the heirloom pool for a new run, gated on the player's persistent
     /// [`TimeCrystals`] progress. Crystal-gated entries are appended only when the
@@ -2037,198 +2108,14 @@ impl HeirloomChoiceQueue {
             HeirloomChoiceState::new(Heirloom::CrateBreakDamage, HeirloomRarity::Legendary),
         ];
 
-        // Crystal 0
-        if time_crystals.is_complete(0) {
-            pool.push(HeirloomChoiceState::new(
-                Heirloom::ManaOrbs,
-                HeirloomRarity::Common,
-            ));
-            pool.push(HeirloomChoiceState::new(
-                Heirloom::ManaOrbAttack,
-                HeirloomRarity::Uncommon,
-            ));
-            pool.push(HeirloomChoiceState::new(
-                Heirloom::SkillManaRegen,
-                HeirloomRarity::Uncommon,
-            ));
-        }
-
-        // Crystal 1
-        if time_crystals.is_complete(1) {
-            pool.push(HeirloomChoiceState::new(
-                Heirloom::FrailStacks,
-                HeirloomRarity::Uncommon,
-            ));
-            pool.push(HeirloomChoiceState::new(
-                Heirloom::WaveAttack,
-                HeirloomRarity::Rare,
-            ));
-        }
-        // Crystal 2
-        if time_crystals.is_complete(2) {
-            // TODO: 3 heirlooms unlocked by Time Crystal #3
-            pool.push(HeirloomChoiceState::new(
-                Heirloom::SkillCDReduction,
-                HeirloomRarity::Common,
-            ));
-            pool.push(HeirloomChoiceState::new(
-                Heirloom::Shield,
-                HeirloomRarity::Uncommon,
-            ));
-            pool.push(HeirloomChoiceState::new(
-                Heirloom::IncreaseProjectileCount,
-                HeirloomRarity::Rare,
-            ));
-        }
-        // Crystal 3
-        if time_crystals.is_complete(3) {
-            // TODO: 3 heirlooms unlocked by Time Crystal #4
-            pool.push(HeirloomChoiceState::new(
-                Heirloom::CoinLightning,
-                HeirloomRarity::Legendary,
-            ));
-            pool.push(HeirloomChoiceState::new(
-                Heirloom::GoldIntoDamage,
-                HeirloomRarity::Rare,
-            ));
-        }
-        // Crystal 4
-        if time_crystals.is_complete(4) {
-            // TODO: 3 heirlooms unlocked by Time Crystal #5
-            pool.push(HeirloomChoiceState::new(
-                Heirloom::MPBarDMG,
-                HeirloomRarity::Rare,
-            ));
-            pool.push(HeirloomChoiceState::new(
-                Heirloom::FrozenMPRegen,
-                HeirloomRarity::Rare,
-            ));
-            pool.push(HeirloomChoiceState::new(
-                Heirloom::IceStaffAoE,
-                HeirloomRarity::Rare,
-            ));
-        }
-        // Crystal 5
-        if time_crystals.is_complete(5) {
-            // TODO: 3 heirlooms unlocked by Time Crystal #6
-            pool.push(HeirloomChoiceState::new(
-                Heirloom::CritChance,
-                HeirloomRarity::Common,
-            ));
-            pool.push(HeirloomChoiceState::new(
-                Heirloom::CritDamage,
-                HeirloomRarity::Common,
-            ));
-            pool.push(HeirloomChoiceState::new(
-                Heirloom::Lifesteal,
-                HeirloomRarity::Common,
-            ));
-        }
-        // Crystal 6
-        if time_crystals.is_complete(6) {
-            // TODO: 3 heirlooms unlocked by Time Crystal #7
-            pool.push(HeirloomChoiceState::new(
-                Heirloom::ThornsLifesteal,
-                HeirloomRarity::Uncommon,
-            ));
-            pool.push(HeirloomChoiceState::new(
-                Heirloom::ThornsOnDamage,
-                HeirloomRarity::Rare,
-            ));
-        }
-        // Crystal 7
-        if time_crystals.is_complete(7) {
-            // TODO: 3 heirlooms unlocked by Time Crystal #8
-
-            pool.push(HeirloomChoiceState::new(
-                Heirloom::XPGain,
-                HeirloomRarity::Common,
-            ));
-            pool.push(HeirloomChoiceState::new(
-                Heirloom::BowArrowSpeed,
-                HeirloomRarity::Uncommon,
-            ));
-            pool.push(HeirloomChoiceState::new(
-                Heirloom::SkillPowerHunt,
-                HeirloomRarity::Rare,
-            ));
-        }
-        // Crystal 8
-        if time_crystals.is_complete(8) {
-            // TODO: 3 heirlooms unlocked by Time Crystal #9
-            pool.push(HeirloomChoiceState::new(
-                Heirloom::LowHPDamage,
-                HeirloomRarity::Rare,
-            ));
-            pool.push(HeirloomChoiceState::new(
-                Heirloom::ManaRegenPoison,
-                HeirloomRarity::Rare,
-            ));
-        }
-        // Crystal 9
-        if time_crystals.is_complete(9) {
-            // TODO: 3 heirlooms unlocked by Time Crystal #10
-            pool.push(HeirloomChoiceState::new(
-                Heirloom::SlowStacks,
-                HeirloomRarity::Uncommon,
-            ));
-            pool.push(HeirloomChoiceState::new(
-                Heirloom::FrozenAoE,
-                HeirloomRarity::Uncommon,
-            ));
-            pool.push(HeirloomChoiceState::new(
-                Heirloom::FrozenCrit,
-                HeirloomRarity::Rare,
-            ));
-        }
-        // Crystal 10
-        if time_crystals.is_complete(10) {
-            // TODO: 3 heirlooms unlocked by Time Crystal #10
-            pool.push(HeirloomChoiceState::new(
-                Heirloom::IceStaffFloor,
-                HeirloomRarity::Legendary,
-            ));
-            pool.push(HeirloomChoiceState::new(
-                Heirloom::DaggerCombo,
-                HeirloomRarity::Legendary,
-            ));
-            pool.push(HeirloomChoiceState::new(
-                Heirloom::CreditCard,
-                HeirloomRarity::Legendary,
-            ));
-        }
-        // Crystal 11
-        if time_crystals.is_complete(11) {
-            // TODO: 3 heirlooms unlocked by Time Crystal #11
-
-            pool.push(HeirloomChoiceState::new(
-                Heirloom::StandStill,
-                HeirloomRarity::Legendary,
-            ));
-            pool.push(HeirloomChoiceState::new(
-                Heirloom::TomeDoubleUpgrade,
-                HeirloomRarity::Legendary,
-            ));
-        }
-        // Crystal 12
-        if time_crystals.is_complete(12) {
-            // TODO: 3 heirlooms unlocked by Time Crystal #12
-            pool.push(HeirloomChoiceState::new(
-                Heirloom::DodgeCrit,
-                HeirloomRarity::Rare,
-            ));
-            pool.push(HeirloomChoiceState::new(
-                Heirloom::ChaosBoost,
-                HeirloomRarity::Uncommon,
-            ));
-            pool.push(HeirloomChoiceState::new(
-                Heirloom::ChaosStats,
-                HeirloomRarity::Rare,
-            ));
-        }
-        // Crystal 13
-        if time_crystals.is_complete(13) {
-            // TODO: 3 heirlooms unlocked by Time Crystal #13
+        // Crystal-gated heirlooms. Mapping lives in `time_crystal_heirlooms`.
+        for idx in 0..time_crystals.crystals.len() {
+            if !time_crystals.is_complete(idx) {
+                continue;
+            }
+            for (heirloom, rarity) in time_crystal_heirlooms(idx) {
+                pool.push(HeirloomChoiceState::new(heirloom, rarity));
+            }
         }
         info!("====== Heirloom Summery ======");
         info!(

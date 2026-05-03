@@ -366,7 +366,7 @@ fn save_player_name(name: &str, game_data_resource: &mut GameData) {
     // Load existing game data or create new
     let mut game_data: GameData = if let Ok(file) = File::open(&game_data_file_path) {
         let reader = BufReader::new(file);
-        serde_json::from_reader(reader).unwrap_or_default()
+        GameData::try_from_json_reader(reader).unwrap_or_default()
     } else {
         GameData::default()
     };
@@ -404,7 +404,7 @@ pub fn check_show_name_entry_popup(
     // Check if player name exists
     let needs_name = if let Ok(file) = File::open(&game_data_file_path) {
         let reader = BufReader::new(file);
-        match serde_json::from_reader::<_, GameData>(reader) {
+        match GameData::try_from_json_reader(reader) {
             Ok(data) => data.player_name.is_none() || data.player_name.as_ref().unwrap().is_empty(),
             Err(_) => true, // File doesn't exist or is corrupted, need name
         }

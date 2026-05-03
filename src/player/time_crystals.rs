@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 
 /// Number of crystals tracked across all runs.
-pub const TIME_CRYSTAL_COUNT: usize = 14;
+pub const TIME_CRYSTAL_COUNT: usize = 12;
 /// Number of shards required to complete each crystal.
 pub const SHARDS_PER_CRYSTAL: u32 = 6;
 /// Run must last at least this many seconds for the survival shard.
@@ -98,5 +98,35 @@ impl TimeCrystals {
 
     pub fn completed_count(&self) -> usize {
         self.crystals.iter().filter(|c| c.is_complete()).count()
+    }
+
+    /// Index of the next crystal that's still incomplete (the one currently being filled).
+    /// Returns `None` if every crystal is complete.
+    pub fn current_focus_idx(&self) -> Option<usize> {
+        self.crystals.iter().position(|c| !c.is_complete())
+    }
+}
+
+/// Snapshot of a player's [`TimeCrystals`] before and after the last run, plus how
+/// many shards were awarded. Inserted on game-over so the post-run popup can show
+/// what the player gained without reaching back through saved data.
+///
+/// Consumed (removed) when the player closes the post-run progress popup.
+#[derive(Resource, Clone, Debug)]
+pub struct LastRunCrystalProgress {
+    /// Snapshot of the crystals BEFORE this run's shards were applied.
+    pub before: TimeCrystals,
+    /// Snapshot of the crystals AFTER this run's shards were applied.
+    pub after: TimeCrystals,
+    /// Total shards awarded for the run.
+    pub shards_earned: u32,
+}
+
+impl LastRunCrystalProgress {
+    /// Indices of crystals that went from incomplete to complete during this run.
+    pub fn newly_completed_indices(&self) -> Vec<usize> {
+        (0..self.after.crystals.len())
+            .filter(|i| !self.before.is_complete(*i) && self.after.is_complete(*i))
+            .collect()
     }
 }

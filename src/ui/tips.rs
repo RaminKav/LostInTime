@@ -23,8 +23,6 @@ use std::{
 #[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Tip {
     Recipes,
-    MagicWeapons,
-    ProjectileWeapons,
     Pets,
     UpgradingGear,
     InventoryStats,
@@ -32,21 +30,25 @@ pub enum Tip {
     EndlessMode,
     PeacefulPeriod,
     Night,
+    /// Any tip type that existed in an older build but was removed still deserializes
+    /// here so `game_data.json` keeps loading. Stripped from disk on the next save
+    /// (see [`crate::client::GameData::try_from_json_reader`]).
+    #[serde(other)]
+    Obsolete,
 }
 
 impl Tip {
     pub fn get_tip_text(&self) -> &'static str {
         match self {
-            Tip::Recipes => "Gather materials to craft\nuseful items right in your\ninventory. Tools, food, maps,\nbridges, and more can aid you\nin your journey!",
-            Tip::MagicWeapons => "Magic weapons are powerful,\nbut cost a bit of mana to\nuse. Keep an eye on your mana\nbar, and pick up some mana\nupgrades if needed!",
-            Tip::ProjectileWeapons => "Projectile weapons use ammo.\nThey automatically reload\nammo when you run out.",
-            Tip::Pets => "Pets can assist you in\ncombat and provide buffs and\npassives. They can also use\nyour extra weapons for you to\nfight! Place a weapon in your\nlast hotbar slot for them!",
-            Tip::UpgradingGear => "Gear can be upgraded in the\ninventory. Place the gear in\nthe top slot, and an upgrade\nmaterial in the bottom. Upgrade\ntomes increase the item's\nlevel by 1, and Orbs re-roll\nthe item's attributes!",
-            Tip::InventoryStats => "Extra gear can be placed in\nyour inventory (hotbar does\nnot count). They will grant you\nthe highlighted stat shown in\ntheir tooltip, passively.",
-            Tip::Chaos => "The island is getting more\nchaotic as time goes on. Some\nactions and choices can add\nchaos as well! Chaos increases\nthe number and strength of\nenemies.",
+            Tip::Recipes => "Gather materials to craft\nuseful items right in your\ninventory. Tools, food, bridges,\nand more can aid you in\nyour journey!",
+            Tip::Pets => "Pets can assist you in\ncombat and provide buffs and\npassives. They can also use\nyour extra weapons for you to\nfight! Place a weapon in your\npet equipment slot for them!",
+            Tip::UpgradingGear => "Gear can be upgraded in the\ninventory. Upgrade tomes\nincrease the item's level\n by 1, and Orbs re-roll\nthe item's attributes!",
+            Tip::InventoryStats => "Extra gear can be placed in\nyour inventory. They will grant you\nthe highlighted stat shown in\ntheir tooltip, passively.",
+            Tip::Chaos => "The island is getting more\nchaotic as time goes on. Some\nactions and choices can add\nchaos as well! Chaos increases\nthe strength of enemies.",
             Tip::EndlessMode => "Pay attention to the timer.\nDefeat the era boss and return\nto the portal before it runs\nout. If time runs out, the chaos\nwill overcome you...",
             Tip::PeacefulPeriod => "Time left over after defeating\nan era boss grants a peaceful\nperiod, where mobs will not\nspawn! Explore, gather\nresources, get stronger, and\nprepare for the next era!",
             Tip::Night => "Night time on the island is\ndangerous! Mob swarms will\nspawn, so make sure to be\nprepared!",
+            Tip::Obsolete => "",
         }
     }
 }
@@ -85,7 +87,7 @@ pub fn persist_seen_tips(seen_tips: &SeenTips) {
     let path = datafiles::game_data();
     let mut game_data = if let Ok(file) = File::open(&path) {
         let reader = BufReader::new(file);
-        serde_json::from_reader::<_, crate::client::GameData>(reader).unwrap_or_default()
+        crate::client::GameData::try_from_json_reader(reader).unwrap_or_default()
     } else {
         crate::client::GameData::default()
     };

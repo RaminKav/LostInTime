@@ -430,7 +430,7 @@ dependencies = [
 [[package]]
 name = "bevy_aseprite"
 version = "0.10.0"
-source = "git+https://github.com/RaminKav/bevy_aseprite.git?branch=v0.10.0-fix#226bcbfd3b63952b84917c47503a81b4b6cd4412"
+source = "git+https://github.com/RaminKav/bevy_aseprite.git?branch=v0.10.0-fix#8a43ad01d01a41bb664b1041ff016c99cd90e79a"
 dependencies = [
  "anyhow",
  "bevy",
@@ -441,7 +441,7 @@ dependencies = [
 [[package]]
 name = "bevy_aseprite_derive"
 version = "0.3.1"
-source = "git+https://github.com/RaminKav/bevy_aseprite.git?branch=v0.10.0-fix#226bcbfd3b63952b84917c47503a81b4b6cd4412"
+source = "git+https://github.com/RaminKav/bevy_aseprite.git?branch=v0.10.0-fix#8a43ad01d01a41bb664b1041ff016c99cd90e79a"
 dependencies = [
  "bevy_aseprite_reader",
  "heck 0.4.1",
@@ -453,7 +453,7 @@ dependencies = [
 [[package]]
 name = "bevy_aseprite_reader"
 version = "0.1.1"
-source = "git+https://github.com/RaminKav/bevy_aseprite.git?branch=v0.10.0-fix#226bcbfd3b63952b84917c47503a81b4b6cd4412"
+source = "git+https://github.com/RaminKav/bevy_aseprite.git?branch=v0.10.0-fix#8a43ad01d01a41bb664b1041ff016c99cd90e79a"
 dependencies = [
  "flate2",
  "image",
@@ -6103,7 +6103,7 @@ dependencies = [
  "js-sys",
  "log",
  "naga",
- "parking_lot 0.12.1",
+ "parking_lot 0.11.2",
  "profiling",
  "raw-window-handle",
  "smallvec",
@@ -6129,7 +6129,7 @@ dependencies = [
  "fxhash",
  "log",
  "naga",
- "parking_lot 0.12.1",
+ "parking_lot 0.11.2",
  "profiling",
  "raw-window-handle",
  "smallvec",
@@ -6168,7 +6168,7 @@ dependencies = [
  "metal",
  "naga",
  "objc",
- "parking_lot 0.12.1",
+ "parking_lot 0.11.2",
  "profiling",
  "range-alloc",
  "raw-window-handle",

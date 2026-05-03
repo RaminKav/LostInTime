@@ -199,7 +199,7 @@ impl InputMappings {
         let path = datafiles::game_data();
         if let Ok(file) = File::open(&path) {
             let reader = BufReader::new(file);
-            if let Ok(game_data) = serde_json::from_reader::<_, crate::client::GameData>(reader) {
+            if let Ok(game_data) = crate::client::GameData::try_from_json_reader(reader) {
                 return game_data.keybindings.unwrap_or_default();
             }
         }
@@ -210,7 +210,7 @@ impl InputMappings {
         let path = datafiles::game_data();
         let mut game_data = if let Ok(file) = File::open(&path) {
             let reader = BufReader::new(file);
-            serde_json::from_reader::<_, crate::client::GameData>(reader).unwrap_or_default()
+            crate::client::GameData::try_from_json_reader(reader).unwrap_or_default()
         } else {
             crate::client::GameData::default()
         };

@@ -42,7 +42,7 @@ use crate::{
         score::{HighScores, RunScore, RunTimer},
         skills::{HeirloomChoiceQueue, PlayerClass, PlayerSkills, SkillClass},
         stats::{PlayerStats, SkillPoints},
-        time_crystals::{TimeCrystals, SURVIVAL_SHARD_THRESHOLD_SECONDS},
+        time_crystals::{LastRunCrystalProgress, TimeCrystals, SURVIVAL_SHARD_THRESHOLD_SECONDS},
         unlocks::{UnlockUpgrades, UnlockedClasses},
         Player,
     },
@@ -239,6 +239,20 @@ pub struct GameData {
     #[serde(default)]
     pub time_crystals: TimeCrystals,
 }
+
+impl GameData {
+    /// Deserialize `game_data.json` and drop tombstone tip entries from removed enum variants.
+    pub fn try_from_json_reader<R: std::io::Read>(reader: R) -> serde_json::Result<Self> {
+        let mut g: GameData = serde_json::from_reader(reader)?;
+        g.sanitize_persistent_tips();
+        Ok(g)
+    }
+
+    fn sanitize_persistent_tips(&mut self) {
+        self.seen_tips.retain(|t| !matches!(t, Tip::Obsolete));
+    }
+}
+
 pub fn handle_append_run_data_after_death(
     night: Res<NightTracker>,
     mut game_over: EventReader<GameOverEvent>,
@@ -264,7 +278,7 @@ pub fn handle_append_run_data_after_death(
             let reader = BufReader::new(file_file);
 
             // Read the JSON contents of the file as an instance of `GameData`.
-            match serde_json::from_reader::<_, GameData>(reader) {
+            match GameData::try_from_json_reader(reader) {
                 Ok(data) => {
                     game_data = data;
                     info!(
@@ -390,10 +404,11 @@ pub fn handle_append_run_data_after_death(
         // --- Time Crystal shard awards ---
         // Start from the in-memory resource if present so we don't lose any shards
         // earned earlier in this session that weren't yet flushed to disk.
-        let mut crystals = time_crystals
+        let crystals_before = time_crystals
             .as_ref()
             .map(|tc| (**tc).clone())
             .unwrap_or_else(|| game_data.time_crystals.clone());
+        let mut crystals = crystals_before.clone();
 
         let mut shards_earned: u32 = 0;
         // +1 shard for surviving at least the survival threshold (6 minutes)
@@ -421,7 +436,16 @@ pub fn handle_append_run_data_after_death(
         game_data.time_crystals = crystals.clone();
         // Update the in-memory resource so the next run's heirloom pool reflects any
         // newly completed crystals without requiring a game restart.
-        commands.insert_resource(crystals);
+        commands.insert_resource(crystals.clone());
+        // Record this run's progress so the main-menu popup can display it. Only
+        // insert when there's actually progress to show.
+        if shards_earned > 0 {
+            commands.insert_resource(LastRunCrystalProgress {
+                before: crystals_before,
+                after: crystals,
+                shards_earned,
+            });
+        }
 
         let game_data_path = datafiles::game_data();
 
@@ -673,7 +697,7 @@ pub fn load_state(
     let game_data_file_path = datafiles::game_data();
     if let Ok(file_file) = File::open(game_data_file_path) {
         let reader = BufReader::new(file_file);
-        match serde_json::from_reader::<_, GameData>(reader) {
+        match GameData::try_from_json_reader(reader) {
             Ok(game_data) => {
                 commands.insert_resource(game_data.high_scores);
                 // Also make sure class ranks are available early if present
@@ -703,7 +727,7 @@ pub fn load_game_data_for_ui(mut commands: Commands) {
     let game_data_file_path = datafiles::game_data();
     if let Ok(file_file) = File::open(game_data_file_path) {
         let reader = BufReader::new(file_file);
-        match serde_json::from_reader::<_, GameData>(reader) {
+        match GameData::try_from_json_reader(reader) {
             Ok(game_data) => {
                 // Insert bounce tracker as a resource
                 commands.insert_resource(game_data.bounce_tracker.clone());
@@ -731,7 +755,7 @@ pub fn persist_time_fragments(time_fragments: i32) {
     let path = datafiles::game_data();
     let mut game_data = if let Ok(file) = File::open(&path) {
         let reader = BufReader::new(file);
-        serde_json::from_reader::<_, GameData>(reader).unwrap_or_default()
+        GameData::try_from_json_reader(reader).unwrap_or_default()
     } else {
         GameData::default()
     };
