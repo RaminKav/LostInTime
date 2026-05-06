@@ -39,6 +39,7 @@ use crate::{
         levels::PlayerLevel,
         skills::{Heirloom, HeirloomChoiceQueue, PlayerSkills},
         stats::StatType,
+        time_crystals::TimeCrystals,
         unlocks::RunUnlockState,
     },
     proto::proto_param::ProtoParam,
@@ -1017,7 +1018,11 @@ pub fn handle_interaction_clicks(
                                 let from_slot = state.slot_index;
                                 let furnace_item = inv.furnace_items.items[from_slot].take();
                                 if let Some(mut moved_item) = furnace_item {
-                                    if let Some(empty_slot) = inv.items.get_first_empty_slot() {
+                                    let empty_slot = inv.items.get_first_empty_player_slot_for_pickup(
+                                        &moved_item.item_stack,
+                                        &proto,
+                                    );
+                                    if let Some(empty_slot) = empty_slot {
                                         moved_item.slot = empty_slot;
                                         inv.items.items[empty_slot] = Some(moved_item);
                                         if from_slot == 1 {
@@ -1042,11 +1047,13 @@ pub fn handle_interaction_clicks(
                                     inv.crafting_inputs_items.move_item_to_target_container(
                                         active_container,
                                         state.slot_index,
+                                        None,
                                     );
                                 } else {
                                     inv.items.move_item_to_target_container(
                                         active_container,
                                         state.slot_index,
+                                        None,
                                     );
                                 }
                                 state.dirty = true;
@@ -1057,6 +1064,7 @@ pub fn handle_interaction_clicks(
                                 active_container.move_item_to_target_container(
                                     &mut inv.items,
                                     state.slot_index,
+                                    Some(&proto),
                                 );
                                 state.dirty = true;
                             } else if state.r#type.is_equipment()
@@ -1069,6 +1077,7 @@ pub fn handle_interaction_clicks(
                                         &mut inv,
                                         state.r#type,
                                         state.slot_index,
+                                        &proto,
                                     );
                                     state.dirty = true;
                                 }
@@ -1086,6 +1095,7 @@ pub fn handle_interaction_clicks(
                                     &mut inv,
                                     state.r#type,
                                     state.slot_index,
+                                    &proto,
                                 );
                                 state.dirty = true;
                             }
@@ -1135,10 +1145,13 @@ pub fn handle_interaction_clicks(
                             crafting_inputs_items.move_item_to_target_container(
                                 items,
                                 state.slot_index,
+                                Some(&proto),
                             );
                         } else {
-                            inv.items
-                                .move_item_from_hotbar_to_inv_or_vice_versa(state.slot_index);
+                            inv.items.move_item_from_hotbar_to_inv_or_vice_versa(
+                                state.slot_index,
+                                &proto,
+                            );
                         }
                         state.dirty = true;
                     }
@@ -1424,6 +1437,7 @@ pub fn handle_cursor_banish_buttons(
     graphics: Res<Graphics>,
     mut run_unlocks: ResMut<RunUnlockState>,
     mut skill_queue: ResMut<HeirloomChoiceQueue>,
+    time_crystals: Res<TimeCrystals>,
     skill_ui: Query<(Entity, &SkillChoiceUI), With<SkillChoiceUI>>,
     dice_buttons: Query<(Entity, &RerollDice), With<RerollDice>>,
 ) {
@@ -1431,7 +1445,8 @@ pub fn handle_cursor_banish_buttons(
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
     let mut banished_slot: Option<usize> = None;
     for (e, mut interactable, banish) in banish_buttons.iter_mut() {
-        let banishes_available = run_unlocks.banishes_remaining > 0;
+        let banishes_available = run_unlocks.banishes_remaining > 0
+            && skill_queue.banish_allowed_for_choice_slot(&time_crystals, banish.0);
         match hit_test {
             Some(hit_ent) if hit_ent.0 == e => match interactable.current() {
                 Interaction::None => {
@@ -1447,11 +1462,10 @@ pub fn handle_cursor_banish_buttons(
                 }
                 Interaction::Hovering => {
                     if left_mouse_pressed && banishes_available {
-                        run_unlocks.banishes_remaining =
-                            run_unlocks.banishes_remaining.saturating_sub(1);
-                        commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.35));
-
-                        if skill_queue.banish_slot(banish.0).is_some() {
+                        if skill_queue.banish_slot(&time_crystals, banish.0).is_some() {
+                            run_unlocks.banishes_remaining =
+                                run_unlocks.banishes_remaining.saturating_sub(1);
+                            commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.35));
                             // Clear the entire queue to prevent the pending levelup check
                             // from reopening the UI - banishing is a deliberate choice to
                             // forfeit the current level-up reward

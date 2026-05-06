@@ -16,7 +16,10 @@ use crate::{
         LIGHT_GREEN, LIGHT_GREY, ORANGE, STATS_TITLE, TOOLTIP_BLACK, TOOLTIP_BLACK_2, WHITE,
         YELLOW, YELLOW_2,
     },
-    combat::damage_tracker::{spawn_damage_tracker_ui, DamageTracker, PetAbilityStats},
+    combat::damage_tracker::{
+        spawn_damage_tracker_ui, spawn_mob_stat_tracker_ui, DamageTracker, MobStatTracker,
+        PetAbilityStats,
+    },
     inventory::{Inventory, ItemStack},
     item::{item_actions::ItemActions, EquipmentType, Recipes, WorldObject},
     juice::bounce::BounceOnHit,
@@ -1015,6 +1018,82 @@ pub fn handle_spawn_inv_player_stats(
     }
 }
 
+/// Value column uses bold (`slkscrbold`); parenthetical bits and the dodge `%` use regular `slkscr`.
+fn stat_tooltip_value_text(
+    value: &str,
+    bold_font: Handle<Font>,
+    regular_font: Handle<Font>,
+    font_size: f32,
+    color: Color,
+) -> Text {
+    const SPACE_OPEN_PAREN: &str = " (";
+    if let Some(pos) = value.find(SPACE_OPEN_PAREN) {
+        let after = &value[pos + SPACE_OPEN_PAREN.len()..];
+        // Defence `42 (37%)` or attack `123 (1.30x)` — trailing non-bold parenthetical.
+        let is_mitigation =
+            after.ends_with(')') && after.contains('%') && !after.contains('x');
+        let is_damage_mult =
+            after.ends_with(')') && after.contains('x') && !after.contains('%');
+        if is_mitigation || is_damage_mult {
+            return Text {
+                sections: vec![
+                    TextSection {
+                        value: value[..pos].to_string(),
+                        style: TextStyle {
+                            font: bold_font,
+                            font_size,
+                            color,
+                        },
+                    },
+                    TextSection {
+                        value: value[pos..].to_string(),
+                        style: TextStyle {
+                            font: regular_font,
+                            font_size,
+                            color,
+                        },
+                    },
+                ],
+                alignment: TextAlignment::Right,
+                ..Default::default()
+            };
+        }
+    }
+    if value.len() > 1 && value.ends_with('%') && !value.contains('(') {
+        return Text {
+            sections: vec![
+                TextSection {
+                    value: value[..value.len() - 1].to_string(),
+                    style: TextStyle {
+                        font: bold_font,
+                        font_size,
+                        color,
+                    },
+                },
+                TextSection {
+                    value: "%".to_string(),
+                    style: TextStyle {
+                        font: regular_font,
+                        font_size,
+                        color,
+                    },
+                },
+            ],
+            alignment: TextAlignment::Right,
+            ..Default::default()
+        };
+    }
+    Text::from_section(
+        value.to_string(),
+        TextStyle {
+            font: bold_font,
+            font_size,
+            color,
+        },
+    )
+    .with_alignment(TextAlignment::Right)
+}
+
 /// Single helper for spawning the player stats tooltip (inventory "Final Stats" hover and game over "Final Stats" hover).
 /// Spawns the tooltip at `translation`, parents it to `parent`, and adds a "Stats" header plus each (name, value) row.
 /// `attributes` should be the (name, value) pairs from `ItemAttributes::get_stats_summary`.
@@ -1053,6 +1132,9 @@ pub fn spawn_stats_tooltip_at(
             Name::new("TOOLTIP"),
         ))
         .id();
+
+    let stat_value_font_bold = asset_server.load("fonts/slkscrbold.ttf");
+    let stat_value_font_regular = asset_server.load("fonts/slkscr.ttf");
 
     // Horizontal inset from the tooltip sprite edges to the start of text.
     // The `StatTooltip.png` art has a ~14 px wooden frame on each side; text inside this inset
@@ -1106,13 +1188,12 @@ pub fn spawn_stats_tooltip_at(
         let _text_att_value = commands
             .spawn((
                 Text2dBundle {
-                    text: Text::from_section(
-                        text.1.to_string(),
-                        TextStyle {
-                            font: asset_server.load("fonts/slkscrbold.ttf"),
-                            font_size: 8.4,
-                            color: YELLOW_2,
-                        },
+                    text: stat_tooltip_value_text(
+                        &text.1,
+                        stat_value_font_bold.clone(),
+                        stat_value_font_regular.clone(),
+                        8.4,
+                        YELLOW_2,
                     ),
                     text_anchor: Anchor::CenterRight,
                     transform: Transform {
@@ -1138,7 +1219,7 @@ pub fn spawn_stats_tooltip_at(
 }
 
 #[derive(Component)]
-pub struct DamageTrackerPanel;
+pub struct InventorySideStatsPanel;
 
 pub fn spawn_damage_tracker_in_inventory(
     mut commands: Commands,
@@ -1146,8 +1227,9 @@ pub fn spawn_damage_tracker_in_inventory(
     mut updates: EventReader<ShowInvPlayerStatsEvent>,
     inv: Query<Entity, With<InventoryUI>>,
     ui_state: Res<State<UIState>>,
-    old_panels: Query<Entity, With<DamageTrackerPanel>>,
+    old_panels: Query<Entity, With<InventorySideStatsPanel>>,
     tracker: Res<DamageTracker>,
+    mob_tracker: Res<MobStatTracker>,
     pet_stats: Option<Res<PetAbilityStats>>,
 ) {
     if ui_state.0 != UIState::Inventory {
@@ -1173,18 +1255,35 @@ pub fn spawn_damage_tracker_in_inventory(
         + 86.)
         / 2.;
     let start_y = INVENTORY_UI_SIZE.y / 2. - 8.;
+    let stats_width = 80.0;
+    let mut next_y = start_y;
 
-    if let Some(entities) = spawn_damage_tracker_ui(
+    if let Some((entities, dmg_bottom_y)) = spawn_damage_tracker_ui(
         &mut commands,
         &asset_server,
         &tracker,
-        Transform::from_translation(Vec3::new(panel_x, start_y, 2.)),
+        Transform::from_translation(Vec3::new(panel_x, next_y, 2.)),
         1.0,
-        80.0,
+        stats_width,
         pet_stats.as_deref(),
     ) {
         if let Some(panel) = entities.first() {
-            commands.entity(*panel).insert(DamageTrackerPanel);
+            commands.entity(*panel).insert(InventorySideStatsPanel);
+            commands.entity(inv_entity).add_child(*panel);
+        }
+        next_y += dmg_bottom_y - 10.0;
+    }
+
+    if let Some((entities, _)) = spawn_mob_stat_tracker_ui(
+        &mut commands,
+        &asset_server,
+        &mob_tracker,
+        Transform::from_translation(Vec3::new(panel_x, next_y, 2.)),
+        1.0,
+        stats_width,
+    ) {
+        if let Some(panel) = entities.first() {
+            commands.entity(*panel).insert(InventorySideStatsPanel);
             commands.entity(inv_entity).add_child(*panel);
         }
     }

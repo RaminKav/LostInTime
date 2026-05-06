@@ -20,6 +20,7 @@ use crate::{
 };
 
 use super::{
+    heirloom_tooltip::{HeirloomTooltipRequest, HeirloomTooltipShow},
     interactions::Interaction, ui_helpers, ui_helpers::spawn_ui_overlay, Interactable,
     ToolTipUpdateEvent, TooltipTeardownEvent, UIElement, UIState, SKILLS_CHOICE_UI_SIZE,
 };
@@ -721,9 +722,7 @@ pub fn handle_item_chest_final_item_hover(
 
 /// Handle hovering on the final heirloom in the heirloom chest to show tooltip
 pub fn handle_heirloom_chest_final_item_hover(
-    mut commands: Commands,
-    graphics: Res<Graphics>,
-    asset_server: Res<AssetServer>,
+    mut tooltip_requests: EventWriter<HeirloomTooltipRequest>,
     cursor_pos: Res<CursorPos>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     mut final_heirlooms: Query<
@@ -735,10 +734,8 @@ pub fn handle_heirloom_chest_final_item_hover(
         ),
         With<ItemChestFinalItem>,
     >,
-    existing_tooltips: Query<Entity, With<HeirloomChestTooltip>>,
 ) {
     use super::interactions::Interaction;
-    use super::skill_choice_ui::spawn_heirloom_tooltip_card;
 
     let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
 
@@ -748,28 +745,17 @@ pub fn handle_heirloom_chest_final_item_hover(
                 Interaction::None => {
                     interactable.change(Interaction::Hovering);
 
-                    for tooltip_e in existing_tooltips.iter() {
-                        commands.entity(tooltip_e).despawn_recursive();
-                    }
-
                     let icon_pos = transform.translation();
                     let tooltip_pos = Vec3::new(icon_pos.x - 98., icon_pos.y - 25., 15.);
 
-                    let tooltip_e = spawn_heirloom_tooltip_card(
-                        &graphics,
-                        &mut commands,
-                        &asset_server,
-                        heirloom_data.heirloom.heirloom.clone(),
-                        heirloom_data.heirloom.rarity.clone(),
-                        tooltip_pos,
-                        None,
-                        None,
-                    );
-
-                    commands
-                        .entity(tooltip_e)
-                        .insert(HeirloomChestTooltip)
-                        .insert(RenderLayers::from_layers(&[3]));
+                    tooltip_requests.send(HeirloomTooltipRequest::Show(HeirloomTooltipShow {
+                        heirloom: heirloom_data.heirloom.heirloom.clone(),
+                        rarity: heirloom_data.heirloom.rarity,
+                        position: tooltip_pos,
+                        scaling_text: None,
+                        trigger_count_text: None,
+                        ui_state: Some(super::UIState::ItemChest),
+                    }));
                 }
                 Interaction::Hovering => {}
                 _ => {}
@@ -777,14 +763,9 @@ pub fn handle_heirloom_chest_final_item_hover(
             _ => {
                 if matches!(interactable.current(), Interaction::Hovering) {
                     interactable.change(Interaction::None);
-                    for tooltip_e in existing_tooltips.iter() {
-                        commands.entity(tooltip_e).despawn_recursive();
-                    }
+                    tooltip_requests.send(HeirloomTooltipRequest::Clear);
                 }
             }
         }
     }
 }
-
-#[derive(Component)]
-pub struct HeirloomChestTooltip;

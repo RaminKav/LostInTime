@@ -442,7 +442,13 @@ impl ItemAttributes {
                 1. + self.bonus_damage.value as f32 / 100.
             ),
         ));
-        tooltips.push(("Defence        ".to_string(), format!("{}", self.defence)));
+        // Mitigation matches incoming damage scaling in combat (`damage * 0.997^defence`).
+        let defence_mitigation_pct =
+            ((1.0 - 0.997_f32.powi(self.defence.value)) * 100.0).round() as i32;
+        tooltips.push((
+            "Defence        ".to_string(),
+            format!("{} ({defence_mitigation_pct}%)", self.defence),
+        ));
         tooltips.push((
             "Crit Chance     ".to_string(),
             format!("{}", self.crit_chance),
@@ -461,7 +467,10 @@ impl ItemAttributes {
             format!("{}", self.health_regen),
         ));
         tooltips.push(("Thorns           ".to_string(), format!("{}", self.thorns)));
-        tooltips.push(("Dodge            ".to_string(), format!("{}", self.dodge)));
+        tooltips.push((
+            "Dodge            ".to_string(),
+            format!("{}%", self.dodge),
+        ));
         tooltips.push(("Speed          ".to_string(), format!("{}", self.speed)));
 
         tooltips.push(("Size           ".to_string(), format!("{}", self.size)));
@@ -608,7 +617,7 @@ impl ItemAttributes {
             self.health_regen.value
                 + skills.get_count(Heirloom::HPRegen) * 5
                 + skills.get_count(Heirloom::HealEcho) * 5
-                - regen_lifesteal_stacks * 10,
+                - regen_lifesteal_stacks * 7,
         ));
         entity.insert(Healing(self.healing.value));
 
@@ -657,8 +666,8 @@ impl ItemAttributes {
         // Lifesteal: base + RegenLifesteal (+5% per stack) + LifestealCoins (+5% per stack)
         entity.insert(Lifesteal(
             self.lifesteal.value
-                + regen_lifesteal_stacks * 10
-                + skills.get_count(Heirloom::Lifesteal) * 4
+                + regen_lifesteal_stacks * 7
+                + skills.get_count(Heirloom::Lifesteal) * 3
                 + skills.get_count(Heirloom::LifestealCoins) * 5,
         ));
         // Defence already calculated above for ThornArmor

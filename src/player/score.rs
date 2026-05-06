@@ -1,7 +1,12 @@
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use crate::{chaos::ChaosTracker, item::WorldObject, night::InfiniteMode};
+use crate::{
+    chaos::ChaosTracker,
+    combat::damage_tracker::MobStatTracker,
+    item::WorldObject,
+    night::InfiniteMode,
+};
 
 /// Tracks the current run's score and statistics
 #[derive(Resource, Debug, Clone, Serialize, Deserialize, Default)]
@@ -84,11 +89,13 @@ pub fn tick_run_timer(time: Res<Time>, mut run_timer: ResMut<RunTimer>) {
 /// System to track mob kills and update score
 pub fn track_mob_kills(
     mut run_score: ResMut<RunScore>,
+    mut mob_stat_tracker: ResMut<MobStatTracker>,
     mut death_events: bevy::ecs::event::EventReader<crate::combat::EnemyDeathEvent>,
     chaos: Res<ChaosTracker>,
     infinite_mode: Res<InfiniteMode>,
 ) {
-    for _death in death_events.iter() {
+    for death in death_events.iter() {
+        mob_stat_tracker.record_kill(death.mob.clone());
         // Include both global chaos and infinite mode chaos bonus for score
         let total_chaos = chaos.get_chaos() + infinite_mode.get_chaos_bonus();
         run_score.add_mob_kill(1 + total_chaos.trunc() as u32);

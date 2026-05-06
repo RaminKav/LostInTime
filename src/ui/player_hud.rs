@@ -5,8 +5,9 @@ use std::collections::HashMap;
 
 use super::{
     damage_numbers::spawn_text,
+    heirloom_tooltip::{HeirloomTooltipRequest, HeirloomTooltipShow},
     interactions::{DraggedItem, Interaction},
-    spawn_heirloom_tooltip_card, spawn_inv_slot, spawn_item_stack_icon,
+    spawn_inv_slot, spawn_item_stack_icon,
     tooltips::spawn_world_item_tooltip_for_stack,
     tooltips::ConsumableBuffHudTooltip,
     ui_helpers::{
@@ -40,8 +41,8 @@ use crate::{
         combat_heirlooms::{CrateBreakDamageTracker, MaxHPHuntTracker, SkillPowerHuntTracker},
         levels::PlayerLevel,
         skills::{
-            ActiveSkill, ActiveSkillChoiceState, ActiveSkillUsedEvent, ClassSkillSlots,
-            FURY_ATTACK_SPEED_REFERENCE_COOLDOWN_SECS, Heirloom, HeirloomRarity, PlayerSkills,
+            ActiveSkill, ActiveSkillChoiceState, ActiveSkillUsedEvent, ClassSkillSlots, Heirloom,
+            HeirloomRarity, PlayerSkills, FURY_ATTACK_SPEED_REFERENCE_COOLDOWN_SECS,
         },
         CoinCurrency, Player, RunScore, TimeFragmentCurrency,
     },
@@ -1188,9 +1189,6 @@ pub struct SkillHudIcon(pub Heirloom);
 pub struct HeirloomCounterText;
 
 #[derive(Component)]
-pub struct HeirloomHudTooltip;
-
-#[derive(Component)]
 pub struct ActiveSkillHudTooltip;
 
 /// Stores which skill and slot the HUD tooltip is for (used to show remaining cooldown).
@@ -1202,9 +1200,7 @@ pub struct SkillTooltipCooldownText;
 
 /// System to handle tooltips for heirloom icons in the HUD
 pub fn handle_heirloom_hud_tooltip(
-    mut commands: Commands,
-    graphics: Res<Graphics>,
-    asset_server: Res<AssetServer>,
+    mut tooltip_requests: EventWriter<HeirloomTooltipRequest>,
     cursor_pos: Res<crate::cursor::CursorPos>,
     hit_detection_sprites: Query<
         (Entity, &Sprite, &GlobalTransform),
@@ -1217,7 +1213,6 @@ pub fn handle_heirloom_hud_tooltip(
         &mut super::interactions::Interactable,
         &SkillHudIcon,
     )>,
-    existing_tooltips: Query<Entity, With<HeirloomHudTooltip>>,
     mut last_hovered: Local<Option<Heirloom>>,
     player_query: Query<
         (
@@ -1268,74 +1263,60 @@ pub fn handle_heirloom_hud_tooltip(
         return;
     }
 
-    // Despawn all existing tooltips
-    for tooltip_e in existing_tooltips.iter() {
-        commands.entity(tooltip_e).despawn_recursive();
-    }
+    match &currently_hovered {
+        None => tooltip_requests.send(HeirloomTooltipRequest::Clear),
+        Some((heirloom, icon_pos)) => {
+            let Ok((
+                skills,
+                max_health,
+                hunt_tracker,
+                crate_tracker,
+                thorns_tracker,
+                skill_power_hunt_tracker,
+            )) = player_query.get_single()
+            else {
+                *last_hovered = hovered_heirloom;
+                return;
+            };
 
-    // Spawn new tooltip if hovering
-    if let Some((heirloom, icon_pos)) = currently_hovered {
-        let Ok((
-            skills,
-            max_health,
-            hunt_tracker,
-            crate_tracker,
-            thorns_tracker,
-            skill_power_hunt_tracker,
-        )) = player_query.get_single()
-        else {
-            return;
-        };
+            let rarity = skills
+                .heirlooms
+                .iter()
+                .find(|h| h.heirloom == *heirloom)
+                .map(|h| h.rarity)
+                .unwrap_or(HeirloomRarity::Common);
 
-        // Get the rarity from the player's heirloom list
-        let rarity = skills
-            .heirlooms
-            .iter()
-            .find(|h| h.heirloom == heirloom)
-            .map(|h| h.rarity.clone())
-            .unwrap_or(HeirloomRarity::Common);
+            let scaling_text = get_heirloom_scaling_text(
+                heirloom.clone(),
+                skills,
+                coins.coins,
+                max_health.0,
+                hunt_tracker,
+                crate_tracker,
+                thorns_tracker,
+                skill_power_hunt_tracker,
+            );
 
-        // Get current scaling value if applicable
-        let scaling_text = get_heirloom_scaling_text(
-            heirloom.clone(),
-            skills,
-            coins.coins,
-            max_health.0,
-            hunt_tracker,
-            crate_tracker,
-            thorns_tracker,
-            skill_power_hunt_tracker,
-        );
+            let trigger_count = trigger_counts.get(heirloom);
+            let trigger_count_text = if trigger_count > 0 {
+                Some(format!(
+                    "Triggered: {}",
+                    crate::ui::ui_helpers::format_number(trigger_count as i64)
+                ))
+            } else {
+                None
+            };
 
-        // Get trigger count for this heirloom
-        let trigger_count = trigger_counts.get(&heirloom);
-        let trigger_count_text = if trigger_count > 0 {
-            Some(format!(
-                "Triggered: {}",
-                crate::ui::ui_helpers::format_number(trigger_count as i64)
-            ))
-        } else {
-            None
-        };
-
-        // Position tooltip below the hovered icon
-        let tooltip_pos = Vec3::new(icon_pos.x, icon_pos.y - 90., icon_pos.z + 10.);
-
-        let tooltip_e = spawn_heirloom_tooltip_card(
-            &graphics,
-            &mut commands,
-            &asset_server,
-            heirloom,
-            rarity,
-            tooltip_pos,
-            scaling_text,
-            trigger_count_text,
-        );
-
-        commands
-            .entity(tooltip_e)
-            .insert(HeirloomHudTooltip)
-            .insert(RenderLayers::from_layers(&[3]));
+            let tooltip_pos = Vec3::new(icon_pos.x, icon_pos.y - 90., icon_pos.z + 10.);
+            tooltip_requests.send(HeirloomTooltipRequest::Show(HeirloomTooltipShow {
+                heirloom: heirloom.clone(),
+                rarity,
+                position: tooltip_pos,
+                scaling_text,
+                trigger_count_text,
+                ui_state: None,
+            }));
+        }
     }
 
     *last_hovered = hovered_heirloom;
@@ -2094,7 +2075,13 @@ pub fn handle_active_skill_slot_drag_drop(
     mouse_input: Res<Input<MouseButton>>,
     mut drag_state: ResMut<ActiveSkillDragState>,
     mut skill_icons: Query<
-        (Entity, &ActiveSkillIcon, &UIElement, &mut Sprite, &Interactable),
+        (
+            Entity,
+            &ActiveSkillIcon,
+            &UIElement,
+            &mut Sprite,
+            &Interactable,
+        ),
         Without<ActiveSkillSlotBg>,
     >,
     slot_bgs: Query<(&ActiveSkillSlotBg, &GlobalTransform, &Sprite), Without<UIElement>>,

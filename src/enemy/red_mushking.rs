@@ -532,6 +532,7 @@ pub fn handle_death(
     item_drop_query: Query<(Entity, &ItemStack), (With<ItemDrop>, Without<BeingPulledToPlayer>)>,
     inv: Query<&Inventory, With<Player>>,
     pets: Query<(), With<Pet>>,
+    proto: ProtoParam,
 ) {
     for (entity, mut anim, mob) in death.iter_mut() {
         // Only handle RedMushking death animations
@@ -570,7 +571,12 @@ pub fn handle_death(
             if let Ok(inv) = inv.get_single() {
                 let player_has_pet = pets.iter().next().is_some();
                 for (item_entity, item_stack) in item_drop_query.iter() {
-                    if !player_can_accept_ground_item_pickup(item_stack, inv, player_has_pet) {
+                    if !player_can_accept_ground_item_pickup(
+                        item_stack,
+                        inv,
+                        player_has_pet,
+                        &proto,
+                    ) {
                         continue;
                     }
                     commands

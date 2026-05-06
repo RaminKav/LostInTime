@@ -661,7 +661,7 @@ pub fn handle_time_crystals_browser_done_button(
 pub fn cleanup_time_crystals_browser_ui(
     mut commands: Commands,
     query: Query<Entity, With<TimeCrystalsBrowserUI>>,
-    tooltips: Query<Entity, With<super::time_crystal_progress_ui::CrystalUnlockTooltip>>,
+    tooltips: Query<Entity, With<super::heirloom_tooltip::HeirloomDynamicTooltip>>,
     mut grid_open: ResMut<TimeCrystalsHeirloomGridOpen>,
 ) {
     grid_open.0 = false;

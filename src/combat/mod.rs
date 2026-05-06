@@ -1,3 +1,4 @@
+use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 
 use bevy_aseprite::anim::AsepriteAnimation;
@@ -104,6 +105,7 @@ pub struct EnemyDeathEvent {
     pub entity: Entity,
     pub enemy_pos: Vec2,
     pub killed_by_crit: bool,
+    pub mob: Mob,
 }
 #[derive(Debug, Clone)]
 
@@ -112,6 +114,17 @@ pub struct ObjBreakEvent {
     pub obj: WorldObject,
     pub pos: TileMapPosition,
     pub give_drops_and_xp: bool,
+}
+
+/// Bundles `EventWriter`s for [`handle_hits`] so the system stays within Bevy's `SystemParam` tuple limit.
+#[derive(SystemParam)]
+pub struct HitOutcomeEvents<'w> {
+    pub enemy_death: EventWriter<'w, EnemyDeathEvent>,
+    pub combat_shrine_mob_death: EventWriter<'w, CombatShrineMobDeathEvent>,
+    pub dungeon_shrine_mob_death: EventWriter<'w, DungeonShrineMobDeathEvent>,
+    pub obj_break: EventWriter<'w, ObjBreakEvent>,
+    pub analytics: EventWriter<'w, AnalyticsUpdateEvent>,
+    pub attribute_change: EventWriter<'w, AttributeChangeEvent>,
 }
 
 /// Event to trigger lifesteal calculation and healing
@@ -175,6 +188,7 @@ impl Plugin for CombatPlugin {
             .add_event::<LifestealEvent>()
             .add_event::<ObjBreakEvent>()
             .init_resource::<damage_tracker::DamageTracker>()
+            .init_resource::<damage_tracker::MobStatTracker>()
             .init_resource::<damage_tracker::PetAbilityStats>()
             .add_plugin(CollisionPlugion)
             .add_systems(
@@ -382,12 +396,12 @@ fn handle_enemy_death(
 
         // On-kill heirloom effects (skip when kill was from another heirloom to prevent chaining)
         let (_, attack, mut current_mana) = player_query.single_mut();
-        // KillLightning: 20% chance per stack to spawn lightning on a random nearby enemy; over 100% = guaranteed 1 + (chance-100)% for a second strike on a different enemy
+        // KillLightning: 15% chance per stack to spawn lightning on a random nearby enemy; over 100% = guaranteed 1 + (chance-100)% for a second strike on a different enemy
         let kill_lightning_stacks =
             player_skills.get_count(crate::player::skills::Heirloom::KillLightning);
         if kill_lightning_stacks > 0 {
             let mut rng = rand::thread_rng();
-            let chance_pct = (kill_lightning_stacks as u32 * 20).min(200); // cap at 200% (1 guaranteed + 100% second)
+            let chance_pct = (kill_lightning_stacks as u32 * 15).min(200); // cap at 200% (1 guaranteed + 100% second)
             let death_pos = death_event.enemy_pos;
             let nearby_enemies: Vec<(Entity, Vec2)> = enemies
                 .iter()
@@ -497,6 +511,7 @@ fn handle_invincibility_frames(
 
 pub fn handle_hits(
     mut commands: Commands,
+    mut mob_stat_tracker: ResMut<damage_tracker::MobStatTracker>,
     mut game: GameParam,
     mut health: Query<(
         Entity,
@@ -516,16 +531,11 @@ pub fn handle_hits(
         Option<&DungeonShrineMob>,
     )>,
     mut hit_events: EventReader<HitEvent>,
-    mut enemy_death_events: EventWriter<EnemyDeathEvent>,
-    mut shrine_mob_death_event: EventWriter<CombatShrineMobDeathEvent>,
-    mut dungeon_shrine_mob_death_event: EventWriter<DungeonShrineMobDeathEvent>,
-    mut obj_death_events: EventWriter<ObjBreakEvent>,
+    mut hit_outcome: HitOutcomeEvents,
     in_i_frame: Query<&InvincibilityTimer>,
     proto_param: ProtoParam,
-    mut analytics_events: EventWriter<AnalyticsUpdateEvent>,
     slime_shields: Query<Entity, With<SlimeTempShieldSprite>>,
     mut hallucination_query: Query<&mut HallucinationStats, With<Player>>,
-    mut attribute_events: EventWriter<AttributeChangeEvent>,
     asset_server: Res<AssetServer>,
     mut player_blessing_mana_query: Query<
         (&OwnedBlessings, &mut CurrentMana, &Inventory),
@@ -622,7 +632,7 @@ pub fn handle_hits(
                     debug!("HP {:?} {:?}", e, hit_health.0);
                 }
                 if hit_health.0 <= 0 {
-                    obj_death_events.send(ObjBreakEvent {
+                    hit_outcome.obj_break.send(ObjBreakEvent {
                         entity: e,
                         obj: *obj,
                         pos,
@@ -664,7 +674,7 @@ pub fn handle_hits(
                                 );
 
                                 // Trigger attribute recalculation
-                                attribute_events.send(AttributeChangeEvent);
+                                hit_outcome.attribute_change.send(AttributeChangeEvent);
                             }
                         }
                     }
@@ -738,6 +748,13 @@ pub fn handle_hits(
                     }
 
                     if is_player {
+                        if let Some(attacker_mob) = hit.hit_by_mob.as_ref() {
+                            if *attacker_mob != Mob::None && damage_to_apply > 0 {
+                                mob_stat_tracker
+                                    .record_damage_taken(attacker_mob.clone(), damage_to_apply);
+                            }
+                        }
+
                         let echo_count = game.skill_count(Heirloom::OnHitEcho);
                         if echo_count > 0 {
                             if let Ok((_, mut current_mana, _)) =
@@ -836,25 +853,28 @@ pub fn handle_hits(
                         commands.entity(e).insert(KilledByHeirloomEffect);
                     }
 
-                    enemy_death_events.send(EnemyDeathEvent {
+                    hit_outcome.enemy_death.send(EnemyDeathEvent {
                         entity: e,
                         enemy_pos: t.translation().truncate(),
                         killed_by_crit: hit.was_crit,
+                        mob: mob_option.cloned().unwrap_or(Mob::None),
                     });
 
                     if let Some(parent_shrine) = shrine_option {
-                        shrine_mob_death_event
+                        hit_outcome
+                            .combat_shrine_mob_death
                             .send(CombatShrineMobDeathEvent(parent_shrine.parent_shrine));
                     }
 
                     if let Some(parent_shrine) = dungeon_shrine_option {
-                        dungeon_shrine_mob_death_event
+                        hit_outcome
+                            .dungeon_shrine_mob_death
                             .send(DungeonShrineMobDeathEvent(parent_shrine.parent_shrine));
                     }
                 }
 
                 if is_player {
-                    analytics_events.send(AnalyticsUpdateEvent {
+                    hit_outcome.analytics.send(AnalyticsUpdateEvent {
                         update_type: AnalyticsTrigger::DamageTaken(
                             hit.hit_by_mob.clone().unwrap_or(Mob::default()),
                             final_dmg as u32,
@@ -863,7 +883,7 @@ pub fn handle_hits(
                     commands.spawn(SoundSpawner::new(AudioSoundEffect::PlayerHit, 0.35));
                 } else if let Some(mob) = mob_option {
                     game.player_mut().next_hit_crit = false;
-                    analytics_events.send(AnalyticsUpdateEvent {
+                    hit_outcome.analytics.send(AnalyticsUpdateEvent {
                         update_type: AnalyticsTrigger::DamageDealt(mob.clone(), final_dmg as u32),
                     });
                 }

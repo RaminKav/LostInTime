@@ -138,6 +138,14 @@ pub struct ItemActions {
 }
 
 impl ItemActions {
+    /// Items without any non-[`ItemAction::None`] entry cannot be bound to hotbar keys
+    /// ([`crate::inputs::handle_hotbar_consume_keys`] requires an [`ItemActions`] component).
+    pub fn allows_hotbar_band_placement(&self) -> bool {
+        self.actions
+            .iter()
+            .any(|a| !matches!(a, ItemAction::None))
+    }
+
     pub fn get_action_type(&self) -> String {
         let mut has_eat = false;
         let mut has_places_into = false;
@@ -543,4 +551,12 @@ pub fn handle_item_action_success(
             }
         }
     }
+}
+
+/// Whether this object may occupy the bottom quick-access band of the main grid (slots
+/// `0..crate::inventory::INVENTORY_HOTBAR_BAND_SLOTS`), i.e. it has a usable [`ItemActions`] list.
+pub fn proto_item_allows_hotbar_band(obj: WorldObject, proto: &ProtoParam) -> bool {
+    proto
+        .get_component::<ItemActions, _>(obj)
+        .is_some_and(ItemActions::allows_hotbar_band_placement)
 }

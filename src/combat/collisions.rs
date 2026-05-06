@@ -33,6 +33,7 @@ use crate::{
         mage_skills::IceExplosionDmg,
         melee_skills::{Parried, ParryState, ParrySuccessEvent, SpearAttack},
     },
+    proto::proto_param::ProtoParam,
     ui::{damage_numbers::DodgeEvent, FlashExpBarEvent},
     CustomFlush, GameParam, GameState, Player, ScreenResolution,
 };
@@ -770,6 +771,7 @@ pub fn check_item_drop_collisions(
     resolution: Res<ScreenResolution>,
     mut chaos_tracker: ResMut<ChaosTracker>,
     mut flash_event: EventWriter<FlashExpBarEvent>,
+    proto: ProtoParam,
 ) {
     let player_txfm = player.single();
     let player_pos = player_txfm.translation.truncate();
@@ -819,7 +821,7 @@ pub fn check_item_drop_collisions(
             || obj == WorldObject::XPShardLarge
         {
             let mut xp_amount = match obj {
-                WorldObject::XPShard => 8,
+                WorldObject::XPShard => 9,
                 WorldObject::XPShardMedium => 32,
                 WorldObject::XPShardLarge => 500,
                 _ => 0,
@@ -846,9 +848,11 @@ pub fn check_item_drop_collisions(
         let player_has_pet = pets.iter().next().is_some();
         if !can_auto_equip_weapon_on_pickup(&item_stack, inv.single(), player_has_pet) {
             let inv_container = inv.single().items.clone();
-            if inv_container.get_first_empty_slot().is_none()
+            if inv_container
+                .get_first_empty_player_slot_for_pickup(&item_stack, &proto)
+                .is_none()
                 && inv_container
-                    .get_slot_for_item_in_container_with_space(&item_stack, None)
+                    .get_slot_for_item_in_container_with_space_for_pickup(&item_stack, None, &proto)
                     .is_none()
             {
                 return;
@@ -862,7 +866,7 @@ pub fn check_item_drop_collisions(
             &mut game.inv_slot_query,
             player_has_pet,
         ) {
-            item_stack.add_to_inventory(&mut inv_mut.items, &mut game.inv_slot_query);
+            item_stack.add_to_inventory(&mut inv_mut.items, &mut game.inv_slot_query, &proto);
         }
 
         if obj != WorldObject::TimeFragment

@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     assets::Graphics,
-    combat::damage_tracker::DamageTracker,
+    combat::damage_tracker::{DamageTracker, MobStatTracker},
     player::{
         score::{RunScore, RunTimer},
         skills::{PlayerClass, PlayerSkills},
@@ -49,8 +49,8 @@ pub struct SubmitScoreRequest {
     pub mobs_killed: i32,
     pub objs_destroyed: i32,
 
-    /// Structured breakdown of damage sources / amounts dealt during the run
-    /// (serialized from the `DamageTracker` run resource).
+    /// Combat telemetry JSON: new clients send `{ "damage_dealt": …, "mob_stats": … }`
+    /// (`DamageTracker` + `MobStatTracker`). Legacy clients sent only the damage tracker object (`totals`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub damage_tracker: Option<serde_json::Value>,
 
@@ -385,6 +385,7 @@ pub fn auto_submit_score_on_game_over(
     class: Res<PlayerClass>,
     graphics: Res<Graphics>,
     damage_tracker: Res<DamageTracker>,
+    mob_stat_tracker: Res<MobStatTracker>,
     era_manager: Res<EraManager>,
     game: Res<Game>,
     player_skills_q: Query<&PlayerSkills, With<Player>>,
@@ -416,9 +417,30 @@ pub fn auto_submit_score_on_game_over(
         last_submitted.rank = None; // Clear previous rank
         last_submitted.is_personal_best = false;
 
-        let damage_tracker_json = serde_json::to_value(&*damage_tracker)
-            .map_err(|e| warn!("Failed to serialize DamageTracker: {}", e))
-            .ok();
+        let damage_tracker_json = match (
+            serde_json::to_value(&*damage_tracker),
+            serde_json::to_value(&*mob_stat_tracker),
+        ) {
+            (Ok(dmg), Ok(mob)) => Some(serde_json::json!({
+                "damage_dealt": dmg,
+                "mob_stats": mob,
+            })),
+            (Ok(dmg), Err(e)) => {
+                warn!("Failed to serialize MobStatTracker: {}", e);
+                Some(dmg)
+            }
+            (Err(e), Ok(mob)) => {
+                warn!("Failed to serialize DamageTracker: {}", e);
+                Some(serde_json::json!({ "mob_stats": mob }))
+            }
+            (Err(e1), Err(e2)) => {
+                warn!(
+                    "Failed to serialize trackers (damage: {}, mob: {})",
+                    e1, e2
+                );
+                None
+            }
+        };
 
         let player_heirlooms_json = player_skills_q
             .get_single()

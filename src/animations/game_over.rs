@@ -15,13 +15,20 @@ use crate::{
     chaos::ChaosTracker,
     client::{leaderboard::LastSubmittedScore, GameData, GameOverEvent},
     colors::{overwrite_alpha, WHITE, YELLOW_2},
-    combat::damage_tracker::{spawn_damage_tracker_ui, DamageTracker, PetAbilityStats},
+    combat::damage_tracker::{
+        spawn_damage_tracker_ui, spawn_mob_stat_tracker_ui, DamageTracker, MobStatTracker,
+        PetAbilityStats,
+    },
     datafiles,
     inputs::FacingDirection,
     inventory::ItemStack,
     item::WorldObject,
     night::InfiniteMode,
-    player::{score::RunScore, Player, TimeFragmentCurrency},
+    player::{
+        levels::PlayerLevel,
+        score::{RunScore, RunTimer},
+        Player, TimeFragmentCurrency,
+    },
     proto::proto_param::ProtoParam,
     ui::{
         boss_health_bar::{BossHealthBar, BossHealthBarFrame, BossNameText},
@@ -63,6 +70,13 @@ fn format_rank(rank: i64) -> String {
     format!("#{}{} Worldwide", rank, suffix)
 }
 
+fn format_run_time_mm_ss(elapsed_seconds: f64) -> String {
+    let s = elapsed_seconds.max(0.0);
+    let minutes = (s / 60.0) as u32;
+    let secs = (s % 60.0).floor() as u32;
+    format!("{:02}:{:02}", minutes, secs)
+}
+
 pub fn handle_game_over_fadeout(
     mut commands: Commands,
     game_over_events: EventReader<GameOverEvent>,
@@ -74,6 +88,7 @@ pub fn handle_game_over_fadeout(
             &mut Transform,
             &mut TextureAtlasSprite,
             &mut AsepriteAnimation,
+            &PlayerLevel,
         ),
         With<Player>,
     >,
@@ -82,6 +97,7 @@ pub fn handle_game_over_fadeout(
     mut next_ui_state: ResMut<NextState<UIState>>,
     resolution: Res<ScreenResolution>,
     run_score: Res<RunScore>,
+    run_timer: Res<RunTimer>,
     last_submitted: Res<LastSubmittedScore>,
     mut trackers: ParamSet<(
         Res<DamageTracker>,
@@ -89,6 +105,7 @@ pub fn handle_game_over_fadeout(
         Res<ChaosTracker>,
         Option<Res<InfiniteMode>>,
     )>,
+    mob_stat_tracker: Res<MobStatTracker>,
     pet_stats: Res<PetAbilityStats>,
     // Cleanup queries
     boss_health_bars: Query<
@@ -109,7 +126,7 @@ pub fn handle_game_over_fadeout(
         for entity in guide_hud.iter() {
             commands.entity(entity).despawn_recursive();
         }
-        let (player_e, dir, mut player_t, mut sprite, mut anim) = player.single_mut();
+        let (player_e, dir, mut player_t, mut sprite, mut anim, player_level) = player.single_mut();
         next_ui_state.set(UIState::Closed);
         // BLACK OVERLAY
         commands
@@ -184,9 +201,8 @@ pub fn handle_game_over_fadeout(
             Name::new("Rank Text"),
         ));
 
-        // Left panel position (same as damage tracker) for run stats
+        // Left panel position (same as damage tracker)
         let panel_x = -resolution.game_width / 2. + 10.;
-        let stats_left_x = panel_x;
         let damage_font = asset_server.load("fonts/4x5.ttf");
         let stat_text_style = TextStyle {
             font: damage_font.clone(),
@@ -216,32 +232,54 @@ pub fn handle_game_over_fadeout(
             RenderLayers::from_layers(&[3]),
             Name::new("Score Text"),
         ));
-        // DAMAGE BREAKDOWN - left side list with category headers
-        let panel_x = -resolution.game_width / 2. + 10.;
+        // DAMAGE BREAKDOWN + mob stats — left side list with category headers
         let start_y = resolution.game_height / 2. - 60.;
+        let stats_width = 84.0;
+        let mut next_y = start_y;
 
         let damage_tracker = trackers.p0();
 
-        if let Some(entities) = spawn_damage_tracker_ui(
+        if let Some((entities, dmg_bottom_y)) = spawn_damage_tracker_ui(
             &mut commands,
             &asset_server,
             &damage_tracker,
             Transform::from_translation(Vec3::new(
                 panel_x + 42.0,
-                start_y,
+                next_y,
                 Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND,
             )),
             0.0,
-            84.0,
+            stats_width,
             Some(&pet_stats),
+        ) {
+            for e in entities {
+                commands.entity(e).insert(GameOverText);
+            }
+            next_y += dmg_bottom_y - 10.0;
+        }
+
+        if let Some((entities, _)) = spawn_mob_stat_tracker_ui(
+            &mut commands,
+            &asset_server,
+            &mob_stat_tracker,
+            Transform::from_translation(Vec3::new(
+                panel_x + 42.0,
+                next_y,
+                Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND,
+            )),
+            0.0,
+            stats_width,
         ) {
             for e in entities {
                 commands.entity(e).insert(GameOverText);
             }
         }
 
-        // ERA REACHED
-        let y_offset = -100.;
+        // Run summary on the right, below time crystal count (same x anchor as `CurrencyText` in `tick_game_over_overlay`)
+        let right_stats_x = resolution.game_width / 2. - 100.;
+        let line_step = 10.0;
+        let mut line_y = resolution.game_height / 2. - 76.;
+
         let era_manager = trackers.p1();
         let era_num = era_display_number(&era_manager.current_era);
         commands.spawn((
@@ -253,8 +291,8 @@ pub fn handle_game_over_fadeout(
                 .with_alignment(TextAlignment::Left),
                 text_anchor: Anchor::CenterLeft,
                 transform: Transform::from_translation(Vec3::new(
-                    stats_left_x,
-                    y_offset + 16.,
+                    right_stats_x,
+                    line_y,
                     Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND,
                 )),
                 ..default()
@@ -263,10 +301,55 @@ pub fn handle_game_over_fadeout(
             RenderLayers::from_layers(&[3]),
             Name::new("Era Text"),
         ));
+        line_y -= line_step;
 
-        // TIME IN ENDLESS (only if they made it to endless)
+        let chaos_tracker = trackers.p2();
+        commands.spawn((
+            Text2dBundle {
+                text: Text::from_section(
+                    format!("Chaos Level: {:.1}", chaos_tracker.get_chaos()),
+                    stat_text_style.clone(),
+                )
+                .with_alignment(TextAlignment::Left),
+                text_anchor: Anchor::CenterLeft,
+                transform: Transform::from_translation(Vec3::new(
+                    right_stats_x,
+                    line_y,
+                    Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND,
+                )),
+                ..default()
+            },
+            GameOverText,
+            RenderLayers::from_layers(&[3]),
+            Name::new("Chaos Text"),
+        ));
+        line_y -= line_step;
+
+        commands.spawn((
+            Text2dBundle {
+                text: Text::from_section(
+                    format!(
+                        "Run Time: {}",
+                        format_run_time_mm_ss(run_timer.elapsed_seconds)
+                    ),
+                    stat_text_style.clone(),
+                )
+                .with_alignment(TextAlignment::Left),
+                text_anchor: Anchor::CenterLeft,
+                transform: Transform::from_translation(Vec3::new(
+                    right_stats_x,
+                    line_y,
+                    Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND,
+                )),
+                ..default()
+            },
+            GameOverText,
+            RenderLayers::from_layers(&[3]),
+            Name::new("Run Time Text"),
+        ));
+        line_y -= line_step;
+
         let infinite_mode = trackers.p3();
-
         if let Some(ref inf) = infinite_mode {
             if inf.active && inf.elapsed_seconds > 0.0 {
                 commands.spawn((
@@ -278,8 +361,8 @@ pub fn handle_game_over_fadeout(
                         .with_alignment(TextAlignment::Left),
                         text_anchor: Anchor::CenterLeft,
                         transform: Transform::from_translation(Vec3::new(
-                            stats_left_x,
-                            y_offset,
+                            right_stats_x,
+                            line_y,
                             Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND,
                         )),
                         ..default()
@@ -288,32 +371,33 @@ pub fn handle_game_over_fadeout(
                     RenderLayers::from_layers(&[3]),
                     Name::new("Endless Time Text"),
                 ));
+                line_y -= line_step;
             }
         }
 
-        // CHAOS LEVEL
-        let chaos_tracker = trackers.p2();
         commands.spawn((
             Text2dBundle {
                 text: Text::from_section(
-                    format!("Chaos Level: {:.1}", chaos_tracker.get_chaos()),
+                    format!("Level: {}", player_level.level),
                     stat_text_style.clone(),
                 )
                 .with_alignment(TextAlignment::Left),
                 text_anchor: Anchor::CenterLeft,
                 transform: Transform::from_translation(Vec3::new(
-                    stats_left_x,
-                    y_offset + 32.,
+                    right_stats_x,
+                    line_y,
                     Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND,
                 )),
                 ..default()
             },
             GameOverText,
             RenderLayers::from_layers(&[3]),
-            Name::new("Chaos Text"),
+            Name::new("Game Over Level Text"),
         ));
 
-        // FINAL STATS - hoverable text that shows player stats tooltip (grey box, no sprite texture)
+        // FINAL STATS — centered, just above "Try Again"
+        const TRY_AGAIN_BUTTON_Y: f32 = -99.;
+        let view_stats_y = TRY_AGAIN_BUTTON_Y + 9. + 8. + 7.;
         let final_stats_hit = commands
             .spawn((
                 SpriteBundle {
@@ -323,8 +407,8 @@ pub fn handle_game_over_fadeout(
                         ..default()
                     },
                     transform: Transform::from_translation(Vec3::new(
-                        panel_x + 42.,
-                        y_offset + 48.,
+                        0.,
+                        view_stats_y,
                         Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND + 1.,
                     )),
                     ..default()
@@ -347,9 +431,9 @@ pub fn handle_game_over_fadeout(
                             color: YELLOW_2.with_a(0.),
                         },
                     )
-                    .with_alignment(TextAlignment::Left),
-                    text_anchor: Anchor::CenterLeft,
-                    transform: Transform::from_translation(Vec3::new(-36., 0., 1.)),
+                    .with_alignment(TextAlignment::Center),
+                    text_anchor: Anchor::Center,
+                    transform: Transform::from_translation(Vec3::new(0., 0., 1.)),
                     ..default()
                 },
                 GameOverText,
@@ -533,7 +617,7 @@ pub fn tick_game_over_overlay(
                 &mut commands,
                 &asset_server,
                 Vec3::new(
-                    res.game_width / 2. - 35.,
+                    res.game_width / 2. - 45.,
                     res.game_height / 2. - 43.5,
                     Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND,
                 ),
@@ -788,7 +872,8 @@ pub fn handle_game_over_final_stats_tooltip(
             }
             .get_stats_summary(curr_health.0, curr_mana.0);
 
-            let tooltip_pos = Vec3::new(120., -16., 2.);
+            // Hitbox is centered above "Try Again"; place tooltip up and to the left so it stays on-screen.
+            let tooltip_pos = Vec3::new(-125., 18., 2.);
             let tooltip_e = spawn_stats_tooltip_at(
                 &mut commands,
                 &graphics,

@@ -165,7 +165,7 @@ pub fn handle_echo_after_heal(
         }
         let rng = &mut rand::thread_rng();
         let count = skills.get_count(Heirloom::HealEcho);
-        if count > 0 && rng.gen_bool((count as f64 * 0.25).clamp(0.0, 1.0)) {
+        if count > 0 && rng.gen_bool((count as f64 * 0.1).clamp(0.0, 1.0)) {
             if let Some(ref cooldowns) = cooldowns {
                 if cooldowns
                     .chalice_echo
@@ -510,9 +510,7 @@ pub fn handle_spear_pull_delay(
             &mut commands,
             Transform::from_translation(Vec3::new(epicenter.x, epicenter.y, 1.0)),
             0.5, // Very short duration, just for the hit
-            (attack.0 as f32
-                * skill_power_mult
-                * attack_damage_multiplier(PARRY_SPEAR)) as i32,
+            (attack.0 as f32 * skill_power_mult * attack_damage_multiplier(PARRY_SPEAR)) as i32,
             Collider::ball(18.0), // 20px radius
             Projectile::SpearGravity,
         );
@@ -590,27 +588,31 @@ pub fn handle_delayed_heirloom_casts(
                 dmg,
                 size_multiplier,
             } => {
-                spawn_ice_explosion_hitbox(
-                    &mut commands,
-                    &graphics,
-                    *pos,
-                    *dmg,
-                    *size_multiplier,
-                );
+                spawn_ice_explosion_hitbox(&mut commands, &graphics, *pos, *dmg, *size_multiplier);
             }
             DelayedCastType::Echo {
                 player,
                 dmg,
                 size_multiplier,
             } => {
-                spawn_echo_hitbox(&mut commands, &asset_server, *player, *dmg, *size_multiplier);
+                spawn_echo_hitbox(
+                    &mut commands,
+                    &asset_server,
+                    *player,
+                    *dmg,
+                    *size_multiplier,
+                );
             }
         }
         commands.entity(entity).despawn();
     }
 }
 
-pub fn spawn_delayed_heirloom_cast(commands: &mut Commands, delay_secs: f32, cast_type: DelayedCastType) {
+pub fn spawn_delayed_heirloom_cast(
+    commands: &mut Commands,
+    delay_secs: f32,
+    cast_type: DelayedCastType,
+) {
     commands.spawn(DelayedHeirloomCast {
         delay: Timer::from_seconds(delay_secs, TimerMode::Once),
         cast_type,

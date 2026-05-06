@@ -1952,7 +1952,10 @@ pub fn handle_portal_animation(
                         commands.init_resource::<CraftingTracker>();
                         commands.init_resource::<EraManager>();
 
-                        run_unlock_state.reset_for_run(&*unlock_upgrades);
+                        run_unlock_state.reset_for_run(
+                            &*unlock_upgrades,
+                            time_crystals.completed_count() as u32,
+                        );
 
                         // Start the game with fade-in overlay
                         commands

@@ -269,6 +269,59 @@ pub struct DamageTracker {
     pub totals: HashMap<DamageSource, i64>,
 }
 
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct MobStatEntry {
+    pub kills: u32,
+    pub damage_taken: i64,
+}
+
+/// Per mob type: kills attributed to the player and damage taken from that mob type during the run.
+#[derive(Resource, Default, Debug, Serialize)]
+pub struct MobStatTracker {
+    pub per_mob: HashMap<Mob, MobStatEntry>,
+}
+
+impl MobStatTracker {
+    pub fn record_damage_taken(&mut self, mob: Mob, amount: i32) {
+        if mob == Mob::None || amount <= 0 {
+            return;
+        }
+        let e = self.per_mob.entry(mob).or_default();
+        e.damage_taken += amount as i64;
+    }
+
+    pub fn record_kill(&mut self, mob: Mob) {
+        if mob == Mob::None {
+            return;
+        }
+        let e = self.per_mob.entry(mob).or_default();
+        e.kills += 1;
+    }
+
+    pub fn sorted_entries(&self) -> Vec<(Mob, &MobStatEntry)> {
+        let mut v: Vec<_> = self
+            .per_mob
+            .iter()
+            .filter(|(m, s)| **m != Mob::None && (s.kills > 0 || s.damage_taken > 0))
+            .map(|(m, s)| (m.clone(), s))
+            .collect();
+        v.sort_by(|a, b| {
+            b.1.damage_taken
+                .cmp(&a.1.damage_taken)
+                .then_with(|| b.1.kills.cmp(&a.1.kills))
+                .then_with(|| {
+                    a.0.stat_tracker_display_name()
+                        .cmp(&b.0.stat_tracker_display_name())
+                })
+        });
+        v
+    }
+
+    pub fn has_any(&self) -> bool {
+        !self.sorted_entries().is_empty()
+    }
+}
+
 /// Stats from pet active abilities (shields, healing, coins, self-damage) for the damage tracker UI.
 #[derive(Resource, Default, Debug, Clone)]
 pub struct PetAbilityStats {
@@ -375,13 +428,13 @@ pub fn track_player_damage(
     }
 }
 
-/// Helper function to spawn the damage tracker UI elements.
-/// Returns a vector of spawned entities (the parent panel and all text nodes)
-/// so the caller can add context-specific components (like `GameOverText`).
+/// Spawn damage-dealt UI (panel entity first in returned vec; use for `GameOverText` etc.).
 ///
 /// `width` specifies the horizontal distance between the left-aligned text and right-aligned text.
 /// `base_alpha` is used for fading (0.0 for fading in on game over, 1.0 for inventory).
 /// `pet_stats` when provided adds Shields/Healing/Coins/Self damage lines under the Pet category.
+///
+/// Returns spawned entities and final relative `cursor_y` (negative offset below the title) for stacking another panel below.
 pub fn spawn_damage_tracker_ui(
     commands: &mut Commands,
     asset_server: &AssetServer,
@@ -390,7 +443,7 @@ pub fn spawn_damage_tracker_ui(
     base_alpha: f32,
     width: f32,
     pet_stats: Option<&PetAbilityStats>,
-) -> Option<Vec<Entity>> {
+) -> Option<(Vec<Entity>, f32)> {
     let mut groups = tracker.grouped_entries();
     if let Some(ps) = pet_stats {
         if ps.has_any() && !groups.iter().any(|(c, _)| *c == DamageSourceCategory::Pet) {
@@ -710,5 +763,185 @@ pub fn spawn_damage_tracker_ui(
         cursor_y -= category_gap;
     }
 
-    Some(spawned_entities)
+    Some((spawned_entities, cursor_y))
+}
+
+/// Mob kills and damage taken from each mob type (stack below damage-dealt via transform).
+pub fn spawn_mob_stat_tracker_ui(
+    commands: &mut Commands,
+    asset_server: &AssetServer,
+    tracker: &MobStatTracker,
+    parent_transform: Transform,
+    base_alpha: f32,
+    width: f32,
+) -> Option<(Vec<Entity>, f32)> {
+    let entries = tracker.sorted_entries();
+    if entries.is_empty() {
+        return None;
+    }
+
+    let mut spawned_entities = Vec::new();
+    let row_spacing = 8.0;
+    let category_gap = 4.0;
+    let mut cursor_y = 0.0;
+    let hw = width / 2.0;
+
+    let panel = commands
+        .spawn((
+            SpriteBundle {
+                sprite: Sprite {
+                    color: Color::rgba(0., 0., 0., 0.),
+                    ..Default::default()
+                },
+                transform: parent_transform,
+                ..default()
+            },
+            RenderLayers::from_layers(&[3]),
+            Name::new("Mob Stat Tracker Panel"),
+        ))
+        .id();
+    spawned_entities.push(panel);
+
+    let title = commands
+        .spawn((
+            Text2dBundle {
+                text: Text::from_section(
+                    "Mob encounters",
+                    TextStyle {
+                        font: asset_server.load("fonts/4x5.ttf"),
+                        font_size: 5.0,
+                        color: YELLOW_2.with_a(base_alpha),
+                    },
+                )
+                .with_alignment(TextAlignment::Left),
+                text_anchor: Anchor::CenterLeft,
+                transform: Transform::from_translation(Vec3::new(-hw, cursor_y, 1.)),
+                ..default()
+            },
+            RenderLayers::from_layers(&[3]),
+            Name::new("Mob Stat Tracker Title"),
+        ))
+        .id();
+    commands.entity(panel).add_child(title);
+    spawned_entities.push(title);
+    cursor_y -= 10.0;
+
+    for (mob, stats) in entries {
+        let mob_header = commands
+            .spawn((
+                Text2dBundle {
+                    text: Text::from_section(
+                        mob.stat_tracker_display_name(),
+                        TextStyle {
+                            font: asset_server.load("fonts/4x5.ttf"),
+                            font_size: 5.0,
+                            color: LEVEL_BLUE.with_a(base_alpha),
+                        },
+                    )
+                    .with_alignment(TextAlignment::Left),
+                    text_anchor: Anchor::CenterLeft,
+                    transform: Transform::from_translation(Vec3::new(-hw, cursor_y, 1.)),
+                    ..default()
+                },
+                RenderLayers::from_layers(&[3]),
+            ))
+            .id();
+        commands.entity(panel).add_child(mob_header);
+        spawned_entities.push(mob_header);
+        cursor_y -= row_spacing;
+
+        let kills_label = commands
+            .spawn((
+                Text2dBundle {
+                    text: Text::from_section(
+                        "    Kills:",
+                        TextStyle {
+                            font: asset_server.load("fonts/4x5.ttf"),
+                            font_size: 5.0,
+                            color: WHITE.with_a(base_alpha),
+                        },
+                    )
+                    .with_alignment(TextAlignment::Left),
+                    text_anchor: Anchor::CenterLeft,
+                    transform: Transform::from_translation(Vec3::new(-hw, cursor_y, 1.)),
+                    ..default()
+                },
+                RenderLayers::from_layers(&[3]),
+            ))
+            .id();
+        commands.entity(panel).add_child(kills_label);
+        spawned_entities.push(kills_label);
+
+        let kills_val = commands
+            .spawn((
+                Text2dBundle {
+                    text: Text::from_section(
+                        format_damage(stats.kills as i64),
+                        TextStyle {
+                            font: asset_server.load("fonts/4x5.ttf"),
+                            font_size: 5.0,
+                            color: WHITE.with_a(base_alpha),
+                        },
+                    )
+                    .with_alignment(TextAlignment::Right),
+                    text_anchor: Anchor::CenterRight,
+                    transform: Transform::from_translation(Vec3::new(hw + 10., cursor_y, 1.)),
+                    ..default()
+                },
+                RenderLayers::from_layers(&[3]),
+            ))
+            .id();
+        commands.entity(panel).add_child(kills_val);
+        spawned_entities.push(kills_val);
+        cursor_y -= row_spacing;
+
+        let hp_label = commands
+            .spawn((
+                Text2dBundle {
+                    text: Text::from_section(
+                        "    HP Lost:",
+                        TextStyle {
+                            font: asset_server.load("fonts/4x5.ttf"),
+                            font_size: 5.0,
+                            color: WHITE.with_a(base_alpha),
+                        },
+                    )
+                    .with_alignment(TextAlignment::Left),
+                    text_anchor: Anchor::CenterLeft,
+                    transform: Transform::from_translation(Vec3::new(-hw, cursor_y, 1.)),
+                    ..default()
+                },
+                RenderLayers::from_layers(&[3]),
+            ))
+            .id();
+        commands.entity(panel).add_child(hp_label);
+        spawned_entities.push(hp_label);
+
+        let hp_val = commands
+            .spawn((
+                Text2dBundle {
+                    text: Text::from_section(
+                        format_damage(stats.damage_taken),
+                        TextStyle {
+                            font: asset_server.load("fonts/4x5.ttf"),
+                            font_size: 5.0,
+                            color: WHITE.with_a(base_alpha),
+                        },
+                    )
+                    .with_alignment(TextAlignment::Right),
+                    text_anchor: Anchor::CenterRight,
+                    transform: Transform::from_translation(Vec3::new(hw + 10., cursor_y, 1.)),
+                    ..default()
+                },
+                RenderLayers::from_layers(&[3]),
+            ))
+            .id();
+        commands.entity(panel).add_child(hp_val);
+        spawned_entities.push(hp_val);
+        cursor_y -= row_spacing;
+
+        cursor_y -= category_gap;
+    }
+
+    Some((spawned_entities, cursor_y))
 }

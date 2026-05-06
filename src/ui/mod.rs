@@ -28,6 +28,11 @@ mod fps_text;
 pub mod key_input_guide;
 use key_input_guide::*;
 pub mod furnace_ui;
+mod heirloom_tooltip;
+pub use heirloom_tooltip::{
+    process_heirloom_tooltip_requests,  
+    HeirloomTooltipRequest, 
+};
 pub use skill_choice_ui::*;
 mod achievement_banner;
 mod active_skill_shrine_ui;
@@ -280,6 +285,7 @@ impl Plugin for UIPlugin {
             .add_event::<DropInWorldEvent>()
             .add_event::<MenuButtonClickEvent>()
             .add_event::<GrantHeirloomDevEvent>()
+            .add_event::<HeirloomTooltipRequest>()
             .add_plugin(Material2dPlugin::<ScreenEffectMaterial>::default())
             .register_type::<InventorySlotState>()
             .add_plugin(MinimapPlugin)
@@ -343,16 +349,18 @@ impl Plugin for UIPlugin {
             // Check for pending level-up rewards when any menu closes during gameplay
             .add_system(
                 check_pending_levelup_rewards_on_menu_close
+                    .in_set(OnUpdate(GameState::Main))
                     .run_if(in_state(GameState::Main))
                     .run_if(state_changed::<UIState>())
-                    .run_if(in_state(UIState::Closed))
+                    .run_if(in_state(UIState::Closed)),
             )
-            // Grant brief i-frames after exiting chest reward / level-up screens
             .add_system(
                 grant_iframes_after_chest_or_levelup_ui_close
+                    .in_set(OnUpdate(GameState::Main))
+                    .before(handle_hits)
                     .run_if(in_state(GameState::Main))
                     .run_if(state_changed::<UIState>())
-                    .after(check_pending_levelup_rewards_on_menu_close)
+                    .after(check_pending_levelup_rewards_on_menu_close),
             )
             .add_systems(
                 (
@@ -767,6 +775,17 @@ impl Plugin for UIPlugin {
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
+            .add_systems(
+                (
+                    update_banish_tracker_ui.run_if(in_state(UIState::Skills)),
+                    handle_banish_tracker_tooltip.run_if(in_state(UIState::Skills)),
+                    process_heirloom_tooltip_requests,
+                )
+                    .in_set(OnUpdate(GameState::Main)),
+            )
+            .add_system(
+                process_heirloom_tooltip_requests.in_set(OnUpdate(GameState::MainMenu)),
+            )
             .add_systems((
                 auto_equip_upgrade_slot_on_inv_close
                     .before(handle_new_ui_state)
@@ -995,9 +1014,9 @@ pub fn grant_iframes_after_chest_or_levelup_ui_close(
         return;
     }
 
-    let was_reward_ui = matches!(
+    let was_reward_ui = !matches!(
         prev,
-        UIState::ItemChest | UIState::Skills | UIState::ActiveSkills
+        UIState::Inventory | UIState::Options
     );
     if !was_reward_ui {
         return;
@@ -1009,7 +1028,7 @@ pub fn grant_iframes_after_chest_or_levelup_ui_close(
     commands
         .entity(player_e)
         .insert(InvincibilityTimer(Timer::from_seconds(
-            0.3,
+            1.,
             TimerMode::Once,
         )));
 }

@@ -8,6 +8,10 @@ pub const SHARDS_PER_CRYSTAL: u32 = 6;
 /// Run must last at least this many seconds for the survival shard.
 pub const SURVIVAL_SHARD_THRESHOLD_SECONDS: f64 = 6.0 * 60.0;
 
+/// Each threshold grants +1 shard when [`crate::player::score::RunScore::score`] reaches it
+/// (checked at game over; all that apply stack).
+pub const SCORE_SHARD_THRESHOLDS: &[u32] = &[2000, 8000, 16_000, 100_000];
+
 /// A single time crystal, completed once enough shards are collected.
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 pub struct TimeCrystal {

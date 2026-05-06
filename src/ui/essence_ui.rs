@@ -51,18 +51,14 @@ pub struct EssenceShopCache {
     pub shops: std::collections::HashMap<crate::world::TileMapPosition, Vec<EssenceOption>>,
 }
 
-use super::skill_choice_ui::spawn_heirloom_tooltip_card;
-
 use super::{
+    heirloom_tooltip::{HeirloomTooltipRequest, HeirloomTooltipShow},
     main_menu::spawn_back_button, spawn_item_stack_icon, ui_helpers::spawn_ui_overlay,
     Interactable, UIElement, UIState, ESSENCE_UI_SIZE,
 };
 
 #[derive(Component)]
 pub struct EssenceUI;
-
-#[derive(Component)]
-pub struct EssenceTooltipCard;
 
 #[derive(Component, Clone, Debug, Resource, Default)]
 pub struct EssenceOption {
@@ -98,11 +94,8 @@ aseprite!(pub BlacksmithMerchant, "textures/blacksmith.ase");
 
 /// System to handle spawning/despawning tooltip cards when hovering over heirlooms
 pub fn handle_essence_heirloom_tooltip(
-    mut commands: Commands,
-    graphics: Res<Graphics>,
-    asset_server: Res<AssetServer>,
+    mut tooltip_requests: EventWriter<HeirloomTooltipRequest>,
     essence_options: Query<(&EssenceOption, &super::interactions::Interactable)>,
-    existing_tooltips: Query<Entity, With<EssenceTooltipCard>>,
     mut last_hovered: Local<Option<Heirloom>>,
 ) {
     use super::interactions::Interaction;
@@ -118,35 +111,23 @@ pub fn handle_essence_heirloom_tooltip(
         return;
     }
 
-    // Despawn all existing tooltips
-    for tooltip_e in existing_tooltips.iter() {
-        commands.entity(tooltip_e).despawn_recursive();
-    }
-
-    // Spawn new tooltip if hovering
-    if let Some(hovered_heirloom) = &currently_hovered {
-        // Find the essence option to get the rarity
-        for (essence_option, interactable) in essence_options.iter() {
-            if matches!(interactable.current(), Interaction::Hovering)
-                && essence_option.get_heirloom() == *hovered_heirloom
-            {
-                let tooltip_e = spawn_heirloom_tooltip_card(
-                    &graphics,
-                    &mut commands,
-                    &asset_server,
-                    essence_option.get_heirloom(),
-                    essence_option.get_rarity(),
-                    Vec3::new(-130., 0., 15.), // Left side of the essence shop
-                    None,                      // No scaling text for shop tooltips
-                    None,                      // No trigger count for shop tooltips
-                );
-
-                commands
-                    .entity(tooltip_e)
-                    .insert(EssenceTooltipCard)
-                    .insert(UIState::Essence);
-
-                break;
+    match &currently_hovered {
+        None => tooltip_requests.send(HeirloomTooltipRequest::Clear),
+        Some(hovered_heirloom) => {
+            for (essence_option, interactable) in essence_options.iter() {
+                if matches!(interactable.current(), Interaction::Hovering)
+                    && essence_option.get_heirloom() == *hovered_heirloom
+                {
+                    tooltip_requests.send(HeirloomTooltipRequest::Show(HeirloomTooltipShow {
+                        heirloom: essence_option.get_heirloom(),
+                        rarity: essence_option.get_rarity(),
+                        position: Vec3::new(-130., 0., 15.),
+                        scaling_text: None,
+                        trigger_count_text: None,
+                        ui_state: Some(UIState::Essence),
+                    }));
+                    break;
+                }
             }
         }
     }

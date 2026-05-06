@@ -2,12 +2,12 @@ use core::panic;
 use std::cmp::min;
 
 use crate::{
-    animations::{AnimationPosTracker, AnimationTimer, DoneAnimation},
-    attributes::{add_item_glows, AttributeModifier, ItemAttributes, ItemRarity, RarityGlows},
+    animations::{AnimationPosTracker, AnimationTimer},
+    attributes::{add_item_glows, AttributeModifier, ItemAttributes, ItemRarity},
     container::{main_inv_bag_slot_indices_top_to_bottom, Container},
     inputs::FacingDirection,
     item::{
-        item_actions::{ItemAction, ItemActions},
+        item_actions::{proto_item_allows_hotbar_band, ItemActions},
         ActiveMainHandState, Equipment, EquipmentType, ItemDisplayMetaData, ItemDrop, MainHand,
         WorldObject, PLAYER_EQUIPMENT_POSITIONS,
     },
@@ -20,7 +20,6 @@ use crate::{
 use rand::Rng;
 
 use bevy::prelude::*;
-use bevy_aseprite::{anim::AsepriteAnimation, AsepriteBundle};
 
 use crate::item::ammo::Ammo;
 use bevy_proto::prelude::*;
@@ -29,6 +28,8 @@ use serde::{Deserialize, Serialize};
 pub const INVENTORY_SIZE: usize = 8 * 4;
 /// First this many `Inventory::items` indices are the quickbar (keys 1–4 + two extra storage slots).
 pub const INVENTORY_HOTBAR_SLOTS: usize = 4;
+/// Keyed row (`0..INVENTORY_HOTBAR_SLOTS`) plus two passive cells (`4` and `5`); consumables only.
+pub const INVENTORY_HOTBAR_BAND_SLOTS: usize = 6;
 pub const MAX_STACK_SIZE: usize = 9999;
 
 #[derive(Component, Debug, Default, Clone, Serialize, Deserialize)]
@@ -374,6 +375,12 @@ impl InventoryItemStack {
         if slot_type.is_weapon_slot() || slot_type.is_pet_slot() {
             return self.slot == 0 && self.item_stack.obj_type.is_weapon();
         }
+        if slot_type.is_inventory() || slot_type.is_hotbar() {
+            if self.slot < INVENTORY_HOTBAR_BAND_SLOTS {
+                return proto_item_allows_hotbar_band(self.item_stack.obj_type, proto_param);
+            }
+            return true;
+        }
         if !(slot_type.is_accessory() || slot_type.is_equipment()) {
             return true;
         }
@@ -502,14 +509,25 @@ impl ItemStack {
         self,
         container: &mut Container,
         inv_slots: &mut Query<&mut InventorySlotState>,
+        proto: &ProtoParam,
     ) {
         // if stack of that item exists, add to it, otherwise push as new stack.
-        if let Some(stack) = container.items.iter().find(|i| match i {
-            Some(ii) if ii.item_stack.count < MAX_STACK_SIZE => self.is_stackable(&ii.item_stack),
-            _ => false,
+        if let Some((_, stack_cell)) = container.items.iter().enumerate().find(|(slot_idx, i)| {
+            let skip_band = container.items.len() == INVENTORY_SIZE
+                && *slot_idx < INVENTORY_HOTBAR_BAND_SLOTS
+                && !proto_item_allows_hotbar_band(self.obj_type, proto);
+            if skip_band {
+                return false;
+            }
+            match i {
+                Some(ii) if ii.item_stack.count < MAX_STACK_SIZE => {
+                    self.is_stackable(&ii.item_stack)
+                }
+                _ => false,
+            }
         }) {
             // safe to unwrap, we check for it above
-            let slot = stack.clone().unwrap().slot;
+            let slot = stack_cell.as_ref().unwrap().slot;
             let inv_item_stack = container.items[slot].clone().unwrap();
             let pre_stack_size = inv_item_stack.item_stack.count;
 
@@ -524,18 +542,20 @@ impl ItemStack {
                     self.copy_with_count(pre_stack_size + self.count - MAX_STACK_SIZE),
                     container,
                     inv_slots,
+                    proto,
                 );
             }
         } else {
-            Self::add_to_empty_inventory_slot(self, container, inv_slots);
+            Self::add_to_empty_inventory_slot(self, container, inv_slots, proto);
         }
     }
     pub fn add_to_empty_inventory_slot(
         self,
         container: &mut Container,
         inv_slots: &mut Query<&mut InventorySlotState>,
+        proto: &ProtoParam,
     ) {
-        let slot = container.get_first_empty_slot();
+        let slot = container.get_first_empty_player_slot_for_pickup(&self, proto);
         if let Some(slot) = slot {
             let item = InventoryItemStack {
                 item_stack: self,
@@ -731,6 +751,31 @@ pub fn sort_main_inventory(
         });
     }
 
+    // Evict gear/materials from quick-access band slots (keys 1–4 row + two passive cells).
+    for slot in 0..INVENTORY_HOTBAR_BAND_SLOTS.min(len) {
+        let Some(cell) = inv.items.items[slot].clone() else {
+            continue;
+        };
+        if proto_item_allows_hotbar_band(cell.item_stack.obj_type, proto) {
+            continue;
+        }
+        let stack_ref = &cell.item_stack;
+        if inv
+            .items
+            .get_first_empty_player_slot_for_pickup(stack_ref, proto)
+            .is_none()
+            && inv
+                .items
+                .get_slot_for_item_in_container_with_space_for_pickup(stack_ref, None, proto)
+                .is_none()
+        {
+            continue;
+        }
+        inv.items.items[slot] = None;
+        cell.item_stack
+            .add_to_inventory(&mut inv.items, inv_slots, proto);
+    }
+
     // Mark every visible inventory slot (Normal + Hotbar) dirty so the UI respawns icons.
     for mut state in inv_slots.iter_mut() {
         if state.r#type.is_inventory() || state.r#type.is_hotbar() {
@@ -771,6 +816,7 @@ pub fn player_can_accept_ground_item_pickup(
     item_stack: &ItemStack,
     inventory: &Inventory,
     player_has_pet: bool,
+    proto: &ProtoParam,
 ) -> bool {
     let obj = item_stack.obj_type;
     if obj == WorldObject::TimeFragment
@@ -786,9 +832,11 @@ pub fn player_can_accept_ground_item_pickup(
         return true;
     }
     let inv_container = &inventory.items;
-    inv_container.get_first_empty_slot().is_some()
+    inv_container
+        .get_first_empty_player_slot_for_pickup(item_stack, proto)
+        .is_some()
         || inv_container
-            .get_slot_for_item_in_container_with_space(item_stack, None)
+            .get_slot_for_item_in_container_with_space_for_pickup(item_stack, None, proto)
             .is_some()
 }
 
@@ -961,7 +1009,9 @@ fn take_item_from_shift_source(
     src_slot: usize,
 ) -> Option<InventoryItemStack> {
     match source {
-        InventoryShiftClickSource::MainGrid => inv.items.items.get_mut(src_slot).and_then(|s| s.take()),
+        InventoryShiftClickSource::MainGrid => {
+            inv.items.items.get_mut(src_slot).and_then(|s| s.take())
+        }
         InventoryShiftClickSource::CraftingInputs => inv
             .crafting_inputs_items
             .items
@@ -998,12 +1048,7 @@ pub fn try_shift_quick_equip_from_inventory_source(
     let item_stack = stack_entry.item_stack;
 
     if item_stack.obj_type.is_weapon() {
-        if inv
-            .weapon_items
-            .items
-            .get(0)
-            .map_or(true, |s| s.is_none())
-        {
+        if inv.weapon_items.items.get(0).map_or(true, |s| s.is_none()) {
             InventoryItemStack {
                 item_stack: item_stack.clone(),
                 slot: 0,
@@ -1012,13 +1057,7 @@ pub fn try_shift_quick_equip_from_inventory_source(
             take_item_from_shift_source(inv, source, src_slot);
             return ShiftQuickEquipResult::Equipped;
         }
-        if player_has_pet
-            && inv
-                .pet_items
-                .items
-                .get(0)
-                .map_or(true, |s| s.is_none())
-        {
+        if player_has_pet && inv.pet_items.items.get(0).map_or(true, |s| s.is_none()) {
             InventoryItemStack {
                 item_stack: item_stack.clone(),
                 slot: 0,
@@ -1086,23 +1125,30 @@ pub fn shift_move_equipped_slot_to_main_items(
     inv: &mut Inventory,
     slot_type: InventorySlotType,
     slot_index: usize,
+    proto: &ProtoParam,
 ) {
     match slot_type {
         InventorySlotType::Equipment => {
-            inv.equipment_items
-                .move_item_to_target_container(&mut inv.items, slot_index);
+            inv.equipment_items.move_item_to_target_container(
+                &mut inv.items,
+                slot_index,
+                Some(proto),
+            );
         }
         InventorySlotType::Accessory => {
-            inv.accessory_items
-                .move_item_to_target_container(&mut inv.items, slot_index);
+            inv.accessory_items.move_item_to_target_container(
+                &mut inv.items,
+                slot_index,
+                Some(proto),
+            );
         }
         InventorySlotType::Weapon => {
             inv.weapon_items
-                .move_item_to_target_container(&mut inv.items, slot_index);
+                .move_item_to_target_container(&mut inv.items, slot_index, Some(proto));
         }
         InventorySlotType::Pet => {
             inv.pet_items
-                .move_item_to_target_container(&mut inv.items, slot_index);
+                .move_item_to_target_container(&mut inv.items, slot_index, Some(proto));
         }
         _ => {}
     }

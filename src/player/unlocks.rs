@@ -283,10 +283,14 @@ pub struct RunUnlockState {
 }
 
 impl RunUnlockState {
-    pub fn reset_for_run(&mut self, upgrades: &UnlockUpgrades) {
+    /// `banishes_from_time_crystals`: +1 starting banish per **completed** time crystal
+    /// ([`crate::player::time_crystals::TimeCrystals::completed_count`]), on top of shop tiers.
+    pub fn reset_for_run(&mut self, upgrades: &UnlockUpgrades, banishes_from_time_crystals: u32) {
         self.rerolls_total = upgrades.reroll_total();
         self.rerolls_remaining = self.rerolls_total;
-        self.banishes_total = upgrades.banish_total();
+        self.banishes_total = upgrades
+            .banish_total()
+            .saturating_add(banishes_from_time_crystals);
         self.banishes_remaining = self.banishes_total;
         self.pending_food = upgrades.food_count();
         self.pending_tomes = upgrades.tome_count();

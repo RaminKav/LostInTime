@@ -56,12 +56,15 @@ pub fn setup_active_skill_shrine_ui(
         With<Player>,
     >,
 ) {
-    spawn_ui_overlay(
+    let shrine_overlay = spawn_ui_overlay(
         &mut commands,
         Vec2::new(res.game_width + 10., res.game_height + 100.),
         0.9,
         9.,
     );
+    commands
+        .entity(shrine_overlay)
+        .insert(UIState::ActiveSkillShrine);
     let _title_text = commands
         .spawn((
             Text2dBundle {
@@ -311,12 +314,15 @@ pub fn setup_active_skill_shrine_overwrite_ui(
         With<Player>,
     >,
 ) {
-    spawn_ui_overlay(
+    let overwrite_overlay = spawn_ui_overlay(
         &mut commands,
         Vec2::new(res.game_width + 10., res.game_height + 100.),
         0.9,
         9.,
     );
+    commands
+        .entity(overwrite_overlay)
+        .insert(UIState::ActiveSkills);
     let _title_text = commands
         .spawn((
             Text2dBundle {

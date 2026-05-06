@@ -979,7 +979,7 @@ impl Heirloom {
             Heirloom::SkillEcho => 3,
             Heirloom::WaveAttack => 5,
             Heirloom::AntFarm => 2,
-            Heirloom::StoneTooth => 7,
+            Heirloom::StoneTooth => 5,
             Heirloom::SummonRing => 10,
             Heirloom::Reaper => 5,
             Heirloom::CoinLightning => 5,
@@ -1130,7 +1130,7 @@ impl Heirloom {
             Heirloom::Thorns => vec!["Gain +25 Thorns, ".to_string(), "permanently.".to_string()],
             Heirloom::Lifesteal => {
                 vec![
-                    "Gain +4% Lifesteal,".to_string(),
+                    "Gain +3% Lifesteal,".to_string(),
                     "permanently.".to_string(),
                 ]
             }
@@ -1454,7 +1454,7 @@ impl Heirloom {
                 format!("Costs {} mana.", Heirloom::ViralVenum.get_mana_cost()),
             ],
             Heirloom::HealEcho => vec![
-                "Healing has a 25%".to_string(),
+                "Healing has a 10%".to_string(),
                 "chance to trigger an".to_string(),
                 "echo that damages".to_string(),
                 "enemies around you.".to_string(),
@@ -1514,8 +1514,8 @@ impl Heirloom {
                 "for 3 seconds.".to_string(),
             ],
             Heirloom::RegenLifesteal => vec![
-                "Lose 10 HP Regen,".to_string(),
-                "gain 10% Lifesteal.".to_string(),
+                "Lose 7 HP Regen,".to_string(),
+                "gain 7% Lifesteal.".to_string(),
             ],
             Heirloom::StandStill => vec![
                 "Standing still".to_string(),
@@ -1618,7 +1618,7 @@ impl Heirloom {
             ],
             Heirloom::KillLightning => vec![
                 "Killing an enemy".to_string(),
-                "has a 20% chance".to_string(),
+                "has a 15% chance".to_string(),
                 "to spawn a lightning".to_string(),
                 "strike on a random".to_string(),
                 "nearby enemy.".to_string(),
@@ -1883,7 +1883,9 @@ pub fn grant_skill_charge_after_cooldown_complete(
     }
 }
 
-#[derive(Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Default, Debug, Serialize, Deserialize)]
+#[derive(
+    Copy, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Default, Debug, Serialize, Deserialize,
+)]
 pub enum HeirloomRarity {
     #[default]
     Common,
@@ -1966,6 +1968,9 @@ pub struct HeirloomChoiceQueue {
     pub active_heirloom_limbo: Option<ActiveSkillChoiceState>,
     #[serde(default)]
     pub banned: HashSet<Heirloom>,
+    /// Heirlooms banished this run (for UI). Pool math uses live counts; this is display-only.
+    #[serde(default)]
+    pub banished_heirlooms: Vec<HeirloomChoiceState>,
 }
 
 impl Default for HeirloomChoiceQueue {
@@ -1979,6 +1984,7 @@ impl Default for HeirloomChoiceQueue {
             active_heirloom_limbo: None,
             pool: Vec::new(),
             banned: HashSet::default(),
+            banished_heirlooms: Vec::new(),
         }
     }
 }
@@ -2055,12 +2061,9 @@ pub fn time_crystal_heirlooms(idx: usize) -> Vec<(Heirloom, HeirloomRarity)> {
 }
 
 impl HeirloomChoiceQueue {
-    /// Build the heirloom pool for a new run, gated on the player's persistent
-    /// [`TimeCrystals`] progress. Crystal-gated entries are appended only when the
-    /// corresponding crystal is complete. Crystals fill in order, so crystal 0 is
-    /// unlocked first, then crystal 1, etc.
-    pub fn new_for_player(time_crystals: &TimeCrystals) -> Self {
-        let mut pool: Vec<HeirloomChoiceState> = vec![
+    /// Base heirloom pool with **no** time-crystal unlocks (used for banish caps per rarity).
+    pub fn base_pool_entries() -> Vec<HeirloomChoiceState> {
+        vec![
             HeirloomChoiceState::new(Heirloom::Speed, HeirloomRarity::Common),
             HeirloomChoiceState::new(Heirloom::Thorns, HeirloomRarity::Common),
             HeirloomChoiceState::new(Heirloom::Attack, HeirloomRarity::Common),
@@ -2106,7 +2109,85 @@ impl HeirloomChoiceQueue {
             HeirloomChoiceState::new(Heirloom::DeathDefiance, HeirloomRarity::Legendary),
             HeirloomChoiceState::new(Heirloom::LifestealCoins, HeirloomRarity::Legendary),
             HeirloomChoiceState::new(Heirloom::CrateBreakDamage, HeirloomRarity::Legendary),
-        ];
+        ]
+    }
+
+    pub fn base_pool_count_for_rarity(rarity: HeirloomRarity) -> usize {
+        Self::base_pool_entries()
+            .iter()
+            .filter(|x| x.rarity == rarity)
+            .count()
+    }
+
+    /// Reconstruct the theoretical run pool from `TimeCrystals` (base + crystal unlocks),
+    /// minus heirlooms already banished in this run. This is independent of the live
+    /// `pool`/`queue` state, which mutates as level-ups draw cards / clashing heirlooms
+    /// are pruned / child heirlooms are added.
+    fn reconstructed_available_pool(
+        &self,
+        time_crystals: &TimeCrystals,
+    ) -> Vec<HeirloomChoiceState> {
+        let mut pool: Vec<HeirloomChoiceState> = Self::base_pool_entries();
+        for idx in 0..time_crystals.crystals.len() {
+            if !time_crystals.is_complete(idx) {
+                continue;
+            }
+            for (heirloom, rarity) in time_crystal_heirlooms(idx) {
+                pool.push(HeirloomChoiceState::new(heirloom, rarity));
+            }
+        }
+        pool.retain(|x| !self.banned.contains(&x.heirloom));
+        pool
+    }
+
+    /// Count of heirlooms of `rarity` available in the reconstructed run pool.
+    pub fn reconstructed_count_for_rarity(
+        &self,
+        time_crystals: &TimeCrystals,
+        rarity: HeirloomRarity,
+    ) -> usize {
+        self.reconstructed_available_pool(time_crystals)
+            .iter()
+            .filter(|x| x.rarity == rarity)
+            .count()
+    }
+
+    /// Max further banishes allowed at this rarity without dropping the pool below `base_count - 1`.
+    /// Formula: `current_pool_count - base_pool_count + 1` (clamped).
+    /// Uses the **reconstructed** pool (not the live one) so the count is stable across
+    /// level-ups, picks, and clashing/child heirloom edits.
+    pub fn allowed_banishes_for_rarity(
+        &self,
+        time_crystals: &TimeCrystals,
+        rarity: HeirloomRarity,
+    ) -> usize {
+        let base = Self::base_pool_count_for_rarity(rarity);
+        let current = self.reconstructed_count_for_rarity(time_crystals, rarity);
+        current.saturating_add(1).saturating_sub(base)
+    }
+
+    /// Whether the heirloom currently offered in `queue[0][slot]` may be banished (rarity cap + non-placeholder).
+    pub fn banish_allowed_for_choice_slot(
+        &self,
+        time_crystals: &TimeCrystals,
+        slot: usize,
+    ) -> bool {
+        let Some(choices) = self.queue.first() else {
+            return false;
+        };
+        let c = &choices[slot];
+        if c.heirloom == Heirloom::None {
+            return false;
+        }
+        self.allowed_banishes_for_rarity(time_crystals, c.rarity) > 0
+    }
+
+    /// Build the heirloom pool for a new run, gated on the player's persistent
+    /// [`TimeCrystals`] progress. Crystal-gated entries are appended only when the
+    /// corresponding crystal is complete. Crystals fill in order, so crystal 0 is
+    /// unlocked first, then crystal 1, etc.
+    pub fn new_for_player(time_crystals: &TimeCrystals) -> Self {
+        let mut pool = Self::base_pool_entries();
 
         // Crystal-gated heirlooms. Mapping lives in `time_crystal_heirlooms`.
         for idx in 0..time_crystals.crystals.len() {
@@ -2148,6 +2229,7 @@ impl HeirloomChoiceQueue {
             active_heirloom_limbo: None,
             pool,
             banned: HashSet::default(),
+            banished_heirlooms: Vec::new(),
         }
     }
 
@@ -2233,7 +2315,7 @@ impl HeirloomChoiceQueue {
         // Calculate adjusted thresholds (lower threshold = more chance for that rarity)
         let legendary_threshold = (99.5 - loot_bonus_f * 0.02).max(0.0);
         let rare_threshold = (95.5 - loot_bonus_f * 0.06).max(0.0);
-        let uncommon_threshold = (78.0 - loot_bonus_f * 0.1).max(0.0);
+        let uncommon_threshold = (75.0 - loot_bonus_f * 0.1).max(0.0);
         let roll = rng.gen_range(0_f32..100_f32);
 
         if roll >= legendary_threshold {
@@ -2370,8 +2452,15 @@ impl HeirloomChoiceQueue {
         }
     }
 
-    pub fn banish_slot(&mut self, slot: usize) -> Option<HeirloomChoiceState> {
+    pub fn banish_slot(
+        &mut self,
+        time_crystals: &TimeCrystals,
+        slot: usize,
+    ) -> Option<HeirloomChoiceState> {
         if self.queue.is_empty() {
+            return None;
+        }
+        if !self.banish_allowed_for_choice_slot(time_crystals, slot) {
             return None;
         }
         let mut choices = self.queue.remove(0);
@@ -2379,6 +2468,7 @@ impl HeirloomChoiceQueue {
         choices[slot] = HeirloomChoiceState::default();
         self.queue.push(choices.clone());
         self.banned.insert(banned_choice.heirloom.clone());
+        self.banished_heirlooms.push(banned_choice.clone());
         self.pool.retain(|x| x.heirloom != banned_choice.heirloom);
 
         for (index, choice) in choices.into_iter().enumerate() {

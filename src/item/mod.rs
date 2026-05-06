@@ -19,13 +19,12 @@ use crate::player::levels::ExperienceReward;
 use crate::player::Player;
 use crate::proto::proto_param::ProtoParam;
 
-use crate::schematic::loot_chests::get_random_loot_chest_type;
 use crate::status_effects::{
     check_freeze_on_slow_stacks, ensure_mob_status_effects, handle_burning_ticks,
     handle_frail_stack_ticks, handle_frozen_ticks, handle_slow_stack_ticks,
 };
 use crate::ui::minimap::UpdateMiniMapEvent;
-use crate::ui::{ChestContainer, FlashExpBarEvent, InventorySlotType};
+use crate::ui::{FlashExpBarEvent, InventorySlotType};
 use crate::world::dungeon::Dungeon;
 use crate::world::dungeon_generation::DUNGEON_GRID_SIZE;
 use crate::world::generation::WallBreakEvent;
@@ -1498,14 +1497,6 @@ pub fn handle_placing_world_object(
                         game.add_object_to_chunk_cache(tile_pos, place_event.obj);
                         //TODO: do what old game data did, add obj to registry
                         commands.entity(item_e).set_parent(chunk);
-                        if !place_event.placed_by_player
-                            && container_reg.containers.get(&tile_pos).is_none()
-                            && place_event.obj == WorldObject::Chest
-                        {
-                            commands
-                                .entity(item_e)
-                                .insert(get_random_loot_chest_type(rand::thread_rng()));
-                        }
 
                         if place_event.obj.is_medium_size(&proto_param) {
                             minimap_event.send(UpdateMiniMapEvent {

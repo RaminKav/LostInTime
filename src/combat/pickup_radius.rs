@@ -6,6 +6,7 @@ use crate::{
     item::{object_actions::TouchTriggerObjectAction, ItemDrop},
     pets::state::Pet,
     player::{skills::PlayerSkills, Player},
+    proto::proto_param::ProtoParam,
 };
 
 #[derive(Component, Debug, Clone)]
@@ -70,6 +71,7 @@ pub fn mark_items_in_pickup_range(
     player_query: Query<(&Transform, &PickupRadius), With<Player>>,
     inv: Query<&Inventory, With<Player>>,
     pets: Query<(), With<Pet>>,
+    proto: ProtoParam,
 ) {
     let Ok((player_transform, pickup_radius)) = player_query.get_single() else {
         return;
@@ -83,7 +85,7 @@ pub fn mark_items_in_pickup_range(
     let pickup_range = pickup_radius.0;
 
     for (item_entity, item_transform, item_stack) in item_query.iter() {
-        if !player_can_accept_ground_item_pickup(item_stack, inv, player_has_pet) {
+        if !player_can_accept_ground_item_pickup(item_stack, inv, player_has_pet, &proto) {
             continue;
         }
         let item_pos = item_transform.translation.truncate();
@@ -107,6 +109,7 @@ pub fn handle_item_pickup_radius(
     pets: Query<(), With<Pet>>,
     mut commands: Commands,
     time: Res<Time>,
+    proto: ProtoParam,
 ) {
     let Ok(player_transform) = player_query.get_single() else {
         return;
@@ -119,7 +122,7 @@ pub fn handle_item_pickup_radius(
     let player_pos = player_transform.translation.truncate();
 
     for (item_entity, mut item_transform, mut pull_state, item_stack) in item_query.iter_mut() {
-        if !player_can_accept_ground_item_pickup(item_stack, inv, player_has_pet) {
+        if !player_can_accept_ground_item_pickup(item_stack, inv, player_has_pet, &proto) {
             commands.entity(item_entity).remove::<BeingPulledToPlayer>();
             continue;
         }
@@ -174,6 +177,7 @@ pub fn handle_magnet_pull(
     pets: Query<(), With<Pet>>,
     mut commands: Commands,
     time: Res<Time>,
+    proto: ProtoParam,
 ) {
     let Ok((mut magnet_timer, player_skills)) = magnet_timer_query.get_single_mut() else {
         return;
@@ -196,7 +200,7 @@ pub fn handle_magnet_pull(
         magnet_timer.duration_timer.reset();
 
         for (item_entity, item_stack) in item_query.iter() {
-            if !player_can_accept_ground_item_pickup(item_stack, inv, player_has_pet) {
+            if !player_can_accept_ground_item_pickup(item_stack, inv, player_has_pet, &proto) {
                 continue;
             }
             commands

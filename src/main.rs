@@ -67,7 +67,6 @@ mod night;
 mod player;
 mod proto;
 mod sapling;
-mod schematic;
 mod ui;
 mod world;
 use animations::AnimationsPlugin;
@@ -89,7 +88,6 @@ use player::{
 };
 use proto::{proto_param::ProtoParam, ProtoPlugin};
 
-use schematic::SchematicPlugin;
 use tracing::level_filters::LevelFilter;
 #[cfg(feature = "tracy")]
 use tracing_subscriber::filter::FilterFn;
@@ -287,7 +285,6 @@ fn main() {
         .add_plugin(ClientPlugin)
         .add_plugin(client::leaderboard::LeaderboardPlugin)
         .add_plugin(ProtoPlugin)
-        .add_plugin(SchematicPlugin)
         .add_plugin(JuicePlugin)
         .add_plugin(PetsPlugin)
         .add_plugin(BlessingsPlugin)
@@ -884,8 +881,9 @@ impl<'w, 's> GameParam<'w, 's> {
             }
             // Base crit damage (includes overflow from crit chance > 200% at 1:1 ratio
             // and any per-skill bonus crit damage, e.g. ArrowVolley scaling with crit chance)
-            let crit_multiplier =
-                f32::abs((crit_dmg.0 + crit_dmb_bonus + overflow_crit_damage + bonus_crit_damage) as f32) / 100.;
+            let crit_multiplier = f32::abs(
+                (crit_dmg.0 + crit_dmb_bonus + overflow_crit_damage + bonus_crit_damage) as f32,
+            ) / 100.;
             // Overcrit adds an extra 50% on top
             let overcrit_multiplier = if did_overcrit { 1.5 } else { 1.0 };
             (

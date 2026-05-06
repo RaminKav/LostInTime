@@ -193,6 +193,20 @@ pub fn handle_anim_change_when_player_dir_changes(
         new_dir_query.iter_mut()
     {
         if curr_anim.is_dir_locked() && !prev_anim_state.just_finished() {
+            // Left/right share the same Aseprite tag (`…Side`); only `flip_x` differs.
+            // Locked animations skip full tag swaps mid-playback, but during rapid
+            // attack chains (e.g. auto attack) we must still refresh horizontal flip.
+            let side_to_side = matches!(
+                (&prev_dir.prev_dir, new_dir),
+                (
+                    FacingDirection::Left | FacingDirection::Right,
+                    FacingDirection::Left | FacingDirection::Right,
+                )
+            );
+            if side_to_side {
+                sprite.flip_x = new_dir == &FacingDirection::Left;
+                prev_dir.prev_dir = new_dir.clone();
+            }
             continue;
         }
 

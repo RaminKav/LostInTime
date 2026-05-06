@@ -46,7 +46,6 @@ use crate::{
     },
     player::levels::ExperienceReward,
     sapling::{GrowsInto, Sapling},
-    schematic::loot_chests::LootChestType,
     status_effects::{StatusEffectState, StatusEffectTracker},
     ui::{
         crafting_ui::CraftingContainerType,
@@ -96,7 +95,6 @@ impl Plugin for ProtoPlugin {
             .register_type::<SpriteSheetProto>()
             .register_type::<KCC>()
             .register_type::<MobLevel>()
-            .register_type::<LootChestType>()
             .register_type::<SpriteSize>()
             .register_type::<SpriteAnchor>()
             .register_type::<ItemAction>()

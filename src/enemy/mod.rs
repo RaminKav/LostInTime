@@ -198,6 +198,17 @@ impl Mob {
             _ => None,
         }
     }
+
+    /// Label for run stat UI (boss lore names, otherwise enum display).
+    pub fn stat_tracker_display_name(&self) -> String {
+        if let Some(name) = self.get_boss_name() {
+            name.to_string()
+        } else if *self == Mob::None {
+            "Unknown".to_string()
+        } else {
+            self.to_string()
+        }
+    }
 }
 #[derive(
     Component, Default, Deserialize, Debug, Clone, Schematic, Reflect, FromReflect, PartialEq, Eq,

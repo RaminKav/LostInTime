@@ -42,16 +42,19 @@ use crate::{
         score::{HighScores, RunScore, RunTimer},
         skills::{HeirloomChoiceQueue, PlayerClass, PlayerSkills, SkillClass},
         stats::{PlayerStats, SkillPoints},
-        time_crystals::{LastRunCrystalProgress, TimeCrystals, SURVIVAL_SHARD_THRESHOLD_SECONDS},
+        time_crystals::{
+            LastRunCrystalProgress, TimeCrystals, SCORE_SHARD_THRESHOLDS,
+            SURVIVAL_SHARD_THRESHOLD_SECONDS,
+        },
         unlocks::{UnlockUpgrades, UnlockedClasses},
         Player,
     },
-    world::portal::BossKillTracker,
     ui::{
         tips::{SeenTips, Tip},
         ChestContainer, FurnaceContainer,
     },
     vectorize::{vectorize, vectorize_inner},
+    world::portal::BossKillTracker,
     world::{
         chunk::{Chunk, ReflectedPos, TileEntityCollection, TileSpriteData},
         dimension::{
@@ -424,11 +427,19 @@ pub fn handle_append_run_data_after_death(
                 }
             }
         }
+        let run_score_value = run_score.as_ref().map(|rs| rs.score).unwrap_or(0);
+        let score_shard_bonus = SCORE_SHARD_THRESHOLDS
+            .iter()
+            .filter(|&&t| run_score_value >= t)
+            .count() as u32;
+        shards_earned += score_shard_bonus;
 
         if shards_earned > 0 {
             info!(
-                "Awarding {} time crystal shard(s) for this run (survived {}s)",
-                shards_earned, run_timer.elapsed_seconds as u64
+                "Awarding {} time crystal shard(s) for this run (survived {}s, score {})",
+                shards_earned,
+                run_timer.elapsed_seconds as u64,
+                run_score_value,
             );
             crystals.add_shards(shards_earned);
         }
@@ -692,6 +703,7 @@ pub fn load_state(
         commands.init_resource::<WorldObjectCache>();
     }
     commands.insert_resource(GenerationSeed { seed });
+    commands.insert_resource(BossKillTracker::default());
 
     // Load HighScores and Achievements early so UI (class selection) can use them
     let game_data_file_path = datafiles::game_data();

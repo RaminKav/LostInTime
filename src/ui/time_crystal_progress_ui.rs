@@ -10,8 +10,8 @@ use crate::{
         time_crystals::LastRunCrystalProgress,
     },
     ui::{
+        heirloom_tooltip::{HeirloomTooltipRequest, HeirloomTooltipShow},
         interactions::{Interactable, Interaction},
-        skill_choice_ui::spawn_heirloom_tooltip_card,
         ui_helpers, UIElement, UIState,
     },
     ScreenResolution,
@@ -40,10 +40,6 @@ pub struct HeirloomGridLockedCell {
     pub heirloom: Heirloom,
     pub rarity: HeirloomRarity,
 }
-
-/// Marker for the hover tooltip spawned over a [`CrystalUnlockIcon`].
-#[derive(Component)]
-pub struct CrystalUnlockTooltip;
 
 const PANEL_Z: f32 = 101.;
 const PANEL_CONTENT_Z: f32 = 102.;
@@ -427,12 +423,10 @@ pub fn handle_time_crystal_progress_ok_button(
 /// Spawn / despawn the heirloom tooltip card for whichever unlock icon is being hovered.
 ///
 /// Main menu has no global hover driver for arbitrary [`Interactable`]s (unlike in-game HUD),
-/// so we pointcast here and drive [`Interaction::Hovering`] ourselves, then mirror
-/// [`crate::ui::essence_ui::handle_essence_heirloom_tooltip`].
+/// so we pointcast here and drive [`Interaction::Hovering`] ourselves, then send
+/// [`HeirloomTooltipRequest`] for the shared tooltip processor.
 pub fn handle_time_crystal_unlock_hover_tooltip(
-    mut commands: Commands,
-    graphics: Res<Graphics>,
-    asset_server: Res<AssetServer>,
+    mut tooltip_requests: EventWriter<HeirloomTooltipRequest>,
     ui_state: Res<State<UIState>>,
     cursor_pos: Res<CursorPos>,
     icon_hit_targets: Query<
@@ -455,7 +449,6 @@ pub fn handle_time_crystal_unlock_hover_tooltip(
             Or<(With<CrystalUnlockIcon>, With<HeirloomGridLockedCell>)>,
         ),
     >,
-    existing_tooltips: Query<Entity, With<CrystalUnlockTooltip>>,
     mut last_hovered: Local<Option<Entity>>,
 ) {
     let tooltip_ui_state = match ui_state.0 {
@@ -485,45 +478,37 @@ pub fn handle_time_crystal_unlock_hover_tooltip(
         return;
     }
 
-    for tooltip_e in existing_tooltips.iter() {
-        commands.entity(tooltip_e).despawn_recursive();
-    }
-
-    if let Some(entity) = hovered_entity {
-        let Ok((_, _, transform, c_icon, l_cell)) = icons.get(entity) else {
-            *last_hovered = hovered_entity;
-            return;
-        };
-        let (heirloom, rarity) = if let Some(c) = c_icon {
-            (c.heirloom.clone(), c.rarity.clone())
-        } else if let Some(l) = l_cell {
-            (l.heirloom.clone(), l.rarity.clone())
-        } else {
-            *last_hovered = hovered_entity;
-            return;
-        };
-        let icon_pos = transform.translation();
-        let tooltip_y = if icon_pos.y - 90. >= -100. {
-            icon_pos.y - 90.
-        } else {
-            icon_pos.y + 100.
-        };
-        let tooltip_pos = Vec3::new(icon_pos.x, tooltip_y, TOOLTIP_Z);
-        let tooltip_e = spawn_heirloom_tooltip_card(
-            &graphics,
-            &mut commands,
-            &asset_server,
-            heirloom,
-            rarity,
-            tooltip_pos,
-            None,
-            None,
-        );
-        commands
-            .entity(tooltip_e)
-            .insert(CrystalUnlockTooltip)
-            .insert(tooltip_ui_state)
-            .insert(RenderLayers::from_layers(&[3]));
+    match hovered_entity {
+        None => tooltip_requests.send(HeirloomTooltipRequest::Clear),
+        Some(entity) => {
+            let Ok((_, _, transform, c_icon, l_cell)) = icons.get(entity) else {
+                *last_hovered = hovered_entity;
+                return;
+            };
+            let (heirloom, rarity) = if let Some(c) = c_icon {
+                (c.heirloom.clone(), c.rarity)
+            } else if let Some(l) = l_cell {
+                (l.heirloom.clone(), l.rarity)
+            } else {
+                *last_hovered = hovered_entity;
+                return;
+            };
+            let icon_pos = transform.translation();
+            let tooltip_y = if icon_pos.y - 90. >= -100. {
+                icon_pos.y - 90.
+            } else {
+                icon_pos.y + 100.
+            };
+            let tooltip_pos = Vec3::new(icon_pos.x, tooltip_y, TOOLTIP_Z);
+            tooltip_requests.send(HeirloomTooltipRequest::Show(HeirloomTooltipShow {
+                heirloom,
+                rarity,
+                position: tooltip_pos,
+                scaling_text: None,
+                trigger_count_text: None,
+                ui_state: Some(tooltip_ui_state),
+            }));
+        }
     }
 
     *last_hovered = hovered_entity;
@@ -532,7 +517,7 @@ pub fn handle_time_crystal_unlock_hover_tooltip(
 pub fn cleanup_time_crystal_progress_ui(
     mut commands: Commands,
     query: Query<Entity, With<TimeCrystalProgressUI>>,
-    tooltips: Query<Entity, With<CrystalUnlockTooltip>>,
+    tooltips: Query<Entity, With<super::heirloom_tooltip::HeirloomDynamicTooltip>>,
 ) {
     for entity in query.iter() {
         commands.entity(entity).despawn_recursive();

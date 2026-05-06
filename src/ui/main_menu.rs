@@ -15,7 +15,7 @@ use crate::{
     chaos::ChaosTracker,
     client::analytics::{connect_server, AnalyticsData},
     colors::{overwrite_alpha, WHITE},
-    combat::damage_tracker::{DamageTracker, PetAbilityStats},
+    combat::damage_tracker::{DamageTracker, MobStatTracker, PetAbilityStats},
     container::ContainerRegistry,
     datafiles,
     item::CraftingTracker,
@@ -39,6 +39,7 @@ use crate::{
     world::{
         dimension::{ActiveDimension, EraManager, GenerationSeed},
         generation::WorldObjectCache,
+        portal::BossKillTracker,
     },
     DoNotDespawnOnGameOver, Game, GameState, ScreenResolution, DEBUG, GAME_HEIGHT,
 };
@@ -78,6 +79,7 @@ pub struct MenuButtonExtras<'w, 's> {
     class_slots: Query<'w, 's, &'static mut PlayerSelectSlot>,
     pagination_state: ResMut<'w, AchievementsPagination>,
     run_unlock_state: ResMut<'w, RunUnlockState>,
+    time_crystals: Res<'w, TimeCrystals>,
     screen_res: Res<'w, ScreenResolution>,
     player_class: Option<Res<'w, PlayerClass>>,
 }
@@ -419,9 +421,10 @@ pub fn handle_menu_button_click_events(
                         pets: player_class.pets.clone(),
                     });
 
-                    extras
-                        .run_unlock_state
-                        .reset_for_run(&*extras.unlock_upgrades);
+                    extras.run_unlock_state.reset_for_run(
+                        &*extras.unlock_upgrades,
+                        extras.time_crystals.completed_count() as u32,
+                    );
                 }
 
                 next_ui_state.set(UIState::Closed);
@@ -750,6 +753,7 @@ pub fn cleanup_run_state(
     commands.insert_resource(EraManager::default());
     commands.remove_resource::<WorldObjectCache>();
     commands.insert_resource(DamageTracker::default());
+    commands.insert_resource(MobStatTracker::default());
     commands.insert_resource(PetAbilityStats::default());
     commands.remove_resource::<XpBarFadeIn>();
     commands.insert_resource(crate::player::skills::HeirloomTriggerCounts::default());
@@ -757,6 +761,7 @@ pub fn cleanup_run_state(
     commands.insert_resource(FogOfWarData::default());
     commands.insert_resource(MinimapTileCache::default());
     commands.insert_resource(crate::item::boss_shrine::BossSummonTracker::default());
+    commands.insert_resource(BossKillTracker::default());
 
     // Reset Rapier physics world to free accumulated internal arena allocations
     commands.insert_resource(RapierContext::default());
