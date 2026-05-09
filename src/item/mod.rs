@@ -1,4 +1,4 @@
-use crate::assets::{SpriteSize, WorldObjectData};
+use crate::assets::{SpriteAnchor, SpriteSize, WorldObjectData};
 use crate::attributes::item_abilities::ItemAbility;
 use crate::chaos::ChaosTracker;
 use crate::client::analytics::{AnalyticsTrigger, AnalyticsUpdateEvent};
@@ -28,8 +28,14 @@ use crate::ui::{FlashExpBarEvent, InventorySlotType};
 use crate::world::dungeon::Dungeon;
 use crate::world::dungeon_generation::DUNGEON_GRID_SIZE;
 use crate::world::generation::WallBreakEvent;
+use crate::world::grass_patches::{
+    grass_patch_local_offset_for_shrine_anchor, spawn_grass_patch, GrassPatch,
+    GrassPatchesGraphics, GRASS_PATCH_TREE_LOCAL_OFFSET_Y, GRASS_PATCH_YSORT_KEY_7,
+    GRASS_PATCH_YSORT_KEY_8, GRASS_PATCH_YSORT_KEY_9,
+};
 use crate::world::world_helpers::{
-    can_object_be_placed_here, tile_pos_to_world_pos, world_pos_to_tile_pos,
+    can_object_be_placed_here, object_within_tile_radius_of_water, tile_pos_to_world_pos,
+    world_pos_to_tile_pos,
 };
 use crate::world::{TileMapPosition, CHUNK_SIZE};
 use crate::{custom_commands::CommandsExt, player::Limb, CustomFlush, GameParam, GameState};
@@ -776,6 +782,25 @@ impl WorldObjectResource {
     }
 }
 
+/// Objects that receive key-7 grass decoration under them when placed (`GrassPatch2`).
+pub const OBJECTS_WITH_GRASS_PATCH_7: &[WorldObject] = &[
+    WorldObject::Crate,
+    WorldObject::Crate2,
+    // WorldObject::BerryBush,
+    // WorldObject::BlueberryBush,
+    // WorldObject::Stump,
+    // WorldObject::Stump2,
+    WorldObject::LargeStump,
+    WorldObject::LargeMushroomStump,
+    WorldObject::Boulder,
+    WorldObject::Boulder2,
+    WorldObject::CoalBoulder,
+    WorldObject::MetalBoulder,
+    WorldObject::Bush,
+    WorldObject::Bush2,
+    WorldObject::XPJug,
+];
+
 impl WorldObject {
     pub fn is_wall(&self) -> bool {
         match self {
@@ -795,8 +820,43 @@ impl WorldObject {
             WorldObject::Era2SmallTree => true,
             WorldObject::Era2MediumTree => true,
             WorldObject::Era2LargeTree => true,
+            WorldObject::SnowLeaflessTree1 => true,
+            WorldObject::SnowLeaflessTree2 => true,
+            WorldObject::SnowLeaflessTree3 => true,
+            WorldObject::SnowTree1 => true,
+            WorldObject::SnowTree2 => true,
+            WorldObject::SnowTree3 => true,
+            WorldObject::SnowTree4 => true,
             _ => false,
         }
+    }
+
+    pub fn spawns_grass_patch_7_under(&self) -> bool {
+        OBJECTS_WITH_GRASS_PATCH_7.contains(self)
+    }
+
+    /// Shrines that get key-9 grass (`GrassPatch4`) under them; offset from proto [`SpriteAnchor`].
+    pub fn spawns_grass_patch_9_shrine_under(&self) -> bool {
+        matches!(
+            self,
+            WorldObject::CombatShrine
+                | WorldObject::CombatShrineDone
+                | WorldObject::GambleShrine
+                | WorldObject::GambleShrineDone
+                | WorldObject::ActiveSkillShrine
+                | WorldObject::ActiveSkillShrineDone
+                | WorldObject::WeaponShrine
+                | WorldObject::WeaponShrineDone
+                | WorldObject::ArmorShrine
+                | WorldObject::ArmorShrineDone
+                | WorldObject::AccessoryShrine
+                | WorldObject::AccessoryShrineDone
+                | WorldObject::HeirloomShrine
+                | WorldObject::HeirloomShrineDone
+                | WorldObject::MicrowaveShrine
+                | WorldObject::MicrowaveShrineDone
+                | WorldObject::BossShrine
+        )
     }
     pub fn is_weapon(&self) -> bool {
         match self {
@@ -1429,6 +1489,7 @@ pub fn handle_placing_world_object(
     mut proto_param: ProtoParam,
     mut game: GameParam,
     mut commands: Commands,
+    grass_graphics: Res<GrassPatchesGraphics>,
     mut events: EventReader<PlaceItemEvent>,
     water_colliders: Query<
         (Entity, &Collider, &GlobalTransform),
@@ -1525,6 +1586,51 @@ pub fn handle_placing_world_object(
                                 {
                                     commands.entity(e).insert(Sensor);
                                 }
+                            }
+                        }
+
+                        let suppress_grass_near_water = object_within_tile_radius_of_water(
+                            tile_pos,
+                            place_event.obj,
+                            &game,
+                            &proto_param,
+                            1,
+                        );
+                        if !suppress_grass_near_water {
+                            if place_event.obj.is_tree() {
+                                spawn_grass_patch(
+                                    &mut commands,
+                                    &grass_graphics,
+                                    GrassPatch::GrassPatch3,
+                                    pos,
+                                    GRASS_PATCH_YSORT_KEY_8,
+                                    Some(item_e),
+                                    Vec2::new(0., GRASS_PATCH_TREE_LOCAL_OFFSET_Y),
+                                );
+                            } else if place_event.obj.spawns_grass_patch_9_shrine_under() {
+                                let anchor = proto_param
+                                    .get_component::<SpriteAnchor, _>(place_event.obj)
+                                    .map(|a| a.0)
+                                    .unwrap_or(Vec2::ZERO);
+                                spawn_grass_patch(
+                                    &mut commands,
+                                    &grass_graphics,
+                                    GrassPatch::GrassPatch4,
+                                    pos,
+                                    GRASS_PATCH_YSORT_KEY_9,
+                                    Some(item_e),
+                                    grass_patch_local_offset_for_shrine_anchor(anchor),
+                                );
+                            } else if place_event.obj.spawns_grass_patch_7_under() {
+                                spawn_grass_patch(
+                                    &mut commands,
+                                    &grass_graphics,
+                                    GrassPatch::GrassPatch2,
+                                    pos,
+                                    GRASS_PATCH_YSORT_KEY_7,
+                                    Some(item_e),
+                                    Vec2::ZERO,
+                                );
                             }
                         }
                     }

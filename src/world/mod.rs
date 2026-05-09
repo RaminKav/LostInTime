@@ -3,6 +3,7 @@ pub mod dimension;
 pub mod dungeon;
 pub mod dungeon_generation;
 pub mod generation;
+pub mod grass_patches;
 mod noise_helpers;
 pub mod portal;
 pub mod tile;

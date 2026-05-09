@@ -8,7 +8,7 @@ use crate::inputs::{cursor_pos_in_ui, cursor_pos_in_world, player_move_inputs};
 use crate::item::ammo::Ammo;
 use crate::item::WorldObject;
 use crate::GameState;
-use crate::{Player, TextureCamera};
+use crate::{Player, TextureCamera, DEBUG};
 
 #[derive(Reflect, Resource, Debug)]
 #[reflect(Resource)]
@@ -40,17 +40,34 @@ pub struct ReloadIndicatorBackground;
 
 pub struct CustomCursorPlugin;
 
+/// Custom sprite cursor and hidden OS cursor are off when `DEBUG` is set (e.g. `DEBUG=1`).
+fn use_custom_cursor() -> bool {
+    !*DEBUG
+}
+
 impl Plugin for CustomCursorPlugin {
     fn build(&self, app: &mut App) {
         app.add_system(update_cursor_pos.after(player_move_inputs))
             // Setup cursor once graphics are loaded (after Loading state)
-            .add_system(setup_custom_cursor.in_schedule(OnEnter(GameState::MainMenu)))
+            .add_system(
+                setup_custom_cursor
+                    .run_if(use_custom_cursor)
+                    .in_schedule(OnEnter(GameState::MainMenu)),
+            )
             // Hide system cursor as soon as we leave loading
-            .add_system(hide_system_cursor.in_schedule(OnEnter(GameState::MainMenu)))
+            .add_system(
+                hide_system_cursor
+                    .run_if(use_custom_cursor)
+                    .in_schedule(OnEnter(GameState::MainMenu)),
+            )
             // Update cursor position in all game states (not just Main)
-            .add_system(update_custom_cursor_position)
+            .add_system(update_custom_cursor_position.run_if(use_custom_cursor))
             // Reload indicator only relevant during gameplay
-            .add_system(update_reload_indicator.in_set(OnUpdate(GameState::Main)));
+            .add_system(
+                update_reload_indicator
+                    .run_if(use_custom_cursor)
+                    .in_set(OnUpdate(GameState::Main)),
+            );
     }
 }
 

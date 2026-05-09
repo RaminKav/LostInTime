@@ -121,6 +121,44 @@ pub fn get_neighbour_wall_data(
     game.get_wall_data_at_tile(pos, proto_param)
 }
 
+/// True if any tile within Chebyshev distance `radius` of `center` has [`WorldObject::WaterTile`]
+/// in its block type (missing tile data is ignored).
+pub fn water_within_tile_radius(center: TileMapPosition, game: &GameParam, radius: i8) -> bool {
+    for dy in -radius..=radius {
+        for dx in -radius..=radius {
+            let tp = get_neighbour_tile(center, (dx, dy));
+            if let Some(tile_data) = game.get_tile_data(tp) {
+                if tile_data.block_type.contains(&WorldObject::WaterTile) {
+                    return true;
+                }
+            }
+        }
+    }
+    false
+}
+
+/// True if any footprint tile of `obj` at `anchor_tile` is within `radius` tiles (Chebyshev)
+/// of water. Medium objects include their [`TileMapPosition::get_neighbour_tiles_for_medium_objects`]
+/// footprint.
+pub fn object_within_tile_radius_of_water(
+    anchor_tile: TileMapPosition,
+    obj: WorldObject,
+    game: &GameParam,
+    proto_param: &ProtoParam,
+    radius: i8,
+) -> bool {
+    let footprint = if obj.is_medium_size(proto_param) {
+        let mut v = vec![anchor_tile];
+        v.extend(anchor_tile.get_neighbour_tiles_for_medium_objects());
+        v
+    } else {
+        vec![anchor_tile]
+    };
+    footprint
+        .iter()
+        .any(|t| water_within_tile_radius(*t, game, radius))
+}
+
 pub fn can_object_be_placed_here(
     tile_pos: TileMapPosition,
     game: &mut GameParam,

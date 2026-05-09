@@ -34,7 +34,7 @@ use bevy::{
     log::LogPlugin,
     prelude::*,
     render::{camera::ScalingMode, view::RenderLayers},
-    window::{PresentMode, PrimaryWindow, WindowMode, WindowResolution},
+    window::{PresentMode, PrimaryWindow, Window, WindowMode, WindowResolution},
 };
 use bevy_common_assets::ron::RonAssetPlugin;
 use bevy_embedded_assets::EmbeddedAssetPlugin;
@@ -258,6 +258,10 @@ fn main() {
             "class_unlocks.ron",
         ]))
         .add_plugin(RonAssetPlugin::<RecipeListProto>::new(&["ron"]))
+        .add_plugin(RonAssetPlugin::<world::grass_patches::GrassPatchesDesc>::new(
+            &["patches.ron"],
+        ))
+        .add_plugin(world::grass_patches::GrassPatchesPlugin)
         .insert_resource(Msaa::Off)
         .insert_resource(FixedTime::new_from_secs(TIME_STEP))
         .add_plugin(panic_handler::PanicHandler::new().build())
@@ -486,6 +490,10 @@ pub struct ImageAssets {
     pub recipes: Handle<RecipeListProto>,
     #[asset(path = "data/class_unlocks.class_unlocks.ron")]
     pub class_unlocks: Handle<ClassUnlockConfig>,
+    #[asset(path = "textures/grass_patches.png")]
+    pub grass_patches_sheet: Handle<Image>,
+    #[asset(path = "textures/grass_patches.patches.ron")]
+    pub grass_patches_desc: Handle<world::grass_patches::GrassPatchesDesc>,
 }
 
 #[derive(Component)]
@@ -978,7 +986,7 @@ fn calculate_pixel_perfect_resolution(window_width: f32, window_height: f32) -> 
         window_width, window_height, scale, game_width, game_height, target_height
     );
 
-    ScreenResolution {
+    let screen = ScreenResolution {
         width: window_width,
         height: window_height,
         game_width,
@@ -989,7 +997,54 @@ fn calculate_pixel_perfect_resolution(window_width: f32, window_height: f32) -> 
         render_height,
         viewport_offset: Vec2::ZERO,
         viewport_size: Vec2::new(window_width, window_height),
+    };
+    phase1_log_resolution_after_calc(&screen);
+    screen
+}
+
+/// Phase 1 pixel-grid diagnostics (`DEBUG=1`). Logs parity of `game_* * scale` vs physical size,
+/// odd-scale flag, and render dimensions for correlating soft text with subpixel layout.
+fn phase1_log_resolution_after_calc(res: &ScreenResolution) {
+    if !*DEBUG {
+        return;
     }
+    let parity_h = res.game_width * res.scale as f32 - res.width;
+    let parity_v = res.game_height * res.scale as f32 - res.height;
+    let odd_scale = res.scale % 2 == 1;
+    info!(
+        "Phase1 pixel_grid: scale={} odd_scale={} game_wh=({:.4}x{:.4}) phys_wh=({:.1}x{:.1}) render={}x{} parity_delta_px=({:.6},{:.6}) target_game_height={}",
+        res.scale,
+        odd_scale,
+        res.game_width,
+        res.game_height,
+        res.width,
+        res.height,
+        res.render_width,
+        res.render_height,
+        parity_h,
+        parity_v,
+        GAME_HEIGHT,
+    );
+}
+
+/// Window DPI / logical vs physical (`DEBUG=1`), for cursor vs projection hypotheses.
+fn phase1_log_window(context: &str, window: &Window, res: &ScreenResolution) {
+    if !*DEBUG {
+        return;
+    }
+    let phys_w = window.resolution.physical_width() as f32;
+    let phys_h = window.resolution.physical_height() as f32;
+    info!(
+        "Phase1 window [{}]: logical={:.1}x{:.1} physical={}x{} scale_factor={:.4} | res.width/height minus phys=({:.3},{:.3})",
+        context,
+        window.width(),
+        window.height(),
+        window.resolution.physical_width(),
+        window.resolution.physical_height(),
+        window.resolution.scale_factor(),
+        res.width - phys_w,
+        res.height - phys_h,
+    );
 }
 
 fn setup(mut commands: Commands, window_query: Query<&Window, With<PrimaryWindow>>) {
@@ -1005,7 +1060,9 @@ fn setup(mut commands: Commands, window_query: Query<&Window, With<PrimaryWindow
             window.height(),
             window.resolution.scale_factor()
         );
-        calculate_pixel_perfect_resolution(phys_w, phys_h)
+        let res = calculate_pixel_perfect_resolution(phys_w, phys_h);
+        phase1_log_window("startup", window, &res);
+        res
     } else {
         info!("No window found, using default resolution");
         calculate_pixel_perfect_resolution(WIDTH, HEIGHT)
@@ -1102,6 +1159,23 @@ fn update_pixel_perfect_viewport(
     *last_size = target_size;
 
     let new_res = calculate_pixel_perfect_resolution(target_size.x as f32, target_size.y as f32);
+
+    if *DEBUG {
+        phase1_log_window("viewport_resize", &window, &new_res);
+        let window_phys = UVec2::new(
+            window.resolution.physical_width(),
+            window.resolution.physical_height(),
+        );
+        if target_size != window_phys {
+            warn!(
+                "Phase1: camera physical_target {}x{} != window physical {}x{} (check HiDPI / viewport)",
+                target_size.x,
+                target_size.y,
+                window_phys.x,
+                window_phys.y,
+            );
+        }
+    }
 
     for (_, mut proj) in cameras.iter_mut() {
         proj.scaling_mode = ScalingMode::FixedVertical(new_res.game_height);
