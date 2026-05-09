@@ -15,7 +15,7 @@ use crate::{
         unlocks::RunUnlockState,
         Player,
     },
-    ui::CheatSettings,
+    ui::{game_fonts as gf, CheatSettings},
     ScreenResolution, DEBUG, GAME_HEIGHT,
 };
 
@@ -84,12 +84,7 @@ fn build_banish_tracker_children(
     time_crystals: &TimeCrystals,
     root: Entity,
 ) {
-    let font = asset_server.load("fonts/slkscr.ttf");
-    let title_style = TextStyle {
-        font: font.clone(),
-        font_size: 8.5,
-        color: DARK_WOOD_BROWN,
-    };
+    let title_style = gf::SKILL_CHOICE_TRACKER_TITLE.text_style(asset_server, DARK_WOOD_BROWN);
 
     let mut y: f32 = 0.;
     let title = commands
@@ -122,11 +117,7 @@ fn build_banish_tracker_children(
             HeirloomRarity::Legendary => ("Legendary", LEGENDARY_TOOLTIP_TITLE),
         };
         let allowed = queue.allowed_banishes_for_rarity(time_crystals, rarity);
-        let heading_style = TextStyle {
-            font: asset_server.load("fonts/4x5.ttf").clone(),
-            font_size: 5.,
-            color: heading_color,
-        };
+        let heading_style = gf::SKILL_CHOICE_MICRO.text_style(asset_server, heading_color);
         let heading_e = commands
             .spawn((
                 Text2dBundle {
@@ -281,6 +272,7 @@ pub fn setup_skill_choice_ui(
         next_ui_state.set(UIState::Closed);
         return;
     }
+    let asset_server = asset_server.as_ref();
     let choices = &choices_queue.queue[0];
     let t_offset = Vec2::new(4., 4.);
 
@@ -310,11 +302,7 @@ pub fn setup_skill_choice_ui(
             Text2dBundle {
                 text: Text::from_section(
                     "Choose an Heirloom".to_string(),
-                    TextStyle {
-                        font: asset_server.load("fonts/alagard.ttf"),
-                        font_size: 15.0,
-                        color: BLACK,
-                    },
+                    gf::MENU_TITLE.text_style(asset_server, BLACK),
                 ),
                 transform: Transform {
                     translation: Vec3::new(0., -1., 1.),
@@ -433,15 +421,14 @@ pub fn setup_skill_choice_ui(
                     Text2dBundle {
                         text: Text::from_section(
                             "Banish ",
-                            TextStyle {
-                                font: asset_server.load("fonts/4x5.ttf"),
-                                font_size: 5.0,
-                                color: if banish_enabled {
+                            gf::SKILL_CHOICE_MICRO.text_style(
+                                asset_server,
+                                if banish_enabled {
                                     WHITE
                                 } else {
                                     Color::rgb(0.7, 0.7, 0.7)
                                 },
-                            },
+                            ),
                         )
                         .with_alignment(TextAlignment::Center),
                         text_anchor: Anchor::Center,
@@ -483,11 +470,7 @@ pub fn setup_skill_choice_ui(
         Text2dBundle {
             text: Text::from_section(
                 format!("Rerolls: {}", run_unlocks.rerolls_remaining),
-                TextStyle {
-                    font: asset_server.load("fonts/4x5.ttf"),
-                    font_size: 5.0,
-                    color: WHITE,
-                },
+                gf::SKILL_CHOICE_MICRO.text_style(asset_server, WHITE),
             )
             .with_alignment(TextAlignment::Center),
             text_anchor: Anchor::Center,
@@ -508,11 +491,7 @@ pub fn setup_skill_choice_ui(
         Text2dBundle {
             text: Text::from_section(
                 format!("Banishes: {}", run_unlocks.banishes_remaining),
-                TextStyle {
-                    font: asset_server.load("fonts/4x5.ttf"),
-                    font_size: 5.0,
-                    color: WHITE,
-                },
+                gf::SKILL_CHOICE_MICRO.text_style(asset_server, WHITE),
             )
             .with_alignment(TextAlignment::Center),
             text_anchor: Anchor::Center,

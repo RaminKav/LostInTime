@@ -49,6 +49,10 @@ const UNIQUE_OBJECTS_DATA: [(WorldObject, Vec2, i32); 3] = [
     // (WorldObject::TimeGate, Vec2::new(2., 2.), 3),
 ];
 
+/// Shrines stay inside this radius (world pixels from `(0, 0)`) so they avoid the outer ring
+/// of island chunks where tiles are often water.
+const SHRINE_MAX_DIST_FROM_WORLD_ORIGIN: f32 = 5. * CHUNK_SIZE as f32 * TILE_SIZE.x;
+
 #[derive(Resource, Debug, Default, Clone)]
 pub struct WorldObjectCache {
     pub objects: HashMap<TileMapPosition, WorldObject>,
@@ -359,39 +363,47 @@ impl GenerationPlugin {
         shrines_to_place.shuffle(&mut rng);
         chunk_pool.shuffle(&mut rng);
 
+        let max_dist_sq = SHRINE_MAX_DIST_FROM_WORLD_ORIGIN * SHRINE_MAX_DIST_FROM_WORLD_ORIGIN;
+        let max_chunk_pick_attempts = (chunk_pool.len().saturating_mul(32)).max(64);
+
         let mut placed = 0_usize;
         for shrine_obj in shrines_to_place.iter() {
-            let Some(chunk_pos) = chunk_pool.pop() else {
-                warn!(
-                    "Ran out of chunks while placing shrines; {} {:?} could not be placed",
-                    shrines_to_place.len() - placed,
-                    shrine_obj,
-                );
-                break;
-            };
-
             const TILE_RETRIES: u32 = 8;
-            let mut chosen: Option<TileMapPosition> = None;
-            for _ in 0..TILE_RETRIES {
-                let tx = rng.gen_range(4..13);
-                let ty = rng.gen_range(4..13);
-                let candidate = TileMapPosition::new(chunk_pos, TilePos::new(tx, ty));
-                let world_pos = tile_pos_to_world_pos(candidate, false);
-                let is_water = is_tile_water(world_pos, &*game).unwrap_or(false);
-                if is_water {
-                    continue;
+            let mut chosen: Option<(usize, TileMapPosition)> = None;
+
+            for _ in 0..max_chunk_pick_attempts {
+                if chunk_pool.is_empty() {
+                    break;
                 }
-                chosen = Some(candidate);
-                break;
+                let chunk_idx = rng.gen_range(0..chunk_pool.len());
+                let chunk_pos = chunk_pool[chunk_idx];
+
+                for _ in 0..TILE_RETRIES {
+                    let tx = rng.gen_range(4..13);
+                    let ty = rng.gen_range(4..13);
+                    let candidate = TileMapPosition::new(chunk_pos, TilePos::new(tx, ty));
+                    let world_pos = tile_pos_to_world_pos(candidate, false);
+                    if world_pos.length_squared() > max_dist_sq {
+                        continue;
+                    }
+                    chosen = Some((chunk_idx, candidate));
+                    break;
+                }
+
+                if chosen.is_some() {
+                    break;
+                }
             }
 
-            let pos = chosen.unwrap_or_else(|| {
-                TileMapPosition::new(
-                    chunk_pos,
-                    TilePos::new(rng.gen_range(4..13), rng.gen_range(4..13)),
-                )
-            });
+            let Some((chunk_idx, pos)) = chosen else {
+                warn!(
+                    "Could not place shrine {:?} within {:.0}px of world origin (non-water); skipping",
+                    shrine_obj, SHRINE_MAX_DIST_FROM_WORLD_ORIGIN,
+                );
+                continue;
+            };
 
+            chunk_pool.swap_remove(chunk_idx);
             game.world_obj_cache.shrines.insert(pos, *shrine_obj);
             placed += 1;
         }

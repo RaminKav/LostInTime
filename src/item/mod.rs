@@ -25,6 +25,7 @@ use crate::status_effects::{
 };
 use crate::ui::minimap::UpdateMiniMapEvent;
 use crate::ui::{FlashExpBarEvent, InventorySlotType};
+use crate::world::dimension::Era;
 use crate::world::dungeon::Dungeon;
 use crate::world::dungeon_generation::DUNGEON_GRID_SIZE;
 use crate::world::generation::WallBreakEvent;
@@ -845,12 +846,8 @@ impl WorldObject {
                 | WorldObject::GambleShrineDone
                 | WorldObject::ActiveSkillShrine
                 | WorldObject::ActiveSkillShrineDone
-                | WorldObject::WeaponShrine
-                | WorldObject::WeaponShrineDone
-                | WorldObject::ArmorShrine
-                | WorldObject::ArmorShrineDone
-                | WorldObject::AccessoryShrine
-                | WorldObject::AccessoryShrineDone
+                | WorldObject::BlacksmithMerchant
+                | WorldObject::BlacksmithMerchantDone
                 | WorldObject::HeirloomShrine
                 | WorldObject::HeirloomShrineDone
                 | WorldObject::MicrowaveShrine
@@ -1596,7 +1593,8 @@ pub fn handle_placing_world_object(
                             &proto_param,
                             1,
                         );
-                        if !suppress_grass_near_water {
+                        let era_allows_decor_grass = game.era.current_era == Era::Main;
+                        if era_allows_decor_grass && !suppress_grass_near_water {
                             if place_event.obj.is_tree() {
                                 spawn_grass_patch(
                                     &mut commands,

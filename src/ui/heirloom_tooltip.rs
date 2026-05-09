@@ -9,7 +9,7 @@ use crate::{
     player::skills::{Heirloom, HeirloomRarity},
 };
 
-use super::UIState;
+use super::{game_fonts as gf, UIState};
 
 /// Marker on tooltip cards spawned through [`HeirloomTooltipRequest`] (and cleared by the processor).
 #[derive(Component)]
@@ -108,11 +108,7 @@ pub fn spawn_heirloom_tooltip_card(
         Text2dBundle {
             text: Text::from_section(
                 heirloom.get_title(),
-                TextStyle {
-                    font: asset_server.load("fonts/4x5.ttf"),
-                    font_size: 5.0,
-                    color: WHITE,
-                },
+                gf::HEIRLOOM_CARD_TITLE.text_style(asset_server, WHITE),
             ),
             text_anchor: Anchor::Center,
             transform: Transform {
@@ -132,11 +128,7 @@ pub fn spawn_heirloom_tooltip_card(
             Text2dBundle {
                 text: Text::from_section(
                     desc,
-                    TextStyle {
-                        font: asset_server.load("fonts/4x5.ttf"),
-                        font_size: 5.0,
-                        color: WHITE,
-                    },
+                    gf::HEIRLOOM_CARD_BODY.text_style(asset_server, WHITE),
                 ),
                 text_anchor: Anchor::Center,
                 transform: Transform {
@@ -160,11 +152,7 @@ pub fn spawn_heirloom_tooltip_card(
             Text2dBundle {
                 text: Text::from_section(
                     scaling_text,
-                    TextStyle {
-                        font: asset_server.load("fonts/4x5.ttf"),
-                        font_size: 5.0,
-                        color: crate::colors::LIGHT_GREY,
-                    },
+                    gf::HEIRLOOM_CARD_META.text_style(asset_server, crate::colors::LIGHT_GREY),
                 ),
                 text_anchor: Anchor::Center,
                 transform: Transform {
@@ -187,11 +175,7 @@ pub fn spawn_heirloom_tooltip_card(
             Text2dBundle {
                 text: Text::from_section(
                     trigger_text,
-                    TextStyle {
-                        font: asset_server.load("fonts/4x5.ttf"),
-                        font_size: 5.0,
-                        color: crate::colors::YELLOW_2,
-                    },
+                    gf::HEIRLOOM_CARD_META.text_style(asset_server, crate::colors::YELLOW_2),
                 ),
                 text_anchor: Anchor::Center,
                 transform: Transform {

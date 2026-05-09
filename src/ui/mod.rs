@@ -14,7 +14,7 @@ use item_chest::*;
 pub mod ui_container_param;
 pub mod tips;
 use tips::*;
-use bevy::sprite::Material2dPlugin;
+use bevy::{render::view::RenderLayers, sprite::Material2dPlugin};
 use damage_numbers::FloatingTextQueue;
 use scrapper_ui::{
     add_inv_to_new_scrapper_objs, change_ui_state_to_scrapper_when_resource_added,
@@ -25,6 +25,8 @@ pub use ui_container_param::*;
 pub mod boss_health_bar;
 mod enemy_health_bar;
 mod fps_text;
+
+pub mod game_fonts;
 pub mod key_input_guide;
 use key_input_guide::*;
 pub mod furnace_ui;
@@ -102,7 +104,7 @@ use crate::{
     player::unlocks::RunUnlockState,
     player::RunScore,
     proto::proto_param::ProtoParam,
-    CustomFlush, Game, GameState, Player, DEBUG,
+    CustomFlush, Game, GameState, Player, ScreenResolution, DEBUG,
 };
 
 use self::{
@@ -244,6 +246,29 @@ pub const INV_CRAFTING_PANEL_RESULT_Y: f32 = 41.0;
 /// Amount text offset beneath each ingredient icon (e.g. "2/3").
 pub const INV_CRAFTING_PANEL_INGREDIENT_COUNT_Y_OFFSET: f32 = -11.0;
 
+pub(crate) fn snap_world_to_pixel_grid(value: f32, scale: u32) -> f32 {
+    let s = scale as f32;
+    (value * s).round() / s
+}
+
+/// Pixel-snap all layer-3 UI visuals (text + sprites) to the current integer render scale.
+/// This keeps glyphs/icons aligned to physical pixels on HiDPI screens.
+pub(crate) fn snap_layer3_visuals_to_pixel_grid(
+    resolution: Res<ScreenResolution>,
+    mut ui_visuals: Query<
+        (&mut Transform, &RenderLayers),
+        (Or<(With<Text>, With<Sprite>, With<TextureAtlasSprite>)>, Without<Camera>),
+    >,
+) {
+    for (mut transform, layers) in ui_visuals.iter_mut() {
+        if !layers.intersects(&RenderLayers::layer(3)) {
+            continue;
+        }
+        transform.translation.x = snap_world_to_pixel_grid(transform.translation.x, resolution.scale);
+        transform.translation.y = snap_world_to_pixel_grid(transform.translation.y, resolution.scale);
+    }
+}
+
 pub struct UIPlugin;
 //TODO: extract out ui darken overlay into a helper function
 impl Plugin for UIPlugin {
@@ -296,6 +321,16 @@ impl Plugin for UIPlugin {
                     .run_if(in_state(GameState::Initializing)),
             )
             .add_system(spawn_fps_text.run_if(run_once_per_run()).in_schedule(OnEnter(GameState::Main)))
+            .add_system(
+                phase1_fps_text_viewport_diag
+                    .in_base_set(CoreSet::PostUpdate)
+                    .run_if(in_state(GameState::Main)),
+            )
+            .add_system(
+                snap_layer3_visuals_to_pixel_grid
+                    .in_base_set(CoreSet::PostUpdate)
+                    .run_if(not(in_state(GameState::Initializing))),
+            )
             .add_system(
                 setup_leaderboard_ui
                     .in_schedule(OnEnter(GameState::MainMenu))

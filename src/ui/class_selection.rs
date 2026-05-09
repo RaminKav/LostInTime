@@ -28,9 +28,8 @@ use crate::{
         ClassUnlockData, UnlockedClasses,
     },
     ui::{
-        main_menu::GameStartFadein, spawn_back_button, spawn_back_button_texture_only,
-        options_ui::CheatSettings,
-        MenuButton, UIElement, UIState,
+        main_menu::GameStartFadein, options_ui::CheatSettings, spawn_back_button,
+        spawn_back_button_texture_only, MenuButton, UIElement, UIState,
     },
     world::{dimension::EraManager, portal::UIPortal},
     FairyPetSprite, Pet, RenderLayers, ScreenResolution, SlimePetSprite,
@@ -1303,7 +1302,7 @@ fn spawn_player_preview(
             ),
             text_anchor: Anchor::Center,
             transform: Transform {
-                translation: Vec3::new(TITLE_X_OFFSET, ICONS_Y_OFFSET + ICON_Y_SPACING - 27., 1.),
+                translation: Vec3::new(TITLE_X_OFFSET, ICONS_Y_OFFSET + ICON_Y_SPACING - 24., 1.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },

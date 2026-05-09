@@ -47,7 +47,7 @@ use crate::{
         CoinCurrency, Player, RunScore, TimeFragmentCurrency,
     },
     proto::proto_param::ProtoParam,
-    ui::Interactable,
+    ui::{game_fonts as gf, Interactable},
     GameState, InputMappings, ScreenResolution,
 };
 use bevy::utils::Duration;
@@ -1326,6 +1326,7 @@ pub fn handle_heirloom_hud_tooltip(
 /// Extracted from class selection UI for reuse.
 /// Coordinates match [`UIElement::SkillTooltip`] / shrine banners.
 /// If `slot_index` is `Some`, also spawns a cooldown text placeholder (updated by system when in HUD).
+/// Description lines come from [`ActiveSkill::get_desc`](crate::player::skills::ActiveSkill::get_desc); vertical spacing is [`SKILL_TOOLTIP_DESC_LINE_STEP`](crate::ui::game_fonts::SKILL_TOOLTIP_DESC_LINE_STEP).
 pub fn spawn_skill_tooltip_content(
     commands: &mut Commands,
     graphics: &Graphics,
@@ -1341,26 +1342,22 @@ pub fn spawn_skill_tooltip_content(
     speed: i32,
 ) {
     const ICONS_X_OFFSET: f32 = -24.;
-    const TEXT_Y_OFFSET: f32 = 12.;
+    const TEXT_Y_OFFSET: f32 = 14.;
     const DESC_TEXT_X: f32 = ICONS_X_OFFSET + 12.;
-    const BODY_FONT: &str = "fonts/slkscr.ttf";
-    const TITLE_FONT: &str = "fonts/slkscrbold.ttf";
-    const BODY_FONT_SIZE: f32 = 8.4;
     const COOLDOWN_TEXT_X: f32 = 181.;
     const TITLE_Y: f32 = TEXT_Y_OFFSET + 6.;
 
     let active_skill_icon = graphics.get_active_skill_icon(active_skill.clone());
-    let active_skill_desc = active_skill
-        .get_desc(
-            skill_power,
-            max_mana,
-            max_health,
-            attack_cooldown_secs,
-            crit_chance,
-            speed,
-        )
-        .join("\n");
+    let active_skill_desc_lines = active_skill.get_desc(
+        skill_power,
+        max_mana,
+        max_health,
+        attack_cooldown_secs,
+        crit_chance,
+        speed,
+    );
     let active_skill_name = active_skill.get_title();
+    let desc_body_style = gf::SKILL_PANEL_BODY.text_style(asset_server, DARK_WOOD_BROWN);
 
     let _active_skill_icon = commands
         .spawn(SpriteBundle {
@@ -1386,8 +1383,8 @@ pub fn spawn_skill_tooltip_content(
             text: Text::from_section(
                 active_skill_name,
                 TextStyle {
-                    font: asset_server.load(TITLE_FONT),
-                    font_size: BODY_FONT_SIZE,
+                    font: gf::SKILL_PANEL_TITLE_BOLD.load_font(asset_server),
+                    font_size: gf::SKILL_PANEL_TITLE_BOLD.size,
                     color: DARK_WOOD_BROWN,
                 },
             )
@@ -1411,8 +1408,8 @@ pub fn spawn_skill_tooltip_content(
                 text: Text::from_section(
                     "",
                     TextStyle {
-                        font: asset_server.load(BODY_FONT),
-                        font_size: BODY_FONT_SIZE,
+                        font: gf::SKILL_PANEL_BODY.load_font(asset_server),
+                        font_size: gf::SKILL_PANEL_BODY.size,
                         color: LIGHT_GREY,
                     },
                 )
@@ -1432,29 +1429,27 @@ pub fn spawn_skill_tooltip_content(
             .id();
     }
 
-    let _active_skill_description_text = commands
-        .spawn(Text2dBundle {
-            text: Text::from_section(
-                active_skill_desc,
-                TextStyle {
-                    font: asset_server.load(BODY_FONT),
-                    font_size: BODY_FONT_SIZE,
-                    color: DARK_WOOD_BROWN,
+    for (j, line) in active_skill_desc_lines.iter().enumerate() {
+        commands
+            .spawn(Text2dBundle {
+                text: Text::from_section(line.as_str(), desc_body_style.clone())
+                    .with_alignment(TextAlignment::Left),
+                text_anchor: Anchor::TopLeft,
+                transform: Transform {
+                    translation: Vec3::new(
+                        DESC_TEXT_X,
+                        (TEXT_Y_OFFSET - 2.) - j as f32 * gf::SKILL_TOOLTIP_DESC_LINE_STEP,
+                        2.,
+                    ),
+                    scale: Vec3::new(1., 1., 1.),
+                    ..Default::default()
                 },
-            )
-            .with_alignment(TextAlignment::Left),
-            text_anchor: Anchor::TopLeft,
-            transform: Transform {
-                translation: Vec3::new(DESC_TEXT_X, TEXT_Y_OFFSET - 2., 2.),
-                scale: Vec3::new(1., 1., 1.),
-                ..Default::default()
-            },
-            ..default()
-        })
-        .insert(RenderLayers::from_layers(&[3]))
-        .insert(Name::new("SKILL TOOLTIP DESCRIPTION"))
-        .set_parent(parent_entity)
-        .id();
+                ..default()
+            })
+            .insert(RenderLayers::from_layers(&[3]))
+            .insert(Name::new("SKILL TOOLTIP DESCRIPTION LINE"))
+            .set_parent(parent_entity);
+    }
 }
 
 /// System to handle tooltips for active skill icons in the HUD

@@ -21,11 +21,11 @@ use crate::{
         PetAbilityStats,
     },
     inventory::{Inventory, ItemStack},
-    item::{item_actions::ItemActions, EquipmentType, Recipes, WorldObject},
-    juice::bounce::BounceOnHit,
+    item::{item_actions::ItemActions, EquipmentType, WorldObject},
     player::{stats::StatType, Player},
     proto::proto_param::ProtoParam,
     ui::{
+        game_fonts::{self as gf, paths},
         spawn_item_stack_icon, INVENTORY_EQUIPMENT_UI_SIZE, INVENTORY_UPGRADE_UI_SIZE,
         TOOLTIP_UI_SIZE,
     },
@@ -34,7 +34,7 @@ use crate::{
 use super::{
     item_chest::ItemChestUI, EssenceUI, InventoryUI, UIElement, UIState, CHEST_INVENTORY_UI_SIZE,
     CRAFTING_INVENTORY_UI_SIZE, ESSENCE_UI_SIZE, FURNACE_INVENTORY_UI_SIZE, INVENTORY_UI_SIZE,
-    INVENTORY_Y_OFFSET, SKILLS_CHOICE_UI_SIZE,
+    INVENTORY_Y_OFFSET,
 };
 
 aseprite!(pub InventoryStatHighlightCommon, "textures/effects/InventoryStatHighlightCommon.ase");
@@ -44,13 +44,6 @@ aseprite!(pub InventoryStatHighlightLegendary, "textures/effects/InventoryStatHi
 
 /// Panel size for `LargeTooltip*` sprites (inventory item card + consumable buff HUD hover).
 pub const ITEM_TOOLTIP_LARGE_CARD_SIZE: Vec2 = Vec2::new(172., 272.);
-/// Horizontal spacing between recipe ingredient icons on the recipe tooltip (center-to-center).
-pub const RECIPE_TOOLTIP_INGREDIENT_SPACING_X: f32 = 28.;
-/// Panel-local Y for the ingredient icon row (below the title, above the type line).
-pub const RECIPE_TOOLTIP_INGREDIENT_ROW_Y: f32 = 22.;
-/// Y offset for the required-count label under each ingredient icon.
-pub const RECIPE_TOOLTIP_INGREDIENT_COUNT_Y_OFFSET: f32 = 10.;
-
 /// Wait after an inventory item tooltip closes before showing the stats tooltip again
 /// (avoids flicker when moving quickly across slots).
 pub const STATS_TOOLTIP_RESPAWN_DELAY_SECS: f32 = 0.18;
@@ -106,10 +99,7 @@ impl TooltipTextProps {
         anchor: Anchor,
         font: String,
     ) -> Self {
-        let font_size = match font.as_str() {
-            "fonts/alagard.ttf" => 15.0,
-            _ => 8.4,
-        };
+        let font_size = gf::tooltip_default_size_for_font_path(font.as_str());
         Self {
             text,
             quality,
@@ -199,6 +189,7 @@ pub fn handle_spawn_inv_item_tooltip(
     mut tooltip_manager: ResMut<TooltipsManager>,
 ) {
     for item in updates.iter() {
+        let asset_server = asset_server.as_ref();
         tooltip_manager.stats_respawn_delay = None;
         for t in old_tooltips.iter() {
             commands.entity(t).despawn_recursive();
@@ -354,12 +345,12 @@ pub fn handle_spawn_inv_item_tooltip(
                     text: Text::from_section(
                         level_string,
                         TextStyle {
-                            font: asset_server.load(if is_item_action {
-                                "fonts/slkscr.ttf"
+                            font: if is_item_action {
+                                gf::TOOLTIP_CARD_LINE.load_font(asset_server)
                             } else {
-                                "fonts/slkscrbold.ttf"
-                            }),
-                            font_size: 8.5,
+                                gf::TOOLTIP_CARD_SUBHEAD_BOLD.load_font(asset_server)
+                            },
+                            font_size: gf::TOOLTIP_CARD_LINE.size,
                             color: if is_item_action {
                                 ORANGE
                             } else {
@@ -389,8 +380,8 @@ pub fn handle_spawn_inv_item_tooltip(
                         text: Text::from_section(
                             "Base Stats",
                             TextStyle {
-                                font: asset_server.load("fonts/slkscrbold.ttf"),
-                                font_size: 8.5,
+                                font: gf::TOOLTIP_CARD_SUBHEAD_BOLD.load_font(asset_server),
+                                font_size: gf::TOOLTIP_CARD_SUBHEAD_BOLD.size,
                                 color: YELLOW_2,
                             },
                         ),
@@ -414,8 +405,8 @@ pub fn handle_spawn_inv_item_tooltip(
                         text: Text::from_section(
                             "Description",
                             TextStyle {
-                                font: asset_server.load("fonts/slkscrbold.ttf"),
-                                font_size: 8.5,
+                                font: gf::TOOLTIP_CARD_SUBHEAD_BOLD.load_font(asset_server),
+                                font_size: gf::TOOLTIP_CARD_SUBHEAD_BOLD.size,
                                 color: YELLOW_2,
                             },
                         ),
@@ -440,8 +431,8 @@ pub fn handle_spawn_inv_item_tooltip(
                     text: Text::from_section(
                         item.item_stack.rarity.get_name(),
                         TextStyle {
-                            font: asset_server.load("fonts/slkscr.ttf"),
-                            font_size: 8.5,
+                            font: gf::TOOLTIP_CARD_LINE.load_font(asset_server),
+                            font_size: gf::TOOLTIP_CARD_LINE.size,
                             color: item.item_stack.rarity.get_color(),
                         },
                     ),
@@ -488,8 +479,8 @@ pub fn handle_spawn_inv_item_tooltip(
                     text: Text::from_section(
                         type_string.to_string(),
                         TextStyle {
-                            font: asset_server.load("fonts/slkscr.ttf"),
-                            font_size: 8.5,
+                            font: gf::TOOLTIP_CARD_LINE.load_font(asset_server),
+                            font_size: gf::TOOLTIP_CARD_LINE.size,
                             color: item.item_stack.rarity.get_color(),
                         },
                     ),
@@ -516,8 +507,8 @@ pub fn handle_spawn_inv_item_tooltip(
                         text: Text::from_section(
                             "Bonus Stats".to_string(),
                             TextStyle {
-                                font: asset_server.load("fonts/slkscrbold.ttf"),
-                                font_size: 8.5,
+                                font: gf::TOOLTIP_CARD_SUBHEAD_BOLD.load_font(asset_server),
+                                font_size: gf::TOOLTIP_CARD_SUBHEAD_BOLD.size,
                                 color: YELLOW_2,
                             },
                         ),
@@ -542,7 +533,7 @@ pub fn handle_spawn_inv_item_tooltip(
                     d,
                     *q,
                     Anchor::CenterLeft,
-                    "fonts/slkscr.ttf".to_string(),
+                    paths::SLKSCR.to_string(),
                 ));
             }
 
@@ -578,8 +569,8 @@ pub fn handle_spawn_inv_item_tooltip(
                             text: Text::from_section(
                                 "Description".to_string(),
                                 TextStyle {
-                                    font: asset_server.load("fonts/slkscrbold.ttf"),
-                                    font_size: 8.5,
+                                    font: gf::TOOLTIP_CARD_SUBHEAD_BOLD.load_font(asset_server),
+                                    font_size: gf::TOOLTIP_CARD_SUBHEAD_BOLD.size,
                                     color: TOOLTIP_BLACK,
                                 },
                             ),
@@ -602,7 +593,7 @@ pub fn handle_spawn_inv_item_tooltip(
                     0.,
                     AttributeQuality::Low,
                     Anchor::CenterLeft,
-                    "fonts/slkscr.ttf".to_string(),
+                    paths::SLKSCR.to_string(),
                 ));
             }
             for (i, desc_string) in item.item_stack.metadata.desc.iter().enumerate() {
@@ -619,7 +610,7 @@ pub fn handle_spawn_inv_item_tooltip(
                         AttributeQuality::Average
                     },
                     Anchor::CenterLeft,
-                    "fonts/slkscr.ttf".to_string(),
+                    paths::SLKSCR.to_string(),
                 ));
             }
         }
@@ -827,8 +818,8 @@ pub fn handle_spawn_inv_item_tooltip(
                         text: Text::from_section(
                             label,
                             TextStyle {
-                                font: asset_server.load("fonts/slkscr.ttf"),
-                                font_size: 8.5,
+                                font: gf::TOOLTIP_CARD_LINE.load_font(asset_server),
+                                font_size: gf::TOOLTIP_CARD_LINE.size,
                                 color: if active { LIGHT_GREEN } else { LIGHT_GREY },
                             },
                         ),
@@ -1030,10 +1021,8 @@ fn stat_tooltip_value_text(
     if let Some(pos) = value.find(SPACE_OPEN_PAREN) {
         let after = &value[pos + SPACE_OPEN_PAREN.len()..];
         // Defence `42 (37%)` or attack `123 (1.30x)` — trailing non-bold parenthetical.
-        let is_mitigation =
-            after.ends_with(')') && after.contains('%') && !after.contains('x');
-        let is_damage_mult =
-            after.ends_with(')') && after.contains('x') && !after.contains('%');
+        let is_mitigation = after.ends_with(')') && after.contains('%') && !after.contains('x');
+        let is_damage_mult = after.ends_with(')') && after.contains('x') && !after.contains('%');
         if is_mitigation || is_damage_mult {
             return Text {
                 sections: vec![
@@ -1133,8 +1122,8 @@ pub fn spawn_stats_tooltip_at(
         ))
         .id();
 
-    let stat_value_font_bold = asset_server.load("fonts/slkscrbold.ttf");
-    let stat_value_font_regular = asset_server.load("fonts/slkscr.ttf");
+    let stat_value_font_bold = gf::TOOLTIP_HEADER_BOLD.load_font(asset_server);
+    let stat_value_font_regular = gf::TOOLTIP_BODY.load_font(asset_server);
 
     // Horizontal inset from the tooltip sprite edges to the start of text.
     // The `StatTooltip.png` art has a ~14 px wooden frame on each side; text inside this inset
@@ -1164,11 +1153,15 @@ pub fn spawn_stats_tooltip_at(
                         text.0.to_string(),
                         TextStyle {
                             font: if i == 0 {
-                                asset_server.load("fonts/alagard.ttf")
+                                gf::STATS_TOOLTIP_TITLE_ROW.load_font(asset_server)
                             } else {
-                                asset_server.load("fonts/slkscr.ttf")
+                                gf::STATS_TOOLTIP_ROW_NAME.load_font(asset_server)
                             },
-                            font_size: if i == 0 { 15. } else { 8.4 },
+                            font_size: if i == 0 {
+                                gf::STATS_TOOLTIP_TITLE_ROW.size
+                            } else {
+                                gf::STATS_TOOLTIP_ROW_NAME.size
+                            },
                             color: if i == 0 { STATS_TITLE } else { YELLOW_2 },
                         },
                     ),
@@ -1192,7 +1185,7 @@ pub fn spawn_stats_tooltip_at(
                         &text.1,
                         stat_value_font_bold.clone(),
                         stat_value_font_regular.clone(),
-                        8.4,
+                        gf::STATS_TOOLTIP_ROW_VALUE.size,
                         YELLOW_2,
                     ),
                     text_anchor: Anchor::CenterRight,
@@ -1289,81 +1282,6 @@ pub fn spawn_damage_tracker_in_inventory(
     }
 }
 
-/// Recipe result item: ingredient icons in a horizontal row at the top of the card, with required
-/// counts (always shown — `spawn_item_stack_icon` only draws stack text when count > 1).
-fn spawn_recipe_ingredients_tooltip_row(
-    commands: &mut Commands,
-    graphics: &Graphics,
-    asset_server: &AssetServer,
-    tooltip: Entity,
-    result_obj: WorldObject,
-    recipes: &Recipes,
-    item_stacks: &Query<(Entity, &ItemStack), Without<RecipeIngredientTooltipIcon>>,
-) {
-    let Some((ingredients, _, _)) = recipes.crafting_list.get(&result_obj) else {
-        return;
-    };
-    if ingredients.is_empty() {
-        return;
-    }
-
-    let n = ingredients.len() as f32;
-    let span = (n - 1.).max(0.) * RECIPE_TOOLTIP_INGREDIENT_SPACING_X;
-    let x_start = -span / 2.;
-
-    for (j, ing) in ingredients.iter().enumerate() {
-        let x = x_start + j as f32 * RECIPE_TOOLTIP_INGREDIENT_SPACING_X;
-        let stack = ItemStack {
-            obj_type: ing.item,
-            count: 1,
-            ..Default::default()
-        };
-        let icon_e = spawn_item_stack_icon(
-            commands,
-            graphics,
-            &stack,
-            asset_server,
-            Vec2::new(x, RECIPE_TOOLTIP_INGREDIENT_ROW_Y),
-            Vec2::ZERO,
-            3,
-        );
-        commands.entity(icon_e).insert(RecipeIngredientTooltipIcon);
-        commands.entity(tooltip).add_child(icon_e);
-
-        commands
-            .spawn((
-                Text2dBundle {
-                    text: Text::from_section(
-                        format!("{}", ing.count),
-                        TextStyle {
-                            font: asset_server.load("fonts/4x5.ttf"),
-                            font_size: 5.0,
-                            color: WHITE,
-                        },
-                    ),
-                    text_anchor: Anchor::Center,
-                    transform: Transform::from_translation(Vec3::new(
-                        x,
-                        RECIPE_TOOLTIP_INGREDIENT_ROW_Y - RECIPE_TOOLTIP_INGREDIENT_COUNT_Y_OFFSET,
-                        4.,
-                    )),
-                    ..default()
-                },
-                Name::new("RECIPE INGREDIENT COUNT"),
-                RenderLayers::from_layers(&[3]),
-            ))
-            .set_parent(tooltip);
-
-        for (e, inv_stack) in item_stacks.iter() {
-            if inv_stack.obj_type == ing.item {
-                if let Some(mut ec) = commands.get_entity(e) {
-                    ec.insert(BounceOnHit::new());
-                }
-            }
-        }
-    }
-}
-
 /// Icon (2× scale), optional rarity glow, and title row — same layout as inventory item tooltip header.
 pub fn spawn_item_tooltip_icon_name_header(
     commands: &mut Commands,
@@ -1404,8 +1322,8 @@ pub fn spawn_item_tooltip_icon_name_header(
                 text: Text::from_section(
                     item_stack.metadata.name.clone(),
                     TextStyle {
-                        font: asset_server.load("fonts/alagard.ttf"),
-                        font_size: 15.,
+                        font: gf::TOOLTIP_ITEM_TITLE.load_font(asset_server),
+                        font_size: gf::TOOLTIP_ITEM_TITLE.size,
                         color: item_stack.rarity.get_color(),
                     },
                 ),
@@ -1485,8 +1403,8 @@ pub fn spawn_world_item_tooltip_for_stack(
                     text: Text::from_section(
                         action_or_level,
                         TextStyle {
-                            font: asset_server.load("fonts/slkscr.ttf"),
-                            font_size: 8.5,
+                            font: gf::TOOLTIP_CARD_LINE.load_font(asset_server),
+                            font_size: gf::TOOLTIP_CARD_LINE.size,
                             color: ORANGE,
                         },
                     ),
@@ -1507,8 +1425,8 @@ pub fn spawn_world_item_tooltip_for_stack(
                     text: Text::from_section(
                         line.clone(),
                         TextStyle {
-                            font: asset_server.load("fonts/slkscr.ttf"),
-                            font_size: 8.4,
+                            font: gf::TOOLTIP_BODY.load_font(asset_server),
+                            font_size: gf::TOOLTIP_BODY.size,
                             color: TOOLTIP_BLACK_2,
                         },
                     ),
