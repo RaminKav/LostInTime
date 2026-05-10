@@ -17,6 +17,7 @@
 
 ### Changes
 
+- shrine generation rebuilt around per-era min/max counts that are pre-rolled at world init and distributed across non-center chunks, replacing the per-chunk probability rolls
 - shrines no longer spawn near/in the starting clearing
 - full internal player animation refactor
 - Fire staff is now Ice Staff
@@ -287,3 +288,106 @@ Heirlooms:
 - Defeating the era boss now pulls all loot on the map to the player
 - Remove movement penalty on weapon attacks (nerf bow slightly to compensate)
 - Attempt once again to fix performance
+
+## 0.17.4
+
+- [Frozen Tear] Moved from Uncommon -> Rare
+- [Ice Lantern] Moved from Rare -> Uncommon
+- [Ripe Tomato] Capped at 250hp
+- [Arcane Tome] Capped at 1000 skill power
+- [Stanley] Nerfed 15% -> 8% cooldown reduction
+- Add toggles for animations for Weapon attack, skills, and heirloom effects
+- Add different starting base stats for classes (mainly hp, mp, crit)
+- Add hp regen and dmg multi in stats view
+- Bosses dont inflate very large anymore lol
+- Stagger desert era mobs properly when first entering the era
+- No longer grant heirloom level up rewards past level 50
+- Buff attack scaling in endless mode
+- Tweak some heirloom mana costs (overall things cost more)
+- Allow ice explosion and echo heirlooms to multi cast if you have more than 1 copy
+- Stone golem spawns in endless every 8min :)
+- buff move speeds of cactus mobs
+- Fix bug for auto attack and multi projectile attacks
+- Fix bug with staffs granting +1 on cast instead of -1 mana
+- Tweak drop rates for tomes, keys, small potions
+- More trees in snow era
+
+## 0.17.5
+
+- nerf xp gain from mobs, and environment objects
+- [Cursed Crown] nerfed from 20 -> 10% chance
+- rework lunge, feels smoother now, with a slightly new animation
+- [Possessed Blade] NEW skill for rogue
+- [Arrow Volley] NEW skill for Hunter
+- Boss always drops loot
+- Boss scaling tiers, re-summons of bosses cause it to summon an uncommon, then rare, then legandary varient that scales hp, attack, and abilities
+- Added a toggle button in inventory to turn off ALL drops from objects (grass, stone, trees, flowers, food, etc).
+- Some classes get starting speed bonus
+- Fix [Sturdy Crate] to apply from era2/3 crates
+- make stone walls unbreakable in dungeon
+- increase player reach distance to break objects or place bridges
+
+## 0.17.6
+
+- Rework mana orbs, now drops at a fixed 10% rate on kill and regens a fixed 10 MP, [Mana Dust] now increases mana orb regen by 5
+- Nerf xp gain by about 20% again
+- Buff endless: HP Scales slower, enemy dmg scales faster. Max mob count increased, spawn rate increased, mob speed increased
+- [Vampiric Ring] Nerfed from Uncommon -> Rare
+- Rebalanced a few skills damage values
+- Buffed heal skill cooldown from 45s -> 20s
+- Fix active skill shrine locking you out if you exit early
+- BUG: Sheild does not regen while paused anymore
+
+## 0.17.7
+
+- Make shrine generation mroe consistant, with set min/max spawn counts per era
+- Increase island size from 5 to 6, map will feel a bit bigger
+- Remove collider from pet, wont blocking your way
+- World objects like trees and boulders will scale their health with chaos in the same way mobs do. this is an experiment
+- Increase heirlooms shown in each row of the player HUD
+- Rework shop scaling to be based on level of the player
+- Rebalance class and pet passives
+- Add scaling mechanics to the last skill of Warrior, Rogue, and Hunter.
+- Increase teleport distance by 12.5%
+- Tweak summon times (mostly buffs) of the 3 summon heirlooms
+- Buff [Reaper] damage by 100%
+- Add Set bonuses to gear!
+- Remove starting tomes/orbs for balance reasons
+- Fix bug with starting hp/mp of some classes not being full
+
+## 0.18.0
+
+- [Feature] Added new meta progression system: Time Crystals. Will make sense when the lore is finalized. Collect Shards by doing runs, shards complete Time Crytals, which will unlock new heirlooms that you can find in your run. Added a new Time Crystals menu button to view unlock progress, AND to view all unlocked/locked heirlooms. This UI is a placeholder.
+- [Art] Add new rogue player sprite/animations!
+- [Art] Add new boulder asset, its chunky now.
+- [QoL] Can now drag and rearrange skills directly in the player HUD
+- [QoL] Fix teleport skill to place you on a nearby tile, if possible, if you teleport directly on top of an object
+- Shift + Left Click now moves items to and from the hotbar, or equipment slots based on the type of item
+- [Boulder] Update rotations and movement of boulder
+- [Piercing Ring] Buff duration of rings
+- [Wizard] Now scales with Mana instead of Mana Regen
+- Buff dagger damage, nerf claw damage
+- Add Duration scaling to Fire Pillar
+- Reduce starting speed of endless mobs a bit
+- Improve skill descriptions to show scaling dynamic values, based on the stat they scale with (description of the scaled value will update as you scale)
+- Fix Attack speed bug with Rapid Fire skill
+- Clean up some tips and pop up boxes that were outdated
+
+## 0.18.1
+
+- [Feature] New Special Food Items and crafting improvements: Foods that grant perm stat buffs, using materials from different eras (biomes) Added new food materials to Desert and Tundra to make this work.
+- [Feature] Banished Heirlooms tracker
+- [Feature] Cosmetic Grass and dirt patches added to Forest (Era1). Will add to rest soon!
+- [Feature] Mob stats tracker underneat Damage Tracker. Tracks kills and damage taken by mob type
+- Buff xp gain by ~10%
+- Nerf [Rose] 4 -> 3% lifesteal
+- Nerf [Dark Blade] 10 -> 7% Lifesteal
+- Nerf [Lightning Ring] 20% -> 15% proc chance
+- Nerf [Chalice] 20% -> 10% proc chance
+- Free Heirloom shrines per era dropped from 7 -> 5
+- [QoL] Add new stats to Stats tooltip (Defence mitigation %, regen timers)
+- [QoL] Improve Shift + Click interactions in inventory
+- [QoL] Only consumables can go in the hotbar
+- [QoL] Auto-Attack is on by default, and is now a checkbox toggle
+- [Bug] Fix animation for Rogue movement
+- [Bug] Fix overlays when opening inventory during heirloom selection
