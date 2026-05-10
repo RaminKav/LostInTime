@@ -85,6 +85,7 @@ pub struct MenuButtonExtras<'w, 's> {
     time_crystals: Res<'w, TimeCrystals>,
     screen_res: Res<'w, ScreenResolution>,
     player_class: Option<Res<'w, PlayerClass>>,
+    game_state: Res<'w, State<GameState>>,
 }
 
 #[derive(Component, Clone, Eq, Display, Debug, PartialEq)]
@@ -108,6 +109,7 @@ pub enum MenuButton {
     AchievementsNext,
     OptionsRestart,
     OptionsExit,
+    ShowTutorial,
 }
 #[derive(Component)]
 pub struct InfoModal;
@@ -487,6 +489,13 @@ pub fn handle_menu_button_click_events(
                 next_state.set(GameState::MainMenu);
                 cleanup_event.send_default();
             }
+            MenuButton::ShowTutorial => {
+                if extras.game_state.0 != GameState::Main || current_ui_state.0 != UIState::Options {
+                    continue;
+                }
+                commands.insert_resource(crate::ui::tutorial_ui::TutorialReplayRequested);
+                next_ui_state.set(UIState::Closed);
+            }
         }
     }
 }
@@ -640,6 +649,7 @@ pub fn tick_game_start_overlay(
         timer.0.tick(time.delta());
         if timer.0.finished() {
             commands.insert_resource(XpBarFadeIn(Timer::from_seconds(2.0, TimerMode::Once)));
+            commands.insert_resource(crate::ui::tutorial_ui::TutorialReady);
             commands.entity(e).despawn();
         } else {
             let alpha = f32::max(0., 1. - timer.0.percent());

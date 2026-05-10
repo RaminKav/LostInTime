@@ -245,6 +245,8 @@ pub struct GameData {
     pub seen_tips: std::collections::HashSet<Tip>,
     #[serde(default)]
     pub time_crystals: TimeCrystals,
+    #[serde(default)]
+    pub has_seen_tutorial: bool,
 }
 
 impl GameData {

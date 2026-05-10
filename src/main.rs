@@ -758,8 +758,6 @@ impl<'w, 's> GameParam<'w, 's> {
     /// hit crits (does not affect crit *chance*; non-crit damage is unaffected).
     pub fn calculate_player_damage(
         &self,
-        commands: &mut Commands,
-        hit_entity: Entity,
         bonus_crit: u32,
         dmg_mult: Option<f32>,
         dmg_bonus: u32,
@@ -883,10 +881,6 @@ impl<'w, 's> GameParam<'w, 's> {
         let total_dmg_bonus = dmg_bonus as i32 + mana_charge_bonus;
 
         if did_crit {
-            commands.entity(hit_entity).insert(WasHitWithCrit(true));
-            if did_overcrit {
-                commands.entity(hit_entity).insert(WasHitWithOvercrit(true));
-            }
             // Base crit damage (includes overflow from crit chance > 200% at 1:1 ratio
             // and any per-skill bonus crit damage, e.g. ArrowVolley scaling with crit chance)
             let crit_multiplier = f32::abs(

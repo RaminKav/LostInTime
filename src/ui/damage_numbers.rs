@@ -3,7 +3,7 @@ use rand::Rng;
 
 use crate::{
     assets::Graphics,
-    attributes::{Attack, BonusDamage, CurrentHealth, MaxHealth},
+    attributes::{CurrentHealth, MaxHealth},
     colors::{BLACK, DMG_NUM_GREEN, DMG_NUM_ORANGE, DMG_NUM_PURPLE, DMG_NUM_RED, DMG_NUM_YELLOW},
     enemy::Mob,
     inventory::ItemStack,
@@ -113,7 +113,6 @@ pub fn handle_add_damage_numbers_after_hit(
     >,
     txfms: Query<&GlobalTransform>,
     asset_server: Res<AssetServer>,
-    raw_dmg: Query<(&Attack, &BonusDamage)>,
     game: Res<Game>,
     cheat_settings: Option<Res<CheatSettings>>,
 ) {
@@ -153,11 +152,9 @@ pub fn handle_add_damage_numbers_after_hit(
         let pos_offset = Vec3::new(
             rng.gen_range(-drop_spread..drop_spread) as f32,
             rng.gen_range(0_f64..drop_spread) as f32,
-            2.,
+            400.,
         );
-        let dmg = raw_dmg.get(game.player).unwrap().0 .0 + raw_dmg.get(game.player).unwrap().1 .0;
-        let crit_flag = crit_option.as_deref().map(|c| c.0).unwrap_or(false);
-        let is_crit = crit_flag || (!is_player && delta.abs() > dmg && dmg != 0);
+        let is_crit = crit_option.as_deref().map(|c| c.0).unwrap_or(false);
         let is_overcrit = overcrit_option.as_deref().map(|c| c.0).unwrap_or(false);
         spawn_floating_text_with_shadow(
             &mut commands,
@@ -499,8 +496,8 @@ pub fn spawn_text(
             text: Text::from_section(
                 text,
                 TextStyle {
-                    font: asset_server.load("fonts/slkscr.ttf"),
-                    font_size: 8.4 * font_scale,
+                    font: asset_server.load("fonts/alagard.ttf"),
+                    font_size: 15. * font_scale,
                     color,
                 },
             ),

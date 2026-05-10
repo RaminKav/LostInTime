@@ -1446,27 +1446,49 @@ pub fn handle_cursor_banish_buttons(
     time_crystals: Res<TimeCrystals>,
     skill_ui: Query<(Entity, &SkillChoiceUI), With<SkillChoiceUI>>,
     dice_buttons: Query<(Entity, &RerollDice), With<RerollDice>>,
+    asset_server: Res<AssetServer>,
 ) {
     let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
     let mut banished_slot: Option<usize> = None;
     for (e, mut interactable, banish) in banish_buttons.iter_mut() {
-        let banishes_available = run_unlocks.banishes_remaining > 0
-            && skill_queue.banish_allowed_for_choice_slot(&time_crystals, banish.0);
+        let no_banishes = run_unlocks.banishes_remaining == 0;
+        let slot_allowed = skill_queue.banish_allowed_for_choice_slot(&time_crystals, banish.0);
+        let banishes_available = !no_banishes && slot_allowed;
         match hit_test {
             Some(hit_ent) if hit_ent.0 == e => match interactable.current() {
                 Interaction::None => {
-                    if !banishes_available {
-                        continue;
-                    }
                     interactable.change(Interaction::Hovering);
-                    let ui_element = UIElement::BackButtonHover;
-                    commands
-                        .entity(e)
-                        .insert(ui_element.clone())
-                        .insert(graphics.get_ui_element_texture(ui_element));
+                    if banishes_available {
+                        let ui_element = UIElement::BackButtonHover;
+                        commands
+                            .entity(e)
+                            .insert(ui_element.clone())
+                            .insert(graphics.get_ui_element_texture(ui_element));
+                    }
                 }
                 Interaction::Hovering => {
+                    if left_mouse_pressed && !banishes_available {
+                        let btn_pos = ui_sprites
+                            .get(e)
+                            .map(|(_, _, gt)| gt.translation())
+                            .unwrap_or(Vec3::ZERO);
+                        let msg = if no_banishes {
+                            "No Banishes Left".to_string()
+                        } else {
+                            "Rarity Banish Cap Reached".to_string()
+                        };
+                        let text = spawn_floating_text_with_shadow(
+                            &mut commands,
+                            &asset_server,
+                            btn_pos + Vec3::new(0., 12., 10.),
+                            RED,
+                            msg,
+                        );
+                        commands
+                            .entity(text)
+                            .insert(bevy::render::view::RenderLayers::from_layers(&[3]));
+                    }
                     if left_mouse_pressed && banishes_available {
                         if skill_queue.banish_slot(&time_crystals, banish.0).is_some() {
                             run_unlocks.banishes_remaining =
@@ -1936,6 +1958,7 @@ pub fn handle_cursor_main_menu_buttons(
                 | MenuButton::GameOverOK
                 | MenuButton::OptionsRestart
                 | MenuButton::OptionsExit
+                | MenuButton::ShowTutorial
         );
         match hit_test {
             Some(hit_ent) if hit_ent.0 == e => match interactable.current() {

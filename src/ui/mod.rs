@@ -14,6 +14,7 @@ use item_chest::*;
 pub mod ui_container_param;
 pub mod tips;
 use tips::*;
+pub mod tutorial_ui;
 use bevy::{render::view::RenderLayers, sprite::Material2dPlugin};
 use damage_numbers::FloatingTextQueue;
 use scrapper_ui::{
@@ -337,6 +338,7 @@ impl Plugin for UIPlugin {
             .register_type::<InventorySlotState>()
             .add_plugin(MinimapPlugin)
             .add_plugin(TipPlugin)
+            .add_plugin(tutorial_ui::TutorialPlugin)
             .add_system(setup_loading_screen.in_schedule(OnEnter(GameState::Initializing)))
             .add_system(
                 check_initialization_complete
@@ -861,6 +863,10 @@ impl Plugin for UIPlugin {
                     .before(handle_new_ui_state)
                     .in_base_set(CoreSet::PostUpdate),
                 handle_new_ui_state.in_base_set(CoreSet::PostUpdate),
+                sync_client_pause_with_modal_overlays
+                    .after(handle_new_ui_state)
+                    .in_base_set(CoreSet::PostUpdate)
+                    .run_if(in_state(GameState::Main)),
             ))
             .add_systems((
                 handle_class_selection.run_if(in_state(UIState::ClassSelection)),
@@ -952,6 +958,29 @@ pub fn auto_equip_upgrade_slot_on_inv_close(
     }
     if let Ok(mut inv) = inv.get_single_mut() {
         try_auto_equip_from_upgrade_slot(&mut inv, &proto, &mut inv_slots);
+    }
+}
+
+/// Mirrors the pause rule in [`handle_new_ui_state`]: gameplay pauses whenever a menu is open,
+/// tip boxes are shown, the minimap overlay is up, a tutorial replay is queued from Options
+/// ([`tutorial_ui::TutorialReplayRequested`]), or the tutorial overlay is visible.
+pub fn sync_client_pause_with_modal_overlays(
+    ui_state: Res<State<UIState>>,
+    tip_boxes: Query<Entity, With<tips::TipBox>>,
+    minimap_open: Res<minimap::IslandMapOpen>,
+    tutorial_ui: Query<(), With<tutorial_ui::TutorialUI>>,
+    tutorial_replay_pending: Option<Res<tutorial_ui::TutorialReplayRequested>>,
+    mut next_client_state: ResMut<NextState<ClientState>>,
+) {
+    let should_pause = ui_state.0 != UIState::Closed
+        || !tip_boxes.is_empty()
+        || minimap_open.0
+        || !tutorial_ui.is_empty()
+        || tutorial_replay_pending.is_some();
+    if should_pause {
+        next_client_state.set(ClientState::Paused);
+    } else {
+        next_client_state.set(ClientState::Unpaused);
     }
 }
 

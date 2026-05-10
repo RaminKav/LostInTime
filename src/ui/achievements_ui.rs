@@ -286,16 +286,25 @@ pub fn setup_achievements_ui(
             ))
             .id();
 
-        let desc_entity = spawn_text(
-            &mut commands,
-            &asset_server,
-            Vec3::new(-70., y_pos, 1.),
-            desc_color,
-            desc_text,
-            bevy::sprite::Anchor::CenterLeft,
-            1.,
-            3,
-        );
+        let desc_entity = commands
+            .spawn(Text2dBundle {
+                text: Text::from_section(
+                    desc_text,
+                    TextStyle {
+                        font: asset_server.load("fonts/slkscr.ttf"),
+                        font_size: 8.5,
+                        color: desc_color,
+                    },
+                ),
+                transform: Transform {
+                    translation: Vec3::new(-70., y_pos, 1.),
+                    ..Default::default()
+                },
+                text_anchor: Anchor::CenterLeft,
+                ..Default::default()
+            })
+            .insert(RenderLayers::from_layers(&[3]))
+            .id();
 
         commands.entity(desc_entity).insert((
             AchievementsUI,

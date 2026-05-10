@@ -71,8 +71,6 @@ pub fn handle_second_split_attack(
 
         let frail_stacks = status_option.map(|s| s.frail_stacks()).unwrap_or(0);
         let (damage, was_crit, was_overcrit) = game.calculate_player_damage(
-            &mut commands,
-            e,
             (frail_stacks * 5) as u32,
             None,
             0,

@@ -575,6 +575,17 @@ pub fn handle_hits(
             } else {
                 hit.damage
             };
+            // Propagate crit flags from the HitEvent onto the target so the
+            // damage-numbers UI can render yellow/orange numbers. Skip the
+            // player (they don't take crits) and skip non-crit hits to keep
+            // the "consume by setting back to false" pattern from churning
+            // archetypes — see WasHitWithCrit doc comment.
+            if hit.was_crit && hit.hit_entity != game.game.player {
+                commands.entity(e).insert(WasHitWithCrit(true));
+                if hit.was_overcrit {
+                    commands.entity(e).insert(WasHitWithOvercrit(true));
+                }
+            }
             if let Some(obj) = obj_option {
                 // Skill projectiles (AoE, shouts, explosions, etc.) never satisfy tool gating -
                 // only regular attack projectiles can chop/mine when the player carries the tool.

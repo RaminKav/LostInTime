@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Chaos scaling playground</title>
+  <style>
+    :root {
+      --bg: #12141a;
+      --panel: #1a1d26;
+      --border: #2a3142;
+      --text: #e8eaef;
+      --muted: #8b93a7;
+      --accent: #a78bfa;
+      --hp: #f472b6;
+      --atk: #38bdf8;
+      --cutoff: #fbbf24;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: ui-sans-serif, system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.45;
+      padding: 1.25rem;
+      max-width: 960px;
+      margin-inline: auto;
+    }
+    h1 { font-size: 1.25rem; font-weight: 600; margin: 0 0 0.25rem; }
+    .sub { color: var(--muted); font-size: 0.875rem; margin-bottom: 1.25rem; }
+    .grid {
+      display: grid;
+      gap: 1rem;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1rem 1.1rem;
+    }
+    .panel h2 {
+      margin: 0 0 0.75rem;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      font-weight: 600;
+    }
+    label {
+      display: block;
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-bottom: 0.35rem;
+    }
+    input[type="number"], input[type="text"] {
+      width: 100%;
+      padding: 0.45rem 0.55rem;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text);
+      font-size: 0.95rem;
+    }
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+    }
+    .row {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 0.85rem;
+    }
+    .row input[type="number"] { width: 5.5rem; flex-shrink: 0; }
+    .row span.val { min-width: 3.5rem; text-align: right; font-variant-numeric: tabular-nums; color: var(--accent); }
+    .stats {
+      font-variant-numeric: tabular-nums;
+      font-size: 0.95rem;
+    }
+    .stats dt { color: var(--muted); font-size: 0.75rem; margin-top: 0.5rem; }
+    .stats dd { margin: 0.15rem 0 0; }
+    .hp { color: var(--hp); }
+    .atk { color: var(--atk); }
+    canvas {
+      width: 100%;
+      height: 220px;
+      display: block;
+      border-radius: 8px;
+      background: #0e1015;
+    }
+    details {
+      margin-top: 1rem;
+      border-top: 1px solid var(--border);
+      padding-top: 0.75rem;
+    }
+    summary {
+      cursor: pointer;
+      color: var(--muted);
+      font-size: 0.85rem;
+      user-select: none;
+    }
+    summary:hover { color: var(--text); }
+    .hint { font-size: 0.75rem; color: var(--muted); margin-top: 0.5rem; }
+    .badge {
+      display: inline-block;
+      font-size: 0.7rem;
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+      background: var(--border);
+      color: var(--cutoff);
+      margin-left: 0.35rem;
+    }
+  </style>
+</head>
+<body>
+  <h1>Chaos scaling playground</h1>
+  <p class="sub">
+    Mirrors <code>juice_up_spawned_mobs_per_day</code> in the game:
+    <code>chaos_factor = 1 + total_chaos</code>;
+    HP uses <code>chaos_factor<sup>0.7</sup></code> if <code>chaos_factor ≤ cutoff</code>, else <code>lateFactor × chaos_factor</code>;
+    attack uses <code>chaos_factor<sup>0.4</sup></code>. Floors match Rust <code>as i32</code> truncation toward zero.
+    <strong>Endless time</strong> (readout below) assumes <strong>only</strong> endless chaos on top of a fixed <strong>20</strong> total chaos at endless entry:
+    <code>total_chaos = 20 + 0.011·t<sup>1.5</sup>·mult(difficulty)</code> with difficulty 1 at start, +1 every 90s (same as <code>InfiniteMode</code> in <code>night.rs</code>).
+  </p>
+
+  <div class="grid">
+    <div class="panel">
+      <h2>Bases (proto)</h2>
+      <label for="baseHp">Base max HP</label>
+      <input type="number" id="baseHp" value="8" min="1" step="1" />
+      <label for="baseAtk" style="margin-top:0.75rem">Base attack</label>
+      <input type="number" id="baseAtk" value="8" min="1" step="1" />
+    </div>
+
+    <div class="panel">
+      <h2>Total chaos (tracker + endless bonus)</h2>
+      <div class="row">
+        <input type="range" id="chaosSlider" min="0" max="120" value="8" step="0.5" />
+        <input type="number" id="chaosNum" value="8" min="0" step="0.1" />
+      </div>
+      <label for="chaosMax">Chart chaos range (max X)</label>
+      <input type="number" id="chaosMax" value="80" min="5" step="5" />
+      <p class="hint">Era-only floor in game: ~0 / ~8 / ~22 from era modifiers, plus days, XP, blessings, etc.</p>
+    </div>
+  </div>
+
+  <div class="panel" style="margin-top:1rem">
+    <h2>At selected chaos</h2>
+    <dl class="stats" id="readout"></dl>
+  </div>
+
+  <div class="panel" style="margin-top:1rem">
+    <h2>Curves (scaled HP &amp; attack vs chaos)</h2>
+    <canvas id="chart" width="900" height="240"></canvas>
+    <p class="hint">Yellow dashed line = <code>chaos_factor</code> cutoff (HP curve kink). Drag chaos slider to move the vertical marker.</p>
+  </div>
+
+  <details class="panel" style="margin-top:1rem">
+    <summary>Advanced — tweak formula (not wired to Rust)</summary>
+    <div class="grid" style="margin-top:0.75rem">
+      <div>
+        <label for="expHpEarly">HP early exponent (game: 0.7)</label>
+        <input type="number" id="expHpEarly" value="0.7" step="0.05" />
+      </div>
+      <div>
+        <label for="expAtk">Attack exponent (game: 0.4)</label>
+        <input type="number" id="expAtk" value="0.4" step="0.05" />
+      </div>
+      <div>
+        <label for="lateFactor">Late HP factor (game: 1.45)</label>
+        <input type="number" id="lateFactor" value="1.45" step="0.05" />
+      </div>
+      <div>
+        <label for="cutoff">Early / late cutoff on chaos_factor (game: 20)</label>
+        <input type="number" id="cutoff" value="20" min="1.01" step="0.5" />
+      </div>
+    </div>
+  </details>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+
+    /** Matches night.rs endless model for inverse-time display. */
+    const ENDLESS_BASE_CHAOS = 20;
+    const ENDLESS_COEFF = 0.011;
+    const ENDLESS_EXP = 1.5;
+    const ENDLESS_DIFFICULTY_INTERVAL = 90;
+    /** get_chaos_multiplier(difficulty_level) — level 1..15 */
+    const CHAOS_MULT_BY_LEVEL = [
+      null,
+      1, 1.03, 1.08, 1.13, 1.2, 1.3, 1.42, 1.55, 1.7, 1.87, 2.05, 2.22, 2.4, 2.6, 3.0,
+    ];
+
+    function difficultyAtElapsed(t) {
+      if (t <= 0) return 1;
+      return Math.min(15, 1 + Math.floor(t / ENDLESS_DIFFICULTY_INTERVAL));
+    }
+
+    function chaosFromElapsedRaw(t) {
+      if (t <= 0) return 0;
+      return ENDLESS_COEFF * Math.pow(t, ENDLESS_EXP);
+    }
+
+    function endlessBonusAtElapsed(t) {
+      const lvl = difficultyAtElapsed(t);
+      return chaosFromElapsedRaw(t) * CHAOS_MULT_BY_LEVEL[lvl];
+    }
+
+    function totalChaosEndlessModel(t) {
+      return ENDLESS_BASE_CHAOS + endlessBonusAtElapsed(t);
+    }
+
+    function solveElapsedForEndlessTotalChaos(target) {
+      if (target < ENDLESS_BASE_CHAOS) return null;
+      if (target <= ENDLESS_BASE_CHAOS + 1e-9) return 0;
+
+      let lo = 0;
+      let hi = 90;
+      while (totalChaosEndlessModel(hi) < target && hi < 1e9) hi *= 2;
+
+      if (totalChaosEndlessModel(hi) < target) return null;
+
+      for (let i = 0; i < 80; i++) {
+        const mid = (lo + hi) * 0.5;
+        if (totalChaosEndlessModel(mid) < target) lo = mid;
+        else hi = mid;
+      }
+      return hi;
+    }
+
+    function formatEndlessElapsed(sec) {
+      if (sec <= 0) return "0:00.0";
+      const h = Math.floor(sec / 3600);
+      const rem = sec % 3600;
+      const m = Math.floor(rem / 60);
+      const s = rem - m * 60;
+      if (h > 0) {
+        return `${h}h ${String(m).padStart(2, "0")}m ${s < 10 ? "0" : ""}${s.toFixed(1)}s`;
+      }
+      return `${m}:${s < 10 ? "0" : ""}${s.toFixed(1)}`;
+    }
+
+    function chaosFactor(totalChaos) {
+      return 1 + totalChaos;
+    }
+
+    function hpMultiplier(cf, lateFactor, cutoff, expEarly) {
+      if (cf <= cutoff) return Math.pow(cf, expEarly);
+      return lateFactor * cf;
+    }
+
+    function atkMultiplier(cf, expAtk) {
+      return Math.pow(cf, expAtk);
+    }
+
+    function scaled(baseHp, baseAtk, totalChaos, params) {
+      const f = chaosFactor(totalChaos);
+      const hpM = hpMultiplier(f, params.lateFactor, params.cutoff, params.expHpEarly);
+      const atkM = atkMultiplier(f, params.expAtk);
+      return {
+        chaosFactor: f,
+        hpMult: hpM,
+        atkMult: atkM,
+        hp: Math.trunc(baseHp * hpM),
+        atk: Math.trunc(baseAtk * atkM),
+        branch: f <= params.cutoff ? "early (power)" : "late (linear × factor)",
+      };
+    }
+
+    function paramsFromDom() {
+      return {
+        expHpEarly: parseFloat($("expHpEarly").value) || 0.7,
+        expAtk: parseFloat($("expAtk").value) || 0.4,
+        lateFactor: parseFloat($("lateFactor").value) || 1.45,
+        cutoff: parseFloat($("cutoff").value) || 20,
+      };
+    }
+
+    function renderReadout() {
+      const baseHp = Math.max(1, parseInt($("baseHp").value, 10) || 8);
+      const baseAtk = Math.max(1, parseInt($("baseAtk").value, 10) || 8);
+      const chaos = parseFloat($("chaosNum").value) || 0;
+      const p = paramsFromDom();
+      const r = scaled(baseHp, baseAtk, chaos, p);
+      const atCutoff = scaled(baseHp, baseAtk, p.cutoff - 1, p); // chaos_factor = 20 when total_chaos = 19
+
+      let endlessHtml = "";
+      if (chaos < ENDLESS_BASE_CHAOS) {
+        endlessHtml = `
+        <dt style="margin-top:0.75rem">Endless time (model)</dt>
+        <dd style="color:var(--muted)">Selected chaos &lt; ${ENDLESS_BASE_CHAOS} (assumed total chaos at endless entry). No positive endless elapsed.</dd>`;
+      } else {
+        const tSolve = solveElapsedForEndlessTotalChaos(chaos);
+        if (tSolve === null) {
+          endlessHtml = `
+        <dt style="margin-top:0.75rem">Endless time (model)</dt>
+        <dd style="color:var(--muted)">Could not bracket this chaos below 1e9 s — value is past the model search cap.</dd>`;
+        } else {
+          const lvl = difficultyAtElapsed(tSolve);
+          const mult = CHAOS_MULT_BY_LEVEL[lvl];
+          const raw = chaosFromElapsedRaw(tSolve);
+          const bonus = endlessBonusAtElapsed(tSolve);
+          const verify = totalChaosEndlessModel(tSolve);
+          endlessHtml = `
+        <dt style="margin-top:0.75rem">Endless time (model)</dt>
+        <dd><strong>${formatEndlessElapsed(tSolve)}</strong> <span style="color:var(--muted)">(${tSolve.toFixed(2)} s)</span></dd>
+        <dt>Difficulty @ that time</dt><dd>${lvl} <span style="color:var(--muted)">(chaos mult ×${mult})</span></dd>
+        <dt>Raw · mult = bonus</dt><dd>${raw.toFixed(3)} × ${mult} ≈ ${bonus.toFixed(2)} → total ${verify.toFixed(2)} <span style="color:var(--muted)">(want ${chaos.toFixed(2)})</span></dd>`;
+        }
+      }
+
+      $("readout").innerHTML = `
+        <dt>chaos_factor</dt><dd>${r.chaosFactor.toFixed(2)}</dd>
+        <dt>HP branch</dt><dd>${r.branch}${r.chaosFactor <= p.cutoff + 0.001 ? "" : ' <span class="badge">past cutoff</span>'}</dd>
+        <dt>HP multiplier</dt><dd class="hp">${r.hpMult.toFixed(4)}</dd>
+        <dt>Attack multiplier</dt><dd class="atk">${r.atkMult.toFixed(4)}</dd>
+        <dt>Scaled max HP</dt><dd class="hp">${r.hp} <span style="color:var(--muted)">(base ${baseHp})</span></dd>
+        <dt>Scaled attack</dt><dd class="atk">${r.atk} <span style="color:var(--muted)">(base ${baseAtk})</span></dd>
+        <dt style="margin-top:0.75rem">Reference @ chaos_factor = ${p.cutoff} (total_chaos ≈ ${(p.cutoff - 1).toFixed(2)})</dt>
+        <dd class="hp">HP mult ≈ ${atCutoff.hpMult.toFixed(4)} → ${atCutoff.hp} HP</dd>
+        ${endlessHtml}
+      `;
+    }
+
+    function drawChart() {
+      const canvas = $("chart");
+      const ctx = canvas.getContext("2d");
+      const w = canvas.width;
+      const h = canvas.height;
+      const padL = 48, padR = 16, padT = 14, padB = 32;
+      const plotW = w - padL - padR;
+      const plotH = h - padT - padB;
+
+      const baseHp = Math.max(1, parseInt($("baseHp").value, 10) || 8);
+      const baseAtk = Math.max(1, parseInt($("baseAtk").value, 10) || 8);
+      const chaosEnd = Math.max(5, parseFloat($("chaosMax").value) || 80);
+      const curChaos = parseFloat($("chaosNum").value) || 0;
+      const p = paramsFromDom();
+
+      const samples = 200;
+      let maxY = 1;
+      const hpSeries = [];
+      const atkSeries = [];
+      for (let i = 0; i <= samples; i++) {
+        const t = (i / samples) * chaosEnd;
+        const r = scaled(baseHp, baseAtk, t, p);
+        hpSeries.push(r.hp);
+        atkSeries.push(r.atk);
+        maxY = Math.max(maxY, r.hp, r.atk);
+      }
+
+      ctx.fillStyle = "#0e1015";
+      ctx.fillRect(0, 0, w, h);
+
+      const xAt = (chaos) => padL + (chaos / chaosEnd) * plotW;
+      const yAt = (v) => padT + plotH - (v / maxY) * plotH;
+
+      // Grid
+      ctx.strokeStyle = "#252a36";
+      ctx.lineWidth = 1;
+      for (let g = 0; g <= 4; g++) {
+        const y = padT + (g / 4) * plotH;
+        ctx.beginPath();
+        ctx.moveTo(padL, y);
+        ctx.lineTo(padL + plotW, y);
+        ctx.stroke();
+      }
+
+      // Cutoff vertical (chaos where chaos_factor = cutoff → total_chaos = cutoff - 1)
+      const chaosAtCutoff = p.cutoff - 1;
+      if (chaosAtCutoff >= 0 && chaosAtCutoff <= chaosEnd) {
+        const xc = xAt(chaosAtCutoff);
+        ctx.strokeStyle = "rgba(251, 191, 36, 0.45)";
+        ctx.setLineDash([5, 5]);
+        ctx.beginPath();
+        ctx.moveTo(xc, padT);
+        ctx.lineTo(xc, padT + plotH);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = "#b08d30";
+        ctx.font = "10px ui-sans-serif, system-ui, sans-serif";
+        ctx.fillText(`factor=${p.cutoff}`, xc + 4, padT + 12);
+      }
+
+      function drawLine(series, color) {
+        ctx.beginPath();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+        for (let i = 0; i <= samples; i++) {
+          const t = (i / samples) * chaosEnd;
+          const x = xAt(t);
+          const y = yAt(series[i]);
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+      }
+
+      drawLine(hpSeries, "#f472b6");
+      drawLine(atkSeries, "#38bdf8");
+
+      // Current chaos marker
+      const cx = Math.max(padL, Math.min(padL + plotW, xAt(curChaos)));
+      ctx.strokeStyle = "#e8eaef";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(cx, padT);
+      ctx.lineTo(cx, padT + plotH);
+      ctx.stroke();
+
+      // Axes
+      ctx.strokeStyle = "#4a5568";
+      ctx.beginPath();
+      ctx.moveTo(padL, padT + plotH);
+      ctx.lineTo(padL + plotW, padT + plotH);
+      ctx.stroke();
+
+      ctx.fillStyle = "#8b93a7";
+      ctx.font = "11px ui-sans-serif, system-ui, sans-serif";
+      ctx.fillText("0", padL - 4, padT + plotH + 14);
+      ctx.textAlign = "right";
+      ctx.fillText(String(Math.round(chaosEnd)), padL + plotW, padT + plotH + 14);
+      ctx.textAlign = "left";
+      ctx.fillText("chaos →", padL + plotW - 50, padT + plotH + 14);
+
+      ctx.fillStyle = "#f472b6";
+      ctx.fillText("HP", padL, padT - 2);
+      ctx.fillStyle = "#38bdf8";
+      ctx.fillText("ATK", padL + 36, padT - 2);
+
+      ctx.fillStyle = "#8b93a7";
+      ctx.textAlign = "right";
+      ctx.fillText(String(Math.round(maxY)), padL - 6, padT + 10);
+      ctx.fillText("0", padL - 6, padT + plotH);
+    }
+
+    function refresh() {
+      renderReadout();
+      drawChart();
+    }
+
+    $("chaosSlider").addEventListener("input", () => {
+      $("chaosNum").value = $("chaosSlider").value;
+      refresh();
+    });
+    $("chaosNum").addEventListener("input", () => {
+      const s = $("chaosSlider");
+      const n = $("chaosNum");
+      const v = Math.max(0, parseFloat(n.value) || 0);
+      n.value = String(v);
+      const max = parseFloat(s.max);
+      s.value = String(Math.min(max, v));
+      refresh();
+    });
+    ["baseHp", "baseAtk", "chaosNum", "chaosMax", "expHpEarly", "expAtk", "lateFactor", "cutoff"].forEach((id) => {
+      $(id).addEventListener("input", refresh);
+    });
+
+    refresh();
+  </script>
+</body>
+</html>

@@ -251,13 +251,13 @@ fn pick_target(
 /// Summon damage = player damage (same calculation as skills: attack, crit, bonuses, frail, etc).
 /// Returns (damage, was_crit, was_overcrit).
 fn calculate_summon_damage(
-    commands: &mut Commands,
+    _commands: &mut Commands,
     game: &GameParam,
-    target: Entity,
+    _target: Entity,
     frail_stacks: u8,
 ) -> (i32, bool, bool) {
     let (damage, was_crit, was_overcrit) =
-        game.calculate_player_damage(commands, target, 0, None, 0, None, frail_stacks, 0);
+        game.calculate_player_damage(0, None, 0, None, frail_stacks, 0);
     (i32::max(1, damage as i32), was_crit, was_overcrit)
 }
 

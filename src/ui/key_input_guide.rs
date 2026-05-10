@@ -163,7 +163,7 @@ pub fn spawn_shrine_interact_key_guide(
                     .id();
                 let key_entity = if let Some(key) = guide.key.clone() {
                     let x_offset = if guide.text.is_some() {
-                        f32::round(guide.text.as_ref().unwrap().chars().count() as f32 * -2.7 - 4.)
+                        f32::round(guide.text.as_ref().unwrap().chars().count() as f32 * -4. - 12.)
                     } else {
                         0.
                     };

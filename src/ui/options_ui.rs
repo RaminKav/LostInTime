@@ -807,9 +807,22 @@ pub fn setup_options_ui(
         // );
         // commands.entity(restart_button).insert(OptionsUI);
 
-        // Exit to Menu button
+        // Bottom row (same Y as Back): Show Tutorial, Exit to Menu, Back — only during a run.
+        let tutorial_btn = crate::ui::main_menu::spawn_menu_button(
+            Vec3::new(0., -156., ui_helpers::Z_DEPTH_OPTIONS_CONTENT),
+            Vec3::new(-52., -1., 1.),
+            "Show Tutorial",
+            crate::ui::main_menu::MenuButton::ShowTutorial,
+            Vec2::new(118., 18.),
+            &mut commands,
+            &graphics,
+            &asset_server,
+            crate::ui::UIElement::AchievementsButton,
+        );
+        commands.entity(tutorial_btn).insert(OptionsUI);
+
         let exit_button = crate::ui::main_menu::spawn_menu_button(
-            Vec3::new(140., -156., ui_helpers::Z_DEPTH_OPTIONS_CONTENT),
+            Vec3::new(155., -156., ui_helpers::Z_DEPTH_OPTIONS_CONTENT),
             Vec3::new(-50., -1., 1.),
             "Exit to Menu",
             crate::ui::main_menu::MenuButton::OptionsExit,
@@ -824,7 +837,7 @@ pub fn setup_options_ui(
 
     // Back Button
     let back_button = spawn_back_button(
-        Vec3::new(240., -156., ui_helpers::Z_DEPTH_OPTIONS_CONTENT),
+        Vec3::new(255., -156., ui_helpers::Z_DEPTH_OPTIONS_CONTENT),
         &mut commands,
         &graphics,
         &asset_server,

@@ -182,16 +182,8 @@ fn check_melee_hit_collisions(
             };
 
             let frail_stacks = status_option.map(|s| s.frail_stacks()).unwrap_or(0);
-            let (mut damage, was_crit, was_overcrit) = game.calculate_player_damage(
-                &mut commands,
-                hit_entity,
-                0,
-                None,
-                0,
-                None,
-                frail_stacks,
-                0,
-            );
+            let (mut damage, was_crit, was_overcrit) =
+                game.calculate_player_damage(0, None, 0, None, frail_stacks, 0);
 
             let is_status_effected = status_option
                 .map(|s| s.is_burning() || s.is_slowed() || s.frail.is_some())
@@ -326,8 +318,6 @@ fn check_projectile_hit_mob_collisions(
                 0
             };
             let (mut damage, was_crit, was_overcrit) = game.calculate_player_damage(
-                &mut commands,
-                *e2,
                 crit_bonus,
                 None,
                 0,
@@ -526,8 +516,6 @@ fn check_multihit_projectile_ongoing_collisions(
                         };
 
                     let (mut damage, was_crit, was_overcrit) = game.calculate_player_damage(
-                        &mut commands,
-                        target_e,
                         crit_bonus,
                         None,
                         0,

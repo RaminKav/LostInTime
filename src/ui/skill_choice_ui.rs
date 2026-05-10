@@ -377,71 +377,69 @@ pub fn setup_skill_choice_ui(
         }
     }
 
-    let banish_enabled = run_unlocks.banishes_remaining > 0;
-    if banish_enabled {
-        for i in -1i32..2 {
-            let slot_index = (i + 1) as usize;
-            let translation = Vec3::new(
-                i as f32 * (SKILLS_CHOICE_UI_SIZE.x + 16.) + 4.,
-                -136.,
-                Z_DEPTH_HEIRLOOM_SKILL_CHOICE_CONTENT,
-            );
-            let mut banish_button = commands.spawn(SpriteBundle {
-                texture: graphics
-                    .get_ui_element_texture(UIElement::BackButton)
-                    .clone(),
-                sprite: Sprite {
-                    custom_size: Some(Vec2::new(48., 18.)),
-                    color: if banish_enabled {
-                        Color::WHITE
-                    } else {
-                        Color::rgb(0.5, 0.5, 0.5)
-                    },
-                    ..Default::default()
-                },
-                transform: Transform {
-                    translation,
-                    ..Default::default()
+    for i in -1i32..2 {
+        let slot_index = (i + 1) as usize;
+        let slot_ok =
+            choices_queue.banish_allowed_for_choice_slot(time_crystals.as_ref(), slot_index);
+        let banish_enabled = run_unlocks.banishes_remaining > 0 && slot_ok;
+        let translation = Vec3::new(
+            i as f32 * (SKILLS_CHOICE_UI_SIZE.x + 16.) + 4.,
+            -136.,
+            Z_DEPTH_HEIRLOOM_SKILL_CHOICE_CONTENT,
+        );
+        let mut banish_button = commands.spawn(SpriteBundle {
+            texture: graphics
+                .get_ui_element_texture(UIElement::BackButton)
+                .clone(),
+            sprite: Sprite {
+                custom_size: Some(Vec2::new(48., 18.)),
+                color: if banish_enabled {
+                    Color::WHITE
+                } else {
+                    Color::rgb(0.5, 0.5, 0.5)
                 },
                 ..Default::default()
-            });
-            let banish_entity = banish_button.id();
-            banish_button
-                .insert(RenderLayers::from_layers(&[3]))
-                .insert(UIState::Skills)
-                .insert(UIElement::BackButton)
-                .insert(BanishButton(slot_index))
-                .insert(Name::new(format!("BANISH BUTTON {slot_index}")));
-            if banish_enabled {
-                banish_button.insert(Interactable::default());
-            }
+            },
+            transform: Transform {
+                translation,
+                ..Default::default()
+            },
+            ..Default::default()
+        });
+        let banish_entity = banish_button.id();
+        banish_button
+            .insert(RenderLayers::from_layers(&[3]))
+            .insert(UIState::Skills)
+            .insert(UIElement::BackButton)
+            .insert(BanishButton(slot_index))
+            .insert(Interactable::default())
+            .insert(Name::new(format!("BANISH BUTTON {slot_index}")));
 
-            commands
-                .spawn((
-                    Text2dBundle {
-                        text: Text::from_section(
-                            "Banish ",
-                            gf::SKILL_CHOICE_MICRO.text_style(
-                                asset_server,
-                                if banish_enabled {
-                                    WHITE
-                                } else {
-                                    Color::rgb(0.7, 0.7, 0.7)
-                                },
-                            ),
-                        )
-                        .with_alignment(TextAlignment::Center),
-                        text_anchor: Anchor::Center,
-                        transform: Transform::from_translation(Vec3::new(2., 0., 1.)),
-                        ..Default::default()
-                    },
-                    RenderLayers::from_layers(&[3]),
-                    UIState::Skills,
-                    BanishButtonLabel(slot_index),
-                    Name::new(format!("BANISH BUTTON TEXT {slot_index}")),
-                ))
-                .set_parent(banish_entity);
-        }
+        commands
+            .spawn((
+                Text2dBundle {
+                    text: Text::from_section(
+                        "Banish ",
+                        gf::SKILL_CHOICE_MICRO.text_style(
+                            asset_server,
+                            if banish_enabled {
+                                WHITE
+                            } else {
+                                Color::rgb(0.7, 0.7, 0.7)
+                            },
+                        ),
+                    )
+                    .with_alignment(TextAlignment::Center),
+                    text_anchor: Anchor::Center,
+                    transform: Transform::from_translation(Vec3::new(2., 0., 1.)),
+                    ..Default::default()
+                },
+                RenderLayers::from_layers(&[3]),
+                UIState::Skills,
+                BanishButtonLabel(slot_index),
+                Name::new(format!("BANISH BUTTON TEXT {slot_index}")),
+            ))
+            .set_parent(banish_entity);
     }
 
     let tracker_root = commands

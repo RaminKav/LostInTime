@@ -2355,16 +2355,26 @@ pub fn setup_clock_hud(
         .insert(RenderLayers::from_layers(&[3]))
         .insert(ClockHUD)
         .id();
-    let text = spawn_text(
-        &mut commands,
-        &asset_server,
-        Vec3::new(10.5, -7., 1.),
-        BLACK,
-        format!("{}:00", night_tracker.get_hour()),
-        Anchor::CenterRight,
-        1.,
-        3,
-    );
+    let text = commands
+        .spawn(Text2dBundle {
+            text: Text::from_section(
+                format!("{}:00", night_tracker.get_hour()),
+                TextStyle {
+                    font: asset_server.load("fonts/slkscr.ttf"),
+                    font_size: 8.5,
+                    color: BLACK,
+                },
+            ),
+            transform: Transform {
+                translation: Vec3::new(10.5, -7., 1.),
+                ..Default::default()
+            },
+            text_anchor: Anchor::CenterRight,
+            ..Default::default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .id();
+
     commands
         .entity(text)
         .insert(ClockText)
