@@ -74,7 +74,7 @@ pub struct InputsPlugin;
 impl Plugin for InputsPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(CursorPos::default())
-            .init_resource::<AutoAttackState>()
+            .insert_resource(AutoAttackState::load())
             .register_type::<CursorPos>()
             .add_event::<BounceEvent>()
             // .add_plugin(ResourceInspectorPlugin::<CursorPos>::default())
@@ -93,7 +93,6 @@ impl Plugin for InputsPlugin {
                 (
                     player_move_inputs.run_if(is_not_paused),
                     turn_player.run_if(is_not_paused),
-                    toggle_auto_attack.run_if(is_not_paused),
                     mouse_click_system.run_if(is_not_paused).after(CustomFlush),
                     dispatch_active_skill_events.run_if(is_not_paused),
                     handle_hotbar_consume_keys.run_if(is_not_paused),
@@ -119,8 +118,43 @@ impl Plugin for InputsPlugin {
     }
 }
 
-#[derive(Resource, Debug, Default)]
+#[derive(Resource, Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
 pub struct AutoAttackState(pub bool);
+
+impl Default for AutoAttackState {
+    fn default() -> Self {
+        Self(true)
+    }
+}
+
+impl AutoAttackState {
+    pub fn load() -> Self {
+        let path = crate::datafiles::game_data();
+        if let Ok(file) = std::fs::File::open(&path) {
+            let reader = std::io::BufReader::new(file);
+            if let Ok(game_data) = crate::client::GameData::try_from_json_reader(reader) {
+                return game_data.auto_attack.unwrap_or_default();
+            }
+        }
+        Self::default()
+    }
+
+    pub fn save(&self) {
+        let path = crate::datafiles::game_data();
+        let mut game_data = if let Ok(file) = std::fs::File::open(&path) {
+            let reader = std::io::BufReader::new(file);
+            crate::client::GameData::try_from_json_reader(reader).unwrap_or_default()
+        } else {
+            crate::client::GameData::default()
+        };
+
+        game_data.auto_attack = Some(*self);
+
+        if let Ok(file) = std::fs::File::create(&path) {
+            let _ = serde_json::to_writer_pretty(file, &game_data);
+        }
+    }
+}
 
 #[derive(Component, Debug, Default)]
 pub struct MovementVector(pub Vec2);
@@ -828,22 +862,6 @@ pub fn diagnostics(
         debug!("Spawner Count: {:?}", spawners.spawners.iter().count());
     }
 }
-pub fn toggle_auto_attack(
-    key_input: Res<Input<KeyCode>>,
-    mouse_input: Res<Input<MouseButton>>,
-    keybinds: Res<InputMappings>,
-    mut auto_attack: ResMut<AutoAttackState>,
-    ui_state: Res<State<UIState>>,
-) {
-    if ui_state.0 != UIState::Closed {
-        return;
-    }
-    if keybinds.check_auto_attack_toggle_input(&key_input, &mouse_input) {
-        auto_attack.0 = !auto_attack.0;
-        info!("Auto Attack: {}", if auto_attack.0 { "ON" } else { "OFF" });
-    }
-}
-
 pub fn mouse_click_system(
     mut commands: Commands,
     mouse_button_input: Res<Input<MouseButton>>,

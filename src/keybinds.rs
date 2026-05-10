@@ -5,9 +5,6 @@ use std::io::BufReader;
 
 use crate::datafiles;
 
-fn default_auto_attack_toggle() -> InputBinding {
-    InputBinding::KeyBinding(KeyCode::T)
-}
 fn default_hotbar_slot_0() -> InputBinding {
     InputBinding::KeyBinding(KeyCode::Key1)
 }
@@ -30,8 +27,6 @@ pub struct InputMappings {
     pub active_skill_slot_4: InputBinding, // Bonus slot from blessings
     pub inventory: InputBinding,
     pub minimap: InputBinding,
-    #[serde(default = "default_auto_attack_toggle")]
-    pub auto_attack_toggle: InputBinding,
     /// Keys that consume / use the item currently sitting in hotbar slot 0..=3.
     /// Driven by `handle_hotbar_consume_keys` — pressing runs the slot item's
     /// `ItemActions`, no "selection" is performed.
@@ -55,13 +50,12 @@ impl Default for InputMappings {
     fn default() -> Self {
         Self {
             active_skill_slot_0: InputBinding::KeyBinding(KeyCode::Space),
-            active_skill_slot_1: InputBinding::MouseBinding(MouseButton::Right),
-            active_skill_slot_2: InputBinding::KeyBinding(KeyCode::LShift),
-            active_skill_slot_3: InputBinding::KeyBinding(KeyCode::Q),
+            active_skill_slot_1: InputBinding::MouseBinding(MouseButton::Left),
+            active_skill_slot_2: InputBinding::MouseBinding(MouseButton::Right),
+            active_skill_slot_3: InputBinding::KeyBinding(KeyCode::LShift),
             active_skill_slot_4: InputBinding::KeyBinding(KeyCode::E), // Bonus slot
             inventory: InputBinding::KeyBinding(KeyCode::Tab),
-            minimap: InputBinding::KeyBinding(KeyCode::M),
-            auto_attack_toggle: InputBinding::KeyBinding(KeyCode::T),
+            minimap: InputBinding::KeyBinding(KeyCode::C),
             hotbar_slot_0: InputBinding::KeyBinding(KeyCode::Key1),
             hotbar_slot_1: InputBinding::KeyBinding(KeyCode::Key2),
             hotbar_slot_2: InputBinding::KeyBinding(KeyCode::Key3),
@@ -139,26 +133,6 @@ impl InputMappings {
 
     pub fn set_minimap_key(&mut self, key: InputBinding) {
         self.minimap = key;
-    }
-
-    pub fn get_auto_attack_toggle_key(&self) -> InputBinding {
-        self.auto_attack_toggle
-    }
-
-    pub fn set_auto_attack_toggle_key(&mut self, key: InputBinding) {
-        self.auto_attack_toggle = key;
-    }
-
-    pub fn check_auto_attack_toggle_input(
-        &self,
-        keys: &Res<Input<KeyCode>>,
-        mouse: &Res<Input<MouseButton>>,
-    ) -> bool {
-        let input = self.get_auto_attack_toggle_key();
-        match input {
-            InputBinding::KeyBinding(key) => keys.just_pressed(key),
-            InputBinding::MouseBinding(button) => mouse.just_pressed(button),
-        }
     }
 
     /// Returns the binding that consumes/uses the item in hotbar slot `slot` (0..=3).

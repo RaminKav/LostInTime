@@ -27,10 +27,11 @@ use crate::{
     colors::{DARK_GREEN, RED},
     cursor::CursorPos,
     inventory::{
-        sort_main_inventory, Inventory, InventoryItemStack, InventoryShiftClickSource, ItemStack,
-        MaterialDropsToggleButton, MaterialDropsToggleXOverlay, ShiftQuickEquipResult,
-        SortInventoryButton, SuppressNonMobBreakDrops, shift_move_equipped_slot_to_main_items,
-        try_shift_quick_equip_from_inventory_source,
+        shift_move_equipped_slot_to_main_items, sort_main_inventory,
+        try_shift_quick_equip_from_inventory_source, Inventory, InventoryItemStack,
+        InventoryShiftClickSource, ItemStack, MaterialDropsToggleButton,
+        MaterialDropsToggleXOverlay, ShiftQuickEquipResult, SortInventoryButton,
+        SuppressNonMobBreakDrops,
     },
     item::{heirloom_shrine::HeirloomShrineState, CraftedItemEvent, EquipmentType},
     pets::state::Pet,
@@ -58,9 +59,8 @@ use super::{
     crafting_ui::CraftingContainer, scrapper_ui::ScrapperContainer, spawn_item_stack_icon,
     spawn_skill_choice_flash, stats_ui::StatsButtonState, ui_helpers, BanishButton, ChestContainer,
     EssenceOption, InfoModal, InventorySlotState, InventorySlotType, MenuButton,
-    MenuButtonClickEvent, RerollDice,
-    ShowInvPlayerStatsEvent, SkillChoiceUI, SubmitEssenceChoice, ToolTipUpdateEvent,
-    TooltipTeardownEvent, UIContainersParam, UIState, SKILLS_CHOICE_UI_SIZE,
+    MenuButtonClickEvent, RerollDice, ShowInvPlayerStatsEvent, SkillChoiceUI, SubmitEssenceChoice,
+    ToolTipUpdateEvent, TooltipTeardownEvent, UIContainersParam, UIState, SKILLS_CHOICE_UI_SIZE,
 };
 
 #[derive(
@@ -830,10 +830,7 @@ pub fn handle_interaction_clicks(
     dragging_query: Query<&DraggedItem>,
     graphics: Res<Graphics>,
     asset_server: Res<AssetServer>,
-    mut inv_and_pet: ParamSet<(
-        Query<&mut Inventory>,
-        Query<(), With<Pet>>,
-    )>,
+    mut inv_and_pet: ParamSet<(Query<&mut Inventory>, Query<(), With<Pet>>)>,
     mut inv_slot_events: InvSlotInteractionEvents,
     mut container_param: UIContainersParam,
     proto: ProtoParam,
@@ -1028,10 +1025,11 @@ pub fn handle_interaction_clicks(
                                 let from_slot = state.slot_index;
                                 let furnace_item = inv.furnace_items.items[from_slot].take();
                                 if let Some(mut moved_item) = furnace_item {
-                                    let empty_slot = inv.items.get_first_empty_player_slot_for_pickup(
-                                        &moved_item.item_stack,
-                                        &proto,
-                                    );
+                                    let empty_slot =
+                                        inv.items.get_first_empty_player_slot_for_pickup(
+                                            &moved_item.item_stack,
+                                            &proto,
+                                        );
                                     if let Some(empty_slot) = empty_slot {
                                         moved_item.slot = empty_slot;
                                         inv.items.items[empty_slot] = Some(moved_item);
@@ -1050,9 +1048,7 @@ pub fn handle_interaction_clicks(
                         if let Some(active_container) =
                             container_param.get_active_ui_container_mut()
                         {
-                            if state.r#type.is_inventory()
-                                || state.r#type.is_crafting_input()
-                            {
+                            if state.r#type.is_inventory() || state.r#type.is_crafting_input() {
                                 if state.r#type.is_crafting_input() {
                                     inv.crafting_inputs_items.move_item_to_target_container(
                                         active_container,

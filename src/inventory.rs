@@ -29,7 +29,7 @@ pub const INVENTORY_SIZE: usize = 8 * 4;
 /// First this many `Inventory::items` indices are the quickbar (keys 1–4 + two extra storage slots).
 pub const INVENTORY_HOTBAR_SLOTS: usize = 4;
 /// Keyed row (`0..INVENTORY_HOTBAR_SLOTS`) plus two passive cells (`4` and `5`); consumables only.
-pub const INVENTORY_HOTBAR_BAND_SLOTS: usize = 6;
+pub const INVENTORY_HOTBAR_BAND_SLOTS: usize = 4;
 pub const MAX_STACK_SIZE: usize = 9999;
 
 #[derive(Component, Debug, Default, Clone, Serialize, Deserialize)]

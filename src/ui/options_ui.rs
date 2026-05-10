@@ -6,6 +6,7 @@ use crate::{
     assets::Graphics,
     audio::{AudioSoundEffect, AudioVolume, SoundSpawner},
     cursor::CursorPos,
+    inputs::AutoAttackState,
     keybinds::InputMappings,
     ui::{
         interactions::Interaction, spawn_back_button, ui_helpers, Interactable, UIElement, UIState,
@@ -62,6 +63,7 @@ pub enum OptionsCheckboxType {
     HideAttackAnims,
     HideSkillAnims,
     HideHeirloomAnims,
+    AutoAttack,
 }
 
 #[derive(Component)]
@@ -92,7 +94,6 @@ pub enum KeyBindType {
     Hotbar(usize),
     Inventory,
     Minimap,
-    AutoAttackToggle,
 }
 
 #[derive(Component)]
@@ -217,9 +218,6 @@ pub fn handle_key_rebind_input(
                 }
                 KeyBindType::Inventory => keybinds.set_inventory_key(InputBinding::KeyBinding(key)),
                 KeyBindType::Minimap => keybinds.set_minimap_key(InputBinding::KeyBinding(key)),
-                KeyBindType::AutoAttackToggle => {
-                    keybinds.set_auto_attack_toggle_key(InputBinding::KeyBinding(key))
-                }
             }
             keybinds.save();
             commands.entity(entity).remove::<WaitingForKeyInput>();
@@ -248,9 +246,6 @@ pub fn handle_key_rebind_input(
                 }
                 KeyBindType::Minimap => {
                     keybinds.set_minimap_key(InputBinding::MouseBinding(mouse_button))
-                }
-                KeyBindType::AutoAttackToggle => {
-                    keybinds.set_auto_attack_toggle_key(InputBinding::MouseBinding(mouse_button))
                 }
             }
             keybinds.save();
@@ -296,7 +291,6 @@ pub fn update_keybind_text(
                 KeyBindType::Hotbar(slot) => keybinds.get_hotbar_key(slot),
                 KeyBindType::Inventory => keybinds.get_inventory_key(),
                 KeyBindType::Minimap => keybinds.get_minimap_key(),
-                KeyBindType::AutoAttackToggle => keybinds.get_auto_attack_toggle_key(),
             };
             text.sections[0].value = crate::keybinds::get_key_display_name(key);
             text.sections[0].style.color = crate::colors::WHITE;
@@ -319,6 +313,7 @@ pub fn setup_options_ui(
     game_state: Res<State<crate::GameState>>,
     cheat_settings: Res<CheatSettings>,
     audio_volume: Res<AudioVolume>,
+    auto_attack: Res<AutoAttackState>,
 ) {
     let overlay = ui_helpers::spawn_ui_overlay(
         &mut commands,
@@ -513,24 +508,25 @@ pub fn setup_options_ui(
         &keybinds,
     );
 
-    // Auto attack toggle keybind
+    // Auto attack toggle checkbox (not a keybind anymore)
     let auto_attack_y = minimap_y + row_spacing;
-    spawn_keybind_row(
+    spawn_options_checkbox(
         &mut commands,
         &graphics,
         &asset_server,
-        KeyBindType::AutoAttackToggle,
+        "Toggle Auto Attack:",
         Vec3::new(
             left_side_x + 2.,
             auto_attack_y,
             ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
         ),
         Vec3::new(
-            left_side_x + 160.,
-            auto_attack_y - 3.5,
+            left_side_x + 100.,
+            auto_attack_y + 0.5,
             ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
         ),
-        &keybinds,
+        OptionsCheckboxType::AutoAttack,
+        auto_attack.0,
     );
 
     // Cheats section
@@ -869,7 +865,6 @@ fn spawn_keybind_row(
         }
         KeyBindType::Inventory => ("Inventory:", keybinds.get_inventory_key()),
         KeyBindType::Minimap => ("Map:", keybinds.get_minimap_key()),
-        KeyBindType::AutoAttackToggle => ("Auto Attack:", keybinds.get_auto_attack_toggle_key()),
     };
 
     commands.spawn((
@@ -1032,6 +1027,7 @@ pub fn handle_cheat_checkbox_click(
         With<OptionsCheckbox>,
     >,
     mut cheat_settings: ResMut<CheatSettings>,
+    mut auto_attack: ResMut<AutoAttackState>,
     mut commands: Commands,
     graphics: Res<Graphics>,
 ) {
@@ -1151,6 +1147,18 @@ pub fn handle_cheat_checkbox_click(
                                     },
                                 )
                             }
+                            OptionsCheckboxType::AutoAttack => {
+                                auto_attack.0 = !auto_attack.0;
+                                auto_attack.save();
+                                (
+                                    auto_attack.0,
+                                    if auto_attack.0 {
+                                        UIElement::CheckBoxSelected
+                                    } else {
+                                        UIElement::CheckBox
+                                    },
+                                )
+                            }
                         };
                         *texture = graphics.get_ui_element_texture(checkbox_ui).clone();
                         commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.2));
@@ -1171,10 +1179,11 @@ pub fn handle_cheat_checkbox_click(
 
 pub fn update_cheat_checkbox_visual(
     cheat_settings: Res<CheatSettings>,
+    auto_attack: Res<AutoAttackState>,
     mut checkboxes: Query<(&OptionsCheckbox, &mut Handle<Image>)>,
     graphics: Res<Graphics>,
 ) {
-    if !cheat_settings.is_changed() {
+    if !cheat_settings.is_changed() && !auto_attack.is_changed() {
         return;
     }
 
@@ -1238,6 +1247,13 @@ pub fn update_cheat_checkbox_visual(
             }
             OptionsCheckboxType::HideHeirloomAnims => {
                 if cheat_settings.hide_heirloom_anims {
+                    UIElement::CheckBoxSelected
+                } else {
+                    UIElement::CheckBox
+                }
+            }
+            OptionsCheckboxType::AutoAttack => {
+                if auto_attack.0 {
                     UIElement::CheckBoxSelected
                 } else {
                     UIElement::CheckBox
