@@ -24,7 +24,7 @@ use crate::{
         score::HighScores,
         skills::{HeirloomChoiceQueue, PlayerClass, SkillClass},
         time_crystals::TimeCrystals,
-        unlocks::{persist_unlock_data, RunUnlockState, UnlockUpgrades},
+        unlocks::{persist_unlock_data, RunUnlockState, UnlockUpgrades, UnlockedSkills},
         ClassUnlockData, UnlockedClasses,
     },
     ui::{
@@ -116,6 +116,42 @@ pub enum ClassUnlockConfirmButton {
     No,
 }
 
+/// Marker on the locked-skill backing sprite. Clicking it opens the skill
+/// unlock confirm popup. Tracks the class and slot index this entry represents.
+#[derive(Component, Debug, Clone)]
+pub struct LockedSkillSlot {
+    pub class: SkillClass,
+    pub slot_index: usize,
+    pub cost: u32,
+}
+
+/// Marks any entity that belongs to the rendering of a class skill row in the
+/// preview panel. Despawned/respawned together when `unlocked_skills` changes
+/// so we can rebuild locked vs. unlocked visuals atomically.
+#[derive(Component)]
+pub struct ClassPreviewSkillEntry;
+
+#[derive(Resource, Default, Debug, Clone)]
+pub struct SkillUnlockConfirmState {
+    pub active: bool,
+    pub class: Option<SkillClass>,
+    pub slot_index: usize,
+    pub cost: u32,
+    pub anchor_position: Vec3,
+}
+
+#[derive(Component)]
+pub struct SkillUnlockConfirmPanel;
+
+#[derive(Component)]
+pub struct SkillUnlockConfirmText;
+
+#[derive(Component)]
+pub enum SkillUnlockConfirmButton {
+    Yes,
+    No,
+}
+
 #[derive(Component)]
 pub struct ClassInfoCard;
 
@@ -174,6 +210,7 @@ pub fn setup_class_selection_ui(
     high_scores: Option<Res<HighScores>>,
     achievements: Option<Res<Achievements>>,
     unlocked_classes: Res<UnlockedClasses>,
+    unlocked_skills: Res<UnlockedSkills>,
     unlock_currency: Option<Res<TimeFragmentCurrency>>,
     _class_unlocks: Option<Res<ClassUnlockData>>,
     cheat_settings: Res<CheatSettings>,
@@ -249,6 +286,7 @@ pub fn setup_class_selection_ui(
         .id();
     spawn_class_unlock_info_ui(&mut commands, &asset_server);
     spawn_class_unlock_confirm_ui(&mut commands, &asset_server);
+    spawn_skill_unlock_confirm_ui(&mut commands, &asset_server);
 
     // Title
     let title_text = commands
@@ -582,6 +620,8 @@ pub fn setup_class_selection_ui(
         &graphics,
         &class_ranks,
         high_scores.as_ref(),
+        &unlocked_skills,
+        cheat_settings.bypass_class_unlocks,
     );
 
     // No pet preview by default - wait for player selection
@@ -769,6 +809,199 @@ fn spawn_class_unlock_confirm_ui(commands: &mut Commands, asset_server: &AssetSe
     commands.entity(text_entity).set_parent(panel_entity);
 
     // Don't spawn buttons here - they'll be spawned/despawned dynamically in update_class_unlock_confirm_panel
+}
+
+/// Renders a locked-skill placeholder inside the given `parent` skill container
+/// of the class preview. Mimics the `time_crystals_browser_ui` lock styling: a
+fn spawn_locked_skill_content(
+    commands: &mut Commands,
+    asset_server: &AssetServer,
+    parent: Entity,
+    class: SkillClass,
+    slot_index: usize,
+) {
+    const ICONS_X_OFFSET: f32 = -24.;
+    const TITLE_Y: f32 = 20.;
+    const DESC_TEXT_X: f32 = ICONS_X_OFFSET + 12.;
+    const TEXT_Y_OFFSET: f32 = 10.;
+    /// Matches [`UIElement::SkillTooltipBanner`] width used with skill tooltips.
+    const ROW_HIT_W: f32 = 236.;
+    const ROW_HIT_H: f32 = 56.;
+    /// Centers the hit rect over icon + title + body (aligned with shrine skill rows).
+    const ROW_HIT_POS: Vec3 = Vec3::new(70., -4., -12.);
+
+    let cost = UnlockedSkills::cost_for_slot(slot_index);
+    let ordinal = match slot_index {
+        2 => "3rd",
+        3 => "4th",
+        n => return_ordinal(n),
+    };
+
+    commands
+        .spawn((
+            SpriteBundle {
+                sprite: Sprite {
+                    color: Color::rgba(0., 0., 0., 0.),
+                    custom_size: Some(Vec2::new(ROW_HIT_W, ROW_HIT_H)),
+                    ..Default::default()
+                },
+                transform: Transform::from_translation(ROW_HIT_POS),
+                ..Default::default()
+            },
+            RenderLayers::from_layers(&[3]),
+            Interactable::default(),
+            LockedSkillSlot {
+                class: class.clone(),
+                slot_index,
+                cost,
+            },
+            ClassPreviewSkillEntry,
+            Name::new("LOCKED SKILL ROW HIT"),
+        ))
+        .set_parent(parent);
+
+    let icon_bg = commands
+        .spawn((
+            SpriteBundle {
+                sprite: Sprite {
+                    color: Color::rgba(0.08, 0.08, 0.1, 0.85),
+                    custom_size: Some(Vec2::new(20., 20.)),
+                    ..Default::default()
+                },
+                transform: Transform::from_translation(Vec3::new(ICONS_X_OFFSET, 0., 2.)),
+                ..Default::default()
+            },
+            RenderLayers::from_layers(&[3]),
+            ClassPreviewSkillEntry,
+            Name::new("LOCKED SKILL ICON"),
+        ))
+        .set_parent(parent)
+        .id();
+
+    commands
+        .spawn((
+            Text2dBundle {
+                text: Text::from_section(
+                    "?",
+                    TextStyle {
+                        font: asset_server.load("fonts/alagard.ttf"),
+                        font_size: 15.0,
+                        color: WHITE,
+                    },
+                ),
+                text_anchor: Anchor::Center,
+                transform: Transform::from_translation(Vec3::new(1., 0., 1.)),
+                ..Default::default()
+            },
+            RenderLayers::from_layers(&[3]),
+            ClassPreviewSkillEntry,
+            Name::new("LOCKED SKILL ICON ?"),
+        ))
+        .set_parent(icon_bg);
+
+    commands
+        .spawn((
+            Text2dBundle {
+                text: Text::from_section(
+                    "???",
+                    TextStyle {
+                        font: asset_server.load("fonts/slkscrbold.ttf"),
+                        font_size: 8.5,
+                        color: DARK_WOOD_BROWN,
+                    },
+                )
+                .with_alignment(TextAlignment::Left),
+                text_anchor: Anchor::TopLeft,
+                transform: Transform::from_translation(Vec3::new(DESC_TEXT_X, TITLE_Y, 2.)),
+                ..Default::default()
+            },
+            RenderLayers::from_layers(&[3]),
+            ClassPreviewSkillEntry,
+            Name::new("LOCKED SKILL TITLE"),
+        ))
+        .set_parent(parent);
+
+    commands
+        .spawn((
+            Text2dBundle {
+                text: Text::from_section(
+                    format!("Unlock {} Skill for {} Time\nFragments", ordinal, cost),
+                    TextStyle {
+                        font: asset_server.load(BODY_FONT),
+                        font_size: BODY_FONT_SIZE,
+                        color: DARK_WOOD_BROWN,
+                    },
+                )
+                .with_alignment(TextAlignment::Left),
+                text_anchor: Anchor::TopLeft,
+                transform: Transform::from_translation(Vec3::new(
+                    DESC_TEXT_X,
+                    TEXT_Y_OFFSET - 2.,
+                    2.,
+                )),
+                ..Default::default()
+            },
+            RenderLayers::from_layers(&[3]),
+            ClassPreviewSkillEntry,
+            Name::new("LOCKED SKILL DESC"),
+        ))
+        .set_parent(parent);
+}
+
+fn return_ordinal(n: usize) -> &'static str {
+    // Fallback, not expected to be hit since only slots 2/3 are lockable.
+    match n {
+        0 => "1st",
+        1 => "2nd",
+        _ => "Nth",
+    }
+}
+
+fn spawn_skill_unlock_confirm_ui(commands: &mut Commands, asset_server: &AssetServer) {
+    let panel_entity = commands
+        .spawn((
+            SpriteBundle {
+                sprite: Sprite {
+                    color: Color::rgba(0.05, 0.05, 0.05, 0.99),
+                    custom_size: Some(Vec2::new(140., 70.)),
+                    ..Default::default()
+                },
+                transform: Transform::from_translation(Vec3::new(0., 0., 30.)),
+                visibility: Visibility::Hidden,
+                ..Default::default()
+            },
+            UIState::ClassSelection,
+            ClassSelectionUI,
+            SkillUnlockConfirmPanel,
+            RenderLayers::from_layers(&[3]),
+            Name::new("Skill Unlock Confirm Panel"),
+        ))
+        .id();
+
+    let text_entity = commands
+        .spawn((
+            Text2dBundle {
+                text: Text::from_section(
+                    "",
+                    TextStyle {
+                        font: asset_server.load(BODY_FONT),
+                        font_size: BODY_FONT_SIZE,
+                        color: Color::WHITE,
+                    },
+                )
+                .with_alignment(TextAlignment::Center),
+                text_anchor: Anchor::Center,
+                transform: Transform::from_translation(Vec3::new(0., 10., 1.)),
+                ..Default::default()
+            },
+            RenderLayers::from_layers(&[3]),
+            SkillUnlockConfirmText,
+            UIState::ClassSelection,
+            ClassSelectionUI,
+            Name::new("Skill Unlock Confirm Text"),
+        ))
+        .id();
+    commands.entity(text_entity).set_parent(panel_entity);
 }
 
 pub fn handle_class_selection(
@@ -1200,6 +1433,211 @@ pub fn update_class_unlock_confirm_panel(
     }
 }
 
+/// Detects clicks on `LockedSkillSlot` backings in the class preview and opens
+/// the skill unlock confirm popup at the slot's position. Mirrors the
+/// `handle_class_selection` flow for class unlocks but operates on skill rows.
+pub fn handle_locked_skill_selection(
+    cursor_pos: Res<CursorPos>,
+    mouse_input: Res<Input<MouseButton>>,
+    ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
+    mut locked_slots: Query<(
+        Entity,
+        &mut Interactable,
+        &LockedSkillSlot,
+        &GlobalTransform,
+    )>,
+    unlock_currency: Option<Res<TimeFragmentCurrency>>,
+    mut confirm_state: ResMut<SkillUnlockConfirmState>,
+    class_confirm_state: Res<ClassUnlockConfirmState>,
+    mut commands: Commands,
+) {
+    if class_confirm_state.active {
+        return;
+    }
+    let hit_test = super::ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
+
+    for (entity, mut interactable, locked, transform) in locked_slots.iter_mut() {
+        match hit_test {
+            Some(hit) if hit.0 == entity => match interactable.current() {
+                Interaction::None => {
+                    interactable.change(Interaction::Hovering);
+                    commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonHover, 0.05));
+                }
+                Interaction::Hovering => {
+                    if left_mouse_pressed && !confirm_state.active {
+                        let can_afford = unlock_currency
+                            .as_ref()
+                            .map(|c| c.can_spend(locked.cost))
+                            .unwrap_or(false);
+                        if can_afford {
+                            confirm_state.active = true;
+                            confirm_state.class = Some(locked.class.clone());
+                            confirm_state.slot_index = locked.slot_index;
+                            confirm_state.cost = locked.cost;
+                            confirm_state.anchor_position = transform.translation();
+                            commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.2));
+                        }
+                    }
+                }
+                _ => {}
+            },
+            _ => {
+                if matches!(interactable.current(), Interaction::Hovering) {
+                    interactable.change(Interaction::None);
+                }
+            }
+        }
+    }
+}
+
+/// Updates the skill unlock confirm popup: positions it next to the clicked
+/// slot, updates body text, and spawns/despawns Yes/No buttons mirroring
+/// `update_class_unlock_confirm_panel` for class unlocks.
+pub fn update_skill_unlock_confirm_panel(
+    confirm_state: Res<SkillUnlockConfirmState>,
+    graphics: Res<Graphics>,
+    asset_server: Res<AssetServer>,
+    mut commands: Commands,
+    mut param_set: ParamSet<(
+        Query<(Entity, &mut Transform), With<SkillUnlockConfirmPanel>>,
+        Query<Entity, With<SkillUnlockConfirmButton>>,
+    )>,
+    mut text_query: Query<&mut Text, With<SkillUnlockConfirmText>>,
+    mut panel_vis_query: Query<&mut Visibility, With<SkillUnlockConfirmPanel>>,
+) {
+    let active = confirm_state.active;
+
+    if let Ok(mut panel_vis) = panel_vis_query.get_single_mut() {
+        *panel_vis = if active {
+            Visibility::Visible
+        } else {
+            Visibility::Hidden
+        };
+    }
+
+    let panel_entity = if let Ok((e, mut transform)) = param_set.p0().get_single_mut() {
+        if active {
+            transform.translation = Vec3::new(
+                confirm_state.anchor_position.x + 80.,
+                confirm_state.anchor_position.y,
+                30.,
+            );
+        }
+        Some(e)
+    } else {
+        None
+    };
+
+    if !active {
+        let button_query = param_set.p1();
+        for button_entity in button_query.iter() {
+            commands.entity(button_entity).despawn_recursive();
+        }
+        return;
+    }
+
+    let button_query = param_set.p1();
+    let button_count = button_query.iter().count();
+    if button_count == 0 {
+        if let Some(panel) = panel_entity {
+            let button_font = asset_server.load("fonts/alagard.ttf");
+
+            let yes_button = commands
+                .spawn((
+                    SpriteBundle {
+                        texture: graphics.get_ui_element_texture(UIElement::BackButton),
+                        sprite: Sprite {
+                            custom_size: Some(Vec2::new(48., 18.)),
+                            ..Default::default()
+                        },
+                        transform: Transform::from_translation(Vec3::new(28., -20., 1.)),
+                        ..Default::default()
+                    },
+                    RenderLayers::from_layers(&[3]),
+                    SkillUnlockConfirmButton::Yes,
+                    Interactable::default(),
+                    MenuButton::SkillUnlockYes,
+                    UIElement::BackButton,
+                    UIState::ClassSelection,
+                    ClassSelectionUI,
+                    Name::new("SKILL UNLOCK YES BUTTON"),
+                ))
+                .id();
+            let no_button = commands
+                .spawn((
+                    SpriteBundle {
+                        texture: graphics.get_ui_element_texture(UIElement::BackButton),
+                        sprite: Sprite {
+                            custom_size: Some(Vec2::new(48., 18.)),
+                            ..Default::default()
+                        },
+                        transform: Transform::from_translation(Vec3::new(-30., -20., 1.)),
+                        ..Default::default()
+                    },
+                    RenderLayers::from_layers(&[3]),
+                    SkillUnlockConfirmButton::No,
+                    Interactable::default(),
+                    MenuButton::SkillUnlockNo,
+                    UIElement::BackButton,
+                    UIState::ClassSelection,
+                    ClassSelectionUI,
+                    Name::new("SKILL UNLOCK NO BUTTON"),
+                ))
+                .id();
+            commands.entity(yes_button).set_parent(panel);
+            commands.entity(no_button).set_parent(panel);
+
+            commands
+                .spawn(Text2dBundle {
+                    text: Text::from_section(
+                        "Yes",
+                        TextStyle {
+                            font: button_font.clone(),
+                            font_size: 15.0,
+                            color: WHITE,
+                        },
+                    )
+                    .with_alignment(TextAlignment::Center),
+                    text_anchor: Anchor::Center,
+                    transform: Transform::from_translation(Vec3::new(0., -1., 1.)),
+                    ..Default::default()
+                })
+                .insert(RenderLayers::from_layers(&[3]))
+                .set_parent(yes_button);
+            commands
+                .spawn(Text2dBundle {
+                    text: Text::from_section(
+                        "No",
+                        TextStyle {
+                            font: button_font,
+                            font_size: 15.0,
+                            color: WHITE,
+                        },
+                    )
+                    .with_alignment(TextAlignment::Center),
+                    text_anchor: Anchor::Center,
+                    transform: Transform::from_translation(Vec3::new(0., -1., 1.)),
+                    ..Default::default()
+                })
+                .insert(RenderLayers::from_layers(&[3]))
+                .set_parent(no_button);
+        }
+    }
+
+    if let Ok(mut text) = text_query.get_single_mut() {
+        let ordinal = match confirm_state.slot_index {
+            2 => "3rd",
+            3 => "4th",
+            _ => "Nth",
+        };
+        text.sections[0].value = format!(
+            "Unlock {} Skill\n\n\nfor {} Time Fragments?",
+            ordinal, confirm_state.cost
+        );
+    }
+}
+
 pub fn persist_class_unlock_state(
     time_fragment_currency: Option<&TimeFragmentCurrency>,
     unlocked_classes: &UnlockedClasses,
@@ -1211,6 +1649,7 @@ pub fn persist_class_unlock_state(
         Some(unlocked_classes),
         achievements,
         unlock_upgrades,
+        None,
     );
 }
 
@@ -1222,6 +1661,8 @@ fn spawn_player_preview(
     graphics: &Res<Graphics>,
     class_ranks: &Res<ClassRankSystem>,
     high_scores: Option<&Res<HighScores>>,
+    unlocked_skills: &UnlockedSkills,
+    bypass_unlocks: bool,
 ) -> Entity {
     let ICONS_X_OFFSET = -24.;
     // let SKILL_X_OFFSET = -20.;
@@ -1524,25 +1965,37 @@ fn spawn_player_preview(
                 ..Default::default()
             }))
             .insert(RenderLayers::from_layers(&[3]))
+            .insert(ClassPreviewSkillEntry)
             .insert(Name::new(format!("SKILL CONTAINER {}", skill_index)))
             .set_parent(player_container)
             .id();
 
-        // Use the shared helper function to spawn skill content
-        spawn_skill_tooltip_content(
-            commands,
-            graphics,
-            asset_server,
-            active_skill.clone(),
-            None,
-            skill_container,
-            1.,
-            100,
-            100,
-            0.6,
-            10,
-            0,
-        );
+        let is_unlocked =
+            bypass_unlocks || unlocked_skills.is_unlocked(selected_class, skill_index);
+        if is_unlocked {
+            spawn_skill_tooltip_content(
+                commands,
+                graphics,
+                asset_server,
+                active_skill.clone(),
+                None,
+                skill_container,
+                1.,
+                100,
+                100,
+                0.6,
+                10,
+                0,
+            );
+        } else {
+            spawn_locked_skill_content(
+                commands,
+                asset_server,
+                skill_container,
+                selected_class.clone(),
+                skill_index,
+            );
+        }
     }
 
     player_container
@@ -1755,8 +2208,10 @@ pub fn update_preview_sprites(
     graphics: Res<Graphics>,
     class_ranks: Res<ClassRankSystem>,
     high_scores: Option<Res<HighScores>>,
+    unlocked_skills: Res<UnlockedSkills>,
+    cheat_settings: Res<CheatSettings>,
 ) {
-    if !selection_state.is_changed() {
+    if !selection_state.is_changed() && !unlocked_skills.is_changed() {
         return;
     }
 
@@ -1781,6 +2236,8 @@ pub fn update_preview_sprites(
             &graphics,
             &class_ranks,
             high_scores.as_ref(),
+            &unlocked_skills,
+            cheat_settings.bypass_class_unlocks,
         );
     }
 

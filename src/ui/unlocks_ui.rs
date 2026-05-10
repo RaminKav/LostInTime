@@ -148,6 +148,7 @@ pub fn handle_unlocks_clicks(
                                 Some(&*unlocked_classes),
                                 Some(&*achievements),
                                 Some(&*upgrades),
+                                None,
                             );
                         }
                         interactable.change(Interaction::None);

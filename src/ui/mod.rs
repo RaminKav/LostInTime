@@ -8,7 +8,7 @@ mod loading_screen;
 pub mod scrapper_ui;
 pub mod screen_effects;
 use class_selection::*;
-use class_selection::{ClassUnlockConfirmState, ClassUnlockHoverState};
+use class_selection::{ClassUnlockConfirmState, ClassUnlockHoverState, SkillUnlockConfirmState};
 use guide_hud::*;
 use item_chest::*;
 pub mod ui_container_param;
@@ -300,6 +300,7 @@ impl Plugin for UIPlugin {
             .insert_resource(ClassSelectionState::default())
             .init_resource::<ClassUnlockHoverState>()
             .init_resource::<ClassUnlockConfirmState>()
+            .init_resource::<SkillUnlockConfirmState>()
             .init_resource::<CheatSettings>()
             .insert_resource(RunUnlockState::default())
             .init_resource::<AchievementsPagination>()
@@ -871,6 +872,8 @@ impl Plugin for UIPlugin {
                 update_unlock_currency_text.run_if(in_state(UIState::ClassSelection)),
                 update_class_unlock_panel.run_if(in_state(UIState::ClassSelection)),
                 update_class_unlock_confirm_panel.run_if(in_state(UIState::ClassSelection)),
+                handle_locked_skill_selection.run_if(in_state(UIState::ClassSelection)),
+                update_skill_unlock_confirm_panel.run_if(in_state(UIState::ClassSelection)),
                 handle_portal_animation.run_if(in_state(UIState::ClassSelection)),
             ))
             .add_system(init_goal_state.run_if(run_once_per_run()).in_schedule(OnEnter(GameState::Main)))

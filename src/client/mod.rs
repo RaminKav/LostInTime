@@ -46,7 +46,7 @@ use crate::{
             LastRunCrystalProgress, TimeCrystals, SCORE_SHARD_THRESHOLDS,
             SURVIVAL_SHARD_THRESHOLD_SECONDS,
         },
-        unlocks::{UnlockUpgrades, UnlockedClasses},
+        unlocks::{UnlockUpgrades, UnlockedClasses, UnlockedSkills},
         Player,
     },
     ui::{
@@ -228,6 +228,8 @@ pub struct GameData {
     #[serde(default)]
     pub unlock_upgrades: UnlockUpgrades,
     #[serde(default)]
+    pub unlocked_skills: UnlockedSkills,
+    #[serde(default)]
     pub cumulative_analytics: Option<AnalyticsData>,
     #[serde(default)]
     pub keybindings: Option<crate::keybinds::InputMappings>,
@@ -270,6 +272,7 @@ pub fn handle_append_run_data_after_death(
     achievements: ResMut<Achievements>,
     unlocked_classes: Option<Res<UnlockedClasses>>,
     unlock_upgrades: Option<Res<UnlockUpgrades>>,
+    unlocked_skills: Option<Res<UnlockedSkills>>,
     bounce_tracker: Res<crate::player::achievements::BounceAchievementTracker>,
     run_timer: Res<RunTimer>,
     boss_kill_tracker: Option<Res<BossKillTracker>>,
@@ -401,6 +404,9 @@ pub fn handle_append_run_data_after_death(
         }
         if let Some(upgrades) = unlock_upgrades.as_ref() {
             game_data.unlock_upgrades = upgrades.as_ref().clone();
+        }
+        if let Some(skills) = unlocked_skills.as_ref() {
+            game_data.unlocked_skills = skills.as_ref().clone();
         }
 
         // Save bounce tracker

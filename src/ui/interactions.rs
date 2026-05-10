@@ -1931,6 +1931,8 @@ pub fn handle_cursor_main_menu_buttons(
                 | MenuButton::Begin
                 | MenuButton::ClassUnlockYes
                 | MenuButton::ClassUnlockNo
+                | MenuButton::SkillUnlockYes
+                | MenuButton::SkillUnlockNo
                 | MenuButton::GameOverOK
                 | MenuButton::OptionsRestart
                 | MenuButton::OptionsExit

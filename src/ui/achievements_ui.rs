@@ -1053,6 +1053,7 @@ pub fn handle_achievement_row_clicks(
                                     None,
                                     None,
                                     None,
+                                    None,
                                 );
                             }
                             commands.spawn(crate::audio::SoundSpawner::new(

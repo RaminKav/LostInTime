@@ -46,6 +46,50 @@ impl UnlockedClasses {
     }
 }
 
+/// Per-class unlocked active skill slots beyond the default (0, 1). Persists
+/// purchases of the 3rd/4th class skills using Time Fragments. Slots 0 and 1
+/// are always considered unlocked and are not tracked here.
+#[derive(Resource, Debug, Clone, Default, Serialize, Deserialize)]
+pub struct UnlockedSkills {
+    /// Set of `(class, slot_index)` pairs that have been purchased. Only slot
+    /// indices 2 and 3 are ever inserted; 0 and 1 are free.
+    pub entries: HashSet<(SkillClass, usize)>,
+}
+
+/// Time Fragment costs for unlocking a given class skill slot.
+pub const SKILL_UNLOCK_COSTS: [u32; 4] = [0, 0, 15, 30];
+
+impl UnlockedSkills {
+    pub fn new<I: IntoIterator<Item = (SkillClass, usize)>>(entries: I) -> Self {
+        Self {
+            entries: entries.into_iter().collect(),
+        }
+    }
+
+    /// Returns true if the given class skill slot is available to the player.
+    /// Slots 0 and 1 are always unlocked. Slots 2 and 3 require purchase. Any
+    /// other slot index is considered unlocked (e.g. blessing-granted slot 4).
+    pub fn is_unlocked(&self, class: &SkillClass, slot: usize) -> bool {
+        match slot {
+            0 | 1 => true,
+            2 | 3 => self.entries.contains(&(class.clone(), slot)),
+            _ => true,
+        }
+    }
+
+    pub fn insert(&mut self, class: SkillClass, slot: usize) -> bool {
+        self.entries.insert((class, slot))
+    }
+
+    pub fn to_vec(&self) -> Vec<(SkillClass, usize)> {
+        self.entries.iter().cloned().collect()
+    }
+
+    pub fn cost_for_slot(slot: usize) -> u32 {
+        SKILL_UNLOCK_COSTS.get(slot).copied().unwrap_or(0)
+    }
+}
+
 #[derive(Deserialize, TypeUuid, Clone, Debug)]
 #[uuid = "2fd56698-6f3b-45aa-8a7f-6f9f8700b5a1"]
 pub struct ClassUnlockConfig {
@@ -305,6 +349,7 @@ pub fn persist_unlock_data(
     unlocked_classes: Option<&UnlockedClasses>,
     achievements: Option<&Achievements>,
     unlock_upgrades: Option<&UnlockUpgrades>,
+    unlocked_skills: Option<&UnlockedSkills>,
 ) {
     let path = datafiles::game_data();
     let mut game_data = if let Ok(file) = File::open(&path) {
@@ -325,6 +370,9 @@ pub fn persist_unlock_data(
     }
     if let Some(upgrades) = unlock_upgrades {
         game_data.unlock_upgrades = upgrades.clone();
+    }
+    if let Some(skills) = unlocked_skills {
+        game_data.unlocked_skills = skills.clone();
     }
 
     match File::create(&path) {

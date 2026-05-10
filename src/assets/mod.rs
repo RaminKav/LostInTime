@@ -33,7 +33,7 @@ use crate::player::skills::SkillClass;
 use crate::player::skills::{ActiveSkill, Heirloom};
 use crate::player::{
     get_default_unlocked_classes, Achievements, ClassUnlockConfig, ClassUnlockData, CoinCurrency,
-    TimeCrystals, TimeFragmentCurrency, UnlockUpgrades, UnlockedClasses,
+    TimeCrystals, TimeFragmentCurrency, UnlockUpgrades, UnlockedClasses, UnlockedSkills,
 };
 use crate::status_effects::StatusEffect;
 use crate::ui::tips::SeenTips;
@@ -388,6 +388,7 @@ impl GameAssetsPlugin {
                     let achievements = game_data.achievements.clone();
                     let unlock_upgrades = game_data.unlock_upgrades.clone();
                     let unlocked_classes_vec = game_data.unlocked_classes.clone();
+                    let unlocked_skills = game_data.unlocked_skills.clone();
                     let time_fragments = game_data.time_fragments;
                     let seen_tips_set = game_data.seen_tips.clone();
                     let time_crystals = game_data.time_crystals.clone();
@@ -400,6 +401,7 @@ impl GameAssetsPlugin {
                     let mut unlocked = UnlockedClasses::new(unlocked_classes_vec);
                     unlocked.ensure_defaults(&get_default_unlocked_classes());
                     commands.insert_resource(unlocked);
+                    commands.insert_resource(unlocked_skills);
                     commands.insert_resource(unlock_upgrades);
                     commands.insert_resource(TimeFragmentCurrency::new(
                         (time_fragments.min(i32::MAX as u128)) as i32,
@@ -418,6 +420,7 @@ impl GameAssetsPlugin {
                     let mut unlocked = UnlockedClasses::default();
                     unlocked.ensure_defaults(&get_default_unlocked_classes());
                     commands.insert_resource(unlocked);
+                    commands.insert_resource(UnlockedSkills::default());
                     commands.insert_resource(Achievements::default());
                     commands.insert_resource(TimeFragmentCurrency::default());
                     commands.insert_resource(SeenTips::default());
@@ -430,6 +433,7 @@ impl GameAssetsPlugin {
             let mut unlocked = UnlockedClasses::default();
             unlocked.ensure_defaults(&get_default_unlocked_classes());
             commands.insert_resource(unlocked);
+            commands.insert_resource(UnlockedSkills::default());
             commands.insert_resource(Achievements::default());
             commands.insert_resource(TimeFragmentCurrency::default());
             commands.insert_resource(SeenTips::default());

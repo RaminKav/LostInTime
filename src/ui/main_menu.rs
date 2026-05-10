@@ -12,7 +12,6 @@ use strum_macros::Display;
 use crate::{
     assets::Graphics,
     audio::UpdateBGMTrackEvent,
-    chaos::ChaosTracker,
     client::analytics::{connect_server, AnalyticsData},
     colors::{overwrite_alpha, WHITE},
     combat::damage_tracker::{DamageTracker, MobStatTracker, PetAbilityStats},
@@ -25,13 +24,15 @@ use crate::{
         currency::TimeFragmentCurrency,
         skills::{HeirloomChoiceQueue, PlayerClass, PlayerSkills},
         time_crystals::TimeCrystals,
-        unlocks::{RunUnlockState, UnlockUpgrades, UnlockedClasses},
+        unlocks::{
+            persist_unlock_data, RunUnlockState, UnlockUpgrades, UnlockedClasses, UnlockedSkills,
+        },
     },
     ui::{
         achievements_ui::{AchievementsPagination, ACHIEVEMENTS_PER_PAGE},
         class_selection::{
             persist_class_unlock_state, ClassSelectionState, ClassUnlockConfirmState,
-            ClassUnlockHoverState, PendingGameStart, PlayerSelectSlot,
+            ClassUnlockHoverState, PendingGameStart, PlayerSelectSlot, SkillUnlockConfirmState,
         },
         options_ui::CheatSettings,
         ChestContainer, FurnaceContainer, UIState,
@@ -71,8 +72,10 @@ pub struct MenuButtonExtras<'w, 's> {
     scrapper_event: EventWriter<'w, ScrapperEvent>,
     selection_state: ResMut<'w, ClassSelectionState>,
     confirm_state: ResMut<'w, ClassUnlockConfirmState>,
+    skill_confirm_state: ResMut<'w, SkillUnlockConfirmState>,
     time_fragment_currency: Option<ResMut<'w, TimeFragmentCurrency>>,
     unlocked_classes: Option<ResMut<'w, UnlockedClasses>>,
+    unlocked_skills: ResMut<'w, UnlockedSkills>,
     unlock_upgrades: Res<'w, UnlockUpgrades>,
     hover_state: ResMut<'w, ClassUnlockHoverState>,
     achievements: Option<Res<'w, Achievements>>,
@@ -99,6 +102,8 @@ pub enum MenuButton {
     Begin,
     ClassUnlockYes,
     ClassUnlockNo,
+    SkillUnlockYes,
+    SkillUnlockNo,
     AchievementsPrev,
     AchievementsNext,
     OptionsRestart,
@@ -351,6 +356,51 @@ pub fn handle_menu_button_click_events(
                     extras.confirm_state.class = None;
                     extras.confirm_state.cost = 0;
                     extras.confirm_state.anchor_position = Vec3::ZERO;
+                }
+            }
+            MenuButton::SkillUnlockNo => {
+                if extras.skill_confirm_state.active {
+                    extras.skill_confirm_state.active = false;
+                    extras.skill_confirm_state.class = None;
+                    extras.skill_confirm_state.slot_index = 0;
+                    extras.skill_confirm_state.cost = 0;
+                    extras.skill_confirm_state.anchor_position = Vec3::ZERO;
+                }
+            }
+            MenuButton::SkillUnlockYes => {
+                if extras.skill_confirm_state.active {
+                    if let Some(class) = extras.skill_confirm_state.class.clone() {
+                        let cost = extras.skill_confirm_state.cost;
+                        let slot = extras.skill_confirm_state.slot_index;
+                        let mut unlocked_now = false;
+                        if let Some(currency_res) = extras.time_fragment_currency.as_mut() {
+                            let currency = currency_res.as_mut();
+                            if currency.spend(cost) {
+                                if extras.unlocked_skills.insert(class.clone(), slot) {
+                                    unlocked_now = true;
+                                }
+                            } else {
+                                warn!(
+                                    "Attempted to unlock skill slot {} for {:?} without enough currency (cost: {}, owned: {})",
+                                    slot, class, cost, currency.time_fragments
+                                );
+                            }
+                        }
+                        if unlocked_now {
+                            persist_unlock_data(
+                                extras.time_fragment_currency.as_ref().map(|c| c.as_ref()),
+                                extras.unlocked_classes.as_ref().map(|u| u.as_ref()),
+                                extras.achievements.as_ref().map(|a| a.as_ref()),
+                                Some(&*extras.unlock_upgrades),
+                                Some(&*extras.unlocked_skills),
+                            );
+                        }
+                    }
+                    extras.skill_confirm_state.active = false;
+                    extras.skill_confirm_state.class = None;
+                    extras.skill_confirm_state.slot_index = 0;
+                    extras.skill_confirm_state.cost = 0;
+                    extras.skill_confirm_state.anchor_position = Vec3::ZERO;
                 }
             }
             MenuButton::GameOverOK => {
