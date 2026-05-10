@@ -1,0 +1,18 @@
+(
+  name: "CritChanceFood",
+  templates: ["item_drop.prototype.ron"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": CritChanceFood,
+  "survival_rogue_like::item::item_actions::ItemActions": (actions: [GainStat("crit_chance", 5)]),
+  "survival_rogue_like::item::item_actions::ConsumableItem": (),
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: CritChanceFood,
+        metadata: (
+            name: "Crit Boost", 
+            desc: ["Drink to permanently", "gain +5 crit chance.", "Made with ingredients", "from the Desert."]
+        ),
+        rarity: Rare,
+        count: 1
+  ),
+  }
+)

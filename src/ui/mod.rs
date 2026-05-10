@@ -232,6 +232,18 @@ pub const INV_BLUEPRINT_SLOT_TOP_Y: f32 = INVENTORY_BLUEPRINT_UI_SIZE.y * 0.5 - 
 pub const INV_BLUEPRINT_SLOT_CENTER_X: f32 = -3.0;
 /// Max number of blueprint rows that fit inside the blueprints panel art.
 pub const MAX_BLUEPRINT_ROWS: usize = 10;
+/// Pagination buttons (`ButtonPageUp` / `ButtonPageDown` art). Matches `assets/ui/ButtonPageUp.png`.
+pub const BLUEPRINT_PAGE_BTN_SIZE: Vec2 = Vec2::new(19., 14.);
+/// Gap from the panel bottom edge to the button centers.
+pub const BLUEPRINT_PAGE_BTN_BOTTOM_PAD: f32 = 8.0;
+/// Panel-local **center** Y for both pagination buttons (sits along the bottom of the blueprints panel).
+pub const BLUEPRINT_PAGE_BTN_CENTER_Y: f32 = -INVENTORY_BLUEPRINT_UI_SIZE.y * 0.5
+    + BLUEPRINT_PAGE_BTN_SIZE.y * 0.5
+    + BLUEPRINT_PAGE_BTN_BOTTOM_PAD;
+/// Panel-local **center** X for the page-up control (left half of the bottom band).
+pub const BLUEPRINT_PAGE_BTN_UP_X: f32 = -INVENTORY_BLUEPRINT_UI_SIZE.x * 0.1;
+/// Panel-local **center** X for the page-down control (right half of the bottom band).
+pub const BLUEPRINT_PAGE_BTN_DOWN_X: f32 = INVENTORY_BLUEPRINT_UI_SIZE.x * 0.1;
 /// X offset (from the row's left edge) where the recipe result icon is centered.
 pub const INV_BLUEPRINT_SLOT_ICON_X_OFFSET: f32 = 12.0;
 /// X offset (from the row's left edge) where the recipe name label starts (anchored left).
@@ -245,6 +257,14 @@ pub const INV_CRAFTING_PANEL_INGREDIENT_SPACING_X: f32 = 32.;
 pub const INV_CRAFTING_PANEL_RESULT_Y: f32 = 41.0;
 /// Amount text offset beneath each ingredient icon (e.g. "2/3").
 pub const INV_CRAFTING_PANEL_INGREDIENT_COUNT_Y_OFFSET: f32 = -11.0;
+
+/// Reset the blueprints panel page to 0 whenever the player (re-)opens the inventory in
+/// `InventoryCrafting` mode so the panel always boots at the first page of recipes.
+pub fn reset_blueprints_pagination_on_open(
+    mut pagination: ResMut<crate::ui::inventory_ui::BlueprintsPagination>,
+) {
+    pagination.page = 0;
+}
 
 pub(crate) fn snap_world_to_pixel_grid(value: f32, scale: u32) -> f32 {
     let s = scale as f32;
@@ -276,6 +296,7 @@ impl Plugin for UIPlugin {
         app.add_state::<UIState>()
             .insert_resource(InventoryState::default())
             .init_resource::<SelectedCraftingRecipe>()
+            .init_resource::<crate::ui::inventory_ui::BlueprintsPagination>()
             .insert_resource(ClassSelectionState::default())
             .init_resource::<ClassUnlockHoverState>()
             .init_resource::<ClassUnlockConfirmState>()
@@ -365,8 +386,12 @@ impl Plugin for UIPlugin {
                 setup_inv_ui
                     .before(CustomFlush)
                     .run_if(state_changed::<UIState>().and_then(in_state(UIState::Inventory))),
+                reset_blueprints_pagination_on_open
+                    .before(CustomFlush)
+                    .run_if(state_changed::<UIState>().and_then(in_state(UIState::InventoryCrafting))),
                 setup_inv_ui
                     .before(CustomFlush)
+                    .after(reset_blueprints_pagination_on_open)
                     .run_if(state_changed::<UIState>().and_then(in_state(UIState::InventoryCrafting))),
                 setup_inv_ui
                     .before(CustomFlush)
@@ -806,6 +831,15 @@ impl Plugin for UIPlugin {
                     // consumed for crafting instead of being treated as a drop.
                     handle_crafting_result_slot_click
                         .before(handle_item_drop_clicks)
+                        .run_if(in_state(UIState::InventoryCrafting)),
+                )
+                    .in_set(OnUpdate(GameState::Main)),
+            )
+            .add_systems(
+                (
+                    crate::ui::inventory_ui::handle_blueprint_pagination_clicks
+                        .run_if(in_state(UIState::InventoryCrafting)),
+                    crate::ui::inventory_ui::refresh_blueprints_on_pagination_change
                         .run_if(in_state(UIState::InventoryCrafting)),
                 )
                     .in_set(OnUpdate(GameState::Main)),

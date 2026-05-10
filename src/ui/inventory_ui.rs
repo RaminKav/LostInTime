@@ -14,11 +14,12 @@ use crate::player::unlocks::RunUnlockState;
 use crate::player::ModifyCurencyEvent;
 use crate::proto::proto_param::ProtoParam;
 use crate::ui::{
-    INVENTORY_BLUEPRINT_UI_SIZE, INVENTORY_CRAFTING_PANEL_UI_SIZE, INVENTORY_EQUIPMENT_UI_SIZE,
-    INVENTORY_UPGRADE_UI_SIZE, INVENTORY_Y_OFFSET, INV_BLUEPRINT_SLOT_CENTER_X,
-    INV_BLUEPRINT_SLOT_ICON_X_OFFSET, INV_BLUEPRINT_SLOT_LABEL_X_OFFSET,
-    INV_BLUEPRINT_SLOT_ROW_GAP, INV_BLUEPRINT_SLOT_SIZE, INV_BLUEPRINT_SLOT_TOP_Y,
-    INV_CRAFTING_INPUT_SLOTS_Y_LOCAL, INV_CRAFTING_INPUT_SLOT_SPACING_X,
+    BLUEPRINT_PAGE_BTN_CENTER_Y, BLUEPRINT_PAGE_BTN_DOWN_X, BLUEPRINT_PAGE_BTN_SIZE,
+    BLUEPRINT_PAGE_BTN_UP_X, INVENTORY_BLUEPRINT_UI_SIZE, INVENTORY_CRAFTING_PANEL_UI_SIZE,
+    INVENTORY_EQUIPMENT_UI_SIZE, INVENTORY_UPGRADE_UI_SIZE, INVENTORY_Y_OFFSET,
+    INV_BLUEPRINT_SLOT_CENTER_X, INV_BLUEPRINT_SLOT_ICON_X_OFFSET,
+    INV_BLUEPRINT_SLOT_LABEL_X_OFFSET, INV_BLUEPRINT_SLOT_ROW_GAP, INV_BLUEPRINT_SLOT_SIZE,
+    INV_BLUEPRINT_SLOT_TOP_Y, INV_CRAFTING_INPUT_SLOTS_Y_LOCAL, INV_CRAFTING_INPUT_SLOT_SPACING_X,
     INV_CRAFTING_PANEL_INGREDIENT_COUNT_Y_OFFSET, INV_CRAFTING_PANEL_INGREDIENT_ROW_Y,
     INV_CRAFTING_PANEL_INGREDIENT_SPACING_X, INV_CRAFTING_PANEL_RESULT_Y,
     INV_UPGRADE_PANEL_OFFSET_Y_CRAFTING, MAX_BLUEPRINT_ROWS, UI_UPGRADE_SLOT_SIZE,
@@ -166,6 +167,22 @@ pub struct CraftingResultIcon;
 #[derive(Resource, Default, Clone, Debug)]
 pub struct SelectedCraftingRecipe(pub Option<WorldObject>);
 
+/// Current page (0-indexed) for the blueprints panel in `UIState::InventoryCrafting`.
+/// Each page shows up to [`MAX_BLUEPRINT_ROWS`] recipes.  Navigated via the up/down arrow
+/// buttons next to the panel.  Reset to 0 when the inventory closes.
+#[derive(Resource, Default, Clone, Debug)]
+pub struct BlueprintsPagination {
+    pub page: usize,
+}
+
+/// Marker on the blueprints panel up-arrow button (page--).
+#[derive(Component, Default, Clone, Debug)]
+pub struct BlueprintsPrevButton;
+
+/// Marker on the blueprints panel down-arrow button (page++).
+#[derive(Component, Default, Clone, Debug)]
+pub struct BlueprintsNextButton;
+
 /// Dev-only button shown in inventory when dev mode is enabled (Options > Dev Mode).
 #[derive(Component, Clone, Copy, PartialEq, Eq, Debug)]
 pub enum DevButtonAction {
@@ -265,6 +282,8 @@ pub fn setup_inv_ui(
     recipes: Res<Recipes>,
     mut selected_recipe: ResMut<SelectedCraftingRecipe>,
     proto_param: ProtoParam,
+    era_manager: Res<crate::world::dimension::EraManager>,
+    blueprints_pagination: Res<BlueprintsPagination>,
 ) {
     let (size, texture, pos_offset) = match cur_inv_state.0 {
         UIState::Inventory | UIState::InventoryCrafting => (
@@ -537,95 +556,17 @@ pub fn setup_inv_ui(
         // Reset any previously-held selection; refreshing logic re-populates on pick.
         selected_recipe.0 = None;
 
-        // Populate one blueprint row per recipe the player has access to. Sort by `Debug` name so
-        // the row order is stable between panel rebuilds. Cap at `MAX_BLUEPRINT_ROWS` because the
-        // `BlueprintsPanel` background art only has room for that many.
-        let mut recipe_list: Vec<WorldObject> = recipes.crafting_list.keys().copied().collect();
-        recipe_list.sort_by_key(|obj| format!("{:?}", obj));
-        for (i, recipe_obj) in recipe_list.iter().take(MAX_BLUEPRINT_ROWS).enumerate() {
-            let row_y = INV_BLUEPRINT_SLOT_TOP_Y
-                - i as f32 * (INV_BLUEPRINT_SLOT_SIZE.y + INV_BLUEPRINT_SLOT_ROW_GAP);
-            let row_entity = commands
-                .spawn(SpriteBundle {
-                    texture: graphics.get_ui_element_texture(UIElement::BlueprintSlot),
-                    sprite: Sprite {
-                        custom_size: Some(INV_BLUEPRINT_SLOT_SIZE),
-                        ..Default::default()
-                    },
-                    transform: Transform {
-                        translation: Vec3::new(INV_BLUEPRINT_SLOT_CENTER_X, row_y, 1.),
-                        scale: Vec3::new(1., 1., 1.),
-                        ..Default::default()
-                    },
-                    ..Default::default()
-                })
-                .insert(Name::new(format!("BLUEPRINT ROW {:?}", recipe_obj)))
-                .insert(UIElement::BlueprintSlot)
-                .insert(Interactable::default())
-                .insert(BlueprintSlot {
-                    recipe_obj: *recipe_obj,
-                })
-                .insert(cur_inv_state.0.clone())
-                .insert(RenderLayers::from_layers(&[3]))
-                .id();
-
-            // Recipe result icon, anchored near the left edge of the row. Uses the same sprite
-            // pipeline as inventory items so rarity/metadata render consistently.
-            if let Some(item_data) = proto_param.get_item_data(*recipe_obj).cloned() {
-                let icon_stack = item_data.copy_with_count(1);
-                let icon_entity = spawn_item_stack_icon(
-                    &mut commands,
-                    &graphics,
-                    &icon_stack,
-                    &asset_server,
-                    Vec2::new(
-                        -INV_BLUEPRINT_SLOT_SIZE.x * 0.5 + INV_BLUEPRINT_SLOT_ICON_X_OFFSET,
-                        0.,
-                    ),
-                    Vec2::ZERO,
-                    3,
-                );
-                commands
-                    .entity(icon_entity)
-                    .insert(Name::new("BLUEPRINT ROW ICON"))
-                    .set_parent(row_entity);
-            }
-
-            // Label: recipe result name (shifted right to clear the icon).
-            let label = proto_param
-                .get_item_data(*recipe_obj)
-                .map(|s| s.metadata.name.clone())
-                .unwrap_or_else(|| format!("{:?}", recipe_obj));
-            let _row_text = commands
-                .spawn(Text2dBundle {
-                    text: Text::from_section(
-                        label,
-                        TextStyle {
-                            font: asset_server.load("fonts/slkscrbold.ttf"),
-                            font_size: 8.4,
-                            color: YELLOW_2,
-                        },
-                    ),
-                    text_anchor: Anchor::CenterLeft,
-                    transform: Transform {
-                        translation: Vec3::new(
-                            -INV_BLUEPRINT_SLOT_SIZE.x * 0.5 + INV_BLUEPRINT_SLOT_LABEL_X_OFFSET,
-                            0.,
-                            1.,
-                        ),
-                        scale: Vec3::new(1., 1., 1.),
-                        ..Default::default()
-                    },
-                    ..default()
-                })
-                .insert(RenderLayers::from_layers(&[3]))
-                .insert(Name::new("BLUEPRINT ROW LABEL"))
-                .set_parent(row_entity)
-                .id();
-            commands
-                .entity(blueprint_panel)
-                .push_children(&[row_entity]);
-        }
+        render_blueprint_rows_and_nav(
+            &mut commands,
+            blueprint_panel,
+            &graphics,
+            &asset_server,
+            &proto_param,
+            &recipes,
+            &era_manager,
+            &blueprints_pagination,
+            &cur_inv_state,
+        );
 
         // Ingredient display slots on the crafting side panel (x3). Purely visual; the
         // icon + "owned/needed" text are populated by `refresh_crafting_ingredient_display`
@@ -1074,11 +1015,11 @@ pub fn setup_inv_slots_ui(
                 Interaction::None,
                 &inv_state_res,
                 &inv_query,
-            &asset_server,
-            InventorySlotType::Trash,
-            trash_item,
-            &resolution,
-        );
+                &asset_server,
+                InventorySlotType::Trash,
+                trash_item,
+                &resolution,
+            );
 
             // Sort button — slot-sized tile sitting directly under the trash slot. Clicking
             // sorts the main inventory grid (see `handle_sort_inventory_button_click`).
@@ -1270,9 +1211,7 @@ fn spawn_material_drops_toggle_button(
         .insert(Name::new("MATERIAL DROPS TOGGLE X"))
         .id();
 
-    commands
-        .entity(button)
-        .push_children(&[icon, x_overlay]);
+    commands.entity(button).push_children(&[icon, x_overlay]);
 
     if let Ok(inv_e) = inv_query.get_single() {
         commands.entity(button).set_parent(inv_e);
@@ -2031,11 +1970,7 @@ pub fn handle_cursor_inventory_craft_toggle_button(
                             && target == UIState::InventoryCrafting
                         {
                             if let Ok(mut inv) = inv.get_single_mut() {
-                                try_auto_equip_from_upgrade_slot(
-                                    &mut inv,
-                                    &proto,
-                                    &mut inv_slots,
-                                );
+                                try_auto_equip_from_upgrade_slot(&mut inv, &proto, &mut inv_slots);
                             }
                         }
                         next_ui_state.set(target);
@@ -2373,5 +2308,380 @@ pub fn handle_crafting_result_slot_click(
 
         crafted_event.send(CraftedItemEvent { obj: recipe_obj });
         mouse_input.clear();
+    }
+}
+
+/// Deterministic sort key for the blueprints panel.
+///
+/// Recipes are grouped into three buckets so the panel always reads the same way:
+///   0. Materials / equipment / everything that isn't a consumable.
+///   1. Regular consumable foods (anything proto-tagged with [`crate::item::item_actions::ConsumableItem`]
+///      that isn't one of the new permanent stat-foods).
+///   2. New stat-boost foods (anything matched by
+///      [`crate::item::food_recipes::food_recipe_required_eras`]) — pinned to the bottom.
+///
+/// Within a bucket, items are sorted alphabetically by `WorldObject` debug name so the order
+/// is stable between panel rebuilds.
+pub fn blueprint_sort_key(obj: WorldObject, proto: &ProtoParam) -> (u8, String) {
+    let bucket = if crate::item::food_recipes::food_recipe_required_eras(obj).is_some() {
+        2
+    } else if proto
+        .get_component::<crate::item::item_actions::ConsumableItem, _>(obj)
+        .is_some()
+        && obj != WorldObject::BridgeBlock
+    {
+        1
+    } else {
+        0
+    };
+    (bucket, format!("{:?}", obj))
+}
+
+/// Spawns/refreshes the blueprint row entities + up/down pagination buttons on `blueprint_panel`.
+///
+/// Used by both `setup_inv_ui` (initial render when the inventory opens in `InventoryCrafting`)
+/// and `refresh_blueprints_on_pagination_change` (after the player flips pages).
+pub fn render_blueprint_rows_and_nav(
+    commands: &mut Commands,
+    blueprint_panel: Entity,
+    graphics: &Graphics,
+    asset_server: &AssetServer,
+    proto_param: &ProtoParam,
+    recipes: &Recipes,
+    era_manager: &crate::world::dimension::EraManager,
+    blueprints_pagination: &BlueprintsPagination,
+    cur_inv_state: &State<UIState>,
+) {
+    let mut recipe_list: Vec<WorldObject> = recipes
+        .crafting_list
+        .keys()
+        .copied()
+        .filter(|obj| {
+            crate::item::food_recipes::is_food_recipe_unlocked(*obj, &era_manager.visited_eras)
+        })
+        .collect();
+    recipe_list.sort_by_key(|obj| blueprint_sort_key(*obj, proto_param));
+    let total_pages = if recipe_list.is_empty() {
+        1
+    } else {
+        (recipe_list.len() + MAX_BLUEPRINT_ROWS - 1) / MAX_BLUEPRINT_ROWS
+    };
+    let page = blueprints_pagination
+        .page
+        .min(total_pages.saturating_sub(1));
+    let start = page * MAX_BLUEPRINT_ROWS;
+    let end = (start + MAX_BLUEPRINT_ROWS).min(recipe_list.len());
+    for (i, recipe_obj) in recipe_list[start..end].iter().enumerate() {
+        let row_y = INV_BLUEPRINT_SLOT_TOP_Y
+            - i as f32 * (INV_BLUEPRINT_SLOT_SIZE.y + INV_BLUEPRINT_SLOT_ROW_GAP);
+        let row_entity = commands
+            .spawn(SpriteBundle {
+                texture: graphics.get_ui_element_texture(UIElement::BlueprintSlot),
+                sprite: Sprite {
+                    custom_size: Some(INV_BLUEPRINT_SLOT_SIZE),
+                    ..Default::default()
+                },
+                transform: Transform {
+                    translation: Vec3::new(INV_BLUEPRINT_SLOT_CENTER_X, row_y, 1.),
+                    scale: Vec3::new(1., 1., 1.),
+                    ..Default::default()
+                },
+                ..Default::default()
+            })
+            .insert(Name::new(format!("BLUEPRINT ROW {:?}", recipe_obj)))
+            .insert(UIElement::BlueprintSlot)
+            .insert(Interactable::default())
+            .insert(BlueprintSlot {
+                recipe_obj: *recipe_obj,
+            })
+            .insert(cur_inv_state.0.clone())
+            .insert(RenderLayers::from_layers(&[3]))
+            .id();
+        if let Some(item_data) = proto_param.get_item_data(*recipe_obj).cloned() {
+            let icon_stack = item_data.copy_with_count(1);
+            let icon_entity = spawn_item_stack_icon(
+                commands,
+                graphics,
+                &icon_stack,
+                asset_server,
+                Vec2::new(
+                    -INV_BLUEPRINT_SLOT_SIZE.x * 0.5 + INV_BLUEPRINT_SLOT_ICON_X_OFFSET,
+                    0.,
+                ),
+                Vec2::ZERO,
+                3,
+            );
+            commands
+                .entity(icon_entity)
+                .insert(Name::new("BLUEPRINT ROW ICON"))
+                .set_parent(row_entity);
+        }
+        let label = proto_param
+            .get_item_data(*recipe_obj)
+            .map(|s| s.metadata.name.clone())
+            .unwrap_or_else(|| format!("{:?}", recipe_obj));
+        commands
+            .spawn(Text2dBundle {
+                text: Text::from_section(
+                    label,
+                    TextStyle {
+                        font: asset_server.load("fonts/slkscrbold.ttf"),
+                        font_size: 8.4,
+                        color: YELLOW_2,
+                    },
+                ),
+                text_anchor: Anchor::CenterLeft,
+                transform: Transform {
+                    translation: Vec3::new(
+                        -INV_BLUEPRINT_SLOT_SIZE.x * 0.5 + INV_BLUEPRINT_SLOT_LABEL_X_OFFSET,
+                        0.,
+                        1.,
+                    ),
+                    scale: Vec3::new(1., 1., 1.),
+                    ..Default::default()
+                },
+                ..default()
+            })
+            .insert(RenderLayers::from_layers(&[3]))
+            .insert(Name::new("BLUEPRINT ROW LABEL"))
+            .set_parent(row_entity);
+        commands
+            .entity(blueprint_panel)
+            .push_children(&[row_entity]);
+    }
+
+    // Pagination arrows are always rendered for visual consistency. The click handler
+    // (`handle_blueprint_pagination_clicks`) gates the actual page change on `page > 0`
+    // (prev) / `page + 1 < total_pages` (next), so the buttons are inert at the
+    // boundaries — useful when there's only one page or you're already at the first/last.
+    let up_btn = commands
+        .spawn(SpriteBundle {
+            texture: graphics.get_ui_element_texture(UIElement::ButtonPageUp),
+            sprite: Sprite {
+                custom_size: Some(BLUEPRINT_PAGE_BTN_SIZE),
+                ..Default::default()
+            },
+            transform: Transform::from_translation(Vec3::new(
+                BLUEPRINT_PAGE_BTN_UP_X,
+                BLUEPRINT_PAGE_BTN_CENTER_Y,
+                2.,
+            )),
+            ..Default::default()
+        })
+        .insert(UIElement::ButtonPageUp)
+        .insert(Interactable::default())
+        .insert(BlueprintsPrevButton)
+        .insert(cur_inv_state.0.clone())
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(Name::new("BLUEPRINTS PREV"))
+        .id();
+    commands.entity(blueprint_panel).push_children(&[up_btn]);
+
+    let down_btn = commands
+        .spawn(SpriteBundle {
+            texture: graphics.get_ui_element_texture(UIElement::ButtonPageDown),
+            sprite: Sprite {
+                custom_size: Some(BLUEPRINT_PAGE_BTN_SIZE),
+                ..Default::default()
+            },
+            transform: Transform::from_translation(Vec3::new(
+                BLUEPRINT_PAGE_BTN_DOWN_X,
+                BLUEPRINT_PAGE_BTN_CENTER_Y,
+                2.,
+            )),
+            ..Default::default()
+        })
+        .insert(UIElement::ButtonPageDown)
+        .insert(Interactable::default())
+        .insert(BlueprintsNextButton)
+        .insert(cur_inv_state.0.clone())
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(Name::new("BLUEPRINTS NEXT"))
+        .id();
+    commands.entity(blueprint_panel).push_children(&[down_btn]);
+}
+
+/// System that re-renders blueprint rows when [`BlueprintsPagination`] changes (the player
+/// clicked the up/down arrows).  Despawns the existing rows + arrow buttons under the
+/// `BlueprintsPanel` and re-runs [`render_blueprint_rows_and_nav`] with the new page.
+pub fn refresh_blueprints_on_pagination_change(
+    mut commands: Commands,
+    blueprints_pagination: Res<BlueprintsPagination>,
+    cur_inv_state: Res<State<UIState>>,
+    blueprint_panel_q: Query<(Entity, &UIElement)>,
+    existing_rows: Query<Entity, With<BlueprintSlot>>,
+    existing_prev: Query<Entity, With<BlueprintsPrevButton>>,
+    existing_next: Query<Entity, With<BlueprintsNextButton>>,
+    graphics: Res<Graphics>,
+    asset_server: Res<AssetServer>,
+    proto_param: ProtoParam,
+    recipes: Res<Recipes>,
+    era_manager: Res<crate::world::dimension::EraManager>,
+) {
+    if !blueprints_pagination.is_changed() {
+        return;
+    }
+    if cur_inv_state.0 != UIState::InventoryCrafting {
+        return;
+    }
+    let Some((blueprint_panel, _)) = blueprint_panel_q
+        .iter()
+        .find(|(_, ui)| **ui == UIElement::BlueprintsPanel)
+    else {
+        return;
+    };
+    for e in existing_rows.iter() {
+        if let Some(ec) = commands.get_entity(e) {
+            ec.despawn_recursive();
+        }
+    }
+    for e in existing_prev.iter() {
+        if let Some(ec) = commands.get_entity(e) {
+            ec.despawn_recursive();
+        }
+    }
+    for e in existing_next.iter() {
+        if let Some(ec) = commands.get_entity(e) {
+            ec.despawn_recursive();
+        }
+    }
+    render_blueprint_rows_and_nav(
+        &mut commands,
+        blueprint_panel,
+        &graphics,
+        &asset_server,
+        &proto_param,
+        &recipes,
+        &era_manager,
+        &blueprints_pagination,
+        &cur_inv_state,
+    );
+}
+
+fn blueprint_prev_normal_sprite(commands: &mut Commands, graphics: &Graphics, e: Entity) {
+    commands
+        .entity(e)
+        .insert(UIElement::ButtonPageUp)
+        .insert(graphics.get_ui_element_texture(UIElement::ButtonPageUp));
+}
+
+fn blueprint_next_normal_sprite(commands: &mut Commands, graphics: &Graphics, e: Entity) {
+    commands
+        .entity(e)
+        .insert(UIElement::ButtonPageDown)
+        .insert(graphics.get_ui_element_texture(UIElement::ButtonPageDown));
+}
+
+/// Click + hover handler for the blueprint pagination buttons on the bottom of the blueprints
+/// panel. Updates [`BlueprintsPagination::page`] on click; swaps `ButtonPage*` / `*Hover` sprites.
+pub fn handle_blueprint_pagination_clicks(
+    cursor_pos: Res<CursorPos>,
+    mouse_input: Res<Input<MouseButton>>,
+    ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
+    mut prev_buttons: Query<
+        (Entity, &mut Interactable),
+        (With<BlueprintsPrevButton>, Without<BlueprintsNextButton>),
+    >,
+    mut next_buttons: Query<
+        (Entity, &mut Interactable),
+        (With<BlueprintsNextButton>, Without<BlueprintsPrevButton>),
+    >,
+    mut pagination: ResMut<BlueprintsPagination>,
+    recipes: Res<Recipes>,
+    era_manager: Res<crate::world::dimension::EraManager>,
+    mut commands: Commands,
+    graphics: Res<Graphics>,
+) {
+    let hit = super::ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    let left_pressed = mouse_input.just_pressed(MouseButton::Left);
+
+    let total_unlocked = recipes
+        .crafting_list
+        .keys()
+        .filter(|obj| {
+            crate::item::food_recipes::is_food_recipe_unlocked(**obj, &era_manager.visited_eras)
+        })
+        .count();
+    let total_pages = if total_unlocked == 0 {
+        1
+    } else {
+        (total_unlocked + MAX_BLUEPRINT_ROWS - 1) / MAX_BLUEPRINT_ROWS
+    };
+
+    let Some(hit) = hit else {
+        for (e, mut interactable) in prev_buttons.iter_mut() {
+            if matches!(interactable.current(), Interaction::Hovering) {
+                interactable.change(Interaction::None);
+                blueprint_prev_normal_sprite(&mut commands, &graphics, e);
+            }
+        }
+        for (e, mut interactable) in next_buttons.iter_mut() {
+            if matches!(interactable.current(), Interaction::Hovering) {
+                interactable.change(Interaction::None);
+                blueprint_next_normal_sprite(&mut commands, &graphics, e);
+            }
+        }
+        return;
+    };
+
+    for (e, mut interactable) in prev_buttons.iter_mut() {
+        if hit.0 == e {
+            match interactable.current() {
+                Interaction::None => {
+                    interactable.change(Interaction::Hovering);
+                    commands
+                        .entity(e)
+                        .insert(UIElement::ButtonPageUpHover)
+                        .insert(graphics.get_ui_element_texture(UIElement::ButtonPageUpHover));
+                    commands.spawn(crate::audio::SoundSpawner::new(
+                        crate::audio::AudioSoundEffect::ButtonHover,
+                        0.05,
+                    ));
+                }
+                Interaction::Hovering => {
+                    if left_pressed && pagination.page > 0 {
+                        pagination.page -= 1;
+                        commands.spawn(crate::audio::SoundSpawner::new(
+                            crate::audio::AudioSoundEffect::ButtonClick,
+                            0.2,
+                        ));
+                    }
+                }
+                _ => {}
+            }
+        } else if matches!(interactable.current(), Interaction::Hovering) {
+            interactable.change(Interaction::None);
+            blueprint_prev_normal_sprite(&mut commands, &graphics, e);
+        }
+    }
+    for (e, mut interactable) in next_buttons.iter_mut() {
+        if hit.0 == e {
+            match interactable.current() {
+                Interaction::None => {
+                    interactable.change(Interaction::Hovering);
+                    commands
+                        .entity(e)
+                        .insert(UIElement::ButtonPageDownHover)
+                        .insert(graphics.get_ui_element_texture(UIElement::ButtonPageDownHover));
+                    commands.spawn(crate::audio::SoundSpawner::new(
+                        crate::audio::AudioSoundEffect::ButtonHover,
+                        0.05,
+                    ));
+                }
+                Interaction::Hovering => {
+                    if left_pressed && pagination.page + 1 < total_pages {
+                        pagination.page += 1;
+                        commands.spawn(crate::audio::SoundSpawner::new(
+                            crate::audio::AudioSoundEffect::ButtonClick,
+                            0.2,
+                        ));
+                    }
+                }
+                _ => {}
+            }
+        } else if matches!(interactable.current(), Interaction::Hovering) {
+            interactable.change(Interaction::None);
+            blueprint_next_normal_sprite(&mut commands, &graphics, e);
+        }
     }
 }

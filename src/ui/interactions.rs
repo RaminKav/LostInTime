@@ -206,6 +206,12 @@ pub enum UIElement {
     /// name label. Clicking selects the recipe, hover opens the recipe tooltip.
     BlueprintSlot,
     BlueprintSlotHover,
+    /// Previous page on the blueprints panel (`assets/ui/ButtonPageUp.png`).
+    ButtonPageUp,
+    ButtonPageUpHover,
+    /// Next page on the blueprints panel (`assets/ui/ButtonPageDown.png`).
+    ButtonPageDown,
+    ButtonPageDownHover,
 }
 impl UIElement {
     pub fn get_hover_state(&self) -> Option<UIElement> {
@@ -228,6 +234,8 @@ impl UIElement {
             UIElement::CraftingSlot => Some(UIElement::CraftingSlotHover),
             UIElement::CraftButton => Some(UIElement::CraftButtonHover),
             UIElement::BlueprintSlot => Some(UIElement::BlueprintSlotHover),
+            UIElement::ButtonPageUp => Some(UIElement::ButtonPageUpHover),
+            UIElement::ButtonPageDown => Some(UIElement::ButtonPageDownHover),
             _ => None,
         }
     }
@@ -251,6 +259,8 @@ impl UIElement {
             UIElement::CraftingSlotHover => Some(UIElement::CraftingSlot),
             UIElement::CraftButtonHover => Some(UIElement::CraftButton),
             UIElement::BlueprintSlotHover => Some(UIElement::BlueprintSlot),
+            UIElement::ButtonPageUpHover => Some(UIElement::ButtonPageUp),
+            UIElement::ButtonPageDownHover => Some(UIElement::ButtonPageDown),
             _ => None,
         }
     }

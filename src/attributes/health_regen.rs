@@ -27,6 +27,13 @@ fn get_regen_cooldown_multiplier(stacks: i32) -> f32 {
     }
 }
 
+/// Real-time seconds between regen ticks for this timer duration and heirloom stacks.
+/// Same scaling as `handle_health_regen` / `handle_mana_regen` (`duration * multiplier`).
+pub fn effective_regen_period_secs(timer_duration_secs: f32, heirloom_stacks: i32) -> f32 {
+    let multiplier = get_regen_cooldown_multiplier(heirloom_stacks).max(0.01);
+    timer_duration_secs * multiplier
+}
+
 pub fn handle_health_regen(
     mut player_regen: Query<
         (&HealthRegen, &mut HealthRegenTimer, &Hunger, &PlayerSkills),

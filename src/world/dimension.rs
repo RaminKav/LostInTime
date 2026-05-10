@@ -126,11 +126,24 @@ impl Era {
     }
 }
 
-#[derive(Resource, Default, Debug, Clone)]
+#[derive(Resource, Debug, Clone)]
 pub struct EraManager {
     pub current_era: Era,
+    /// Eras the player has actually entered this run (includes the starting overworld era).
+    /// Used for unlocks (e.g. blueprint recipes). Duplicates are avoided when recording transitions.
     pub visited_eras: Vec<Era>,
     pub era_generation_cache: HashMap<Era, WorldObjectCache>,
+}
+
+impl Default for EraManager {
+    fn default() -> Self {
+        let start = Era::default();
+        Self {
+            current_era: start.clone(),
+            visited_eras: vec![start],
+            era_generation_cache: HashMap::default(),
+        }
+    }
 }
 pub struct DimensionPlugin;
 
@@ -305,7 +318,9 @@ impl DimensionPlugin {
                     .cloned()
                     .unwrap_or(WorldObjectCache::default());
 
-                game.era.visited_eras.push(new_era.clone());
+                if !game.era.visited_eras.contains(new_era) {
+                    game.era.visited_eras.push(new_era.clone());
+                }
                 commands.insert_resource(new_world_cache);
                 proto_commands.apply(format!("Era{}WorldGenerationParams", new_era.index() + 1));
             } else {

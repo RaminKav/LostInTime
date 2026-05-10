@@ -1,0 +1,18 @@
+(
+  name: "ManaRegenFood",
+  templates: ["item_drop.prototype.ron"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": ManaRegenFood,
+  "survival_rogue_like::item::item_actions::ItemActions": (actions: [GainStat("mana_regen", 3)]),
+  "survival_rogue_like::item::item_actions::ConsumableItem": (),
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: ManaRegenFood,
+        metadata: (
+            name: "Mana Regen Boost", 
+            desc: ["Drink to permanently", "gain +3 mana regen.", "Made with ingredients", "from the Tundra."]
+        ),
+        rarity: Rare,
+        count: 1
+  ),
+  }
+)

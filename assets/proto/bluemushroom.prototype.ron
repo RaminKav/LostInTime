@@ -1,0 +1,17 @@
+(
+  name: "BlueMushroom",
+  templates: ["item_drop.prototype.ron"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": BlueMushroom,
+  "survival_rogue_like::item::item_actions::ItemActions": (actions: [ModifyHealth(5)]),
+  "survival_rogue_like::item::item_actions::ConsumableItem": (),
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: BlueMushroom,
+        metadata: (
+            name: "Blue Mushroom ", 
+            desc: ["Smells funny...", "Looks cool though!", "Good for some", "recipes."]
+        ),
+        count: 1
+  ),
+  }
+)

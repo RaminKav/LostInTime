@@ -972,6 +972,11 @@
             size: (16., 19.),
             anchor: None,
         ),
+        Bones: WorldObjectData(
+            texture_pos: (0., 24.),
+            size: (16., 16.),
+            anchor: None,
+        ),
         DesertBones1: WorldObjectData(
             texture_pos: (0., 24.), // START
             size: (16., 16.),
@@ -1075,6 +1080,16 @@
         ),
         SmlCactus3: WorldObjectData(
             texture_pos: (9., 26.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        CactusFlower: WorldObjectData(
+            texture_pos: (5., 27.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        CactusBerry: WorldObjectData(
+            texture_pos: (5., 28.),
             size: (16., 16.),
             anchor: None,
         ),
@@ -1215,7 +1230,17 @@
             anchor: None,
         ),
         BoulderHeirloom: WorldObjectData(
-            texture_pos: (0., 16.),
+            texture_pos: (0., 15.),
+            size: (32., 32.),
+            anchor: None,
+        ),
+        DesertMetalBoulder: WorldObjectData(
+            texture_pos: (2., 15.),
+            size: (32., 32.),
+            anchor: None,
+        ),
+        SnowMetalBoulder: WorldObjectData(
+            texture_pos: (4., 15.),
             size: (32., 32.),
             anchor: None,
         ),
@@ -1451,6 +1476,11 @@
             size: (16., 16.),
             anchor: None,
         ),
+        YellowBerries: WorldObjectData(
+            texture_pos: (8., 37.),
+            size: (16., 16.),
+            anchor: None,
+        ),
         SnowDeadSapling: WorldObjectData(
             texture_pos: (9., 37.),
             size: (16., 16.),
@@ -1466,6 +1496,72 @@
             size: (16., 16.),
             anchor: None,
         ),
+        BlueMushroom: WorldObjectData(
+            texture_pos: (14., 35.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        ThornsFood: WorldObjectData(
+            texture_pos: (0., 17.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        CritChanceFood: WorldObjectData(
+            texture_pos: (2., 17.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        DodgeFood: WorldObjectData(
+            texture_pos: (3., 17.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        HealthFood: WorldObjectData(
+            texture_pos: (4., 17.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        SizeFood: WorldObjectData(
+            texture_pos: (5., 17.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        AttackSpeedFood: WorldObjectData(
+            texture_pos: (6., 17.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        SkillPowerFood: WorldObjectData(
+            texture_pos: (8., 17.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        SpeedFood: WorldObjectData(
+            texture_pos: (9., 17.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        ManaFood: WorldObjectData(
+            texture_pos: (10., 17.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        ManaRegenFood: WorldObjectData(
+            texture_pos: (12., 17.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        DefenceFood: WorldObjectData(
+            texture_pos: (13., 17.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        LifestealFood: WorldObjectData(
+            texture_pos: (15., 17.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+
         
 
     },

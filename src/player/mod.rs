@@ -62,8 +62,9 @@ use crate::{
         hunger::{Hunger, HungerTracker},
         modifiers::handle_modify_health_event,
         ActiveConsumableBuffs, Attack, AttackCooldown, AttributeQuality, AttributeValue,
-        BonusAttackSpeed, CritChance, CritDamage, CurrentMana, HealthRegen, InvincibilityCooldown,
-        ItemAttributes, ManaRegen, MaxHealth, MaxMana, PlayerAttributeBundle, ShieldRegen,
+        BonusAttackSpeed, CritChance, CritDamage, CurrentMana, FoodAttributeBonuses, HealthRegen,
+        InvincibilityCooldown, ItemAttributes, ManaRegen, MaxHealth, MaxMana,
+        PlayerAttributeBundle, ShieldRegen,
     },
     blessings::{HeirloomStatsBonuses, OwnedBlessings},
     client::is_not_paused,
@@ -498,6 +499,7 @@ fn spawn_player(
         .insert(SkillPoints { count: 0 })
         .insert(BonusAttackSpeed::new())
         .insert(ActiveConsumableBuffs::default())
+        .insert(FoodAttributeBonuses::default())
         .insert(ClawUpgradeMultiThrow(
             Timer::from_seconds(0.12, TimerMode::Once),
             0,

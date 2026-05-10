@@ -86,6 +86,10 @@ pub enum ItemAction {
     ApplyPeriodicHeal(i32, f32, f32),
     /// Triggers a bounce effect (same as walking over a pink flower).
     TriggerBounce,
+    /// Permanently grants `i32` to the named attribute on the player's [`crate::attributes::FoodAttributeBonuses`].
+    /// Used by stat foods (Era 1/2/3 + cross-era recipes).  Attribute name must match a field on
+    /// [`crate::attributes::ItemAttributes`] (e.g. "speed", "health", "thorns", "skill_power").
+    GainStat(String, i32),
 }
 impl ItemAction {
     pub fn get_tooltip(&self) -> Option<String> {
@@ -113,21 +117,52 @@ impl ItemAction {
                 if delta > &0 { "+" } else { "" },
                 delta
             )),
-            ItemAction::ApplyTemporaryThorns(amount, duration) => Some(format!(
-                "+{} Thorns for {:.0}s",
-                amount, duration
-            )),
-            ItemAction::ApplyTemporarySpeed(amount, duration) => Some(format!(
-                "+{} Speed for {:.0}s",
-                amount, duration
-            )),
+            ItemAction::ApplyTemporaryThorns(amount, duration) => {
+                Some(format!("+{} Thorns for {:.0}s", amount, duration))
+            }
+            ItemAction::ApplyTemporarySpeed(amount, duration) => {
+                Some(format!("+{} Speed for {:.0}s", amount, duration))
+            }
             ItemAction::ApplyPeriodicHeal(heal, interval, total) => Some(format!(
                 "+{} HP every {:.1}s for {:.0}s",
                 heal, interval, total
             )),
             ItemAction::TriggerBounce => Some("Bounce!".to_string()),
+            ItemAction::GainStat(attr, delta) => Some(format!(
+                "{}{} {}",
+                if delta > &0 { "+" } else { "" },
+                delta,
+                format_stat_name(attr),
+            )),
             _ => None,
         }
+    }
+}
+
+/// Player-facing label for an attribute key used by [`ItemAction::GainStat`] tooltips.
+fn format_stat_name(attr: &str) -> &'static str {
+    match attr {
+        "health" => "Max HP",
+        "mana" => "Max MP",
+        "speed" => "Speed",
+        "thorns" => "Thorns",
+        "crit_chance" => "Crit Chance",
+        "crit_damage" => "Crit DMG",
+        "lifesteal" => "Lifesteal",
+        "skill_power" => "Skill Power",
+        "mana_regen" => "MP Regen",
+        "health_regen" => "HP Regen",
+        "dodge" => "Dodge",
+        "defence" => "Defence",
+        "attack" => "Attack",
+        "attack_speed" => "Attack Speed",
+        "size" | "projectile_size" => "Size",
+        "loot_rate" => "Luck",
+        "xp_rate" => "XP",
+        "pickup_range" => "Pickup Range",
+        "bonus_damage" => "Damage",
+        "healing" => "Healing",
+        _ => "Stat",
     }
 }
 
@@ -141,9 +176,7 @@ impl ItemActions {
     /// Items without any non-[`ItemAction::None`] entry cannot be bound to hotbar keys
     /// ([`crate::inputs::handle_hotbar_consume_keys`] requires an [`ItemActions`] component).
     pub fn allows_hotbar_band_placement(&self) -> bool {
-        self.actions
-            .iter()
-            .any(|a| !matches!(a, ItemAction::None))
+        self.actions.iter().any(|a| !matches!(a, ItemAction::None))
     }
 
     pub fn get_action_type(&self) -> String {
@@ -163,6 +196,7 @@ impl ItemActions {
                 ItemAction::ApplyTemporarySpeed(_, _) => has_consumable = true,
                 ItemAction::ApplyPeriodicHeal(_, _, _) => has_consumable = true,
                 ItemAction::TriggerBounce => has_consumable = true,
+                ItemAction::GainStat(_, _) => has_consumable = true,
                 _ => {}
             }
         }
@@ -227,7 +261,14 @@ pub struct ItemActionParam<'w, 's> {
     pub tip_event: EventWriter<'w, TipEvent>,
     pub seen_tips: Option<Res<'w, SeenTips>>,
     pub attribute_change_event: EventWriter<'w, AttributeChangeEvent>,
-    pub consumable_buffs: Query<'w, 's, &'static mut ActiveConsumableBuffs, With<crate::player::Player>>,
+    pub consumable_buffs:
+        Query<'w, 's, &'static mut ActiveConsumableBuffs, With<crate::player::Player>>,
+    pub food_bonuses: Query<
+        'w,
+        's,
+        &'static mut crate::attributes::FoodAttributeBonuses,
+        With<crate::player::Player>,
+    >,
 
     #[system_param(ignore)]
     marker: PhantomData<&'s ()>,
@@ -298,6 +339,13 @@ impl ItemActions {
                     item_action_param.bounce_event.send(BounceEvent);
                     item_action_param.use_item_event.send(UseItemEvent(obj));
                 }
+                ItemAction::GainStat(attr_name, delta) => {
+                    if let Ok(mut food) = item_action_param.food_bonuses.get_single_mut() {
+                        food.add(attr_name, *delta);
+                        item_action_param.attribute_change_event.send_default();
+                    }
+                    item_action_param.use_item_event.send(UseItemEvent(obj));
+                }
                 ItemAction::ApplyPeriodicHeal(heal, interval, total_duration) => {
                     push_player_consumable_buff(
                         item_action_param,
@@ -305,7 +353,10 @@ impl ItemActions {
                         *total_duration,
                         ConsumableBuffEffect::PeriodicHeal {
                             heal_per_tick: *heal,
-                            interval: Timer::from_seconds(interval.max(0.001), TimerMode::Repeating),
+                            interval: Timer::from_seconds(
+                                interval.max(0.001),
+                                TimerMode::Repeating,
+                            ),
                         },
                     );
                     item_action_param.use_item_event.send(UseItemEvent(obj));

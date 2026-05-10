@@ -93,6 +93,7 @@
         DesertSmlBoulder4: 0.0008,
         DesertSmlBoulder5: 0.0008,
         DesertSmlBoulder6: 0.0008,
+        DesertMetalBoulder: 0.001,
       },
        shrine_counts: {
         CombatShrine: (min: 2, max: 4),

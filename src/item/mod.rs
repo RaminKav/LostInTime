@@ -67,6 +67,7 @@ use projectile::handle_reset_proj_hit_enemies_state;
 use rand::Rng;
 
 mod crafting;
+pub mod food_recipes;
 pub mod item_actions;
 
 pub mod active_skill_shrine;
@@ -396,6 +397,8 @@ pub enum WorldObject {
     MetalShard,
     CoalBoulder,
     MetalBoulder,
+    DesertMetalBoulder,
+    SnowMetalBoulder,
     SlimeGooProjectile,
     StoneChunk,
     WoodSword,
@@ -606,6 +609,9 @@ pub enum WorldObject {
     Tumbleweed4,
     DesertCrate,
     DesertCrate2,
+    Bones,
+    CactusFlower,
+    CactusBerry,
 
     // SNOW
     SnowGrass1,
@@ -651,6 +657,7 @@ pub enum WorldObject {
     SnowBerryBushMed2,
     SnowMushroom1,
     SnowMushroom2,
+    BlueMushroom,
 
     SnowCrate1,
     SnowCrate2,
@@ -669,6 +676,20 @@ pub enum WorldObject {
     SnowFlower2Block,
     SnowDeadSapling,
     IcePatch,
+    YellowBerries,
+
+    SpeedFood,
+    HealthFood,
+    ManaFood,
+    ThornsFood,
+    CritChanceFood,
+    LifestealFood,
+    SkillPowerFood,
+    ManaRegenFood,
+    DodgeFood,
+    DefenceFood,
+    SizeFood,
+    AttackSpeedFood,
 }
 
 #[derive(

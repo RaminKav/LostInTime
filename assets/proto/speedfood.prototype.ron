@@ -1,0 +1,18 @@
+(
+  name: "SpeedFood",
+  templates: ["item_drop.prototype.ron"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": SpeedFood,
+  "survival_rogue_like::item::item_actions::ItemActions": (actions: [GainStat("speed", 7)]),
+  "survival_rogue_like::item::item_actions::ConsumableItem": (),
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: SpeedFood,
+        metadata: (
+            name: "Speed Boost", 
+            desc: ["Drink to permanently", "gain +7 speed.", "Made with ingredients", "from the Forest."]
+        ),
+        rarity: Rare,
+        count: 1
+  ),
+  }
+)

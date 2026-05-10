@@ -1,0 +1,17 @@
+(
+  name: "CactusBerry",
+  templates: ["item_drop.prototype.ron"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": CactusBerry,
+  "survival_rogue_like::item::item_actions::ItemActions": (actions: [ModifyHealth(5)]),
+  "survival_rogue_like::item::item_actions::ConsumableItem": (),
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: CactusBerry,
+        metadata: (
+            name: "Cactus Berries", 
+            desc: ["Crunchy and sharp", "cactus berries."]
+        ),
+        count: 1
+  ),
+  }
+)

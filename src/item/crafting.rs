@@ -260,11 +260,17 @@ pub fn get_crafting_inventory_item_stacks(
             .0
             .iter()
             .map(|ingredient| {
-                format!(
-                    "{}x {}",
-                    ingredient.count,
-                    proto.get_item_data(ingredient.item).unwrap().metadata.name
-                )
+                let ingredient_name = proto
+                    .get_item_data(ingredient.item)
+                    .map(|stack| stack.metadata.name.clone())
+                    .unwrap_or_else(|| {
+                        warn!(
+                            "Recipe ingredient {:?} has no ItemStack prototype (crafting UI desc); use an item_drop proto or fix recipe.",
+                            ingredient.item
+                        );
+                        format!("{}", ingredient.item)
+                    });
+                format!("{}x {}", ingredient.count, ingredient_name)
             })
             .collect();
         default_stack.metadata.desc = desc;

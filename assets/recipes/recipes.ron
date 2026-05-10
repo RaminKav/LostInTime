@@ -24,6 +24,29 @@
     (PinkFlowerStew, ([(item: PinkFlowerBlock, count: 2)], Inventory, 1)),
     (YellowFlowerStew, ([(item: YellowFlowerBlock, count: 2),(item: BrownMushroomBlock, count: 3)], Inventory, 1)),
     (BerryJam, ([(item: Berries, count: 2),(item: Blueberries, count: 2)], Inventory, 1)),
+
+    // --- Stat foods (Era-gated; require [`MagicGem`] + biome ingredients).  Effect (perma stat)
+    // is encoded on the food prototype's `ItemActions::GainStat`.  Era gating is enforced in the
+    // blueprints UI via `food_recipe_required_eras` (src/item/food_recipes.rs); recipes themselves
+    // are stored here so the crafting tracker / inventory crafting flow can resolve them normally.
+    // Era 1 foods
+    (SpeedFood, ([(item: YellowFlowerBlock, count: 3),(item: BrownMushroomBlock, count: 3),(item: MagicGem, count: 1)], Inventory, 1)),
+    (HealthFood, ([(item: RedFlowerBlock, count: 3),(item: RedMushroomBlock, count: 3),(item: MagicGem, count: 1)], Inventory, 1)),
+    (ManaFood, ([(item: Blueberries, count: 3),(item: MagicGem, count: 1)], Inventory, 1)),
+    // Era 2 foods
+    (ThornsFood, ([(item: CactusFlower, count: 3),(item: MagicGem, count: 1)], Inventory, 1)),
+    (CritChanceFood, ([(item: CactusBerry, count: 3),(item: MagicGem, count: 1)], Inventory, 1)),
+    (LifestealFood, ([(item: Bones, count: 4),(item: CactusBerry, count: 2),(item: MagicGem, count: 1)], Inventory, 1)),
+    // Era 3 foods
+    (SkillPowerFood, ([(item: SnowFlowerBlock, count: 3),(item: SnowFlower2Block, count: 3),(item: MagicGem, count: 1)], Inventory, 1)),
+    // Snow mushroom world protos have no ItemStack; RedMushroomBlock is the gatherable drop from SnowMushroom1.
+    (ManaRegenFood, ([(item: BlueMushroom, count: 4),(item: MagicGem, count: 1)], Inventory, 1)),
+    (DodgeFood, ([(item: YellowBerries, count: 3),(item: MagicGem, count: 1)], Inventory, 1)),
+    // Cross-era (Legendary) foods — unlock once both source eras are visited.
+    (DefenceFood, ([(item: SnowFlowerBlock, count: 2),(item: CactusFlower, count: 2),(item: MagicGem, count: 1)], Inventory, 1)),
+    (SizeFood, ([(item: CactusBerry, count: 2),(item: Apple, count: 2),(item: MagicGem, count: 1)], Inventory, 1)),
+    (AttackSpeedFood, ([(item: Berries, count: 2),(item: YellowBerries, count: 2),(item: MagicGem, count: 1)], Inventory, 1)),
+
     // (Chestplate, ([(item: MetalBar, count: 20)], Anvil, 1)),
     // (MetalPants, ([(item: MetalBar, count: 15)], Anvil, 1)),
     // (MetalShoes, ([(item: MetalBar, count: 10)], Anvil, 1)),
@@ -44,7 +67,7 @@
     // (YellowBeaconBlock, ([(item: YellowFlowerBlock, count: 5),(item: PlantFibre, count: 4),(item: MagicGem, count: 1)], Inventory, 1)),
     // (RedBeaconBlock, ([(item: RedFlowerBlock, count: 5),(item: PlantFibre, count: 4),(item: MagicGem, count: 1)], Inventory, 1)),
     // (PinkBeaconBlock, ([(item: PinkFlowerBlock, count: 5),(item: PlantFibre, count: 4),(item: MagicGem, count: 1)], Inventory, 1)),
-    (MagicTusk, ([(item: MagicGem, count: 1)], Inventory, 1)),
+    // (MagicTusk, ([(item: MagicGem, count: 1)], Inventory, 1)),
     
 ],
 [

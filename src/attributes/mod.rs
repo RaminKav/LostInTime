@@ -424,7 +424,13 @@ impl ItemAttributes {
         "".to_string()
     }
 
-    pub fn get_stats_summary(&self, curr_health: i32, curr_mana: i32) -> Vec<(String, String)> {
+    pub fn get_stats_summary(
+        &self,
+        curr_health: i32,
+        curr_mana: i32,
+        mp_regen_period_secs: Option<f32>,
+        hp_regen_period_secs: Option<f32>,
+    ) -> Vec<(String, String)> {
         let mut tooltips: Vec<(String, String)> = vec![];
         tooltips.push((
             "Health          ".to_string(),
@@ -461,10 +467,25 @@ impl ItemAttributes {
             "Skill Power     ".to_string(),
             format!("{}", self.skill_power),
         ));
-        tooltips.push(("Mana Regen  ".to_string(), format!("{}", self.mana_regen)));
+        tooltips.push((
+            "Mana Regen  ".to_string(),
+            match mp_regen_period_secs {
+                Some(secs) => {
+                    let s = (secs.max(0.0) * 10.0).round() / 10.0;
+                    format!("{} ({:.1}s)", self.mana_regen, s)
+                }
+                None => format!("{}", self.mana_regen),
+            },
+        ));
         tooltips.push((
             "Health Regen  ".to_string(),
-            format!("{}", self.health_regen),
+            match hp_regen_period_secs {
+                Some(secs) => {
+                    let s = (secs.max(0.0) * 10.0).round() / 10.0;
+                    format!("{} ({:.1}s)", self.health_regen, s)
+                }
+                None => format!("{}", self.health_regen),
+            },
         ));
         tooltips.push(("Thorns           ".to_string(), format!("{}", self.thorns)));
         tooltips.push((
@@ -1234,6 +1255,26 @@ impl AttackSpeed {
     }
 }
 
+/// Permanent stat bonuses gained from consuming "stat foods" (Rare/Legendary foods crafted from
+/// flowers/berries/etc + a [`WorldObject::MagicGem`]). Applied by [`item_actions::ItemAction::GainStat`].
+///
+/// Combined into the player's effective [`ItemAttributes`] alongside other sources (equipment,
+/// inventory buffs, set bonuses, heirloom stats) inside `handle_player_item_attribute_change_events`.
+#[derive(Default, Component, Clone, Debug)]
+pub struct FoodAttributeBonuses {
+    pub bonuses: ItemAttributes,
+}
+
+impl FoodAttributeBonuses {
+    /// Adds `delta` to the named attribute. Unknown names are warned about by [`ItemAttributes::change_attribute`].
+    pub fn add(&mut self, attribute_name: &str, delta: i32) {
+        self.bonuses.change_attribute(AttributeModifier {
+            modifier: attribute_name.to_string(),
+            delta,
+        });
+    }
+}
+
 #[derive(Component, Clone, Debug, Default)]
 pub struct BonusAttackSpeed {
     pub multiplier: f32,
@@ -1532,6 +1573,7 @@ fn handle_player_item_attribute_change_events(
             Option<&ThornsOnDamageTracker>,
             Option<&SkillPowerHuntTracker>,
             Option<&BonusAttackSpeed>,
+            Option<&FoodAttributeBonuses>,
         ),
         With<Player>,
     >,
@@ -1557,6 +1599,7 @@ fn handle_player_item_attribute_change_events(
             thorns_on_damage_tracker,
             skill_power_hunt_tracker,
             bonus_attack_speed,
+            food_bonuses,
         ) = player_atts.single();
         let mut new_att = att.clone();
         let (player, inv) = player.single();
@@ -1581,6 +1624,11 @@ fn handle_player_item_attribute_change_events(
         // Combine heirloom stats bonuses from HeirloomStats blessing
         if let Some(heirloom_stats) = heirloom_stats_bonuses {
             new_att = new_att.combine(heirloom_stats.as_item_attributes());
+        }
+
+        // Combine permanent stat bonuses gained from consuming stat foods (GainStat action)
+        if let Some(food) = food_bonuses {
+            new_att = new_att.combine(&food.bonuses);
         }
 
         // Calculate inventory buffs from items in inventory (not hotbar)

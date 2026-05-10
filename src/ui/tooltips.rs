@@ -5,6 +5,9 @@ use crate::{
     assets::{asset_helpers::spawn_sprite, Graphics},
     attributes::{
         add_item_glows,
+        health_regen::{
+            effective_regen_period_secs, HealthRegenTimer, ManaRegenTimer,
+        },
         set_bonus::{EquipmentSet, SET_PIECES_REQUIRED},
         Attack, AttackSpeed, AttributeQuality, AttributeValue, BonusDamage, CritChance, CritDamage,
         CurrentHealth, CurrentMana, Defence, Dodge, Healing, HealthRegen, ItemAttributes,
@@ -22,7 +25,11 @@ use crate::{
     },
     inventory::{Inventory, ItemStack},
     item::{item_actions::ItemActions, EquipmentType, WorldObject},
-    player::{stats::StatType, Player},
+    player::{
+        skills::{Heirloom, PlayerSkills},
+        stats::StatType,
+        Player,
+    },
     proto::proto_param::ProtoParam,
     ui::{
         game_fonts::{self as gf, paths},
@@ -899,6 +906,9 @@ pub fn handle_spawn_inv_player_stats(
             &PickupRange,
             &AttackSpeed,
             &HealthRegen,
+            &ManaRegenTimer,
+            &HealthRegenTimer,
+            &PlayerSkills,
         ),
         With<Player>,
     >,
@@ -971,7 +981,19 @@ pub fn handle_spawn_inv_player_stats(
             pickup_range,
             attack_speed,
             health_regen,
+            mana_regen_timer,
+            health_regen_timer,
+            skills,
         ) = player_stats.single();
+
+        let mp_regen_period_secs = effective_regen_period_secs(
+            mana_regen_timer.0.duration().as_secs_f32(),
+            skills.get_count(Heirloom::MPRegenCooldown),
+        );
+        let hp_regen_period_secs = effective_regen_period_secs(
+            health_regen_timer.0.duration().as_secs_f32(),
+            skills.get_count(Heirloom::HPRegenCooldown),
+        );
 
         let attributes = ItemAttributes {
             attack: AttributeValue::new(attack.0, AttributeQuality::Low, 0.),
@@ -996,7 +1018,12 @@ pub fn handle_spawn_inv_player_stats(
             health_regen: AttributeValue::new(health_regen.0, AttributeQuality::Low, 0.),
             ..Default::default()
         }
-        .get_stats_summary(curr_health.0, curr_mana.0);
+        .get_stats_summary(
+            curr_health.0,
+            curr_mana.0,
+            Some(mp_regen_period_secs),
+            Some(hp_regen_period_secs),
+        );
 
         let _ = spawn_stats_tooltip_at(
             &mut commands,
@@ -1009,7 +1036,8 @@ pub fn handle_spawn_inv_player_stats(
     }
 }
 
-/// Value column uses bold (`slkscrbold`); parenthetical bits and the dodge `%` use regular `slkscr`.
+/// Value column uses bold (`slkscrbold`); parenthetical bits (mitigation %, damage mult `x`, regen `(Ns)`)
+/// and the dodge `%` use regular `slkscr`.
 fn stat_tooltip_value_text(
     value: &str,
     bold_font: Handle<Font>,
@@ -1023,7 +1051,15 @@ fn stat_tooltip_value_text(
         // Defence `42 (37%)` or attack `123 (1.30x)` — trailing non-bold parenthetical.
         let is_mitigation = after.ends_with(')') && after.contains('%') && !after.contains('x');
         let is_damage_mult = after.ends_with(')') && after.contains('x') && !after.contains('%');
-        if is_mitigation || is_damage_mult {
+        // Regen cooldown `15 (2.3s)` — same split; require numeric `Ns` so `(10 stacks)` etc. stay bold-only.
+        let is_regen_cd_secs = after.ends_with("s)")
+            && !after.contains('%')
+            && !after.contains('x')
+            && after
+                .strip_suffix("s)")
+                .and_then(|inner| inner.parse::<f32>().ok())
+                .is_some();
+        if is_mitigation || is_damage_mult || is_regen_cd_secs {
             return Text {
                 sections: vec![
                     TextSection {

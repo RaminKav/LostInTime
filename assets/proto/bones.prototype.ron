@@ -1,0 +1,15 @@
+(
+  name: "Bones",
+  templates: ["item_drop.prototype.ron"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": Bones,
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: Bones,
+        metadata: (
+            name: "Bone", 
+            desc: ["A bone from a", "dead animal.", "Might be useful in", "a recipe."]
+        ),
+        count: 1
+  ),
+  }
+)

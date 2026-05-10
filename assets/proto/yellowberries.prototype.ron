@@ -1,0 +1,17 @@
+(
+  name: "YellowBerries",
+  templates: ["item_drop.prototype.ron"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": YellowBerries,
+  "survival_rogue_like::item::item_actions::ItemActions": (actions: [ModifyHealth(5)]),
+  "survival_rogue_like::item::item_actions::ConsumableItem": (),
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: YellowBerries,
+        metadata: (
+            name: "Yellow Berries", 
+            desc: ["Crunchy and juicy", "Yellow Berries. So", "refreshing!"]
+        ),
+        count: 1
+  ),
+  }
+)

@@ -870,7 +870,7 @@ pub fn handle_game_over_final_stats_tooltip(
                 attack_speed: AttributeValue::new(attack_speed.0, AttributeQuality::Low, 0.),
                 ..Default::default()
             }
-            .get_stats_summary(curr_health.0, curr_mana.0);
+            .get_stats_summary(curr_health.0, curr_mana.0, None, None);
 
             // Hitbox is centered above "Try Again"; place tooltip up and to the left so it stays on-screen.
             let tooltip_pos = Vec3::new(-125., 18., 2.);

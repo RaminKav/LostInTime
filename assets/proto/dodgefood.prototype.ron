@@ -1,0 +1,18 @@
+(
+  name: "DodgeFood",
+  templates: ["item_drop.prototype.ron"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": DodgeFood,
+  "survival_rogue_like::item::item_actions::ItemActions": (actions: [GainStat("dodge", 5)]),
+  "survival_rogue_like::item::item_actions::ConsumableItem": (),
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: DodgeFood,
+        metadata: (
+            name: "Dodge Boost", 
+            desc: ["Drink to permanently", " gain+5 dodge.", "Made with ingredients", "from the Tundra."]
+        ),
+        rarity: Rare,
+        count: 1
+  ),
+  }
+)

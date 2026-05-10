@@ -1,0 +1,18 @@
+(
+  name: "ThornsFood",
+  templates: ["item_drop.prototype.ron"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": ThornsFood,
+  "survival_rogue_like::item::item_actions::ItemActions": (actions: [GainStat("thorns", 15)]),
+  "survival_rogue_like::item::item_actions::ConsumableItem": (),
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: ThornsFood,
+        metadata: (
+            name: "Thorns Boost", 
+            desc: ["Drink to permanently", "gain +15 thorns.", "Made with ingredients", "from the Desert."]
+        ),
+        rarity: Rare,
+        count: 1
+  ),
+  }
+)

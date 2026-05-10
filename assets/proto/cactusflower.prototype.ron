@@ -1,0 +1,15 @@
+(
+  name: "CactusFlower",
+  templates: ["item_drop.prototype.ron"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": CactusFlower,
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: CactusFlower,
+        metadata: (
+            name: "Cactus Flower", 
+            desc: ["A sharp flower.", "Might help in a","recipe."]
+        ),
+        count: 1
+  ),
+  }
+)
