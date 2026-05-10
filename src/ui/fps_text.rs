@@ -5,7 +5,7 @@ use bevy::{
 };
 
 use crate::{ui::game_fonts as gf, ScreenResolution, UICamera, DEBUG};
-const VERSION: &str = "v0.18.1";
+const VERSION: &str = "v0.18.2";
 #[derive(Component)]
 pub struct FPSText;
 

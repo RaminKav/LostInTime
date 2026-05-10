@@ -1959,6 +1959,9 @@ pub fn handle_cursor_main_menu_buttons(
                 | MenuButton::OptionsRestart
                 | MenuButton::OptionsExit
                 | MenuButton::ShowTutorial
+                | MenuButton::WipeGameData
+                | MenuButton::WipeDataConfirm
+                | MenuButton::WipeDataCancel
         );
         match hit_test {
             Some(hit_ent) if hit_ent.0 == e => match interactable.current() {

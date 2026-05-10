@@ -302,7 +302,7 @@ impl Plugin for UIPlugin {
             .init_resource::<ClassUnlockHoverState>()
             .init_resource::<ClassUnlockConfirmState>()
             .init_resource::<SkillUnlockConfirmState>()
-            .init_resource::<CheatSettings>()
+            .insert_resource(CheatSettings::load_from_game_data())
             .insert_resource(RunUnlockState::default())
             .init_resource::<AchievementsPagination>()
             .init_resource::<MicrowaveShrineUsages>()

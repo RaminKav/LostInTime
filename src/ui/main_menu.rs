@@ -48,6 +48,7 @@ use crate::{
 use super::{
     essence_ui::EssenceShopCache,
     minimap::{FogOfWarData, MinimapTileCache},
+    options_ui::{spawn_wipe_data_popup, WipeDataPopup},
     player_hud::XpBarFadeIn,
     scrapper_ui::ScrapperEvent,
     Interactable, UIElement,
@@ -86,6 +87,9 @@ pub struct MenuButtonExtras<'w, 's> {
     screen_res: Res<'w, ScreenResolution>,
     player_class: Option<Res<'w, PlayerClass>>,
     game_state: Res<'w, State<GameState>>,
+    wipe_popup: Query<'w, 's, Entity, With<WipeDataPopup>>,
+    graphics: Res<'w, Graphics>,
+    asset_server: Res<'w, AssetServer>,
 }
 
 #[derive(Component, Clone, Eq, Display, Debug, PartialEq)]
@@ -110,6 +114,9 @@ pub enum MenuButton {
     OptionsRestart,
     OptionsExit,
     ShowTutorial,
+    WipeGameData,
+    WipeDataConfirm,
+    WipeDataCancel,
 }
 #[derive(Component)]
 pub struct InfoModal;
@@ -185,6 +192,15 @@ pub fn handle_menu_button_click_events(
 ) {
     for event in event_reader.iter() {
         let info_modal_open = extras.info_modal.iter().next().is_some();
+        let wipe_popup_open = extras.wipe_popup.iter().next().is_some();
+        if wipe_popup_open
+            && !matches!(
+                event.button,
+                MenuButton::WipeDataConfirm | MenuButton::WipeDataCancel
+            )
+        {
+            continue;
+        }
 
         // Block all menu interactions when name entry popup is open
         if current_ui_state.0 == UIState::EnterName {
@@ -495,6 +511,26 @@ pub fn handle_menu_button_click_events(
                 }
                 commands.insert_resource(crate::ui::tutorial_ui::TutorialReplayRequested);
                 next_ui_state.set(UIState::Closed);
+            }
+            MenuButton::WipeGameData => {
+                if current_ui_state.0 != UIState::Options {
+                    continue;
+                }
+                if extras.wipe_popup.iter().next().is_some() {
+                    continue;
+                }
+                spawn_wipe_data_popup(&mut commands, &extras.graphics, &extras.asset_server);
+            }
+            MenuButton::WipeDataCancel => {
+                for e in extras.wipe_popup.iter() {
+                    commands.entity(e).despawn_recursive();
+                }
+            }
+            MenuButton::WipeDataConfirm => {
+                info!("Wiping game data: deleting game_data.json and save state");
+                let _ = fs::remove_file(datafiles::game_data());
+                let _ = fs::remove_file(datafiles::save_file());
+                exit(0);
             }
         }
     }

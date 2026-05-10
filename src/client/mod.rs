@@ -237,6 +237,9 @@ pub struct GameData {
     pub audio_volume: Option<crate::audio::AudioVolume>,
     #[serde(default)]
     pub auto_attack: Option<crate::inputs::AutoAttackState>,
+    /// Options screen: "Unlock All Classes" cheat (`CheatSettings::bypass_class_unlocks`).
+    #[serde(default)]
+    pub bypass_class_unlocks: Option<bool>,
     #[serde(default)]
     pub player_name: Option<String>,
     #[serde(default)]

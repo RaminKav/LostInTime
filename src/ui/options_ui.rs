@@ -2,10 +2,15 @@ use bevy::prelude::*;
 use bevy::render::view::RenderLayers;
 use bevy::sprite::Anchor;
 
+use std::fs::File;
+use std::io::{BufReader, BufWriter};
+
 use crate::{
     assets::Graphics,
     audio::{AudioSoundEffect, AudioVolume, SoundSpawner},
+    client::GameData,
     cursor::CursorPos,
+    datafiles,
     inputs::AutoAttackState,
     keybinds::InputMappings,
     ui::{
@@ -38,15 +43,47 @@ pub struct CheatSettings {
 impl Default for CheatSettings {
     fn default() -> Self {
         Self {
-            bypass_class_unlocks: true,
+            bypass_class_unlocks: false,
             color_blind_mode: false,
             dev_mode: false,
             show_enemy_damage_numbers: true,
-            show_tile_hover: true,
+            show_tile_hover: false,
             bypass_time_crystal_pool: false,
             hide_attack_anims: false,
             hide_skill_anims: false,
             hide_heirloom_anims: false,
+        }
+    }
+}
+
+impl CheatSettings {
+    /// Builds settings from defaults, then overrides `bypass_class_unlocks` from `game_data.json` when present.
+    pub fn load_from_game_data() -> Self {
+        let mut s = Self::default();
+        let path = datafiles::game_data();
+        if let Ok(file) = File::open(&path) {
+            let reader = BufReader::new(file);
+            if let Ok(game_data) = GameData::try_from_json_reader(reader) {
+                if let Some(v) = game_data.bypass_class_unlocks {
+                    s.bypass_class_unlocks = v;
+                }
+            }
+        }
+        s
+    }
+
+    pub fn persist_bypass_class_unlocks(bypass_class_unlocks: bool) {
+        let path = datafiles::game_data();
+        let mut game_data = if let Ok(file) = File::open(&path) {
+            let reader = BufReader::new(file);
+            GameData::try_from_json_reader(reader).unwrap_or_default()
+        } else {
+            GameData::default()
+        };
+        game_data.bypass_class_unlocks = Some(bypass_class_unlocks);
+        if let Ok(file) = File::create(&path) {
+            let writer = BufWriter::new(file);
+            let _ = serde_json::to_writer_pretty(writer, &game_data);
         }
     }
 }
@@ -80,6 +117,10 @@ pub fn boss_warning_indicator_color(settings: &CheatSettings) -> Color {
 
 #[derive(Component)]
 pub struct OptionsUI;
+
+/// Marker for the "Wipe Game Data" confirmation popup (overlay + panel + buttons).
+#[derive(Component)]
+pub struct WipeDataPopup;
 
 #[derive(Component)]
 pub struct KeyBindButton {
@@ -298,8 +339,15 @@ pub fn update_keybind_text(
     }
 }
 
-pub fn cleanup_options_ui(mut commands: Commands, query: Query<Entity, With<OptionsUI>>) {
+pub fn cleanup_options_ui(
+    mut commands: Commands,
+    query: Query<Entity, With<OptionsUI>>,
+    popup: Query<Entity, With<WipeDataPopup>>,
+) {
     for entity in query.iter() {
+        commands.entity(entity).despawn_recursive();
+    }
+    for entity in popup.iter() {
         commands.entity(entity).despawn_recursive();
     }
 }
@@ -833,6 +881,20 @@ pub fn setup_options_ui(
             crate::ui::UIElement::AchievementsButton,
         );
         commands.entity(exit_button).insert(OptionsUI);
+    } else {
+        // Wipe Game Data button (only on the main-menu options screen, not during a run).
+        let wipe_btn = crate::ui::main_menu::spawn_menu_button(
+            Vec3::new(0., -156., ui_helpers::Z_DEPTH_OPTIONS_CONTENT),
+            Vec3::new(-58., -1., 1.),
+            "Wipe Game Data",
+            crate::ui::main_menu::MenuButton::WipeGameData,
+            Vec2::new(130., 18.),
+            &mut commands,
+            &graphics,
+            &asset_server,
+            crate::ui::UIElement::AchievementsButton,
+        );
+        commands.entity(wipe_btn).insert(OptionsUI);
     }
 
     // Back Button
@@ -1059,6 +1121,9 @@ pub fn handle_cheat_checkbox_click(
                             OptionsCheckboxType::UnlockAllClasses => {
                                 cheat_settings.bypass_class_unlocks =
                                     !cheat_settings.bypass_class_unlocks;
+                                CheatSettings::persist_bypass_class_unlocks(
+                                    cheat_settings.bypass_class_unlocks,
+                                );
                                 (
                                     cheat_settings.bypass_class_unlocks,
                                     if cheat_settings.bypass_class_unlocks {
@@ -1491,6 +1556,184 @@ pub fn handle_volume_button_click(
             }
         }
     }
+}
+
+/// Spawns the "Wipe Game Data" confirmation popup: a semi-transparent black full-screen
+/// backdrop with a centered panel containing a warning message and Delete / Back buttons.
+pub fn spawn_wipe_data_popup(
+    commands: &mut Commands,
+    graphics: &Graphics,
+    asset_server: &AssetServer,
+) {
+    use crate::ui::main_menu::MenuButton;
+
+    // Backdrop: semi-transparent black full-screen overlay, above the options content.
+    let backdrop_z = ui_helpers::Z_DEPTH_OPTIONS_CONTENT + 5.0;
+    let backdrop = commands
+        .spawn((
+            SpriteBundle {
+                sprite: Sprite {
+                    color: Color::rgba(0.0, 0.0, 0.0, 0.7),
+                    custom_size: Some(Vec2::new(10000., 10000.)),
+                    ..Default::default()
+                },
+                transform: Transform::from_translation(Vec3::new(0., 0., backdrop_z)),
+                ..Default::default()
+            },
+            RenderLayers::from_layers(&[3]),
+            UIState::Options,
+            WipeDataPopup,
+            Name::new("Wipe Data Popup Backdrop"),
+        ))
+        .id();
+
+    // Panel
+    let panel = commands
+        .spawn((
+            SpriteBundle {
+                sprite: Sprite {
+                    color: Color::rgba(0.05, 0.05, 0.05, 0.95),
+                    custom_size: Some(Vec2::new(260., 110.)),
+                    ..Default::default()
+                },
+                transform: Transform::from_translation(Vec3::new(0., 0., 1.)),
+                ..Default::default()
+            },
+            RenderLayers::from_layers(&[3]),
+            UIState::Options,
+            WipeDataPopup,
+            Name::new("Wipe Data Popup Panel"),
+        ))
+        .id();
+    commands.entity(panel).set_parent(backdrop);
+
+    // Title
+    commands
+        .spawn((
+            Text2dBundle {
+                text: Text::from_section(
+                    "Wipe Game Data?",
+                    TextStyle {
+                        font: asset_server.load("fonts/alagard.ttf"),
+                        font_size: 30.0,
+                        color: crate::colors::YELLOW_2,
+                    },
+                )
+                .with_alignment(TextAlignment::Center),
+                text_anchor: Anchor::Center,
+                transform: Transform::from_translation(Vec3::new(0., 36., 1.)),
+                ..Default::default()
+            },
+            RenderLayers::from_layers(&[3]),
+            UIState::Options,
+            WipeDataPopup,
+            Name::new("Wipe Data Popup Title"),
+        ))
+        .set_parent(panel);
+
+    // Warning text
+    commands
+        .spawn((
+            Text2dBundle {
+                text: Text::from_section(
+                    "This will reset all game progress\n\nto a fresh account.\n\nThis cannot be undone.",
+                    TextStyle {
+                        font: asset_server.load("fonts/4x5.ttf"),
+                        font_size: 5.0,
+                        color: crate::colors::WHITE,
+                    },
+                )
+                .with_alignment(TextAlignment::Center),
+                text_anchor: Anchor::Center,
+                transform: Transform::from_translation(Vec3::new(0., 4., 1.)),
+                ..Default::default()
+            },
+            RenderLayers::from_layers(&[3]),
+            UIState::Options,
+            WipeDataPopup,
+            Name::new("Wipe Data Popup Warning"),
+        ))
+        .set_parent(panel);
+
+    // Delete button (left)
+    let delete_btn = commands
+        .spawn((
+            SpriteBundle {
+                texture: graphics.get_ui_element_texture(UIElement::BackButton),
+                sprite: Sprite {
+                    custom_size: Some(Vec2::new(80., 18.)),
+                    ..Default::default()
+                },
+                transform: Transform::from_translation(Vec3::new(-50., -30., 1.)),
+                ..Default::default()
+            },
+            RenderLayers::from_layers(&[3]),
+            Interactable::default(),
+            UIElement::BackButton,
+            MenuButton::WipeDataConfirm,
+            UIState::Options,
+            WipeDataPopup,
+            Name::new("Wipe Data Delete Button"),
+        ))
+        .id();
+    commands.entity(delete_btn).set_parent(panel);
+    commands
+        .spawn(Text2dBundle {
+            text: Text::from_section(
+                "Delete",
+                TextStyle {
+                    font: asset_server.load("fonts/alagard.ttf"),
+                    font_size: 15.0,
+                    color: crate::colors::WHITE,
+                },
+            )
+            .with_alignment(TextAlignment::Center),
+            text_anchor: Anchor::Center,
+            transform: Transform::from_translation(Vec3::new(0., -1., 1.)),
+            ..Default::default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .set_parent(delete_btn);
+
+    // Back button (right)
+    let back_btn = commands
+        .spawn((
+            SpriteBundle {
+                texture: graphics.get_ui_element_texture(UIElement::BackButton),
+                sprite: Sprite {
+                    custom_size: Some(Vec2::new(80., 18.)),
+                    ..Default::default()
+                },
+                transform: Transform::from_translation(Vec3::new(50., -30., 1.)),
+                ..Default::default()
+            },
+            RenderLayers::from_layers(&[3]),
+            Interactable::default(),
+            UIElement::BackButton,
+            MenuButton::WipeDataCancel,
+            UIState::Options,
+            WipeDataPopup,
+            Name::new("Wipe Data Back Button"),
+        ))
+        .id();
+    commands.entity(back_btn).set_parent(panel);
+    commands
+        .spawn(Text2dBundle {
+            text: Text::from_section(
+                "Back",
+                TextStyle {
+                    font: asset_server.load("fonts/alagard.ttf"),
+                    font_size: 15.0,
+                    color: crate::colors::WHITE,
+                },
+            )
+            .with_alignment(TextAlignment::Center),
+            text_anchor: Anchor::Center,
+            transform: Transform::from_translation(Vec3::new(0., -1., 1.)),
+            ..Default::default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .set_parent(back_btn);
 }
 
 pub fn update_volume_text(
