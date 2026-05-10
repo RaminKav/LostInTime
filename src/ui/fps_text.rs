@@ -4,11 +4,8 @@ use bevy::{
     render::view::RenderLayers,
 };
 
-use crate::{
-    ui::game_fonts as gf,
-    ScreenResolution, UICamera, DEBUG,
-};
-const VERSION: &str = "v0.18.0";
+use crate::{ui::game_fonts as gf, ScreenResolution, UICamera, DEBUG};
+const VERSION: &str = "v0.18.1";
 #[derive(Component)]
 pub struct FPSText;
 

@@ -9,7 +9,7 @@
         obj_type: DodgeFood,
         metadata: (
             name: "Dodge Boost", 
-            desc: ["Drink to permanently", " gain+5 dodge.", "Made with ingredients", "from the Tundra."]
+            desc: ["Drink to permanently", "gain +5 dodge.", "Made with ingredients", "from the Tundra."]
         ),
         rarity: Rare,
         count: 1
