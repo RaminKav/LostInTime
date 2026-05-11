@@ -1,6 +1,14 @@
 use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
 
+use bevy_aseprite::{anim::AsepriteAnimation, aseprite, Aseprite, AsepriteBundle};
 use bevy_proto::prelude::ProtoCommands;
+
+aseprite!(pub CraftingArrowAse, "textures/effects/CraftingArrow.aseprite");
+
+/// Marker for the indicator arrow spawned over the crafting result slot when the
+/// player has all the ingredients needed for the selected recipe.
+#[derive(Component)]
+pub struct CraftingArrowIndicator;
 
 use crate::chaos::ChaosTracker;
 use crate::colors::{
@@ -729,7 +737,7 @@ pub fn setup_inv_ui(
     // so the player can flip between the two side-panel layouts.  The visual is the
     // `CraftButton` sprite (which has a matching `CraftButtonHover` variant handled by the
     // hover highlight system), and the label text sits as a child of that sprite.
-    let toggle_label = if is_crafting_mode { "Done" } else { "Craft" };
+    let toggle_label = if is_crafting_mode { "Back" } else { "Craft" };
     let toggle_button = commands
         .spawn(SpriteBundle {
             texture: graphics.get_ui_element_texture(UIElement::CraftButton),
@@ -2064,6 +2072,7 @@ pub fn refresh_crafting_ingredient_display(
     result_slots: Query<Entity, With<CraftingResultSlot>>,
     existing_ing_icons: Query<Entity, With<CraftingIngredientIcon>>,
     existing_result_icons: Query<Entity, With<CraftingResultIcon>>,
+    existing_arrows: Query<Entity, With<CraftingArrowIndicator>>,
     mut count_texts: Query<(&mut Text, &CraftingIngredientCountText)>,
     graphics: Res<Graphics>,
     asset_server: Res<AssetServer>,
@@ -2084,6 +2093,9 @@ pub fn refresh_crafting_ingredient_display(
         commands.entity(e).despawn_recursive();
     }
     for e in existing_result_icons.iter() {
+        commands.entity(e).despawn_recursive();
+    }
+    for e in existing_arrows.iter() {
         commands.entity(e).despawn_recursive();
     }
 
@@ -2185,6 +2197,22 @@ pub fn refresh_crafting_ingredient_display(
                 }
             });
             commands.entity(result_entity).push_children(&[icon]);
+        }
+
+        if all_satisfied {
+            let arrow = commands
+                .spawn(AsepriteBundle {
+                    aseprite: asset_server.load::<Aseprite, _>(CraftingArrowAse::PATH),
+                    animation: AsepriteAnimation::from(CraftingArrowAse::tags::IDLE),
+                    transform: Transform::from_translation(Vec3::new(0., 2., 4.)),
+                    ..Default::default()
+                })
+                .insert(Name::new("CRAFTING ARROW INDICATOR"))
+                .insert(CraftingArrowIndicator)
+                .insert(UIState::InventoryCrafting)
+                .insert(RenderLayers::from_layers(&[3]))
+                .id();
+            commands.entity(result_entity).push_children(&[arrow]);
         }
     }
 }
