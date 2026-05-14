@@ -1,0 +1,129 @@
+(
+  name: "Scorpion",
+  templates: [],
+  schematics: {
+    "survival_rogue_like::enemy::Mob": Scorpion,
+    "survival_rogue_like::proto::KCC": (),
+    "survival_rogue_like::combat::status_effects::StatusEffectTracker": (effects: []),
+    "survival_rogue_like::world::y_sort::YSort": (1.),
+    "survival_rogue_like::enemy::CombatAlignment": Hostile,
+    "survival_rogue_like::enemy::FollowSpeed": (0.65),
+    "survival_rogue_like::enemy::scorpion::ScorpionClawAttack": (
+        activation_distance: 64.,
+        cooldown: 1.4,
+        prep_duration: 0.4,
+        loop_duration: 0.3,
+        lunge_duration: 0.25,
+        lunge_speed: 220.,
+        hitbox_duration: 0.3,
+        hitbox_offset: 22.,
+    ),
+    "survival_rogue_like::enemy::scorpion::ScorpionTailAttack": (
+        activation_distance: 160.,
+        cooldown: 2.0,
+        prep_duration: 0.5,
+        loop_duration: 0.3,
+        num_waves: 3,
+        projectiles_per_wave: 3,
+        cone_half_angle: 0.35,
+        wave_duration: 0.35,
+    ),
+    "survival_rogue_like::enemy::scorpion::ScorpionTornadoAttack": (
+        interval: 10.0,
+        tornado_duration: 20.0,
+        tornado_speed: 55.,
+        spawn_distance: 32.,
+    ),
+    "survival_rogue_like::proto::ColliderCapsulProto": (x1: -6., y1: -10., x2: 6., y2: -10., r: 18.),
+    "survival_rogue_like::attributes::MaxHealth": (1500),
+    "survival_rogue_like::attributes::Attack": (18),
+    "survival_rogue_like::enemy::MobLevel": (1),
+    "survival_rogue_like::item::loot_table::LootTable": (
+        drops: [(
+                item: SmallPotion,
+                min: 1,
+                max: 1,
+                rate: 0.5
+            ),
+            (
+                item: LargePotion,
+                min: 1,
+                max: 1,
+                rate: 0.25
+            ),
+            (
+                item: ChestBlock,
+                min: 1,
+                max: 1,
+                rate: 1.
+            ),
+            (
+                item: HeirloomChest,
+                min: 1,
+                max: 1,
+                rate: 1.
+            ),
+            (
+                item: UpgradeTome,
+                min: 1,
+                max: 2,
+                rate: 0.75
+            ),
+            (
+                item: UpgradeTome,
+                min: 1,
+                max: 2,
+                rate: 0.45
+            ),
+            (
+                item: OrbOfTransformation,
+                min: 1,
+                max: 1,
+                rate: 0.85
+            ),
+            (
+                item: OrbOfTransformation,
+                min: 1,
+                max: 1,
+                rate: 0.85
+            ),
+            (
+                item: TimeFragment,
+                min: 2,
+                max: 4,
+                rate: 1.
+            ),
+            (
+                item: Coin,
+                min: 8,
+                max: 13,
+                rate: 1.
+            ),
+            (
+                item: XPShardLarge,
+                min: 1,
+                max: 1,
+                rate: 1.
+            ),
+            (
+                item: XPShard,
+                min: 1,
+                max: 1,
+                rate: 1.
+            ),
+            (
+                item: XPShard,
+                min: 1,
+                max: 1,
+                rate: 1.
+            ),
+            (
+                item: XPShard,
+                min: 1,
+                max: 1,
+                rate: 1.
+            ),
+            ]
+        ),
+  }
+)

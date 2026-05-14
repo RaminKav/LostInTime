@@ -30,6 +30,7 @@ use crate::{
         RawItemBaseAttributes, RawItemBonusAttributes,
     },
     enemy::{
+        scorpion::{ScorpionClawAttack, ScorpionTailAttack, ScorpionTornadoAttack},
         BullChargeAttack, CircleAttack, CombatAlignment, EnemyMaterial, FollowSpeed, LeapAttack,
         Mob, MobLevel, MultiLeapAttack, ProjectileAttack,
     },
@@ -151,6 +152,9 @@ impl Plugin for ProtoPlugin {
             .register_type::<CircleAttack>()
             .register_type::<MultiLeapAttack>()
             .register_type::<BullChargeAttack>()
+            .register_type::<ScorpionClawAttack>()
+            .register_type::<ScorpionTailAttack>()
+            .register_type::<ScorpionTornadoAttack>()
             .register_type::<RangeInclusive<i32>>()
             .register_type_data::<Range<i32>, ReflectDeserialize>()
             .register_type_data::<RangeInclusive<i32>, ReflectDeserialize>()

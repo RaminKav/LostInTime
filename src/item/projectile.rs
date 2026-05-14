@@ -102,6 +102,7 @@ pub enum Projectile {
     CactusSlam,
     PossessedBlade,
     ArrowVolleyShot,
+    ScorpionProjectile,
 }
 
 impl Projectile {
@@ -136,6 +137,7 @@ impl Projectile {
             Projectile::DaggerThrow => Some(-0.7853982),    // -45°
             Projectile::PossessedBlade => Some(-0.7853982), // -45°
             Projectile::CrowFeather => Some(-0.7853982),    // -45°
+            Projectile::ScorpionProjectile => Some(std::f32::consts::FRAC_PI_2), // sprite is +Y; align with velocity
             _ => None,
         }
     }

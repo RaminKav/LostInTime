@@ -97,8 +97,11 @@ pub fn change_anim_offset_when_character_action_state_changes(
         }
     }
 }
-/// Only runs for legacy sprite-sheet mobs. Aseprite-based mobs (AsepriteBasicEnemy) are excluded
-/// so their atlas is not overwritten with mob_spritesheets data they don't have.
+/// Only runs for legacy sprite-sheet mobs. Aseprite-based mobs are excluded so their atlas is
+/// not overwritten with mob_spritesheets data they don't have:
+/// - [`AsepriteBasicEnemy`] for shared walk+lunge aseprite mobs
+/// - [`AsepriteAnimation`] for any other aseprite-driven mob (e.g. bosses) that may still carry
+///   [`FacingDirection`] for AI; those use their own sheet from [`AsepriteBundle`].
 pub fn change_character_anim_direction(
     mut mob_query: Query<
         (
@@ -108,7 +111,11 @@ pub fn change_character_anim_direction(
             &Mob,
             Option<&LeftFacingSideProfile>,
         ),
-        (Changed<FacingDirection>, Without<AsepriteBasicEnemy>),
+        (
+            Changed<FacingDirection>,
+            Without<AsepriteBasicEnemy>,
+            Without<AsepriteAnimation>,
+        ),
     >,
     mut texture_atlases: ResMut<Assets<TextureAtlas>>,
     _asset_server: Res<AssetServer>,

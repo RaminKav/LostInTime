@@ -952,6 +952,10 @@ pub enum Heirloom {
     ManaRegenLightning, // Mana regen has a 10% chance per stack to trigger lightning
     ManaRegenPoison,    // Every 100 mana regen applies poison to all enemies
     SkillManaRegen,     // Using a skill has a 20% chance to trigger mana regen
+    /// Chance on each non-heirloom damage hit to restore 1 MP (1% + 1% per stack).
+    DamageDealtMp,
+    /// Additive multiplier to base Mana Orb drop chance (1 + stacks: 2x, 3x, ...).
+    ManaOrbDropMult,
 }
 
 pub enum HeirloomTrait {
@@ -1101,6 +1105,8 @@ impl Heirloom {
             Heirloom::ManaRegenLightning => "Lightning Cape".to_string(),
             Heirloom::ManaRegenPoison => "Toxic Tome".to_string(),
             Heirloom::SkillManaRegen => "Brown Card".to_string(),
+            Heirloom::DamageDealtMp => "Blue Card".to_string(),
+            Heirloom::ManaOrbDropMult => "Purple Card".to_string(),
         }
     }
     pub fn get_desc(&self) -> Vec<String> {
@@ -1648,6 +1654,16 @@ impl Heirloom {
                 "trigger mana".to_string(),
                 "regeneration.".to_string(),
             ],
+            Heirloom::DamageDealtMp => vec![
+                "Damage from Weapons".to_string(),
+                "or skills has a 3%".to_string(),
+                "chance to restore 1".to_string(),
+                "Mana.".to_string(),
+            ],
+            Heirloom::ManaOrbDropMult => vec![
+                "Mana Orb drop chance".to_string(),
+                "from enemies is doubled.".to_string(),
+            ],
         }
     }
     pub fn get_instant_drop(&self) -> Option<(WorldObject, usize)> {
@@ -2089,6 +2105,7 @@ impl HeirloomChoiceQueue {
             HeirloomChoiceState::new(Heirloom::LoadedDice, HeirloomRarity::Uncommon),
             HeirloomChoiceState::new(Heirloom::RegenLifesteal, HeirloomRarity::Uncommon),
             HeirloomChoiceState::new(Heirloom::ThornsSpikes, HeirloomRarity::Uncommon),
+            HeirloomChoiceState::new(Heirloom::DamageDealtMp, HeirloomRarity::Uncommon),
             HeirloomChoiceState::new(Heirloom::KillLightning, HeirloomRarity::Uncommon),
             HeirloomChoiceState::new(Heirloom::OnHitEcho, HeirloomRarity::Rare),
             HeirloomChoiceState::new(Heirloom::PoisonDuration, HeirloomRarity::Rare),
@@ -2101,6 +2118,7 @@ impl HeirloomChoiceQueue {
             HeirloomChoiceState::new(Heirloom::ThornArmor, HeirloomRarity::Rare),
             HeirloomChoiceState::new(Heirloom::CritHeal, HeirloomRarity::Rare),
             HeirloomChoiceState::new(Heirloom::ManaRegenLightning, HeirloomRarity::Rare),
+            HeirloomChoiceState::new(Heirloom::ManaOrbDropMult, HeirloomRarity::Rare),
             HeirloomChoiceState::new(Heirloom::MagnetPull, HeirloomRarity::Rare),
             HeirloomChoiceState::new(Heirloom::HealSummons, HeirloomRarity::Legendary),
             HeirloomChoiceState::new(Heirloom::ViralVenum, HeirloomRarity::Legendary),

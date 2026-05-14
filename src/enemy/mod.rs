@@ -42,6 +42,7 @@ pub mod aseprite_enemy;
 pub mod fairy;
 pub mod red_mushking;
 pub mod red_mushling;
+pub mod scorpion;
 pub mod spawn_helpers;
 pub mod spawner;
 pub mod stone_golem;
@@ -65,6 +66,7 @@ impl Plugin for EnemyPlugin {
                 (
                     handle_new_red_mushling_state_machine,
                     handle_new_red_mushking_state_machine,
+                    scorpion::handle_new_scorpion_state_machine,
                     stone_golem::handle_new_stone_golem_state_machine,
                     handle_new_fairy_state_machine,
                     handle_new_mob_state_machine,
@@ -73,7 +75,8 @@ impl Plugin for EnemyPlugin {
                     red_mushling::handle_mushling_rush_warnings.run_if(is_not_paused),
                     juice_up_spawned_elite_mobs.before(add_current_health_with_max_health),
                     juice_up_spawned_mobs_per_day.before(add_current_health_with_max_health),
-                    juice_up_world_object_max_health_by_chaos.before(add_current_health_with_max_health),
+                    juice_up_world_object_max_health_by_chaos
+                        .before(add_current_health_with_max_health),
                     scale_boss_summon_stats
                         .after(juice_up_spawned_mobs_per_day)
                         .before(add_current_health_with_max_health),
@@ -100,6 +103,18 @@ impl Plugin for EnemyPlugin {
                     stone_golem::update_stone_golem_walk_animation.run_if(is_not_paused),
                     stone_golem::handle_stone_golem_death.run_if(is_not_paused),
                     red_mushling::handle_mushling_wakeup_timers.run_if(is_not_paused),
+                )
+                    .in_set(OnUpdate(GameState::Main)),
+            )
+            .add_systems(
+                (
+                    scorpion::scorpion_queue_next_attack.run_if(is_not_paused),
+                    scorpion::scorpion_follow.run_if(is_not_paused),
+                    scorpion::tick_scorpion_timers.run_if(is_not_paused),
+                    scorpion::handle_claw_attack.run_if(is_not_paused),
+                    scorpion::handle_tail_attack.run_if(is_not_paused),
+                    scorpion::tick_tornado_timer.run_if(is_not_paused),
+                    scorpion::handle_scorpion_death.run_if(is_not_paused),
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
@@ -143,6 +158,7 @@ pub enum Mob {
     SmallCactus,
     BigCactus,
     Bull,
+    Scorpion,
 }
 
 impl Mob {
@@ -163,6 +179,7 @@ impl Mob {
             Mob::SmallCactus => DARK_GREEN,
             Mob::BigCactus => DARK_GREEN,
             Mob::Bull => LIGHT_BROWN,
+            Mob::Scorpion => LIGHT_BROWN,
         }
     }
     pub fn get_base_kb(&self) -> f32 {
@@ -182,12 +199,14 @@ impl Mob {
             Mob::SmallCactus => 60.,
             Mob::BigCactus => 50.,
             Mob::Bull => 30.,
+            Mob::Scorpion => 0.,
         }
     }
     pub fn is_boss(&self) -> bool {
         match self {
             Mob::RedMushking => true,
             Mob::StoneGolem => true,
+            Mob::Scorpion => true,
             _ => false,
         }
     }
@@ -195,6 +214,7 @@ impl Mob {
         match self {
             Mob::RedMushking => Some("Red Mushking"),
             Mob::StoneGolem => Some("Blake Boulder"),
+            Mob::Scorpion => Some("Desert Scorpion"),
             _ => None,
         }
     }

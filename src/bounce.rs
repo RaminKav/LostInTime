@@ -1,6 +1,9 @@
 use bevy::{prelude::*, sprite::MaterialMesh2dBundle};
 use bevy_aseprite::{anim::AsepriteAnimation, aseprite, AsepriteBundle};
-use bevy_rapier2d::prelude::KinematicCharacterController;
+use bevy_rapier2d::prelude::{
+    ActiveCollisionTypes, ActiveEvents, Collider, CollisionGroups, Group,
+    KinematicCharacterController, RapierContext, Sensor,
+};
 
 use crate::{
     animations::player_sprite::PlayerAnimation,
@@ -9,7 +12,7 @@ use crate::{
     inputs::MovementVector,
     item::{Equipment, WorldObject},
     player::Player,
-    world::chunk::Chunk,
+    world::{chunk::Chunk, y_sort::YSort},
     GameParam, MainCamera, PLAYER_MOVE_SPEED,
 };
 
@@ -309,6 +312,121 @@ pub fn bounce_player(
 }
 
 aseprite!(pub PinkFlowerAseprite, "textures/pinkflower.ase");
+aseprite!(pub DesertTornadoAseprite, "textures/effects/desert_tornado.ase");
+
+/// Desert tornado spawned by the Scorpion boss. Travels in a straight line for
+/// its lifetime; on player overlap, the player gets lifted into the air (no
+/// horizontal travel) and movement is locked for the duration of the lift.
+#[derive(Component)]
+pub struct DesertTornado {
+    pub direction: Vec2,
+    pub speed: f32,
+    pub lifetime: Timer,
+    /// Every N seconds, steer back toward the player.
+    pub retarget_timer: Timer,
+}
+
+const TORNADO_BOUNCE_DURATION: f32 = 1.25;
+const TORNADO_BOUNCE_MAX_HEIGHT: f32 = 28.0;
+
+/// Spawn a desert tornado that travels in `direction` for `lifetime` seconds.
+pub fn spawn_desert_tornado(
+    commands: &mut Commands,
+    asset_server: &AssetServer,
+    pos: Vec2,
+    direction: Vec2,
+    speed: f32,
+    lifetime: f32,
+) -> Entity {
+    let mut animation = AsepriteAnimation::default();
+    animation.play();
+    commands
+        .spawn((
+            AsepriteBundle {
+                aseprite: asset_server.load(DesertTornadoAseprite::PATH),
+                animation,
+                transform: Transform::from_translation(pos.extend(50.)),
+                ..Default::default()
+            },
+            DesertTornado {
+                direction: direction.normalize_or_zero(),
+                speed,
+                lifetime: Timer::from_seconds(lifetime, TimerMode::Once),
+                retarget_timer: Timer::from_seconds(5.0, TimerMode::Repeating),
+            },
+            Collider::capsule(Vec2::new(0., -5.), Vec2::new(0., 0.), 10.),
+            Sensor,
+            ActiveEvents::COLLISION_EVENTS,
+            ActiveCollisionTypes::all(),
+            YSort(0.),
+            CollisionGroups::new(Group::GROUP_2, Group::GROUP_2),
+            Name::new("DesertTornado"),
+        ))
+        .id()
+}
+
+/// Move tornadoes along their direction; periodically re-aim toward the player; despawn when
+/// lifetime ends.
+pub fn update_desert_tornadoes(
+    mut commands: Commands,
+    mut tornadoes: Query<(Entity, &mut Transform, &mut DesertTornado)>,
+    player_q: Query<&GlobalTransform, With<crate::player::Player>>,
+    time: Res<Time>,
+) {
+    for (e, mut tf, mut tornado) in tornadoes.iter_mut() {
+        tornado.lifetime.tick(time.delta());
+        tornado.retarget_timer.tick(time.delta());
+        if tornado.retarget_timer.just_finished() {
+            if let Ok(player_tf) = player_q.get_single() {
+                let my = tf.translation.truncate();
+                let to_player = (player_tf.translation().truncate() - my).normalize_or_zero();
+                if to_player.length_squared() > 0.0001 {
+                    tornado.direction = to_player;
+                }
+            }
+        }
+        if tornado.lifetime.finished() {
+            commands.entity(e).despawn_recursive();
+            continue;
+        }
+        let delta = tornado.direction * tornado.speed * time.delta_seconds();
+        tf.translation.x += delta.x;
+        tf.translation.y += delta.y;
+    }
+}
+
+/// When the player overlaps a tornado, lift them straight up (no horizontal
+/// component) and lock their movement for the lift duration. Re-triggers when
+/// the previous lift completes if the overlap continues.
+pub fn handle_tornado_player_overlap(
+    mut commands: Commands,
+    rapier_context: Res<RapierContext>,
+    tornadoes: Query<Entity, With<DesertTornado>>,
+    player_query: Query<(Entity, &Transform, Option<&BounceEffect>), With<crate::player::Player>>,
+) {
+    let Ok((player_e, player_tf, bounce_opt)) = player_query.get_single() else {
+        return;
+    };
+    if bounce_opt.map(|b| b.is_active()).unwrap_or(false) {
+        return;
+    }
+    for tornado_e in tornadoes.iter() {
+        if rapier_context.intersection_pair(player_e, tornado_e) == Some(true)
+            || rapier_context.intersection_pair(tornado_e, player_e) == Some(true)
+        {
+            let start_pos = player_tf.translation.truncate();
+            commands.entity(player_e).insert(BounceEffect::new(
+                start_pos,
+                Vec2::ZERO,
+                0.0,
+                false,
+                TORNADO_BOUNCE_DURATION,
+                TORNADO_BOUNCE_MAX_HEIGHT,
+            ));
+            break;
+        }
+    }
+}
 
 /// System to spawn Aseprite animation for pink flowers when they're created
 pub fn spawn_pink_flower_aseprite(

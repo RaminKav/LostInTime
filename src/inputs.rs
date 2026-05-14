@@ -86,6 +86,8 @@ impl Plugin for InputsPlugin {
                     bounce_player.run_if(is_not_paused),
                     update_shadow.run_if(is_not_paused),
                     update_bounce_effect,
+                    crate::bounce::update_desert_tornadoes.run_if(is_not_paused),
+                    crate::bounce::handle_tornado_player_overlap.run_if(is_not_paused),
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
@@ -765,7 +767,7 @@ pub fn toggle_inventory(
             // proto_commands.spawn_item_from_proto(WorldObject::Claw, &proto, pos, 1, Some(5));
             // proto_commands.spawn_item_from_proto(WorldObject::IceStaff, &proto, pos, 1, Some(5));
             // proto_commands.spawn_item_from_proto(WorldObject::BasicStaff, &proto, pos, 1, Some(5));
-            // proto_commands.spawn_from_proto(Mob::SpikeSlime, &proto.prototypes, pos);
+            proto_commands.spawn_from_proto(Mob::Scorpion, &proto.prototypes, pos);
             // proto_commands.spawn_from_proto(Mob::StingFly, &proto.prototypes, pos);
             // proto_commands.spawn_from_proto(Mob::FurDevil, &proto.prototypes, pos);
             // proto_commands.spawn_from_proto(Mob::Bushling, &proto.prototypes, pos);
@@ -774,7 +776,7 @@ pub fn toggle_inventory(
             // proto_commands.spawn_from_proto(Mob::SmallCactus, &proto.prototypes, pos);
             // proto_commands.spawn_from_proto(Mob::Bull, &proto.prototypes, pos);
             // proto_commands.spawn_from_proto(Mob::Fairy, &proto.prototypes, pos);
-            proto_commands.spawn_from_proto(Mob::FurDevil, &proto.prototypes, pos);
+            // proto_commands.spawn_from_proto(Mob::FurDevil, &proto.prototypes, pos);
             // commands.entity(t.unwrap()).insert(MobLevel(10));
             // proto_commands.spawn_from_proto(Mob::RedMushking, &proto.prototypes, pos);
             // let f = proto_commands.spawn_from_proto(Mob::SpikeSlime, &proto.prototypes, pos);

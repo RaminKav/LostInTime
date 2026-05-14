@@ -74,19 +74,30 @@ pub fn bounce_on_hit(
             2.
         };
         bounce_on_hit.timer.tick(time.delta());
+        // Bounce magnitude only; negative scale.x is used for horizontal flip (e.g. scorpion).
+        // Old code used `.clamp(1., max)` on signed scale, which forced left-facing sprites to +1.
+        let sign_x = t.scale.x.signum();
+        let sign_x = if sign_x == 0. { 1. } else { sign_x };
+        let sign_y = t.scale.y.signum();
+        let sign_y = if sign_y == 0. { 1. } else { sign_y };
+        let mut mag_x = t.scale.x.abs();
+        let mut mag_y = t.scale.y.abs();
+        let bump = 2.5 * time.delta_seconds() * modifier;
         if bounce_on_hit.timer.percent() < 0.5 {
-            t.scale.x += 2.5 * time.delta_seconds() * modifier;
-            t.scale.y += 2.5 * time.delta_seconds() * modifier;
+            mag_x += bump;
+            mag_y += bump;
         } else {
-            t.scale.x -= 2.5 * time.delta_seconds() * modifier;
-            t.scale.y -= 2.5 * time.delta_seconds() * modifier;
+            mag_x -= bump;
+            mag_y -= bump;
         }
+        mag_x = mag_x.clamp(1., max_bounce);
+        mag_y = mag_y.clamp(1., max_bounce);
+        t.scale.x = sign_x * mag_x;
+        t.scale.y = sign_y * mag_y;
         if bounce_on_hit.timer.finished() {
-            t.scale.x = 1.0;
-            t.scale.y = 1.0;
+            t.scale.x = sign_x * 1.0;
+            t.scale.y = sign_y * 1.0;
             bounce_on_hit.is_active = false;
         }
-        t.scale.x = t.scale.x.clamp(1., max_bounce);
-        t.scale.y = t.scale.y.clamp(1., max_bounce);
     }
 }

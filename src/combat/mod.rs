@@ -132,6 +132,9 @@ pub struct HitOutcomeEvents<'w> {
 #[derive(Debug, Clone)]
 pub struct LifestealEvent {
     pub thorns_lifesteal_stacks: i32,
+    /// True only for direct player→mob hits from [`crate::item::item_upgrades::handle_on_hit_upgrades`]
+    /// (non-[`HitEvent::from_heirloom_effect`]). False for thorns-only lifesteal procs.
+    pub is_direct_player_damage: bool,
 }
 
 /// Flags set on an entity by `calculate_player_damage` so that
@@ -895,8 +898,7 @@ pub fn handle_hits(
                         ),
                     });
                     if attacker_mob != Mob::None && final_dmg > 0 {
-                        run_beastiary
-                            .record_damage_taken(attacker_mob.clone(), final_dmg as u32);
+                        run_beastiary.record_damage_taken(attacker_mob.clone(), final_dmg as u32);
                         // Memo for `clamp_health` to attribute death to this mob.
                         last_attacker.0 = Some(attacker_mob);
                     }
@@ -1113,6 +1115,7 @@ pub fn handle_lifesteal(
     mut lifesteal_events: EventReader<LifestealEvent>,
     player_query: Query<(&PlayerSkills, &Lifesteal, &GlobalTransform), With<Player>>,
     mut modify_health_events: EventWriter<ModifyHealthEvent>,
+    mut modify_mana_events: EventWriter<ModifyManaEvent>,
     mut proto_commands: ProtoCommands,
     proto: ProtoParam,
     mut trigger_counts: ResMut<HeirloomTriggerCounts>,
@@ -1123,6 +1126,19 @@ pub fn handle_lifesteal(
     let player_pos = player_txfm.translation().truncate();
 
     for event in lifesteal_events.iter() {
+        let mut rng = rand::thread_rng();
+
+        if event.is_direct_player_damage {
+            let stacks = skills.get_count(Heirloom::DamageDealtMp);
+            if stacks > 0 {
+                let chance = (0.03_f64 * stacks as f64).clamp(0.0, 1.0);
+                if rng.gen_bool(chance) {
+                    modify_mana_events.send(ModifyManaEvent(1));
+                    trigger_counts.increment(Heirloom::DamageDealtMp);
+                }
+            }
+        }
+
         // ThornsLifesteal bonus: +25% per stack for thorns damage specifically
         let thorns_bonus = event.thorns_lifesteal_stacks * 25;
         let total_lifesteal = lifesteal.0 + thorns_bonus;
@@ -1132,7 +1148,6 @@ pub fn handle_lifesteal(
             // >= 100% = guaranteed 1 HP heal
             // For each additional 100% over 100%, guaranteed another HP
             // Remainder is a random chance for +1 more HP
-            let mut rng = rand::thread_rng();
             let mut heal_amount = 0;
             let mut remaining_lifesteal = total_lifesteal;
 

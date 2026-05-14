@@ -2103,6 +2103,16 @@
             size: (16., 16.),
             anchor: None,
         ),
+        DamageDealtMp: WorldObjectData(
+            texture_pos: (11., 23.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        ManaOrbDropMult: WorldObjectData(
+            texture_pos: (6., 19.),
+            size: (16., 16.),
+            anchor: None,
+        ),
     },
     icons : {
         StoneWallBlock: SpriteData(

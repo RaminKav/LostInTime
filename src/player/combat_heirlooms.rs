@@ -40,8 +40,8 @@ const ANT_CHAIN_DELAY: f32 = 0.25;
 /// Time for one full orbit (rotation speed); faster = snappier feel.
 const STONE_TOOTH_ORBIT_PERIOD: f32 = 2.0;
 /// Delay between spawning the next batch.
-const STONE_TOOTH_SPAWN_INTERVAL: f32 = 3.8;
-const STONE_TOOTH_ROCK_LIFETIME: f32 = 2.0;
+const STONE_TOOTH_SPAWN_INTERVAL: f32 = 6.0;
+const STONE_TOOTH_ROCK_LIFETIME: f32 = 4.0;
 /// Distance rocks travel outward from the player over their lifetime.
 const STONE_TOOTH_TRAVEL_DISTANCE: f32 = 40.0;
 const STONE_CONTACT_DISTANCE: f32 = 28.0;
@@ -1200,11 +1200,18 @@ pub fn handle_mana_orb_drops(
     proto: ProtoParam,
     mut death_events: EventReader<EnemyDeathEvent>,
     mut trigger_counts: ResMut<HeirloomTriggerCounts>,
+    player_skills: Query<&PlayerSkills, With<Player>>,
 ) {
     let mut rng = rand::thread_rng();
     const MANA_ORB_DROP_CHANCE: f64 = 0.1;
+    let drop_mult = 1.0
+        + player_skills
+            .get_single()
+            .map(|s| s.get_count(Heirloom::ManaOrbDropMult) as f64)
+            .unwrap_or(0.0);
+    let roll_chance = (MANA_ORB_DROP_CHANCE * drop_mult).min(1.0);
     for event in death_events.iter() {
-        if !rng.gen_bool(MANA_ORB_DROP_CHANCE) {
+        if !rng.gen_bool(roll_chance) {
             continue;
         }
         let offset = Vec2::new(rng.gen_range(-10.0..10.0), rng.gen_range(-10.0..10.0));
@@ -1226,9 +1233,16 @@ pub fn handle_boss_hit_mana_orb_drops(
     mut hit_events: EventReader<HitEvent>,
     mobs: Query<(&Mob, &GlobalTransform, Option<&EliteMob>)>,
     mut trigger_counts: ResMut<HeirloomTriggerCounts>,
+    player_skills: Query<&PlayerSkills, With<Player>>,
 ) {
     let mut rng = rand::thread_rng();
     const MANA_ORB_DROP_CHANCE: f64 = 0.01;
+    let drop_mult = 1.0
+        + player_skills
+            .get_single()
+            .map(|s| s.get_count(Heirloom::ManaOrbDropMult) as f64)
+            .unwrap_or(0.0);
+    let roll_chance = (MANA_ORB_DROP_CHANCE * drop_mult).min(1.0);
 
     for hit in hit_events.iter() {
         // Check if hit entity is a boss
@@ -1240,7 +1254,7 @@ pub fn handle_boss_hit_mana_orb_drops(
             continue;
         }
 
-        if !rng.gen_bool(MANA_ORB_DROP_CHANCE) {
+        if !rng.gen_bool(roll_chance) {
             continue;
         }
 

@@ -10,9 +10,21 @@ use crate::{
     player::{ModifyCurencyEvent, Player},
     proto::proto_param::ProtoParam,
     ui::key_input_guide::InteractionGuideTrigger,
-    world::{dungeon::Dungeon, world_helpers::tile_pos_to_world_pos},
+    world::{
+        dimension::Era,
+        dungeon::Dungeon,
+        world_helpers::tile_pos_to_world_pos,
+    },
     GameParam, TextureCamera,
 };
+
+/// Per-era boss selection used by the boss shrine.
+fn boss_for_era(era: &Era) -> Mob {
+    match era {
+        Era::Second => Mob::Scorpion,
+        _ => Mob::RedMushking,
+    }
+}
 
 use super::WorldObject;
 
@@ -109,7 +121,7 @@ pub fn handle_pay_shrine_cost(
             summon_tracker.summon_count += 1;
             commands.insert_resource(DelayedSpawn {
                 timer: Timer::from_seconds(3., TimerMode::Once),
-                mob: Mob::RedMushking,
+                mob: boss_for_era(&game.era.current_era),
                 pos: shrine_pos,
                 summon_index,
             });

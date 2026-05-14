@@ -387,6 +387,7 @@ pub fn handle_on_hit_upgrades(
 
         events.p2().send(LifestealEvent {
             thorns_lifesteal_stacks: 0,
+            is_direct_player_damage: true,
         });
     }
 }

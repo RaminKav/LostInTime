@@ -1,0 +1,10 @@
+(
+  name: "ScorpionProjectile",
+  templates: ["projectile.prototype.ron"],
+  schematics: {
+        "survival_rogue_like::item::projectile::Projectile": ScorpionProjectile,
+        "survival_rogue_like::proto::ColliderProto": (x: 5., y: 8.),
+        "survival_rogue_like::item::projectile::ProjectileState": (speed: 140., direction: (x: 0., y: 0.), hit_entities: [], despawn_on_hit: true),
+        "survival_rogue_like::proto::SpriteSheetProto": (asset: "textures/scorpion/scorpionProjectile.png", size: (x: 10., y: 16.), cols: 1, rows: 1),
+  }
+)

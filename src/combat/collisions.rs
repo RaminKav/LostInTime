@@ -372,6 +372,7 @@ fn check_projectile_hit_mob_collisions(
                             .increment(Heirloom::ThornsLifesteal);
                         lifesteal_events.send(LifestealEvent {
                             thorns_lifesteal_stacks,
+                            is_direct_player_damage: false,
                         });
                     }
                 }
@@ -1105,6 +1106,7 @@ fn check_mob_to_player_collisions(
                     trigger_counts.increment(Heirloom::ThornsLifesteal);
                     lifesteal_events.send(LifestealEvent {
                         thorns_lifesteal_stacks,
+                        is_direct_player_damage: false,
                     });
                 }
 
