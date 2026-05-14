@@ -1551,7 +1551,7 @@ pub fn update_skill_unlock_confirm_panel(
                             custom_size: Some(Vec2::new(48., 18.)),
                             ..Default::default()
                         },
-                        transform: Transform::from_translation(Vec3::new(28., -20., 1.)),
+                        transform: Transform::from_translation(Vec3::new(-30., -20., 1.)),
                         ..Default::default()
                     },
                     RenderLayers::from_layers(&[3]),
@@ -1572,7 +1572,7 @@ pub fn update_skill_unlock_confirm_panel(
                             custom_size: Some(Vec2::new(48., 18.)),
                             ..Default::default()
                         },
-                        transform: Transform::from_translation(Vec3::new(-30., -20., 1.)),
+                        transform: Transform::from_translation(Vec3::new(28., -20., 1.)),
                         ..Default::default()
                     },
                     RenderLayers::from_layers(&[3]),
