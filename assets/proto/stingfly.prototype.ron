@@ -88,6 +88,12 @@
                 max: 1,
                 rate: 0.22
             ),
+            (
+                item: StingflyCard,
+                min: 1,
+                max: 1,
+                rate: 0.00005
+            ),
             ]
         ),
   }

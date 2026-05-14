@@ -1,0 +1,16 @@
+(
+  name: "SmallCactusCard",
+  templates: ["item_drop.prototype.ron"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": SmallCactusCard,
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: SmallCactusCard,
+        metadata: (
+            name: "Small Cactus Card",
+            desc: [""]
+        ),
+        rarity: Common,
+        count: 1
+  ),
+  }
+)

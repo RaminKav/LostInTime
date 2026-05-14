@@ -1,0 +1,16 @@
+(
+  name: "BushlingCard",
+  templates: ["item_drop.prototype.ron"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": BushlingCard,
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: BushlingCard,
+        metadata: (
+            name: "Bushling Card",
+            desc: [""]
+        ),
+        rarity: Common,
+        count: 1
+  ),
+  }
+)

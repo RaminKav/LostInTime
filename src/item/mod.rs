@@ -690,6 +690,17 @@ pub enum WorldObject {
     DefenceFood,
     SizeFood,
     AttackSpeedFood,
+
+    //Monster Cards
+    FurDevilCard,
+    BushlingCard,
+    SpikeSlimeCard,
+    StingflyCard,
+    RedMushlingCard,
+    SmallCactusCard,
+    LargeCactusCard,
+    BullCard,
+    StoneGolemCard,
 }
 
 #[derive(
@@ -882,7 +893,7 @@ impl WorldObject {
             WorldObject::Sword => true,
             WorldObject::Spear => true,
             WorldObject::Dagger => true,
-            WorldObject::Gun => true,
+            // WorldObject::Gun => true,
             WorldObject::Blowdart => true,
             WorldObject::FireStaff => true,
             WorldObject::PlasmaStaff => true,
@@ -983,6 +994,13 @@ impl WorldObject {
             WorldObject::SmlFruitCactus2 => true,
             WorldObject::SmlFruitCactus3 => true,
             WorldObject::SmlFruitCactus4 => true,
+            WorldObject::MedFruitCactus1 => true,
+            WorldObject::MedFruitCactus2 => true,
+            WorldObject::MedCactus1 => true,
+            WorldObject::MedCactus2 => true,
+            WorldObject::MedCactus3 => true,
+            WorldObject::MedCactus4 => true,
+            WorldObject::MedCactus5 => true,
 
             WorldObject::SnowSmlBoulder1 => true,
             WorldObject::SnowSmlBoulder2 => true,

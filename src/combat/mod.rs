@@ -541,6 +541,8 @@ pub fn handle_hits(
         (&OwnedBlessings, &mut CurrentMana, &Inventory),
         With<Player>,
     >,
+    mut run_beastiary: ResMut<crate::player::beastiary::RunBeastiary>,
+    mut last_attacker: ResMut<crate::player::beastiary::LastPlayerAttackerMob>,
 ) {
     for hit in hit_events.iter() {
         // is in invincibility frames from a previous hit
@@ -885,18 +887,28 @@ pub fn handle_hits(
                 }
 
                 if is_player {
+                    let attacker_mob = hit.hit_by_mob.clone().unwrap_or(Mob::default());
                     hit_outcome.analytics.send(AnalyticsUpdateEvent {
                         update_type: AnalyticsTrigger::DamageTaken(
-                            hit.hit_by_mob.clone().unwrap_or(Mob::default()),
+                            attacker_mob.clone(),
                             final_dmg as u32,
                         ),
                     });
+                    if attacker_mob != Mob::None && final_dmg > 0 {
+                        run_beastiary
+                            .record_damage_taken(attacker_mob.clone(), final_dmg as u32);
+                        // Memo for `clamp_health` to attribute death to this mob.
+                        last_attacker.0 = Some(attacker_mob);
+                    }
                     commands.spawn(SoundSpawner::new(AudioSoundEffect::PlayerHit, 0.35));
                 } else if let Some(mob) = mob_option {
                     game.player_mut().next_hit_crit = false;
                     hit_outcome.analytics.send(AnalyticsUpdateEvent {
                         update_type: AnalyticsTrigger::DamageDealt(mob.clone(), final_dmg as u32),
                     });
+                    if final_dmg > 0 {
+                        run_beastiary.record_damage_dealt(mob.clone(), final_dmg as u32);
+                    }
                 }
             }
 
@@ -923,6 +935,7 @@ pub fn cleanup_marked_for_death_entities(
         With<MarkedForDeath>,
     >,
     mut analytics: EventWriter<AnalyticsUpdateEvent>,
+    mut run_beastiary: ResMut<crate::player::beastiary::RunBeastiary>,
     mut player: Query<(
         &PlayerSkills,
         &Attack,
@@ -1067,6 +1080,7 @@ pub fn cleanup_marked_for_death_entities(
         analytics.send(AnalyticsUpdateEvent {
             update_type: AnalyticsTrigger::MobKilled(mob.clone()),
         });
+        run_beastiary.record_kill(mob.clone());
     }
 
     // Apply deferred ViralVenum spreads after we've released read access above.

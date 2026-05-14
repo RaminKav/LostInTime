@@ -35,6 +35,7 @@ use crate::{
     night::NightTracker,
     player::{
         achievements::Achievements,
+        beastiary::{Beastiary, RunBeastiary},
         check_first_run_achievement,
         class_rank::ClassRankSystem,
         currency::TimeFragmentCurrency,
@@ -138,6 +139,7 @@ impl Plugin for ClientPlugin {
                 timer: Timer::from_seconds(100., TimerMode::Repeating),
             })
             .add_plugin(AnalyticsPlugin)
+            .add_plugin(crate::player::beastiary::BeastiaryPlugin)
             .add_system(
                 load_state
                     .after(add_analytics_resource_on_start)
@@ -156,6 +158,7 @@ impl Plugin for ClientPlugin {
                     handle_append_run_data_after_death
                         .run_if(resource_exists::<AnalyticsData>())
                         .after(check_first_run_achievement),
+                    persist_run_beastiary_on_game_over,
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
@@ -250,6 +253,8 @@ pub struct GameData {
     pub time_crystals: TimeCrystals,
     #[serde(default)]
     pub has_seen_tutorial: bool,
+    #[serde(default)]
+    pub beastiary: Beastiary,
 }
 
 impl GameData {
@@ -776,6 +781,106 @@ pub fn load_game_data_for_ui(mut commands: Commands) {
 
 /// Persists time fragments to game_data.json immediately when they are spent
 /// This prevents save-scumming by closing and restarting the game
+/// On `GameOverEvent`, fold per-run bestiary stats (kills, damage, deaths)
+/// into `game_data.beastiary` on disk. `cards_collected` is intentionally
+/// untouched — it's persisted live on pickup via `persist_beastiary_card_pickup`.
+/// Runs as a separate small system so [`handle_append_run_data_after_death`]
+/// stays under Bevy's max-system-param limit.
+pub fn persist_run_beastiary_on_game_over(
+    mut game_over: EventReader<GameOverEvent>,
+    mut run_beastiary: Option<ResMut<RunBeastiary>>,
+    mut beastiary: Option<ResMut<Beastiary>>,
+) {
+    let mut fired = false;
+    for _ in game_over.iter() {
+        fired = true;
+    }
+    if !fired {
+        return;
+    }
+    let Some(ref mut run_b) = run_beastiary else { return };
+    if run_b.entries.is_empty() {
+        return;
+    }
+
+    // Merge the run's stats into the live in-memory `Beastiary` resource so
+    // the bestiary UI reflects the just-finished run without requiring a
+    // restart. `cards_collected` is intentionally untouched here — pickups
+    // already mutate the live resource directly.
+    if let Some(ref mut live) = beastiary {
+        for (mob, run_entry) in run_b.entries.iter() {
+            let entry = live.entries.entry(mob.clone()).or_default();
+            entry.number_killed += run_entry.number_killed;
+            entry.damage_dealt += run_entry.damage_dealt;
+            entry.damage_taken += run_entry.damage_taken;
+            entry.deaths_caused += run_entry.deaths_caused;
+        }
+    }
+
+    let path = datafiles::game_data();
+    let mut game_data = if let Ok(file) = File::open(&path) {
+        let reader = BufReader::new(file);
+        GameData::try_from_json_reader(reader).unwrap_or_default()
+    } else {
+        GameData::default()
+    };
+    for (mob, run_entry) in run_b.entries.iter() {
+        let entry = game_data.beastiary.entries.entry(mob.clone()).or_default();
+        entry.number_killed += run_entry.number_killed;
+        entry.damage_dealt += run_entry.damage_dealt;
+        entry.damage_taken += run_entry.damage_taken;
+        entry.deaths_caused += run_entry.deaths_caused;
+    }
+    match File::create(&path) {
+        Ok(file) => {
+            let writer = BufWriter::new(file);
+            if let Err(err) = serde_json::to_writer(writer, &game_data) {
+                error!("Failed to persist run beastiary to game_data.json: {err:?}");
+            }
+        }
+        Err(err) => error!(
+            "Failed to create game_data.json while persisting run beastiary: {err:?}"
+        ),
+    }
+
+    // Drain the run resource so the next run starts fresh and we don't
+    // double-count if this system runs again on the same data.
+    run_b.entries.clear();
+}
+
+/// Read `game_data.json`, increment `beastiary.entries[mob].cards_collected` by
+/// 1, write it back. Called from the card-pickup branch in
+/// `check_item_drop_collisions` so card progress is durable even if the player
+/// quits mid-run.
+pub fn persist_beastiary_card_pickup(mob: crate::enemy::Mob) {
+    let path = datafiles::game_data();
+    let mut game_data = if let Ok(file) = File::open(&path) {
+        let reader = BufReader::new(file);
+        GameData::try_from_json_reader(reader).unwrap_or_default()
+    } else {
+        GameData::default()
+    };
+
+    game_data
+        .beastiary
+        .entries
+        .entry(mob)
+        .or_default()
+        .cards_collected += 1;
+
+    match File::create(&path) {
+        Ok(file) => {
+            let writer = BufWriter::new(file);
+            if let Err(err) = serde_json::to_writer(writer, &game_data) {
+                error!("Failed to persist beastiary card pickup to game_data.json: {err:?}");
+            }
+        }
+        Err(err) => error!(
+            "Failed to create game_data.json while saving beastiary card: {err:?}"
+        ),
+    }
+}
+
 pub fn persist_time_fragments(time_fragments: i32) {
     let path = datafiles::game_data();
     let mut game_data = if let Ok(file) = File::open(&path) {

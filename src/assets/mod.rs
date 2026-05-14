@@ -392,6 +392,7 @@ impl GameAssetsPlugin {
                     let time_fragments = game_data.time_fragments;
                     let seen_tips_set = game_data.seen_tips.clone();
                     let time_crystals = game_data.time_crystals.clone();
+                    let beastiary = game_data.beastiary.clone();
 
                     commands.insert_resource(class_ranks);
                     commands.insert_resource(high_scores);
@@ -412,6 +413,11 @@ impl GameAssetsPlugin {
                         seen: seen_tips_set,
                     });
                     commands.insert_resource(time_crystals);
+                    commands.insert_resource(beastiary);
+                    commands.insert_resource(crate::player::beastiary::RunBeastiary::default());
+                    commands.insert_resource(
+                        crate::player::beastiary::LastPlayerAttackerMob::default(),
+                    );
                 }
                 Err(err) => {
                     error!("Failed to load class ranks from game_data.json: {err:?}");
@@ -425,6 +431,11 @@ impl GameAssetsPlugin {
                     commands.insert_resource(TimeFragmentCurrency::default());
                     commands.insert_resource(SeenTips::default());
                     commands.insert_resource(TimeCrystals::default());
+                    commands.insert_resource(crate::player::beastiary::Beastiary::default());
+                    commands.insert_resource(crate::player::beastiary::RunBeastiary::default());
+                    commands.insert_resource(
+                        crate::player::beastiary::LastPlayerAttackerMob::default(),
+                    );
                 }
             }
         } else {
@@ -438,6 +449,11 @@ impl GameAssetsPlugin {
             commands.insert_resource(TimeFragmentCurrency::default());
             commands.insert_resource(SeenTips::default());
             commands.insert_resource(TimeCrystals::default());
+            commands.insert_resource(crate::player::beastiary::Beastiary::default());
+            commands.insert_resource(crate::player::beastiary::RunBeastiary::default());
+            commands.insert_resource(
+                crate::player::beastiary::LastPlayerAttackerMob::default(),
+            );
         }
         commands.insert_resource(CoinCurrency::default());
         let sprite_desc_handle: Handle<GraphicsDesc> = sprite_sheet.sprite_desc.clone();
@@ -453,7 +469,7 @@ impl GameAssetsPlugin {
         } else {
             commands.insert_resource(ClassUnlockData::default());
         }
-        let mut atlas = TextureAtlas::new_empty(image_handle.clone(), Vec2::new(256., 544.));
+        let mut atlas = TextureAtlas::new_empty(image_handle.clone(), Vec2::new(256., 736.));
         let wall_atlas = TextureAtlas::from_grid(
             wall_image_handle.clone(),
             Vec2::new(16., 32.),

@@ -1,0 +1,16 @@
+(
+  name: "SpikeSlimeCard",
+  templates: ["item_drop.prototype.ron"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": SpikeSlimeCard,
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: SpikeSlimeCard,
+        metadata: (
+            name: "Spike Slime Card",
+            desc: [""]
+        ),
+        rarity: Uncommon,
+        count: 1
+  ),
+  }
+)

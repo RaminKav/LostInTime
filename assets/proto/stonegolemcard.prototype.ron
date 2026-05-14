@@ -1,0 +1,16 @@
+(
+  name: "StoneGolemCard",
+  templates: ["item_drop.prototype.ron"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": StoneGolemCard,
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: StoneGolemCard,
+        metadata: (
+            name: "Stone Golem Card",
+            desc: [""]
+        ),
+        rarity: Rare,
+        count: 1
+  ),
+  }
+)

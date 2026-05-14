@@ -61,7 +61,7 @@ impl PlayerLevel {
             );
         }
         if did_level_up {
-            chaos_tracker.add_chaos(0.2);
+            chaos_tracker.add_chaos(0.1);
         }
         did_level_up
     }

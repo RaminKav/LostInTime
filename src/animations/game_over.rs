@@ -581,20 +581,28 @@ pub fn tick_game_over_overlay(
             ];
 
             let picked_tip = tips.iter().choose(&mut rand::thread_rng()).unwrap();
-            spawn_text(
-                &mut commands,
-                &asset_server,
-                Vec3::new(
-                    0.,
-                    -res.game_height / 2. + 56.5,
-                    Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND,
-                ),
-                WHITE,
-                format!("Tip: {}", picked_tip),
-                Anchor::Center,
-                1.,
-                3,
-            );
+            commands
+                .spawn(Text2dBundle {
+                    text: Text::from_section(
+                        format!("Tip: {}", picked_tip).to_string(),
+                        TextStyle {
+                            font: asset_server.load("fonts/slkscr.ttf"),
+                            font_size: 8.5,
+                            color: WHITE,
+                        },
+                    ),
+                    transform: Transform {
+                        translation: Vec3::new(
+                            0.,
+                            -res.game_height / 2. + 56.5,
+                            Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND,
+                        ),
+                        ..Default::default()
+                    },
+                    text_anchor: Anchor::Center,
+                    ..Default::default()
+                })
+                .insert(RenderLayers::from_layers(&[3]));
 
             // total currency counter
             let time_fragments = time_fragments.as_ref();

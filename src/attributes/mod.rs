@@ -1399,6 +1399,8 @@ pub fn clamp_health(
     >,
     mut game_over_event: EventWriter<GameOverEvent>,
     mobs: Query<(Entity, &TextureAtlasSprite), With<crate::enemy::Mob>>,
+    mut run_beastiary: Option<ResMut<crate::player::beastiary::RunBeastiary>>,
+    last_attacker: Option<Res<crate::player::beastiary::LastPlayerAttackerMob>>,
 ) {
     for (entity, mut h, max_h, mut s, max_s, game_over_sent, mut skills) in health.iter_mut() {
         if h.0 <= 0 {
@@ -1440,6 +1442,13 @@ pub fn clamp_health(
             if game_over_sent.is_none() {
                 game_over_event.send_default();
                 commands.entity(entity).insert(GameOverSent);
+                if let (Some(rb), Some(la)) = (run_beastiary.as_mut(), last_attacker.as_ref()) {
+                    if let Some(attacker) = la.0.clone() {
+                        if attacker != crate::enemy::Mob::None {
+                            rb.record_death_caused(attacker);
+                        }
+                    }
+                }
             }
         } else if h.0 > max_h.0 {
             h.0 = max_h.0;

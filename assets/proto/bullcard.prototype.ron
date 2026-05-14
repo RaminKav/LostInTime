@@ -1,0 +1,16 @@
+(
+  name: "BullCard",
+  templates: ["item_drop.prototype.ron"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": BullCard,
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: BullCard,
+        metadata: (
+            name: "Bull Card",
+            desc: [""]
+        ),
+        rarity: Uncommon,
+        count: 1
+  ),
+  }
+)

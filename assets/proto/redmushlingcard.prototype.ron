@@ -1,0 +1,16 @@
+(
+  name: "RedMushlingCard",
+  templates: ["item_drop.prototype.ron"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": RedMushlingCard,
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: RedMushlingCard,
+        metadata: (
+            name: "Red Mushling Card",
+            desc: [""]
+        ),
+        rarity: Common,
+        count: 1
+  ),
+  }
+)

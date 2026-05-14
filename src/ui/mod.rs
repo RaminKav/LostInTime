@@ -75,6 +75,8 @@ mod time_crystal_progress_ui;
 pub use time_crystal_progress_ui::*;
 mod time_crystals_browser_ui;
 pub use time_crystals_browser_ui::*;
+mod beastiary_browser_ui;
+pub use beastiary_browser_ui::*;
 mod achievements_ui;
 use crate::run_once_per_run;
 use crate::ui::achievement_banner::{
@@ -327,6 +329,7 @@ impl Plugin for UIPlugin {
             .init_resource::<BlacksmithPurchaseTracker>()
             .init_resource::<EssenceShopCache>()
             .init_resource::<TimeCrystalsHeirloomGridOpen>()
+            .init_resource::<SelectedBeastiaryMob>()
             .add_event::<TooltipTeardownEvent>()
             .add_event::<ShowInvPlayerStatsEvent>()
             .add_event::<SubmitEssenceChoice>()
@@ -627,6 +630,22 @@ impl Plugin for UIPlugin {
                         .run_if(in_state(UIState::TimeCrystalsBrowser)),
                     handle_time_crystals_view_heirlooms_button
                         .run_if(in_state(UIState::TimeCrystalsBrowser)),
+                )
+                    .in_set(OnUpdate(GameState::MainMenu)),
+            )
+            .add_systems(
+                (
+                    setup_beastiary_browser_ui
+                        .before(CustomFlush)
+                        .run_if(state_changed::<UIState>().and_then(in_state(UIState::BeastiaryBrowser))),
+                    cleanup_beastiary_browser_ui
+                        .run_if(state_changed::<UIState>().and_then(not(in_state(UIState::BeastiaryBrowser)))),
+                    handle_beastiary_browser_done_button
+                        .run_if(in_state(UIState::BeastiaryBrowser)),
+                    handle_beastiary_card_click
+                        .run_if(in_state(UIState::BeastiaryBrowser)),
+                    crate::ui::beastiary_browser_ui::animate_beastiary_previews
+                        .run_if(in_state(UIState::BeastiaryBrowser)),
                 )
                     .in_set(OnUpdate(GameState::MainMenu)),
             )

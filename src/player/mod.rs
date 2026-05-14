@@ -33,6 +33,7 @@ use rogue_skills::{
 use serde::Deserialize;
 use strum_macros::{Display, EnumIter};
 pub mod achievements;
+pub mod beastiary;
 pub mod class_rank;
 pub mod combat_heirlooms;
 pub mod currency;

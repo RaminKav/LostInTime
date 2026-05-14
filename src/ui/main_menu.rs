@@ -99,6 +99,7 @@ pub enum MenuButton {
     Options,
     Achievements,
     TimeCrystals,
+    Beastiary,
     Quit,
     InfoOK,
     GameOverOK,
@@ -239,6 +240,12 @@ pub fn handle_menu_button_click_events(
                     continue;
                 }
                 next_ui_state.set(UIState::TimeCrystalsBrowser);
+            }
+            MenuButton::Beastiary => {
+                if info_modal_open {
+                    continue;
+                }
+                next_ui_state.set(UIState::BeastiaryBrowser);
             }
             MenuButton::AchievementsPrev => {
                 let total_achievements = Achievement::iter().count();
@@ -506,7 +513,8 @@ pub fn handle_menu_button_click_events(
                 cleanup_event.send_default();
             }
             MenuButton::ShowTutorial => {
-                if extras.game_state.0 != GameState::Main || current_ui_state.0 != UIState::Options {
+                if extras.game_state.0 != GameState::Main || current_ui_state.0 != UIState::Options
+                {
                     continue;
                 }
                 commands.insert_resource(crate::ui::tutorial_ui::TutorialReplayRequested);
@@ -649,9 +657,21 @@ pub fn spawn_menu_text_buttons(
         UIElement::AchievementsButton,
     );
 
+    spawn_menu_button(
+        Vec3::new(-44., -138., 1.),
+        Vec3::new(-30., -0., 1.),
+        "Beastiary",
+        MenuButton::Beastiary,
+        Vec2::new(118., 18.),
+        &mut commands,
+        &graphics,
+        &asset_server,
+        UIElement::AchievementsButton,
+    );
+
     // Options Button
     spawn_menu_button(
-        Vec3::new(140., -139., 1.),
+        Vec3::new(130., -159., 1.),
         Vec3::new(-27., 0.0, 1.),
         "Options",
         MenuButton::Options,
@@ -664,7 +684,7 @@ pub fn spawn_menu_text_buttons(
 
     // Quit Button
     spawn_menu_button(
-        Vec3::new(-82., -139., 1.),
+        Vec3::new(-82., -159., 1.),
         Vec3::new(-14., -0., 1.),
         "Quit",
         MenuButton::Quit,

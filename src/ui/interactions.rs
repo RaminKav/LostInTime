@@ -1918,7 +1918,8 @@ pub fn handle_cursor_main_menu_buttons(
         || curr_ui_state.0 == UIState::Options
         || curr_ui_state.0 == UIState::Achievements
         || curr_ui_state.0 == UIState::TimeCrystalProgress
-        || curr_ui_state.0 == UIState::TimeCrystalsBrowser;
+        || curr_ui_state.0 == UIState::TimeCrystalsBrowser
+        || curr_ui_state.0 == UIState::BeastiaryBrowser;
     let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
     let left_mouse_pressed = mouse_input.just_released(MouseButton::Left);
 
@@ -1934,6 +1935,7 @@ pub fn handle_cursor_main_menu_buttons(
                     | MenuButton::Unlocks
                     | MenuButton::Options
                     | MenuButton::TimeCrystals
+                    | MenuButton::Beastiary
                     | MenuButton::Quit
             )
         {
@@ -1946,6 +1948,7 @@ pub fn handle_cursor_main_menu_buttons(
                 | MenuButton::Options
                 | MenuButton::Achievements
                 | MenuButton::TimeCrystals
+                | MenuButton::Beastiary
                 | MenuButton::AchievementsPrev
                 | MenuButton::AchievementsNext
                 | MenuButton::Quit

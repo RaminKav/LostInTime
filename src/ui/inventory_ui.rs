@@ -98,6 +98,8 @@ pub enum UIState {
     TimeCrystalProgress,
     /// Main-menu overview of all time crystals and their heirloom unlocks.
     TimeCrystalsBrowser,
+    /// Main-menu bestiary browser: 3x3 grid of mob cards plus a detail panel.
+    BeastiaryBrowser,
 }
 impl UIState {
     pub fn is_inv_open(&self) -> bool {

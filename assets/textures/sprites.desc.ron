@@ -1562,7 +1562,53 @@
             anchor: None,
         ),
 
-        
+        // Monster Cards (placeholder sprite — reuses CreditCard art at (12., 21.)
+        // for all variants until per-mob art exists).
+        FurDevilCard: WorldObjectData(
+            texture_pos: (0., 38.),
+            size: (16., 24.),
+            anchor: None,
+        ),
+        BushlingCard: WorldObjectData(
+           texture_pos: (1., 38.),
+            size: (16., 24.),
+            anchor: None,
+        ),
+        SpikeSlimeCard: WorldObjectData(
+            texture_pos: (4., 38.),
+            size: (16., 24.),
+            anchor: None,
+        ),
+        StingflyCard: WorldObjectData(
+            texture_pos: (3., 38.),
+            size: (16., 24.),
+            anchor: None,
+        ),
+        RedMushlingCard: WorldObjectData(
+           texture_pos: (2., 38.),
+            size: (16., 24.),
+            anchor: None,
+        ),
+        SmallCactusCard: WorldObjectData(
+           texture_pos: (5., 38.),
+            size: (16., 24.),
+            anchor: None,
+        ),
+        LargeCactusCard: WorldObjectData(
+            texture_pos: (6., 38.),
+            size: (16., 24.),
+            anchor: None,
+        ),
+        BullCard: WorldObjectData(
+           texture_pos: (7., 38.),
+            size: (16., 24.),
+            anchor: None,
+        ),
+        StoneGolemCard: WorldObjectData(
+           texture_pos: (8., 38.),
+            size: (16., 24.),
+            anchor: None,
+        ),
 
     },
     heirlooms: {

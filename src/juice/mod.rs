@@ -50,6 +50,9 @@ impl Plugin for JuicePlugin {
                     .before(TransformSystem::TransformPropagate)
                     .in_base_set(CoreSet::PostUpdate)
                     .run_if(in_state(GameState::Main)),
-            );
+            )
+            // Also run the bounce animation system on the main menu so UI
+            // elements (e.g. the bestiary card cells) can play hover bounces.
+            .add_system(bounce_on_hit.in_set(OnUpdate(GameState::MainMenu)));
     }
 }

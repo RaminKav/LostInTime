@@ -98,6 +98,12 @@
                 max: 2,
                 rate: 1.
             ),
+            (
+                item: RedMushlingCard,
+                min: 1,
+                max: 1,
+                rate: 0.00005
+            ),
             ]
         ),
   }

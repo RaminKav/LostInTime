@@ -83,6 +83,12 @@
                 max: 1,
                 rate: 0.22
             ),
+            (
+                item: SmallCactusCard,
+                min: 1,
+                max: 1,
+                rate: 0.00005
+            ),
             ]
         ),
   }

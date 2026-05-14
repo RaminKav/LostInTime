@@ -760,6 +760,7 @@ pub fn check_item_drop_collisions(
     mut chaos_tracker: ResMut<ChaosTracker>,
     mut flash_event: EventWriter<FlashExpBarEvent>,
     proto: ProtoParam,
+    mut beastiary: ResMut<crate::player::beastiary::Beastiary>,
 ) {
     let player_txfm = player.single();
     let player_pos = player_txfm.translation.truncate();
@@ -771,6 +772,20 @@ pub fn check_item_drop_collisions(
         }
         let item_stack = item_stack.clone();
         let obj = item_stack.obj_type;
+        // Bestiary mob cards: never enter inventory, just bump the persistent
+        // bestiary count (live + on disk) and despawn. No fly-to-HUD.
+        if let Some(mob) = crate::player::beastiary::mob_for_card(obj) {
+            beastiary
+                .entries
+                .entry(mob.clone())
+                .or_default()
+                .cards_collected += 1;
+            crate::client::persist_beastiary_card_pickup(mob);
+            commands.entity(e2).despawn_recursive();
+            commands.spawn(SoundSpawner::new(AudioSoundEffect::ItemPickup, 0.15));
+            text_timer.add_item(obj);
+            continue;
+        }
         if obj == WorldObject::TimeFragment || obj == WorldObject::Coin {
             commands.spawn(UIIconMover::new(
                 Vec3::new(0., 0., 9.),
