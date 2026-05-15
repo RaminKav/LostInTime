@@ -73,7 +73,7 @@ const LUNGE_SHADOW_LIFETIME_SECS: f32 = 0.2;
 /// Alpha the tracer starts at. Fades linearly to 0 over its lifetime.
 const LUNGE_SHADOW_START_ALPHA: f32 = 1.;
 
-fn spawn_lunge_shadow(
+pub(crate) fn spawn_lunge_shadow(
     commands: &mut Commands,
     asset_server: &AssetServer,
     world_pos: Vec3,
@@ -554,3 +554,318 @@ pub fn pause_combo_anim_when_done(mut combo: Query<&mut AsepriteAnimation, With<
         }
     }
 }
+
+// ---------------------------------------------------------------------------
+// Recall (Rogue) — rewind-dash to where you were ~1s ago, slicing enemies in the path.
+// ---------------------------------------------------------------------------
+//
+// Position tracking is intentionally cheap: a fixed-capacity ring buffer of
+// world positions sampled at a coarse interval. With 10 samples covering 1.0s
+// (plus a small safety margin), the oldest sample is always >=
+// `RECALL_REWIND_SECONDS` old once the buffer is primed, so resolving "1s ago"
+// is just `samples[0]` — no timestamps, no binary search.
+//
+// The dash itself reuses the existing Teleport pattern: snap the player to the
+// destination via `MovePlayerEvent`, and spawn one short-lived line collider
+// spanning A→B that damages every enemy it overlaps. This avoids any per-frame
+// motion or projectile bookkeeping for the dash itself.
+use crate::item::projectile::RangedAttackEvent;
+use crate::player::skill_heirlooms::Stealthed;
+use crate::player::skills::active_skill_scaling::{
+    RECALL, RECALL_DASH_DURATION_SECS, RECALL_HISTORY_CAPACITY, RECALL_HITBOX_HALF_WIDTH,
+    RECALL_HITBOX_SECONDS, RECALL_LANDING_STEALTH_SECS, RECALL_SAMPLE_INTERVAL_SECS,
+};
+use crate::player::skills::StealthState;
+
+/// Ring buffer of recent player world positions, sampled at a fixed cadence.
+///
+/// Stored `SparseSet` because it's only present on the player while a skill
+/// that depends on it (currently `Recall`) is equipped, so toggling it on/off
+/// must not churn the player's archetype.
+#[derive(Component, Clone)]
+#[component(storage = "SparseSet")]
+pub struct PositionHistory {
+    /// Oldest sample at index 0; pushed at the back. Capacity is bounded so
+    /// the underlying `Vec` never grows past `RECALL_HISTORY_CAPACITY`.
+    pub samples: Vec<Vec2>,
+    /// Ticks every frame, fires every `RECALL_SAMPLE_INTERVAL_SECS` to record.
+    pub sample_timer: Timer,
+}
+
+impl PositionHistory {
+    pub fn new() -> Self {
+        Self {
+            samples: Vec::with_capacity(RECALL_HISTORY_CAPACITY),
+            sample_timer: Timer::from_seconds(
+                RECALL_SAMPLE_INTERVAL_SECS,
+                TimerMode::Repeating,
+            ),
+        }
+    }
+
+    /// Returns the oldest sample (~`RECALL_REWIND_SECONDS` ago) once the buffer
+    /// has been primed with enough samples to actually cover that window.
+    fn oldest(&self) -> Option<Vec2> {
+        if self.samples.len() >= RECALL_HISTORY_CAPACITY {
+            self.samples.first().copied()
+        } else {
+            None
+        }
+    }
+
+    pub fn clear(&mut self) {
+        self.samples.clear();
+    }
+}
+
+pub fn tick_position_history(
+    time: Res<Time>,
+    mut q: Query<(&GlobalTransform, &mut PositionHistory), With<Player>>,
+) {
+    let Ok((tf, mut hist)) = q.get_single_mut() else {
+        return;
+    };
+    hist.sample_timer.tick(time.delta());
+    if !hist.sample_timer.just_finished() {
+        return;
+    }
+    let pos = tf.translation().truncate();
+    if hist.samples.len() >= RECALL_HISTORY_CAPACITY {
+        // Cheap on a 12-element Vec; keeps the buffer at exactly capacity so
+        // `samples[0]` is always the oldest in-window sample.
+        hist.samples.remove(0);
+    }
+    hist.samples.push(pos);
+}
+
+/// Clears the recall history after any forced player teleport so we don't
+/// rewind across dimension changes or scripted moves.
+pub fn clear_position_history_on_move(
+    mut move_events: bevy::ecs::event::EventReader<super::MovePlayerEvent>,
+    mut q: Query<&mut PositionHistory, With<Player>>,
+) {
+    if move_events.is_empty() {
+        return;
+    }
+    move_events.clear();
+    if let Ok(mut hist) = q.get_single_mut() {
+        hist.clear();
+    }
+}
+
+/// Drives the player from cast position to the rewind target over
+/// [`RECALL_DASH_DURATION_SECS`]. Stored `SparseSet` because it's only present
+/// during the brief dash and toggling it must not move the player between
+/// archetypes.
+#[derive(Component, Clone)]
+#[component(storage = "SparseSet")]
+pub struct RecallDashState {
+    pub target: Vec2,
+    pub timer: Timer,
+}
+
+pub fn handle_recall(
+    mut events: bevy::ecs::event::EventReader<ActiveSkillUsedEvent>,
+    mut q: Query<
+        (
+            Entity,
+            &GlobalTransform,
+            &PlayerSkills,
+            &mut PositionHistory,
+            &Attack,
+            &SkillPower,
+            &OwnedBlessings,
+        ),
+        With<Player>,
+    >,
+    game: crate::GameParam,
+    proto_param: crate::proto::proto_param::ProtoParam,
+    asset_server: Res<AssetServer>,
+    mut ranged_attack_events: bevy::ecs::event::EventWriter<RangedAttackEvent>,
+    mut commands: Commands,
+) {
+    let Ok((player_e, tf, skills, mut hist, atk, skill_power, blessings)) = q.get_single_mut()
+    else {
+        return;
+    };
+    let Some(slot) = skills.has_active_skill(ActiveSkill::Recall) else {
+        return;
+    };
+    let should_activate = events.iter().any(|ev| ev.slot == slot);
+    if !should_activate {
+        return;
+    }
+
+    // Buffer not yet primed: nothing to recall to. Cooldown was already
+    // consumed by `dispatch_active_skill_events`; this is an edge case only in
+    // the first ~`RECALL_REWIND_SECONDS` after equip.
+    let Some(target) = hist.oldest() else {
+        return;
+    };
+
+    let from = tf.translation().truncate();
+    let delta = target - from;
+    // Standing still: skip to avoid spawning a zero-length collider.
+    if delta.length_squared() < 4.0 {
+        return;
+    }
+
+    // Validate destination tile (water/wall/tree); fall back to nearest neighbor.
+    let intended_tile = crate::world::world_helpers::world_pos_to_tile_pos(target);
+    let Some(dest_tile) = crate::player::mage_skills::resolve_teleport_destination_tile(
+        intended_tile,
+        from,
+        &game,
+        &proto_param,
+    ) else {
+        return;
+    };
+    let dest = crate::world::world_helpers::tile_pos_to_world_pos(dest_tile, false)
+        + Vec2::new(TILE_SIZE.x * 0.5, TILE_SIZE.y * 0.5);
+
+    let to_dest = dest - from;
+    let dist = to_dest.length();
+    if dist < 1.0 {
+        return;
+    }
+    let dir = to_dest / dist;
+    let mid = from + to_dest * 0.5;
+    let angle = f32::atan2(to_dest.y, to_dest.x);
+
+    let power_mult = skill_power_multiplier(skill_power, blessings.get_skill_power_bonus());
+    let dmg = (atk.0 as f32 * power_mult * attack_damage_multiplier(RECALL)) as i32;
+
+    // Single line-shaped sensor that damages every enemy along A→B for the
+    // full dash. Spawned at cast time rather than driven per-frame so we keep
+    // collision bookkeeping out of the dash tick.
+    let half_length = (dist * 0.5).max(RECALL_HITBOX_HALF_WIDTH);
+    let hitbox = spawn_temp_collider(
+        &mut commands,
+        Transform::from_translation(Vec3::new(mid.x, mid.y, 0.))
+            .with_rotation(Quat::from_rotation_z(angle)),
+        RECALL_HITBOX_SECONDS,
+        dmg,
+        Collider::cuboid(half_length, RECALL_HITBOX_HALF_WIDTH),
+        Projectile::TeleportShock,
+    );
+    commands
+        .entity(hitbox)
+        .insert(crate::player::mage_skills::TeleportShockDmg);
+
+    // Rewind tracers at start/mid/end of the path.
+    for t in [0.0_f32, 0.5, 1.0] {
+        let p = from + to_dest * t;
+        spawn_lunge_shadow(&mut commands, &asset_server, p.extend(0.9), dir);
+    }
+
+    commands.spawn(SoundSpawner::new(AudioSoundEffect::Teleport, 0.1));
+
+    // Smoke poof at the cast (origin) position. The destination smoke is
+    // fired from `tick_recall_dash` when the dash lands.
+    ranged_attack_events.send(RangedAttackEvent {
+        projectile: Projectile::Smoke,
+        direction: Vec2::ZERO,
+        mana_cost: None,
+        from_enemy: false,
+        from_entity: Some(player_e),
+        is_followup_proj: false,
+        dmg_override: Some(0),
+        pos_override: Some(from),
+        spawn_delay: 0.0,
+    });
+
+    // Phase through enemies for the entire dash window. The lunge/teleport
+    // helpers manage filter_groups based on this component's lifetime.
+    commands
+        .entity(player_e)
+        .insert(crate::player::skills::PhasingThroughEnemies::new(
+            RECALL_DASH_DURATION_SECS + 0.02,
+        ));
+
+    // Start the dash. Actual per-frame motion happens in `tick_recall_dash`.
+    commands.entity(player_e).insert(RecallDashState {
+        target: dest,
+        timer: Timer::from_seconds(RECALL_DASH_DURATION_SECS, TimerMode::Once),
+    });
+
+    // Reset history so the next cast can't rewind to a pre-cast position
+    // before the buffer has re-primed at the destination.
+    hist.clear();
+}
+
+/// Drives the high-speed glide from cast position to [`RecallDashState::target`]
+/// over [`RECALL_DASH_DURATION_SECS`]. Each frame we compute
+/// `step = (target - current) * (dt / time_remaining)` so the player arrives
+/// exactly on the target on the final tick regardless of frame rate. On the
+/// last tick we also grant the unbreakable landing-stealth buff and spawn the
+/// stealth smoke VFX.
+pub fn tick_recall_dash(
+    time: Res<Time>,
+    mut q: Query<
+        (
+            Entity,
+            &GlobalTransform,
+            &mut RecallDashState,
+            &mut KinematicCharacterController,
+            &mut MovementVector,
+        ),
+        With<Player>,
+    >,
+    mut ranged_attack_events: bevy::ecs::event::EventWriter<RangedAttackEvent>,
+    mut commands: Commands,
+) {
+    let Ok((player_e, tf, mut dash, mut kcc, mut mv)) = q.get_single_mut() else {
+        return;
+    };
+
+    dash.timer.tick(time.delta());
+
+    let current = tf.translation().truncate();
+    let remaining = dash.target - current;
+
+    let step = if dash.timer.finished() {
+        // Snap any residual sub-pixel gap on the final tick.
+        remaining
+    } else {
+        let time_left =
+            (dash.timer.duration().as_secs_f32() - dash.timer.elapsed_secs()).max(0.0);
+        if time_left <= f32::EPSILON {
+            remaining
+        } else {
+            remaining * (time.delta_seconds() / time_left)
+        }
+    };
+
+    // Suppress any WASD-driven movement during the dash so the player can't
+    // veer off the rewind line.
+    mv.0 = Vec2::ZERO;
+    kcc.translation = Some(step);
+
+    if dash.timer.finished() {
+        commands.entity(player_e).remove::<RecallDashState>();
+
+        // Unbreakable landing stealth: stays active even if the player attacks.
+        commands
+            .entity(player_e)
+            .insert(StealthState {
+                duration: Timer::from_seconds(RECALL_LANDING_STEALTH_SECS, TimerMode::Once),
+                unbreakable: true,
+            })
+            .insert(Stealthed);
+
+        // Reuse the cosmetic smoke that Stealth casts use, so the player gets
+        // the same poof-into-stealth visual.
+        ranged_attack_events.send(RangedAttackEvent {
+            projectile: Projectile::Smoke,
+            direction: Vec2::ZERO,
+            mana_cost: None,
+            from_enemy: false,
+            from_entity: Some(player_e),
+            is_followup_proj: false,
+            dmg_override: Some(0),
+            pos_override: None,
+            spawn_delay: 0.0,
+        });
+    }
+}
+

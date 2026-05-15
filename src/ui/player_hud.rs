@@ -43,6 +43,7 @@ use crate::{
         skills::{
             ActiveSkill, ActiveSkillChoiceState, ActiveSkillUsedEvent, ClassSkillSlots, Heirloom,
             HeirloomRarity, PlayerSkills, FURY_ATTACK_SPEED_REFERENCE_COOLDOWN_SECS,
+            VISIBLE_CLASS_SKILL_COUNT,
         },
         CoinCurrency, Player, RunScore, TimeFragmentCurrency,
     },
@@ -1342,7 +1343,7 @@ pub fn spawn_skill_tooltip_content(
     speed: i32,
 ) {
     const ICONS_X_OFFSET: f32 = -24.;
-    const TEXT_Y_OFFSET: f32 = 14.;
+    const TEXT_Y_OFFSET: f32 = 12.;
     const DESC_TEXT_X: f32 = ICONS_X_OFFSET + 12.;
     const COOLDOWN_TEXT_X: f32 = 181.;
     const TITLE_Y: f32 = TEXT_Y_OFFSET + 6.;
@@ -1814,14 +1815,17 @@ pub fn handle_update_player_skills(
         //     0  // magic_skill_count - removed
         // );
 
-        // Build list of active skill slots to display
+        // Build list of active skill slots to display (first `VISIBLE_CLASS_SKILL_COUNT`
+        // class skills; fourth class slot omitted while experimenting — see
+        // `VISIBLE_CLASS_SKILL_COUNT` in `skills.rs`).
         let mut active_skill_slots = vec![
             (new_skills.active_skill_slot_0.clone(), 0),
             (new_skills.active_skill_slot_1.clone(), 1),
             (new_skills.active_skill_slot_2.clone(), 2),
-            (new_skills.active_skill_slot_3.clone(), 3),
         ];
-
+        if VISIBLE_CLASS_SKILL_COUNT >= 4 {
+            active_skill_slots.push((new_skills.active_skill_slot_3.clone(), 3));
+        }
         if new_skills.active_skill_slot_4.is_some() {
             active_skill_slots.push((new_skills.active_skill_slot_4.clone(), 4));
         }
@@ -1872,7 +1876,7 @@ pub fn handle_update_player_skills(
         }
 
         // Skills are centered around `HUD_SKILLS_CENTER_X` on the right side of the action
-        // row. The half-span shifts with the number of skills (4 normally, 5 when the bonus
+        // row. The half-span shifts with the number of skills (3 normally, 4 when the bonus
         // blessing is active) so the group stays centered regardless of count.
         let num_skills = active_skill_slots.len() as f32;
         let skill_half_span = (num_skills - 1.0) * 0.5;
@@ -1922,10 +1926,10 @@ pub fn handle_update_player_skills(
             );
             commands
                 .entity(key_bg)
-                .insert(ActiveSkillKeyBackground { slot: i });
+                .insert(ActiveSkillKeyBackground { slot: *slot_index });
             commands
                 .entity(key_text)
-                .insert(ActiveSkillKeybindText { slot: i });
+                .insert(ActiveSkillKeybindText { slot: *slot_index });
             if let Some(active_skill) = active_skill_option.clone() {
                 commands
                     .spawn(SpriteBundle {
@@ -2049,7 +2053,8 @@ pub fn update_skill_charge_text(
 /// uses `far = 1000.0`, and values at/above the far plane can clip or depth-sort badly.
 const ACTIVE_SKILL_DRAG_PREVIEW_Z: f32 = 998.;
 
-/// Drag-and-drop reordering for the four (or five) active skill HUD slots.
+/// Drag-and-drop reordering for the active skill HUD slots (three class skills
+/// by default, plus the optional blessing bonus slot).
 ///
 /// Behaviour:
 /// - Left-press on a populated slot icon starts a drag — the original icon stays in

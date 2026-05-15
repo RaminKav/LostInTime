@@ -22,7 +22,7 @@ use crate::{
         class_rank::ClassRankSystem,
         currency::TimeFragmentCurrency,
         score::HighScores,
-        skills::{HeirloomChoiceQueue, PlayerClass, SkillClass},
+        skills::{HeirloomChoiceQueue, PlayerClass, SkillClass, VISIBLE_CLASS_SKILL_COUNT},
         time_crystals::TimeCrystals,
         unlocks::{persist_unlock_data, RunUnlockState, UnlockUpgrades, UnlockedSkills},
         ClassUnlockData, UnlockedClasses,
@@ -1668,7 +1668,6 @@ fn spawn_player_preview(
     // let SKILL_X_OFFSET = -20.;
     let ICONS_Y_OFFSET = -20.;
     let ICON_Y_SPACING = -33.;
-    let SKILL_Y_OFFSET = -16.;
     let TEXT_Y_OFFSET = 12.;
     let TITLE_Y_OFFSET = 5.;
     let TITLE_X_OFFSET = 72.;
@@ -1952,11 +1951,30 @@ fn spawn_player_preview(
         .set_parent(player_container)
         .id();
 
-    for (skill_index, active_skill) in class_data.active_skills.iter().enumerate() {
-        let skill_y_offset = SKILL_Y_OFFSET
-            + ICONS_Y_OFFSET
-            + ICON_Y_SPACING * 2.
-            + ((ICON_Y_SPACING - 4.) * skill_index as f32);
+    // Evenly space skill preview rows between these Y positions inside `player_container`
+    // (more negative = lower on screen).
+    const CLASS_PREVIEW_SKILLS_Y_TOP: f32 = -108.;
+    const CLASS_PREVIEW_SKILLS_Y_BOTTOM: f32 = -196.;
+
+    let skill_row_count = class_data
+        .active_skills
+        .len()
+        .min(VISIBLE_CLASS_SKILL_COUNT)
+        .max(1);
+    let skill_y_span = CLASS_PREVIEW_SKILLS_Y_BOTTOM - CLASS_PREVIEW_SKILLS_Y_TOP;
+
+    for (skill_index, active_skill) in class_data
+        .active_skills
+        .iter()
+        .take(VISIBLE_CLASS_SKILL_COUNT)
+        .enumerate()
+    {
+        let skill_y_offset = if skill_row_count <= 1 {
+            CLASS_PREVIEW_SKILLS_Y_TOP + skill_y_span * 0.5
+        } else {
+            CLASS_PREVIEW_SKILLS_Y_TOP
+                + skill_y_span * (skill_index as f32 / (skill_row_count - 1) as f32)
+        };
 
         let skill_container = commands
             .spawn(SpatialBundle::from_transform(Transform {

@@ -75,7 +75,7 @@ fn teleport_tile_blocked_by_collider(
 }
 
 /// Intended landing tile, or the nearest open neighbor (by world distance to the player) among the 8 adjacent tiles.
-fn resolve_teleport_destination_tile(
+pub(crate) fn resolve_teleport_destination_tile(
     intended_tile: TileMapPosition,
     player_world: Vec2,
     game: &GameParam,

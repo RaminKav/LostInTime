@@ -120,6 +120,9 @@ pub fn break_stealth_on_player_attack(
         return;
     }
     for (e, mut stealth) in q.iter_mut() {
+        if stealth.unbreakable {
+            continue;
+        }
         break_stealth(&mut commands, e, &mut stealth);
     }
 }
@@ -300,7 +303,10 @@ pub fn handle_active_skill_event(
                         dur.tick(time.delta());
                         commands
                             .entity(player_e)
-                            .insert(StealthState { duration: dur })
+                            .insert(StealthState {
+                                duration: dur,
+                                unbreakable: false,
+                            })
                             .insert(Stealthed);
                         start_slot_cooldown_for_cast(
                             &mut class_slots,
@@ -714,6 +720,18 @@ pub fn handle_active_skill_event(
                         commands.entity(player_e).insert(Sprinting);
                     }
                     ActiveSkill::Teleport => {
+                        start_slot_cooldown_for_cast(
+                            &mut class_slots,
+                            ev.slot,
+                            skill_cd,
+                            should_start_cooldown,
+                        );
+                    }
+                    ActiveSkill::Recall => {
+                        // Gameplay (rewind + line slash) lives in
+                        // `rogue_skills::handle_recall`, which reads the same
+                        // `ActiveSkillUsedEvent`. Cooldown is consumed here so
+                        // we match the Teleport pattern exactly.
                         start_slot_cooldown_for_cast(
                             &mut class_slots,
                             ev.slot,
@@ -1344,7 +1362,8 @@ fn remove_skill_state_after_slot_cooldown(
         | ActiveSkill::SprintLunge
         | ActiveSkill::ParrySpear
         | ActiveSkill::Roll
-        | ActiveSkill::Parry => {}
+        | ActiveSkill::Parry
+        | ActiveSkill::Recall => {}
     }
 }
 

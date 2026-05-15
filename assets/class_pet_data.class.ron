@@ -10,7 +10,7 @@
             ],
             class_icon: RedPlayerSelectIcon,
             skill_icon: HealthIcon,
-            active_skills: (SpinAttack, Shout, Heal, ParrySpear), // consumes 5% hp, pulls in further distance per hp deducted
+            active_skills: (SpinAttack, Shout, ParrySpear,Heal), // consumes 5% hp, pulls in further distance per hp deducted
             starting_weapons: [Sword, Spear, Hammer],
         ),
         Wizard: (
@@ -23,7 +23,7 @@
             ],
             class_icon: BluePlayerSelectIcon,
             skill_icon: ManaIcon,
-            active_skills: (Teleport, Lightning, IceWall, FirePillar), // 
+            active_skills: (Teleport, IceWall, FirePillar,Lightning), // 
             starting_weapons: [FireStaff, IceStaff, BasicStaff],
         ),
         Rogue: (
@@ -36,7 +36,7 @@
             ],
             class_icon: RoguePlayerSelectIcon,
             skill_icon: CritChanceIcon,
-            active_skills: (SprintLunge, PossessedBlade, Rapidfire, DaggerSlash), // one extra slash per 25 speed
+            active_skills: (SprintLunge, Recall, DaggerSlash,PossessedBlade), // one extra slash per 25 speed
             starting_weapons: [Dagger],
         ),
         Thief: (
@@ -49,7 +49,7 @@
             ],
             class_icon: GreyPlayerSelectIcon,
             skill_icon: AttackSpeedIcon,
-            active_skills: (Roll, TripleThrow, PiercingStar, Fury),
+            active_skills: (Roll, PiercingStar, Fury,TripleThrow),
             starting_weapons: [Claw],
         ),
         Hunter: (
@@ -62,7 +62,7 @@
             ],
             class_icon: GreenPlayerSelectIcon,
             skill_icon: CritDamageIcon,
-            active_skills: (Buckshot, Bomb, DruidTree, ArrowVolley), // crit chance is added as crit dmg
+            active_skills: (Buckshot, Bomb, ArrowVolley, DruidTree), // crit chance is added as crit dmg
             starting_weapons: [WoodBow, Gun],
         ),
     },

@@ -26,9 +26,10 @@ use melee_skills::{
 };
 use rand::seq::SliceRandom;
 use rogue_skills::{
-    handle_add_combo_counter, handle_dodge_crit, handle_enemy_death_sprint_reset, handle_lunge,
-    handle_lunge_cooldown, handle_sprint_timer, handle_sprinting_cooldown, handle_toggle_sprinting,
-    pause_combo_anim_when_done, tick_combo_counter,
+    clear_position_history_on_move, handle_add_combo_counter, handle_dodge_crit,
+    handle_enemy_death_sprint_reset, handle_lunge, handle_lunge_cooldown, handle_recall,
+    handle_sprint_timer, handle_sprinting_cooldown, handle_toggle_sprinting,
+    pause_combo_anim_when_done, tick_combo_counter, tick_position_history, tick_recall_dash,
 };
 use serde::Deserialize;
 use strum_macros::{Display, EnumIter};
@@ -267,6 +268,14 @@ impl Plugin for PlayerPlugin {
                 (
                     skill_heirlooms::update_stealth_color.run_if(is_not_paused),
                     tick_lunge_shadows.run_if(is_not_paused),
+                    handle_recall
+                        .run_if(is_not_paused)
+                        .before(skill_heirlooms::handle_active_skill_event),
+                    tick_recall_dash
+                        .after(player_move_inputs)
+                        .run_if(is_not_paused),
+                    tick_position_history.run_if(is_not_paused),
+                    clear_position_history_on_move.run_if(is_not_paused),
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )

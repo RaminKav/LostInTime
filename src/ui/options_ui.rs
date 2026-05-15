@@ -13,6 +13,7 @@ use crate::{
     datafiles,
     inputs::AutoAttackState,
     keybinds::InputMappings,
+    player::skills::VISIBLE_CLASS_SKILL_COUNT,
     ui::{
         interactions::Interaction, spawn_back_button, ui_helpers, Interactable, UIElement, UIState,
     },
@@ -428,8 +429,8 @@ pub fn setup_options_ui(
     let start_y = 66.5;
     let row_spacing = -16.0;
 
-    // Skill slot keybinds (slots 0-3)
-    for slot in 0..4 {
+    // Skill slot keybinds (roll + class skills; matches HUD / `VISIBLE_CLASS_SKILL_COUNT`)
+    for slot in 0..VISIBLE_CLASS_SKILL_COUNT {
         let y = start_y + row_spacing * slot as f32;
         spawn_keybind_row(
             &mut commands,
@@ -447,7 +448,8 @@ pub fn setup_options_ui(
     }
 
     // Hotbar keybinds section (Hotbar consume/use keys for slots 0-3)
-    let hotbar_section_y = start_y + row_spacing * 4.5;
+    let hotbar_section_y =
+        start_y + row_spacing * (VISIBLE_CLASS_SKILL_COUNT as f32 + 0.5);
     commands.spawn((
         Text2dBundle {
             text: Text::from_section(

@@ -171,7 +171,13 @@ pub enum ActiveSkill {
     SpinAttack,
     ArrowVolley,    // Hunter - NEW
     PossessedBlade, // Rogue - NEW
+    Recall,         // Rogue - NEW (rewind dash)
 }
+
+/// How many entries from each class's `active_skills` list are used in play
+/// (class selection preview, HUD, `PlayerSkills` slots 0..2). The fourth field
+/// (`active_skill_slot_3`) stays `None` while this is `3` for an easy revert.
+pub const VISIBLE_CLASS_SKILL_COUNT: usize = 3;
 
 /// Percent of base attack for UI (`skill_power_mult * VALUE`) and for damage
 /// `attack * skill_power_mult * attack_damage_multiplier(VALUE)`, except
@@ -227,6 +233,27 @@ pub mod active_skill_scaling {
     pub const LASER_BEAM: f32 = 60.0;
     pub const ARROW_VOLLEY: f32 = 75.0;
     pub const POSSESSED_BLADE: f32 = 115.0;
+    /// Recall dash deals this percent of attack to each enemy in the rewind path.
+    pub const RECALL: f32 = 160.0;
+    /// How far back in time Recall returns the player, in seconds.
+    pub const RECALL_REWIND_SECONDS: f32 = 0.8;
+    /// Interval between position samples used to reconstruct the rewind target.
+    pub const RECALL_SAMPLE_INTERVAL_SECS: f32 = 0.05;
+    /// Capacity of the player's recall position-history ring buffer.
+    /// Sized to hold `RECALL_REWIND_SECONDS / RECALL_SAMPLE_INTERVAL_SECS` + a small
+    /// safety margin so we always have a sample at age >= [`RECALL_REWIND_SECONDS`] once primed.
+    pub const RECALL_HISTORY_CAPACITY: usize = 12;
+    /// How long the player takes to traverse the rewind path. Short so it
+    /// feels like a fast dash rather than a teleport.
+    pub const RECALL_DASH_DURATION_SECS: f32 = 0.12;
+    /// Lifetime (seconds) of the line damage collider spawned along the rewind path.
+    /// Set slightly longer than the dash duration so enemies along the line still
+    /// register hits as the player sweeps across them.
+    pub const RECALL_HITBOX_SECONDS: f32 = 0.22;
+    /// Half-width (pixels) of the line damage collider; full width is 2x this.
+    pub const RECALL_HITBOX_HALF_WIDTH: f32 = 8.0;
+    /// Duration of the (unbreakable) stealth buff granted on Recall landing.
+    pub const RECALL_LANDING_STEALTH_SECS: f32 = 0.75;
     /// Added as [`crate::player::skills::RapidfireState::attack_speed_bonus`] multiplier base.
     pub const RAPIDFIRE_ATTACK_SPEED_BONUS_PERCENT: f32 = 80.0;
 
@@ -319,10 +346,10 @@ impl ActiveSkill {
             ActiveSkill::FirePillar => 12.0,
             ActiveSkill::Heal => 20.0,
             ActiveSkill::Buckshot => 2.3,
-            ActiveSkill::IceWall => 10.0,
+            ActiveSkill::IceWall => 7.0,
             ActiveSkill::DruidTree => 11.0,
             ActiveSkill::Shout => 7.0,
-            ActiveSkill::PiercingStar => 8.0,
+            ActiveSkill::PiercingStar => 7.0,
             ActiveSkill::LaserBeam => 13.0,
             // New skills - placeholder cooldowns
             ActiveSkill::Lightning => 5.0,
@@ -334,6 +361,7 @@ impl ActiveSkill {
             ActiveSkill::SpinAttack => 2.5,
             ActiveSkill::ArrowVolley => 8.0,
             ActiveSkill::PossessedBlade => 6.0,
+            ActiveSkill::Recall => 5.0,
         }
     }
 }
@@ -355,6 +383,9 @@ impl ActiveSkill {
 #[component(storage = "SparseSet")]
 pub struct StealthState {
     pub duration: Timer,
+    /// When true, player-issued attacks do NOT cancel this stealth. Used by
+    /// the Recall skill's landing buff so the player can attack out of it.
+    pub unbreakable: bool,
 }
 #[derive(Component, Clone)]
 #[component(storage = "SparseSet")]
@@ -489,6 +520,7 @@ impl ActiveSkill {
             ActiveSkill::SpinAttack => "Spin Attack".to_string(),
             ActiveSkill::ArrowVolley => "Arrow Volley".to_string(),
             ActiveSkill::PossessedBlade => "Possessed Blade".to_string(),
+            ActiveSkill::Recall => "Shadow Step".to_string(),
         }
     }
 
@@ -505,8 +537,8 @@ impl ActiveSkill {
             dagger_slash_total_slashes, ARROW_VOLLEY, BOMB, BUCKSHOT_PELLET, DAGGER_SLASH,
             DAGGER_THROW, FIRE_PILLAR, FURY, HEAL_MAX_HEALTH_PERCENT, ICE_WALL, LASER_BEAM,
             LIGHTNING, PARRY_SPEAR, PIERCING_STAR, POSSESSED_BLADE,
-            RAPIDFIRE_ATTACK_SPEED_BONUS_PERCENT, SHOUT, SPIN_ATTACK, SPRINT_LUNGE,
-            TELEPORT_SHOCK_ATTACK_PERCENT, TRIPLE_THROW,
+            RAPIDFIRE_ATTACK_SPEED_BONUS_PERCENT, RECALL, RECALL_REWIND_SECONDS, SHOUT,
+            SPIN_ATTACK, SPRINT_LUNGE, TELEPORT_SHOCK_ATTACK_PERCENT, TRIPLE_THROW,
         };
 
         match self {
@@ -692,6 +724,12 @@ impl ActiveSkill {
                 ),
                 "lifesteal on kill, up to 3 times.".to_string(),
             ],
+            ActiveSkill::Recall => vec![
+                format!("Dash back to where you were {:.1}s", RECALL_REWIND_SECONDS),
+                "ago, slicing enemies in your path".to_string(),
+                format!("for {:.1}% damage. Gain stealth", skill_power * RECALL),
+                "breifly afterwards.".to_string(),
+            ],
         }
     }
     //TODO: Grav spear, teleport, and lunge skills rely on this, we should remove the reliance
@@ -745,6 +783,7 @@ impl ActiveSkill {
             ActiveSkill::Stealth => {
                 commands.entity(entity).insert(StealthState {
                     duration: Timer::from_seconds(2.0, TimerMode::Once),
+                    unbreakable: false,
                 });
             }
             ActiveSkill::Rapidfire => {
@@ -787,6 +826,11 @@ impl ActiveSkill {
                 commands.entity(entity).insert(LaserBeamState {
                     hit_clear_timer: Timer::from_seconds(0.5, TimerMode::Repeating),
                 });
+            }
+            ActiveSkill::Recall => {
+                commands
+                    .entity(entity)
+                    .insert(crate::player::rogue_skills::PositionHistory::new());
             }
             // New skills - placeholder implementations (default to Roll behavior for now)
             ActiveSkill::Roll
