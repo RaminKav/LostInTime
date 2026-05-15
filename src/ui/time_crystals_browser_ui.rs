@@ -555,7 +555,12 @@ pub fn setup_time_crystals_browser_ui(
     commands
         .spawn(Text2dBundle {
             text: Text::from_section(
-                "View heirlooms",
+                // Trailing space: Bevy 0.10 derives centered-layout pivot from `TextLayoutInfo.size`
+                // (pipeline.rs: glyph positions + advances) but rasterized sprite positions are built
+                // after `GlyphPlacementAdjuster` rounds each glyph's baseline X (glyph_brush.rs).
+                // Those disagree slightly on scale_factor=1; an extra advance widens `size` and fixes
+                // collapsed pairs ("ei", etc.). Harmless visually — NBSP would also work.
+                "View heirlooms ",
                 TextStyle {
                     font: asset_server.load("fonts/4x5.ttf"),
                     font_size: 5.0,
