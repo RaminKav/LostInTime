@@ -364,30 +364,30 @@ fn handle_ranged_attack_event(
         }
         // Ammo gate for non-staff player shots
         // Skip ammo consumption if Rapidfire is active (duration hasn't finished)
-        let is_rapidfire_active = rapidfire_state
-            .get_single()
-            .map(|r| !r.duration.finished())
-            .unwrap_or(false);
-        if !proj_event.from_enemy
-            && proj_event.from_entity.is_none()
-            && !proj_event.projectile.is_staff_proj()
-            && !proj_event.is_followup_proj
-            && !is_rapidfire_active
-            && !proj_event.projectile.is_skill_projectile()
-        // Don't consume ammo during Rapidfire or using skill projectiles
-        {
-            if let Some(main_hand) = game.player_state.main_hand_slot.clone() {
-                let held_e = main_hand.entity;
-                if let Ok(mut ammo) = ammo_query.get_mut(held_e) {
-                    if !ammo.can_fire() {
-                        ammo.start_reload();
-                        continue;
-                    }
-                    // consume one round, will auto-reload if hits zero
-                    ammo.use_ammo_and_maybe_reload();
-                }
-            }
-        }
+        // let is_rapidfire_active = rapidfire_state
+        //     .get_single()
+        //     .map(|r| !r.duration.finished())
+        //     .unwrap_or(false);
+        // if !proj_event.from_enemy
+        //     && proj_event.from_entity.is_none()
+        //     && !proj_event.projectile.is_staff_proj()
+        //     && !proj_event.is_followup_proj
+        //     && !is_rapidfire_active
+        //     && !proj_event.projectile.is_skill_projectile()
+        // // Don't consume ammo during Rapidfire or using skill projectiles
+        // {
+        //     if let Some(main_hand) = game.player_state.main_hand_slot.clone() {
+        //         let held_e = main_hand.entity;
+        //         if let Ok(mut ammo) = ammo_query.get_mut(held_e) {
+        //             if !ammo.can_fire() {
+        //                 ammo.start_reload();
+        //                 continue;
+        //             }
+        //             // consume one round, will auto-reload if hits zero
+        //             ammo.use_ammo_and_maybe_reload();
+        //         }
+        //     }
+        // }
 
         if let Some(mana_cost) = proj_event.mana_cost {
             if mana_cost.abs() > current_mana.0 {
