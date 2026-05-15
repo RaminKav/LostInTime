@@ -4,7 +4,8 @@ use bevy::{
     render::view::RenderLayers,
 };
 
-use crate::ui::text_scale::{scaled_text_style, text_world_scale_vec, ScaledText2d};
+use bevy::text::TextLayoutInfo;
+
 use crate::{ui::game_fonts as gf, ScreenResolution, UICamera, DEBUG};
 const VERSION: &str = "v0.18.3";
 #[derive(Component)]
@@ -27,32 +28,33 @@ pub fn spawn_fps_text(
         -resolution.game_height / 2. + 10.5,
     );
     let snapped = snap_world_xy_to_pixel_grid(raw, resolution.scale);
-    let scale = resolution.scale;
-    let color = Color::Rgba {
-        red: 75. / 255.,
-        green: 61. / 255.,
-        blue: 68. / 255.,
-        alpha: 1.,
-    };
 
-    // DEBUG FPS — glyph atlas rasterized at physical pixel size (see `ui::text_scale`).
+    // DEBUG FPS
     commands.spawn((
         Text2dBundle {
             text: Text::from_section(
                 format!("FPS: \n\n{VERSION}"),
-                scaled_text_style(asset_server.as_ref(), gf::HUD_FPS_DEBUG, color, scale),
+                TextStyle {
+                    font: gf::HUD_FPS_DEBUG.load_font(asset_server.as_ref()),
+                    font_size: gf::HUD_FPS_DEBUG.size,
+                    color: Color::Rgba {
+                        red: 75. / 255.,
+                        green: 61. / 255.,
+                        blue: 68. / 255.,
+                        alpha: 1.,
+                    },
+                },
             )
             .with_alignment(TextAlignment::Right),
             transform: Transform {
                 translation: Vec3::new(snapped.x, snapped.y, 1.),
-                scale: text_world_scale_vec(scale),
+                scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
             ..default()
         },
         Name::new("FPS TEXT"),
         FPSText,
-        ScaledText2d::from(gf::HUD_FPS_DEBUG),
         RenderLayers::from_layers(&[3]),
     ));
 }
@@ -92,6 +94,88 @@ pub fn phase1_fps_text_viewport_diag(
         vp.y.fract(),
         res.scale,
     );
+    *last_key = Some(key);
+}
+
+/// Phase 2 (`DEBUG=1`): one-shot dump of per-glyph layout for the FPS text after Bevy lays it out.
+///
+/// For each glyph (in font-pixel space), logs:
+/// - `glyph_pos_world`      : glyph quad center in world units (entity-local, post layout)
+/// - `glyph_pos_viewport`   : projected to viewport (logical) pixels
+/// - `glyph_pos_phys`       : projected to physical pixels (the framebuffer grid we sample)
+/// - `glyph_pos_phys.fract` : how far off the physical pixel grid each glyph quad center is
+/// - `atlas_rect_size`      : the atlas rect for this glyph (rasterized pixel size)
+///
+/// If `fract` is non-zero for most glyphs, the "some pixels of the text are smaller or larger
+/// than they should be" symptom is sub-pixel atlas sampling. Re-runs only when scale/render
+/// size changes; emits at most once per resolution change to avoid spam.
+pub fn phase2_fps_text_layout_diag(
+    res: Res<ScreenResolution>,
+    mut last_key: Local<Option<(u32, u32, u32)>>,
+    fps_q: Query<(&GlobalTransform, &TextLayoutInfo, &Text), With<FPSText>>,
+    ui_cam: Query<(&Camera, &GlobalTransform), (With<UICamera>, Without<FPSText>)>,
+    windows: Query<&bevy::window::Window, With<bevy::window::PrimaryWindow>>,
+) {
+    if !*DEBUG {
+        return;
+    }
+    let key = (res.scale, res.render_width, res.render_height);
+    if last_key.as_ref() == Some(&key) {
+        return;
+    }
+    let Ok((fps_gt, layout, text)) = fps_q.get_single() else {
+        return;
+    };
+    let Ok((cam, cam_gt)) = ui_cam.get_single() else {
+        return;
+    };
+    let Ok(window) = windows.get_single() else {
+        return;
+    };
+    if layout.glyphs.is_empty() {
+        return;
+    }
+
+    let scale_factor = window.resolution.scale_factor() as f32;
+    let phys_per_world = res.scale as f32;
+    let entity_world = fps_gt.translation();
+    info!(
+        "Phase2 FPS layout: entity_world=({:.4},{:.4}) entity_world.fract*scale=({:.4},{:.4}) layout_size=({:.4},{:.4}) glyphs={} scale_factor={:.3} phys_per_world={}",
+        entity_world.x,
+        entity_world.y,
+        (entity_world.x * phys_per_world).fract(),
+        (entity_world.y * phys_per_world).fract(),
+        layout.size.x,
+        layout.size.y,
+        layout.glyphs.len(),
+        scale_factor,
+        res.scale,
+    );
+
+    for (i, g) in layout.glyphs.iter().enumerate().take(8) {
+        // PositionedGlyph.position is in *font pixel space* (i.e. pre `scale_factor.recip()`),
+        // see bevy_text-0.10.1/src/text2d.rs extract step.
+        // World-space glyph translation = entity_world + position * (1 / scale_factor).
+        let pos_world =
+            Vec3::new(entity_world.x + g.position.x / scale_factor,
+                      entity_world.y + g.position.y / scale_factor,
+                      entity_world.z);
+        let viewport = cam.world_to_viewport(cam_gt, pos_world);
+        let phys = viewport.map(|v| v * scale_factor);
+        info!(
+            "Phase2 FPS glyph[{i}] section={} char_idx={} pos_font_px=({:.4},{:.4}) pos_world=({:.4},{:.4}) viewport=({:?}) phys=({:?}) phys.fract=({:?}) atlas_size=({:?})",
+            g.section_index,
+            i,
+            g.position.x,
+            g.position.y,
+            pos_world.x,
+            pos_world.y,
+            viewport.map(|v| (format!("{:.4}", v.x), format!("{:.4}", v.y))),
+            phys.map(|p| (format!("{:.4}", p.x), format!("{:.4}", p.y))),
+            phys.map(|p| (format!("{:.4}", p.x.fract()), format!("{:.4}", p.y.fract()))),
+            text.sections.get(g.section_index).map(|_| (g.size.x, g.size.y)),
+        );
+    }
     *last_key = Some(key);
 }
 
