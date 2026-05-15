@@ -4,6 +4,7 @@ use bevy::{
     render::view::RenderLayers,
 };
 
+use crate::ui::text_scale::{scaled_text_style, text_world_scale_vec, ScaledText2d};
 use crate::{ui::game_fonts as gf, ScreenResolution, UICamera, DEBUG};
 const VERSION: &str = "v0.18.3";
 #[derive(Component)]
@@ -26,33 +27,32 @@ pub fn spawn_fps_text(
         -resolution.game_height / 2. + 10.5,
     );
     let snapped = snap_world_xy_to_pixel_grid(raw, resolution.scale);
+    let scale = resolution.scale;
+    let color = Color::Rgba {
+        red: 75. / 255.,
+        green: 61. / 255.,
+        blue: 68. / 255.,
+        alpha: 1.,
+    };
 
-    // DEBUG FPS
+    // DEBUG FPS — glyph atlas rasterized at physical pixel size (see `ui::text_scale`).
     commands.spawn((
         Text2dBundle {
             text: Text::from_section(
                 format!("FPS: \n\n{VERSION}"),
-                TextStyle {
-                    font: gf::HUD_FPS_DEBUG.load_font(asset_server.as_ref()),
-                    font_size: gf::HUD_FPS_DEBUG.size,
-                    color: Color::Rgba {
-                        red: 75. / 255.,
-                        green: 61. / 255.,
-                        blue: 68. / 255.,
-                        alpha: 1.,
-                    },
-                },
+                scaled_text_style(asset_server.as_ref(), gf::HUD_FPS_DEBUG, color, scale),
             )
             .with_alignment(TextAlignment::Right),
             transform: Transform {
                 translation: Vec3::new(snapped.x, snapped.y, 1.),
-                scale: Vec3::new(1., 1., 1.),
+                scale: text_world_scale_vec(scale),
                 ..Default::default()
             },
             ..default()
         },
         Name::new("FPS TEXT"),
         FPSText,
+        ScaledText2d::from(gf::HUD_FPS_DEBUG),
         RenderLayers::from_layers(&[3]),
     ));
 }
