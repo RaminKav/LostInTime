@@ -1954,7 +1954,7 @@ fn spawn_player_preview(
     // Evenly space skill preview rows between these Y positions inside `player_container`
     // (more negative = lower on screen).
     const CLASS_PREVIEW_SKILLS_Y_TOP: f32 = -108.;
-    const CLASS_PREVIEW_SKILLS_Y_BOTTOM: f32 = -196.;
+    const CLASS_PREVIEW_SKILLS_Y_BOTTOM: f32 = -202.;
 
     let skill_row_count = class_data
         .active_skills

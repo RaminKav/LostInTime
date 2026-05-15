@@ -8,7 +8,7 @@ use bevy::sprite::TextureAtlas;
 use bevy::text::TextLayoutInfo;
 
 use crate::{ui::game_fonts as gf, ScreenResolution, UICamera, DEBUG};
-const VERSION: &str = "v0.18.3";
+const VERSION: &str = "v0.19.0";
 #[derive(Component)]
 pub struct FPSText;
 
@@ -157,10 +157,11 @@ pub fn phase2_fps_text_layout_diag(
         // PositionedGlyph.position is in *font pixel space* (i.e. pre `scale_factor.recip()`),
         // see bevy_text-0.10.1/src/text2d.rs extract step.
         // World-space glyph translation = entity_world + position * (1 / scale_factor).
-        let pos_world =
-            Vec3::new(entity_world.x + g.position.x / scale_factor,
-                      entity_world.y + g.position.y / scale_factor,
-                      entity_world.z);
+        let pos_world = Vec3::new(
+            entity_world.x + g.position.x / scale_factor,
+            entity_world.y + g.position.y / scale_factor,
+            entity_world.z,
+        );
         let viewport = cam.world_to_viewport(cam_gt, pos_world);
         let phys = viewport.map(|v| v * scale_factor);
         info!(

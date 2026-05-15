@@ -391,3 +391,26 @@ Heirlooms:
 - [QoL] Auto-Attack is on by default, and is now a checkbox toggle
 - [Bug] Fix animation for Rogue movement
 - [Bug] Fix overlays when opening inventory during heirloom selection
+
+## 0.18.2
+
+- [Feature] Classes start with last 2 skills Locked by default. Unlock them with Time Fragments. Unlock Classes checkbox bypasses this in options
+- [Feature] First Time User Tutorial with visuals! Added "Show Tutorial" button in Options, check it out
+- [QoL] Auto-Attack on by default, changed to a toggle checkbox in options. Left mouse button mapped to a skill now by default
+- [QoL] Improve font used for in-game text hovers (damage numbers, item pickups, shrine text).
+- [Bug] Fixed crit detection for damage numbers, should be consistant now
+- Wipe Game Data button in options, for those who want to try out the new meta progression stuff added recently.
+
+## 0.19.0
+
+- [Feature] Beastiary & Monster Cards
+- [Balance] Nerf chaos gain per level from 0.2 -> 0.1
+- Removed Gun weapon from game pool
+- [Feature] Added Scorpion Boss to Desert Era! Spawns instead of the mushking now in era2
+- [New Heirloom] Blue Card: Uncommon, +3% chance on weapon or skill damage to regen 1 Mana.
+- [New Heirloom] Purple Card: Rare, Rework of old purple card, doubles drop rate of mana orbs. (default is 10% drop).
+- [Balance] Boulder balance: Increase time between spawns, but increase duration of the boulder.
+- [Balance] Reduce drop rate of Time Fragments
+- [Bug] Fix text on some monitors, text should be more clear, please send screenshots if any text looks off on your monitor (non-uniform pixel sizes, etc)
+- [Balance] Reduce classes to 3 skills total, 2 unlocked by default, 3rd one purchased with Time Fragments.
+- [New Skill] Shadow Step: Rogue skill, dash to your position 0.75s ago, damaging all enemies in your path, gain stealth after for 1s.
