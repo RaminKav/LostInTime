@@ -30,7 +30,6 @@ mod fps_text;
 pub mod font_binarize;
 pub mod game_fonts;
 pub mod text_pixel_snap;
-pub mod text_scale;
 pub mod key_input_guide;
 use key_input_guide::*;
 pub mod furnace_ui;
@@ -370,11 +369,6 @@ impl Plugin for UIPlugin {
                 snap_layer3_visuals_to_pixel_grid
                     .in_base_set(CoreSet::PostUpdate)
                     .run_if(not(in_state(GameState::Initializing))),
-            )
-            .add_system(
-                text_scale::sync_scaled_text2d_on_scale_change
-                    .in_base_set(CoreSet::PostUpdate)
-                    .before(snap_layer3_visuals_to_pixel_grid),
             )
             .add_system(
                 font_binarize::binarize_font_atlas_alpha
