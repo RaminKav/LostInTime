@@ -4,6 +4,7 @@ use bevy::{
     render::view::RenderLayers,
 };
 
+use bevy::sprite::TextureAtlas;
 use bevy::text::TextLayoutInfo;
 
 use crate::{ui::game_fonts as gf, ScreenResolution, UICamera, DEBUG};
@@ -175,6 +176,93 @@ pub fn phase2_fps_text_layout_diag(
             phys.map(|p| (format!("{:.4}", p.x.fract()), format!("{:.4}", p.y.fract()))),
             text.sections.get(g.section_index).map(|_| (g.size.x, g.size.y)),
         );
+    }
+    *last_key = Some(key);
+}
+
+/// Phase 3 (`DEBUG=1`): ASCII-dump the alpha channel of each glyph's atlas rect for the FPS text.
+///
+/// Each row is one atlas-pixel row. Glyphs are RGBA8 with alpha encoding glyph coverage.
+/// Legend:
+/// - `#`  = alpha 255 (fully covered, hard pixel)
+/// - `o`  = alpha 192–254
+/// - `=`  = alpha 128–191
+/// - `:`  = alpha  64–127
+/// - `.`  = alpha   1– 63
+/// - ` `  = alpha 0
+///
+/// If most pixels are `#` or space, the rasterizer (`ab_glyph`) produced a clean binary glyph
+/// and the pixel-wobble must be elsewhere. If you see lots of `o`/`=`/`:`/`.`, the artifact is
+/// grayscale anti-aliased edges, and you should switch to a different font (or pre-baked atlas)
+/// for that style.
+pub fn phase3_fps_atlas_dump(
+    mut last_key: Local<Option<(u32, u32, u32)>>,
+    res: Res<ScreenResolution>,
+    fps_q: Query<&TextLayoutInfo, With<FPSText>>,
+    atlases: Res<Assets<TextureAtlas>>,
+    images: Res<Assets<Image>>,
+) {
+    if !*DEBUG {
+        return;
+    }
+    let key = (res.scale, res.render_width, res.render_height);
+    if last_key.as_ref() == Some(&key) {
+        return;
+    }
+    let Ok(layout) = fps_q.get_single() else {
+        return;
+    };
+    if layout.glyphs.is_empty() {
+        return;
+    }
+
+    for (i, g) in layout.glyphs.iter().enumerate().take(8) {
+        let Some(atlas) = atlases.get(&g.atlas_info.texture_atlas) else {
+            continue;
+        };
+        let Some(image) = images.get(&atlas.texture) else {
+            continue;
+        };
+        let rect = atlas.textures[g.atlas_info.glyph_index];
+        let img_w = image.texture_descriptor.size.width as usize;
+        let img_h = image.texture_descriptor.size.height as usize;
+        let bytes_per_pixel = 4;
+        let x0 = rect.min.x as usize;
+        let y0 = rect.min.y as usize;
+        let w = (rect.max.x - rect.min.x) as usize;
+        let h = (rect.max.y - rect.min.y) as usize;
+
+        info!(
+            "Phase3 FPS atlas[{i}]: atlas_image_size=({img_w}x{img_h}) rect_origin=({x0},{y0}) rect_size=({w}x{h})",
+        );
+        let mut rows = String::new();
+        for row in 0..h {
+            let y = y0 + row;
+            let mut line = String::with_capacity(w);
+            for col in 0..w {
+                let x = x0 + col;
+                if x >= img_w || y >= img_h {
+                    line.push('?');
+                    continue;
+                }
+                let pixel_idx = (y * img_w + x) * bytes_per_pixel;
+                let alpha = image.data.get(pixel_idx + 3).copied().unwrap_or(0);
+                let ch = match alpha {
+                    0 => ' ',
+                    1..=63 => '.',
+                    64..=127 => ':',
+                    128..=191 => '=',
+                    192..=254 => 'o',
+                    255 => '#',
+                };
+                line.push(ch);
+            }
+            rows.push('\n');
+            rows.push('|');
+            rows.push_str(&line);
+            rows.push('|');
+        }
+        info!("Phase3 FPS atlas[{i}] alpha grid:{rows}");
     }
     *last_key = Some(key);
 }

@@ -360,6 +360,11 @@ impl Plugin for UIPlugin {
                     .run_if(in_state(GameState::Main)),
             )
             .add_system(
+                fps_text::phase3_fps_atlas_dump
+                    .in_base_set(CoreSet::PostUpdate)
+                    .run_if(in_state(GameState::Main)),
+            )
+            .add_system(
                 snap_layer3_visuals_to_pixel_grid
                     .in_base_set(CoreSet::PostUpdate)
                     .run_if(not(in_state(GameState::Initializing))),
