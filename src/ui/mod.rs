@@ -29,6 +29,7 @@ mod fps_text;
 
 pub mod font_binarize;
 pub mod game_fonts;
+pub mod text_pixel_snap;
 pub mod text_scale;
 pub mod key_input_guide;
 use key_input_guide::*;
@@ -377,6 +378,11 @@ impl Plugin for UIPlugin {
             )
             .add_system(
                 font_binarize::binarize_font_atlas_alpha
+                    .in_base_set(CoreSet::PostUpdate)
+                    .after(bevy::text::update_text2d_layout),
+            )
+            .add_system(
+                text_pixel_snap::pixel_snap_text_glyphs
                     .in_base_set(CoreSet::PostUpdate)
                     .after(bevy::text::update_text2d_layout),
             )
