@@ -236,9 +236,10 @@ pub mod active_skill_scaling {
     /// Recall dash deals this percent of attack to each enemy in the rewind path.
     pub const RECALL: f32 = 160.0;
     /// How far back in time Recall returns the player, in seconds.
-    pub const RECALL_REWIND_SECONDS: f32 = 0.8;
+    pub const RECALL_REWIND_SECONDS: f32 = 1.;
     /// Interval between position samples used to reconstruct the rewind target.
-    pub const RECALL_SAMPLE_INTERVAL_SECS: f32 = 0.05;
+    pub const RECALL_SAMPLE_INTERVAL_SECS: f32 =
+        RECALL_REWIND_SECONDS / RECALL_HISTORY_CAPACITY as f32 + 0.1;
     /// Capacity of the player's recall position-history ring buffer.
     /// Sized to hold `RECALL_REWIND_SECONDS / RECALL_SAMPLE_INTERVAL_SECS` + a small
     /// safety margin so we always have a sample at age >= [`RECALL_REWIND_SECONDS`] once primed.
