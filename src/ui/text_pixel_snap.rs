@@ -10,21 +10,24 @@
 //! When an atlas dimension is **odd** (5×5 letters in `4x5.ttf`, `1×4` colon, `3×5` numerals,
 //! …) and the integer render scale is **odd** (`3`), the quad's center lands on an integer
 //! physical pixel but its edges fall on **half-pixel boundaries**. With nearest sampling that
-//! makes one row (or column) of atlas texels span one fewer physical pixel than its neighbors —
-//! the canonical "some pixels of the text are smaller/larger than they should be" symptom
-//! observed on a 1920×1080 27" monitor.
+//! makes one **row** of atlas texels span one fewer physical pixel than its neighbors — the
+//! canonical "some pixels of the text are smaller/larger than they should be" symptom observed
+//! on a 1920×1080 27" monitor (horizontal odd-width edge effects are rarer in practice).
 //!
 //! Confirmed by [`crate::ui::fps_text::phase2_fps_text_layout_diag`]: glyph[0] of `F` at world
 //! Y=−164.6667 maps to phys Y=1034.0 (integer center) but the 5-pixel-tall atlas places its
 //! edges at phys Y=1026.5 / 1041.5 (half-integer).
 //!
 //! ## What this does
-//! After Bevy lays out the text (in `PostUpdate`, after `update_text2d_layout`), for every
-//! glyph in every `TextLayoutInfo` on render layer 3, shift `position` so the glyph quad's
-//! bottom-left corner — in physical pixels relative to its (already pixel-snapped) parent
-//! entity — lands on an integer. Quad width/height are already integer phys (`atlas_size *
-//! phys_per_world / scale_factor`), so integer corner ⇒ integer edges ⇒ uniform nearest
-//! sampling, every texel becomes exactly `phys_per_world × phys_per_world` physical pixels.
+//! After Bevy lays out the text (in `PostUpdate`, after `update_text2d_layout`), for every glyph
+//! in every `TextLayoutInfo` on render layer 3, shift `position` so the glyph quad's bottom edge
+//! lands on an integer physical **Y** relative to the parent (same coordinate space as
+//! [`crate::ui::snap_layer3_visuals_to_pixel_grid`]).
+//!
+//! **Only Y is rounded.** Rounding each glyph's bottom-left **X** independently distorts
+//! horizontal spacing from `glyph_brush_layout` — different glyphs pick up different nudges, so
+//! letter gaps shrink or grow. On Windows (`scale_factor == 1`) that showed up as merged pairs in
+//! longer strings such as "View heirlooms"; macOS (`scale_factor == 2`) masked it.
 //!
 //! ## Scope
 //! Restricted to `RenderLayers::layer(3)` (the UI camera), which is also what
@@ -74,12 +77,10 @@ pub fn pixel_snap_text_glyphs(
             let corner_offset_font = center_offset_font - half_size_font;
             let corner_offset_phys = corner_offset_font / scale_factor * phys_per_world;
 
-            let target_phys = Vec2::new(
-                corner_offset_phys.x.round(),
-                corner_offset_phys.y.round(),
-            );
+            // Y only — see module docs (preserve horizontal letter spacing).
+            let target_phys = Vec2::new(corner_offset_phys.x, corner_offset_phys.y.round());
             let delta_phys = target_phys - corner_offset_phys;
-            if delta_phys.x.abs() < 1e-4 && delta_phys.y.abs() < 1e-4 {
+            if delta_phys.y.abs() < 1e-4 {
                 continue;
             }
             g.position += delta_phys * font_per_phys;
