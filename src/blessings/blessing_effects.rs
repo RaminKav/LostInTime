@@ -14,7 +14,10 @@ use crate::{
         HeirloomWithRarity, PlayerSkills,
     },
     proto::proto_param::ProtoParam,
-    ui::damage_numbers::spawn_floating_text_with_shadow,
+    ui::{
+        damage_numbers::spawn_floating_text_with_shadow,
+        game_fonts::FLOATING_TEXT,
+    },
 };
 
 #[derive(Component, Default)]
@@ -256,6 +259,7 @@ pub fn handle_blessing_selected(
                         player_pos + Vec3::new(0., 20., 2.),
                         LIGHT_GREEN,
                         format!("+{}", skill_name),
+                        FLOATING_TEXT,
                     );
                 }
             }

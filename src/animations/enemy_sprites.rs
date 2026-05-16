@@ -12,6 +12,7 @@ use bevy_proto::prelude::{ReflectSchematic, Schematic};
 use crate::{
     assets::Graphics,
     combat_helpers::DespawnTimer,
+    ecs_helpers::SafeHierarchyExt,
     enemy::{aseprite_enemy::AsepriteBasicEnemy, Mob},
     inputs::FacingDirection,
     player::melee_skills::Parried,
@@ -212,6 +213,6 @@ pub fn spawn_attack_warning_aseprite(
             ..Default::default()
         })
         .insert(DespawnTimer(Timer::from_seconds(duration, TimerMode::Once)))
-        .set_parent(parent)
+        .safe_set_parent(parent)
         .id()
 }

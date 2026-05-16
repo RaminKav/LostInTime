@@ -3,19 +3,23 @@ use bevy_proto::prelude::ProtoCommands;
 use rand::Rng;
 
 use crate::{
+    colors::RED,
     custom_commands::CommandsExt,
     enemy::Mob,
     inventory::ItemStack,
     juice::{FlashEffect, ShakeEffect},
     player::{ModifyCurencyEvent, Player},
     proto::proto_param::ProtoParam,
-    ui::key_input_guide::InteractionGuideTrigger,
+    ui::{
+        global_text_message::GlobalTextMessageEvent,
+        key_input_guide::InteractionGuideTrigger,
+    },
     world::{
         dimension::Era,
         dungeon::Dungeon,
         world_helpers::tile_pos_to_world_pos,
     },
-    GameParam, TextureCamera,
+    GameParam, InputMappings, TextureCamera,
 };
 
 /// Per-era boss selection used by the boss shrine.
@@ -83,11 +87,14 @@ pub struct DelayedSpawn {
 
 pub fn handle_pay_shrine_cost(
     mut commands: Commands,
-    key_input: ResMut<Input<KeyCode>>,
+    key_input: Res<Input<KeyCode>>,
+    mouse_input: Res<Input<MouseButton>>,
+    keybinds: Res<InputMappings>,
     player_query: Query<&GlobalTransform, With<Player>>,
     game: GameParam,
     mut game_camera: Query<Entity, With<TextureCamera>>,
     mut currency_event: EventWriter<ModifyCurencyEvent>,
+    mut global_text_events: EventWriter<GlobalTextMessageEvent>,
     dungeon_check: Query<&Dungeon>,
     delayed_spawn: Option<Res<DelayedSpawn>>,
     mut summon_tracker: ResMut<BossSummonTracker>,
@@ -98,7 +105,7 @@ pub fn handle_pay_shrine_cost(
     if delayed_spawn.is_some() {
         return;
     }
-    if key_input.just_pressed(KeyCode::F) {
+    if keybinds.check_interact_input(&key_input, &mouse_input) {
         let player_t = player_query.single();
         let Some(shrine) = game
             .world_obj_cache
@@ -117,6 +124,7 @@ pub fn handle_pay_shrine_cost(
                 delta: -cost,
                 obj: WorldObject::Coin,
             });
+            global_text_events.send(GlobalTextMessageEvent::new("WARNING!", RED));
             let summon_index = summon_tracker.summon_count;
             summon_tracker.summon_count += 1;
             commands.insert_resource(DelayedSpawn {

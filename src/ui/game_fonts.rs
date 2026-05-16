@@ -147,6 +147,24 @@ pub const MENU_TITLE: FontStyle = FontStyle {
     size: 15.0,
 };
 
+// --- World / HUD floating text ------------------------------------------------
+
+/// Default floating combat and pickup labels (`alagard` 15).
+pub const FLOATING_TEXT: FontStyle = FontStyle {
+    path: paths::ALAGARD,
+    size: 15.0,
+};
+/// Compact floating text when "Small damage text" is enabled (`4x5` 5).
+pub const FLOATING_TEXT_SMALL: FontStyle = FontStyle {
+    path: paths::MONO_4X5,
+    size: 5.0,
+};
+/// Top-center transient announcements (`alagard` 30).
+pub const GLOBAL_MESSAGE: FontStyle = FontStyle {
+    path: paths::ALAGARD,
+    size: 30.0,
+};
+
 /// Default logical size for a tooltip font path when building [`crate::ui::tooltips::TooltipTextProps`].
 #[inline]
 pub fn tooltip_default_size_for_font_path(font_path: &str) -> f32 {

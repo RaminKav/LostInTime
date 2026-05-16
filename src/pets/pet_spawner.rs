@@ -3,10 +3,11 @@ use crate::pets::state::{Pet, PetSpawner, PetState};
 use crate::player::achievements::{Achievement, AchievementUnlockedEvent};
 use crate::player::Player;
 use crate::ui::damage_numbers::spawn_floating_text_with_shadow;
+use crate::ui::game_fonts::FLOATING_TEXT;
 use crate::ui::key_input_guide::InteractionGuideTrigger;
 use crate::ui::tips::{SeenTips, Tip, TipEvent};
 use crate::world::y_sort::YSort;
-use crate::GameParam;
+use crate::{GameParam, InputMappings};
 use bevy::prelude::*;
 use bevy_rapier2d::prelude::Collider;
 
@@ -22,13 +23,16 @@ pub fn handle_pet_spawner_interaction(
         (With<PetSpawner>, Without<Pet>),
     >,
     player_query: Query<&GlobalTransform, With<Player>>,
+    pets: Query<(), With<Pet>>,
     game: GameParam,
     mut item_action_param: ItemActionParam,
     key_input: Res<Input<KeyCode>>,
+    mouse_input: Res<Input<MouseButton>>,
+    keybinds: Res<InputMappings>,
     asset_server: Res<AssetServer>,
     seen_tips: Res<SeenTips>,
 ) {
-    if !key_input.just_pressed(KeyCode::F) {
+    if !keybinds.check_interact_input(&key_input, &mouse_input) {
         return;
     }
 
@@ -44,6 +48,7 @@ pub fn handle_pet_spawner_interaction(
             .distance(player_t.translation().truncate());
         if distance <= trigger.activation_distance {
             let pet_type = &spawner.pet_type;
+            let player_has_pet = pets.iter().next().is_some();
 
             let Some(achievement) = (match pet_type {
                 Pet::Slime => Some(Achievement::SlimePet),
@@ -80,18 +85,18 @@ pub fn handle_pet_spawner_interaction(
                 if !player_class.pets.contains(pet_type) {
                     player_class.pets.push(pet_type.clone());
 
-                    // Spawn the pet entity near player
-                    let player_pos = game.player().position;
-                    commands.spawn((
-                        pet_type.clone(),
-                        PetState::default(),
-                        YSort(0.001),
-                        Collider::capsule(Vec2::new(0., -6.), Vec2::new(0., -6.), 5.0),
-                        Transform::from_translation(spawner_t.translation()),
-                        Name::new(format!("{:?} Pet", pet_type)),
-                    ));
+                    if !player_has_pet {
+                        commands.spawn((
+                            pet_type.clone(),
+                            PetState::default(),
+                            YSort(0.001),
+                            Collider::capsule(Vec2::new(0., -6.), Vec2::new(0., -6.), 5.0),
+                            Transform::from_translation(spawner_t.translation()),
+                            Name::new(format!("{:?} Pet", pet_type)),
+                        ));
+                    }
 
-                    // Show feedback text at spawner location
+                    let player_pos = game.player().position;
                     let spawner_pos = spawner_t.translation().truncate();
                     spawn_floating_text_with_shadow(
                         &mut commands,
@@ -99,6 +104,7 @@ pub fn handle_pet_spawner_interaction(
                         spawner_pos.extend(player_pos.z) + Vec3::new(0., 20., 0.),
                         crate::colors::DMG_NUM_GREEN,
                         format!("{:?} Pet Found!", pet_type),
+                        FLOATING_TEXT,
                     );
 
                     if !seen_tips.has_seen(&Tip::Pets) {

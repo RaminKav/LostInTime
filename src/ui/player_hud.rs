@@ -2566,6 +2566,48 @@ pub struct SkillCooldownOverlay {
     pub index: usize,
 }
 
+/// Cooldown progress for a skill hotkey slot (same sources as [`SkillCooldownOverlay`]).
+///
+/// `Some(0.0)` = just used, `Some(1.0)` = almost ready, `None` = ready / not on cooldown.
+pub fn skill_slot_cooldown_progress(
+    slot_index: usize,
+    roll_slot: Option<usize>,
+    slots: &ClassSkillSlots,
+    dash_cooldown: &Timer,
+    overlay: Option<&SkillCooldownOverlay>,
+) -> Option<f32> {
+    if Some(slot_index) == roll_slot {
+        if dash_cooldown.finished() {
+            return None;
+        }
+        let duration = dash_cooldown.duration().as_secs_f32();
+        if duration <= 0.0 {
+            return None;
+        }
+        let elapsed = dash_cooldown.elapsed().as_secs_f32();
+        return Some((elapsed / duration).clamp(0.0, 1.0));
+    }
+
+    if slot_index < 4 {
+        let tracker = &slots.0[slot_index];
+        if tracker.max_charges > 0 && tracker.current_charges < tracker.max_charges {
+            let duration = tracker.cooldown_timer.duration().as_secs_f32();
+            if duration <= 0.0 {
+                return None;
+            }
+            let elapsed = tracker.cooldown_timer.elapsed().as_secs_f32();
+            return Some((elapsed / duration).clamp(0.0, 1.0));
+        }
+        return None;
+    }
+
+    let overlay = overlay?;
+    if overlay.timer.finished() {
+        return None;
+    }
+    Some(overlay.timer.percent())
+}
+
 /// Marker component for decorative XP shards that rain during skill choice UI
 #[derive(Component)]
 pub struct DecorativeXPShard {
@@ -2643,38 +2685,24 @@ pub fn tick_skill_cooldown_overlays(
         return;
     };
 
-    for (mut sprite, mut timer) in overlays.iter_mut() {
-        if Some(timer.index) == roll_slot {
-            let dash_cooldown = &game.player_state.player_dash_cooldown;
-            let elapsed = dash_cooldown.elapsed().as_secs_f32();
-            let duration = dash_cooldown.duration().as_secs_f32();
-            let percent = if duration > 0.0 {
-                elapsed / duration
-            } else {
-                1.0
-            };
-            sprite.custom_size = Some(Vec2::new(16., 16. * (1.0 - percent)));
-            continue;
+    let dash_cooldown = &game.player_state.player_dash_cooldown;
+
+    for (mut sprite, mut overlay) in overlays.iter_mut() {
+        if overlay.index >= 4 {
+            overlay.timer.tick(time.delta());
         }
 
-        if timer.index < 4 {
-            let tracker = &slots.0[timer.index];
-            if tracker.max_charges > 0 && tracker.current_charges < tracker.max_charges {
-                let elapsed = tracker.cooldown_timer.elapsed().as_secs_f32();
-                let duration = tracker.cooldown_timer.duration().as_secs_f32();
-                let percent = if duration > 0.0 {
-                    elapsed / duration
-                } else {
-                    1.0
-                };
-                sprite.custom_size = Some(Vec2::new(16., 16. * (1.0 - percent)));
-            } else {
-                sprite.custom_size = Some(Vec2::new(16., 0.));
-            }
-        } else {
-            timer.timer.tick(time.delta());
-            sprite.custom_size = Some(Vec2::new(16., 16. * (1. - timer.timer.percent())));
-        }
+        let height = skill_slot_cooldown_progress(
+            overlay.index,
+            roll_slot,
+            slots,
+            dash_cooldown,
+            Some(&*overlay),
+        )
+        .map(|progress| 16.0 * (1.0 - progress))
+        .unwrap_or(0.0);
+
+        sprite.custom_size = Some(Vec2::new(16., height));
     }
 }
 

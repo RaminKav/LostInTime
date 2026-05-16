@@ -2,8 +2,9 @@ use bevy::prelude::*;
 use bevy_aseprite::{anim::AsepriteAnimation, aseprite, AsepriteBundle};
 use bevy_proto::backend::schematics::ReflectSchematic;
 use bevy_proto::prelude::Schematic;
-use bevy_rapier2d::prelude::{Collider, CollisionGroups, Group, KinematicCharacterController};
-use rand::Rng;
+use bevy_rapier2d::prelude::{
+    Collider, CollisionGroups, Group, KinematicCharacterController, Sensor,
+};
 use seldom_state::{prelude::StateMachine, trigger::BoolTrigger};
 
 use crate::{
@@ -12,13 +13,15 @@ use crate::{
     attributes::Attack,
     bounce::spawn_desert_tornado,
     collisions::DamagesWorldObjects,
-    combat::{combat_helpers::spawn_temp_collider, status_effects::MobStatusEffects},
+    animations::enemy_sprites::spawn_attack_warning_aseprite,
+    combat::status_effects::MobStatusEffects,
+    ecs_helpers::SafeHierarchyExt,
     enemy::{
         red_mushking::DeathState, spawner::MobSpawningPaused, FollowSpeed, Mob, MobIsAttacking,
     },
     item::{
         boss_shrine::BossSummonIndex,
-        projectile::{EnemyProjectile, Projectile, RangedAttackEvent},
+        projectile::{Projectile, RangedAttackEvent},
     },
     night::EraTimer,
     player::Player,
@@ -206,7 +209,7 @@ pub struct ScorpionCurrentTag(pub String);
 #[derive(Component, Default)]
 pub struct ScorpionFacingDir(ScorpionFacing);
 
-/// Shared cooldown after any attack; [`scorpion_queue_next_attack`] rolls the next strike.
+/// Cooldown before the next queued attack; reset with the finishing attack's own cooldown.
 #[derive(Component)]
 pub struct ScorpionAttackTimers {
     pub attack_cooldown: Timer,
@@ -229,6 +232,10 @@ pub enum ScorpionQueuedAttackKind {
 #[component(storage = "SparseSet")]
 pub struct ScorpionQueuedAttack(pub ScorpionQueuedAttackKind);
 
+/// Child claw hitbox entity while lunging; despawned when the claw attack ends.
+#[derive(Component, Default)]
+pub struct ClawAttackCollider(pub Option<Entity>);
+
 #[derive(Clone, Component, Reflect)]
 #[component(storage = "SparseSet")]
 pub struct ClawAttackState {
@@ -240,7 +247,6 @@ pub struct ClawAttackState {
     pub facing: ScorpionFacing,
     /// Aim toward player at the start of [`ClawPhase::Attack`] (claw-attack tag); used for lunge + hitbox.
     pub lunge_dir: Vec2,
-    pub spawned_hitbox: bool,
 }
 
 #[derive(Clone, Copy, Reflect, Debug, PartialEq, Eq)]
@@ -396,14 +402,12 @@ pub fn handle_new_scorpion_state_machine(
             .insert(ScorpionFacingDir::default())
             .insert(ScorpionComfortRing::default())
             .insert(ScorpionAttackTimers {
-                attack_cooldown: Timer::from_seconds(
-                    claw_cfg.cooldown.max(tail_cfg.cooldown),
-                    TimerMode::Once,
-                ),
+                attack_cooldown: Timer::from_seconds(1., TimerMode::Once),
             })
             .insert(ScorpionTornadoTimer {
                 timer: Timer::from_seconds(tornado_cfg.interval, TimerMode::Repeating),
-            });
+            })
+            .insert(ClawAttackCollider::default());
 
         let state_machine = StateMachine::default()
             .set_trans_logging(false)
@@ -420,7 +424,6 @@ pub fn handle_new_scorpion_state_machine(
                     cooldown_timer: Timer::from_seconds(claw_cfg.cooldown, TimerMode::Once),
                     facing: ScorpionFacing::South,
                     lunge_dir: Vec2::ZERO,
-                    spawned_hitbox: false,
                 },
             )
             .trans::<FollowState>(
@@ -702,10 +705,7 @@ pub fn scorpion_queue_next_attack(
             continue;
         }
 
-        let mut rng = rand::thread_rng();
-        let kind = if dist_sq > claw_sq {
-            ScorpionQueuedAttackKind::Tail
-        } else if rng.gen_bool(0.5) {
+        let kind = if dist_sq <= claw_sq {
             ScorpionQueuedAttackKind::Claw
         } else {
             ScorpionQueuedAttackKind::Tail
@@ -728,18 +728,19 @@ pub fn handle_claw_attack(
             &mut KinematicCharacterController,
             &mut ClawAttackState,
             &ScorpionClawAttack,
-            &ScorpionTailAttack,
             &FollowSpeed,
             &mut AsepriteAnimation,
             &mut ScorpionCurrentTag,
             &mut ScorpionFacingDir,
             &mut ScorpionAttackTimers,
+            &mut ClawAttackCollider,
             Option<&HitAnimationTracker>,
         ),
         Without<crate::combat::MarkedForDeath>,
     >,
     time: Res<Time>,
     game: GameParam,
+    asset_server: Res<AssetServer>,
 ) {
     for (
         entity,
@@ -748,12 +749,12 @@ pub fn handle_claw_attack(
         mut kcc,
         mut state,
         claw_cfg,
-        tail_cfg,
         follow_speed,
         mut anim,
         mut current_tag,
         mut facing_dir,
         mut timers,
+        mut claw_collider,
         hit_tracker,
     ) in attacks.iter_mut()
     {
@@ -822,33 +823,45 @@ pub fn handle_claw_attack(
                 }
             }
             ClawPhase::Attack => {
+                if claw_collider.0.is_none() {
+                    let offset = Vec3::new(
+                        state.lunge_dir.x * claw_cfg.hitbox_offset,
+                        state.lunge_dir.y * claw_cfg.hitbox_offset,
+                        1.,
+                    );
+                    let hitbox = commands
+                        .spawn((
+                            TransformBundle::from_transform(Transform::from_translation(offset)),
+                            Attack(enemy_attack.0),
+                            Collider::cuboid(17., 17.),
+                            Sensor,
+                            MobIsAttacking(mob.clone()),
+                        ))
+                        .safe_set_parent(entity)
+                        .id();
+                    claw_collider.0 = Some(hitbox);
+                    spawn_attack_warning_aseprite(
+                        &mut commands,
+                        &asset_server,
+                        Vec3::new(offset.x, offset.y + 12., 10.),
+                        entity,
+                        claw_cfg.lunge_duration,
+                    );
+                }
+
                 state.lunge_timer.tick(time.delta());
                 if !state.lunge_timer.finished() {
                     kcc.translation =
                         Some(state.lunge_dir * claw_cfg.lunge_speed * time.delta_seconds());
                 }
 
-                if !state.spawned_hitbox {
-                    state.spawned_hitbox = true;
-                    let hitbox_pos = my_pos + (state.lunge_dir * claw_cfg.hitbox_offset).extend(0.);
-                    let hitbox = spawn_temp_collider(
-                        &mut commands,
-                        Transform::from_translation(hitbox_pos),
-                        claw_cfg.hitbox_duration,
-                        enemy_attack.0,
-                        Collider::cuboid(17., 17.),
-                        Projectile::None,
-                    );
-                    commands.entity(hitbox).insert(EnemyProjectile {
-                        entity,
-                        mob: mob.clone(),
-                    });
-                }
-
                 state.hitbox_timer.tick(time.delta());
                 if anim.just_finished() {
-                    let shared_cd = claw_cfg.cooldown.max(tail_cfg.cooldown);
-                    timers.attack_cooldown = Timer::from_seconds(shared_cd, TimerMode::Once);
+                    if let Some(hitbox) = claw_collider.0.take() {
+                        commands.entity(hitbox).despawn_recursive();
+                    }
+                    timers.attack_cooldown =
+                        Timer::from_seconds(claw_cfg.cooldown, TimerMode::Once);
                     commands
                         .entity(entity)
                         .remove::<ClawAttackState>()
@@ -878,7 +891,6 @@ pub fn handle_tail_attack(
             &Mob,
             &Attack,
             &mut TailAttackState,
-            &ScorpionClawAttack,
             &ScorpionTailAttack,
             &FollowSpeed,
             &mut AsepriteAnimation,
@@ -898,7 +910,6 @@ pub fn handle_tail_attack(
         mob,
         enemy_attack,
         mut state,
-        claw_cfg,
         tail_cfg,
         follow_speed,
         mut anim,
@@ -1002,8 +1013,8 @@ pub fn handle_tail_attack(
                 if state.phase_timer.finished() {
                     state.waves_left = state.waves_left.saturating_sub(1);
                     if state.waves_left == 0 {
-                        let shared_cd = claw_cfg.cooldown.max(tail_cfg.cooldown);
-                        timers.attack_cooldown = Timer::from_seconds(shared_cd, TimerMode::Once);
+                        timers.attack_cooldown =
+                            Timer::from_seconds(tail_cfg.cooldown, TimerMode::Once);
                         commands
                             .entity(entity)
                             .remove::<TailAttackState>()

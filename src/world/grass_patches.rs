@@ -4,6 +4,7 @@ use bevy::utils::HashMap;
 use serde::Deserialize;
 
 use crate::cursor::CursorPos;
+use crate::ecs_helpers::safe_set_parent;
 use crate::world::y_sort::YSort;
 use crate::{GameState, ImageAssets, DEBUG};
 
@@ -166,7 +167,7 @@ pub fn spawn_grass_patch(
     }
     let id = ec.id();
     if let Some(p) = parent {
-        commands.entity(id).set_parent(p);
+        safe_set_parent(commands, id, p);
     }
     Some(id)
 }

@@ -1,9 +1,10 @@
 use bevy::prelude::*;
 
+use crate::ecs_helpers::SafeHierarchyExt;
+
 use crate::{
     assets::Graphics,
     attributes::{CurrentHealth, MaxHealth},
-    colors::{RED, YELLOW},
     enemy::{EliteMob, Mob},
 };
 
@@ -48,6 +49,6 @@ pub fn add_ui_icon_for_elite_mobs(
                 },
                 ..Default::default()
             })
-            .set_parent(elite);
+            .safe_set_parent(elite);
     }
 }

@@ -1,21 +1,36 @@
-use bevy::{prelude::*, sprite::Anchor};
+use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
 
 use crate::{
-    assets::SpriteAnchor,
+    assets::{Graphics, SpriteAnchor},
+    ecs_helpers::{safe_push_children, safe_set_parent, SafeHierarchyExt},
     inventory::{Inventory, ItemStack},
     item::{boss_shrine::BossSummonTracker, WorldObject},
+    keybinds::InputMappings,
     player::Player,
     GameParam,
 };
 
-use super::{damage_numbers::spawn_text, spawn_item_stack_icon, UIElement};
+use super::{
+    damage_numbers::spawn_text,
+    game_fonts::FLOATING_TEXT,
+    spawn_item_stack_icon,
+    ui_helpers::{get_key_size_and_element, spawn_keybind_badge},
+    UIElement,
+};
+
+const INTERACT_GUIDE_RENDER_LAYER: u8 = 0;
 
 #[derive(Component)]
 pub struct InteractGuide;
 
 #[derive(Component)]
+pub struct InteractGuideKeyBackground;
+
+#[derive(Component)]
+pub struct InteractGuideKeybindText;
+
+#[derive(Component)]
 pub struct InteractionGuideTrigger {
-    pub key: Option<String>,
     pub text: Option<String>,
     pub activation_distance: f32,
     pub icon_stack: Option<ItemStack>,
@@ -29,7 +44,6 @@ pub fn add_guide_to_unique_objs(
         match obj {
             WorldObject::BossShrine => {
                 commands.entity(e).insert(InteractionGuideTrigger {
-                    key: Some("F".to_string()),
                     text: Some("Summon".to_string()),
                     activation_distance: 32.,
                     icon_stack: Some(
@@ -39,7 +53,6 @@ pub fn add_guide_to_unique_objs(
             }
             WorldObject::DungeonEntrance => {
                 commands.entity(e).insert(InteractionGuideTrigger {
-                    key: Some("F".to_string()),
                     text: Some("Enter".to_string()),
                     activation_distance: 32.,
                     icon_stack: Some(ItemStack::crate_icon_stack(WorldObject::Key)),
@@ -47,7 +60,6 @@ pub fn add_guide_to_unique_objs(
             }
             WorldObject::DungeonExit => {
                 commands.entity(e).insert(InteractionGuideTrigger {
-                    key: Some("F".to_string()),
                     text: Some("Exit".to_string()),
                     activation_distance: 32.,
                     icon_stack: None,
@@ -55,7 +67,6 @@ pub fn add_guide_to_unique_objs(
             }
             WorldObject::CombatShrine => {
                 commands.entity(e).insert(InteractionGuideTrigger {
-                    key: Some("F".to_string()),
                     text: Some("Fight".to_string()),
                     activation_distance: 32.,
                     icon_stack: Some(ItemStack::crate_icon_stack(WorldObject::ChestBlock)),
@@ -63,7 +74,6 @@ pub fn add_guide_to_unique_objs(
             }
             WorldObject::WeaponShrine => {
                 commands.entity(e).insert(InteractionGuideTrigger {
-                    key: Some("F".to_string()),
                     text: Some("Fight".to_string()),
                     activation_distance: 32.,
                     icon_stack: None,
@@ -71,7 +81,6 @@ pub fn add_guide_to_unique_objs(
             }
             WorldObject::ArmorShrine => {
                 commands.entity(e).insert(InteractionGuideTrigger {
-                    key: Some("F".to_string()),
                     text: Some("Fight".to_string()),
                     activation_distance: 32.,
                     icon_stack: None,
@@ -79,7 +88,6 @@ pub fn add_guide_to_unique_objs(
             }
             WorldObject::AccessoryShrine => {
                 commands.entity(e).insert(InteractionGuideTrigger {
-                    key: Some("F".to_string()),
                     text: Some("Fight".to_string()),
                     activation_distance: 32.,
                     icon_stack: None,
@@ -87,7 +95,6 @@ pub fn add_guide_to_unique_objs(
             }
             WorldObject::GambleShrine => {
                 commands.entity(e).insert(InteractionGuideTrigger {
-                    key: Some("F".to_string()),
                     text: Some("Pay Offering".to_string()),
                     activation_distance: 32.,
                     icon_stack: Some(ItemStack::crate_icon_stack(WorldObject::TimeFragment)),
@@ -95,7 +102,6 @@ pub fn add_guide_to_unique_objs(
             }
             WorldObject::BlacksmithMerchant => {
                 commands.entity(e).insert(InteractionGuideTrigger {
-                    key: Some("F".to_string()),
                     text: Some("Purchase".to_string()),
                     activation_distance: 32.,
                     icon_stack: Some(ItemStack::crate_icon_stack(WorldObject::Coin)),
@@ -103,7 +109,6 @@ pub fn add_guide_to_unique_objs(
             }
             WorldObject::ActiveSkillShrine => {
                 commands.entity(e).insert(InteractionGuideTrigger {
-                    key: Some("F".to_string()),
                     text: Some("Get Skill".to_string()),
                     activation_distance: 32.,
                     icon_stack: None,
@@ -111,7 +116,6 @@ pub fn add_guide_to_unique_objs(
             }
             WorldObject::HeirloomShrine => {
                 commands.entity(e).insert(InteractionGuideTrigger {
-                    key: Some("F".to_string()),
                     text: Some("Talk ".to_string()),
                     activation_distance: 32.,
                     icon_stack: None,
@@ -119,7 +123,6 @@ pub fn add_guide_to_unique_objs(
             }
             WorldObject::MicrowaveShrine => {
                 commands.entity(e).insert(InteractionGuideTrigger {
-                    key: Some("F".to_string()),
                     text: Some("Swap Heirlooms".to_string()),
                     activation_distance: 32.,
                     icon_stack: None,
@@ -127,7 +130,6 @@ pub fn add_guide_to_unique_objs(
             }
             WorldObject::ChaosTotem => {
                 commands.entity(e).insert(InteractionGuideTrigger {
-                    key: Some("F".to_string()),
                     text: Some("Activate".to_string()),
                     activation_distance: 32.,
                     icon_stack: None,
@@ -171,6 +173,7 @@ fn resolve_interaction_guide_text(
 pub fn spawn_shrine_interact_key_guide(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
+    keybinds: Res<InputMappings>,
     player_query: Query<(Entity, &GlobalTransform), With<Player>>,
     player_inv: Query<&Inventory, With<Player>>,
     summon_tracker: Res<BossSummonTracker>,
@@ -183,6 +186,8 @@ pub fn spawn_shrine_interact_key_guide(
         Option<&WorldObject>,
     )>,
 ) {
+    let interact_key = keybinds.get_interact_key();
+    let (_, key_width) = get_key_size_and_element(interact_key);
     let (player_e, player_t) = player_query.single();
     let key_count = player_inv
         .single()
@@ -208,57 +213,57 @@ pub fn spawn_shrine_interact_key_guide(
                         Vec3::new(0., 25.5, 1.),
                     )))
                     .insert(InteractGuide)
-                    .set_parent(player_e)
                     .insert(Name::new("Interact Guide"))
+                    .safe_set_parent(player_e)
                     .id();
-                let key_entity = if let Some(key) = guide.key.clone() {
-                    let x_offset = if display_text.is_some() {
-                        f32::round(
-                            display_text.as_ref().unwrap().chars().count() as f32 * -4. - 12.,
-                        )
-                    } else {
-                        0.
-                    };
-                    Some(
-                        commands
-                            .spawn(SpriteBundle {
-                                texture: asset_server.load(format!("textures/{}Key.png", key)),
-                                transform: Transform::from_translation(Vec3::new(
-                                    x_offset, 0.5, 1.,
-                                )),
-                                sprite: Sprite {
-                                    custom_size: Some(Vec2::new(10., 10.)),
-                                    ..Default::default()
-                                },
-                                ..Default::default()
-                            })
-                            .set_parent(parent_entity)
-                            .id(),
-                    )
-                } else {
-                    None
-                };
-                if let Some(text) = display_text {
-                    let x = if key_entity.is_some() { 6. } else { 0.5 };
-                    let text_e = spawn_text(
-                        &mut commands,
-                        &asset_server,
-                        Vec3::new(x, -1., 1.),
-                        Color::WHITE,
-                        text,
-                        if key_entity.is_some() {
-                            Anchor::Center
-                        } else {
-                            Anchor::Center
-                        },
-                        1.,
-                        0,
-                    );
-                    if let Some(key_e) = key_entity {
-                        commands.entity(key_e).set_parent(text_e);
+
+                match display_text {
+                    Some(text) => {
+                        let char_count = text.chars().count() as f32;
+                        let text_e = spawn_text(
+                            &mut commands,
+                            &asset_server,
+                            Vec3::new(6., -1., 1.),
+                            Color::WHITE,
+                            text,
+                            Anchor::Center,
+                            FLOATING_TEXT,
+                            INTERACT_GUIDE_RENDER_LAYER,
+                        );
+                        safe_set_parent(&mut commands, text_e, parent_entity);
+
+                        // Key cap sits left of the label (same spacing as the old F-key sprite).
+                        // Wider caps shift further left so they do not overlap the text.
+                        let key_x_offset =
+                            f32::round(char_count * -4. - 12. - (key_width - 10.) / 2.);
+                        let (key_bg, key_text) = spawn_keybind_badge(
+                            &mut commands,
+                            &game.graphics,
+                            &asset_server,
+                            interact_key,
+                            text_e,
+                            Vec3::new(key_x_offset, 0.5, 1.),
+                            Vec3::new(0., 1., 1.),
+                            INTERACT_GUIDE_RENDER_LAYER,
+                        );
+                        commands.entity(key_bg).insert(InteractGuideKeyBackground);
+                        commands.entity(key_text).insert(InteractGuideKeybindText);
                     }
-                    commands.entity(text_e).set_parent(parent_entity);
-                };
+                    None => {
+                        let (key_bg, key_text) = spawn_keybind_badge(
+                            &mut commands,
+                            &game.graphics,
+                            &asset_server,
+                            interact_key,
+                            parent_entity,
+                            Vec3::new(0., 0.5, 1.),
+                            Vec3::new(0., 1., 1.),
+                            INTERACT_GUIDE_RENDER_LAYER,
+                        );
+                        commands.entity(key_bg).insert(InteractGuideKeyBackground);
+                        commands.entity(key_text).insert(InteractGuideKeybindText);
+                    }
+                }
                 if let Some(icon_stack) = guide.icon_stack.clone() {
                     let icon = spawn_item_stack_icon(
                         &mut commands,
@@ -270,7 +275,7 @@ pub fn spawn_shrine_interact_key_guide(
                         0,
                     );
 
-                    commands
+                    let slot_entity = commands
                         .spawn(SpriteBundle {
                             texture: game
                                 .graphics
@@ -282,9 +287,11 @@ pub fn spawn_shrine_interact_key_guide(
                             },
                             ..Default::default()
                         })
-                        .set_parent(parent_entity)
-                        .push_children(&[icon]);
-                };
+                        .insert(RenderLayers::from_layers(&[INTERACT_GUIDE_RENDER_LAYER]))
+                        .safe_set_parent(parent_entity)
+                        .id();
+                    safe_push_children(&mut commands, slot_entity, &[icon]);
+                }
             }
         }
     } else {
@@ -298,5 +305,27 @@ pub fn spawn_shrine_interact_key_guide(
         for t in already_exists.iter() {
             commands.entity(t).despawn_recursive();
         }
+    }
+}
+
+pub fn update_interact_guide_keybind_text(
+    keybinds: Res<InputMappings>,
+    mut texts: Query<&mut Text, With<InteractGuideKeybindText>>,
+    mut key_backgrounds: Query<(&mut Handle<Image>, &mut Sprite), With<InteractGuideKeyBackground>>,
+    graphics: Res<Graphics>,
+) {
+    if !keybinds.is_changed() {
+        return;
+    }
+
+    let interact_key = keybinds.get_interact_key();
+    for mut text in texts.iter_mut() {
+        text.sections[0].value = crate::keybinds::get_key_display_name(interact_key);
+    }
+
+    for (mut texture, mut sprite) in key_backgrounds.iter_mut() {
+        let (key_element, key_width) = get_key_size_and_element(interact_key);
+        *texture = graphics.get_ui_element_texture(key_element);
+        sprite.custom_size = Some(Vec2::new(key_width, 10.));
     }
 }

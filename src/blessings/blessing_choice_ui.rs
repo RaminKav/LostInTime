@@ -12,6 +12,7 @@ use crate::{
     player::skills::{Heirloom, HeirloomWithRarity},
     ui::{
         damage_numbers::spawn_floating_text_with_shadow,
+        game_fonts::FLOATING_TEXT,
         ui_helpers::{self, spawn_ui_overlay},
         Interactable, Interaction, UIElement, UIState, SKILLS_CHOICE_UI_SIZE,
     },
@@ -360,6 +361,7 @@ pub fn transition_blessing_ui_after_choice(
                     transform.translation() + Vec3::new(0., -90. - 12. * i as f32, 1.),
                     heirloom.rarity.get_color(),
                     heirloom.heirloom.get_title(),
+                    FLOATING_TEXT,
                 );
                 commands
                     .entity(floating_text)

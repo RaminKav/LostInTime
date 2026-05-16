@@ -21,6 +21,7 @@ mod panic_handler;
 mod pets;
 mod vectorize;
 pub use bounce::*;
+pub use ecs_helpers::*;
 pub use keybinds::*;
 pub use pets::*;
 
@@ -58,6 +59,7 @@ mod collider_load_test;
 mod colors;
 mod combat;
 mod custom_commands;
+mod ecs_helpers;
 mod enemy;
 mod gameplay_load_tests;
 mod inputs;

@@ -29,7 +29,10 @@ use crate::{
         },
     },
     status_effects::MobStatusEffects,
-    ui::damage_numbers::{spawn_floating_text_with_shadow, PreviousHealth},
+    ui::{
+        damage_numbers::{spawn_floating_text_with_shadow, PreviousHealth},
+        game_fonts::FLOATING_TEXT,
+    },
     world::TILE_SIZE,
     GameParam, HitEvent,
 };
@@ -405,6 +408,7 @@ pub fn handle_parry_success(
             player_txfm.translation() + Vec3::new(0., 16., 0.),
             LIGHT_RED,
             "Parry!".to_string(),
+            FLOATING_TEXT,
         );
         if skills.has(Heirloom::ParryHPRegen) {
             modify_health_event.send(ModifyHealthEvent(health_regen.0));

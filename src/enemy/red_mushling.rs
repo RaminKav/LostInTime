@@ -8,6 +8,7 @@ use seldom_state::{
 use crate::{
     ai::{FollowState, HurtByPlayer, IdleState, LineOfSight, NightTimeAggro},
     animations::enemy_sprites::spawn_attack_warning_aseprite,
+    ecs_helpers::SafeHierarchyExt,
     attributes::Attack,
     inputs::FacingDirection,
     Game,
@@ -214,7 +215,7 @@ pub fn gas_attack(
                         MobIsAttacking(Mob::RedMushling),
                         Sensor,
                     ))
-                    .set_parent(entity)
+                    .safe_set_parent(entity)
                     .id();
                 gas_state.hitbox = Some(hitbox);
             }

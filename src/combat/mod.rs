@@ -61,7 +61,11 @@ use crate::{
         skills::{Heirloom, HeirloomTriggerCounts, PlayerSkills},
     },
     proto::proto_param::ProtoParam,
-    ui::{damage_numbers::spawn_floating_text_with_shadow, CheatSettings},
+    ui::{
+        damage_numbers::spawn_floating_text_with_shadow,
+        game_fonts::FLOATING_TEXT,
+        CheatSettings,
+    },
     world::{world_helpers::world_pos_to_tile_pos, y_sort::YSort, TileMapPosition, TILE_SIZE},
     CustomFlush, GameParam, GameState, Player, SlimeTempShield, SlimeTempShieldSprite, DEBUG,
 };
@@ -687,6 +691,7 @@ pub fn handle_hits(
                                     player_pos + pos_offset,
                                     stat_type.color(),
                                     format!("+{} {}", amount, stat_type.name()),
+                                    FLOATING_TEXT,
                                 );
 
                                 // Trigger attribute recalculation

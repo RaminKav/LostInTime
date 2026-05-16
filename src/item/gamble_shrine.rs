@@ -119,7 +119,6 @@ pub fn handle_gamble_shrine_rewards(
                 .entity(e)
                 .remove::<GambleShrine>()
                 .insert(InteractionGuideTrigger {
-                    key: Some("F".to_string()),
                     text: Some("Interact".to_string()),
                     activation_distance: 32.,
                     icon_stack: Some(ItemStack::crate_icon_stack(WorldObject::TimeFragment)),

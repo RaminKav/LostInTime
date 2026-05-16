@@ -11,7 +11,10 @@ use crate::{
         skills::{Heirloom, HeirloomRarity, PlayerSkills},
         CoinCurrency,
     },
-    ui::damage_numbers::spawn_floating_text_with_shadow,
+    ui::{
+        damage_numbers::spawn_floating_text_with_shadow,
+        game_fonts::FLOATING_TEXT,
+    },
     ui::{
         interactions::{Interactable, Interaction},
         main_menu::spawn_back_button,
@@ -486,6 +489,7 @@ pub fn handle_microwave_shrine_heirloom_click(
                                     pt.translation + Vec3::new(0., 40., 15.),
                                     color,
                                     "-1 ".to_string(),
+                                    FLOATING_TEXT,
                                 );
                                 // Keep shadow + children on layer 0 so game camera renders them with the main "-1 " text
                                 commands

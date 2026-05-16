@@ -17,6 +17,9 @@ fn default_hotbar_slot_2() -> InputBinding {
 fn default_hotbar_slot_3() -> InputBinding {
     InputBinding::KeyBinding(KeyCode::Key4)
 }
+fn default_interact() -> InputBinding {
+    InputBinding::KeyBinding(KeyCode::F)
+}
 
 #[derive(Resource, Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct InputMappings {
@@ -27,6 +30,8 @@ pub struct InputMappings {
     pub active_skill_slot_4: InputBinding, // Bonus slot from blessings
     pub inventory: InputBinding,
     pub minimap: InputBinding,
+    #[serde(default = "default_interact")]
+    pub interact: InputBinding,
     /// Keys that consume / use the item currently sitting in hotbar slot 0..=3.
     /// Driven by `handle_hotbar_consume_keys` — pressing runs the slot item's
     /// `ItemActions`, no "selection" is performed.
@@ -56,6 +61,7 @@ impl Default for InputMappings {
             active_skill_slot_4: InputBinding::KeyBinding(KeyCode::E), // Bonus slot
             inventory: InputBinding::KeyBinding(KeyCode::Tab),
             minimap: InputBinding::KeyBinding(KeyCode::C),
+            interact: InputBinding::KeyBinding(KeyCode::F),
             hotbar_slot_0: InputBinding::KeyBinding(KeyCode::Key1),
             hotbar_slot_1: InputBinding::KeyBinding(KeyCode::Key2),
             hotbar_slot_2: InputBinding::KeyBinding(KeyCode::Key3),
@@ -70,6 +76,9 @@ impl InputMappings {
     }
     pub fn get_minimap_key(&self) -> InputBinding {
         self.minimap
+    }
+    pub fn get_interact_key(&self) -> InputBinding {
+        self.interact
     }
     pub fn get_active_skill_key(&self, slot: usize) -> InputBinding {
         match slot {
@@ -133,6 +142,21 @@ impl InputMappings {
 
     pub fn set_minimap_key(&mut self, key: InputBinding) {
         self.minimap = key;
+    }
+
+    pub fn set_interact_key(&mut self, key: InputBinding) {
+        self.interact = key;
+    }
+
+    pub fn check_interact_input(
+        &self,
+        keys: &Res<Input<KeyCode>>,
+        mouse: &Res<Input<MouseButton>>,
+    ) -> bool {
+        match self.get_interact_key() {
+            InputBinding::KeyBinding(key) => keys.just_pressed(key),
+            InputBinding::MouseBinding(button) => mouse.just_pressed(button),
+        }
     }
 
     /// Returns the binding that consumes/uses the item in hotbar slot `slot` (0..=3).

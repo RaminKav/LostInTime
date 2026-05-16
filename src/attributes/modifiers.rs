@@ -9,8 +9,8 @@ use crate::{
         Player,
     },
     ui::{
-        damage_numbers::spawn_floating_text_with_shadow,
-        tips::{SeenTips, Tip, TipEvent},
+        damage_numbers::{floating_text_font_style, spawn_floating_text_with_shadow},
+        CheatSettings,
     },
 };
 
@@ -95,7 +95,7 @@ pub fn handle_modify_mana_event(
     mut query: Query<(&mut CurrentMana, &MaxMana, &GlobalTransform), With<Player>>,
     mut commands: Commands,
     asset_server: Res<AssetServer>,
-    game: crate::GameParam,
+    cheat_settings: Option<Res<CheatSettings>>,
 ) {
     for event in event.iter() {
         let (mut mana, max_mana, player_t) = query.single_mut();
@@ -104,12 +104,19 @@ pub fn handle_modify_mana_event(
         }
         mana.0 += event.0;
         if event.0 > 0 {
+            if cheat_settings
+                .as_deref()
+                .is_some_and(|s| !s.show_player_damage_numbers)
+            {
+                continue;
+            }
             spawn_floating_text_with_shadow(
                 &mut commands,
                 &asset_server,
                 player_t.translation() + Vec3::new(0., 15., 0.),
                 BLUE,
                 format!("+{} MP", event.0),
+                floating_text_font_style(cheat_settings.as_deref()),
             );
         }
     }

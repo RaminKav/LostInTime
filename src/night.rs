@@ -247,6 +247,7 @@ impl Plugin for NightPlugin {
             .add_system(reset_era_timer_on_new_run.in_schedule(OnEnter(GameState::MainMenu)))
             .add_systems(
                 (
+                    sync_night_overlay_on_tracker_change,
                     tick_night_color.run_if(is_not_paused),
                     handle_infinite_mode_started,
                     tick_infinite_mode_chaos.run_if(is_not_paused),
@@ -287,6 +288,41 @@ pub fn spawn_night(
         .insert(RenderLayers::from_layers(&[3]))
         .insert(Night(Timer::from_seconds(9.5, TimerMode::Repeating)))
         .insert(Name::new("night"));
+}
+
+/// Keeps the night overlay in sync when `NightTracker` is changed externally (e.g. era transition).
+fn sync_night_overlay_on_tracker_change(
+    night_tracker: Res<NightTracker>,
+    infinite_mode: Res<InfiniteMode>,
+    mut night_query: Query<&mut Sprite, With<Night>>,
+    mut bgm_track_event: EventWriter<UpdateBGMTrackEvent>,
+    bgm_tracker: Res<BGMPicker>,
+) {
+    if !night_tracker.is_changed() {
+        return;
+    }
+
+    let alpha = if infinite_mode.active {
+        night_tracker.get_infinite_mode_alpha()
+    } else {
+        night_tracker.get_alpha()
+    };
+    for mut sprite in night_query.iter_mut() {
+        sprite.color = overwrite_alpha(NIGHT, alpha);
+    }
+
+    if infinite_mode.active {
+        return;
+    }
+    if night_tracker.is_night() && bgm_tracker.current_track != *"sounds/bgm_night.ogg" {
+        bgm_track_event.send(UpdateBGMTrackEvent {
+            asset_path: "sounds/bgm_night.ogg".to_owned(),
+        });
+    } else if !night_tracker.is_night() && bgm_tracker.current_track != *"sounds/bgm_day.ogg" {
+        bgm_track_event.send(UpdateBGMTrackEvent {
+            asset_path: "sounds/bgm_day.ogg".to_owned(),
+        });
+    }
 }
 
 pub fn tick_night_color(
@@ -333,7 +369,7 @@ pub fn tick_night_color(
         }
     }
 
-    if music_changed || night_tracker.is_added() {
+    if music_changed || night_tracker.is_added() || night_tracker.is_changed() {
         // change music
         if night_tracker.is_night() && bgm_tracker.current_track != *"sounds/bgm_night.ogg" {
             bgm_track_event.send(UpdateBGMTrackEvent {

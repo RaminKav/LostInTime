@@ -5,7 +5,14 @@ use crate::combat::LifestealEvent;
 use crate::player::combat_heirlooms::ThornsOnDamageTracker;
 use crate::player::skill_heirlooms::{handle_fire_pillar_hit_clear, handle_laser_beam_hit_clear};
 use crate::player::skills::{Heirloom, PlayerSkills};
-use crate::ui::damage_numbers::FloatingTextQueue;
+use crate::{
+    attributes::ItemRarity,
+    player::beastiary::mob_display_name,
+    ui::{
+        damage_numbers::FloatingTextQueue,
+        global_text_message::GlobalTextMessageEvent,
+    },
+};
 use crate::NO_XP;
 use crate::{
     animations::{player_sprite::PlayerAnimation, ui_animaitons::UIIconMover},
@@ -760,6 +767,7 @@ pub fn check_item_drop_collisions(
     resolution: Res<ScreenResolution>,
     mut chaos_tracker: ResMut<ChaosTracker>,
     mut flash_event: EventWriter<FlashExpBarEvent>,
+    mut global_text_events: EventWriter<GlobalTextMessageEvent>,
     proto: ProtoParam,
     mut beastiary: ResMut<crate::player::beastiary::Beastiary>,
 ) {
@@ -781,10 +789,25 @@ pub fn check_item_drop_collisions(
                 .entry(mob.clone())
                 .or_default()
                 .cards_collected += 1;
-            crate::client::persist_beastiary_card_pickup(mob);
+            crate::client::persist_beastiary_card_pickup(mob.clone());
             commands.entity(e2).despawn_recursive();
             commands.spawn(SoundSpawner::new(AudioSoundEffect::ItemPickup, 0.15));
-            text_timer.add_item(obj);
+            let item_rarity = proto
+                .get_item_data(obj)
+                .map(|data| data.rarity.clone())
+                .unwrap_or(ItemRarity::Common);
+            let text_color = if item_rarity == ItemRarity::Common {
+                crate::colors::WHITE
+            } else {
+                item_rarity.get_color()
+            };
+            global_text_events.send(
+                GlobalTextMessageEvent::new(
+                    format!("{} Card Obtained!", mob_display_name(&mob)),
+                    text_color,
+                )
+                .with_icon(obj),
+            );
             continue;
         }
         if obj == WorldObject::TimeFragment || obj == WorldObject::Coin {

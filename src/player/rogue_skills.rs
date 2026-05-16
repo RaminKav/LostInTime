@@ -8,12 +8,16 @@ use crate::{
     colors::BLACK,
     combat_helpers::spawn_temp_collider,
     cursor::CursorPos,
+    ecs_helpers::{safe_set_parent, SafeHierarchyExt},
     enemy::Mob,
     inputs::{FacingDirection, MovementVector},
     item::projectile::Projectile,
-    ui::damage_numbers::{spawn_text, DodgeEvent},
+    ui::{
+        damage_numbers::{spawn_text, DodgeEvent},
+        game_fonts::FLOATING_TEXT,
+    },
     world::{y_sort::YSort, TILE_SIZE},
-    AttackTimer, EnemyDeathEvent, GameParam, HitEvent, InputMappings, PLAYER_MOVE_SPEED,
+    AttackTimer, EnemyDeathEvent, GameParam, HitEvent, PLAYER_MOVE_SPEED,
 };
 use bevy::{prelude::*, sprite::Anchor};
 use bevy_aseprite::{anim::AsepriteAnimation, aseprite, AsepriteBundle};
@@ -288,13 +292,11 @@ pub fn handle_lunge(
                 Transform::from_translation(Vec3::new(0., 0., 0.))
                     .with_rotation(Quat::from_rotation_z(angle)),
                 0.5,
-                (dmg.0 as f32
-                    * skill_power_mult
-                    * attack_damage_multiplier(SPRINT_LUNGE)) as i32,
+                (dmg.0 as f32 * skill_power_mult * attack_damage_multiplier(SPRINT_LUNGE)) as i32,
                 Collider::cuboid(9., 1.5 * TILE_SIZE.x),
                 Projectile::None,
             );
-            commands.entity(lunge_e).set_parent(e);
+            safe_set_parent(&mut commands, lunge_e, e);
 
             {
                 let echo_count = skills.get_count(Heirloom::SkillEcho);
@@ -510,7 +512,7 @@ pub fn handle_add_combo_counter(
                 BLACK,
                 format!("{}", c.counter),
                 Anchor::Center,
-                1.,
+                FLOATING_TEXT,
                 0,
             );
             let count = old_combo_anims.iter().count() as f32;
@@ -523,8 +525,8 @@ pub fn handle_add_combo_counter(
                 })
                 .insert(VisibilityBundle::default())
                 .insert(ComboAnim)
-                .add_child(text)
-                .set_parent(player_e);
+                .safe_add_child(text)
+                .safe_set_parent(player_e);
         }
     }
 }
@@ -594,10 +596,7 @@ impl PositionHistory {
     pub fn new() -> Self {
         Self {
             samples: Vec::with_capacity(RECALL_HISTORY_CAPACITY),
-            sample_timer: Timer::from_seconds(
-                RECALL_SAMPLE_INTERVAL_SECS,
-                TimerMode::Repeating,
-            ),
+            sample_timer: Timer::from_seconds(RECALL_SAMPLE_INTERVAL_SECS, TimerMode::Repeating),
         }
     }
 
@@ -761,11 +760,7 @@ pub fn handle_recall(
     // Retrace: current → newest recorded → … → second-oldest → snapped oldest.
     let mut path: Vec<Vec2> = Vec::with_capacity(samples.len() + 1);
     path.push(from);
-    for &p in samples
-        .iter()
-        .rev()
-        .take(samples.len().saturating_sub(1))
-    {
+    for &p in samples.iter().rev().take(samples.len().saturating_sub(1)) {
         path.push(p);
     }
     path.push(dest);
@@ -926,4 +921,3 @@ pub fn tick_recall_dash(
         });
     }
 }
-

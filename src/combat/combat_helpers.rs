@@ -1,10 +1,13 @@
 use bevy::prelude::*;
 use bevy_aseprite::{anim::AsepriteAnimation, Aseprite};
-use bevy_rapier2d::prelude::{ActiveCollisionTypes, ActiveEvents, Collider, Sensor};
+use bevy_rapier2d::prelude::{
+    ActiveCollisionTypes, ActiveEvents, Collider, CollisionGroups, Group, RigidBody, Sensor,
+};
 
 use crate::{
     animations::DoneAnimation,
     attributes::Attack,
+    ecs_helpers::SafeHierarchyExt,
     item::projectile::{Projectile, ProjectileState},
 };
 
@@ -50,10 +53,7 @@ pub fn spawn_temp_collider(
 ) -> Entity {
     let category = projectile.animation_category();
     commands
-        .spawn(TransformBundle {
-            local: transform,
-            ..Default::default()
-        })
+        .spawn(TransformBundle::from_transform(transform))
         .insert(DespawnTimer(Timer::from_seconds(duration, TimerMode::Once)))
         .insert(Attack(attack))
         .insert(projectile)
@@ -72,6 +72,40 @@ pub fn spawn_temp_collider(
         })
         .insert(collider)
         .id()
+}
+
+/// Short-lived sensor hitbox for an enemy melee strike. Uses [`Group::GROUP_1`] membership
+/// (hostile mobs) and filters player [`Group::GROUP_2`] plus other hostile colliders.
+pub fn spawn_enemy_melee_hitbox(
+    commands: &mut Commands,
+    world_pos: Vec3,
+    duration: f32,
+    attack: i32,
+    collider: Collider,
+    strike_dir: Vec2,
+) -> Entity {
+    let entity = spawn_temp_collider(
+        commands,
+        Transform::from_translation(world_pos),
+        duration,
+        attack,
+        collider,
+        Projectile::None,
+    );
+    commands.entity(entity).insert((
+        RigidBody::Fixed,
+        CollisionGroups::new(Group::GROUP_1, Group::GROUP_1 | Group::GROUP_2),
+        ProjectileState {
+            speed: 0.,
+            direction: strike_dir.normalize_or_zero(),
+            hit_entities: vec![],
+            spawn_offset: Vec2::ZERO,
+            rotating: false,
+            mana_bar_full: false,
+            despawn_on_hit: false,
+        },
+    ));
+    entity
 }
 
 pub fn spawn_one_time_aseprite_collider(
@@ -164,12 +198,8 @@ pub fn handle_deferred_aseprite_spawns(
             projectile,
         );
 
-        // Set parent if specified
         if let Some(parent_entity) = parent {
-            // Use safe entity access to avoid issues if parent doesn't exist
-            if let Some(mut entity_commands) = commands.get_entity(entity) {
-                entity_commands.set_parent(parent_entity);
-            }
+            commands.entity(entity).safe_set_parent(parent_entity);
         }
 
         // Add extra components based on the deferred data

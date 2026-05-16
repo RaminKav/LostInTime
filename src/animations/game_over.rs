@@ -33,6 +33,7 @@ use crate::{
     ui::{
         boss_health_bar::{BossHealthBar, BossHealthBarFrame, BossNameText},
         damage_numbers::spawn_text,
+        game_fonts::FLOATING_TEXT,
         key_input_guide::InteractGuide,
         spawn_item_stack_icon, spawn_stats_tooltip_at,
         ui_helpers::{self, Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND},
@@ -632,7 +633,7 @@ pub fn tick_game_over_overlay(
                 WHITE,
                 format!("{:}", total_currency - currency_this_run as u128),
                 Anchor::CenterLeft,
-                1.,
+                FLOATING_TEXT,
                 3,
             );
             commands.entity(text).insert(CurrencyText);

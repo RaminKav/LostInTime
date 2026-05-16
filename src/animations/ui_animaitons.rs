@@ -11,7 +11,10 @@ use crate::{
     item::WorldObject,
     player::ModifyCurencyEvent,
     proto::proto_param::ProtoParam,
-    ui::damage_numbers::spawn_text,
+    ui::{
+        damage_numbers::spawn_text,
+        game_fonts::FLOATING_TEXT,
+    },
 };
 
 #[derive(Component)]
@@ -208,7 +211,7 @@ pub fn handle_ui_time_fragments(
                     }
                 ),
                 Anchor::CenterLeft,
-                1.,
+                FLOATING_TEXT,
                 3,
             );
             commands.entity(text).set_parent(icon_e);

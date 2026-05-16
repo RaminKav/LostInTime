@@ -30,6 +30,7 @@ use seldom_state::{
 
 use crate::{
     ai::{EnemyAttackCooldown, FollowState, LeapAttackState},
+    ecs_helpers::SafeHierarchyExt,
     attributes::{Attack, CurrentHealth, MaxHealth},
     collisions::DamagesWorldObjects,
     item::projectile::{Projectile, RangedAttackEvent},
@@ -371,7 +372,7 @@ pub fn new_leap_attack(
                         Sensor,
                         DamagesWorldObjects,
                     ))
-                    .set_parent(entity)
+                    .safe_set_parent(entity)
                     .id();
                 att_collider.0 = Some(hitbox);
 

@@ -635,6 +635,7 @@ pub fn close_container(
     }
 }
 pub fn toggle_inventory(
+    mut commands: Commands,
     mut game: GameParam,
     key_input: Res<Input<KeyCode>>,
     mouse_input: Res<Input<MouseButton>>,
@@ -1072,42 +1073,48 @@ pub fn handle_interact_objects(
     mut proto_param: ProtoParam,
     mut item_action_param: ItemActionParam,
     mut commands: Commands,
-    key_input: ResMut<Input<KeyCode>>,
+    key_input: Res<Input<KeyCode>>,
+    mouse_input: Res<Input<MouseButton>>,
+    keybinds: Res<InputMappings>,
 ) {
-    if key_input.just_pressed(KeyCode::F) {
-        for (obj_e, t, obj_action, obj, anchor) in objs.iter() {
-            let obj_t = t.translation().truncate() - anchor.0;
-            let (player_t, mut inv) = player_query.single_mut();
-            if obj_t.distance(player_t.translation().truncate()) <= 32. {
-                obj_action.run_action(
-                    obj_e,
-                    world_pos_to_tile_pos(obj_t),
-                    *obj,
-                    &mut game,
-                    &mut item_action_param,
-                    &mut commands,
-                    &mut proto_param,
-                    &mut inv,
-                );
-            }
+    if !keybinds.check_interact_input(&key_input, &mouse_input) {
+        return;
+    }
+    for (obj_e, t, obj_action, obj, anchor) in objs.iter() {
+        let obj_t = t.translation().truncate() - anchor.0;
+        let (player_t, mut inv) = player_query.single_mut();
+        if obj_t.distance(player_t.translation().truncate()) <= 32. {
+            obj_action.run_action(
+                obj_e,
+                world_pos_to_tile_pos(obj_t),
+                *obj,
+                &mut game,
+                &mut item_action_param,
+                &mut commands,
+                &mut proto_param,
+                &mut inv,
+            );
         }
     }
 }
 
 pub fn handle_open_essence_ui(
     mut commands: Commands,
-    key_input: ResMut<Input<KeyCode>>,
+    key_input: Res<Input<KeyCode>>,
+    mouse_input: Res<Input<MouseButton>>,
+    keybinds: Res<InputMappings>,
     player_query: Query<&GlobalTransform, With<Player>>,
     nearby_merchant_query: Query<(&GlobalTransform, &EssenceShopChoices)>,
     mut next_inv_state: ResMut<NextState<UIState>>,
 ) {
-    if key_input.just_pressed(KeyCode::F) {
-        let player_t = player_query.single().translation().truncate();
-        for (transform, choices) in nearby_merchant_query.iter() {
-            if player_t.distance(transform.translation().truncate()) < 32. {
-                commands.insert_resource(choices.clone());
-                next_inv_state.set(UIState::Essence);
-            }
+    if !keybinds.check_interact_input(&key_input, &mouse_input) {
+        return;
+    }
+    let player_t = player_query.single().translation().truncate();
+    for (transform, choices) in nearby_merchant_query.iter() {
+        if player_t.distance(transform.translation().truncate()) < 32. {
+            commands.insert_resource(choices.clone());
+            next_inv_state.set(UIState::Essence);
         }
     }
 }

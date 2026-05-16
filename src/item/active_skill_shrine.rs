@@ -5,13 +5,9 @@ use crate::{
     assets::Graphics,
     item::object_actions::ObjectAction,
     player::skills::{
-        ActiveSkill, ActiveSkillChoiceState, HeirloomRarity, PlayerSkills,
+        get_disabled_skills, ActiveSkill, ActiveSkillChoiceState, HeirloomRarity, PlayerSkills,
     },
-    ui::{
-        key_input_guide::InteractionGuideTrigger,
-        minimap::UpdateMiniMapEvent,
-        UIState,
-    },
+    ui::{key_input_guide::InteractionGuideTrigger, minimap::UpdateMiniMapEvent, UIState},
     world::TileMapPosition,
     GameParam,
 };
@@ -76,8 +72,7 @@ pub fn refresh_active_skill_shrine_offer_skills(
 
     let mut available_skills: Vec<ActiveSkill> = ActiveSkill::iter()
         .filter(|skill| {
-            *skill != ActiveSkill::Parry
-                && *skill != ActiveSkill::Sprint
+            !get_disabled_skills().contains(skill)
                 && *skill != ActiveSkill::LaserBeam
                 && !player_current_skills.contains(skill)
                 && !chosen_skills.contains(skill)
@@ -189,7 +184,6 @@ fn restore_active_skill_shrine_interactivity(commands: &mut Commands, shrine_ent
         .remove::<ActiveSkillShrineState>()
         .insert(ObjectAction::ActiveSkillShrine)
         .insert(InteractionGuideTrigger {
-            key: Some("F".to_string()),
             text: Some("Get Skill".to_string()),
             activation_distance: 32.,
             icon_stack: None,

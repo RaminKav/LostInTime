@@ -134,7 +134,6 @@ impl GenerationPlugin {
             YSort(0.001),
             Collider::capsule(Vec2::new(0., -6.), Vec2::new(0., -6.), 5.0),
             InteractionGuideTrigger {
-                key: Some("F".to_string()),
                 text: Some("Interact".to_string()),
                 activation_distance: 32.,
                 icon_stack: None,
@@ -574,7 +573,6 @@ impl GenerationPlugin {
                 .insert(WorldObject::TimePortal)
                 .insert(SpriteAnchor(Vec2::new(0., 10.)))
                 .insert(InteractionGuideTrigger {
-                    key: Some("F".to_string()),
                     text: Some("???".to_string()),
                     activation_distance: 32.,
                     icon_stack: None,

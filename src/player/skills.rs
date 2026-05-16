@@ -174,6 +174,18 @@ pub enum ActiveSkill {
     Recall,         // Rogue - NEW (rewind dash)
 }
 
+pub fn get_disabled_skills() -> Vec<ActiveSkill> {
+    vec![
+        ActiveSkill::Parry,
+        ActiveSkill::Stealth,
+        ActiveSkill::DaggerThrow,
+        ActiveSkill::TripleThrow,
+        ActiveSkill::PossessedBlade,
+        ActiveSkill::Sprint,
+        ActiveSkill::Lightning,
+    ]
+}
+
 /// How many entries from each class's `active_skills` list are used in play
 /// (class selection preview, HUD, `PlayerSkills` slots 0..2). The fourth field
 /// (`active_skill_slot_3`) stays `None` while this is `3` for an easy revert.
@@ -340,6 +352,18 @@ pub fn fury_estimated_kunai_per_cast(attack_cooldown_secs: f32) -> f32 {
 }
 
 impl ActiveSkill {
+    /// Dodge / reposition skills shown on the movement cooldown bar.
+    pub fn is_movement_skill(self) -> bool {
+        matches!(
+            self,
+            ActiveSkill::SpinAttack
+                | ActiveSkill::Teleport
+                | ActiveSkill::Roll
+                | ActiveSkill::SprintLunge
+                | ActiveSkill::Buckshot
+        )
+    }
+
     /// Returns the base cooldown in seconds for this skill
     pub fn get_base_cooldown(&self) -> f32 {
         match self {
@@ -733,16 +757,10 @@ impl ActiveSkill {
                 "lifesteal on kill, up to 3 times.".to_string(),
             ],
             ActiveSkill::Recall => vec![
-                format!(
-                    "Retrace your steps from the last {:.1}s,",
-                    RECALL_REWIND_SECONDS
-                ),
-                "dashing along that path and slicing".to_string(),
-                format!(
-                    "enemies for {:.1}% damage. Gain stealth",
-                    skill_power * RECALL
-                ),
-                "briefly afterwards.".to_string(),
+                "Retrace your steps from the last".to_string(),
+                format!("{:.1}s, dashing along that path and", RECALL_REWIND_SECONDS),
+                format!("slicing enemies for {:.1}% damage.", skill_power * RECALL),
+                "Gain stealth briefly afterwards.".to_string(),
             ],
         }
     }
@@ -2650,6 +2668,19 @@ impl PlayerSkills {
         }
         chance
     }
+    /// Hotkey slot for the equipped movement skill, if any.
+    pub fn movement_skill_slot(&self) -> Option<usize> {
+        for slot in 0..5 {
+            if self
+                .get_active_skill_in_slot(slot)
+                .is_some_and(ActiveSkill::is_movement_skill)
+            {
+                return Some(slot);
+            }
+        }
+        None
+    }
+
     pub fn has_active_skill(&self, active_skill: ActiveSkill) -> Option<usize> {
         if self
             .active_skill_slot_0

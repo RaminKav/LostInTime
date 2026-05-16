@@ -2,6 +2,7 @@ pub mod chest_ui;
 pub mod class_selection;
 pub mod crafting_ui;
 pub mod damage_numbers;
+pub mod global_text_message;
 pub mod guide_hud;
 pub mod item_chest;
 mod loading_screen;
@@ -45,6 +46,7 @@ mod interactions;
 mod inventory_ui;
 pub mod minimap;
 mod player_hud;
+mod player_movement_cooldown_bar;
 mod skill_choice_ui;
 pub mod stats_ui;
 pub use active_skill_shrine_ui::*;
@@ -60,6 +62,7 @@ pub use furnace_ui::*;
 pub use interactions::*;
 pub use inventory_ui::*;
 pub use player_hud::*;
+pub use player_movement_cooldown_bar::*;
 pub use tooltips::*;
 mod main_menu;
 pub use main_menu::*;
@@ -86,6 +89,9 @@ use crate::ui::achievement_banner::{
 };
 use crate::ui::damage_numbers::{
     handle_clamp_screen_locked_icons_worldpos, BeaconGuidanceRegistry,
+};
+use crate::ui::global_text_message::{
+    handle_global_text_message_events, tick_global_text_messages, GlobalTextMessageEvent,
 };
 pub use achievements_ui::*;
 
@@ -325,6 +331,7 @@ impl Plugin for UIPlugin {
             .add_event::<ItemChestAnimChangeEvent>()
             .add_event::<DropOnSlotEvent>()
             .add_event::<DodgeEvent>()
+            .add_event::<GlobalTextMessageEvent>()
             .add_event::<RemoveFromSlotEvent>()
             .add_event::<ToolTipUpdateEvent>()
             .init_resource::<BeaconGuidanceRegistry>()
@@ -479,6 +486,7 @@ impl Plugin for UIPlugin {
                     handle_skill_choice_ui_close.after(update_xp_bar),
                     handle_enemy_health_bar_change,
                     add_ui_icon_for_elite_mobs,
+                    spawn_player_movement_cooldown_bar,
                     handle_add_dodge_text,
                     boss_health_bar::spawn_boss_health_bar,
                     boss_health_bar::update_boss_health_bar,
@@ -486,8 +494,16 @@ impl Plugin for UIPlugin {
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
-            .add_systems((handle_queued_floating_texts.run_if(in_state(GameState::Main).or_else(in_state(GameState::BlessingChoice))),
-                        tick_damage_numbers.run_if(in_state(GameState::Main).or_else(in_state(GameState::BlessingChoice)))))
+            .add_systems((
+                handle_queued_floating_texts
+                    .run_if(in_state(GameState::Main).or_else(in_state(GameState::BlessingChoice))),
+                tick_damage_numbers
+                    .run_if(in_state(GameState::Main).or_else(in_state(GameState::BlessingChoice))),
+                handle_global_text_message_events
+                    .run_if(in_state(GameState::Main).or_else(in_state(GameState::BlessingChoice))),
+                tick_global_text_messages
+                    .run_if(in_state(GameState::Main).or_else(in_state(GameState::BlessingChoice))),
+            ))
             .add_system(
                 handle_add_damage_numbers_after_hit
                     .before(handle_hits)
@@ -774,6 +790,10 @@ impl Plugin for UIPlugin {
                     .in_set(OnUpdate(GameState::Main)),
             )
             .add_system(
+                update_interact_guide_keybind_text
+                    .in_set(OnUpdate(GameState::Main)),
+            )
+            .add_system(
                 handle_essence_heirloom_tooltip
                     .in_set(OnUpdate(GameState::Main)),
             )
@@ -838,6 +858,9 @@ impl Plugin for UIPlugin {
             .add_systems(
                 (
                     tick_skill_cooldown_overlays.run_if(is_not_paused),
+                    update_player_movement_cooldown_bar
+                        .run_if(is_not_paused)
+                        .after(tick_skill_cooldown_overlays),
                     player_hud::handle_active_skill_event
                         .run_if(is_not_paused)
                         .after(crate::player::skill_heirlooms::handle_active_skill_event),

@@ -8,7 +8,7 @@
     "survival_rogue_like::enemy::BullChargeAttack": (activation_distance: 180., charge_speed: 160., startup: 0.7, cooldown: 1.2, overshoot: 32., stop_duration: 0.6),
     "survival_rogue_like::proto::ColliderCapsulProto": (x1: 0., y1: -1., x2: 0., y2: -1.5, r: 7.),
     "survival_rogue_like::attributes::MaxHealth": (26),
-    "survival_rogue_like::attributes::Attack": (16),
+    "survival_rogue_like::attributes::Attack": (11),
     "survival_rogue_like::player::levels::ExperienceReward": (35),
     "survival_rogue_like::item::loot_table::LootTable": (
         drops: [(

@@ -3,6 +3,7 @@ use std::cmp::min;
 
 use crate::{
     animations::{AnimationPosTracker, AnimationTimer},
+    ecs_helpers::SafeHierarchyExt,
     attributes::{add_item_glows, AttributeModifier, ItemAttributes, ItemRarity},
     container::{main_inv_bag_slot_indices_top_to_bottom, Container},
     inputs::FacingDirection,
@@ -259,7 +260,7 @@ impl InventoryItemStack {
             .insert(self.item_stack.attributes.clone())
             .insert(obj)
             .insert(self.item_stack.clone())
-            .set_parent(player_e)
+            .safe_set_parent(player_e)
             .id();
 
         let mut item_entity = commands.entity(item);

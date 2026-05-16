@@ -3,6 +3,7 @@ use bevy_proto::prelude::ProtoCommands;
 use rand::Rng;
 
 use crate::attributes::CurrentHealth;
+use crate::ecs_helpers::SafeHierarchyExt;
 use crate::combat::damage_tracker::PetAbilityStats;
 use crate::custom_commands::CommandsExt;
 use crate::item::WorldObject;
@@ -80,7 +81,7 @@ pub fn slime_shield_ability(
                             ..Default::default()
                         })
                         .insert(SlimeTempShieldSprite)
-                        .set_parent(player_e);
+                        .safe_set_parent(player_e);
                 }
             }
         }

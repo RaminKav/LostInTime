@@ -4,6 +4,7 @@ use serde::Deserialize;
 use strum_macros::{Display, EnumIter};
 
 use crate::assets::Graphics;
+use crate::ecs_helpers::SafeHierarchyExt;
 use crate::attributes::{BonusDamage, CritChance, CritDamage};
 use crate::enemy::red_mushking::DeathState;
 use crate::player::skills::{Heirloom, PlayerSkills};
@@ -242,7 +243,7 @@ pub fn update_status_effect_icons(
                         ..Default::default()
                     })
                     .insert(StatusEffectIcon)
-                    .set_parent(entity)
+                    .safe_set_parent(entity)
                     .id();
 
                 // Add text count next to the icon
@@ -264,7 +265,7 @@ pub fn update_status_effect_icons(
                         ..Default::default()
                     })
                     // .insert(RenderLayers::from_layers(&[1]))
-                    .set_parent(icon_entity);
+                    .safe_set_parent(icon_entity);
             } else {
                 // Original behavior: show one icon per stack
                 for i in 0..effect.num_stacks {
@@ -292,7 +293,7 @@ pub fn update_status_effect_icons(
                             ..Default::default()
                         })
                         .insert(StatusEffectIcon)
-                        .set_parent(entity);
+                        .safe_set_parent(entity);
                 }
             }
         }

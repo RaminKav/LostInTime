@@ -25,6 +25,7 @@ use crate::ui::damage_numbers::{
     spawn_floating_text_with_shadow, spawn_screen_locked_icon_to_world_pos, BeaconGuidance,
     BeaconTarget,
 };
+use crate::ui::game_fonts::FLOATING_TEXT;
 use crate::ui::item_chest::ItemChestState;
 use crate::ui::key_input_guide::InteractionGuideTrigger;
 use crate::ui::minimap::UpdateMiniMapEvent;
@@ -631,6 +632,7 @@ impl ObjectAction {
                     pos.extend(game.player().position.z) + Vec3::new(0., 20., 0.),
                     RED,
                     format!("+{} Chaos", amount),
+                    FLOATING_TEXT,
                 );
             }
             ObjectAction::TimePortal => {
@@ -655,6 +657,7 @@ impl ObjectAction {
                                 pos.extend(game.player().position.z) + Vec3::new(0., 28., 0.),
                                 WHITE,
                                 "A strong force prevents you...".to_string(),
+                                FLOATING_TEXT,
                             );
                             return;
                         }
@@ -666,6 +669,7 @@ impl ObjectAction {
                             pos.extend(game.player().position.z) + Vec3::new(0., 28., 0.),
                             WHITE,
                             "A strong force prevents you...".to_string(),
+                            FLOATING_TEXT,
                         );
                         return;
                     }

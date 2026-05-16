@@ -1,4 +1,5 @@
 use crate::assets::{SpriteAnchor, SpriteSize, WorldObjectData};
+use crate::ecs_helpers::safe_set_parent;
 use crate::attributes::item_abilities::ItemAbility;
 use crate::chaos::ChaosTracker;
 use crate::client::analytics::{AnalyticsTrigger, AnalyticsUpdateEvent};
@@ -1593,7 +1594,7 @@ pub fn handle_placing_world_object(
                         // Successfully spawned - register in cache
                         game.add_object_to_chunk_cache(tile_pos, place_event.obj);
                         //TODO: do what old game data did, add obj to registry
-                        commands.entity(item_e).set_parent(chunk);
+                        safe_set_parent(&mut commands, item_e, chunk);
 
                         if place_event.obj.is_medium_size(&proto_param) {
                             minimap_event.send(UpdateMiniMapEvent {

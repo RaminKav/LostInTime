@@ -29,8 +29,12 @@ pub struct CheatSettings {
     pub color_blind_mode: bool,
     /// When true, dev tools (XP, spawn chest/tome/orb, era teleport, endless) are shown in the inventory
     pub dev_mode: bool,
-    /// When true, damage numbers are shown when enemies take damage (player damage numbers always show)
+    /// When true, damage numbers are shown when enemies take damage
     pub show_enemy_damage_numbers: bool,
+    /// When true, damage/healing/regen floating text and item pickup labels use compact `4x5` at 5.0
+    pub small_damage_text: bool,
+    /// When true, player HP healing/regen and MP gain floating numbers are shown
+    pub show_player_damage_numbers: bool,
     /// When true, the tile under the cursor is highlighted during gameplay
     pub show_tile_hover: bool,
     /// When true, heirloom level-up / chest pools ignore time crystal progress and use
@@ -48,6 +52,8 @@ impl Default for CheatSettings {
             color_blind_mode: false,
             dev_mode: false,
             show_enemy_damage_numbers: true,
+            small_damage_text: false,
+            show_player_damage_numbers: true,
             show_tile_hover: false,
             bypass_time_crystal_pool: false,
             hide_attack_anims: false,
@@ -96,6 +102,8 @@ pub enum OptionsCheckboxType {
     ColorBlindMode,
     DevMode,
     ShowEnemyDamageNumbers,
+    SmallDamageText,
+    ShowPlayerDamageNumbers,
     ShowTileHover,
     BypassTimeCrystalPool,
     HideAttackAnims,
@@ -136,6 +144,7 @@ pub enum KeyBindType {
     Hotbar(usize),
     Inventory,
     Minimap,
+    Interact,
 }
 
 #[derive(Component)]
@@ -260,6 +269,7 @@ pub fn handle_key_rebind_input(
                 }
                 KeyBindType::Inventory => keybinds.set_inventory_key(InputBinding::KeyBinding(key)),
                 KeyBindType::Minimap => keybinds.set_minimap_key(InputBinding::KeyBinding(key)),
+                KeyBindType::Interact => keybinds.set_interact_key(InputBinding::KeyBinding(key)),
             }
             keybinds.save();
             commands.entity(entity).remove::<WaitingForKeyInput>();
@@ -288,6 +298,9 @@ pub fn handle_key_rebind_input(
                 }
                 KeyBindType::Minimap => {
                     keybinds.set_minimap_key(InputBinding::MouseBinding(mouse_button))
+                }
+                KeyBindType::Interact => {
+                    keybinds.set_interact_key(InputBinding::MouseBinding(mouse_button))
                 }
             }
             keybinds.save();
@@ -333,6 +346,7 @@ pub fn update_keybind_text(
                 KeyBindType::Hotbar(slot) => keybinds.get_hotbar_key(slot),
                 KeyBindType::Inventory => keybinds.get_inventory_key(),
                 KeyBindType::Minimap => keybinds.get_minimap_key(),
+                KeyBindType::Interact => keybinds.get_interact_key(),
             };
             text.sections[0].value = crate::keybinds::get_key_display_name(key);
             text.sections[0].style.color = crate::colors::WHITE;
@@ -401,6 +415,8 @@ pub fn setup_options_ui(
     ));
     let left_side_x = -resolution.game_width / 2. + 22.;
     let right_side_x = resolution.game_width / 2. - 142.;
+    // Center column between keybinds (left) and cheats (right)
+    let center_side_x = (left_side_x + 160. + right_side_x) / 2. - 45.;
     // Section title
     commands.spawn((
         Text2dBundle {
@@ -558,8 +574,28 @@ pub fn setup_options_ui(
         &keybinds,
     );
 
+    // Interact keybind
+    let interact_y = minimap_y + row_spacing;
+    spawn_keybind_row(
+        &mut commands,
+        &graphics,
+        &asset_server,
+        KeyBindType::Interact,
+        Vec3::new(
+            left_side_x + 2.,
+            interact_y,
+            ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
+        ),
+        Vec3::new(
+            left_side_x + 160.,
+            interact_y - 3.5,
+            ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
+        ),
+        &keybinds,
+    );
+
     // Auto attack toggle checkbox (not a keybind anymore)
-    let auto_attack_y = minimap_y + row_spacing;
+    let auto_attack_y = interact_y + row_spacing;
     spawn_options_checkbox(
         &mut commands,
         &graphics,
@@ -577,6 +613,58 @@ pub fn setup_options_ui(
         ),
         OptionsCheckboxType::AutoAttack,
         auto_attack.0,
+    );
+
+    // Volume section (center column)
+    let volume_section_y = 90.;
+    commands.spawn((
+        Text2dBundle {
+            text: Text::from_section(
+                "Volume",
+                TextStyle {
+                    font: asset_server.load("fonts/alagard.ttf"),
+                    font_size: 15.0,
+                    color: crate::colors::DARK_WOOD_BROWN,
+                },
+            )
+            .with_alignment(TextAlignment::Left),
+            text_anchor: bevy::sprite::Anchor::CenterLeft,
+            transform: Transform::from_translation(Vec3::new(
+                center_side_x,
+                volume_section_y,
+                ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
+            )),
+            ..Default::default()
+        },
+        RenderLayers::from_layers(&[3]),
+        OptionsUI,
+        Name::new("Volume Section Title"),
+    ));
+
+    let music_vol_y = volume_section_y - 26.;
+    spawn_volume_row(
+        &mut commands,
+        &graphics,
+        &asset_server,
+        "Music:",
+        VolumeChannel::Music,
+        audio_volume.music,
+        Vec3::new(
+            center_side_x,
+            music_vol_y,
+            ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
+        ),
+    );
+
+    let sfx_vol_y = music_vol_y - 18.;
+    spawn_volume_row(
+        &mut commands,
+        &graphics,
+        &asset_server,
+        "SFX:",
+        VolumeChannel::Sfx,
+        audio_volume.sfx,
+        Vec3::new(center_side_x, sfx_vol_y, ui_helpers::Z_DEPTH_OPTIONS_CONTENT),
     );
 
     // Cheats section
@@ -689,7 +777,47 @@ pub fn setup_options_ui(
         cheat_settings.show_enemy_damage_numbers,
     );
 
-    let tile_hover_checkbox_y = enemy_damage_checkbox_y - 16.;
+    let small_damage_checkbox_y = enemy_damage_checkbox_y - 16.;
+    spawn_options_checkbox(
+        &mut commands,
+        &graphics,
+        &asset_server,
+        "Small damage text:",
+        Vec3::new(
+            right_side_x,
+            small_damage_checkbox_y,
+            ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
+        ),
+        Vec3::new(
+            right_side_x + 100.5,
+            small_damage_checkbox_y + 0.5,
+            ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
+        ),
+        OptionsCheckboxType::SmallDamageText,
+        cheat_settings.small_damage_text,
+    );
+
+    let player_numbers_checkbox_y = small_damage_checkbox_y - 16.;
+    spawn_options_checkbox(
+        &mut commands,
+        &graphics,
+        &asset_server,
+        "Player Heal/Regen #s:",
+        Vec3::new(
+            right_side_x,
+            player_numbers_checkbox_y,
+            ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
+        ),
+        Vec3::new(
+            right_side_x + 100.5,
+            player_numbers_checkbox_y + 0.5,
+            ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
+        ),
+        OptionsCheckboxType::ShowPlayerDamageNumbers,
+        cheat_settings.show_player_damage_numbers,
+    );
+
+    let tile_hover_checkbox_y = player_numbers_checkbox_y - 16.;
     spawn_options_checkbox(
         &mut commands,
         &graphics,
@@ -787,58 +915,6 @@ pub fn setup_options_ui(
         ),
         OptionsCheckboxType::BypassTimeCrystalPool,
         cheat_settings.bypass_time_crystal_pool,
-    );
-
-    // Volume section
-    let volume_section_y = bypass_time_crystal_y - 28.;
-    commands.spawn((
-        Text2dBundle {
-            text: Text::from_section(
-                "Volume",
-                TextStyle {
-                    font: asset_server.load("fonts/alagard.ttf"),
-                    font_size: 15.0,
-                    color: crate::colors::DARK_WOOD_BROWN,
-                },
-            )
-            .with_alignment(TextAlignment::Left),
-            text_anchor: bevy::sprite::Anchor::CenterLeft,
-            transform: Transform::from_translation(Vec3::new(
-                right_side_x,
-                volume_section_y,
-                ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
-            )),
-            ..Default::default()
-        },
-        RenderLayers::from_layers(&[3]),
-        OptionsUI,
-        Name::new("Volume Section Title"),
-    ));
-
-    let music_vol_y = volume_section_y - 26.;
-    spawn_volume_row(
-        &mut commands,
-        &graphics,
-        &asset_server,
-        "Music:",
-        VolumeChannel::Music,
-        audio_volume.music,
-        Vec3::new(
-            right_side_x,
-            music_vol_y,
-            ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
-        ),
-    );
-
-    let sfx_vol_y = music_vol_y - 18.;
-    spawn_volume_row(
-        &mut commands,
-        &graphics,
-        &asset_server,
-        "SFX:",
-        VolumeChannel::Sfx,
-        audio_volume.sfx,
-        Vec3::new(right_side_x, sfx_vol_y, ui_helpers::Z_DEPTH_OPTIONS_CONTENT),
     );
 
     //TODO: fix restart button
@@ -942,6 +1018,7 @@ fn spawn_keybind_row(
         }
         KeyBindType::Inventory => ("Inventory:", keybinds.get_inventory_key()),
         KeyBindType::Minimap => ("Map:", keybinds.get_minimap_key()),
+        KeyBindType::Interact => ("Interact:", keybinds.get_interact_key()),
     };
 
     commands.spawn((
@@ -1169,6 +1246,30 @@ pub fn handle_cheat_checkbox_click(
                                     },
                                 )
                             }
+                            OptionsCheckboxType::SmallDamageText => {
+                                cheat_settings.small_damage_text =
+                                    !cheat_settings.small_damage_text;
+                                (
+                                    cheat_settings.small_damage_text,
+                                    if cheat_settings.small_damage_text {
+                                        UIElement::CheckBoxSelected
+                                    } else {
+                                        UIElement::CheckBox
+                                    },
+                                )
+                            }
+                            OptionsCheckboxType::ShowPlayerDamageNumbers => {
+                                cheat_settings.show_player_damage_numbers =
+                                    !cheat_settings.show_player_damage_numbers;
+                                (
+                                    cheat_settings.show_player_damage_numbers,
+                                    if cheat_settings.show_player_damage_numbers {
+                                        UIElement::CheckBoxSelected
+                                    } else {
+                                        UIElement::CheckBox
+                                    },
+                                )
+                            }
                             OptionsCheckboxType::ShowTileHover => {
                                 cheat_settings.show_tile_hover = !cheat_settings.show_tile_hover;
                                 (
@@ -1292,6 +1393,20 @@ pub fn update_cheat_checkbox_visual(
             }
             OptionsCheckboxType::ShowEnemyDamageNumbers => {
                 if cheat_settings.show_enemy_damage_numbers {
+                    UIElement::CheckBoxSelected
+                } else {
+                    UIElement::CheckBox
+                }
+            }
+            OptionsCheckboxType::SmallDamageText => {
+                if cheat_settings.small_damage_text {
+                    UIElement::CheckBoxSelected
+                } else {
+                    UIElement::CheckBox
+                }
+            }
+            OptionsCheckboxType::ShowPlayerDamageNumbers => {
+                if cheat_settings.show_player_damage_numbers {
                     UIElement::CheckBoxSelected
                 } else {
                     UIElement::CheckBox

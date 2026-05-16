@@ -7,6 +7,7 @@ use bevy_rapier2d::prelude::{
 
 use crate::{
     animations::player_sprite::PlayerAnimation,
+    ecs_helpers::SafeHierarchyExt,
     attributes::{hunger::Hunger, Speed},
     audio::{AudioSoundEffect, SoundSpawner},
     inputs::MovementVector,
@@ -305,7 +306,7 @@ pub fn bounce_player(
                     },
                     PlayerShadow { owner: player_e },
                 ))
-                .set_parent(player_e);
+                .safe_set_parent(player_e);
             commands.spawn(SoundSpawner::new(AudioSoundEffect::ItemPickup, 0.35));
         }
     }

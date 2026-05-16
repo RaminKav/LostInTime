@@ -7,6 +7,7 @@ use crate::{
     player::Player,
     ui::{
         damage_numbers::spawn_floating_text_with_shadow,
+        game_fonts::FLOATING_TEXT,
         tips::{SeenTips, Tip, TipEvent},
     },
 };
@@ -52,7 +53,7 @@ use crate::{
         },
         InventoryState,
     },
-    GameParam,
+    GameParam, InputMappings,
 };
 
 use super::{
@@ -1291,6 +1292,7 @@ pub fn handle_cursor_skills_buttons(
                                             player_pos + pos_offset,
                                             stat_type.color(),
                                             format!("+{} {}", amount, stat_type.name()),
+                                            FLOATING_TEXT,
                                         );
 
                                         info!(
@@ -1484,6 +1486,7 @@ pub fn handle_cursor_banish_buttons(
                             btn_pos + Vec3::new(0., 12., 10.),
                             RED,
                             msg,
+                            FLOATING_TEXT,
                         );
                         commands
                             .entity(text)
@@ -1588,6 +1591,7 @@ pub fn handle_cursor_inventory_upgrade_button(
                                     btn_pos + Vec3::new(0., 10., 10.),
                                     RED,
                                     "Max Level Reached".to_string(),
+                                    FLOATING_TEXT,
                                 );
                                 commands
                                     .entity(text)
@@ -1628,6 +1632,7 @@ pub fn handle_cursor_item_chest_button(
     cursor_pos: Res<CursorPos>,
     mouse_input: Res<Input<MouseButton>>,
     key_input: Res<Input<KeyCode>>,
+    keybinds: Res<InputMappings>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     mut item_chest_button: Query<
         (Entity, &mut Interactable, &ItemChestButton),
@@ -1645,8 +1650,8 @@ pub fn handle_cursor_item_chest_button(
         return;
     }
 
-    // F key advances the chest state directly, bypassing hover
-    if key_input.just_pressed(KeyCode::F) {
+    // Interact key advances the chest state directly, bypassing hover
+    if keybinds.check_interact_input(&key_input, &mouse_input) {
         advance_item_chest_state(
             &mut item_chest_state,
             &mut chest_event,
@@ -1736,6 +1741,7 @@ pub fn handle_cursor_heirloom_chest_button(
     cursor_pos: Res<CursorPos>,
     mouse_input: Res<Input<MouseButton>>,
     key_input: Res<Input<KeyCode>>,
+    keybinds: Res<InputMappings>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     mut item_chest_button: Query<
         (Entity, &mut Interactable, &ItemChestButton),
@@ -1757,8 +1763,8 @@ pub fn handle_cursor_heirloom_chest_button(
         return;
     }
 
-    // F key advances the chest state directly, bypassing hover
-    if key_input.just_pressed(KeyCode::F) {
+    // Interact key advances the chest state directly, bypassing hover
+    if keybinds.check_interact_input(&key_input, &mouse_input) {
         advance_heirloom_chest_state(
             &mut item_chest_state,
             &mut chest_event,

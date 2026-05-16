@@ -1,13 +1,12 @@
-use bevy::{prelude::*, render::view::RenderLayers};
+use bevy::prelude::*;
 use bevy_proto::prelude::{ReflectSchematic, Schematic};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    animations::AnimationTimer,
     chaos::ChaosTracker,
     colors::YELLOW,
     player::skills::{Heirloom, PlayerSkills},
-    ui::{damage_numbers::spawn_floating_text_with_shadow, UIState},
+    ui::{damage_numbers::spawn_floating_text_with_shadow, game_fonts::FLOATING_TEXT, UIState},
     DEBUG,
 };
 
@@ -94,6 +93,7 @@ pub fn handle_level_up(
                 player_t.translation() + Vec3::new(0., 15., 0.),
                 YELLOW,
                 "LEVEL UP!".to_string(),
+                FLOATING_TEXT,
             );
         }
     }

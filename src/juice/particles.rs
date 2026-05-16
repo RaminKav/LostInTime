@@ -4,6 +4,7 @@ use bevy_hanabi::prelude::*;
 
 use crate::{
     assets::SpriteAnchor,
+    ecs_helpers::SafeHierarchyExt,
     colors::YELLOW,
     combat::{EnemyDeathEvent, HitEvent, ObjBreakEvent},
     enemy::Mob,
@@ -281,7 +282,7 @@ pub fn setup_particles(
                 },
                 DustParticles,
             ))
-            .set_parent(player_e);
+            .safe_set_parent(player_e);
     }
 }
 

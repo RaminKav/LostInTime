@@ -13,7 +13,20 @@ use crate::{
     Game, TextureCamera, WasHitWithCrit, WasHitWithOvercrit,
 };
 
-use super::{spawn_item_stack_icon, UIElement};
+use super::{
+    game_fonts::{FontStyle, FLOATING_TEXT, FLOATING_TEXT_SMALL},
+    spawn_item_stack_icon, UIElement,
+};
+
+/// Font used for damage, healing/regen, and item-pickup floating labels.
+#[inline]
+pub fn floating_text_font_style(settings: Option<&CheatSettings>) -> FontStyle {
+    if settings.is_some_and(|s| s.small_damage_text) {
+        FLOATING_TEXT_SMALL
+    } else {
+        FLOATING_TEXT
+    }
+}
 
 #[derive(Component)]
 pub struct DamageNumber {
@@ -139,10 +152,15 @@ pub fn handle_add_damage_numbers_after_hit(
             continue;
         }
         let is_player = e == game.player;
-        // Skip spawning enemy damage numbers when the option is off (player damage numbers always show)
         if !is_player {
             if let Some(ref settings) = cheat_settings {
                 if !settings.show_enemy_damage_numbers {
+                    continue;
+                }
+            }
+        } else if delta > 0 {
+            if let Some(ref settings) = cheat_settings {
+                if !settings.show_player_damage_numbers {
                     continue;
                 }
             }
@@ -186,6 +204,7 @@ pub fn handle_add_damage_numbers_after_hit(
             } else {
                 format!("+{}", delta)
             },
+            floating_text_font_style(cheat_settings.as_deref()),
         );
         // Consume the crit/overcrit flags in place instead of removing the
         // component, to avoid archetype churn on mobs. See the doc comment on
@@ -218,6 +237,7 @@ pub fn handle_add_dodge_text(
             txfms.get(event.entity).unwrap().translation() + pos_offset,
             DMG_NUM_YELLOW,
             "Dodge!".to_string(),
+            FLOATING_TEXT,
         );
     }
 }
@@ -378,6 +398,7 @@ pub fn spawn_floating_text_with_shadow(
     pos: Vec3,
     color: Color,
     text: String,
+    font_style: FontStyle,
 ) -> Entity {
     let mut shadow_e = Entity::from_raw(0);
     for i in 0..2 {
@@ -392,7 +413,7 @@ pub fn spawn_floating_text_with_shadow(
             if i == 0 { BLACK } else { color },
             text.clone(),
             Anchor::CenterRight,
-            1.0,
+            font_style,
             0,
         );
         if i == 0 {
@@ -422,6 +443,7 @@ pub fn handle_queued_floating_texts(
     graphics: Res<Graphics>,
     proto: crate::proto::proto_param::ProtoParam,
     time: Res<Time>,
+    cheat_settings: Option<Res<CheatSettings>>,
 ) {
     const STACK_OFFSET: f32 = 14.5;
 
@@ -444,7 +466,7 @@ pub fn handle_queued_floating_texts(
 
         // Get item data
         let item_data = proto.get_item_data(queued.obj);
-        let (item_name, item_rarity) = if let Some(data) = item_data {
+        let (item_name, _item_rarity) = if let Some(data) = item_data {
             (data.metadata.name.clone(), data.rarity.clone())
         } else {
             (
@@ -460,6 +482,7 @@ pub fn handle_queued_floating_texts(
             queued.pos + Vec3::new(0., STACK_OFFSET * i as f32, 0.),
             queued.color,
             item_name,
+            floating_text_font_style(cheat_settings.as_deref()),
         );
 
         // Add icon
@@ -488,19 +511,12 @@ pub fn spawn_text(
     color: Color,
     text: String,
     anchor: Anchor,
-    font_scale: f32,
+    font_style: FontStyle,
     render_layer: u8,
 ) -> Entity {
     commands
         .spawn(Text2dBundle {
-            text: Text::from_section(
-                text,
-                TextStyle {
-                    font: asset_server.load("fonts/alagard.ttf"),
-                    font_size: 15. * font_scale,
-                    color,
-                },
-            ),
+            text: Text::from_section(text, font_style.text_style(asset_server, color)),
             transform: Transform {
                 translation: pos,
                 ..Default::default()
