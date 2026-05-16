@@ -244,17 +244,24 @@ pub mod active_skill_scaling {
     /// Sized to hold `RECALL_REWIND_SECONDS / RECALL_SAMPLE_INTERVAL_SECS` + a small
     /// safety margin so we always have a sample at age >= [`RECALL_REWIND_SECONDS`] once primed.
     pub const RECALL_HISTORY_CAPACITY: usize = 12;
-    /// How long the player takes to traverse the rewind path. Short so it
-    /// feels like a fast dash rather than a teleport.
-    pub const RECALL_DASH_DURATION_SECS: f32 = 0.12;
+    /// World speed (pixels per second) along the retrace polyline. Dash time is
+    /// `path_length / RECALL_DASH_SPEED_PX_PER_SEC`, clamped by min/max below.
+    pub const RECALL_DASH_SPEED_PX_PER_SEC: f32 = 720.0;
+    /// Minimum dash duration so a very short retrace still feels snappy.
+    pub const RECALL_DASH_DURATION_MIN_SECS: f32 = 0.06;
+    /// Upper bound so a zig-zag path cannot lock movement for too long.
+    pub const RECALL_DASH_DURATION_MAX_SECS: f32 = 0.45;
     /// Lifetime (seconds) of the line damage collider spawned along the rewind path.
     /// Set slightly longer than the dash duration so enemies along the line still
     /// register hits as the player sweeps across them.
     pub const RECALL_HITBOX_SECONDS: f32 = 0.22;
     /// Half-width (pixels) of the line damage collider; full width is 2x this.
-    pub const RECALL_HITBOX_HALF_WIDTH: f32 = 8.0;
+    pub const RECALL_HITBOX_HALF_WIDTH: f32 = 12.0;
+    /// Arc length (pixels) between lunge-style shadow tracers while Shadow Step
+    /// retraces — spawned during the dash, not all at cast time.
+    pub const RECALL_SHADOW_INTERVAL_ARC_PX: f32 = 24.0;
     /// Duration of the (unbreakable) stealth buff granted on Recall landing.
-    pub const RECALL_LANDING_STEALTH_SECS: f32 = 0.75;
+    pub const RECALL_LANDING_STEALTH_SECS: f32 = 1.;
     /// Added as [`crate::player::skills::RapidfireState::attack_speed_bonus`] multiplier base.
     pub const RAPIDFIRE_ATTACK_SPEED_BONUS_PERCENT: f32 = 80.0;
 
@@ -726,10 +733,16 @@ impl ActiveSkill {
                 "lifesteal on kill, up to 3 times.".to_string(),
             ],
             ActiveSkill::Recall => vec![
-                format!("Dash back to where you were {:.1}s", RECALL_REWIND_SECONDS),
-                "ago, slicing enemies in your path".to_string(),
-                format!("for {:.1}% damage. Gain stealth", skill_power * RECALL),
-                "breifly afterwards.".to_string(),
+                format!(
+                    "Retrace your steps from the last {:.1}s,",
+                    RECALL_REWIND_SECONDS
+                ),
+                "dashing along that path and slicing".to_string(),
+                format!(
+                    "enemies for {:.1}% damage. Gain stealth",
+                    skill_power * RECALL
+                ),
+                "briefly afterwards.".to_string(),
             ],
         }
     }
@@ -1706,8 +1719,9 @@ impl Heirloom {
                 "Mana.".to_string(),
             ],
             Heirloom::ManaOrbDropMult => vec![
-                "Mana Orb drop chance".to_string(),
-                "from enemies is doubled.".to_string(),
+                "Mana Orb drop".to_string(),
+                "chance from enemiess".to_string(),
+                "is doubled.".to_string(),
             ],
         }
     }

@@ -556,24 +556,22 @@ pub fn pause_combo_anim_when_done(mut combo: Query<&mut AsepriteAnimation, With<
 }
 
 // ---------------------------------------------------------------------------
-// Recall (Rogue) — rewind-dash to where you were ~1s ago, slicing enemies in the path.
+// Recall / Shadow Step (Rogue) — retrace sampled positions from the last
+// [`RECALL_REWIND_SECONDS`] window at a fixed world speed along the polyline.
 // ---------------------------------------------------------------------------
 //
-// Position tracking is intentionally cheap: a fixed-capacity ring buffer of
-// world positions sampled at a coarse interval. With 10 samples covering 1.0s
-// (plus a small safety margin), the oldest sample is always >=
-// `RECALL_REWIND_SECONDS` old once the buffer is primed, so resolving "1s ago"
-// is just `samples[0]` — no timestamps, no binary search.
-//
-// The dash itself reuses the existing Teleport pattern: snap the player to the
-// destination via `MovePlayerEvent`, and spawn one short-lived line collider
-// spanning A→B that damages every enemy it overlaps. This avoids any per-frame
-// motion or projectile bookkeeping for the dash itself.
+// [`PositionHistory`] stores world `Vec2` samples oldest-first. On cast we
+// walk **current → newest sample → … → second-oldest → snapped oldest tile
+// center** so the player visually follows the path they actually took, in
+// reverse. Dash duration is `polyline_length / RECALL_DASH_SPEED_PX_PER_SEC`
+// (clamped). Damage uses one short-lived line collider per polyline edge.
 use crate::item::projectile::RangedAttackEvent;
 use crate::player::skill_heirlooms::Stealthed;
 use crate::player::skills::active_skill_scaling::{
-    RECALL, RECALL_DASH_DURATION_SECS, RECALL_HISTORY_CAPACITY, RECALL_HITBOX_HALF_WIDTH,
+    RECALL, RECALL_DASH_DURATION_MAX_SECS, RECALL_DASH_DURATION_MIN_SECS,
+    RECALL_DASH_SPEED_PX_PER_SEC, RECALL_HISTORY_CAPACITY, RECALL_HITBOX_HALF_WIDTH,
     RECALL_HITBOX_SECONDS, RECALL_LANDING_STEALTH_SECS, RECALL_SAMPLE_INTERVAL_SECS,
+    RECALL_SHADOW_INTERVAL_ARC_PX,
 };
 use crate::player::skills::StealthState;
 
@@ -600,16 +598,6 @@ impl PositionHistory {
                 RECALL_SAMPLE_INTERVAL_SECS,
                 TimerMode::Repeating,
             ),
-        }
-    }
-
-    /// Returns the oldest sample (~`RECALL_REWIND_SECONDS` ago) once the buffer
-    /// has been primed with enough samples to actually cover that window.
-    fn oldest(&self) -> Option<Vec2> {
-        if self.samples.len() >= RECALL_HISTORY_CAPACITY {
-            self.samples.first().copied()
-        } else {
-            None
         }
     }
 
@@ -653,14 +641,64 @@ pub fn clear_position_history_on_move(
     }
 }
 
-/// Drives the player from cast position to the rewind target over
-/// [`RECALL_DASH_DURATION_SECS`]. Stored `SparseSet` because it's only present
-/// during the brief dash and toggling it must not move the player between
-/// archetypes.
-#[derive(Component, Clone)]
+fn polyline_length(path: &[Vec2]) -> f32 {
+    path.windows(2).map(|w| w[0].distance(w[1])).sum()
+}
+
+/// Arc-length `s` (pixels) along `path`, clamped to the polyline length.
+fn position_along_polyline(path: &[Vec2], mut s: f32) -> Vec2 {
+    if path.is_empty() {
+        return Vec2::ZERO;
+    }
+    if path.len() == 1 {
+        return path[0];
+    }
+    let max_s = polyline_length(path);
+    s = s.min(max_s);
+    for w in path.windows(2) {
+        let a = w[0];
+        let b = w[1];
+        let len = a.distance(b);
+        if len < 1e-4 {
+            continue;
+        }
+        if s <= len {
+            let t = (s / len).min(1.0);
+            return a + (b - a) * t;
+        }
+        s -= len;
+    }
+    *path.last().unwrap()
+}
+
+/// Forward tangent on the retrace polyline at arc length `s` (for shadow orientation).
+fn recall_shadow_tangent(path: &[Vec2], s: f32) -> Vec2 {
+    let max_s = polyline_length(path);
+    let eps = 6.0_f32;
+    let s0 = (s - eps).max(0.);
+    let s1 = (s + eps).min(max_s);
+    let p0 = position_along_polyline(path, s0);
+    let p1 = position_along_polyline(path, s1);
+    let d = p1 - p0;
+    if d.length_squared() > 1e-4 {
+        d.normalize()
+    } else {
+        LUNGE_SHADOW_DEFAULT_DIR
+    }
+}
+
+/// Drives the player along [`RecallDashState::path`] at [`RECALL_DASH_SPEED_PX_PER_SEC`].
+/// Stored `SparseSet` because it's only present during the dash.
+#[derive(Component)]
 #[component(storage = "SparseSet")]
 pub struct RecallDashState {
-    pub target: Vec2,
+    /// World polyline: cast position → newest sample → … → second-oldest → snapped end.
+    pub path: Vec<Vec2>,
+    pub path_length: f32,
+    /// Distance covered along the polyline (arc length, pixels).
+    pub traveled: f32,
+    /// Next arc length at which to spawn a lunge shadow (moves forward with the dash).
+    pub next_shadow_arclength: f32,
     pub timer: Timer,
 }
 
@@ -680,7 +718,6 @@ pub fn handle_recall(
     >,
     game: crate::GameParam,
     proto_param: crate::proto::proto_param::ProtoParam,
-    asset_server: Res<AssetServer>,
     mut ranged_attack_events: bevy::ecs::event::EventWriter<RangedAttackEvent>,
     mut commands: Commands,
 ) {
@@ -696,22 +733,20 @@ pub fn handle_recall(
         return;
     }
 
-    // Buffer not yet primed: nothing to recall to. Cooldown was already
-    // consumed by `dispatch_active_skill_events`; this is an edge case only in
-    // the first ~`RECALL_REWIND_SECONDS` after equip.
-    let Some(target) = hist.oldest() else {
+    // Buffer not yet primed: nothing to retrace. Cooldown was already consumed.
+    if hist.samples.len() < RECALL_HISTORY_CAPACITY {
+        return;
+    }
+
+    let samples = hist.samples.clone();
+    let Some(&oldest_raw) = samples.first() else {
         return;
     };
 
     let from = tf.translation().truncate();
-    let delta = target - from;
-    // Standing still: skip to avoid spawning a zero-length collider.
-    if delta.length_squared() < 4.0 {
-        return;
-    }
 
-    // Validate destination tile (water/wall/tree); fall back to nearest neighbor.
-    let intended_tile = crate::world::world_helpers::world_pos_to_tile_pos(target);
+    // Validate destination tile for the oldest sample (water/wall/tree).
+    let intended_tile = crate::world::world_helpers::world_pos_to_tile_pos(oldest_raw);
     let Some(dest_tile) = crate::player::mage_skills::resolve_teleport_destination_tile(
         intended_tile,
         from,
@@ -723,45 +758,58 @@ pub fn handle_recall(
     let dest = crate::world::world_helpers::tile_pos_to_world_pos(dest_tile, false)
         + Vec2::new(TILE_SIZE.x * 0.5, TILE_SIZE.y * 0.5);
 
-    let to_dest = dest - from;
-    let dist = to_dest.length();
-    if dist < 1.0 {
+    // Retrace: current → newest recorded → … → second-oldest → snapped oldest.
+    let mut path: Vec<Vec2> = Vec::with_capacity(samples.len() + 1);
+    path.push(from);
+    for &p in samples
+        .iter()
+        .rev()
+        .take(samples.len().saturating_sub(1))
+    {
+        path.push(p);
+    }
+    path.push(dest);
+
+    let path_length = polyline_length(&path);
+    if path_length < 4.0 {
         return;
     }
-    let dir = to_dest / dist;
-    let mid = from + to_dest * 0.5;
-    let angle = f32::atan2(to_dest.y, to_dest.x);
+
+    let dash_duration = (path_length / RECALL_DASH_SPEED_PX_PER_SEC)
+        .clamp(RECALL_DASH_DURATION_MIN_SECS, RECALL_DASH_DURATION_MAX_SECS);
 
     let power_mult = skill_power_multiplier(skill_power, blessings.get_skill_power_bonus());
     let dmg = (atk.0 as f32 * power_mult * attack_damage_multiplier(RECALL)) as i32;
 
-    // Single line-shaped sensor that damages every enemy along A→B for the
-    // full dash. Spawned at cast time rather than driven per-frame so we keep
-    // collision bookkeeping out of the dash tick.
-    let half_length = (dist * 0.5).max(RECALL_HITBOX_HALF_WIDTH);
-    let hitbox = spawn_temp_collider(
-        &mut commands,
-        Transform::from_translation(Vec3::new(mid.x, mid.y, 0.))
-            .with_rotation(Quat::from_rotation_z(angle)),
-        RECALL_HITBOX_SECONDS,
-        dmg,
-        Collider::cuboid(half_length, RECALL_HITBOX_HALF_WIDTH),
-        Projectile::TeleportShock,
-    );
-    commands
-        .entity(hitbox)
-        .insert(crate::player::mage_skills::TeleportShockDmg);
-
-    // Rewind tracers at start/mid/end of the path.
-    for t in [0.0_f32, 0.5, 1.0] {
-        let p = from + to_dest * t;
-        spawn_lunge_shadow(&mut commands, &asset_server, p.extend(0.9), dir);
+    // One line hitbox per edge so damage matches the actual retrace path.
+    let hit_life = (dash_duration + RECALL_HITBOX_SECONDS).max(RECALL_HITBOX_SECONDS);
+    for w in path.windows(2) {
+        let a = w[0];
+        let b = w[1];
+        let d = b - a;
+        let seg_len = d.length();
+        if seg_len < 1.0 {
+            continue;
+        }
+        let mid = a + d * 0.5;
+        let angle = f32::atan2(d.y, d.x);
+        let half_length = (seg_len * 0.5).max(RECALL_HITBOX_HALF_WIDTH);
+        let hitbox = spawn_temp_collider(
+            &mut commands,
+            Transform::from_translation(Vec3::new(mid.x, mid.y, 0.))
+                .with_rotation(Quat::from_rotation_z(angle)),
+            hit_life,
+            dmg,
+            Collider::cuboid(half_length, RECALL_HITBOX_HALF_WIDTH),
+            Projectile::TeleportShock,
+        );
+        commands
+            .entity(hitbox)
+            .insert(crate::player::mage_skills::TeleportShockDmg);
     }
 
     commands.spawn(SoundSpawner::new(AudioSoundEffect::Teleport, 0.1));
 
-    // Smoke poof at the cast (origin) position. The destination smoke is
-    // fired from `tick_recall_dash` when the dash lands.
     ranged_attack_events.send(RangedAttackEvent {
         projectile: Projectile::Smoke,
         direction: Vec2::ZERO,
@@ -774,37 +822,32 @@ pub fn handle_recall(
         spawn_delay: 0.0,
     });
 
-    // Phase through enemies for the entire dash window. The lunge/teleport
-    // helpers manage filter_groups based on this component's lifetime.
     commands
         .entity(player_e)
         .insert(crate::player::skills::PhasingThroughEnemies::new(
-            RECALL_DASH_DURATION_SECS + 0.02,
+            dash_duration + 0.02,
         ));
 
-    // Start the dash. Actual per-frame motion happens in `tick_recall_dash`.
     commands.entity(player_e).insert(RecallDashState {
-        target: dest,
-        timer: Timer::from_seconds(RECALL_DASH_DURATION_SECS, TimerMode::Once),
+        path,
+        path_length,
+        traveled: 0.,
+        next_shadow_arclength: RECALL_SHADOW_INTERVAL_ARC_PX,
+        timer: Timer::from_seconds(dash_duration, TimerMode::Once),
     });
 
-    // Reset history so the next cast can't rewind to a pre-cast position
-    // before the buffer has re-primed at the destination.
     hist.clear();
 }
 
-/// Drives the high-speed glide from cast position to [`RecallDashState::target`]
-/// over [`RECALL_DASH_DURATION_SECS`]. Each frame we compute
-/// `step = (target - current) * (dt / time_remaining)` so the player arrives
-/// exactly on the target on the final tick regardless of frame rate. On the
-/// last tick we also grant the unbreakable landing-stealth buff and spawn the
-/// stealth smoke VFX.
+/// Fixed-speed motion along [`RecallDashState::path`]. On the last tick, grants
+/// unbreakable landing stealth and destination smoke (see [`handle_recall`] for
+/// origin smoke).
 pub fn tick_recall_dash(
     time: Res<Time>,
+    asset_server: Res<AssetServer>,
     mut q: Query<
         (
             Entity,
-            &GlobalTransform,
             &mut RecallDashState,
             &mut KinematicCharacterController,
             &mut MovementVector,
@@ -814,37 +857,54 @@ pub fn tick_recall_dash(
     mut ranged_attack_events: bevy::ecs::event::EventWriter<RangedAttackEvent>,
     mut commands: Commands,
 ) {
-    let Ok((player_e, tf, mut dash, mut kcc, mut mv)) = q.get_single_mut() else {
+    let Ok((player_e, mut dash, mut kcc, mut mv)) = q.get_single_mut() else {
         return;
     };
 
+    // [`PhasingThroughEnemies`] only swaps the player to [`Group::GROUP_2`],
+    // which still intersects world/static colliders that use [`Group::ALL`].
+    // For Recall we need true no-clip through trees/walls for the dash line,
+    // matching the pattern used on enemies (`NONE` / `NONE` on the controller).
+    // `manage_ability_phasing` runs earlier in the schedule; we override here
+    // every dash frame. After the dash ends we remove this state and leave
+    // `NONE` for the rest of the frame; the next frame phasing restores
+    // `GROUP_2` for the short tail before [`PhasingThroughEnemies`] expires.
+    commands
+        .entity(player_e)
+        .insert(CollisionGroups::new(Group::NONE, Group::NONE));
+    kcc.filter_groups = Some(CollisionGroups::new(Group::NONE, Group::NONE));
+
     dash.timer.tick(time.delta());
 
-    let current = tf.translation().truncate();
-    let remaining = dash.target - current;
+    let speed = RECALL_DASH_SPEED_PX_PER_SEC;
+    let t0 = dash.traveled;
+    let t1 = (t0 + speed * time.delta_seconds()).min(dash.path_length);
+    let pos0 = position_along_polyline(&dash.path, t0);
+    let pos1 = position_along_polyline(&dash.path, t1);
+    dash.traveled = t1;
 
-    let step = if dash.timer.finished() {
-        // Snap any residual sub-pixel gap on the final tick.
-        remaining
-    } else {
-        let time_left =
-            (dash.timer.duration().as_secs_f32() - dash.timer.elapsed_secs()).max(0.0);
-        if time_left <= f32::EPSILON {
-            remaining
-        } else {
-            remaining * (time.delta_seconds() / time_left)
+    // Trail shadows spaced by arc length as we move — avoids spawning them all at cast.
+    while dash.next_shadow_arclength <= dash.traveled + 0.5 {
+        let s = dash.next_shadow_arclength.min(dash.path_length);
+        let p = position_along_polyline(&dash.path, s);
+        let dir = recall_shadow_tangent(&dash.path, s);
+        spawn_lunge_shadow(&mut commands, &asset_server, p.extend(0.9), dir);
+        dash.next_shadow_arclength += RECALL_SHADOW_INTERVAL_ARC_PX;
+        if dash.next_shadow_arclength > dash.path_length + RECALL_SHADOW_INTERVAL_ARC_PX {
+            break;
         }
-    };
+    }
 
-    // Suppress any WASD-driven movement during the dash so the player can't
-    // veer off the rewind line.
+    let step = pos1 - pos0;
+
     mv.0 = Vec2::ZERO;
     kcc.translation = Some(step);
 
-    if dash.timer.finished() {
+    let finished = dash.timer.finished() || dash.traveled >= dash.path_length - 0.25;
+
+    if finished {
         commands.entity(player_e).remove::<RecallDashState>();
 
-        // Unbreakable landing stealth: stays active even if the player attacks.
         commands
             .entity(player_e)
             .insert(StealthState {
@@ -853,8 +913,6 @@ pub fn tick_recall_dash(
             })
             .insert(Stealthed);
 
-        // Reuse the cosmetic smoke that Stealth casts use, so the player gets
-        // the same poof-into-stealth visual.
         ranged_attack_events.send(RangedAttackEvent {
             projectile: Projectile::Smoke,
             direction: Vec2::ZERO,
