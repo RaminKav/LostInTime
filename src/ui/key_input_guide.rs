@@ -1,7 +1,11 @@
 use bevy::{prelude::*, sprite::Anchor};
 
 use crate::{
-    assets::SpriteAnchor, inventory::ItemStack, item::WorldObject, player::Player, GameParam,
+    assets::SpriteAnchor,
+    inventory::{Inventory, ItemStack},
+    item::{boss_shrine::BossSummonTracker, WorldObject},
+    player::Player,
+    GameParam,
 };
 
 use super::{damage_numbers::spawn_text, spawn_item_stack_icon, UIElement};
@@ -134,25 +138,71 @@ pub fn add_guide_to_unique_objs(
     }
 }
 
+fn resolve_interaction_guide_text(
+    guide: &InteractionGuideTrigger,
+    world_obj: Option<WorldObject>,
+    coins: u32,
+    summon_cost: i32,
+    boss_summon_count: u32,
+    key_count: usize,
+) -> Option<String> {
+    let base = guide.text.clone();
+    match world_obj {
+        Some(WorldObject::BossShrine) => {
+            if (coins as i32) < summon_cost {
+                Some("Not enough coins".to_string())
+            } else if boss_summon_count >= 1 {
+                Some("Summon... Again?".to_string())
+            } else {
+                base
+            }
+        }
+        Some(WorldObject::DungeonEntrance) => {
+            if key_count < 1 {
+                Some("Needs a Key".to_string())
+            } else {
+                base
+            }
+        }
+        _ => base,
+    }
+}
+
 pub fn spawn_shrine_interact_key_guide(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     player_query: Query<(Entity, &GlobalTransform), With<Player>>,
+    player_inv: Query<&Inventory, With<Player>>,
+    summon_tracker: Res<BossSummonTracker>,
     game: GameParam,
     already_exists: Query<Entity, With<InteractGuide>>,
     guides: Query<(
         &GlobalTransform,
         &InteractionGuideTrigger,
         Option<&SpriteAnchor>,
+        Option<&WorldObject>,
     )>,
 ) {
     let (player_e, player_t) = player_query.single();
+    let key_count = player_inv
+        .single()
+        .items
+        .get_item_count_in_container(WorldObject::Key);
+    let summon_cost = summon_tracker.current_cost();
 
     if already_exists.iter().count() == 0 {
-        for (txfm, guide, anchor_option) in guides.iter() {
+        for (txfm, guide, anchor_option, world_obj) in guides.iter() {
             let guide_pos =
                 txfm.translation().truncate() - anchor_option.unwrap_or(&SpriteAnchor::default()).0;
             if guide_pos.distance(player_t.translation().truncate()) < guide.activation_distance {
+                let display_text = resolve_interaction_guide_text(
+                    guide,
+                    world_obj.copied(),
+                    game.get_coins(),
+                    summon_cost,
+                    summon_tracker.summon_count,
+                    key_count,
+                );
                 let parent_entity = commands
                     .spawn(SpatialBundle::from_transform(Transform::from_translation(
                         Vec3::new(0., 25.5, 1.),
@@ -162,8 +212,10 @@ pub fn spawn_shrine_interact_key_guide(
                     .insert(Name::new("Interact Guide"))
                     .id();
                 let key_entity = if let Some(key) = guide.key.clone() {
-                    let x_offset = if guide.text.is_some() {
-                        f32::round(guide.text.as_ref().unwrap().chars().count() as f32 * -4. - 12.)
+                    let x_offset = if display_text.is_some() {
+                        f32::round(
+                            display_text.as_ref().unwrap().chars().count() as f32 * -4. - 12.,
+                        )
                     } else {
                         0.
                     };
@@ -186,7 +238,7 @@ pub fn spawn_shrine_interact_key_guide(
                 } else {
                     None
                 };
-                if let Some(text) = guide.text.clone() {
+                if let Some(text) = display_text {
                     let x = if key_entity.is_some() { 6. } else { 0.5 };
                     let text_e = spawn_text(
                         &mut commands,
@@ -236,7 +288,7 @@ pub fn spawn_shrine_interact_key_guide(
             }
         }
     } else {
-        for (txfm, guide, anchor_option) in guides.iter() {
+        for (txfm, guide, anchor_option, _world_obj) in guides.iter() {
             let guide_pos =
                 txfm.translation().truncate() - anchor_option.unwrap_or(&SpriteAnchor::default()).0;
             if guide_pos.distance(player_t.translation().truncate()) < guide.activation_distance {

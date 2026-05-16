@@ -117,7 +117,7 @@ pub fn setup_beastiary_browser_ui(
     commands.spawn((
         Text2dBundle {
             text: Text::from_section(
-                "Beastiary",
+                "Bestiary",
                 TextStyle {
                     font: asset_server.load("fonts/alagard.ttf"),
                     font_size: 15.0,

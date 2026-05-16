@@ -11,6 +11,7 @@ use crate::{
     inventory::ItemStack,
     item::WorldObject,
     player::{
+        currency::CoinCurrency,
         levels::PlayerLevel,
         skills::{Heirloom, HeirloomChoiceQueue, HeirloomRarity, HeirloomWithRarity, PlayerSkills},
         ModifyCurencyEvent, Player,
@@ -53,12 +54,17 @@ pub struct EssenceShopCache {
 
 use super::{
     heirloom_tooltip::{HeirloomTooltipRequest, HeirloomTooltipShow},
-    main_menu::spawn_back_button, spawn_item_stack_icon, ui_helpers::spawn_ui_overlay,
+    main_menu::spawn_back_button,
+    spawn_item_stack_icon,
+    ui_helpers::spawn_ui_overlay,
     Interactable, UIElement, UIState, ESSENCE_UI_SIZE,
 };
 
 #[derive(Component)]
 pub struct EssenceUI;
+
+#[derive(Component)]
+pub struct BlacksmithCoinsText;
 
 #[derive(Component, Clone, Debug, Resource, Default)]
 pub struct EssenceOption {
@@ -135,12 +141,27 @@ pub fn handle_essence_heirloom_tooltip(
     *last_hovered = currently_hovered;
 }
 
+pub fn update_blacksmith_coin_display(
+    coins: Res<CoinCurrency>,
+    mut q: Query<&mut Text, With<BlacksmithCoinsText>>,
+) {
+    if !coins.is_changed() {
+        return;
+    }
+    for mut text in q.iter_mut() {
+        if let Some(section) = text.sections.first_mut() {
+            section.value = coins.coins.to_string();
+        }
+    }
+}
+
 pub fn setup_essence_ui(
     mut commands: Commands,
     graphics: Res<Graphics>,
     asset_server: Res<AssetServer>,
     shop: Res<EssenceShopChoices>,
     resolution: Res<ScreenResolution>,
+    coins: Res<CoinCurrency>,
 ) {
     let (size, texture, t_offset) = (
         ESSENCE_UI_SIZE,
@@ -196,6 +217,39 @@ pub fn setup_essence_ui(
         .insert(UIState::Essence)
         .insert(RenderLayers::from_layers(&[3]))
         .id();
+
+    let coin_icon = spawn_item_stack_icon(
+        &mut commands,
+        &graphics,
+        &ItemStack::crate_icon_stack(WorldObject::Coin).copy_with_count(1),
+        &asset_server,
+        Vec2::new(98., 52.),
+        Vec2::new(0., 0.),
+        3,
+    );
+    commands.entity(coin_icon).set_parent(essence_ui_e);
+
+    commands
+        .spawn((
+            Text2dBundle {
+                text: Text::from_section(
+                    coins.coins.to_string(),
+                    TextStyle {
+                        font: asset_server.load("fonts/alagard.ttf"),
+                        font_size: 15.0,
+                        color: DARK_WOOD_BROWN,
+                    },
+                )
+                .with_alignment(TextAlignment::Left),
+                text_anchor: bevy::sprite::Anchor::CenterLeft,
+                transform: Transform::from_translation(Vec3::new(108., 52., 2.)),
+                ..Default::default()
+            },
+            RenderLayers::from_layers(&[3]),
+            BlacksmithCoinsText,
+            Name::new("Blacksmith Coins"),
+        ))
+        .set_parent(essence_ui_e);
 
     for (i, essence_option) in shop.choices.iter().enumerate() {
         let y_offset = 38.5 - (i as f32 * 38.) + if i == 2 { -1. } else { 0. };

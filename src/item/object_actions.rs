@@ -12,7 +12,7 @@ use super::{get_crafting_inventory_item_stacks, PlaceItemEvent, WorldObject};
 
 use crate::assets::SpriteAnchor;
 use crate::chaos::IncreaseChaosEvent;
-use crate::colors::RED;
+use crate::colors::{RED, WHITE};
 use crate::container::Container;
 use crate::custom_commands::CommandsExt;
 use crate::inventory::Inventory;
@@ -648,9 +648,25 @@ impl ObjectAction {
 
                     if let Some(boss_kill_tracker) = item_action_param.boss_kill_tracker.as_ref() {
                         if !boss_kill_tracker.is_boss_killed(&current_era) {
+                            let pos = tile_pos_to_world_pos(obj_pos, true);
+                            spawn_floating_text_with_shadow(
+                                commands,
+                                &item_action_param.asset_server,
+                                pos.extend(game.player().position.z) + Vec3::new(0., 28., 0.),
+                                WHITE,
+                                "A strong force prevents you...".to_string(),
+                            );
                             return;
                         }
                     } else {
+                        let pos = tile_pos_to_world_pos(obj_pos, true);
+                        spawn_floating_text_with_shadow(
+                            commands,
+                            &item_action_param.asset_server,
+                            pos.extend(game.player().position.z) + Vec3::new(0., 28., 0.),
+                            WHITE,
+                            "A strong force prevents you...".to_string(),
+                        );
                         return;
                     }
                 }

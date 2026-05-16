@@ -99,9 +99,7 @@ pub struct BeastiaryPlugin;
 
 impl Plugin for BeastiaryPlugin {
     fn build(&self, app: &mut App) {
-        app.add_system(
-            reset_run_beastiary_on_run_start.in_schedule(OnExit(GameState::MainMenu)),
-        );
+        app.add_system(reset_run_beastiary_on_run_start.in_schedule(OnExit(GameState::MainMenu)));
     }
 }
 
@@ -115,7 +113,7 @@ pub fn mob_display_name(mob: &Mob) -> &'static str {
         Mob::SmallCactus => "Small Cactus",
         Mob::BigCactus => "Large Cactus",
         Mob::Bull => "Bull",
-        Mob::StoneGolem => "Stone Golem",
+        Mob::StoneGolem => "Blake Boulder",
         Mob::Slime => "Slime",
         Mob::Hog => "Hog",
         Mob::Fairy => "Fairy",

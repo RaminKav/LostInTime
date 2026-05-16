@@ -660,7 +660,7 @@ pub fn spawn_menu_text_buttons(
     spawn_menu_button(
         Vec3::new(-44., -138., 1.),
         Vec3::new(-30., -0., 1.),
-        "Beastiary",
+        "Bestiary",
         MenuButton::Beastiary,
         Vec2::new(118., 18.),
         &mut commands,

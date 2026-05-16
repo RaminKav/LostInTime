@@ -727,6 +727,11 @@ impl Plugin for UIPlugin {
                     .in_set(OnUpdate(GameState::Main)),
             )
             .add_system(
+                update_blacksmith_coin_display
+                    .in_set(OnUpdate(GameState::Main))
+                    .run_if(in_state(UIState::Essence)),
+            )
+            .add_system(
                     handle_update_player_skills.after(clamp_health).run_if(in_state(GameState::Main).or_else(in_state(GameState::BlessingChoice))),
             )
             .add_systems(

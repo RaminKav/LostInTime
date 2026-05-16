@@ -29,6 +29,7 @@ use crate::{
     },
     night::{InfiniteMode, InfiniteModeMob, NightTracker},
     player::{
+        beastiary::mob_display_name,
         levels::{ExperienceReward, PlayerLevel},
         Player,
     },
@@ -212,10 +213,7 @@ impl Mob {
     }
     pub fn get_boss_name(&self) -> Option<&'static str> {
         match self {
-            Mob::RedMushking => Some("Red Mushking"),
-            Mob::StoneGolem => Some("Blake Boulder"),
-            Mob::Scorpion => Some("Desert Scorpion"),
-            _ => None,
+            _ => Some(mob_display_name(self)),
         }
     }
 
