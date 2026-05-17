@@ -55,6 +55,14 @@ pub const ITEM_TOOLTIP_LARGE_CARD_SIZE: Vec2 = Vec2::new(172., 272.);
 /// (avoids flicker when moving quickly across slots).
 pub const STATS_TOOLTIP_RESPAWN_DELAY_SECS: f32 = 0.18;
 
+/// Clamps a center-anchored tooltip's X so its half-width stays inside the game viewport.
+pub fn clamp_tooltip_center_x(x: f32, half_width: f32, game_width: f32, edge_pad: f32) -> f32 {
+    let half_screen = game_width * 0.5;
+    let min_x = -half_screen + half_width + edge_pad;
+    let max_x = half_screen - half_width - edge_pad;
+    x.clamp(min_x, max_x)
+}
+
 #[derive(Component)]
 pub struct PlayerStatsTooltip;
 #[derive(Component)]

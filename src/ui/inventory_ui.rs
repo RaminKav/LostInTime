@@ -56,7 +56,7 @@ use super::{
     interactions::{Interactable, Interaction},
     options_ui::CheatSettings,
     player_hud::FlashExpBarEvent,
-    ui_helpers::spawn_ui_overlay,
+    ui_helpers::{spawn_ui_overlay, Z_DEPTH_HUD_ACTIVE_SKILLS},
     ShowInvPlayerStatsEvent, UIContainersParam, UIElement, CRAFTING_INVENTORY_UI_SIZE,
     FURNACE_INVENTORY_UI_SIZE, HUD_ACTION_ROW_Y_FROM_BOTTOM, HUD_HOTBAR_CENTER_X, HUD_HOTBAR_SLOTS,
     INVENTORY_GRID_COLS, INV_CHEST_SCRAPPER_GRID_OFFSET_Y, INV_CRAFTING_BASE_Y, INV_CRAFTING_COLS,
@@ -1396,7 +1396,13 @@ pub fn spawn_inv_slot(
         &inv_ui_state.0,
         resolution.game_height,
     );
-    let translation = (local + inv_slot_offset).extend(1.);
+    // HUD hotbar slots must render above the `HudBar` frame (Z=1); class-skill icons use the
+    // same depth via `Z_DEPTH_HUD_ACTIVE_SKILLS`.
+    let translation = (local + inv_slot_offset).extend(if slot_type.is_hotbar() {
+        Z_DEPTH_HUD_ACTIVE_SKILLS
+    } else {
+        1.
+    });
     let mut item_icon_option = None;
     let mut item_type_option = None;
     let mut item_count_option = None;

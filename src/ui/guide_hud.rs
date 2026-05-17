@@ -1,12 +1,13 @@
-use bevy::{prelude::*, render::view::RenderLayers};
+use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
 
 use crate::{
     player::Player,
+    ui::{game_fonts as gf, player_hud::ProgressHudBar, PROGRESS_BACKGROUND_SIZE},
     world::{
         dimension::EraManager, portal::BossKillTracker, world_helpers::tile_pos_to_world_pos,
         TILE_SIZE,
     },
-    GameParam, ScreenResolution, GAME_HEIGHT,
+    GameParam,
 };
 
 #[derive(Resource, Debug, Clone, PartialEq, Eq)]
@@ -95,12 +96,16 @@ pub fn display_goal_text(
     goal_state: Res<GoalState>,
     asset_server: Res<AssetServer>,
     goal_text_query: Query<Entity, With<GoalText>>,
-    res: Res<ScreenResolution>,
+    progress_bar: Query<Entity, With<ProgressHudBar>>,
 ) {
     // Update text when goal state changes or if no text exists yet
     if !goal_state.is_changed() && !goal_text_query.is_empty() {
         return;
     }
+
+    let Ok(progress_parent) = progress_bar.get_single() else {
+        return;
+    };
 
     // Remove old goal text
     for entity in goal_text_query.iter() {
@@ -109,32 +114,26 @@ pub fn display_goal_text(
 
     // Get goal text
     let goal_text = match *goal_state {
-        GoalState::FindBossShrine => "Find the Boss Shrine",
+        GoalState::FindBossShrine => "Find Boss Shrine",
         GoalState::DefeatBoss => "Defeat the Boss",
         GoalState::ReturnToPortal => "Return To Portal",
     };
 
-    // Spawn new goal text
+    let objective_x = -PROGRESS_BACKGROUND_SIZE.x * 0.5 + 12.;
+
     commands
         .spawn(Text2dBundle {
             text: Text::from_section(
                 goal_text,
-                TextStyle {
-                    font: asset_server.load("fonts/4x5.ttf"),
-                    font_size: 5.0,
-                    color: Color::WHITE,
-                },
+                gf::HUD_OBJECTIVE.text_style(&asset_server, Color::WHITE),
             )
-            .with_alignment(TextAlignment::Center),
-            text_anchor: bevy::sprite::Anchor::CenterLeft,
-            transform: Transform::from_translation(Vec3::new(
-                -res.game_width / 2. + 5.5,
-                (GAME_HEIGHT - 15.) / 2. - 52.,
-                3.,
-            )),
+            .with_alignment(TextAlignment::Left),
+            text_anchor: Anchor::CenterLeft,
+            transform: Transform::from_translation(Vec3::new(objective_x, 0., 2.)),
             ..Default::default()
         })
         .insert(GoalText)
         .insert(RenderLayers::from_layers(&[3]))
-        .insert(Name::new("Goal Text"));
+        .insert(Name::new("Goal Text"))
+        .set_parent(progress_parent);
 }

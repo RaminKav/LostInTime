@@ -62,9 +62,7 @@ use crate::{
     },
     proto::proto_param::ProtoParam,
     ui::{
-        damage_numbers::spawn_floating_text_with_shadow,
-        game_fonts::FLOATING_TEXT,
-        CheatSettings,
+        damage_numbers::spawn_floating_text_with_shadow, game_fonts::FLOATING_TEXT, CheatSettings,
     },
     world::{world_helpers::world_pos_to_tile_pos, y_sort::YSort, TileMapPosition, TILE_SIZE},
     CustomFlush, GameParam, GameState, Player, SlimeTempShield, SlimeTempShieldSprite, DEBUG,
@@ -838,7 +836,7 @@ pub fn handle_hits(
 
                 // Shout projectile has much higher knockback
                 let shout_knockback_bonus = if hit.hit_with_projectile == Some(Projectile::Shout) {
-                    800.
+                    2000.
                 } else {
                     0.
                 };

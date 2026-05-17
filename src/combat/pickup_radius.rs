@@ -14,7 +14,7 @@ pub struct PickupRadius(pub f32);
 
 pub const BASE_PICKUP_RADIUS: f32 = 36.0;
 
-/// System that updates pickup radius based on ItemPickupRadius heirloom stacks and equipment
+/// System that updates pickup radius based on pickup range (equipment, Magnet heirloom, etc.)
 pub fn update_pickup_radius(
     mut pickup_radius_query: Query<&mut PickupRadius, With<Player>>,
     pickup_range_attr: Query<&PickupRange, With<Player>>,

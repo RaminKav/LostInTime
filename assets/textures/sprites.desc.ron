@@ -2063,6 +2063,11 @@
             size: (16., 16.),
             anchor: None,
         ),
+        GravityScales: WorldObjectData(
+            texture_pos: (15., 19.),
+            size: (16., 16.),
+            anchor: None,
+        ),
         MagnetPull: WorldObjectData(
             texture_pos: (1., 23.),
             size: (16., 16.),

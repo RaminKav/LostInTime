@@ -70,6 +70,7 @@ pub enum DamageSource {
     SpearGravity,
     ArrowVolley,
     PossessedBlade,
+    Recall,
 
     // Heirloom effects
     Echo,
@@ -117,7 +118,8 @@ impl DamageSource {
             | DamageSource::TeleportShock
             | DamageSource::SpearGravity
             | DamageSource::ArrowVolley
-            | DamageSource::PossessedBlade => DamageSourceCategory::Skill,
+            | DamageSource::PossessedBlade
+            | DamageSource::Recall => DamageSourceCategory::Skill,
 
             DamageSource::Echo
             | DamageSource::IceExplosion
@@ -163,6 +165,7 @@ impl DamageSource {
             DamageSource::SpearGravity => "Grav. Spear",
             DamageSource::ArrowVolley => "Arrow Volley",
             DamageSource::PossessedBlade => "Possessed Blade",
+            DamageSource::Recall => "Shadow Step",
             DamageSource::Echo => "Echo",
             DamageSource::IceExplosion => "Ice Explosion",
             DamageSource::IceFloor => "Ice Floor",
@@ -253,6 +256,7 @@ impl DamageSource {
             Projectile::IceExplosionAOE => Some(DamageSource::IceExplosion),
             Projectile::IceFloor => Some(DamageSource::IceFloor),
             Projectile::TeleportShock => Some(DamageSource::TeleportShock),
+            Projectile::Recall => Some(DamageSource::Recall),
             // Both ThornsProjectile and direct thorns damage merge into Thorns
             Projectile::ThornsProjectile => Some(DamageSource::Thorns),
             Projectile::Lightning => Some(DamageSource::Lightning),

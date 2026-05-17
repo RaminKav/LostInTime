@@ -83,6 +83,21 @@ pub const HUD_PRIMARY: FontStyle = FontStyle {
     path: paths::SLKSCR,
     size: 8.4,
 };
+/// Time-fragment / coin counts in the HUD currency backgrounds.
+pub const HUD_CURRENCY_COUNT: FontStyle = FontStyle {
+    path: paths::ALAGARD,
+    size: 15.0,
+};
+/// Current objective line inside the progress background (left side).
+pub const HUD_OBJECTIVE: FontStyle = FontStyle {
+    path: paths::ALAGARD,
+    size: 15.0,
+};
+/// Score + chaos stack inside the progress background (right side).
+pub const HUD_PROGRESS_STAT: FontStyle = FontStyle {
+    path: paths::SLKSCR,
+    size: 8.5,
+};
 pub const HUD_MICRO: FontStyle = FontStyle {
     path: paths::MONO_4X5,
     size: 5.0,

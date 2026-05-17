@@ -45,6 +45,7 @@ mod active_skill_shrine_ui;
 mod interactions;
 mod inventory_ui;
 pub mod minimap;
+pub mod hud_bar_fill;
 mod player_hud;
 mod player_movement_cooldown_bar;
 mod skill_choice_ui;
@@ -137,7 +138,7 @@ pub const INVENTORY_EQUIPMENT_UI_SIZE: Vec2 = Vec2::new(130., 140.);
 /// Side panel that replaces the stats tooltip in `UIState::InventoryCrafting`.
 /// Matches the art height of the stats panel so it occupies the same slot on-screen.
 pub const INVENTORY_BLUEPRINT_UI_SIZE: Vec2 = Vec2::new(192., 312.);
-pub const INVENTORY_Y_OFFSET: f32 =  -2.;
+pub const INVENTORY_Y_OFFSET: f32 = -22.;
 /// Pixel extent of the main item slot grid (4 columns × 7 rows).
 pub const INVENTORY_GRID_COLS: usize = 4;
 pub const SKILLS_CHOICE_UI_SIZE: Vec2 = Vec2::new(164., 191.);
@@ -206,9 +207,11 @@ pub const INV_FURNACE_SLOT_0: Vec2 = Vec2::new(176., -46.);
 /// but they are not rendered in the HUD.
 pub const HUD_HOTBAR_SLOTS: usize = 4;
 
-/// Shared y (offset from the screen bottom) for the single HUD action row that holds
-/// both the class-skill icons and the hotbar slots.
-pub const HUD_ACTION_ROW_Y_FROM_BOTTOM: f32 = 14.0;
+/// Y offset from the screen bottom for the `HudBar` frame sprite.
+pub const HUD_FRAME_Y_FROM_BOTTOM: f32 = 26.0;
+
+/// Shared y (offset from the screen bottom) for the hotbar + class-skill icon row.
+pub const HUD_ACTION_ROW_Y_FROM_BOTTOM: f32 = 24.0;
 
 /// Center x of the 4-slot hotbar group (left side of the action row).
 pub const HUD_HOTBAR_CENTER_X: f32 = -65.0;
@@ -218,6 +221,70 @@ pub const HUD_SKILLS_CENTER_X: f32 = 65.0;
 
 /// Center-to-center spacing between class-skill icons.
 pub const HUD_SKILL_SPACING_X: f32 = 31.0;
+
+/// `assets/ui/ProgressBackground.png` draw size.
+pub const PROGRESS_BACKGROUND_SIZE: Vec2 = Vec2::new(233., 30.);
+
+/// `assets/ui/CurrencyBackground.png` draw size.
+pub const CURRENCY_BACKGROUND_SIZE: Vec2 = Vec2::new(62., 23.);
+
+/// Gap between the two currency background sprites in the HUD row below the XP bar.
+pub const HUD_CURRENCY_BACKGROUND_GAP: f32 = 10.;
+
+/// World-space Y for the HUD row (currency backgrounds + progress bar) sitting just under the XP bar.
+pub fn hud_row_below_xp_y(game_height: f32) -> f32 {
+    // XP bar center ≈ `game_height/2 - 3`, height 6 → bottom at `gh/2 - 6`; leave ~8px gap then
+    // center the 30px-tall progress / 23px-tall currency art on that band.
+    game_height * 0.5 - 25.
+}
+
+/// Inset from the right screen edge (`game_width / 2`) for the era-timer background's right side.
+pub const HUD_ERA_TIMER_RIGHT_INSET: f32 = 80.0;
+
+/// Default era-timer background width at setup (matches `setup_era_timer_hud`).
+pub const HUD_ERA_TIMER_DEFAULT_WIDTH: f32 = 42.0;
+
+/// Center-to-center X distance between the clock and era timer (legacy layout:
+/// clock at `17.5` and timer at `50.5` from the left screen edge).
+pub const HUD_CLOCK_TO_ERA_TIMER_CENTER_OFFSET: f32 = 33.0;
+
+/// Era-timer background center X so its right edge sits `HUD_ERA_TIMER_RIGHT_INSET` from the screen edge.
+pub fn hud_era_timer_center_x(game_width: f32, timer_width: f32) -> f32 {
+    game_width * 0.5 - HUD_ERA_TIMER_RIGHT_INSET - timer_width * 0.5
+}
+
+/// Clock center X: fixed spacing left of the era timer (same separation as before the HUD row move).
+pub fn hud_clock_center_x(game_width: f32, timer_width: f32) -> f32 {
+    hud_era_timer_center_x(game_width, timer_width) - HUD_CLOCK_TO_ERA_TIMER_CENTER_OFFSET
+}
+
+/// Gap between the bottom of the progress bar row and the heirloom icon row.
+pub const HUD_HEIRLOOM_ROW_GAP_BELOW_PROGRESS: f32 = 8.0;
+
+/// Heirloom HUD icon half-size (sprites are 16×16).
+pub const HUD_HEIRLOOM_ICON_HALF: f32 = 8.0;
+
+pub const HUD_HEIRLOOM_ICON_SPACING: f32 = 16.0;
+
+/// Extra inset from the left screen edge to the first heirloom icon center (beyond icon half-width).
+pub const HUD_HEIRLOOM_LEFT_PADDING: f32 = 4.0;
+
+/// Nudge the heirloom row upward from its default position below the progress bar.
+pub const HUD_HEIRLOOM_ROW_Y_NUDGE: f32 = 10.0;
+
+/// World-space Y for the heirloom icon row (below the progress / currency HUD row).
+pub fn hud_heirloom_row_y(game_height: f32) -> f32 {
+    hud_row_below_xp_y(game_height)
+        - PROGRESS_BACKGROUND_SIZE.y * 0.5
+        - HUD_HEIRLOOM_ROW_GAP_BELOW_PROGRESS
+        - HUD_HEIRLOOM_ICON_HALF
+        + HUD_HEIRLOOM_ROW_Y_NUDGE
+}
+
+/// First heirloom icon center X (near the left screen edge).
+pub fn hud_heirloom_first_icon_x(game_width: f32) -> f32 {
+    -game_width * 0.5 + HUD_HEIRLOOM_ICON_HALF + HUD_HEIRLOOM_LEFT_PADDING
+}
 
 /// Parent offset when the inventory UI is in crafting mode (whole panel nudge).
 pub const INV_UI_PARENT_OFFSET_CRAFTING: Vec2 = Vec2::new(0., -4.);
@@ -347,6 +414,7 @@ impl Plugin for UIPlugin {
             .add_event::<GrantHeirloomDevEvent>()
             .add_event::<HeirloomTooltipRequest>()
             .add_plugin(Material2dPlugin::<ScreenEffectMaterial>::default())
+            .add_plugin(hud_bar_fill::HudBarFillPlugin)
             .register_type::<InventorySlotState>()
             .add_plugin(MinimapPlugin)
             .add_plugin(TipPlugin)
@@ -459,9 +527,11 @@ impl Plugin for UIPlugin {
             )
             .add_systems(
                 (
-                    setup_hotbar_hud.run_if(run_once_per_run()),
-                    setup_xp_bar_ui.after(load_state).run_if(run_once_per_run()),
                     setup_bars_ui.after(load_state).run_if(run_once_per_run()),
+                    setup_hotbar_hud
+                        .after(setup_bars_ui)
+                        .run_if(run_once_per_run()),
+                    setup_xp_bar_ui.after(load_state).run_if(run_once_per_run()),
                     setup_currency_ui.run_if(run_once_per_run()),
                     setup_clock_hud.run_if(run_once_per_run()),
                     setup_era_timer_hud.run_if(run_once_per_run()),
@@ -538,9 +608,7 @@ impl Plugin for UIPlugin {
                     text_update_system,
                     add_inv_to_new_scrapper_objs,
                     add_container_to_new_furnace_objs,
-                    update_foodbar,
                     update_healthbar,
-                    update_shieldbar,
                     change_ui_state_to_crafting_when_resource_added
                         .before(CustomFlush)
                         .run_if(resource_added::<CraftingContainer>()),
@@ -786,6 +854,10 @@ impl Plugin for UIPlugin {
                     .in_set(OnUpdate(GameState::Main)),
             )
             .add_system(
+                update_minimap_keybind_text
+                    .in_set(OnUpdate(GameState::Main)),
+            )
+            .add_system(
                 update_hotbar_keybind_text
                     .in_set(OnUpdate(GameState::Main)),
             )
@@ -874,6 +946,10 @@ impl Plugin for UIPlugin {
                     toggle_skills_visibility,
                     toggle_item_chest_visibility.run_if(resource_exists::<ItemChestState>()),
                     update_mana_bar,
+                    player_hud::update_pet_skill_hud_slot,
+                    player_hud::tick_pet_skill_cooldown_overlay,
+                    player_hud::handle_pet_skill_hud_tooltip
+                        .after(player_hud::update_pet_skill_hud_slot),
                     spawn_tile_hover_on_cursor_move,
                 )
                     .in_set(OnUpdate(GameState::Main)),
@@ -951,13 +1027,23 @@ impl Plugin for UIPlugin {
                 update_skill_unlock_confirm_panel.run_if(in_state(UIState::ClassSelection)),
                 handle_portal_animation.run_if(in_state(UIState::ClassSelection)),
             ))
-            .add_system(init_goal_state.run_if(run_once_per_run()).in_schedule(OnEnter(GameState::Main)))
-            .add_system(display_goal_text.run_if(resource_added::<GoalState>()).in_schedule(OnEnter(GameState::Main)))
+            .add_system(
+                init_goal_state
+                    .after(setup_currency_ui)
+                    .run_if(run_once_per_run())
+                    .in_schedule(OnEnter(GameState::Main)),
+            )
+            .add_system(
+                display_goal_text
+                    .after(setup_currency_ui)
+                    .run_if(resource_added::<GoalState>())
+                    .in_schedule(OnEnter(GameState::Main)),
+            )
             .add_systems(
                 (
                     handle_goal_state_updates,
                     handle_goal_reset_on_era_change,
-                    display_goal_text,
+                    display_goal_text.after(setup_currency_ui),
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )

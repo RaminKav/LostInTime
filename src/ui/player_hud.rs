@@ -5,7 +5,11 @@ use std::collections::HashMap;
 
 use super::{
     damage_numbers::spawn_text,
-    heirloom_tooltip::{HeirloomTooltipRequest, HeirloomTooltipShow},
+    heirloom_tooltip::{
+        heirloom_hud_hover_tooltip_position, HeirloomTooltipRequest, HeirloomTooltipShow,
+    },
+    hud_clock_center_x, hud_era_timer_center_x, hud_heirloom_first_icon_x, hud_heirloom_row_y,
+    hud_row_below_xp_y,
     interactions::{DraggedItem, Interaction},
     spawn_inv_slot, spawn_item_stack_icon,
     tooltips::spawn_world_item_tooltip_for_stack,
@@ -14,23 +18,24 @@ use super::{
         get_key_size_and_element, spawn_keybind_badge, Z_DEPTH_HUD_ACTIVE_SKILLS,
         Z_DEPTH_HUD_HEIRLOOM_ICONS,
     },
-    InventorySlotType, InventoryState, InventoryUI, UIElement, UIState,
-    HUD_ACTION_ROW_Y_FROM_BOTTOM, HUD_HOTBAR_SLOTS, HUD_SKILLS_CENTER_X, HUD_SKILL_SPACING_X,
+    InventorySlotType, InventoryState, InventoryUI, UIElement, UIState, CURRENCY_BACKGROUND_SIZE,
+    HUD_ACTION_ROW_Y_FROM_BOTTOM, HUD_CURRENCY_BACKGROUND_GAP, HUD_ERA_TIMER_DEFAULT_WIDTH,
+    HUD_FRAME_Y_FROM_BOTTOM, HUD_HEIRLOOM_ICON_SPACING, HUD_HOTBAR_SLOTS, HUD_SKILLS_CENTER_X,
+    HUD_SKILL_SPACING_X, PROGRESS_BACKGROUND_SIZE,
 };
 use crate::{
     assets::Graphics,
     attributes::{
-        attribute_helpers::skill_power_multiplier, hunger::Hunger, ActiveConsumableBuffs,
-        AttackCooldown, CritChance, CurrentHealth, CurrentMana, CurrentShield, MaxHealth, MaxMana,
-        MaxShield, SkillPower, Speed,
+        attribute_helpers::skill_power_multiplier, ActiveConsumableBuffs, AttackCooldown,
+        CritChance, CurrentHealth, CurrentMana, MaxHealth, MaxMana, SkillPower, Speed,
     },
     audio::{AudioSoundEffect, SoundSpawner},
     blessings::OwnedBlessings,
     chaos::ChaosTracker,
     client::GameOverEvent,
     colors::{
-        overwrite_alpha, BLACK, BLUE, DARK_WOOD_BROWN, LEVEL_BLUE, LEVEL_DARK_BLUE, LIGHT_GREEN,
-        LIGHT_GREY, ORANGE, RED, SHIELD_BLUE, TOOLTIP_BLACK, WHITE, YELLOW,
+        overwrite_alpha, BLACK, DARK_WOOD_BROWN, LEVEL_BLUE, LEVEL_DARK_BLUE, LIGHT_GREY, RED,
+        TOOLTIP_BLACK, WHITE, YELLOW,
     },
     cursor::CursorPos,
     inventory::{Inventory, ItemStack},
@@ -57,11 +62,15 @@ aseprite!(pub Clock, "ui/Clock.aseprite");
 #[derive(Component)]
 pub struct HealthBar;
 #[derive(Component)]
-pub struct ShieldBar;
-#[derive(Component)]
-pub struct FoodBar;
+pub struct HealthBarText;
 #[derive(Component)]
 pub struct ManaBar;
+#[derive(Component)]
+pub struct ManaBarText;
+
+/// Marker for the new bottom HUD frame sprite (replaces the old top "bars" frame).
+#[derive(Component)]
+pub struct HudFrame;
 #[derive(Component)]
 pub struct XPBar;
 #[derive(Component)]
@@ -96,6 +105,14 @@ pub struct CoinIcon;
 pub struct CoinText;
 #[derive(Component)]
 pub struct ScoreText;
+
+/// Center-screen progress / objective bar (`ProgressBackground.png`).
+#[derive(Component)]
+pub struct ProgressHudBar;
+
+/// One of the two currency count backgrounds below the XP bar.
+#[derive(Component)]
+pub struct CurrencyHudBackground;
 
 #[derive(Component)]
 pub struct ClockHUD;
@@ -155,6 +172,15 @@ pub struct InventoryKeybindText;
 pub struct InventoryKeyBackground;
 
 #[derive(Component)]
+pub struct MinimapKeybindText;
+
+#[derive(Component)]
+pub struct MinimapKeyBackground;
+
+/// Center-to-center spacing between the minimap and inventory HUD corner icons.
+const HUD_MINIMAP_ICON_LEFT_OF_BAG: f32 = 28.0;
+
+#[derive(Component)]
 pub struct HotbarKeybindText {
     pub slot: usize,
 }
@@ -186,7 +212,17 @@ pub struct SkillChargeText {
     pub slot: usize, // Which skill slot this text is for (1 or 2)
 }
 
-const INNER_HUD_BAR_SIZE: Vec2 = Vec2::new(66.0, 4.0);
+/// Size of the new HUD frame sprite (`assets/ui/HudBar.png`).
+pub const HUD_FRAME_SIZE: Vec2 = Vec2::new(334.0, 56.0);
+
+/// Pixel size of a single HP/mana fill texture (`HpBarFill.png` / `ManaBarFill.png`).
+pub const HUD_FILL_PIXEL_SIZE: Vec2 = Vec2::new(28.0, 34.0);
+
+/// Horizontal offset (from the frame's center) of each semicircular fill region's center.
+/// The 28×34 fill texture sits inside the cap of the frame, nudged ~8px inward from the
+/// outer edge so the liquid is centered on the visible cap interior rather than the
+/// outermost pixel column.
+pub const HUD_FILL_X_OFFSET: f32 = HUD_FRAME_SIZE.x * 0.5 - HUD_FILL_PIXEL_SIZE.x * 0.5 - 7.0;
 
 #[derive(Component)]
 pub struct BarFlashTimer {
@@ -200,132 +236,118 @@ pub struct FlashExpBarEvent {
     pub did_level: bool,
 }
 
-pub fn setup_bars_ui(mut commands: Commands, graphics: Res<Graphics>, res: Res<ScreenResolution>) {
+/// Spawns the new bottom HUD frame plus shader-driven HP/mana fills that sit inside the
+/// two semicircular caps of the frame. The fills use [`HudBarFillMaterial`] so the
+/// non-rectangular silhouette is respected automatically and the liquid surface line is
+/// highlighted in-shader.
+///
+/// All four legacy inner sprite bars (HP / shield / mana / food) and their old frame
+/// asset have been removed. Shield + food visualizations are gone entirely; their
+/// underlying stats are unaffected.
+pub fn setup_bars_ui(
+    mut commands: Commands,
+    graphics: Res<Graphics>,
+    asset_server: Res<AssetServer>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<crate::ui::hud_bar_fill::HudBarFillMaterial>>,
+    res: Res<ScreenResolution>,
+    player_stats: Query<(&CurrentHealth, &CurrentMana), With<Player>>,
+) {
+    use crate::ui::hud_bar_fill::HudBarFillMaterial;
+    use bevy::sprite::{MaterialMesh2dBundle, Mesh2dHandle};
+
+    let row_y = -res.game_height * 0.5 + HUD_FRAME_Y_FROM_BOTTOM;
+    let bar_label_style = gf::HUD_CURRENCY_COUNT.text_style(&asset_server, WHITE);
+    let (hp_amount, mana_amount) = player_stats
+        .get_single()
+        .map(|(hp, mana)| (hp.0, mana.0))
+        .unwrap_or((0, 0));
+
     let hud_bar_frame = commands
         .spawn(SpriteBundle {
-            texture: graphics.get_ui_element_texture(UIElement::PlayerHUDBars),
-
+            texture: graphics.get_ui_element_texture(UIElement::HudBar),
             sprite: Sprite {
-                custom_size: Some(Vec2::new(85., 48.)),
+                custom_size: Some(HUD_FRAME_SIZE),
                 ..Default::default()
             },
-            transform: Transform {
-                translation: Vec3::new(
-                    (-res.game_width + 90.) / 2.,
-                    (res.game_height - 15.) / 2. - 23.,
-                    5.,
-                ),
-                scale: Vec3::new(1., 1., 1.),
-                ..Default::default()
-            },
+            // Z below `Z_DEPTH_HUD_ACTIVE_SKILLS` (4.0) so the hotbar / skill slot
+            // backgrounds and their icons render on top of the frame. The HP/mana fill
+            // children below add small local Z offsets to stack on top of the frame.
+            transform: Transform::from_translation(Vec3::new(0., row_y, 1.)),
             ..Default::default()
         })
         .insert(Name::new("HUD FRAME"))
+        .insert(HudFrame)
         .insert(RenderLayers::from_layers(&[3]))
         .id();
-    let inner_health = commands
-        .spawn(SpriteBundle {
-            sprite: Sprite {
-                color: RED,
-                custom_size: Some(INNER_HUD_BAR_SIZE),
-                anchor: Anchor::CenterLeft,
-                ..default()
-            },
-            transform: Transform {
-                translation: Vec3::new(-26., 17., -2.),
-                scale: Vec3::new(1., 1., 1.),
-                ..Default::default()
-            },
+
+    // Shader-driven HP/mana fills sitting inside the two semicircular caps.
+    // Z is slightly above the frame so the liquid renders on top of the dark cap interior.
+    let hp_mesh: Mesh2dHandle = meshes
+        .add(Mesh::from(shape::Quad::new(HUD_FILL_PIXEL_SIZE)))
+        .into();
+    let hp_material = materials.add(HudBarFillMaterial::new(
+        asset_server.load("ui/HpBarFill.png"),
+        1.0,
+        HUD_FILL_PIXEL_SIZE.y as u32,
+    ));
+    let hp_fill = commands
+        .spawn(MaterialMesh2dBundle {
+            mesh: hp_mesh,
+            material: hp_material,
+            transform: Transform::from_translation(Vec3::new(-HUD_FILL_X_OFFSET, 0.0, 1.0)),
             ..default()
-        })
-        .insert(BarFlashTimer {
-            timer: Timer::from_seconds(0.1, TimerMode::Once),
-            flash_color: WHITE,
-            color: RED,
         })
         .insert(RenderLayers::from_layers(&[3]))
         .insert(HealthBar)
-        .insert(Name::new("inner health bar"))
+        .insert(Name::new("HUD HP FILL"))
         .id();
-    let inner_shield = commands
-        .spawn(SpriteBundle {
-            sprite: Sprite {
-                color: SHIELD_BLUE,
-                custom_size: Some(INNER_HUD_BAR_SIZE),
-                anchor: Anchor::CenterLeft,
-                ..default()
-            },
-            transform: Transform {
-                translation: Vec3::new(-26., 17., -1.),
-                scale: Vec3::new(1., 1., 1.),
-                ..Default::default()
-            },
+    commands
+        .spawn(Text2dBundle {
+            text: Text::from_section(format!("{hp_amount}"), bar_label_style.clone()),
+            text_anchor: Anchor::Center,
+            transform: Transform::from_translation(Vec3::new(0., 0., 2.)),
             ..default()
-        })
-        .insert(BarFlashTimer {
-            timer: Timer::from_seconds(0.1, TimerMode::Once),
-            flash_color: WHITE,
-            color: SHIELD_BLUE,
         })
         .insert(RenderLayers::from_layers(&[3]))
-        .insert(ShieldBar)
-        .insert(Name::new("inner shield bar"))
-        .id();
-    let inner_mana = commands
-        .spawn(SpriteBundle {
-            sprite: Sprite {
-                color: BLUE,
-                custom_size: Some(INNER_HUD_BAR_SIZE),
-                anchor: Anchor::CenterLeft,
-                ..default()
-            },
-            transform: Transform {
-                translation: Vec3::new(-26., 9., -1.),
-                scale: Vec3::new(1., 1., 1.),
-                ..Default::default()
-            },
+        .insert(HealthBarText)
+        .insert(Name::new("HUD HP TEXT"))
+        .set_parent(hp_fill);
+
+    let mana_mesh: Mesh2dHandle = meshes
+        .add(Mesh::from(shape::Quad::new(HUD_FILL_PIXEL_SIZE)))
+        .into();
+    let mana_material = materials.add(HudBarFillMaterial::new(
+        asset_server.load("ui/ManaBarFill.png"),
+        1.0,
+        HUD_FILL_PIXEL_SIZE.y as u32,
+    ));
+    let mana_fill = commands
+        .spawn(MaterialMesh2dBundle {
+            mesh: mana_mesh,
+            material: mana_material,
+            transform: Transform::from_translation(Vec3::new(HUD_FILL_X_OFFSET, 0.0, 1.0)),
             ..default()
-        })
-        .insert(BarFlashTimer {
-            timer: Timer::from_seconds(0.2, TimerMode::Once),
-            flash_color: WHITE,
-            color: BLUE,
         })
         .insert(RenderLayers::from_layers(&[3]))
         .insert(ManaBar)
-        .insert(Name::new("inner mana bar"))
+        .insert(Name::new("HUD MANA FILL"))
         .id();
-    let inner_food = commands
-        .spawn(SpriteBundle {
-            sprite: Sprite {
-                color: YELLOW,
-                custom_size: Some(INNER_HUD_BAR_SIZE),
-                anchor: Anchor::CenterLeft,
-                ..default()
-            },
-            transform: Transform {
-                translation: Vec3::new(-26., 1., -1.),
-                scale: Vec3::new(1., 1., 1.),
-                ..Default::default()
-            },
+    commands
+        .spawn(Text2dBundle {
+            text: Text::from_section(format!("{mana_amount}"), bar_label_style),
+            text_anchor: Anchor::Center,
+            transform: Transform::from_translation(Vec3::new(0., 0., 2.)),
             ..default()
         })
-        .insert(BarFlashTimer {
-            timer: Timer::from_seconds(0.2, TimerMode::Once),
-            flash_color: WHITE,
-            color: YELLOW,
-        })
         .insert(RenderLayers::from_layers(&[3]))
-        .insert(FoodBar)
-        .insert(Name::new("inner food bar"))
-        .id();
+        .insert(ManaBarText)
+        .insert(Name::new("HUD MANA TEXT"))
+        .set_parent(mana_fill);
 
-    commands.entity(hud_bar_frame).push_children(&[
-        inner_health,
-        inner_food,
-        inner_mana,
-        inner_shield,
-    ]);
+    commands
+        .entity(hud_bar_frame)
+        .push_children(&[hp_fill, mana_fill]);
 }
 
 pub fn setup_xp_bar_ui(
@@ -381,7 +403,7 @@ pub fn setup_xp_bar_ui(
     let level_frame = commands
         .spawn(SpriteBundle {
             sprite: Sprite {
-                color: overwrite_alpha(Color::rgba(0.1, 0.1, 0.1, 0.7), 0.),
+                color: overwrite_alpha(Color::rgba(0.1, 0.1, 0.1, 0.85), 0.),
                 custom_size: Some(Vec2::new(46., 11.)),
                 ..default()
             },
@@ -430,6 +452,8 @@ pub fn setup_xp_bar_ui(
     //     .entity(xp_bar_frame)
     //     .push_children(&[inner_xp_prog, text]);
 }
+/// Spawns the HUD row just below the XP bar: two currency backgrounds (time fragments +
+/// coins) on the left, and the centered progress background (objective + score/chaos).
 pub fn setup_currency_ui(
     mut commands: Commands,
     currency: Res<TimeFragmentCurrency>,
@@ -437,150 +461,202 @@ pub fn setup_currency_ui(
     asset_server: Res<AssetServer>,
     res: Res<ScreenResolution>,
     coins: Res<CoinCurrency>,
+    chaos_tracker: Res<ChaosTracker>,
+    infinite_mode: Res<InfiniteMode>,
     keybinds: Res<InputMappings>,
 ) {
-    let time_fragments = currency.as_ref();
-    let text = commands
-        .spawn((
-            Text2dBundle {
-                text: Text::from_section(
-                    format!("{:}", time_fragments.time_fragments.max(0)),
-                    TextStyle {
-                        font: asset_server.load("fonts/slkscr.ttf"),
-                        font_size: 8.4,
-                        color: BLACK,
-                    },
-                ),
-                text_anchor: Anchor::CenterLeft,
-                transform: Transform {
-                    translation: Vec3::new(
-                        -res.game_width / 2. + 13.,
-                        res.game_height / 2. - 46.,
-                        6.,
-                    ),
-                    scale: Vec3::new(1., 1., 1.),
-                    ..Default::default()
-                },
-                ..default()
-            },
-            Name::new("TIME FRAGMENTS TEXT"),
-            CurrencyText,
-            TimeFragmentText,
-            RenderLayers::from_layers(&[3]),
-        ))
-        .id();
-    let stack = spawn_item_stack_icon(
-        &mut commands,
-        &graphics,
-        &ItemStack::crate_icon_stack(WorldObject::TimeFragment),
-        &asset_server,
-        Vec2::new(-5., 0.),
-        Vec2::new(0., 0.),
-        3,
-    );
-    commands
-        .entity(stack)
-        .insert(TimeFragmentIcon)
-        .set_parent(text);
+    let row_y = hud_row_below_xp_y(res.game_height);
+    let currency_style = gf::HUD_CURRENCY_COUNT.text_style(&asset_server, WHITE);
+    let progress_stat_style = gf::HUD_PROGRESS_STAT.text_style(&asset_server, WHITE);
 
-    let coin_text = commands
-        .spawn((
-            Text2dBundle {
-                text: Text::from_section(
-                    format!("{:}", coins.coins),
-                    TextStyle {
-                        font: asset_server.load("fonts/slkscr.ttf"),
-                        font_size: 8.4,
-                        color: BLACK,
-                    },
-                ),
-                text_anchor: Anchor::CenterLeft,
-                transform: Transform {
-                    translation: Vec3::new(
-                        -res.game_width / 2. + 44.,
-                        res.game_height / 2. - 46.,
-                        6.,
-                    ),
-                    scale: Vec3::new(1., 1., 1.),
-                    ..Default::default()
-                },
-                ..default()
-            },
-            Name::new("COIN TEXT"),
-            CurrencyText,
-            CoinText,
-            RenderLayers::from_layers(&[3]),
-        ))
-        .id();
-    let coin_stack = spawn_item_stack_icon(
-        &mut commands,
-        &graphics,
-        &ItemStack::crate_icon_stack(WorldObject::Coin),
-        &asset_server,
-        Vec2::new(-5., -1.),
-        Vec2::new(0., 0.),
-        3,
-    );
-    commands
-        .entity(coin_stack)
-        .insert(CoinIcon)
-        .set_parent(coin_text);
+    let half_currency = CURRENCY_BACKGROUND_SIZE.x * 0.5;
+    let first_center_x = -res.game_width * 0.5 + half_currency + 4.;
+    let second_center_x = first_center_x + CURRENCY_BACKGROUND_SIZE.x + HUD_CURRENCY_BACKGROUND_GAP;
 
-    // SCORE TEXT
-    let score_timer_frame = commands
+    // Time fragments slot
+    {
+        let bg = commands
+            .spawn(SpriteBundle {
+                texture: graphics.get_ui_element_texture(UIElement::CurrencyBackground),
+                sprite: Sprite {
+                    custom_size: Some(CURRENCY_BACKGROUND_SIZE),
+                    ..default()
+                },
+                transform: Transform::from_translation(Vec3::new(first_center_x, row_y, 3.)),
+                ..default()
+            })
+            .insert(RenderLayers::from_layers(&[3]))
+            .insert(CurrencyHudBackground)
+            .insert(Name::new("TIME FRAGMENT CURRENCY BG"))
+            .id();
+
+        let text = commands
+            .spawn((
+                Text2dBundle {
+                    text: Text::from_section(
+                        format!("{}", currency.time_fragments.max(0)),
+                        currency_style.clone(),
+                    )
+                    .with_alignment(TextAlignment::Center),
+                    text_anchor: Anchor::CenterLeft,
+                    transform: Transform::from_translation(Vec3::new(-12., 0., 2.)),
+                    ..default()
+                },
+                Name::new("TIME FRAGMENTS TEXT"),
+                CurrencyText,
+                TimeFragmentText,
+                RenderLayers::from_layers(&[3]),
+            ))
+            .id();
+        let stack = spawn_item_stack_icon(
+            &mut commands,
+            &graphics,
+            &ItemStack::crate_icon_stack(WorldObject::TimeFragment),
+            &asset_server,
+            Vec2::new(-8., 1.),
+            Vec2::ZERO,
+            3,
+        );
+        commands
+            .entity(stack)
+            .insert(TimeFragmentIcon)
+            .set_parent(text);
+        commands.entity(text).set_parent(bg);
+    }
+
+    // Coins slot
+    {
+        let bg = commands
+            .spawn(SpriteBundle {
+                texture: graphics.get_ui_element_texture(UIElement::CurrencyBackground),
+                sprite: Sprite {
+                    custom_size: Some(CURRENCY_BACKGROUND_SIZE),
+                    ..default()
+                },
+                transform: Transform::from_translation(Vec3::new(second_center_x, row_y, 5.)),
+                ..default()
+            })
+            .insert(RenderLayers::from_layers(&[3]))
+            .insert(CurrencyHudBackground)
+            .insert(Name::new("COIN CURRENCY BG"))
+            .id();
+
+        let coin_text = commands
+            .spawn((
+                Text2dBundle {
+                    text: Text::from_section(format!("{}", coins.coins), currency_style)
+                        .with_alignment(TextAlignment::Center),
+                    text_anchor: Anchor::CenterLeft,
+                    transform: Transform::from_translation(Vec3::new(-12., 0., 2.)),
+                    ..default()
+                },
+                Name::new("COIN TEXT"),
+                CurrencyText,
+                CoinText,
+                RenderLayers::from_layers(&[3]),
+            ))
+            .id();
+        let coin_stack = spawn_item_stack_icon(
+            &mut commands,
+            &graphics,
+            &ItemStack::crate_icon_stack(WorldObject::Coin),
+            &asset_server,
+            Vec2::new(-8., 1.),
+            Vec2::ZERO,
+            3,
+        );
+        commands
+            .entity(coin_stack)
+            .insert(CoinIcon)
+            .set_parent(coin_text);
+        commands.entity(coin_text).set_parent(bg);
+    }
+
+    // Center progress bar — objective text is spawned by `display_goal_text` as a child.
+    let progress_bar = commands
         .spawn(SpriteBundle {
+            texture: graphics.get_ui_element_texture(UIElement::ProgressBackground),
             sprite: Sprite {
-                color: Color::rgba(0.1, 0.1, 0.1, 0.7),
-                custom_size: Some(Vec2::new(70., 26.)),
+                custom_size: Some(PROGRESS_BACKGROUND_SIZE),
                 ..default()
             },
-            transform: Transform {
-                translation: Vec3::new(
-                    32., -8., // Right of the clock
-                    -1.,
-                ),
-                ..Default::default()
-            },
+            transform: Transform::from_translation(Vec3::new(0., row_y + 2., 5.)),
             ..default()
         })
         .insert(RenderLayers::from_layers(&[3]))
+        .insert(ProgressHudBar)
+        .insert(Name::new("PROGRESS HUD BAR"))
         .id();
+
+    let chaos_value = chaos_tracker.get_chaos() + infinite_mode.get_chaos_bonus();
+    let progress_right_x = PROGRESS_BACKGROUND_SIZE.x * 0.5 - 80.;
+
     commands
         .spawn((
             Text2dBundle {
-                text: Text::from_section(
-                    format!("Score: {:}", 0),
-                    TextStyle {
-                        font: asset_server.load("fonts/slkscr.ttf"),
-                        font_size: 8.4,
-                        color: WHITE,
-                    },
-                ),
+                text: Text::from_section("Score: 0", progress_stat_style.clone()),
                 text_anchor: Anchor::CenterLeft,
-                transform: Transform {
-                    translation: Vec3::new(
-                        -res.game_width / 2. + 4.,
-                        res.game_height / 2. - 101.,
-                        6.,
-                    ),
-                    scale: Vec3::new(1., 1., 1.),
-                    ..Default::default()
-                },
+                transform: Transform::from_translation(Vec3::new(progress_right_x, 4., 2.)),
                 ..default()
             },
             Name::new("SCORE TEXT"),
             ScoreText,
             RenderLayers::from_layers(&[3]),
         ))
-        .add_child(score_timer_frame);
+        .set_parent(progress_bar);
 
-    // INVENTORY ICON
+    commands
+        .spawn((
+            Text2dBundle {
+                text: Text::from_section(format!("Chaos: {:.1}", chaos_value), progress_stat_style),
+                text_anchor: Anchor::CenterLeft,
+                transform: Transform::from_translation(Vec3::new(progress_right_x, -5., 2.)),
+                ..default()
+            },
+            ChaosText,
+            RenderLayers::from_layers(&[3]),
+            Name::new("CHAOS TEXT"),
+        ))
+        .set_parent(progress_bar);
+
+    // Minimap + inventory icons (bottom-right HUD corner).
+    let corner_y = -res.game_height / 2. + 12.;
+    let bag_x = res.game_width / 2. - 80.;
+    let map_x = bag_x - HUD_MINIMAP_ICON_LEFT_OF_BAG;
+
+    let map_icon = spawn_item_stack_icon(
+        &mut commands,
+        &graphics,
+        &ItemStack::crate_icon_stack(WorldObject::YellowBeaconBlock),
+        &asset_server,
+        Vec2::new(map_x, corner_y),
+        Vec2::ZERO,
+        3,
+    );
+    commands
+        .entity(map_icon)
+        .insert(Name::new("MINIMAP HUD ICON"));
+
+    let minimap_key = keybinds.get_minimap_key();
+    let (map_key_bg, map_key_text) = spawn_keybind_badge(
+        &mut commands,
+        &graphics,
+        &asset_server,
+        minimap_key,
+        map_icon,
+        Vec3::new(-0.5, 13., 1.),
+        Vec3::new(0., 0., 1.),
+        3,
+    );
+    commands.entity(map_key_bg).insert(MinimapKeyBackground);
+    commands.entity(map_key_text).insert(MinimapKeybindText);
+
     let bag_icon = spawn_item_stack_icon(
         &mut commands,
         &graphics,
         &ItemStack::crate_icon_stack(WorldObject::InventoryBag),
         &asset_server,
-        Vec2::new(140.5, -res.game_height / 2. + 8.),
+        Vec2::new(bag_x, corner_y),
         Vec2::new(0., 0.),
         3,
     );
@@ -600,142 +676,22 @@ pub fn setup_currency_ui(
     commands.entity(key_text).insert(InventoryKeybindText);
 }
 
-pub fn setup_chaos_ui(
-    mut commands: Commands,
-    asset_server: Res<AssetServer>,
-    res: Res<ScreenResolution>,
-    chaos_tracker: Res<ChaosTracker>,
-    infinite_mode: Res<InfiniteMode>,
-) {
-    // Chaos text
-    let chaos_text = commands
-        .spawn((
-            Text2dBundle {
-                text: Text::from_section(
-                    format!(
-                        "Chaos: {:.1}",
-                        chaos_tracker.get_chaos() + infinite_mode.get_chaos_bonus()
-                    ),
-                    TextStyle {
-                        font: asset_server.load("fonts/slkscr.ttf"),
-                        font_size: 8.4,
-                        color: WHITE,
-                    },
-                ),
-                text_anchor: Anchor::CenterLeft,
-                transform: Transform {
-                    translation: Vec3::new(
-                        -res.game_width / 2. + 4.,
-                        res.game_height / 2. - 111.,
-                        6.,
-                    ),
-                    ..Default::default()
-                },
-                ..default()
-            },
-            ChaosText,
-            RenderLayers::from_layers(&[3]),
-            Name::new("CHAOS TEXT"),
-        ))
-        .id();
-
-    // Chaos bar background (empty bar frame)
-    let _bar_bg = commands
-        .spawn(SpriteBundle {
-            sprite: Sprite {
-                color: Color::rgba(0.2, 0.2, 0.2, 0.8),
-                custom_size: Some(Vec2::new(40., 2.)),
-                anchor: Anchor::CenterLeft,
-                ..default()
-            },
-            transform: Transform {
-                translation: Vec3::new(0., -6., 0.),
-                ..Default::default()
-            },
-            ..default()
-        })
-        .insert(RenderLayers::from_layers(&[3]))
-        .set_parent(chaos_text)
-        .id();
-
-    // Chaos bar fill
-    let chaos_value = chaos_tracker.get_chaos();
-    let fill_percent = (chaos_value / 40.0).min(1.0);
-    let fill_width = 40.0 * fill_percent;
-
-    // Color blend: green (0) -> yellow (13.33) -> orange (26.67) -> red (40)
-    let bar_color = if chaos_value <= 13.33 {
-        // Green to Yellow
-        let t = chaos_value / 13.33;
-        lerp_color(LIGHT_GREEN, YELLOW, t)
-    } else if chaos_value <= 26.67 {
-        // Yellow to Orange
-        let t = (chaos_value - 13.33) / (26.67 - 13.33);
-        lerp_color(YELLOW, ORANGE, t)
-    } else {
-        // Orange to Red
-        let t = ((chaos_value - 26.67) / (40.0 - 26.67)).min(1.0);
-        lerp_color(ORANGE, RED, t)
-    };
-    info!("Chaos bar color: {:?}", fill_width);
-    commands
-        .spawn(SpriteBundle {
-            sprite: Sprite {
-                color: bar_color,
-                custom_size: Some(Vec2::new(fill_width, 2.)),
-                anchor: Anchor::CenterLeft,
-                ..default()
-            },
-            transform: Transform {
-                translation: Vec3::new(0., -6., 1.),
-                ..Default::default()
-            },
-            ..default()
-        })
-        .insert(RenderLayers::from_layers(&[3]))
-        .insert(ChaosBar)
-        .set_parent(chaos_text);
-}
+/// Chaos label is spawned inside [`setup_currency_ui`] on the progress bar; this stub
+/// remains so existing plugin registration does not need reshuffling.
+pub fn setup_chaos_ui() {}
 
 pub fn update_chaos_ui(
     chaos_tracker: Res<ChaosTracker>,
     infinite_chaos: Res<InfiniteMode>,
     mut chaos_text_query: Query<&mut Text, With<ChaosText>>,
-    mut chaos_bar_query: Query<&mut Sprite, With<ChaosBar>>,
 ) {
     if !chaos_tracker.is_changed() && !infinite_chaos.is_changed() {
         return;
     }
 
     let chaos_value = chaos_tracker.get_chaos() + infinite_chaos.get_chaos_bonus();
-
-    // Update text
     for mut text in chaos_text_query.iter_mut() {
         text.sections[0].value = format!("Chaos: {:.1}", chaos_value);
-    }
-
-    // Update bar
-    let fill_percent = (chaos_value / 40.0).min(1.0);
-    let fill_width = 40.0 * fill_percent;
-
-    // Color blend: green (0) -> yellow (13.33) -> orange (26.67) -> red (40)
-    let bar_color = if chaos_value <= 13.33 {
-        // Green to Yellow
-        let t = chaos_value / 13.33;
-        lerp_color(LIGHT_GREEN, YELLOW, t)
-    } else if chaos_value <= 26.67 {
-        // Yellow to Orange
-        let t = (chaos_value - 13.33) / (26.67 - 13.33);
-        lerp_color(YELLOW, ORANGE, t)
-    } else {
-        // Orange to Red
-        let t = ((chaos_value - 26.67) / (40.0 - 26.67)).min(1.0);
-        lerp_color(ORANGE, RED, t)
-    };
-
-    for mut sprite in chaos_bar_query.iter_mut() {
-        sprite.custom_size = Some(Vec2::new(fill_width, 2.));
-        sprite.color = bar_color;
     }
 }
 
@@ -793,38 +749,23 @@ pub fn update_healthbar(
             With<Player>,
         ),
     >,
-    mut health_bar_query: Query<(&mut Sprite, &mut BarFlashTimer), With<HealthBar>>,
+    health_bar_query: Query<&Handle<crate::ui::hud_bar_fill::HudBarFillMaterial>, With<HealthBar>>,
+    mut health_text: Query<&mut Text, With<HealthBarText>>,
+    mut materials: ResMut<Assets<crate::ui::hud_bar_fill::HudBarFillMaterial>>,
 ) {
     let Ok((player_health, player_max_health)) = player_health_query.get_single() else {
         return;
     };
-    let (mut sprite, mut _flash) = health_bar_query.single_mut();
-    sprite.custom_size = Some(Vec2 {
-        x: INNER_HUD_BAR_SIZE.x * player_health.0 as f32 / player_max_health.0 as f32,
-        y: INNER_HUD_BAR_SIZE.y,
-    });
-    // flash.timer.tick(Duration::from_nanos(1));
-}
-pub fn update_shieldbar(
-    player_health_query: Query<
-        (&CurrentShield, &MaxShield),
-        (
-            Or<(Changed<CurrentShield>, Changed<MaxShield>)>,
-            With<Player>,
-        ),
-    >,
-    mut health_bar_query: Query<(&mut Sprite, &mut BarFlashTimer), With<ShieldBar>>,
-) {
-    let Ok((curr_shield, max_shield)) = player_health_query.get_single() else {
+    let Ok(handle) = health_bar_query.get_single() else {
         return;
     };
-    let (mut sprite, mut _flash) = health_bar_query.single_mut();
-    sprite.custom_size = Some(Vec2 {
-        x: INNER_HUD_BAR_SIZE.x * curr_shield.0 as f32 / max_shield.0 as f32,
-        y: INNER_HUD_BAR_SIZE.y,
-    });
-
-    // flash.timer.tick(Duration::from_nanos(1));
+    if let Some(material) = materials.get_mut(handle) {
+        material.fill =
+            (player_health.0 as f32 / player_max_health.0.max(1) as f32).clamp(0.0, 1.0);
+    }
+    if let Ok(mut text) = health_text.get_single_mut() {
+        text.sections[0].value = format!("{}", player_health.0);
+    }
 }
 /// Hide the XP bar (progress, background, level text) when in GameOver; show it again in Main.
 pub fn hide_xp_bar_in_game_over(
@@ -870,7 +811,7 @@ pub fn tick_xp_bar_fade_in(
             }
         }
         for mut sprite in xp_bar_frame.iter_mut() {
-            sprite.color = overwrite_alpha(sprite.color, 0.7);
+            sprite.color = overwrite_alpha(sprite.color, 0.85);
         }
         commands.remove_resource::<XpBarFadeIn>();
         return;
@@ -1168,23 +1109,27 @@ pub fn handle_skill_choice_ui_close(
 
     *prev_state = current_state;
 }
-pub fn update_foodbar(
-    player_hunger_query: Query<&Hunger, (With<Player>, Changed<Hunger>)>,
-    mut food_bar_query: Query<(&mut Sprite, &mut BarFlashTimer), With<FoodBar>>,
-) {
-    let Ok(hunger) = player_hunger_query.get_single() else {
-        return;
-    };
-    let (mut sprite, mut flash) = food_bar_query.single_mut();
-    sprite.custom_size = Some(Vec2 {
-        x: 54. * hunger.current as f32 / hunger.max as f32,
-        y: INNER_HUD_BAR_SIZE.y,
-    });
-    // flash.timer.tick(Duration::from_nanos(1));
-}
 
 #[derive(Component, Eq, PartialEq)]
 pub struct SkillHudIcon(pub Heirloom);
+
+/// Marker for the pet's 4th-slot HUD icon (background quad). Sits at the rightmost
+/// position of the skills group on the action row. Unlike class skill icons it has no
+/// keybind badge — the pet auto-casts its ability on an internal timer.
+#[derive(Component)]
+pub struct PetSkillSlotBg;
+
+/// Marker for the pet's skill icon sprite (child of [`PetSkillSlotBg`]).
+#[derive(Component)]
+pub struct PetSkillIcon;
+
+/// Records which pet the current HUD pet slot was built for so we can rebuild on swap.
+#[derive(Component)]
+pub struct PetSkillSlotFor(pub crate::pets::state::Pet);
+
+/// Marker for the cooldown overlay sprite on the pet skill slot.
+#[derive(Component)]
+pub struct PetSkillCooldownOverlay;
 
 #[derive(Component)]
 pub struct HeirloomCounterText;
@@ -1228,6 +1173,7 @@ pub fn handle_heirloom_hud_tooltip(
     >,
     coins: Res<CoinCurrency>,
     trigger_counts: Res<crate::player::skills::HeirloomTriggerCounts>,
+    res: Res<ScreenResolution>,
 ) {
     use super::interactions::Interaction;
 
@@ -1308,7 +1254,12 @@ pub fn handle_heirloom_hud_tooltip(
                 None
             };
 
-            let tooltip_pos = Vec3::new(icon_pos.x, icon_pos.y - 90., icon_pos.z + 10.);
+            let (_, tooltip_size) = heirloom.get_ui_element(rarity);
+            let tooltip_pos = heirloom_hud_hover_tooltip_position(
+                *icon_pos,
+                tooltip_size.x * 0.5,
+                res.game_width,
+            );
             tooltip_requests.send(HeirloomTooltipRequest::Show(HeirloomTooltipShow {
                 heirloom: heirloom.clone(),
                 rarity,
@@ -1738,17 +1689,19 @@ pub fn handle_update_player_skills(
             }
 
             // Spawn all icons in one consolidated loop
+            let heirloom_row_y = hud_heirloom_row_y(res.game_height);
+            let heirloom_start_x = hud_heirloom_first_icon_x(res.game_width);
+
             for (i, (heirloom, count)) in ordered_heirlooms.iter().enumerate() {
-                const MAX_ICONS_PER_ROW: usize = 28;
-                const ICON_SPACING: f32 = 16.;
+                const MAX_ICONS_PER_ROW: usize = 37;
                 const ROW_SPACING: f32 = 16.;
 
                 let row = i / MAX_ICONS_PER_ROW;
                 let col = i % MAX_ICONS_PER_ROW;
 
                 let offset = Vec2::new(
-                    col as f32 * ICON_SPACING + (-res.game_width) / 2. + 98.,
-                    (res.game_height - 15.) / 2. - 8.5 - (row as f32 * ROW_SPACING),
+                    heirloom_start_x + col as f32 * HUD_HEIRLOOM_ICON_SPACING,
+                    heirloom_row_y - row as f32 * ROW_SPACING,
                 );
 
                 // Create the main icon with interactability directly attached
@@ -1876,9 +1829,10 @@ pub fn handle_update_player_skills(
         }
 
         // Skills are centered around `HUD_SKILLS_CENTER_X` on the right side of the action
-        // row. The half-span shifts with the number of skills (3 normally, 4 when the bonus
-        // blessing is active) so the group stays centered regardless of count.
-        let num_skills = active_skill_slots.len() as f32;
+        // row. The group reserves an extra rightmost position for the pet skill slot
+        // (spawned separately by `update_pet_skill_hud_slot`), so the 3 class skills stay
+        // visually centered alongside the pet icon as a 4-wide group.
+        let num_skills = (active_skill_slots.len() + 1) as f32;
         let skill_half_span = (num_skills - 1.0) * 0.5;
         for (i, (active_skill_option, slot_index)) in active_skill_slots.iter().enumerate() {
             let icon_bg = commands
@@ -1920,7 +1874,7 @@ pub fn handle_update_player_skills(
                 &asset_server,
                 keybind,
                 icon_bg,
-                Vec3::new(0., 13., 2.),
+                Vec3::new(0., 12., 2.),
                 Vec3::new(0., 1., 1.),
                 3,
             );
@@ -2260,7 +2214,7 @@ pub fn spawn_hotbar_keybind_badge_for_slot(
         asset_server,
         key,
         slot_entity,
-        Vec3::new(0., 15., 2.),
+        Vec3::new(0., 12., 2.),
         Vec3::new(0., 1., 1.),
         3,
     );
@@ -2321,18 +2275,26 @@ pub fn setup_hotbar_hud(
 }
 
 pub fn update_mana_bar(
-    player_mana: Query<(&CurrentMana, &MaxMana), (With<Player>, Changed<CurrentMana>)>,
-    mut mana_bar_query: Query<(&mut Sprite, &mut BarFlashTimer), With<ManaBar>>,
+    player_mana: Query<
+        (&CurrentMana, &MaxMana),
+        (Or<(Changed<CurrentMana>, Changed<MaxMana>)>, With<Player>),
+    >,
+    mana_bar_query: Query<&Handle<crate::ui::hud_bar_fill::HudBarFillMaterial>, With<ManaBar>>,
+    mut mana_text: Query<&mut Text, With<ManaBarText>>,
+    mut materials: ResMut<Assets<crate::ui::hud_bar_fill::HudBarFillMaterial>>,
 ) {
     let Ok((current_mana, max_mana)) = player_mana.get_single() else {
         return;
     };
-    let (mut sprite, mut flash) = mana_bar_query.single_mut();
-    sprite.custom_size = Some(Vec2 {
-        x: 61. * current_mana.0 as f32 / max_mana.0 as f32,
-        y: INNER_HUD_BAR_SIZE.y,
-    });
-    // flash.timer.tick(Duration::from_nanos(1));
+    let Ok(handle) = mana_bar_query.get_single() else {
+        return;
+    };
+    if let Some(material) = materials.get_mut(handle) {
+        material.fill = (current_mana.0 as f32 / max_mana.0.max(1) as f32).clamp(0.0, 1.0);
+    }
+    if let Ok(mut text) = mana_text.get_single_mut() {
+        text.sections[0].value = format!("{}", current_mana.0);
+    }
 }
 
 pub fn setup_clock_hud(
@@ -2341,16 +2303,15 @@ pub fn setup_clock_hud(
     night_tracker: Res<NightTracker>,
     res: Res<ScreenResolution>,
 ) {
+    let row_y = hud_row_below_xp_y(res.game_height);
+    let clock_x = hud_clock_center_x(res.game_width, HUD_ERA_TIMER_DEFAULT_WIDTH);
+
     let clock_hud_frame = commands
         .spawn(AsepriteBundle {
             animation: AsepriteAnimation::from(Clock::tags::ONE),
             aseprite: asset_server.load::<Aseprite, _>(Clock::PATH),
             transform: Transform {
-                translation: Vec3::new(
-                    -res.game_width / 2. + 17.5,
-                    (res.game_height - 15.) / 2. - 72.5,
-                    6.,
-                ),
+                translation: Vec3::new(clock_x, row_y, 6.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
@@ -2428,21 +2389,20 @@ pub fn setup_era_timer_hud(
         return;
     }
 
-    // Position below the clock HUD
-    // Start with smaller size for timer mode (will expand when ENDLESS)
+    let row_y = hud_row_below_xp_y(res.game_height);
+    let timer_width = HUD_ERA_TIMER_DEFAULT_WIDTH;
+    let timer_x = hud_era_timer_center_x(res.game_width, timer_width);
+
+    // Same HUD row as the progress bar; right edge ~80px from screen right.
     let era_timer_frame = commands
         .spawn(SpriteBundle {
             sprite: Sprite {
                 color: Color::rgba(0.1, 0.1, 0.1, 0.7),
-                custom_size: Some(Vec2::new(42., 16.)),
+                custom_size: Some(Vec2::new(timer_width, 16.)),
                 ..default()
             },
             transform: Transform {
-                translation: Vec3::new(
-                    -res.game_width / 2. + 50.5,
-                    (res.game_height - 16.) / 2. - 74., // Right of the clock
-                    5.,
-                ),
+                translation: Vec3::new(timer_x, row_y, 5.),
                 ..Default::default()
             },
             ..default()
@@ -2507,6 +2467,7 @@ pub fn handle_update_era_timer_hud(
     mut timer_text: Query<&mut Text, (With<EraTimerText>, Without<EndlessElapsedText>)>,
     mut elapsed_text: Query<&mut Text, (With<EndlessElapsedText>, Without<EraTimerText>)>,
     mut timer_bg: Query<(&mut Sprite, &mut Transform), With<EraTimerHUD>>,
+    mut clock_transform: Query<&mut Transform, (With<ClockHUD>, Without<EraTimerHUD>)>,
     res: Res<ScreenResolution>,
 ) {
     for mut text in timer_text.iter_mut() {
@@ -2538,25 +2499,40 @@ pub fn handle_update_era_timer_hud(
         }
     }
 
+    let row_y = hud_row_below_xp_y(res.game_height);
+    let mut timer_width = HUD_ERA_TIMER_DEFAULT_WIDTH;
+
     // Update background color and size based on mode
     for (mut sprite, mut transform) in timer_bg.iter_mut() {
+        transform.translation.y = row_y;
+
         if infinite_mode.active {
             // Bigger size for "ENDLESS" text + elapsed timer below
-            sprite.custom_size = Some(Vec2::new(68., 24.));
+            let size = Vec2::new(68., 24.);
+            timer_width = size.x;
+            sprite.custom_size = Some(size);
             sprite.color = Color::rgba(0.4, 0.1, 0.1, 0.8);
-            transform.translation.x = -res.game_width / 2. + 68.5;
+            transform.translation.x = hud_era_timer_center_x(res.game_width, size.x);
         } else if era_timer.remaining_seconds <= 60.0 {
-            // Normal timer size
-            sprite.custom_size = Some(Vec2::new(42., 14.));
+            let size = Vec2::new(42., 14.);
+            timer_width = size.x;
+            sprite.custom_size = Some(size);
             // Pulse effect for last minute
             let pulse = (era_timer.remaining_seconds * 2.0).sin().abs() * 0.3;
             sprite.color = Color::rgba(0.4 + pulse, 0.1, 0.1, 0.8);
+            transform.translation.x = hud_era_timer_center_x(res.game_width, size.x);
         } else {
-            // Normal timer size
-            sprite.custom_size = Some(Vec2::new(40., 16.));
+            let size = Vec2::new(40., 16.);
+            timer_width = size.x;
+            sprite.custom_size = Some(size);
             sprite.color = Color::rgba(0.1, 0.1, 0.1, 0.7);
-            transform.translation.x = -res.game_width / 2. + 52.;
+            transform.translation.x = hud_era_timer_center_x(res.game_width, size.x);
         }
+    }
+
+    for mut clock_txfm in clock_transform.iter_mut() {
+        clock_txfm.translation.y = row_y;
+        clock_txfm.translation.x = hud_clock_center_x(res.game_width, timer_width);
     }
 }
 
@@ -2889,6 +2865,29 @@ pub fn update_inventory_keybind_text(
     }
 }
 
+pub fn update_minimap_keybind_text(
+    keybinds: Res<crate::keybinds::InputMappings>,
+    mut texts: Query<&mut Text, With<MinimapKeybindText>>,
+    mut key_backgrounds: Query<(&mut Handle<Image>, &mut Sprite), With<MinimapKeyBackground>>,
+    graphics: Res<Graphics>,
+) {
+    if !keybinds.is_changed() {
+        return;
+    }
+
+    let minimap_key = keybinds.get_minimap_key();
+
+    for mut text in texts.iter_mut() {
+        text.sections[0].value = crate::keybinds::get_key_display_name(minimap_key);
+    }
+
+    for (mut texture, mut sprite) in key_backgrounds.iter_mut() {
+        let (key_element, key_width) = get_key_size_and_element(minimap_key);
+        *texture = graphics.get_ui_element_texture(key_element);
+        sprite.custom_size = Some(Vec2::new(key_width, 10.));
+    }
+}
+
 pub const CONSUMABLE_BUFF_HUD_ICON_PX: f32 = 14.;
 
 #[derive(Component, Clone)]
@@ -3108,5 +3107,384 @@ pub fn handle_consumable_buff_hud_tooltip(
             &stack,
             Vec3::new(icon_pos.x - 4., icon_pos.y + 8., 15.),
         );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Pet skill HUD slot (4th icon in the skills group)
+// ---------------------------------------------------------------------------
+
+/// Marker on the floating tooltip container spawned for the pet skill slot.
+#[derive(Component)]
+pub struct PetSkillHudTooltip;
+
+/// Marker on the cooldown text inside the pet tooltip (parallels [`SkillTooltipCooldownText`]).
+#[derive(Component)]
+pub struct PetSkillTooltipCooldownText;
+
+/// Read `(elapsed_secs, duration_secs)` for the given pet's auto-cast timer. Returns
+/// `None` for pets without a timer-based ability (e.g. Goliath).
+fn pet_ability_cooldown(
+    pet: &crate::pets::state::Pet,
+    slime: &Query<&crate::pets::pet_abilities::SlimeShieldTimer, With<crate::pets::state::Pet>>,
+    fairy: &Query<&crate::pets::pet_abilities::FairyHealTimer, With<crate::pets::state::Pet>>,
+    porkipine: &Query<
+        &crate::pets::pet_abilities::PorkipineDamageTimer,
+        With<crate::pets::state::Pet>,
+    >,
+    coin: &Query<&crate::pets::pet_abilities::GoldenPigCoinTimer, With<crate::pets::state::Pet>>,
+) -> Option<(f32, f32)> {
+    use crate::pets::state::Pet;
+    match pet {
+        Pet::Slime => slime
+            .get_single()
+            .ok()
+            .map(|t| (t.0.elapsed().as_secs_f32(), t.0.duration().as_secs_f32())),
+        Pet::Fairy => fairy
+            .get_single()
+            .ok()
+            .map(|t| (t.0.elapsed().as_secs_f32(), t.0.duration().as_secs_f32())),
+        Pet::Porkipine => porkipine
+            .get_single()
+            .ok()
+            .map(|t| (t.0.elapsed().as_secs_f32(), t.0.duration().as_secs_f32())),
+        Pet::GoldenPig => coin
+            .get_single()
+            .ok()
+            .map(|t| (t.0.elapsed().as_secs_f32(), t.0.duration().as_secs_f32())),
+        Pet::Goliath => None,
+    }
+}
+
+/// Spawns / refreshes the pet skill HUD slot. The slot sits at the rightmost position
+/// of the 4-wide skills group (reserved in `handle_update_player_skills` by adding `+1`
+/// to the centering count). Renders the pet's `skill_icon` from
+/// `class_pet_data.class.ron` with no keybind badge.
+pub fn update_pet_skill_hud_slot(
+    mut commands: Commands,
+    graphics: Res<Graphics>,
+    pet_q: Query<&crate::pets::state::Pet>,
+    existing: Query<(Entity, &PetSkillSlotFor), With<PetSkillSlotBg>>,
+    res: Res<ScreenResolution>,
+) {
+    let Some(pet) = pet_q.iter().next() else {
+        for (e, _) in existing.iter() {
+            commands.entity(e).despawn_recursive();
+        }
+        return;
+    };
+
+    if existing.iter().any(|(_, m)| m.0 == *pet) {
+        return;
+    }
+
+    for (e, _) in existing.iter() {
+        commands.entity(e).despawn_recursive();
+    }
+
+    let pet_data = graphics.get_pet_data(pet.clone());
+
+    // Position matches the formula in `handle_update_player_skills`, with 4 reserved
+    // positions and the pet at index 3.
+    let num_skills = 4.0_f32;
+    let skill_half_span = (num_skills - 1.0) * 0.5;
+    let x = HUD_SKILLS_CENTER_X + (3.0 - skill_half_span) * HUD_SKILL_SPACING_X;
+    let y = -res.game_height / 2. + HUD_ACTION_ROW_Y_FROM_BOTTOM;
+
+    let slot_bg = commands
+        .spawn(SpriteBundle {
+            texture: graphics.get_ui_element_texture(UIElement::ScreenIconSlotLarge),
+            sprite: Sprite {
+                custom_size: Some(Vec2::new(20., 20.)),
+                ..default()
+            },
+            transform: Transform::from_translation(Vec3::new(x, y, Z_DEPTH_HUD_ACTIVE_SKILLS)),
+            ..default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(PetSkillSlotBg)
+        .insert(PetSkillSlotFor(pet.clone()))
+        .insert(Name::new("PET SKILL SLOT BG"))
+        .id();
+
+    commands
+        .spawn(SpriteBundle {
+            texture: graphics.get_ui_element_texture(pet_data.skill_icon.clone()),
+            sprite: Sprite {
+                custom_size: Some(Vec2::new(16., 16.)),
+                ..default()
+            },
+            transform: Transform::from_translation(Vec3::new(0., 0., 1.)),
+            ..default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(PetSkillIcon)
+        .insert(super::interactions::Interactable::default())
+        .insert(Name::new("PET SKILL ICON"))
+        .set_parent(slot_bg);
+
+    // Cooldown overlay (matches the class-skill overlay visual style).
+    commands
+        .spawn(SpriteBundle {
+            sprite: Sprite {
+                color: Color::rgba(1., 1., 1., 0.45),
+                custom_size: Some(Vec2::new(16., 0.)),
+                anchor: Anchor::BottomCenter,
+                ..default()
+            },
+            transform: Transform::from_translation(Vec3::new(0., -8., 3.)),
+            ..default()
+        })
+        .insert(PetSkillCooldownOverlay)
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(Name::new("pet skill cooldown overlay"))
+        .set_parent(slot_bg);
+}
+
+/// Drives the pet skill slot's cooldown overlay from the pet's auto-cast timer.
+/// Shrinks the dark overlay from 16px tall down to 0 as the timer progresses, mirroring
+/// `tick_skill_cooldown_overlays`. Pets without timers (Goliath) keep the overlay
+/// invisible.
+pub fn tick_pet_skill_cooldown_overlay(
+    mut overlays: Query<&mut Sprite, With<PetSkillCooldownOverlay>>,
+    pet_q: Query<&crate::pets::state::Pet>,
+    slime: Query<&crate::pets::pet_abilities::SlimeShieldTimer, With<crate::pets::state::Pet>>,
+    fairy: Query<&crate::pets::pet_abilities::FairyHealTimer, With<crate::pets::state::Pet>>,
+    porkipine: Query<
+        &crate::pets::pet_abilities::PorkipineDamageTimer,
+        With<crate::pets::state::Pet>,
+    >,
+    coin: Query<&crate::pets::pet_abilities::GoldenPigCoinTimer, With<crate::pets::state::Pet>>,
+) {
+    let progress = pet_q
+        .iter()
+        .next()
+        .and_then(|pet| pet_ability_cooldown(pet, &slime, &fairy, &porkipine, &coin))
+        .map(|(elapsed, duration)| {
+            if duration <= 0.0 {
+                0.0
+            } else {
+                (elapsed / duration).clamp(0.0, 1.0)
+            }
+        });
+
+    let height = progress.map(|p| 16.0 * (1.0 - p)).unwrap_or(0.0);
+    for mut sprite in overlays.iter_mut() {
+        sprite.custom_size = Some(Vec2::new(16., height));
+    }
+}
+
+/// Hover-tooltip handler for the pet skill slot. Reuses the skill tooltip background
+/// + body styling so the pet ability reads as a 4th skill in the same visual language
+/// as the class skills. The cooldown text is the seconds remaining on the pet's
+/// auto-cast timer (or blank for timer-less pets).
+pub fn handle_pet_skill_hud_tooltip(
+    mut commands: Commands,
+    graphics: Res<Graphics>,
+    asset_server: Res<AssetServer>,
+    cursor_pos: Res<CursorPos>,
+    hit_detection_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
+    mut pet_icons: Query<
+        (Entity, &GlobalTransform, &mut Interactable, &Parent),
+        With<PetSkillIcon>,
+    >,
+    slot_for: Query<&PetSkillSlotFor>,
+    existing_tooltips: Query<Entity, With<PetSkillHudTooltip>>,
+    pet_q: Query<&crate::pets::state::Pet>,
+    slime: Query<&crate::pets::pet_abilities::SlimeShieldTimer, With<crate::pets::state::Pet>>,
+    fairy: Query<&crate::pets::pet_abilities::FairyHealTimer, With<crate::pets::state::Pet>>,
+    porkipine: Query<
+        &crate::pets::pet_abilities::PorkipineDamageTimer,
+        With<crate::pets::state::Pet>,
+    >,
+    coin: Query<&crate::pets::pet_abilities::GoldenPigCoinTimer, With<crate::pets::state::Pet>>,
+    mut last_hovered: Local<Option<crate::pets::state::Pet>>,
+    mut tooltip_cooldown_text: Query<&mut Text, With<PetSkillTooltipCooldownText>>,
+) {
+    use crate::ui::interactions::Interaction;
+
+    let hit_entity = super::ui_helpers::pointcast_2d(&cursor_pos, &hit_detection_sprites, None);
+    for (entity, _, mut interactable, _) in pet_icons.iter_mut() {
+        let is_hit = hit_entity
+            .as_ref()
+            .map(|(e, _, _)| *e == entity)
+            .unwrap_or(false);
+        if is_hit && !matches!(interactable.current(), Interaction::Hovering) {
+            interactable.change(Interaction::Hovering);
+        } else if !is_hit && matches!(interactable.current(), Interaction::Hovering) {
+            interactable.change(Interaction::None);
+        }
+    }
+
+    let currently_hovered = pet_icons
+        .iter()
+        .find_map(|(_, xform, interactable, parent)| {
+            if !matches!(interactable.current(), Interaction::Hovering) {
+                return None;
+            }
+            let pet = slot_for.get(parent.get()).ok()?;
+            Some((pet.0.clone(), xform.translation()))
+        });
+
+    let hovered_pet = currently_hovered.as_ref().map(|(p, _)| p.clone());
+
+    // Keep the tooltip cooldown text live while hovered.
+    if hovered_pet.is_some() {
+        if let Some(pet) = pet_q.iter().next() {
+            if let Some((elapsed, duration)) =
+                pet_ability_cooldown(pet, &slime, &fairy, &porkipine, &coin)
+            {
+                let remaining = (duration - elapsed).max(0.0);
+                for mut text in tooltip_cooldown_text.iter_mut() {
+                    text.sections[0].value = format!("{:.1}s", remaining);
+                }
+            } else {
+                for mut text in tooltip_cooldown_text.iter_mut() {
+                    text.sections[0].value = String::new();
+                }
+            }
+        }
+    }
+
+    if *last_hovered == hovered_pet {
+        return;
+    }
+
+    for tt in existing_tooltips.iter() {
+        commands.entity(tt).despawn_recursive();
+    }
+
+    if let Some((pet, pos)) = currently_hovered {
+        let pet_data = graphics.get_pet_data(pet.clone());
+        let tooltip_pos = Vec3::new(pos.x - 30., pos.y + 56., pos.z + 10.);
+
+        let container = commands
+            .spawn(RenderLayers::from_layers(&[3]))
+            .insert(PetSkillHudTooltip)
+            .insert(SpatialBundle::from_transform(Transform::from_translation(
+                tooltip_pos,
+            )))
+            .id();
+
+        commands
+            .spawn(SpriteBundle {
+                texture: graphics.get_ui_element_texture(UIElement::SkillTooltip),
+                sprite: Sprite {
+                    custom_size: Some(Vec2::new(246., 71.)),
+                    ..Default::default()
+                },
+                transform: Transform::from_translation(Vec3::new(72., -3., 1.)),
+                ..Default::default()
+            })
+            .insert(RenderLayers::from_layers(&[3]))
+            .insert(Name::new("PET SKILL TOOLTIP BG"))
+            .set_parent(container);
+
+        spawn_pet_skill_tooltip_content(
+            &mut commands,
+            &graphics,
+            &asset_server,
+            pet_data,
+            container,
+        );
+    }
+
+    *last_hovered = hovered_pet;
+}
+
+/// Mirrors [`spawn_skill_tooltip_content`] but reads from a pet's `PetData` so the
+/// tooltip layout (icon + title + body lines + cooldown corner) matches class skills
+/// pixel-for-pixel.
+pub fn spawn_pet_skill_tooltip_content(
+    commands: &mut Commands,
+    graphics: &Graphics,
+    asset_server: &AssetServer,
+    pet_data: &crate::assets::PetData,
+    parent_entity: Entity,
+) {
+    const ICONS_X_OFFSET: f32 = -24.;
+    const TEXT_Y_OFFSET: f32 = 12.;
+    const DESC_TEXT_X: f32 = ICONS_X_OFFSET + 12.;
+    const COOLDOWN_TEXT_X: f32 = 181.;
+    const TITLE_Y: f32 = TEXT_Y_OFFSET + 6.;
+
+    let icon_handle = graphics.get_ui_element_texture(pet_data.skill_icon.clone());
+    let desc_body_style = gf::SKILL_PANEL_BODY.text_style(asset_server, DARK_WOOD_BROWN);
+
+    commands
+        .spawn(SpriteBundle {
+            texture: icon_handle,
+            sprite: Sprite {
+                custom_size: Some(Vec2::new(18., 18.)),
+                ..Default::default()
+            },
+            transform: Transform::from_translation(Vec3::new(ICONS_X_OFFSET, 0., 2.)),
+            ..default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(Name::new("PET SKILL TOOLTIP ICON"))
+        .set_parent(parent_entity);
+
+    commands
+        .spawn(Text2dBundle {
+            text: Text::from_section(
+                pet_data.skill_name.clone(),
+                TextStyle {
+                    font: gf::SKILL_PANEL_TITLE_BOLD.load_font(asset_server),
+                    font_size: gf::SKILL_PANEL_TITLE_BOLD.size,
+                    color: DARK_WOOD_BROWN,
+                },
+            )
+            .with_alignment(TextAlignment::Left),
+            text_anchor: Anchor::TopLeft,
+            transform: Transform::from_translation(Vec3::new(DESC_TEXT_X, TITLE_Y, 2.)),
+            ..default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(Name::new("PET SKILL TOOLTIP NAME"))
+        .set_parent(parent_entity);
+
+    commands
+        .spawn(Text2dBundle {
+            text: Text::from_section(
+                "",
+                TextStyle {
+                    font: gf::SKILL_PANEL_BODY.load_font(asset_server),
+                    font_size: gf::SKILL_PANEL_BODY.size,
+                    color: LIGHT_GREY,
+                },
+            )
+            .with_alignment(TextAlignment::Right),
+            text_anchor: Anchor::TopRight,
+            transform: Transform::from_translation(Vec3::new(COOLDOWN_TEXT_X, TITLE_Y, 2.)),
+            ..default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(PetSkillTooltipCooldownText)
+        .insert(Name::new("PET SKILL TOOLTIP COOLDOWN"))
+        .set_parent(parent_entity);
+
+    // Description lines: pet's skill_description is a Vec<String> where each entry
+    // can contain explicit '\n' line breaks (see `class_pet_data.class.ron`).
+    let mut line_index = 0usize;
+    for entry in pet_data.skill_description.iter() {
+        for line in entry.split('\n') {
+            commands
+                .spawn(Text2dBundle {
+                    text: Text::from_section(line, desc_body_style.clone())
+                        .with_alignment(TextAlignment::Left),
+                    text_anchor: Anchor::TopLeft,
+                    transform: Transform::from_translation(Vec3::new(
+                        DESC_TEXT_X,
+                        (TEXT_Y_OFFSET - 2.) - line_index as f32 * gf::SKILL_TOOLTIP_DESC_LINE_STEP,
+                        2.,
+                    )),
+                    ..default()
+                })
+                .insert(RenderLayers::from_layers(&[3]))
+                .insert(Name::new("PET SKILL TOOLTIP DESCRIPTION LINE"))
+                .set_parent(parent_entity);
+            line_index += 1;
+        }
     }
 }

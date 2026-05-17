@@ -9,7 +9,32 @@ use crate::{
     player::skills::{Heirloom, HeirloomRarity},
 };
 
-use super::{game_fonts as gf, UIState};
+use super::{game_fonts as gf, tooltips, UIState};
+
+/// Vertical offset from the hovered HUD heirloom icon to the tooltip card center.
+pub const HEIRLOOM_HUD_HOVER_TOOLTIP_Y_OFFSET: f32 = -90.;
+pub const HEIRLOOM_HUD_HOVER_TOOLTIP_Z_OFFSET: f32 = 10.;
+/// Inset from the screen edge when clamping heirloom hover tooltips.
+pub const HEIRLOOM_TOOLTIP_SCREEN_EDGE_PAD: f32 = 8.;
+
+/// World position for a HUD heirloom hover card, nudged inward when near the left/right edge.
+pub fn heirloom_hud_hover_tooltip_position(
+    icon_pos: Vec3,
+    tooltip_half_width: f32,
+    game_width: f32,
+) -> Vec3 {
+    let x = tooltips::clamp_tooltip_center_x(
+        icon_pos.x,
+        tooltip_half_width,
+        game_width,
+        HEIRLOOM_TOOLTIP_SCREEN_EDGE_PAD,
+    );
+    Vec3::new(
+        x,
+        icon_pos.y + HEIRLOOM_HUD_HOVER_TOOLTIP_Y_OFFSET,
+        icon_pos.z + HEIRLOOM_HUD_HOVER_TOOLTIP_Z_OFFSET,
+    )
+}
 
 /// Marker on tooltip cards spawned through [`HeirloomTooltipRequest`] (and cleared by the processor).
 #[derive(Component)]

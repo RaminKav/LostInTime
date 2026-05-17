@@ -464,8 +464,7 @@ pub fn setup_options_ui(
     }
 
     // Hotbar keybinds section (Hotbar consume/use keys for slots 0-3)
-    let hotbar_section_y =
-        start_y + row_spacing * (VISIBLE_CLASS_SKILL_COUNT as f32 + 0.5);
+    let hotbar_section_y = start_y + row_spacing * (VISIBLE_CLASS_SKILL_COUNT as f32 + 0.5);
     commands.spawn((
         Text2dBundle {
             text: Text::from_section(
@@ -664,7 +663,11 @@ pub fn setup_options_ui(
         "SFX:",
         VolumeChannel::Sfx,
         audio_volume.sfx,
-        Vec3::new(center_side_x, sfx_vol_y, ui_helpers::Z_DEPTH_OPTIONS_CONTENT),
+        Vec3::new(
+            center_side_x,
+            sfx_vol_y,
+            ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
+        ),
     );
 
     // Cheats section
@@ -699,7 +702,7 @@ pub fn setup_options_ui(
         &mut commands,
         &graphics,
         &asset_server,
-        "Unlock All Classes:",
+        "Unlock All Skills:",
         Vec3::new(
             right_side_x,
             checkbox_y,
@@ -802,7 +805,7 @@ pub fn setup_options_ui(
         &mut commands,
         &graphics,
         &asset_server,
-        "Player Heal/Regen #s:",
+        "Player Regen Numbers",
         Vec3::new(
             right_side_x,
             player_numbers_checkbox_y,

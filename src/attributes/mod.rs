@@ -700,12 +700,20 @@ impl ItemAttributes {
         entity.insert(ManaRegen(
             self.mana_regen.value + skills.get_count(Heirloom::MPRegen) * 5,
         ));
+        let pickup_range_total =
+            self.pickup_range.value + skills.get_count(Heirloom::ItemPickupRadius) * 25;
+        let gravity_scales_stacks = skills.get_count(Heirloom::GravityScales);
+        let gravity_size_bonus = if gravity_scales_stacks > 0 {
+            pickup_range_total * 25 * gravity_scales_stacks / 100
+        } else {
+            0
+        };
         entity.insert(ProjectileSize(
-            self.size.value + skills.get_count(Heirloom::Gigantify) * 10,
+            self.size.value
+                + skills.get_count(Heirloom::Gigantify) * 10
+                + gravity_size_bonus,
         ));
-        entity.insert(PickupRange(
-            self.pickup_range.value + skills.get_count(Heirloom::ItemPickupRadius) * 25,
-        ));
+        entity.insert(PickupRange(pickup_range_total));
         entity.insert(SkillPower(
             self.skill_power.value
                 + skills.get_count(Heirloom::SkillPower) * 15

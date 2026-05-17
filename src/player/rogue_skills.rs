@@ -796,11 +796,8 @@ pub fn handle_recall(
             hit_life,
             dmg,
             Collider::cuboid(half_length, RECALL_HITBOX_HALF_WIDTH),
-            Projectile::TeleportShock,
+            Projectile::Recall,
         );
-        commands
-            .entity(hitbox)
-            .insert(crate::player::mage_skills::TeleportShockDmg);
     }
 
     commands.spawn(SoundSpawner::new(AudioSoundEffect::Teleport, 0.1));

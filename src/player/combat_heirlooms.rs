@@ -2177,8 +2177,8 @@ pub fn handle_skill_mana_regen(
     let mut rng = rand::thread_rng();
 
     for _event in skill_events.iter() {
-        // 20% chance per stack (capped at 100%)
-        let chance_per_stack = 20;
+        // 8% chance per stack (capped at 100%)
+        let chance_per_stack = 8;
         let total_chance = (stacks * chance_per_stack).min(100);
         if rng.gen_ratio(total_chance as u32, 100) {
             // Trigger mana regen (same amount as normal regen)

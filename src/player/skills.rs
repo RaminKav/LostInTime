@@ -589,6 +589,7 @@ impl ActiveSkill {
             ActiveSkill::Shout => vec![
                 "SCREAM, releasing a shockwave".to_string(),
                 format!("around you, dealing {:.1}% damage.", skill_power * SHOUT),
+                "Knocks back enemies hit.".to_string(),
             ],
             ActiveSkill::Heal => vec![
                 format!(
@@ -1015,6 +1016,7 @@ pub enum Heirloom {
     ManaOrbs,
     ManaOrbAttack,    // Mana regen shoots mana orb projectiles
     ItemPickupRadius, // Increases pickup radius by 25%
+    GravityScales,    // Converts 25% of pickup range into size per stack
     MagnetPull,       // Periodically pulls all item drops to player
 
     // Thorns build heirlooms
@@ -1168,6 +1170,7 @@ impl Heirloom {
             Heirloom::ManaOrbs => "Mana Dust".to_string(),
             Heirloom::ManaOrbAttack => "Wizard Hat".to_string(),
             Heirloom::ItemPickupRadius => "Magnet".to_string(),
+            Heirloom::GravityScales => "Gravity Scales".to_string(),
             Heirloom::MagnetPull => "Gravitation Tome".to_string(),
 
             // Thorns build heirlooms
@@ -1664,6 +1667,11 @@ impl Heirloom {
                 "pickup radius by".to_string(),
                 "+25%.".to_string(),
             ],
+            Heirloom::GravityScales => vec![
+                "Converts 25% of".to_string(),
+                "pickup range into".to_string(),
+                "size.".to_string(),
+            ],
             Heirloom::MagnetPull => vec![
                 "Periodically pulls".to_string(),
                 "all item drops on".to_string(),
@@ -1726,7 +1734,7 @@ impl Heirloom {
             ],
             Heirloom::SkillManaRegen => vec![
                 "Using a skill has".to_string(),
-                "a 20% chance to".to_string(),
+                "a 8% chance to".to_string(),
                 "trigger mana".to_string(),
                 "regeneration.".to_string(),
             ],
@@ -2094,7 +2102,7 @@ pub fn time_crystal_heirlooms(idx: usize) -> Vec<(Heirloom, HeirloomRarity)> {
         0 => vec![
             (Heirloom::ManaOrbs, HeirloomRarity::Common),
             (Heirloom::ManaOrbAttack, HeirloomRarity::Uncommon),
-            (Heirloom::SkillManaRegen, HeirloomRarity::Uncommon),
+            (Heirloom::SkillManaRegen, HeirloomRarity::Common),
         ],
         1 => vec![
             (Heirloom::FrailStacks, HeirloomRarity::Uncommon),
@@ -2103,7 +2111,7 @@ pub fn time_crystal_heirlooms(idx: usize) -> Vec<(Heirloom, HeirloomRarity)> {
         ],
         2 => vec![
             (Heirloom::SkillCDReduction, HeirloomRarity::Common),
-            (Heirloom::Shield, HeirloomRarity::Uncommon),
+            (Heirloom::GravityScales, HeirloomRarity::Rare),
             (Heirloom::IncreaseProjectileCount, HeirloomRarity::Rare),
         ],
         3 => vec![

@@ -20,7 +20,7 @@ pub struct BossNameText;
 
 const BOSS_BAR_WIDTH: f32 = 120.0;
 const BOSS_BAR_HEIGHT: f32 = 6.0;
-const BOSS_BAR_Y_OFFSET: f32 = GAME_HEIGHT / 2.0 - 40.0; // Top center half of screen
+const BOSS_BAR_Y_OFFSET: f32 = GAME_HEIGHT / 2.0 - 60.0; // Top center half of screen
 const BOSS_BAR_SPACING: f32 = 22.0; // Vertical spacing between multiple boss bars
 
 /// Spawns the boss health bar UI when a boss spawns

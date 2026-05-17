@@ -67,6 +67,7 @@ pub enum Projectile {
     Arc,
     FireAttack,
     TeleportShock,
+    Recall,
     Echo,
     SwordProjectile,
     DaggerProjectile1,
@@ -160,6 +161,7 @@ impl Projectile {
             Projectile::SpearGravity => true,
             Projectile::PossessedBlade => true,
             Projectile::ArrowVolleyShot => true,
+            Projectile::Recall => true,
             _ => false,
         }
     }
@@ -187,6 +189,7 @@ impl Projectile {
             | Projectile::PossessedBlade
             | Projectile::ArrowVolleyShot
             | Projectile::TeleportShock
+            | Projectile::Recall
             | Projectile::PoisonCloud
             | Projectile::HealHearts
             | Projectile::AttackSpeed
@@ -580,7 +583,7 @@ fn handle_spawn_projectiles_after_delay(
 
                 let player_att = game.player_stats.single().0 .0;
                 let computed_dmg = proj.dmg_override.unwrap_or(player_att);
-                info!(
+                debug!(
                     "Spawned projectile {:?} with dmg {}",
                     proj.proj, computed_dmg
                 );
