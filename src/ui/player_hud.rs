@@ -23,7 +23,7 @@ use super::{
 use crate::{
     assets::Graphics,
     attributes::{
-        attribute_helpers::skill_power_multiplier, ActiveConsumableBuffs, AttackCooldown,
+        attribute_helpers::skill_power_multiplier, ActiveConsumableBuffs, BonusAttackSpeed,
         CritChance, CurrentHealth, CurrentMana, MaxHealth, MaxMana, SkillPower, Speed,
     },
     audio::{AudioSoundEffect, SoundSpawner},
@@ -45,7 +45,7 @@ use crate::{
         levels::PlayerLevel,
         skills::{
             ActiveSkill, ActiveSkillChoiceState, ActiveSkillUsedEvent, ClassSkillSlots, Heirloom,
-            HeirloomRarity, PlayerSkills, FURY_ATTACK_SPEED_REFERENCE_COOLDOWN_SECS,
+            HeirloomRarity, PlayerSkills,
             VISIBLE_CLASS_SKILL_COUNT,
         },
         CoinCurrency, Player, RunScore, TimeFragmentCurrency,
@@ -1329,7 +1329,7 @@ pub fn spawn_skill_tooltip_content(
     skill_power: f32,
     max_mana: i32,
     max_health: i32,
-    attack_cooldown_secs: f32,
+    bonus_attack_speed_mult: f32,
     crit_chance: i32,
     speed: i32,
 ) {
@@ -1344,7 +1344,7 @@ pub fn spawn_skill_tooltip_content(
         skill_power,
         max_mana,
         max_health,
-        attack_cooldown_secs,
+        bonus_attack_speed_mult,
         crit_chance,
         speed,
     );
@@ -1466,7 +1466,7 @@ pub fn handle_active_skill_hud_tooltip(
             &OwnedBlessings,
             &MaxMana,
             &MaxHealth,
-            Option<&AttackCooldown>,
+            Option<&BonusAttackSpeed>,
             &CritChance,
             &Speed,
         ),
@@ -1548,11 +1548,9 @@ pub fn handle_active_skill_hud_tooltip(
             .set_parent(container)
             .id();
 
-        let (skill_power, blessings, max_mana, max_health, atk_cd, crit, spd) =
+        let (skill_power, blessings, max_mana, max_health, bonus_as, crit, spd) =
             skill_power.single();
-        let atk_secs = atk_cd
-            .map(|c| c.0)
-            .unwrap_or(FURY_ATTACK_SPEED_REFERENCE_COOLDOWN_SECS);
+        let bonus_as_mult = bonus_as.map(|b| b.get_multiplier()).unwrap_or(1.0);
         spawn_skill_tooltip_content(
             &mut commands,
             &graphics,
@@ -1563,7 +1561,7 @@ pub fn handle_active_skill_hud_tooltip(
             skill_power_multiplier(skill_power, blessings.get_skill_power_bonus()),
             max_mana.0,
             max_health.0,
-            atk_secs,
+            bonus_as_mult,
             crit.0,
             spd.0,
         );

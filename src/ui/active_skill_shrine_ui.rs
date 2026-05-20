@@ -3,15 +3,15 @@ use bevy::{prelude::*, render::view::RenderLayers};
 use crate::{
     assets::Graphics,
     attributes::{
-        attribute_helpers::skill_power_multiplier, AttackCooldown, CritChance, MaxHealth, MaxMana,
-        SkillPower, Speed,
+        attribute_helpers::skill_power_multiplier, BonusAttackSpeed, CritChance, MaxHealth,
+        MaxMana, SkillPower, Speed,
     },
     blessings::OwnedBlessings,
     colors::DARK_WOOD_BROWN,
     item::active_skill_shrine::{ActiveSkillShrineOverwrite, ActiveSkillShrineSelection},
     player::{
         skills::{
-            ActiveSkillChoiceState, FURY_ATTACK_SPEED_REFERENCE_COOLDOWN_SECS, PlayerSkills,
+            ActiveSkillChoiceState, PlayerSkills,
         },
         Player,
     },
@@ -49,7 +49,7 @@ pub fn setup_active_skill_shrine_ui(
             &OwnedBlessings,
             &MaxMana,
             &MaxHealth,
-            Option<&AttackCooldown>,
+            Option<&BonusAttackSpeed>,
             &CritChance,
             &Speed,
         ),
@@ -171,11 +171,9 @@ pub fn setup_active_skill_shrine_ui(
             .insert(Name::new(format!("SKILL_BANNER_{}", index)))
             .set_parent(container)
             .id();
-        let (skill_power, blessings, max_mana, max_health, atk_cd, crit, spd) =
+        let (skill_power, blessings, max_mana, max_health, bonus_as, crit, spd) =
             skill_power.single();
-        let atk_secs = atk_cd
-            .map(|c| c.0)
-            .unwrap_or(FURY_ATTACK_SPEED_REFERENCE_COOLDOWN_SECS);
+        let bonus_as_mult = bonus_as.map(|b| b.get_multiplier()).unwrap_or(1.0);
         spawn_skill_tooltip_content(
             &mut commands,
             &graphics,
@@ -186,7 +184,7 @@ pub fn setup_active_skill_shrine_ui(
             skill_power_multiplier(skill_power, blessings.get_skill_power_bonus()),
             max_mana.0,
             max_health.0,
-            atk_secs,
+            bonus_as_mult,
             crit.0,
             spd.0,
         );
@@ -307,7 +305,7 @@ pub fn setup_active_skill_shrine_overwrite_ui(
             &OwnedBlessings,
             &MaxMana,
             &MaxHealth,
-            Option<&AttackCooldown>,
+            Option<&BonusAttackSpeed>,
             &CritChance,
             &Speed,
         ),
@@ -365,11 +363,9 @@ pub fn setup_active_skill_shrine_overwrite_ui(
         .insert(Name::new("SKILL_VIEW4_BACKGROUND"))
         .id();
 
-    let (skills, skill_power, blessings, max_mana, max_health, atk_cd, crit, spd) =
+    let (skills, skill_power, blessings, max_mana, max_health, bonus_as, crit, spd) =
         skills.single();
-    let atk_secs = atk_cd
-        .map(|c| c.0)
-        .unwrap_or(FURY_ATTACK_SPEED_REFERENCE_COOLDOWN_SECS);
+    let bonus_as_mult = bonus_as.map(|b| b.get_multiplier()).unwrap_or(1.0);
     let choices = vec![
         skills.active_skill_slot_0.clone(),
         skills.active_skill_slot_1.clone(),
@@ -436,7 +432,7 @@ pub fn setup_active_skill_shrine_overwrite_ui(
             skill_power_multiplier(skill_power, blessings.get_skill_power_bonus()),
             max_mana.0,
             max_health.0,
-            atk_secs,
+            bonus_as_mult,
             crit.0,
             spd.0,
         );

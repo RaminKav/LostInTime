@@ -1,7 +1,9 @@
 use bevy::prelude::*;
 
 use crate::{
+    colors::DARK_WOOD_BROWN,
     player::Player,
+    ui::global_text_message::GlobalTextMessageEvent,
     world::{
         dimension::EraManager, portal::BossKillTracker, world_helpers::tile_pos_to_world_pos,
         TILE_SIZE,
@@ -31,6 +33,7 @@ pub fn handle_goal_state_updates(
     game: GameParam,
     boss_kill_tracker: Option<Res<BossKillTracker>>,
     portal_query: Query<&GlobalTransform, With<crate::world::portal::TimePortal>>,
+    mut global_text_events: EventWriter<GlobalTextMessageEvent>,
 ) {
     let player_t = match player_query.get_single() {
         Ok(t) => t,
@@ -58,6 +61,10 @@ pub fn handle_goal_state_updates(
             if let Some(tracker) = boss_kill_tracker.as_ref() {
                 if tracker.is_boss_killed(&game.era.current_era) {
                     *goal_state = GoalState::ReturnToPortal;
+                    global_text_events.send(GlobalTextMessageEvent::new(
+                        "Return to the portal...",
+                        DARK_WOOD_BROWN,
+                    ));
                 }
             }
         }

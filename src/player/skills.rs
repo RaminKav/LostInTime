@@ -330,24 +330,31 @@ pub fn arrow_volley_total_arrows() -> u32 {
     arrow_volley_scaling::WAVE_COUNT * arrow_volley_scaling::ARROWS_PER_WAVE
 }
 
-// --- Fury (throw cadence vs `AttackCooldown`; `skill_heirlooms::tick_fury_duration_and_throw`) ---
+// --- Fury (throw cadence scales purely off `BonusAttackSpeed`; see
+// `skill_heirlooms::tick_fury_duration_and_throw`). The throw timer ticks at
+// `bonus_attack_speed_mult` times real time, where `bonus_attack_speed_mult`
+// is the player's `BonusAttackSpeed` multiplier (1.0 = no bonus, 2.0 = +100%).
+// The weapon's base attack speed is intentionally NOT a factor so slow weapons
+// don't gimp the skill. ---
 
 pub const FURY_DURATION_SECS: f32 = 2.5;
 pub const FURY_THROW_TIMER_EFFECTIVE_SECS: f32 = 0.3;
-pub const FURY_ATTACK_SPEED_REFERENCE_COOLDOWN_SECS: f32 = 0.6;
+pub const FURY_THROW_SPEED_MIN_MULT: f32 = 1.0;
+pub const FURY_THROW_SPEED_MAX_MULT: f32 = 10.0;
 
-pub fn fury_throw_speed_multiplier(attack_cooldown_secs: f32) -> f32 {
-    let denom = 2. * attack_cooldown_secs - FURY_ATTACK_SPEED_REFERENCE_COOLDOWN_SECS;
-    if denom > 0.001 {
-        (FURY_ATTACK_SPEED_REFERENCE_COOLDOWN_SECS / denom).clamp(0.1, 10.0)
-    } else {
-        10.0
-    }
+/// Bonus AS contributes at 2x rate so Fury scales noticeably faster than basic
+/// attacks: `mult = 1 + 2 * (bonus_attack_speed_mult - 1)`. Baseline (no bonus)
+/// stays at 1.0 → 8 kunai per cast.
+pub const FURY_BONUS_AS_SCALE: f32 = 2.0;
+
+pub fn fury_throw_speed_multiplier(bonus_attack_speed_mult: f32) -> f32 {
+    let raw = 1.0 + FURY_BONUS_AS_SCALE * (bonus_attack_speed_mult - 1.0);
+    raw.clamp(FURY_THROW_SPEED_MIN_MULT, FURY_THROW_SPEED_MAX_MULT)
 }
 
 /// Approximate kunai spawned over one Fury (duration matches [`FURY_DURATION_SECS`]).
-pub fn fury_estimated_kunai_per_cast(attack_cooldown_secs: f32) -> f32 {
-    let m = fury_throw_speed_multiplier(attack_cooldown_secs);
+pub fn fury_estimated_kunai_per_cast(bonus_attack_speed_mult: f32) -> f32 {
+    let m = fury_throw_speed_multiplier(bonus_attack_speed_mult);
     (m * FURY_DURATION_SECS / FURY_THROW_TIMER_EFFECTIVE_SECS)
         .floor()
         .max(1.)
@@ -563,7 +570,7 @@ impl ActiveSkill {
         skill_power: f32,
         max_mana: i32,
         max_health: i32,
-        attack_cooldown_secs: f32,
+        bonus_attack_speed_mult: f32,
         crit_chance: i32,
         speed: i32,
     ) -> Vec<String> {
@@ -722,7 +729,7 @@ impl ActiveSkill {
                 format!("{:.1}% damage each.", skill_power * TRIPLE_THROW),
             ],
             ActiveSkill::Fury => {
-                let kunai_n = fury_estimated_kunai_per_cast(attack_cooldown_secs);
+                let kunai_n = fury_estimated_kunai_per_cast(bonus_attack_speed_mult);
                 vec![
                     "Enter fury for a short duration,".to_string(),
                     format!("throwing {:.0} kunai rapidly at enemies", kunai_n),

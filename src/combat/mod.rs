@@ -44,6 +44,7 @@ use crate::{
     custom_commands::CommandsExt,
     enemy::{
         red_mushking::{AoEAttackState, DeathState, ReturnToShrineState, SummonAttackState},
+        scorpion::{ClawAttackCollider, ClawAttackState, ScorpionQueuedAttack, TailAttackState},
         stone_golem::{SpikeAttackState, SpikeWarning},
         Mob, MobLevel,
     },
@@ -1062,6 +1063,10 @@ pub fn cleanup_marked_for_death_entities(
                 .remove::<ReturnToShrineState>()
                 .remove::<AoEAttackState>() // Remove RedMushking's AoE attack state
                 .remove::<SpikeAttackState>() // Remove StoneGolem's attack state
+                .remove::<ClawAttackState>() // Remove Scorpion's claw attack state
+                .remove::<TailAttackState>() // Remove Scorpion's tail attack state
+                .remove::<ScorpionQueuedAttack>()
+                .remove::<ClawAttackCollider>()
                 .remove::<MarkedForDeath>();
         } else {
             let (skills, attack, mana_regen, mut current_mana, projectile_size) =

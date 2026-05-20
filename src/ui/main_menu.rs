@@ -704,6 +704,7 @@ pub fn tick_game_start_overlay(
     for (e, mut timer, mut sprite) in query.iter_mut() {
         timer.0.tick(time.delta());
         if timer.0.finished() {
+            commands.insert_resource(crate::ui::tutorial_ui::PendingFindBossShrineHint);
             commands.insert_resource(XpBarFadeIn(Timer::from_seconds(2.0, TimerMode::Once)));
             commands.insert_resource(crate::ui::tutorial_ui::TutorialReady);
             commands.entity(e).despawn();

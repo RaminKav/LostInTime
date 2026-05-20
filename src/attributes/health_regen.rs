@@ -10,7 +10,7 @@ use crate::player::{
 use super::{
     hunger::Hunger,
     modifiers::{ModifyHealthEvent, ModifyManaEvent},
-    HealthRegen, ManaRegen,
+    CurrentHealth, HealthRegen, ManaRegen,
 };
 
 #[derive(Component)]
@@ -36,13 +36,23 @@ pub fn effective_regen_period_secs(timer_duration_secs: f32, heirloom_stacks: i3
 
 pub fn handle_health_regen(
     mut player_regen: Query<
-        (&HealthRegen, &mut HealthRegenTimer, &Hunger, &PlayerSkills),
+        (
+            &HealthRegen,
+            &mut HealthRegenTimer,
+            &Hunger,
+            &PlayerSkills,
+            Option<&CurrentHealth>,
+        ),
         With<Player>,
     >,
     mut modify_health_event: EventWriter<ModifyHealthEvent>,
     time: Res<Time>,
 ) {
-    let (health_regen, mut timer, hunger, skills) = player_regen.single_mut();
+    let Ok((health_regen, mut timer, hunger, skills, current_health)) =
+        player_regen.get_single_mut()
+    else {
+        return;
+    };
     let d = time.delta();
 
     // Multiplicatively reduce regen cooldown per stack (0.75^stacks)
@@ -57,7 +67,17 @@ pub fn handle_health_regen(
         if hunger.is_starving() {
             return;
         }
-        modify_health_event.send(ModifyHealthEvent(health_regen.0));
+        let regen_delta = health_regen.0;
+        if regen_delta < 0 {
+            let would_be_lethal = current_health
+                .map(|h| h.0 + regen_delta <= 0)
+                .unwrap_or(true);
+            if would_be_lethal {
+                timer.0.reset();
+                return;
+            }
+        }
+        modify_health_event.send(ModifyHealthEvent(regen_delta));
         timer.0.reset();
     }
 }
@@ -72,7 +92,9 @@ pub fn handle_mana_regen(
     mut modify_mana_event: EventWriter<ModifyManaEvent>,
     time: Res<Time>,
 ) {
-    let (mana_regen, mut timer, hunger, skills) = player_regen.single_mut();
+    let Ok((mana_regen, mut timer, hunger, skills)) = player_regen.get_single_mut() else {
+        return;
+    };
     let d = time.delta();
 
     // Multiplicatively reduce regen cooldown per stack (0.75^stacks)

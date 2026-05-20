@@ -5,10 +5,10 @@ use bevy_aseprite::{anim::AsepriteAnimation, aseprite, AsepriteBundle};
 
 use crate::audio::{AudioSoundEffect, SoundSpawner};
 use crate::client::GameData;
-use crate::colors::{BLACK, DARK_GREEN, WHITE, YELLOW_2};
+use crate::colors::{BLACK, DARK_GREEN, DARK_WOOD_BROWN, WHITE, YELLOW_2};
 use crate::cursor::CursorPos;
 use crate::datafiles;
-use crate::ui::{Interactable, Interaction};
+use crate::ui::{global_text_message::GlobalTextMessageEvent, Interactable, Interaction};
 use crate::GameState;
 
 use std::fs::File;
@@ -41,6 +41,29 @@ aseprite!(pub TutorialAnims, "ui/TutorialAnims.ase");
 /// Consumed by `try_spawn_tutorial_overlay` on the first run.
 #[derive(Resource)]
 pub struct TutorialReady;
+
+/// Queued at run start; shown after the first-run tutorial closes, or immediately if
+/// the tutorial is skipped (`has_seen_tutorial`).
+#[derive(Resource)]
+pub struct PendingFindBossShrineHint;
+
+fn show_find_boss_shrine_hint(events: &mut EventWriter<GlobalTextMessageEvent>) {
+    events.send(GlobalTextMessageEvent::new(
+        "Find the Boss Shrine",
+        DARK_WOOD_BROWN,
+    ));
+}
+
+fn flush_pending_find_boss_shrine_hint(
+    commands: &mut Commands,
+    pending: Option<Res<PendingFindBossShrineHint>>,
+    global_text_events: &mut EventWriter<GlobalTextMessageEvent>,
+) {
+    if pending.is_some() {
+        show_find_boss_shrine_hint(global_text_events);
+        commands.remove_resource::<PendingFindBossShrineHint>();
+    }
+}
 
 /// Queued from Options → "Show Tutorial"; same spawn path as [`TutorialReady`] but skips `has_seen_tutorial`.
 #[derive(Resource)]
@@ -103,7 +126,7 @@ impl TutorialContent {
                 "Heirlooms will boost stats or\n\ngrant strong effects. Use them\n\nto create a strong build!"
             }
             TutorialContent::Equipment => {
-                "Equipment can be equiped to boost\n\nyour stats. Upgrade them to make\n\nthem stronger!"
+                "Equipment can be equipped to boost\n\nyour stats. Upgrade them to make\n\nthem stronger!"
             }
             TutorialContent::UpgradeTomes => {
                 "Tomes will level up gear, granting\n\nmore base stats, and improving\n\nrandom bonus stats each level."
@@ -171,6 +194,8 @@ pub(crate) fn try_spawn_tutorial_overlay(
     asset_server: Res<AssetServer>,
     mut state: ResMut<TutorialState>,
     existing: Query<(), With<TutorialUI>>,
+    pending_hint: Option<Res<PendingFindBossShrineHint>>,
+    mut global_text_events: EventWriter<GlobalTextMessageEvent>,
 ) {
     let first_run = ready.is_some();
     let replay = replay.is_some();
@@ -193,6 +218,11 @@ pub(crate) fn try_spawn_tutorial_overlay(
             .map(|g| g.has_seen_tutorial)
             .unwrap_or(false);
         if already_seen {
+            flush_pending_find_boss_shrine_hint(
+                &mut commands,
+                pending_hint,
+                &mut global_text_events,
+            );
             commands.remove_resource::<TutorialReady>();
             return;
         }
@@ -532,6 +562,8 @@ fn handle_tutorial_buttons(
     all_tutorial: Query<Entity, With<TutorialUI>>,
     mut state: ResMut<TutorialState>,
     mut game_data: Option<ResMut<GameData>>,
+    pending_hint: Option<Res<PendingFindBossShrineHint>>,
+    mut global_text_events: EventWriter<GlobalTextMessageEvent>,
 ) {
     if button_queries.p1().is_empty() {
         return;
@@ -586,6 +618,11 @@ fn handle_tutorial_buttons(
                     ec.despawn_recursive();
                 }
             }
+            flush_pending_find_boss_shrine_hint(
+                &mut commands,
+                pending_hint,
+                &mut global_text_events,
+            );
             if let Some(gd) = game_data.as_mut() {
                 gd.has_seen_tutorial = true;
                 persist_has_seen_tutorial(true);

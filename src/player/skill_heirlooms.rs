@@ -9,7 +9,7 @@ use crate::{
     ai::FollowState,
     animations::{player_sprite::PlayerAnimation, AttackEvent},
     attributes::{
-        attribute_helpers::skill_power_multiplier, ActiveConsumableBuffs, Attack, AttackCooldown,
+        attribute_helpers::skill_power_multiplier, ActiveConsumableBuffs, Attack,
         AttributeChangeEvent, BonusAttackSpeed, ConsumableBuffEffect, ConsumableBuffEntry,
         CurrentHealth, CurrentMana, MaxHealth, SkillPower, Speed,
     },
@@ -43,8 +43,7 @@ use crate::{
                 TRIPLE_THROW,
             },
             arrow_volley_scaling,
-            FURY_ATTACK_SPEED_REFERENCE_COOLDOWN_SECS, FURY_DURATION_SECS,
-            FURY_THROW_TIMER_EFFECTIVE_SECS,
+            fury_throw_speed_multiplier, FURY_DURATION_SECS, FURY_THROW_TIMER_EFFECTIVE_SECS,
             grant_skill_charge_after_cooldown_complete, ActiveSkill, ActiveSkillUsedEvent,
             ArrowVolleyState, BombState, BuckshotSkillState, ClassSkillSlots,
             DaggerThrowKillTracker, DaggerThrowState, DruidTreeSkillState, FirePillarState,
@@ -1415,22 +1414,16 @@ pub fn tick_class_skill_hit_clear_timers(
 pub fn tick_fury_duration_and_throw(
     time: Res<Time>,
     mut fury: Query<&mut FuryState, With<Player>>,
-    attack_cooldown: Query<&AttackCooldown, With<Player>>,
+    bonus_attack_speed: Query<&BonusAttackSpeed, With<Player>>,
 ) {
     for mut f in fury.iter_mut() {
         f.duration.tick(time.delta());
-        let attack_speed_mult = if let Ok(cooldown) = attack_cooldown.get_single() {
-            let denom = 2. * cooldown.0 - FURY_ATTACK_SPEED_REFERENCE_COOLDOWN_SECS;
-            let raw = if denom > 0.001 {
-                FURY_ATTACK_SPEED_REFERENCE_COOLDOWN_SECS / denom
-            } else {
-                10.0
-            };
-            raw.clamp(0.1, 10.0)
-        } else {
-            1.0
-        };
-        let scaled_delta = time.delta().mul_f32(attack_speed_mult);
+        let bonus_mult = bonus_attack_speed
+            .get_single()
+            .map(|b| b.get_multiplier())
+            .unwrap_or(1.0);
+        let throw_speed_mult = fury_throw_speed_multiplier(bonus_mult);
+        let scaled_delta = time.delta().mul_f32(throw_speed_mult);
         f.throw_timer.tick(scaled_delta);
     }
 }

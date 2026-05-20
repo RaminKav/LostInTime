@@ -9,8 +9,8 @@ use super::{
     spawn_item_stack_icon,
 };
 
-const MESSAGE_DISPLAY_SECS: f32 = 2.5;
-const TOP_MARGIN: f32 = 60.0;
+const MESSAGE_DISPLAY_SECS: f32 = 3.5;
+const TOP_MARGIN: f32 = 80.0;
 
 const CARD_BASE_W: f32 = 16.;
 const ICON_SCALE: f32 = 2.0;
