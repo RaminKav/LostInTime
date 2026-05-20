@@ -5,7 +5,7 @@
   "survival_rogue_like::item::WorldObject": Claw,
   "survival_rogue_like::item::EquipmentType": Weapon,
   "survival_rogue_like::attributes::RawItemBaseAttributes": (
-        attack: Some((start: 9, end: 12)),
+        attack: Some((start: 8, end: 11)),
   ),
   "survival_rogue_like::attributes::RawItemBonusAttributes": (
         crit_damage: Some((start: 8, end: 18)),
@@ -27,7 +27,7 @@
   "survival_rogue_like::inventory::ItemStack": (
         obj_type: Claw,
         attributes: (
-            attack_cooldown: 0.6
+            attack_cooldown: 0.67
         ),
         metadata: (
             name: "Claw", 

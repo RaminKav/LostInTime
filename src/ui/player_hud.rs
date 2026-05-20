@@ -338,7 +338,7 @@ pub fn setup_bars_ui(
         .spawn(MaterialMesh2dBundle {
             mesh: mana_mesh,
             material: mana_material,
-            transform: Transform::from_translation(Vec3::new(HUD_FILL_X_OFFSET, 0.0, 1.0)),
+            transform: Transform::from_translation(Vec3::new(HUD_FILL_X_OFFSET + 1., -5.0, 1.0)),
             ..default()
         })
         .insert(RenderLayers::from_layers(&[3]))
@@ -349,7 +349,7 @@ pub fn setup_bars_ui(
         .spawn(Text2dBundle {
             text: Text::from_section(format!("{mana_amount}"), bar_label_style),
             text_anchor: Anchor::Center,
-            transform: Transform::from_translation(Vec3::new(1., -3., 2.)),
+            transform: Transform::from_translation(Vec3::new(1., 0., 2.)),
             ..default()
         })
         .insert(RenderLayers::from_layers(&[3]))

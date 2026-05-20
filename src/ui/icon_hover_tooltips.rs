@@ -11,7 +11,7 @@ use crate::{
 };
 
 /// Grey translucent backdrop (same fill as HUD keybind badges).
-pub const ICON_HOVER_TOOLTIP_BG_COLOR: Color = KEYBIND_BADGE_COLOR;
+pub const ICON_HOVER_TOOLTIP_BG_COLOR: Color = Color::rgba(62. / 255., 58. / 255., 58. / 255., 0.9);
 
 /// World-space Z for icon hover tooltips (above inventory panels and slots).
 pub const ICON_HOVER_TOOLTIP_Z: f32 = 30.0;
