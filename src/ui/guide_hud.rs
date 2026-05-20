@@ -1,8 +1,7 @@
-use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
+use bevy::prelude::*;
 
 use crate::{
     player::Player,
-    ui::{game_fonts as gf, player_hud::ProgressHudBar, PROGRESS_BACKGROUND_SIZE},
     world::{
         dimension::EraManager, portal::BossKillTracker, world_helpers::tile_pos_to_world_pos,
         TILE_SIZE,
@@ -91,49 +90,12 @@ pub fn handle_goal_reset_on_era_change(
     *prev_era = Some(current_era.clone());
 }
 
+/// Compact progress HUD omits objective text; despawn any legacy `GoalText` entities.
 pub fn display_goal_text(
     mut commands: Commands,
-    goal_state: Res<GoalState>,
-    asset_server: Res<AssetServer>,
     goal_text_query: Query<Entity, With<GoalText>>,
-    progress_bar: Query<Entity, With<ProgressHudBar>>,
 ) {
-    // Update text when goal state changes or if no text exists yet
-    if !goal_state.is_changed() && !goal_text_query.is_empty() {
-        return;
-    }
-
-    let Ok(progress_parent) = progress_bar.get_single() else {
-        return;
-    };
-
-    // Remove old goal text
     for entity in goal_text_query.iter() {
         commands.entity(entity).despawn_recursive();
     }
-
-    // Get goal text
-    let goal_text = match *goal_state {
-        GoalState::FindBossShrine => "Find Boss Shrine",
-        GoalState::DefeatBoss => "Defeat the Boss",
-        GoalState::ReturnToPortal => "Return To Portal",
-    };
-
-    let objective_x = -PROGRESS_BACKGROUND_SIZE.x * 0.5 + 12.;
-
-    commands
-        .spawn(Text2dBundle {
-            text: Text::from_section(
-                goal_text,
-                gf::HUD_OBJECTIVE.text_style(&asset_server, Color::WHITE),
-            )
-            .with_alignment(TextAlignment::Left),
-            text_anchor: Anchor::CenterLeft,
-            transform: Transform::from_translation(Vec3::new(objective_x, 0., 2.)),
-            ..Default::default()
-        })
-        .insert(GoalText)
-        .insert(RenderLayers::from_layers(&[3]))
-        .insert(Name::new("Goal Text"))
-        .set_parent(progress_parent);
 }

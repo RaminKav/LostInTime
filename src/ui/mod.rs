@@ -51,8 +51,10 @@ mod player_movement_cooldown_bar;
 mod skill_choice_ui;
 pub mod stats_ui;
 pub use active_skill_shrine_ui::*;
+mod icon_hover_tooltips;
 mod tile_hover;
 mod tooltips;
+pub use icon_hover_tooltips::*;
 pub mod microwave_shrine_ui;
 pub use microwave_shrine_ui::*;
 pub mod ui_helpers;
@@ -245,14 +247,23 @@ pub const HUD_SKILL_SPACING_X: f32 = 25.0;
 /// Invisible hit area for HUD skill-slot drag-and-drop (matches the former 20×20 slot bg).
 pub const HUD_SKILL_SLOT_HIT_SIZE: Vec2 = Vec2::new(20., 20.);
 
-/// `assets/ui/ProgressBackground.png` draw size.
-pub const PROGRESS_BACKGROUND_SIZE: Vec2 = Vec2::new(236., 32.);
+/// `assets/ui/ProgressBackground.png` draw size (compact HUD: score + chaos only).
+pub const PROGRESS_BACKGROUND_SIZE: Vec2 = Vec2::new(102., 24.);
 
 /// `assets/ui/CurrencyBackground.png` draw size.
 pub const CURRENCY_BACKGROUND_SIZE: Vec2 = Vec2::new(64., 26.);
 
 /// Gap between the two currency background sprites in the HUD row below the XP bar.
 pub const HUD_CURRENCY_BACKGROUND_GAP: f32 = 10.;
+
+/// Gap between the coin currency background and the progress (score/chaos) bar.
+pub const HUD_PROGRESS_AFTER_CURRENCY_GAP: f32 = 10.;
+
+/// Gap between the progress bar and the era timeline.
+pub const HUD_TIMELINE_AFTER_PROGRESS_GAP: f32 = 4.0;
+
+/// Inset from the left screen edge to the first currency background center.
+pub const HUD_CURRENCY_LEFT_PADDING: f32 = 4.0;
 
 /// World-space Y for the HUD row (currency backgrounds + progress bar) sitting just under the XP bar.
 pub fn hud_row_below_xp_y(game_height: f32) -> f32 {
@@ -261,14 +272,8 @@ pub fn hud_row_below_xp_y(game_height: f32) -> f32 {
     game_height * 0.5 - 20.
 }
 
-/// Inset from the right screen edge (`game_width / 2`) for the era-timer background's right side.
-pub const HUD_ERA_TIMER_RIGHT_INSET: f32 = 81.0;
-
-/// Default era-timer background width at setup (matches `setup_era_timer_hud`).
-pub const HUD_ERA_TIMER_DEFAULT_WIDTH: f32 = 42.0;
-
-/// Center-to-center X distance between the era timeline and era timer.
-pub const HUD_CLOCK_TO_ERA_TIMER_CENTER_OFFSET: f32 = 33.0;
+/// Endless-mode era timer background width (matches `handle_update_era_timer_hud`).
+pub const HUD_ERA_TIMER_ENDLESS_WIDTH: f32 = 68.0;
 
 /// `assets/ui/Timeline.png` draw size.
 pub const HUD_TIMELINE_SIZE: Vec2 = Vec2::new(174., 18.);
@@ -281,14 +286,37 @@ pub fn hud_timeline_arrow_local_x(progress: f32) -> f32 {
     (progress.clamp(0., 1.) - 0.5) * (HUD_TIMELINE_SIZE.x -2.0)
 }
 
-/// Era-timer background center X so its right edge sits `HUD_ERA_TIMER_RIGHT_INSET` from the screen edge.
-pub fn hud_era_timer_center_x(game_width: f32, timer_width: f32) -> f32 {
-    game_width * 0.5 - HUD_ERA_TIMER_RIGHT_INSET - timer_width * 0.5
+/// First (time fragment) currency background center X from the left screen edge.
+pub fn hud_currency_first_center_x(game_width: f32) -> f32 {
+    -game_width * 0.5
+        + CURRENCY_BACKGROUND_SIZE.x * 0.5
+        + HUD_CURRENCY_LEFT_PADDING
 }
 
-/// Era timeline center X: fixed spacing left of the era timer.
-pub fn hud_clock_center_x(game_width: f32, timer_width: f32) -> f32 {
-    hud_era_timer_center_x(game_width, timer_width) - HUD_CLOCK_TO_ERA_TIMER_CENTER_OFFSET
+/// Second (coin) currency background center X.
+pub fn hud_currency_second_center_x(game_width: f32) -> f32 {
+    hud_currency_first_center_x(game_width) + CURRENCY_BACKGROUND_SIZE.x + HUD_CURRENCY_BACKGROUND_GAP
+}
+
+/// Progress bar center X, placed immediately after the coin currency slot.
+pub fn hud_progress_bar_center_x(game_width: f32) -> f32 {
+    hud_currency_second_center_x(game_width)
+        + CURRENCY_BACKGROUND_SIZE.x * 0.5
+        + HUD_PROGRESS_AFTER_CURRENCY_GAP
+        + PROGRESS_BACKGROUND_SIZE.x * 0.5
+}
+
+/// Era timeline center X, placed after the progress bar.
+pub fn hud_timeline_center_x(game_width: f32) -> f32 {
+    hud_progress_bar_center_x(game_width)
+        + PROGRESS_BACKGROUND_SIZE.x * 0.5
+        + HUD_TIMELINE_AFTER_PROGRESS_GAP
+        + HUD_TIMELINE_SIZE.x * 0.5
+}
+
+/// Endless-mode timer center X, flush against the timeline's right edge.
+pub fn hud_era_timer_center_x(game_width: f32, timer_width: f32) -> f32 {
+    hud_timeline_center_x(game_width) + HUD_TIMELINE_SIZE.x * 0.5 + timer_width * 0.5
 }
 
 /// Gap between the bottom of the progress bar row and the heirloom icon row.
@@ -303,7 +331,7 @@ pub const HUD_HEIRLOOM_ICON_SPACING: f32 = 16.0;
 pub const HUD_HEIRLOOM_LEFT_PADDING: f32 = 4.0;
 
 /// Nudge the heirloom row upward from its default position below the progress bar.
-pub const HUD_HEIRLOOM_ROW_Y_NUDGE: f32 = 14.0;
+pub const HUD_HEIRLOOM_ROW_Y_NUDGE: f32 = 10.0;
 
 /// World-space Y for the heirloom icon row (below the progress / currency HUD row).
 pub fn hud_heirloom_row_y(game_height: f32) -> f32 {
@@ -623,6 +651,11 @@ impl Plugin for UIPlugin {
                     handle_interaction_clicks
                         .before(handle_item_drop_clicks)
                         .run_if(not(in_state(UIState::Closed))),
+                    handle_icon_hover_tooltips
+                        .after(handle_interaction_clicks)
+                        .after(handle_sort_inventory_button_click)
+                        .after(handle_material_drops_toggle_button_click)
+                        .run_if(in_state(GameState::Main)),
                     handle_spawn_inv_item_tooltip,
                     update_inventory_ui.after(CustomFlush),
                     handle_update_inv_item_entities,

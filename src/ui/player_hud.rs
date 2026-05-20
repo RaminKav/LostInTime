@@ -3,23 +3,22 @@ use rand::Rng;
 use std::collections::HashMap;
 
 use super::{
-    damage_numbers::spawn_text,
     heirloom_tooltip::{
         heirloom_hud_hover_tooltip_position, HeirloomTooltipRequest, HeirloomTooltipShow,
     },
-    hud_clock_center_x, hud_era_timer_center_x, hud_heirloom_first_icon_x, hud_heirloom_row_y,
-    hud_hotbar_slot_center_x, hud_keybind_badge_center_y, hud_row_below_xp_y,
-    hud_timeline_arrow_local_x,
+    hud_currency_first_center_x, hud_currency_second_center_x, hud_era_timer_center_x,
+    hud_heirloom_first_icon_x, hud_heirloom_row_y, hud_hotbar_slot_center_x,
+    hud_keybind_badge_center_y, hud_progress_bar_center_x, hud_row_below_xp_y,
+    hud_timeline_arrow_local_x, hud_timeline_center_x,
     interactions::{DraggedItem, Interaction},
     spawn_inv_slot, spawn_item_stack_icon,
     tooltips::spawn_world_item_tooltip_for_stack,
     tooltips::ConsumableBuffHudTooltip,
     ui_helpers::{spawn_keybind_badge, Z_DEPTH_HUD_ACTIVE_SKILLS, Z_DEPTH_HUD_HEIRLOOM_ICONS},
     InventorySlotType, InventoryState, InventoryUI, UIElement, UIState, CURRENCY_BACKGROUND_SIZE,
-    HUD_ACTION_ROW_Y_FROM_BOTTOM, HUD_CURRENCY_BACKGROUND_GAP, HUD_ERA_TIMER_DEFAULT_WIDTH,
-    HUD_FRAME_Y_FROM_BOTTOM, HUD_HEIRLOOM_ICON_SPACING, HUD_HOTBAR_SLOTS, HUD_SKILLS_CENTER_X,
-    HUD_SKILL_SLOT_HIT_SIZE, HUD_SKILL_SPACING_X, HUD_TIMELINE_ARROWS_SIZE, HUD_TIMELINE_SIZE,
-    PROGRESS_BACKGROUND_SIZE,
+    HUD_ACTION_ROW_Y_FROM_BOTTOM, HUD_ERA_TIMER_ENDLESS_WIDTH, HUD_FRAME_Y_FROM_BOTTOM,
+    HUD_HEIRLOOM_ICON_SPACING, HUD_HOTBAR_SLOTS, HUD_SKILLS_CENTER_X, HUD_SKILL_SLOT_HIT_SIZE,
+    HUD_SKILL_SPACING_X, HUD_TIMELINE_ARROWS_SIZE, HUD_TIMELINE_SIZE, PROGRESS_BACKGROUND_SIZE,
 };
 use crate::{
     assets::Graphics,
@@ -103,13 +102,17 @@ pub struct CoinText;
 #[derive(Component)]
 pub struct ScoreText;
 
-/// Center-screen progress / objective bar (`ProgressBackground.png`).
+/// Center-screen compact progress bar (`ProgressBackground.png`, score + chaos).
 #[derive(Component)]
 pub struct ProgressHudBar;
 
 /// One of the two currency count backgrounds below the XP bar.
 #[derive(Component)]
 pub struct CurrencyHudBackground;
+
+/// `0` = time fragments, `1` = coins (left-to-right HUD row).
+#[derive(Component)]
+pub struct CurrencyHudSlotIndex(pub u8);
 
 #[derive(Component)]
 pub struct TimelineHUD;
@@ -412,15 +415,12 @@ pub fn setup_xp_bar_ui(
     let level_frame = commands
         .spawn(SpriteBundle {
             sprite: Sprite {
-                color: overwrite_alpha(Color::rgba(0.1, 0.1, 0.1, 0.85), 0.),
+                color: overwrite_alpha(Color::rgba(0.1, 0.1, 0.1, 0.0), 0.),
                 custom_size: Some(Vec2::new(46., 11.)),
                 ..default()
             },
             transform: Transform {
-                translation: Vec3::new(
-                    20., -1., // Right of the clock
-                    -1.,
-                ),
+                translation: Vec3::new(0., 0., -1.),
                 ..Default::default()
             },
             ..default()
@@ -439,13 +439,9 @@ pub fn setup_xp_bar_ui(
                         color: overwrite_alpha(WHITE, 0.),
                     },
                 ),
-                text_anchor: Anchor::CenterLeft,
+                text_anchor: Anchor::Center,
                 transform: Transform {
-                    translation: Vec3::new(
-                        res.game_width / 2. - 44.,
-                        res.game_height / 2. - 10.5,
-                        1.,
-                    ),
+                    translation: Vec3::new(0., res.game_height / 2. - 3., 12.),
                     scale: Vec3::new(1., 1., 1.),
                     ..Default::default()
                 },
@@ -462,7 +458,7 @@ pub fn setup_xp_bar_ui(
     //     .push_children(&[inner_xp_prog, text]);
 }
 /// Spawns the HUD row just below the XP bar: two currency backgrounds (time fragments +
-/// coins) on the left, and the centered progress background (objective + score/chaos).
+/// coins) on the left, and the compact centered progress background (score + chaos only).
 pub fn setup_currency_ui(
     mut commands: Commands,
     currency: Res<TimeFragmentCurrency>,
@@ -478,9 +474,9 @@ pub fn setup_currency_ui(
     let currency_style = gf::HUD_CURRENCY_COUNT.text_style(&asset_server, WHITE);
     let progress_stat_style = gf::HUD_PROGRESS_STAT.text_style(&asset_server, WHITE);
 
-    let half_currency = CURRENCY_BACKGROUND_SIZE.x * 0.5;
-    let first_center_x = -res.game_width * 0.5 + half_currency + 4.;
-    let second_center_x = first_center_x + CURRENCY_BACKGROUND_SIZE.x + HUD_CURRENCY_BACKGROUND_GAP;
+    let first_center_x = hud_currency_first_center_x(res.game_width);
+    let second_center_x = hud_currency_second_center_x(res.game_width);
+    let progress_center_x = hud_progress_bar_center_x(res.game_width);
 
     // Time fragments slot
     {
@@ -496,6 +492,7 @@ pub fn setup_currency_ui(
             })
             .insert(RenderLayers::from_layers(&[3]))
             .insert(CurrencyHudBackground)
+            .insert(CurrencyHudSlotIndex(0))
             .insert(Name::new("TIME FRAGMENT CURRENCY BG"))
             .id();
 
@@ -542,11 +539,12 @@ pub fn setup_currency_ui(
                     custom_size: Some(CURRENCY_BACKGROUND_SIZE),
                     ..default()
                 },
-                transform: Transform::from_translation(Vec3::new(second_center_x, row_y, 5.)),
+                transform: Transform::from_translation(Vec3::new(second_center_x, row_y, 3.)),
                 ..default()
             })
             .insert(RenderLayers::from_layers(&[3]))
             .insert(CurrencyHudBackground)
+            .insert(CurrencyHudSlotIndex(1))
             .insert(Name::new("COIN CURRENCY BG"))
             .id();
 
@@ -581,7 +579,7 @@ pub fn setup_currency_ui(
         commands.entity(coin_text).set_parent(bg);
     }
 
-    // Center progress bar — objective text is spawned by `display_goal_text` as a child.
+    // Compact center progress bar (102×24): score + chaos only.
     let progress_bar = commands
         .spawn(SpriteBundle {
             texture: graphics.get_ui_element_texture(UIElement::ProgressBackground),
@@ -589,7 +587,7 @@ pub fn setup_currency_ui(
                 custom_size: Some(PROGRESS_BACKGROUND_SIZE),
                 ..default()
             },
-            transform: Transform::from_translation(Vec3::new(-36., row_y + 2., 7.)),
+            transform: Transform::from_translation(Vec3::new(progress_center_x, row_y + 1., 7.)),
             ..default()
         })
         .insert(RenderLayers::from_layers(&[3]))
@@ -598,14 +596,14 @@ pub fn setup_currency_ui(
         .id();
 
     let chaos_value = chaos_tracker.get_chaos() + infinite_mode.get_chaos_bonus();
-    let progress_right_x = PROGRESS_BACKGROUND_SIZE.x * 0.5 - 80.;
 
     commands
         .spawn((
             Text2dBundle {
-                text: Text::from_section("Score: 0", progress_stat_style.clone()),
-                text_anchor: Anchor::CenterLeft,
-                transform: Transform::from_translation(Vec3::new(progress_right_x, 4., 2.)),
+                text: Text::from_section("Score: 0", progress_stat_style.clone())
+                    .with_alignment(TextAlignment::Center),
+                text_anchor: Anchor::Center,
+                transform: Transform::from_translation(Vec3::new(0., 4., 2.)),
                 ..default()
             },
             Name::new("SCORE TEXT"),
@@ -617,9 +615,10 @@ pub fn setup_currency_ui(
     commands
         .spawn((
             Text2dBundle {
-                text: Text::from_section(format!("Chaos: {:.1}", chaos_value), progress_stat_style),
-                text_anchor: Anchor::CenterLeft,
-                transform: Transform::from_translation(Vec3::new(progress_right_x, -5., 2.)),
+                text: Text::from_section(format!("Chaos: {:.1}", chaos_value), progress_stat_style)
+                    .with_alignment(TextAlignment::Center),
+                text_anchor: Anchor::Center,
+                transform: Transform::from_translation(Vec3::new(0., -5., 2.)),
                 ..default()
             },
             ChaosText,
@@ -852,7 +851,7 @@ pub fn tick_xp_bar_fade_in(
             }
         }
         for mut sprite in xp_bar_frame.iter_mut() {
-            sprite.color = overwrite_alpha(sprite.color, 0.85);
+            // sprite.color = overwrite_alpha(sprite.color, 0.85);
         }
         commands.remove_resource::<XpBarFadeIn>();
         return;
@@ -869,7 +868,7 @@ pub fn tick_xp_bar_fade_in(
         }
     }
     for mut sprite in xp_bar_frame.iter_mut() {
-        sprite.color = overwrite_alpha(sprite.color, 0.7 * t);
+        // sprite.color = overwrite_alpha(sprite.color, 0.7 * t);
     }
 }
 
@@ -2341,7 +2340,7 @@ pub fn setup_timeline_hud(
     res: Res<ScreenResolution>,
 ) {
     let row_y = hud_row_below_xp_y(res.game_height) + 2.;
-    let timeline_x = hud_clock_center_x(res.game_width, HUD_ERA_TIMER_DEFAULT_WIDTH);
+    let timeline_x = hud_timeline_center_x(res.game_width);
 
     let timeline = commands
         .spawn(SpriteBundle {
@@ -2386,56 +2385,55 @@ fn era_timeline_progress(era_timer: &EraTimer, infinite_mode: &InfiniteMode) -> 
     }
 }
 
-/// Setup era timer HUD - displays countdown timer for the era
+/// Endless-mode timer HUD (hidden until infinite mode is active).
 pub fn setup_era_timer_hud(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
-    era_timer: Res<crate::night::EraTimer>,
     res: Res<ScreenResolution>,
     existing: Query<Entity, With<EraTimerHUD>>,
 ) {
-    // Don't spawn if already exists
     if !existing.is_empty() {
         return;
     }
 
     let row_y = hud_row_below_xp_y(res.game_height) + 2.;
-    let timer_width = HUD_ERA_TIMER_DEFAULT_WIDTH;
+    let timer_width = HUD_ERA_TIMER_ENDLESS_WIDTH;
     let timer_x = hud_era_timer_center_x(res.game_width, timer_width);
 
-    // Same HUD row as the progress bar; right edge ~80px from screen right.
     let era_timer_frame = commands
-        .spawn(SpriteBundle {
-            sprite: Sprite {
-                color: Color::rgba(0.1, 0.1, 0.1, 0.7),
-                custom_size: Some(Vec2::new(timer_width, 16.)),
+        .spawn((
+            SpriteBundle {
+                sprite: Sprite {
+                    color: Color::rgba(0.4, 0.1, 0.1, 0.8),
+                    custom_size: Some(Vec2::new(timer_width, 24.)),
+                    ..default()
+                },
+                transform: Transform {
+                    translation: Vec3::new(timer_x, row_y, 5.),
+                    ..Default::default()
+                },
+                visibility: Visibility::Hidden,
                 ..default()
             },
-            transform: Transform {
-                translation: Vec3::new(timer_x, row_y, 5.),
-                ..Default::default()
-            },
-            ..default()
-        })
-        .insert(Name::new("ERA TIMER HUD"))
-        .insert(RenderLayers::from_layers(&[3]))
-        .insert(EraTimerHUD)
+            Name::new("ERA TIMER HUD"),
+            RenderLayers::from_layers(&[3]),
+            EraTimerHUD,
+        ))
         .id();
 
     let _timer_text = commands
         .spawn((
             Text2dBundle {
                 text: Text::from_section(
-                    era_timer.get_display_string(),
+                    "ENDLESS",
                     TextStyle {
                         font: asset_server.load("fonts/alagard.ttf"),
                         font_size: 15.0,
-                        color: WHITE.with_a(0.),
+                        color: RED,
                     },
                 ),
                 transform: Transform {
                     translation: Vec3::new(0., -2., 1.),
-                    scale: Vec3::new(1., 1., 1.),
                     ..Default::default()
                 },
                 ..default()
@@ -2477,70 +2475,61 @@ pub fn handle_update_era_timer_hud(
     mut timer_text: Query<&mut Text, (With<EraTimerText>, Without<EndlessElapsedText>)>,
     mut elapsed_text: Query<&mut Text, (With<EndlessElapsedText>, Without<EraTimerText>)>,
     mut hud_transforms: ParamSet<(
-        Query<(&mut Sprite, &mut Transform), With<EraTimerHUD>>,
+        Query<(&mut Sprite, &mut Transform, &mut Visibility), With<EraTimerHUD>>,
         Query<&mut Transform, With<TimelineHUD>>,
         Query<&mut Transform, With<TimelineProgressArrows>>,
+        Query<(&CurrencyHudSlotIndex, &mut Transform), With<CurrencyHudBackground>>,
+        Query<&mut Transform, With<ProgressHudBar>>,
     )>,
     res: Res<ScreenResolution>,
 ) {
+    let endless = infinite_mode.active;
+
     for mut text in timer_text.iter_mut() {
-        if infinite_mode.active {
+        if endless {
             text.sections[0].value = "ENDLESS".to_string();
             text.sections[0].style.color = RED;
         } else {
-            text.sections[0].value = era_timer.get_display_string();
-            // Change color based on time remaining
-            let color = if era_timer.remaining_seconds <= 60.0 {
-                RED // Last minute - red
-            } else if era_timer.remaining_seconds <= 180.0 {
-                YELLOW // Last 3 minutes - yellow
-            } else {
-                WHITE
-            };
-            text.sections[0].style.color = color;
+            text.sections[0].style.color = WHITE.with_a(0.);
         }
     }
 
-    // Update endless elapsed timer (only visible during endless mode)
     for mut text in elapsed_text.iter_mut() {
-        if infinite_mode.active {
+        if endless {
             text.sections[0].value = infinite_mode.get_elapsed_display_string();
             text.sections[0].style.color = YELLOW;
         } else {
-            // Hide when not in endless mode
             text.sections[0].style.color = WHITE.with_a(0.);
         }
     }
 
     let row_y = hud_row_below_xp_y(res.game_height) + 2.;
-    let mut timer_width = HUD_ERA_TIMER_DEFAULT_WIDTH;
+    let progress_row_y = hud_row_below_xp_y(res.game_height);
 
-    // Update background color and size based on mode
-    for (mut sprite, mut transform) in hud_transforms.p0().iter_mut() {
+    for (slot, mut transform) in hud_transforms.p3().iter_mut() {
+        transform.translation.x = match slot.0 {
+            0 => hud_currency_first_center_x(res.game_width),
+            1 => hud_currency_second_center_x(res.game_width),
+            _ => transform.translation.x,
+        };
+        transform.translation.y = progress_row_y;
+    }
+    for mut progress_txfm in hud_transforms.p4().iter_mut() {
+        progress_txfm.translation.x = hud_progress_bar_center_x(res.game_width);
+        progress_txfm.translation.y = progress_row_y + 1.;
+    }
+
+    let timer_size = Vec2::new(HUD_ERA_TIMER_ENDLESS_WIDTH, 24.);
+    for (mut sprite, mut transform, mut visibility) in hud_transforms.p0().iter_mut() {
         transform.translation.y = row_y;
-
-        if infinite_mode.active {
-            // Bigger size for "ENDLESS" text + elapsed timer below
-            let size = Vec2::new(68., 24.);
-            timer_width = size.x;
-            sprite.custom_size = Some(size);
-            sprite.color = Color::rgba(0.4, 0.1, 0.1, 0.8);
-            transform.translation.x = hud_era_timer_center_x(res.game_width, size.x);
-        } else if era_timer.remaining_seconds <= 60.0 {
-            let size = Vec2::new(42., 14.);
-            timer_width = size.x;
-            sprite.custom_size = Some(size);
-            // Pulse effect for last minute
-            let pulse = (era_timer.remaining_seconds * 2.0).sin().abs() * 0.3;
-            sprite.color = Color::rgba(0.4 + pulse, 0.1, 0.1, 0.8);
-            transform.translation.x = hud_era_timer_center_x(res.game_width, size.x);
+        transform.translation.x = hud_era_timer_center_x(res.game_width, timer_size.x);
+        sprite.custom_size = Some(timer_size);
+        sprite.color = Color::rgba(0.4, 0.1, 0.1, 0.8);
+        *visibility = if endless {
+            Visibility::Visible
         } else {
-            let size = Vec2::new(40., 16.);
-            timer_width = size.x;
-            sprite.custom_size = Some(size);
-            sprite.color = Color::rgba(0.1, 0.1, 0.1, 0.7);
-            transform.translation.x = hud_era_timer_center_x(res.game_width, size.x);
-        }
+            Visibility::Hidden
+        };
     }
 
     let progress = era_timeline_progress(&era_timer, &infinite_mode);
@@ -2548,7 +2537,7 @@ pub fn handle_update_era_timer_hud(
 
     for mut timeline_txfm in hud_transforms.p1().iter_mut() {
         timeline_txfm.translation.y = row_y;
-        timeline_txfm.translation.x = hud_clock_center_x(res.game_width, timer_width);
+        timeline_txfm.translation.x = hud_timeline_center_x(res.game_width);
     }
 
     for mut arrows_txfm in hud_transforms.p2().iter_mut() {

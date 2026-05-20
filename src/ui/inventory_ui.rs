@@ -53,6 +53,7 @@ use crate::{
 
 use super::{
     crafting_ui::CraftingContainer,
+    icon_hover_tooltips::IconHoverTooltipText,
     interactions::{Interactable, Interaction},
     options_ui::CheatSettings,
     player_hud::FlashExpBarEvent,
@@ -1091,6 +1092,7 @@ fn spawn_sort_inventory_button(
         // `handle_sort_inventory_button_click`.
         .insert(Interactable::default())
         .insert(SortInventoryButton)
+        .insert(IconHoverTooltipText(&["Sort inventory"]))
         .insert(Name::new("SORT INVENTORY BUTTON"))
         .id();
 
@@ -1177,6 +1179,10 @@ fn spawn_material_drops_toggle_button(
         .insert(RenderLayers::from_layers(&[3]))
         .insert(Interactable::default())
         .insert(MaterialDropsToggleButton)
+        .insert(IconHoverTooltipText(&[
+            "Filter: toggle all material",
+            "and Food Drops.",
+        ]))
         .insert(Name::new("MATERIAL DROPS TOGGLE BUTTON"))
         .id();
 
@@ -1536,6 +1542,9 @@ pub fn spawn_inv_slot(
         }));
     if let Some(i) = item_icon_option {
         slot_entity.push_children(&[i]);
+    }
+    if slot_type.is_trash() {
+        slot_entity.insert(IconHoverTooltipText(&["trash: drop items here"]));
     }
     if !slot_type.is_hotbar() {
         let inv_e = inv_query.single();

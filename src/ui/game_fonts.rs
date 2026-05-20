@@ -102,6 +102,11 @@ pub const HUD_MICRO: FontStyle = FontStyle {
     path: paths::MONO_4X5,
     size: 5.0,
 };
+/// Short icon hover labels (inventory trash / sort / filter, etc.).
+pub const ICON_HOVER_TOOLTIP: FontStyle = FontStyle {
+    path: paths::SLKSCR,
+    size: 8.5,
+};
 pub const HUD_FPS_DEBUG: FontStyle = FontStyle {
     path: paths::MONO_4X5,
     size: 5.0,
