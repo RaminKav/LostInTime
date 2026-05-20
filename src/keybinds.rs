@@ -21,11 +21,63 @@ fn default_interact() -> InputBinding {
     InputBinding::KeyBinding(KeyCode::F)
 }
 
+/// Hidden fourth skill slot (no HUD / options row while `VISIBLE_CLASS_SKILL_COUNT` is 3).
+fn default_active_skill_slot_3() -> InputBinding {
+    InputBinding::KeyBinding(KeyCode::F10)
+}
+
+/// Collapse left/right modifier variants so bindings compare and persist consistently.
+pub fn normalize_key_binding(key: KeyCode) -> KeyCode {
+    match key {
+        KeyCode::RShift => KeyCode::LShift,
+        KeyCode::RControl => KeyCode::LControl,
+        KeyCode::RAlt => KeyCode::LAlt,
+        other => other,
+    }
+}
+
+/// Whether `keys` registered a press for the bound key this frame.
+/// Left/right Shift, Ctrl, and Alt are treated as interchangeable.
+pub fn key_binding_just_pressed(bound: KeyCode, keys: &Input<KeyCode>) -> bool {
+    match normalize_key_binding(bound) {
+        KeyCode::LShift => {
+            keys.just_pressed(KeyCode::LShift) || keys.just_pressed(KeyCode::RShift)
+        }
+        KeyCode::LControl => {
+            keys.just_pressed(KeyCode::LControl) || keys.just_pressed(KeyCode::RControl)
+        }
+        KeyCode::LAlt => keys.just_pressed(KeyCode::LAlt) || keys.just_pressed(KeyCode::RAlt),
+        key => keys.just_pressed(key),
+    }
+}
+
+pub fn bindings_conflict(a: InputBinding, b: InputBinding) -> bool {
+    match (a, b) {
+        (InputBinding::KeyBinding(ka), InputBinding::KeyBinding(kb)) => {
+            normalize_key_binding(ka) == normalize_key_binding(kb)
+        }
+        (InputBinding::MouseBinding(ma), InputBinding::MouseBinding(mb)) => ma == mb,
+        _ => false,
+    }
+}
+
+fn check_binding_input(
+    binding: InputBinding,
+    keys: &Input<KeyCode>,
+    mouse: &Input<MouseButton>,
+) -> bool {
+    match binding {
+        InputBinding::KeyBinding(key) => key_binding_just_pressed(key, keys),
+        InputBinding::MouseBinding(button) => mouse.just_pressed(button),
+    }
+}
+
 #[derive(Resource, Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct InputMappings {
     pub active_skill_slot_0: InputBinding,
     pub active_skill_slot_1: InputBinding,
     pub active_skill_slot_2: InputBinding,
+    #[serde(default = "default_active_skill_slot_3")]
     pub active_skill_slot_3: InputBinding,
     pub active_skill_slot_4: InputBinding, // Bonus slot from blessings
     pub inventory: InputBinding,
@@ -57,7 +109,7 @@ impl Default for InputMappings {
             active_skill_slot_0: InputBinding::KeyBinding(KeyCode::Space),
             active_skill_slot_1: InputBinding::MouseBinding(MouseButton::Left),
             active_skill_slot_2: InputBinding::MouseBinding(MouseButton::Right),
-            active_skill_slot_3: InputBinding::KeyBinding(KeyCode::LShift),
+            active_skill_slot_3: default_active_skill_slot_3(),
             active_skill_slot_4: InputBinding::KeyBinding(KeyCode::E), // Bonus slot
             inventory: InputBinding::KeyBinding(KeyCode::Tab),
             minimap: InputBinding::KeyBinding(KeyCode::C),
@@ -93,39 +145,23 @@ impl InputMappings {
     pub fn check_skill_input(
         &self,
         slot: usize,
-        keys: &Res<Input<KeyCode>>,
-        mouse: &Res<Input<MouseButton>>,
+        keys: &Input<KeyCode>,
+        mouse: &Input<MouseButton>,
     ) -> bool {
-        let input = self.get_active_skill_key(slot);
-        match input {
-            InputBinding::KeyBinding(key) => keys.just_pressed(key),
-            InputBinding::MouseBinding(button) => mouse.just_pressed(button),
-        }
+        check_binding_input(self.get_active_skill_key(slot), keys, mouse)
     }
-    pub fn check_inv_input(
-        &self,
-        keys: &Res<Input<KeyCode>>,
-        mouse: &Res<Input<MouseButton>>,
-    ) -> bool {
-        let input = self.get_inventory_key();
-        match input {
-            InputBinding::KeyBinding(key) => keys.just_pressed(key),
-            InputBinding::MouseBinding(button) => mouse.just_pressed(button),
-        }
+    pub fn check_inv_input(&self, keys: &Input<KeyCode>, mouse: &Input<MouseButton>) -> bool {
+        check_binding_input(self.get_inventory_key(), keys, mouse)
     }
-    pub fn check_map_input(
-        &self,
-        keys: &Res<Input<KeyCode>>,
-        mouse: &Res<Input<MouseButton>>,
-    ) -> bool {
-        let input = self.get_minimap_key();
-        match input {
-            InputBinding::KeyBinding(key) => keys.just_pressed(key),
-            InputBinding::MouseBinding(button) => mouse.just_pressed(button),
-        }
+    pub fn check_map_input(&self, keys: &Input<KeyCode>, mouse: &Input<MouseButton>) -> bool {
+        check_binding_input(self.get_minimap_key(), keys, mouse)
     }
 
     pub fn set_active_skill_key(&mut self, slot: usize, key: InputBinding) {
+        let key = match key {
+            InputBinding::KeyBinding(k) => InputBinding::KeyBinding(normalize_key_binding(k)),
+            other => other,
+        };
         match slot {
             0 => self.active_skill_slot_0 = key,
             1 => self.active_skill_slot_1 = key,
@@ -133,6 +169,24 @@ impl InputMappings {
             3 => self.active_skill_slot_3 = key,
             4 => self.active_skill_slot_4 = key,
             _ => {}
+        }
+    }
+
+    /// Remove the same binding from other active-skill slots so a hidden/default slot
+    /// cannot swallow input (e.g. slot 3 still on Shift while only slots 0–2 are used).
+    pub fn clear_active_skill_binding_from_other_slots(
+        &mut self,
+        binding: InputBinding,
+        except_slot: usize,
+    ) {
+        for slot in 0..=4 {
+            if slot == except_slot {
+                continue;
+            }
+            if bindings_conflict(self.get_active_skill_key(slot), binding) {
+                let fallback = Self::default().get_active_skill_key(slot);
+                self.set_active_skill_key(slot, fallback);
+            }
         }
     }
 
@@ -148,15 +202,8 @@ impl InputMappings {
         self.interact = key;
     }
 
-    pub fn check_interact_input(
-        &self,
-        keys: &Res<Input<KeyCode>>,
-        mouse: &Res<Input<MouseButton>>,
-    ) -> bool {
-        match self.get_interact_key() {
-            InputBinding::KeyBinding(key) => keys.just_pressed(key),
-            InputBinding::MouseBinding(button) => mouse.just_pressed(button),
-        }
+    pub fn check_interact_input(&self, keys: &Input<KeyCode>, mouse: &Input<MouseButton>) -> bool {
+        check_binding_input(self.get_interact_key(), keys, mouse)
     }
 
     /// Returns the binding that consumes/uses the item in hotbar slot `slot` (0..=3).
@@ -184,13 +231,10 @@ impl InputMappings {
     pub fn check_hotbar_input(
         &self,
         slot: usize,
-        keys: &Res<Input<KeyCode>>,
-        mouse: &Res<Input<MouseButton>>,
+        keys: &Input<KeyCode>,
+        mouse: &Input<MouseButton>,
     ) -> bool {
-        match self.get_hotbar_key(slot) {
-            InputBinding::KeyBinding(key) => keys.just_pressed(key),
-            InputBinding::MouseBinding(button) => mouse.just_pressed(button),
-        }
+        check_binding_input(self.get_hotbar_key(slot), keys, mouse)
     }
 
     pub fn load() -> Self {
@@ -250,6 +294,7 @@ pub fn get_key_display_name(key: InputBinding) -> String {
         InputBinding::KeyBinding(KeyCode::Back) => "Bksp".to_string(),
         InputBinding::KeyBinding(KeyCode::Capital) => "Caps".to_string(),
         InputBinding::KeyBinding(KeyCode::Escape) => "Esc".to_string(),
+        InputBinding::KeyBinding(KeyCode::Space) => "[_]".to_string(),
         InputBinding::MouseBinding(MouseButton::Left) => "LMB".to_string(),
         InputBinding::MouseBinding(MouseButton::Right) => "RMB".to_string(),
         InputBinding::MouseBinding(MouseButton::Middle) => "MMB".to_string(),

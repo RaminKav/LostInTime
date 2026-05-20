@@ -609,7 +609,7 @@ pub fn tick_game_over_overlay(
             let time_fragments = time_fragments.as_ref();
             let currency_this_run = time_fragments.total_collected_time_fragments_this_run as u32;
             let game_data_file_path = datafiles::game_data();
-            let mut total_currency = 0;
+            let mut total_currency = time_fragments.time_fragments.max(0) as u128;
             if let Ok(file_file) = File::open(game_data_file_path) {
                 let reader = BufReader::new(file_file);
 
@@ -621,6 +621,7 @@ pub fn tick_game_over_overlay(
                     ),
                 }
             };
+            let currency_before_run = total_currency.saturating_sub(currency_this_run as u128);
 
             let text = spawn_text(
                 &mut commands,
@@ -631,7 +632,7 @@ pub fn tick_game_over_overlay(
                     Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND,
                 ),
                 WHITE,
-                format!("{:}", total_currency - currency_this_run as u128),
+                format!("{:}", currency_before_run),
                 Anchor::CenterLeft,
                 FLOATING_TEXT,
                 3,

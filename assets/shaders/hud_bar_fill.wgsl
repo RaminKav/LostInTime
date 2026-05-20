@@ -26,7 +26,8 @@ fn fragment(
     let in_fill = uv.y >= surface;
 
     // The top row of liquid: the band [surface, surface + highlight_thickness).
-    let on_surface = in_fill && (uv.y < surface + highlight_thickness);
+    // Skip when the bar is full — no meniscus line at max fill.
+    let on_surface = in_fill && (fill < 1.0) && (uv.y < surface + highlight_thickness);
 
     var rgb = base.rgb;
     if (on_surface) {

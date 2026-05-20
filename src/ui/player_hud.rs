@@ -1,5 +1,4 @@
 use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
-use bevy_aseprite::{anim::AsepriteAnimation, aseprite, Aseprite, AsepriteBundle};
 use rand::Rng;
 use std::collections::HashMap;
 
@@ -9,19 +8,18 @@ use super::{
         heirloom_hud_hover_tooltip_position, HeirloomTooltipRequest, HeirloomTooltipShow,
     },
     hud_clock_center_x, hud_era_timer_center_x, hud_heirloom_first_icon_x, hud_heirloom_row_y,
-    hud_row_below_xp_y,
+    hud_hotbar_slot_center_x, hud_keybind_badge_center_y, hud_row_below_xp_y,
+    hud_timeline_arrow_local_x,
     interactions::{DraggedItem, Interaction},
     spawn_inv_slot, spawn_item_stack_icon,
     tooltips::spawn_world_item_tooltip_for_stack,
     tooltips::ConsumableBuffHudTooltip,
-    ui_helpers::{
-        get_key_size_and_element, spawn_keybind_badge, Z_DEPTH_HUD_ACTIVE_SKILLS,
-        Z_DEPTH_HUD_HEIRLOOM_ICONS,
-    },
+    ui_helpers::{spawn_keybind_badge, Z_DEPTH_HUD_ACTIVE_SKILLS, Z_DEPTH_HUD_HEIRLOOM_ICONS},
     InventorySlotType, InventoryState, InventoryUI, UIElement, UIState, CURRENCY_BACKGROUND_SIZE,
     HUD_ACTION_ROW_Y_FROM_BOTTOM, HUD_CURRENCY_BACKGROUND_GAP, HUD_ERA_TIMER_DEFAULT_WIDTH,
     HUD_FRAME_Y_FROM_BOTTOM, HUD_HEIRLOOM_ICON_SPACING, HUD_HOTBAR_SLOTS, HUD_SKILLS_CENTER_X,
-    HUD_SKILL_SPACING_X, PROGRESS_BACKGROUND_SIZE,
+    HUD_SKILL_SLOT_HIT_SIZE, HUD_SKILL_SPACING_X, HUD_TIMELINE_ARROWS_SIZE, HUD_TIMELINE_SIZE,
+    PROGRESS_BACKGROUND_SIZE,
 };
 use crate::{
     assets::Graphics,
@@ -41,7 +39,8 @@ use crate::{
     inventory::{Inventory, ItemStack},
     item::WorldObject,
     juice::bounce::BounceOnHit,
-    night::{InfiniteMode, NightTracker},
+    keybinds::InputBinding,
+    night::{EraTimer, InfiniteMode, ERA_TIMER_SECONDS},
     player::{
         combat_heirlooms::{CrateBreakDamageTracker, MaxHPHuntTracker, SkillPowerHuntTracker},
         levels::PlayerLevel,
@@ -57,8 +56,6 @@ use crate::{
     GameState, InputMappings, ScreenResolution,
 };
 use bevy::utils::Duration;
-aseprite!(pub Clock, "ui/Clock.aseprite");
-
 #[derive(Component)]
 pub struct HealthBar;
 #[derive(Component)]
@@ -115,9 +112,9 @@ pub struct ProgressHudBar;
 pub struct CurrencyHudBackground;
 
 #[derive(Component)]
-pub struct ClockHUD;
+pub struct TimelineHUD;
 #[derive(Component)]
-pub struct ClockText;
+pub struct TimelineProgressArrows;
 
 #[derive(Component)]
 pub struct EraTimerHUD;
@@ -132,10 +129,10 @@ pub struct ActiveSkillIcon {
     pub slot_index: usize,
 }
 
-/// Marker placed on the (20×20) active skill slot background sprite. Used as the drop
-/// target during HUD skill drag-and-drop reordering — the icon child entity (with
-/// `UIElement::HeirloomHudIcon` + `Interactable`) is the drag *source*, while the bg
-/// is what the cursor must overlap to land a drop.
+/// Marker on the invisible HUD skill-slot anchor. Used as the drop target during
+/// drag-and-drop reordering — the icon child (`UIElement::HeirloomHudIcon` +
+/// `Interactable`) is the drag *source*, while this anchor is what the cursor must
+/// overlap to land a drop ([`HUD_SKILL_SLOT_HIT_SIZE`]).
 #[derive(Component)]
 pub struct ActiveSkillSlotBg {
     pub slot_index: usize,
@@ -177,8 +174,20 @@ pub struct MinimapKeybindText;
 #[derive(Component)]
 pub struct MinimapKeyBackground;
 
+#[derive(Component)]
+pub struct OptionsKeybindText;
+
+#[derive(Component)]
+pub struct OptionsKeyBackground;
+
 /// Center-to-center spacing between the minimap and inventory HUD corner icons.
-const HUD_MINIMAP_ICON_LEFT_OF_BAG: f32 = 28.0;
+const HUD_CORNER_ICON_SPACING: f32 = 30.0;
+
+/// Inset from the left screen edge to the first corner icon center.
+const HUD_CORNER_LEFT_PADDING: f32 = 6.0;
+
+/// `assets/ui/InventoryIcon.png` / `MapIcon.png` / `SettingsIcon.png` draw size.
+const HUD_CORNER_ICON_SIZE: Vec2 = Vec2::new(27., 27.);
 
 #[derive(Component)]
 pub struct HotbarKeybindText {
@@ -213,16 +222,16 @@ pub struct SkillChargeText {
 }
 
 /// Size of the new HUD frame sprite (`assets/ui/HudBar.png`).
-pub const HUD_FRAME_SIZE: Vec2 = Vec2::new(334.0, 56.0);
+pub const HUD_FRAME_SIZE: Vec2 = Vec2::new(394.0, 62.0);
 
 /// Pixel size of a single HP/mana fill texture (`HpBarFill.png` / `ManaBarFill.png`).
-pub const HUD_FILL_PIXEL_SIZE: Vec2 = Vec2::new(28.0, 34.0);
+pub const HUD_FILL_PIXEL_SIZE: Vec2 = Vec2::new(50.0, 50.0);
 
 /// Horizontal offset (from the frame's center) of each semicircular fill region's center.
 /// The 28×34 fill texture sits inside the cap of the frame, nudged ~8px inward from the
 /// outer edge so the liquid is centered on the visible cap interior rather than the
 /// outermost pixel column.
-pub const HUD_FILL_X_OFFSET: f32 = HUD_FRAME_SIZE.x * 0.5 - HUD_FILL_PIXEL_SIZE.x * 0.5 - 7.0;
+pub const HUD_FILL_X_OFFSET: f32 = HUD_FRAME_SIZE.x * 0.5 - HUD_FILL_PIXEL_SIZE.x;
 
 #[derive(Component)]
 pub struct BarFlashTimer {
@@ -295,7 +304,7 @@ pub fn setup_bars_ui(
         .spawn(MaterialMesh2dBundle {
             mesh: hp_mesh,
             material: hp_material,
-            transform: Transform::from_translation(Vec3::new(-HUD_FILL_X_OFFSET, 0.0, 1.0)),
+            transform: Transform::from_translation(Vec3::new(-HUD_FILL_X_OFFSET + 1., -3.0, 1.0)),
             ..default()
         })
         .insert(RenderLayers::from_layers(&[3]))
@@ -337,7 +346,7 @@ pub fn setup_bars_ui(
         .spawn(Text2dBundle {
             text: Text::from_section(format!("{mana_amount}"), bar_label_style),
             text_anchor: Anchor::Center,
-            transform: Transform::from_translation(Vec3::new(0., 0., 2.)),
+            transform: Transform::from_translation(Vec3::new(1., -3., 2.)),
             ..default()
         })
         .insert(RenderLayers::from_layers(&[3]))
@@ -580,7 +589,7 @@ pub fn setup_currency_ui(
                 custom_size: Some(PROGRESS_BACKGROUND_SIZE),
                 ..default()
             },
-            transform: Transform::from_translation(Vec3::new(0., row_y + 2., 5.)),
+            transform: Transform::from_translation(Vec3::new(-36., row_y + 2., 7.)),
             ..default()
         })
         .insert(RenderLayers::from_layers(&[3]))
@@ -619,61 +628,93 @@ pub fn setup_currency_ui(
         ))
         .set_parent(progress_bar);
 
-    // Minimap + inventory icons (bottom-right HUD corner).
-    let corner_y = -res.game_height / 2. + 12.;
-    let bag_x = res.game_width / 2. - 80.;
-    let map_x = bag_x - HUD_MINIMAP_ICON_LEFT_OF_BAG;
+    // Minimap + inventory + options icons (bottom-left HUD corner).
+    let corner_y = -res.game_height / 2. + 18.;
+    let map_x = -res.game_width * 0.5 + HUD_CORNER_ICON_SIZE.x * 0.5 + HUD_CORNER_LEFT_PADDING;
+    let bag_x = map_x + HUD_CORNER_ICON_SPACING;
+    let settings_x = bag_x + HUD_CORNER_ICON_SPACING;
 
-    let map_icon = spawn_item_stack_icon(
-        &mut commands,
-        &graphics,
-        &ItemStack::crate_icon_stack(WorldObject::YellowBeaconBlock),
-        &asset_server,
-        Vec2::new(map_x, corner_y),
-        Vec2::ZERO,
-        3,
-    );
-    commands
-        .entity(map_icon)
-        .insert(Name::new("MINIMAP HUD ICON"));
+    let map_icon = commands
+        .spawn(SpriteBundle {
+            texture: graphics.get_ui_element_texture(UIElement::MapIcon),
+            sprite: Sprite {
+                custom_size: Some(HUD_CORNER_ICON_SIZE),
+                ..default()
+            },
+            transform: Transform::from_translation(Vec3::new(map_x, corner_y, 6.)),
+            ..default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(Name::new("MINIMAP HUD ICON"))
+        .id();
 
     let minimap_key = keybinds.get_minimap_key();
     let (map_key_bg, map_key_text) = spawn_keybind_badge(
         &mut commands,
-        &graphics,
         &asset_server,
         minimap_key,
-        map_icon,
-        Vec3::new(-0.5, 13., 1.),
-        Vec3::new(0., 0., 1.),
+        Transform::from_translation(Vec3::new(-0.5, 13., 1.)),
+        Some(map_icon),
         3,
     );
     commands.entity(map_key_bg).insert(MinimapKeyBackground);
     commands.entity(map_key_text).insert(MinimapKeybindText);
 
-    let bag_icon = spawn_item_stack_icon(
-        &mut commands,
-        &graphics,
-        &ItemStack::crate_icon_stack(WorldObject::InventoryBag),
-        &asset_server,
-        Vec2::new(bag_x, corner_y),
-        Vec2::new(0., 0.),
-        3,
-    );
+    let bag_icon = commands
+        .spawn(SpriteBundle {
+            texture: graphics.get_ui_element_texture(UIElement::InventoryIcon),
+            sprite: Sprite {
+                custom_size: Some(HUD_CORNER_ICON_SIZE),
+                ..default()
+            },
+            transform: Transform::from_translation(Vec3::new(bag_x, corner_y, 6.)),
+            ..default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(Name::new("INVENTORY HUD ICON"))
+        .id();
 
     let inventory_key = keybinds.get_inventory_key();
     let (key_bg, key_text) = spawn_keybind_badge(
         &mut commands,
-        &graphics,
         &asset_server,
         inventory_key,
-        bag_icon,
-        Vec3::new(-0.5, 13., 1.),
-        Vec3::new(1., 0., 1.),
+        Transform::from_translation(Vec3::new(-0.5, 13., 1.)),
+        Some(bag_icon),
         3,
     );
     commands.entity(key_bg).insert(InventoryKeyBackground);
     commands.entity(key_text).insert(InventoryKeybindText);
+
+    let settings_icon = commands
+        .spawn(SpriteBundle {
+            texture: graphics.get_ui_element_texture(UIElement::SettingsIcon),
+            sprite: Sprite {
+                custom_size: Some(Vec2::new(26., 27.)),
+                ..default()
+            },
+            transform: Transform::from_translation(Vec3::new(settings_x, corner_y, 6.)),
+            ..default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(Name::new("OPTIONS HUD ICON"))
+        .id();
+
+    let options_key = InputBinding::KeyBinding(KeyCode::Escape);
+    let (settings_key_bg, settings_key_text) = spawn_keybind_badge(
+        &mut commands,
+        &asset_server,
+        options_key,
+        Transform::from_translation(Vec3::new(0., 13., 1.)),
+        Some(settings_icon),
+        3,
+    );
+    commands
+        .entity(settings_key_bg)
+        .insert(OptionsKeyBackground);
+    commands
+        .entity(settings_key_text)
+        .insert(OptionsKeybindText);
 }
 
 /// Chaos label is spawned inside [`setup_currency_ui`] on the progress bar; this stub
@@ -1119,7 +1160,7 @@ pub struct SkillHudIcon(pub Heirloom);
 #[derive(Component)]
 pub struct PetSkillSlotBg;
 
-/// Marker for the pet's skill icon sprite (child of [`PetSkillSlotBg`]).
+/// Marker for the pet's skill icon sprite (child of the pet skill slot anchor).
 #[derive(Component)]
 pub struct PetSkillIcon;
 
@@ -1622,6 +1663,7 @@ pub fn handle_update_player_skills(
     existing_heirloom_icons: Query<(Entity, &SkillHudIcon)>, // Query existing heirloom icons
     _counter_texts: Query<&mut Text, With<HeirloomCounterText>>, // Query counter texts to update
     existing_cooldown_overlays: Query<(Entity, &SkillCooldownOverlay)>, // Query existing cooldown overlays to preserve state
+    existing_skill_keybinds: Query<Entity, With<ActiveSkillKeyBackground>>,
     keybinds: Res<crate::keybinds::InputMappings>,
     mut prev_active_skills: Local<Vec<Option<ActiveSkill>>>, // Track previous active skills per slot to detect swaps
 ) {
@@ -1736,7 +1778,7 @@ pub fn handle_update_player_skills(
                                 TextStyle {
                                     font: asset_server.load("fonts/slkscr.ttf"),
                                     font_size: 8.4,
-                                    color: BLACK,
+                                    color: WHITE,
                                 },
                             ),
                             text_anchor: Anchor::BottomRight,
@@ -1816,6 +1858,10 @@ pub fn handle_update_player_skills(
             }
         }
 
+        for e in existing_skill_keybinds.iter() {
+            commands.entity(e).despawn_recursive();
+        }
+
         prev_active_skill_icons.for_each(|e| {
             commands.entity(e).despawn_recursive();
         });
@@ -1836,24 +1882,13 @@ pub fn handle_update_player_skills(
         let skill_half_span = (num_skills - 1.0) * 0.5;
         for (i, (active_skill_option, slot_index)) in active_skill_slots.iter().enumerate() {
             let icon_bg = commands
-                .spawn(SpriteBundle {
-                    texture: graphics.get_ui_element_texture(UIElement::ScreenIconSlotLarge),
-                    sprite: Sprite {
-                        custom_size: Some(Vec2::new(20., 20.)),
-                        ..default()
-                    },
-                    transform: Transform {
-                        translation: Vec3::new(
-                            HUD_SKILLS_CENTER_X
-                                + (i as f32 - skill_half_span) * HUD_SKILL_SPACING_X,
-                            -res.game_height / 2. + HUD_ACTION_ROW_Y_FROM_BOTTOM,
-                            Z_DEPTH_HUD_ACTIVE_SKILLS,
-                        ),
-                        scale: Vec3::new(1., 1., 1.),
-                        ..Default::default()
-                    },
-                    ..default()
-                })
+                .spawn(SpatialBundle::from_transform(Transform::from_translation(
+                    Vec3::new(
+                        HUD_SKILLS_CENTER_X + (i as f32 - skill_half_span) * HUD_SKILL_SPACING_X,
+                        -res.game_height / 2. + HUD_ACTION_ROW_Y_FROM_BOTTOM,
+                        Z_DEPTH_HUD_ACTIVE_SKILLS,
+                    ),
+                )))
                 .insert(RenderLayers::from_layers(&[3]))
                 .insert(ActiveSkillIcon {
                     skill: active_skill_option
@@ -1867,15 +1902,18 @@ pub fn handle_update_player_skills(
                     slot_index: *slot_index,
                 })
                 .id();
+            let skill_x = HUD_SKILLS_CENTER_X + (i as f32 - skill_half_span) * HUD_SKILL_SPACING_X;
             let keybind = keybinds.get_active_skill_key(*slot_index);
             let (key_bg, key_text) = spawn_keybind_badge(
                 &mut commands,
-                &graphics,
                 &asset_server,
                 keybind,
-                icon_bg,
-                Vec3::new(0., 12., 2.),
-                Vec3::new(0., 1., 1.),
+                Transform::from_translation(Vec3::new(
+                    skill_x,
+                    hud_keybind_badge_center_y(res.game_height),
+                    2.,
+                )),
+                None,
                 3,
             );
             commands
@@ -1957,12 +1995,12 @@ pub fn handle_update_player_skills(
                             TextStyle {
                                 font: asset_server.load("fonts/slkscr.ttf"),
                                 font_size: 8.4,
-                                color: TOOLTIP_BLACK,
+                                color: WHITE,
                             },
                         ),
                         text_anchor: Anchor::Center,
                         transform: Transform {
-                            translation: Vec3::new(1., -10., 4.), // Center bottom of icon
+                            translation: Vec3::new(1., 10., 4.), // Center bottom of icon
                             scale: Vec3::new(1., 1., 1.),
                             ..Default::default()
                         },
@@ -2019,8 +2057,8 @@ const ACTIVE_SKILL_DRAG_PREVIEW_Z: f32 = 998.;
 /// - Releasing on the same slot or on no slot cancels the drag — alpha is restored
 ///   and no swap is applied.
 ///
-/// The drop hit-test uses a direct AABB check on `ActiveSkillSlotBg` sprites instead
-/// of `pointcast_2d` so the bg is reliably picked even when the icon child is in the
+/// The drop hit-test uses a direct AABB check on `ActiveSkillSlotBg` anchors instead
+/// of `pointcast_2d` so the slot is reliably picked even when the icon child is in the
 /// same screen position (`pointcast_2d` is order-dependent and would otherwise return
 /// the icon entity).
 pub fn handle_active_skill_slot_drag_drop(
@@ -2038,7 +2076,7 @@ pub fn handle_active_skill_slot_drag_drop(
         ),
         Without<ActiveSkillSlotBg>,
     >,
-    slot_bgs: Query<(&ActiveSkillSlotBg, &GlobalTransform, &Sprite), Without<UIElement>>,
+    slot_bgs: Query<(&ActiveSkillSlotBg, &GlobalTransform), Without<UIElement>>,
     mut player_skills: Query<&mut PlayerSkills, With<Player>>,
     mut class_slots_q: Query<&mut ClassSkillSlots, With<Player>>,
     mut drag_preview_t: Query<&mut Transform, With<ActiveSkillDragIcon>>,
@@ -2051,10 +2089,9 @@ pub fn handle_active_skill_slot_drag_drop(
         return;
     }
 
-    let hovered_slot = slot_bgs.iter().find_map(|(bg, xform, sprite)| {
-        let size = sprite.custom_size?;
+    let hovered_slot = slot_bgs.iter().find_map(|(bg, xform)| {
         let pos = xform.translation();
-        let half = size * 0.5;
+        let half = HUD_SKILL_SLOT_HIT_SIZE * 0.5;
         if cursor.x >= pos.x - half.x
             && cursor.x <= pos.x + half.x
             && cursor.y >= pos.y - half.y
@@ -2201,21 +2238,22 @@ pub fn cancel_active_skill_drag_on_state_exit(
 /// hotbar slot is despawned and respawned (which would otherwise nuke its badge).
 pub fn spawn_hotbar_keybind_badge_for_slot(
     commands: &mut Commands,
-    graphics: &Graphics,
     asset_server: &AssetServer,
     keybinds: &crate::keybinds::InputMappings,
     slot: usize,
-    slot_entity: Entity,
+    game_height: f32,
 ) {
     let key = keybinds.get_hotbar_key(slot);
     let (bg_entity, text_entity) = spawn_keybind_badge(
         commands,
-        graphics,
         asset_server,
         key,
-        slot_entity,
-        Vec3::new(0., 12., 2.),
-        Vec3::new(0., 1., 1.),
+        Transform::from_translation(Vec3::new(
+            hud_hotbar_slot_center_x(slot),
+            hud_keybind_badge_center_y(game_height),
+            2.,
+        )),
+        None,
         3,
     );
     commands
@@ -2249,7 +2287,7 @@ pub fn setup_hotbar_hud(
         .take(HUD_HOTBAR_SLOTS)
         .enumerate()
     {
-        let slot_entity = spawn_inv_slot(
+        let _slot_entity = spawn_inv_slot(
             &mut commands,
             &inv_ui_state,
             &graphics,
@@ -2265,11 +2303,10 @@ pub fn setup_hotbar_hud(
 
         spawn_hotbar_keybind_badge_for_slot(
             &mut commands,
-            &graphics,
             &asset_server,
             &keybinds,
             slot_index,
-            slot_entity,
+            resolution.game_height,
         );
     }
 }
@@ -2297,83 +2334,56 @@ pub fn update_mana_bar(
     }
 }
 
-pub fn setup_clock_hud(
+/// Era progress timeline (`Timeline.png`) with draggable-style arrows (`TimelineArrows.png`).
+pub fn setup_timeline_hud(
     mut commands: Commands,
-    asset_server: Res<AssetServer>,
-    night_tracker: Res<NightTracker>,
+    graphics: Res<Graphics>,
     res: Res<ScreenResolution>,
 ) {
-    let row_y = hud_row_below_xp_y(res.game_height);
-    let clock_x = hud_clock_center_x(res.game_width, HUD_ERA_TIMER_DEFAULT_WIDTH);
+    let row_y = hud_row_below_xp_y(res.game_height) + 2.;
+    let timeline_x = hud_clock_center_x(res.game_width, HUD_ERA_TIMER_DEFAULT_WIDTH);
 
-    let clock_hud_frame = commands
-        .spawn(AsepriteBundle {
-            animation: AsepriteAnimation::from(Clock::tags::ONE),
-            aseprite: asset_server.load::<Aseprite, _>(Clock::PATH),
-            transform: Transform {
-                translation: Vec3::new(clock_x, row_y, 6.),
-                scale: Vec3::new(1., 1., 1.),
-                ..Default::default()
+    let timeline = commands
+        .spawn(SpriteBundle {
+            texture: graphics.get_ui_element_texture(UIElement::Timeline),
+            sprite: Sprite {
+                custom_size: Some(HUD_TIMELINE_SIZE),
+                ..default()
             },
-            ..Default::default()
-        })
-        .insert(Name::new("CLOCK HUD"))
-        .insert(RenderLayers::from_layers(&[3]))
-        .insert(ClockHUD)
-        .id();
-    let text = commands
-        .spawn(Text2dBundle {
-            text: Text::from_section(
-                format!("{}:00", night_tracker.get_hour()),
-                TextStyle {
-                    font: asset_server.load("fonts/slkscr.ttf"),
-                    font_size: 8.5,
-                    color: BLACK,
-                },
-            ),
-            transform: Transform {
-                translation: Vec3::new(10.5, -7., 1.),
-                ..Default::default()
-            },
-            text_anchor: Anchor::CenterRight,
-            ..Default::default()
+            transform: Transform::from_translation(Vec3::new(timeline_x, row_y, 6.)),
+            ..default()
         })
         .insert(RenderLayers::from_layers(&[3]))
+        .insert(TimelineHUD)
+        .insert(Name::new("TIMELINE HUD"))
         .id();
 
     commands
-        .entity(text)
-        .insert(ClockText)
-        .set_parent(clock_hud_frame);
+        .spawn(SpriteBundle {
+            texture: graphics.get_ui_element_texture(UIElement::TimelineArrows),
+            sprite: Sprite {
+                custom_size: Some(HUD_TIMELINE_ARROWS_SIZE),
+                ..default()
+            },
+            transform: Transform::from_translation(Vec3::new(
+                hud_timeline_arrow_local_x(0.),
+                0.,
+                1.,
+            )),
+            ..default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(TimelineProgressArrows)
+        .insert(Name::new("TIMELINE ARROWS"))
+        .set_parent(timeline);
 }
 
-pub fn handle_update_clock_hud(
-    night_tracker: Res<NightTracker>,
-    mut clock_text: Query<&mut Text, With<ClockText>>,
-    mut clock_anim: Query<Entity, With<ClockHUD>>,
-    mut commands: Commands,
-) {
-    let hour = night_tracker.get_hour();
-    let anim = match hour {
-        0 | 1 => Clock::tags::ONE,
-        2 | 3 => Clock::tags::TWO,
-        4 | 5 => Clock::tags::THREE,
-        6 | 7 => Clock::tags::FOUR,
-        8 | 9 => Clock::tags::FIVE,
-        10 | 11 => Clock::tags::SIX,
-        12 | 13 => Clock::tags::SEVEN,
-        14 | 15 => Clock::tags::EIGHT,
-        16 | 17 => Clock::tags::NINE,
-        18 | 19 => Clock::tags::TEN,
-        20 | 21 => Clock::tags::ELEVEN,
-        22 | 23 => Clock::tags::TWELVE,
-        i => unreachable!("Invalid hour: {}", i),
-    };
-    for e in clock_anim.iter_mut() {
-        commands.entity(e).insert(AsepriteAnimation::from(anim));
+fn era_timeline_progress(era_timer: &EraTimer, infinite_mode: &InfiniteMode) -> f32 {
+    if infinite_mode.active {
+        1.
+    } else {
+        1. - (era_timer.remaining_seconds / ERA_TIMER_SECONDS).clamp(0., 1.)
     }
-    let mut text = clock_text.single_mut();
-    text.sections[0].value = format!("{}:00", if hour > 12 { hour - 12 } else { hour });
 }
 
 /// Setup era timer HUD - displays countdown timer for the era
@@ -2389,7 +2399,7 @@ pub fn setup_era_timer_hud(
         return;
     }
 
-    let row_y = hud_row_below_xp_y(res.game_height);
+    let row_y = hud_row_below_xp_y(res.game_height) + 2.;
     let timer_width = HUD_ERA_TIMER_DEFAULT_WIDTH;
     let timer_x = hud_era_timer_center_x(res.game_width, timer_width);
 
@@ -2466,8 +2476,11 @@ pub fn handle_update_era_timer_hud(
     infinite_mode: Res<crate::night::InfiniteMode>,
     mut timer_text: Query<&mut Text, (With<EraTimerText>, Without<EndlessElapsedText>)>,
     mut elapsed_text: Query<&mut Text, (With<EndlessElapsedText>, Without<EraTimerText>)>,
-    mut timer_bg: Query<(&mut Sprite, &mut Transform), With<EraTimerHUD>>,
-    mut clock_transform: Query<&mut Transform, (With<ClockHUD>, Without<EraTimerHUD>)>,
+    mut hud_transforms: ParamSet<(
+        Query<(&mut Sprite, &mut Transform), With<EraTimerHUD>>,
+        Query<&mut Transform, With<TimelineHUD>>,
+        Query<&mut Transform, With<TimelineProgressArrows>>,
+    )>,
     res: Res<ScreenResolution>,
 ) {
     for mut text in timer_text.iter_mut() {
@@ -2499,11 +2512,11 @@ pub fn handle_update_era_timer_hud(
         }
     }
 
-    let row_y = hud_row_below_xp_y(res.game_height);
+    let row_y = hud_row_below_xp_y(res.game_height) + 2.;
     let mut timer_width = HUD_ERA_TIMER_DEFAULT_WIDTH;
 
     // Update background color and size based on mode
-    for (mut sprite, mut transform) in timer_bg.iter_mut() {
+    for (mut sprite, mut transform) in hud_transforms.p0().iter_mut() {
         transform.translation.y = row_y;
 
         if infinite_mode.active {
@@ -2530,9 +2543,16 @@ pub fn handle_update_era_timer_hud(
         }
     }
 
-    for mut clock_txfm in clock_transform.iter_mut() {
-        clock_txfm.translation.y = row_y;
-        clock_txfm.translation.x = hud_clock_center_x(res.game_width, timer_width);
+    let progress = era_timeline_progress(&era_timer, &infinite_mode);
+    let arrow_x = hud_timeline_arrow_local_x(progress);
+
+    for mut timeline_txfm in hud_transforms.p1().iter_mut() {
+        timeline_txfm.translation.y = row_y;
+        timeline_txfm.translation.x = hud_clock_center_x(res.game_width, timer_width);
+    }
+
+    for mut arrows_txfm in hud_transforms.p2().iter_mut() {
+        arrows_txfm.translation.x = arrow_x;
     }
 }
 
@@ -2795,33 +2815,20 @@ pub fn update_skill_tooltip_cooldown(
 pub fn update_active_skill_keybind_text(
     keybinds: Res<crate::keybinds::InputMappings>,
     mut texts: Query<(&ActiveSkillKeybindText, &mut Text)>,
-    mut key_backgrounds: Query<(&ActiveSkillKeyBackground, &mut Handle<Image>, &mut Sprite)>,
-    graphics: Res<Graphics>,
 ) {
     if !keybinds.is_changed() {
         return;
     }
 
-    // Update text
     for (keybind_text, mut text) in texts.iter_mut() {
         let key = keybinds.get_active_skill_key(keybind_text.slot);
         text.sections[0].value = crate::keybinds::get_key_display_name(key);
-    }
-
-    // Update key background size and texture
-    for (key_bg, mut texture, mut sprite) in key_backgrounds.iter_mut() {
-        let key = keybinds.get_active_skill_key(key_bg.slot);
-        let (key_element, key_width) = get_key_size_and_element(key);
-        *texture = graphics.get_ui_element_texture(key_element);
-        sprite.custom_size = Some(Vec2::new(key_width, 10.));
     }
 }
 
 pub fn update_hotbar_keybind_text(
     keybinds: Res<crate::keybinds::InputMappings>,
     mut texts: Query<(&HotbarKeybindText, &mut Text)>,
-    mut key_backgrounds: Query<(&HotbarKeyBackground, &mut Handle<Image>, &mut Sprite)>,
-    graphics: Res<Graphics>,
 ) {
     if !keybinds.is_changed() {
         return;
@@ -2831,60 +2838,33 @@ pub fn update_hotbar_keybind_text(
         let key = keybinds.get_hotbar_key(keybind_text.slot);
         text.sections[0].value = crate::keybinds::get_key_display_name(key);
     }
-
-    for (key_bg, mut texture, mut sprite) in key_backgrounds.iter_mut() {
-        let key = keybinds.get_hotbar_key(key_bg.slot);
-        let (key_element, key_width) = get_key_size_and_element(key);
-        *texture = graphics.get_ui_element_texture(key_element);
-        sprite.custom_size = Some(Vec2::new(key_width, 10.));
-    }
 }
 
 pub fn update_inventory_keybind_text(
     keybinds: Res<crate::keybinds::InputMappings>,
     mut texts: Query<&mut Text, With<InventoryKeybindText>>,
-    mut key_backgrounds: Query<(&mut Handle<Image>, &mut Sprite), With<InventoryKeyBackground>>,
-    graphics: Res<Graphics>,
 ) {
     if !keybinds.is_changed() {
         return;
     }
 
     let inventory_key = keybinds.get_inventory_key();
-
-    // Update text
     for mut text in texts.iter_mut() {
         text.sections[0].value = crate::keybinds::get_key_display_name(inventory_key);
-    }
-
-    // Update key background size and texture
-    for (mut texture, mut sprite) in key_backgrounds.iter_mut() {
-        let (key_element, key_width) = get_key_size_and_element(inventory_key);
-        *texture = graphics.get_ui_element_texture(key_element);
-        sprite.custom_size = Some(Vec2::new(key_width, 10.));
     }
 }
 
 pub fn update_minimap_keybind_text(
     keybinds: Res<crate::keybinds::InputMappings>,
     mut texts: Query<&mut Text, With<MinimapKeybindText>>,
-    mut key_backgrounds: Query<(&mut Handle<Image>, &mut Sprite), With<MinimapKeyBackground>>,
-    graphics: Res<Graphics>,
 ) {
     if !keybinds.is_changed() {
         return;
     }
 
     let minimap_key = keybinds.get_minimap_key();
-
     for mut text in texts.iter_mut() {
         text.sections[0].value = crate::keybinds::get_key_display_name(minimap_key);
-    }
-
-    for (mut texture, mut sprite) in key_backgrounds.iter_mut() {
-        let (key_element, key_width) = get_key_size_and_element(minimap_key);
-        *texture = graphics.get_ui_element_texture(key_element);
-        sprite.custom_size = Some(Vec2::new(key_width, 10.));
     }
 }
 
@@ -3192,19 +3172,13 @@ pub fn update_pet_skill_hud_slot(
     let y = -res.game_height / 2. + HUD_ACTION_ROW_Y_FROM_BOTTOM;
 
     let slot_bg = commands
-        .spawn(SpriteBundle {
-            texture: graphics.get_ui_element_texture(UIElement::ScreenIconSlotLarge),
-            sprite: Sprite {
-                custom_size: Some(Vec2::new(20., 20.)),
-                ..default()
-            },
-            transform: Transform::from_translation(Vec3::new(x, y, Z_DEPTH_HUD_ACTIVE_SKILLS)),
-            ..default()
-        })
+        .spawn(SpatialBundle::from_transform(Transform::from_translation(
+            Vec3::new(x, y, Z_DEPTH_HUD_ACTIVE_SKILLS),
+        )))
         .insert(RenderLayers::from_layers(&[3]))
         .insert(PetSkillSlotBg)
         .insert(PetSkillSlotFor(pet.clone()))
-        .insert(Name::new("PET SKILL SLOT BG"))
+        .insert(Name::new("PET SKILL SLOT"))
         .id();
 
     commands

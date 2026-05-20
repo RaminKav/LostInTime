@@ -1,7 +1,7 @@
 use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
 
 use crate::{
-    assets::{Graphics, SpriteAnchor},
+    assets::SpriteAnchor,
     ecs_helpers::{safe_push_children, safe_set_parent, SafeHierarchyExt},
     inventory::{Inventory, ItemStack},
     item::{boss_shrine::BossSummonTracker, WorldObject},
@@ -14,7 +14,8 @@ use super::{
     damage_numbers::spawn_text,
     game_fonts::FLOATING_TEXT,
     spawn_item_stack_icon,
-    ui_helpers::{get_key_size_and_element, spawn_keybind_badge},
+    ui_helpers::spawn_keybind_badge,
+    KEYBIND_BADGE_SIZE,
     UIElement,
 };
 
@@ -187,7 +188,6 @@ pub fn spawn_shrine_interact_key_guide(
     )>,
 ) {
     let interact_key = keybinds.get_interact_key();
-    let (_, key_width) = get_key_size_and_element(interact_key);
     let (player_e, player_t) = player_query.single();
     let key_count = player_inv
         .single()
@@ -232,18 +232,16 @@ pub fn spawn_shrine_interact_key_guide(
                         );
                         safe_set_parent(&mut commands, text_e, parent_entity);
 
-                        // Key cap sits left of the label (same spacing as the old F-key sprite).
-                        // Wider caps shift further left so they do not overlap the text.
-                        let key_x_offset =
-                            f32::round(char_count * -4. - 12. - (key_width - 10.) / 2.);
+                        // Key badge sits left of the label.
+                        let key_x_offset = f32::round(
+                            char_count * -4. - 12. - (KEYBIND_BADGE_SIZE.x - 10.) / 2.,
+                        );
                         let (key_bg, key_text) = spawn_keybind_badge(
                             &mut commands,
-                            &game.graphics,
                             &asset_server,
                             interact_key,
-                            text_e,
-                            Vec3::new(key_x_offset, 0.5, 1.),
-                            Vec3::new(0., 1., 1.),
+                            Transform::from_translation(Vec3::new(key_x_offset, 0.5, 1.)),
+                            Some(text_e),
                             INTERACT_GUIDE_RENDER_LAYER,
                         );
                         commands.entity(key_bg).insert(InteractGuideKeyBackground);
@@ -252,12 +250,10 @@ pub fn spawn_shrine_interact_key_guide(
                     None => {
                         let (key_bg, key_text) = spawn_keybind_badge(
                             &mut commands,
-                            &game.graphics,
                             &asset_server,
                             interact_key,
-                            parent_entity,
-                            Vec3::new(0., 0.5, 1.),
-                            Vec3::new(0., 1., 1.),
+                            Transform::from_translation(Vec3::new(0., 0.5, 1.)),
+                            Some(parent_entity),
                             INTERACT_GUIDE_RENDER_LAYER,
                         );
                         commands.entity(key_bg).insert(InteractGuideKeyBackground);
@@ -311,8 +307,6 @@ pub fn spawn_shrine_interact_key_guide(
 pub fn update_interact_guide_keybind_text(
     keybinds: Res<InputMappings>,
     mut texts: Query<&mut Text, With<InteractGuideKeybindText>>,
-    mut key_backgrounds: Query<(&mut Handle<Image>, &mut Sprite), With<InteractGuideKeyBackground>>,
-    graphics: Res<Graphics>,
 ) {
     if !keybinds.is_changed() {
         return;
@@ -321,11 +315,5 @@ pub fn update_interact_guide_keybind_text(
     let interact_key = keybinds.get_interact_key();
     for mut text in texts.iter_mut() {
         text.sections[0].value = crate::keybinds::get_key_display_name(interact_key);
-    }
-
-    for (mut texture, mut sprite) in key_backgrounds.iter_mut() {
-        let (key_element, key_width) = get_key_size_and_element(interact_key);
-        *texture = graphics.get_ui_element_texture(key_element);
-        sprite.custom_size = Some(Vec2::new(key_width, 10.));
     }
 }

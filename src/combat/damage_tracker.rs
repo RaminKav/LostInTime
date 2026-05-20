@@ -160,7 +160,7 @@ impl DamageSource {
             DamageSource::Bomb => "Bomb",
             DamageSource::DaggerSlash => "Dagger Slash",
             DamageSource::DaggerThrow => "Dagger Throw",
-            DamageSource::FuryKunai => "Fury Kunai",
+            DamageSource::FuryKunai => "Fury",
             DamageSource::SpinAttack => "Spin Attack",
             DamageSource::SpearGravity => "Grav. Spear",
             DamageSource::ArrowVolley => "Arrow Volley",
@@ -337,10 +337,7 @@ pub struct PetAbilityStats {
 
 impl PetAbilityStats {
     pub fn has_any(&self) -> bool {
-        self.shields_generated > 0
-            || self.healing > 0
-            || self.coins > 0
-            || self.self_damage > 0
+        self.shields_generated > 0 || self.healing > 0 || self.coins > 0 || self.self_damage > 0
     }
 }
 
@@ -595,7 +592,9 @@ pub fn spawn_damage_tracker_ui(
                                 )
                                 .with_alignment(TextAlignment::Left),
                                 text_anchor: Anchor::CenterLeft,
-                                transform: Transform::from_translation(Vec3::new(-hw, cursor_y, 1.)),
+                                transform: Transform::from_translation(Vec3::new(
+                                    -hw, cursor_y, 1.,
+                                )),
                                 ..default()
                             },
                             RenderLayers::from_layers(&[3]),
@@ -616,7 +615,11 @@ pub fn spawn_damage_tracker_ui(
                                 )
                                 .with_alignment(TextAlignment::Right),
                                 text_anchor: Anchor::CenterRight,
-                                transform: Transform::from_translation(Vec3::new(hw + 10., cursor_y, 1.)),
+                                transform: Transform::from_translation(Vec3::new(
+                                    hw + 10.,
+                                    cursor_y,
+                                    1.,
+                                )),
                                 ..default()
                             },
                             RenderLayers::from_layers(&[3]),
@@ -640,7 +643,9 @@ pub fn spawn_damage_tracker_ui(
                                 )
                                 .with_alignment(TextAlignment::Left),
                                 text_anchor: Anchor::CenterLeft,
-                                transform: Transform::from_translation(Vec3::new(-hw, cursor_y, 1.)),
+                                transform: Transform::from_translation(Vec3::new(
+                                    -hw, cursor_y, 1.,
+                                )),
                                 ..default()
                             },
                             RenderLayers::from_layers(&[3]),
@@ -661,7 +666,11 @@ pub fn spawn_damage_tracker_ui(
                                 )
                                 .with_alignment(TextAlignment::Right),
                                 text_anchor: Anchor::CenterRight,
-                                transform: Transform::from_translation(Vec3::new(hw + 10., cursor_y, 1.)),
+                                transform: Transform::from_translation(Vec3::new(
+                                    hw + 10.,
+                                    cursor_y,
+                                    1.,
+                                )),
                                 ..default()
                             },
                             RenderLayers::from_layers(&[3]),
@@ -685,7 +694,9 @@ pub fn spawn_damage_tracker_ui(
                                 )
                                 .with_alignment(TextAlignment::Left),
                                 text_anchor: Anchor::CenterLeft,
-                                transform: Transform::from_translation(Vec3::new(-hw, cursor_y, 1.)),
+                                transform: Transform::from_translation(Vec3::new(
+                                    -hw, cursor_y, 1.,
+                                )),
                                 ..default()
                             },
                             RenderLayers::from_layers(&[3]),
@@ -706,7 +717,11 @@ pub fn spawn_damage_tracker_ui(
                                 )
                                 .with_alignment(TextAlignment::Right),
                                 text_anchor: Anchor::CenterRight,
-                                transform: Transform::from_translation(Vec3::new(hw + 10., cursor_y, 1.)),
+                                transform: Transform::from_translation(Vec3::new(
+                                    hw + 10.,
+                                    cursor_y,
+                                    1.,
+                                )),
                                 ..default()
                             },
                             RenderLayers::from_layers(&[3]),
@@ -730,7 +745,9 @@ pub fn spawn_damage_tracker_ui(
                                 )
                                 .with_alignment(TextAlignment::Left),
                                 text_anchor: Anchor::CenterLeft,
-                                transform: Transform::from_translation(Vec3::new(-hw, cursor_y, 1.)),
+                                transform: Transform::from_translation(Vec3::new(
+                                    -hw, cursor_y, 1.,
+                                )),
                                 ..default()
                             },
                             RenderLayers::from_layers(&[3]),
@@ -751,7 +768,11 @@ pub fn spawn_damage_tracker_ui(
                                 )
                                 .with_alignment(TextAlignment::Right),
                                 text_anchor: Anchor::CenterRight,
-                                transform: Transform::from_translation(Vec3::new(hw + 10., cursor_y, 1.)),
+                                transform: Transform::from_translation(Vec3::new(
+                                    hw + 10.,
+                                    cursor_y,
+                                    1.,
+                                )),
                                 ..default()
                             },
                             RenderLayers::from_layers(&[3]),

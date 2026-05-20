@@ -262,7 +262,9 @@ pub fn handle_key_rebind_input(
         for (entity, waiting_for) in waiting.iter() {
             match waiting_for.bind_type {
                 KeyBindType::ActiveSkill(slot) => {
-                    keybinds.set_active_skill_key(slot, InputBinding::KeyBinding(key))
+                    let binding = InputBinding::KeyBinding(key);
+                    keybinds.clear_active_skill_binding_from_other_slots(binding, slot);
+                    keybinds.set_active_skill_key(slot, binding);
                 }
                 KeyBindType::Hotbar(slot) => {
                     keybinds.set_hotbar_key(slot, InputBinding::KeyBinding(key))
@@ -288,7 +290,9 @@ pub fn handle_key_rebind_input(
         for (entity, waiting_for) in waiting.iter() {
             match waiting_for.bind_type {
                 KeyBindType::ActiveSkill(slot) => {
-                    keybinds.set_active_skill_key(slot, InputBinding::MouseBinding(mouse_button))
+                    let binding = InputBinding::MouseBinding(mouse_button);
+                    keybinds.clear_active_skill_binding_from_other_slots(binding, slot);
+                    keybinds.set_active_skill_key(slot, binding);
                 }
                 KeyBindType::Hotbar(slot) => {
                     keybinds.set_hotbar_key(slot, InputBinding::MouseBinding(mouse_button))

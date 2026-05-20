@@ -256,6 +256,8 @@ pub mod active_skill_scaling {
     /// Sized to hold `RECALL_REWIND_SECONDS / RECALL_SAMPLE_INTERVAL_SECS` + a small
     /// safety margin so we always have a sample at age >= [`RECALL_REWIND_SECONDS`] once primed.
     pub const RECALL_HISTORY_CAPACITY: usize = 12;
+    /// Minimum recorded samples required to cast (full buffer gives ~[`RECALL_REWIND_SECONDS`] rewind).
+    pub const RECALL_MIN_SAMPLES: usize = 2;
     /// World speed (pixels per second) along the retrace polyline. Dash time is
     /// `path_length / RECALL_DASH_SPEED_PX_PER_SEC`, clamped by min/max below.
     pub const RECALL_DASH_SPEED_PX_PER_SEC: f32 = 720.0;

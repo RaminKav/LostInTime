@@ -565,15 +565,16 @@ pub fn pause_combo_anim_when_done(mut combo: Query<&mut AsepriteAnimation, With<
 // [`PositionHistory`] stores world `Vec2` samples oldest-first. On cast we
 // walk **current → newest sample → … → second-oldest → snapped oldest tile
 // center** so the player visually follows the path they actually took, in
-// reverse. Dash duration is `polyline_length / RECALL_DASH_SPEED_PX_PER_SEC`
+// reverse. The ring buffer is not cleared on cast so chained Shadow Steps can
+// reuse recent trail data. Dash duration is `polyline_length / RECALL_DASH_SPEED_PX_PER_SEC`
 // (clamped). Damage uses one short-lived line collider per polyline edge.
 use crate::item::projectile::RangedAttackEvent;
 use crate::player::skill_heirlooms::Stealthed;
 use crate::player::skills::active_skill_scaling::{
     RECALL, RECALL_DASH_DURATION_MAX_SECS, RECALL_DASH_DURATION_MIN_SECS,
     RECALL_DASH_SPEED_PX_PER_SEC, RECALL_HISTORY_CAPACITY, RECALL_HITBOX_HALF_WIDTH,
-    RECALL_HITBOX_SECONDS, RECALL_LANDING_STEALTH_SECS, RECALL_SAMPLE_INTERVAL_SECS,
-    RECALL_SHADOW_INTERVAL_ARC_PX,
+    RECALL_HITBOX_SECONDS, RECALL_LANDING_STEALTH_SECS, RECALL_MIN_SAMPLES,
+    RECALL_SAMPLE_INTERVAL_SECS, RECALL_SHADOW_INTERVAL_ARC_PX,
 };
 use crate::player::skills::StealthState;
 
@@ -732,8 +733,7 @@ pub fn handle_recall(
         return;
     }
 
-    // Buffer not yet primed: nothing to retrace. Cooldown was already consumed.
-    if hist.samples.len() < RECALL_HISTORY_CAPACITY {
+    if hist.samples.len() < RECALL_MIN_SAMPLES {
         return;
     }
 
@@ -827,8 +827,6 @@ pub fn handle_recall(
         next_shadow_arclength: RECALL_SHADOW_INTERVAL_ARC_PX,
         timer: Timer::from_seconds(dash_duration, TimerMode::Once),
     });
-
-    hist.clear();
 }
 
 /// Fixed-speed motion along [`RecallDashState::path`]. On the last tick, grants

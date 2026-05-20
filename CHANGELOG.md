@@ -403,14 +403,32 @@ Heirlooms:
 
 ## 0.19.0
 
-- [Feature] Beastiary & Monster Cards
-- [Balance] Nerf chaos gain per level from 0.2 -> 0.1
-- Removed Gun weapon from game pool
+- [Feature] Beastiary & Monster Cards. Collect rare monster cards, and unlock more information and stats about that monster in the Bestiary. UI is a work in progress (placeholder).
 - [Feature] Added Scorpion Boss to Desert Era! Spawns instead of the mushking now in era2
+- [Balance] Nerf chaos gain per level from 0.2 -> 0.1
+- [New Skill] Shadow Step: Rogue skill, dash to your position 0.75s ago, damaging all enemies in your path, gain stealth after for 1s.
 - [New Heirloom] Blue Card: Uncommon, +3% chance on weapon or skill damage to regen 1 Mana.
 - [New Heirloom] Purple Card: Rare, Rework of old purple card, doubles drop rate of mana orbs. (default is 10% drop).
+- [Balance] Reduce classes to 3 skills total, 2 unlocked by default, 3rd one purchased with Time Fragments.
 - [Balance] Boulder balance: Increase time between spawns, but increase duration of the boulder.
 - [Balance] Reduce drop rate of Time Fragments
 - [Bug] Fix text on some monitors, text should be more clear, please send screenshots if any text looks off on your monitor (non-uniform pixel sizes, etc)
-- [Balance] Reduce classes to 3 skills total, 2 unlocked by default, 3rd one purchased with Time Fragments.
-- [New Skill] Shadow Step: Rogue skill, dash to your position 0.75s ago, damaging all enemies in your path, gain stealth after for 1s.
+- Removed Gun weapon from game pool
+- [QoL] Added more helpful text in the floating text tooltips (boss summon, dungone), and portal, mostly for new players.
+- [QoL] Added coins counter in the shop UI
+
+## 0.19.1
+
+- [Feature] New main HUD UI! This is the first iteration of this, will likely change and adapt in the coming days, but wanted to get it out there asap! Let me know your thoughts on it so far.
+- [New Heirloom] Gravity Scales: Rare, converts 25% of pickup range into size
+- [Balance] Nerf dmg of some desert enemies
+- [Balance] Buff desert Scorpion boss attack pattern and hp
+- [Balance] Buff the knockback from shout by like 150%
+- [Balance] Brown Card (skills trigger mana regen) moved to Common rarity, and reduced from 20% -> 8% chance
+- Remove CDZ heirloom (and shield as a result)
+- [QoL] Add tracker for movement skill cooldowns on top of player
+- [QoL] Remove mana cost from staffs
+- [QoL] More option in settings, switch to smaller dmg numbers, disable player numbers (hp/mp), and change interact button
+- [QoL] Remove some of the lame skills that are not part of any class base kit, from the shrine pool
+- [Bug] Fix the sudden night overlay change when entering a new Era
+- [Bug] Fix crash related to poison, again

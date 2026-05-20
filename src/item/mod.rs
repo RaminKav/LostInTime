@@ -184,6 +184,15 @@ impl EquipmentType {
             _ => false,
         }
     }
+
+    /// Short name for "Craft a/an ___ first" when hitting tool-gated world objects.
+    pub fn craft_hint_name(&self) -> Option<&'static str> {
+        match self {
+            EquipmentType::Axe => Some("Axe"),
+            EquipmentType::Pickaxe => Some("Pickaxe"),
+            _ => None,
+        }
+    }
     pub fn is_armor(&self) -> bool {
         match self {
             EquipmentType::Head => true,

@@ -138,7 +138,7 @@ pub const INVENTORY_EQUIPMENT_UI_SIZE: Vec2 = Vec2::new(130., 140.);
 /// Side panel that replaces the stats tooltip in `UIState::InventoryCrafting`.
 /// Matches the art height of the stats panel so it occupies the same slot on-screen.
 pub const INVENTORY_BLUEPRINT_UI_SIZE: Vec2 = Vec2::new(192., 312.);
-pub const INVENTORY_Y_OFFSET: f32 = -22.;
+pub const INVENTORY_Y_OFFSET: f32 = -13.;
 /// Pixel extent of the main item slot grid (4 columns × 7 rows).
 pub const INVENTORY_GRID_COLS: usize = 4;
 pub const SKILLS_CHOICE_UI_SIZE: Vec2 = Vec2::new(164., 191.);
@@ -208,25 +208,48 @@ pub const INV_FURNACE_SLOT_0: Vec2 = Vec2::new(176., -46.);
 pub const HUD_HOTBAR_SLOTS: usize = 4;
 
 /// Y offset from the screen bottom for the `HudBar` frame sprite.
-pub const HUD_FRAME_Y_FROM_BOTTOM: f32 = 26.0;
+pub const HUD_FRAME_Y_FROM_BOTTOM: f32 = 30.0;
 
 /// Shared y (offset from the screen bottom) for the hotbar + class-skill icon row.
-pub const HUD_ACTION_ROW_Y_FROM_BOTTOM: f32 = 24.0;
+pub const HUD_ACTION_ROW_Y_FROM_BOTTOM: f32 = 19.0;
+
+/// HUD keybind badge draw size (solid grey box, no sprite asset).
+pub const KEYBIND_BADGE_SIZE: Vec2 = Vec2::new(19., 9.);
+
+/// Grey keybind badge fill (`KEYBIND_BADGE_SIZE`).
+pub const KEYBIND_BADGE_COLOR: Color = Color::rgba(62./255., 58./255., 58./255., 0.85);
+
+/// Gap between the bottom screen edge and the bottom of a HUD keybind badge.
+pub const KEYBIND_BADGE_BOTTOM_INSET: f32 = 1.0;
+
+/// World-space y for the center of a bottom-anchored HUD keybind badge.
+pub fn hud_keybind_badge_center_y(game_height: f32) -> f32 {
+    -game_height * 0.5 + KEYBIND_BADGE_BOTTOM_INSET + KEYBIND_BADGE_SIZE.y * 0.5
+}
+
+/// World-space x for hotbar slot `slot_index` (matches [`inventory_ui::inv_slot_local_position`]).
+pub fn hud_hotbar_slot_center_x(slot_index: usize) -> f32 {
+    let half_span = (HUD_HOTBAR_SLOTS as f32 - 1.0) * 0.5;
+    HUD_HOTBAR_CENTER_X + (slot_index as f32 - half_span) * (INV_SLOT_SPACING_X - 5.0)
+}
 
 /// Center x of the 4-slot hotbar group (left side of the action row).
-pub const HUD_HOTBAR_CENTER_X: f32 = -65.0;
+pub const HUD_HOTBAR_CENTER_X: f32 = -59.0;
 
 /// Center x of the class-skill icon group (right side of the action row).
-pub const HUD_SKILLS_CENTER_X: f32 = 65.0;
+pub const HUD_SKILLS_CENTER_X: f32 = 60.0;
 
 /// Center-to-center spacing between class-skill icons.
-pub const HUD_SKILL_SPACING_X: f32 = 31.0;
+pub const HUD_SKILL_SPACING_X: f32 = 25.0;
+
+/// Invisible hit area for HUD skill-slot drag-and-drop (matches the former 20×20 slot bg).
+pub const HUD_SKILL_SLOT_HIT_SIZE: Vec2 = Vec2::new(20., 20.);
 
 /// `assets/ui/ProgressBackground.png` draw size.
-pub const PROGRESS_BACKGROUND_SIZE: Vec2 = Vec2::new(233., 30.);
+pub const PROGRESS_BACKGROUND_SIZE: Vec2 = Vec2::new(236., 32.);
 
 /// `assets/ui/CurrencyBackground.png` draw size.
-pub const CURRENCY_BACKGROUND_SIZE: Vec2 = Vec2::new(62., 23.);
+pub const CURRENCY_BACKGROUND_SIZE: Vec2 = Vec2::new(64., 26.);
 
 /// Gap between the two currency background sprites in the HUD row below the XP bar.
 pub const HUD_CURRENCY_BACKGROUND_GAP: f32 = 10.;
@@ -235,25 +258,35 @@ pub const HUD_CURRENCY_BACKGROUND_GAP: f32 = 10.;
 pub fn hud_row_below_xp_y(game_height: f32) -> f32 {
     // XP bar center ≈ `game_height/2 - 3`, height 6 → bottom at `gh/2 - 6`; leave ~8px gap then
     // center the 30px-tall progress / 23px-tall currency art on that band.
-    game_height * 0.5 - 25.
+    game_height * 0.5 - 20.
 }
 
 /// Inset from the right screen edge (`game_width / 2`) for the era-timer background's right side.
-pub const HUD_ERA_TIMER_RIGHT_INSET: f32 = 80.0;
+pub const HUD_ERA_TIMER_RIGHT_INSET: f32 = 81.0;
 
 /// Default era-timer background width at setup (matches `setup_era_timer_hud`).
 pub const HUD_ERA_TIMER_DEFAULT_WIDTH: f32 = 42.0;
 
-/// Center-to-center X distance between the clock and era timer (legacy layout:
-/// clock at `17.5` and timer at `50.5` from the left screen edge).
+/// Center-to-center X distance between the era timeline and era timer.
 pub const HUD_CLOCK_TO_ERA_TIMER_CENTER_OFFSET: f32 = 33.0;
+
+/// `assets/ui/Timeline.png` draw size.
+pub const HUD_TIMELINE_SIZE: Vec2 = Vec2::new(174., 18.);
+
+/// `assets/ui/TimelineArrows.png` draw size.
+pub const HUD_TIMELINE_ARROWS_SIZE: Vec2 = Vec2::new(10., 22.);
+
+/// Local X for timeline arrows: `0` = left edge, `1` = right edge of the bar.
+pub fn hud_timeline_arrow_local_x(progress: f32) -> f32 {
+    (progress.clamp(0., 1.) - 0.5) * (HUD_TIMELINE_SIZE.x -2.0)
+}
 
 /// Era-timer background center X so its right edge sits `HUD_ERA_TIMER_RIGHT_INSET` from the screen edge.
 pub fn hud_era_timer_center_x(game_width: f32, timer_width: f32) -> f32 {
     game_width * 0.5 - HUD_ERA_TIMER_RIGHT_INSET - timer_width * 0.5
 }
 
-/// Clock center X: fixed spacing left of the era timer (same separation as before the HUD row move).
+/// Era timeline center X: fixed spacing left of the era timer.
 pub fn hud_clock_center_x(game_width: f32, timer_width: f32) -> f32 {
     hud_era_timer_center_x(game_width, timer_width) - HUD_CLOCK_TO_ERA_TIMER_CENTER_OFFSET
 }
@@ -270,7 +303,7 @@ pub const HUD_HEIRLOOM_ICON_SPACING: f32 = 16.0;
 pub const HUD_HEIRLOOM_LEFT_PADDING: f32 = 4.0;
 
 /// Nudge the heirloom row upward from its default position below the progress bar.
-pub const HUD_HEIRLOOM_ROW_Y_NUDGE: f32 = 10.0;
+pub const HUD_HEIRLOOM_ROW_Y_NUDGE: f32 = 14.0;
 
 /// World-space Y for the heirloom icon row (below the progress / currency HUD row).
 pub fn hud_heirloom_row_y(game_height: f32) -> f32 {
@@ -533,7 +566,7 @@ impl Plugin for UIPlugin {
                         .run_if(run_once_per_run()),
                     setup_xp_bar_ui.after(load_state).run_if(run_once_per_run()),
                     setup_currency_ui.run_if(run_once_per_run()),
-                    setup_clock_hud.run_if(run_once_per_run()),
+                    setup_timeline_hud.run_if(run_once_per_run()),
                     setup_era_timer_hud.run_if(run_once_per_run()),
                     setup_chaos_ui.run_if(run_once_per_run()),
                 )
@@ -615,10 +648,6 @@ impl Plugin for UIPlugin {
                     change_ui_state_to_furnace_when_resource_added
                         .before(CustomFlush)
                         .run_if(resource_added::<FurnaceContainer>()),
-                    handle_update_clock_hud.run_if(
-                        resource_exists::<NightTracker>()
-                            .and_then(resource_changed::<NightTracker>()),
-                    ),
                     handle_update_era_timer_hud.run_if(
                         resource_exists::<crate::night::EraTimer>(),
                     ),

@@ -505,22 +505,12 @@ pub fn dispatch_active_skill_events(
         return;
     };
 
-    let slot_3_pressed = keybinds.check_skill_input(3, &key_input, &mouse_input);
-    let slot_2_pressed = keybinds.check_skill_input(2, &key_input, &mouse_input);
-    let slot_1_pressed = keybinds.check_skill_input(1, &key_input, &mouse_input);
-    let slot_0_pressed = keybinds.check_skill_input(0, &key_input, &mouse_input);
-
-    let pressed_slot = if slot_3_pressed {
-        Some(3)
-    } else if slot_2_pressed {
-        Some(2)
-    } else if slot_1_pressed {
-        Some(1)
-    } else if slot_0_pressed {
-        Some(0)
-    } else {
-        None
-    };
+    // Higher slot index wins when multiple bindings match; skip empty skill slots so a
+    // hidden default (e.g. slot 3 still on Shift) cannot block visible slots 0–2.
+    let pressed_slot = [3usize, 2, 1, 0, 4].into_iter().find(|&slot| {
+        skills.get_active_skill_in_slot(slot).is_some()
+            && keybinds.check_skill_input(slot, &key_input, &mouse_input)
+    });
 
     if let Some(slot) = pressed_slot {
         if let Some(skill) = skills.get_active_skill_in_slot(slot) {

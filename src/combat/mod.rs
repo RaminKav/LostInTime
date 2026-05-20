@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 
@@ -62,7 +64,9 @@ use crate::{
     },
     proto::proto_param::ProtoParam,
     ui::{
-        damage_numbers::spawn_floating_text_with_shadow, game_fonts::FLOATING_TEXT, CheatSettings,
+        damage_numbers::{spawn_floating_text_with_shadow, spawn_missing_tool_craft_hint},
+        game_fonts::FLOATING_TEXT,
+        CheatSettings,
     },
     world::{world_helpers::world_pos_to_tile_pos, y_sort::YSort, TileMapPosition, TILE_SIZE},
     CustomFlush, GameParam, GameState, Player, SlimeTempShield, SlimeTempShieldSprite, DEBUG,
@@ -118,6 +122,12 @@ pub struct ObjBreakEvent {
     pub give_drops_and_xp: bool,
 }
 
+#[derive(Debug, Clone)]
+pub struct MissingToolHintEvent {
+    pub world_pos: Vec3,
+    pub required: EquipmentType,
+}
+
 /// Bundles `EventWriter`s for [`handle_hits`] so the system stays within Bevy's `SystemParam` tuple limit.
 #[derive(SystemParam)]
 pub struct HitOutcomeEvents<'w> {
@@ -127,6 +137,7 @@ pub struct HitOutcomeEvents<'w> {
     pub obj_break: EventWriter<'w, ObjBreakEvent>,
     pub analytics: EventWriter<'w, AnalyticsUpdateEvent>,
     pub attribute_change: EventWriter<'w, AttributeChangeEvent>,
+    pub missing_tool_hint: EventWriter<'w, MissingToolHintEvent>,
 }
 
 /// Event to trigger lifesteal calculation and healing
@@ -192,6 +203,7 @@ impl Plugin for CombatPlugin {
             .add_event::<StatusEffectEvent>()
             .add_event::<LifestealEvent>()
             .add_event::<ObjBreakEvent>()
+            .add_event::<MissingToolHintEvent>()
             .init_resource::<damage_tracker::DamageTracker>()
             .init_resource::<damage_tracker::MobStatTracker>()
             .init_resource::<damage_tracker::PetAbilityStats>()
@@ -216,6 +228,7 @@ impl Plugin for CombatPlugin {
             .add_systems(
                 (
                     handle_hits,
+                    handle_missing_tool_hint_events.after(handle_hits),
                     tick_despawn_timer,
                     cleanup_marked_for_death_entities.after(handle_enemy_death),
                     handle_attack_cooldowns
@@ -601,23 +614,39 @@ pub fn handle_hits(
                     .as_ref()
                     .map_or(false, |p| p.is_skill_projectile());
 
-                // Does the player have the tool required to break this object in any inventory slot?
-                let player_has_required_tool = if let Some(item_type_req) = hit_req_option {
-                    !is_skill_projectile
-                        && player_blessing_mana_query
+                // Does the player carry the required tool anywhere in inventory?
+                let inventory_has_required_tool = hit_req_option
+                    .map(|item_type_req| {
+                        player_blessing_mana_query
                             .get_single()
                             .ok()
                             .map_or(false, |(_, _, inv)| {
                                 inv.has_equipment_type(&item_type_req.0, &proto_param)
                             })
-                } else {
-                    false
+                    })
+                    .unwrap_or(false);
+
+                // Regular (non-skill) projectiles can use an in-inventory tool; skill projectiles cannot.
+                let player_has_required_tool =
+                    !is_skill_projectile && inventory_has_required_tool;
+
+                let queue_missing_tool_hint = |hit_outcome: &mut HitOutcomeEvents, required: &EquipmentType| {
+                    if hit.hit_by_mob.is_some() || hit.ignore_tool || inventory_has_required_tool {
+                        return;
+                    }
+                    hit_outcome.missing_tool_hint.send(MissingToolHintEvent {
+                        world_pos: t.translation(),
+                        required: required.clone(),
+                    });
                 };
 
                 // Allow projectile damage on breakable objects, OR on tool-gated objects when the
                 // player carries the matching tool (e.g. axe in inventory lets arrows chop trees).
                 if hit.hit_with_projectile.is_some() && hit.hit_by_mob.is_none() {
                     if !obj.is_breakable_by_projectile() && !player_has_required_tool {
+                        if let Some(item_type_req) = hit_req_option {
+                            queue_missing_tool_hint(&mut hit_outcome, &item_type_req.0);
+                        }
                         continue;
                     }
                 }
@@ -638,9 +667,11 @@ pub fn handle_hits(
                                 .unwrap_or(&EquipmentType::None)
                                 != &item_type_req.0
                             {
+                                queue_missing_tool_hint(&mut hit_outcome, &item_type_req.0);
                                 continue;
                             }
                         } else {
+                            queue_missing_tool_hint(&mut hit_outcome, &item_type_req.0);
                             continue;
                         }
                     }
@@ -927,6 +958,38 @@ pub fn handle_hits(
         }
     }
 }
+
+pub fn handle_missing_tool_hint_events(
+    mut events: EventReader<MissingToolHintEvent>,
+    mut cooldown: Local<Timer>,
+    time: Res<Time>,
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    cheat_settings: Option<Res<CheatSettings>>,
+) {
+    const COOLDOWN_SECS: f32 = 10.0;
+    if cooldown.duration().as_secs_f32() == 0.0 {
+        *cooldown = Timer::from_seconds(COOLDOWN_SECS, TimerMode::Once);
+        cooldown.tick(Duration::from_secs_f32(COOLDOWN_SECS));
+    }
+    cooldown.tick(time.delta());
+
+    if !cooldown.finished() {
+        return;
+    }
+
+    if let Some(event) = events.iter().next() {
+        spawn_missing_tool_craft_hint(
+            &mut commands,
+            &asset_server,
+            event.world_pos,
+            &event.required,
+            cheat_settings.as_deref(),
+        );
+        cooldown.reset();
+    }
+}
+
 pub fn cleanup_marked_for_death_entities(
     mut commands: Commands,
     dead_query: Query<

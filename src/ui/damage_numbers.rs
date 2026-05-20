@@ -4,10 +4,12 @@ use rand::Rng;
 use crate::{
     assets::Graphics,
     attributes::{CurrentHealth, MaxHealth},
-    colors::{BLACK, DMG_NUM_GREEN, DMG_NUM_ORANGE, DMG_NUM_PURPLE, DMG_NUM_RED, DMG_NUM_YELLOW},
+    colors::{
+        BLACK, DMG_NUM_GREEN, DMG_NUM_ORANGE, DMG_NUM_PURPLE, DMG_NUM_RED, DMG_NUM_YELLOW, WHITE,
+    },
     enemy::Mob,
     inventory::ItemStack,
-    item::WorldObject,
+    item::{EquipmentType, WorldObject},
     ui::CheatSettings,
     world::{world_helpers, TILE_SIZE},
     Game, TextureCamera, WasHitWithCrit, WasHitWithOvercrit,
@@ -390,6 +392,42 @@ pub fn handle_clamp_screen_locked_icons_worldpos(
         icon_txfm.translation = edge.extend(20.);
         *v = Visibility::Visible;
     }
+}
+
+pub fn missing_tool_craft_hint_message(required: &EquipmentType) -> Option<String> {
+    let name = required.craft_hint_name()?;
+    let article = match name.chars().next() {
+        Some('A' | 'E' | 'I' | 'O' | 'U' | 'a' | 'e' | 'i' | 'o' | 'u') => "an",
+        _ => "a",
+    };
+    Some(format!("Craft {article} {name} first"))
+}
+
+pub fn spawn_missing_tool_craft_hint(
+    commands: &mut Commands,
+    asset_server: &AssetServer,
+    world_pos: Vec3,
+    required: &EquipmentType,
+    cheat_settings: Option<&CheatSettings>,
+) {
+    let Some(message) = missing_tool_craft_hint_message(required) else {
+        return;
+    };
+    let mut rng = rand::thread_rng();
+    let drop_spread = 16.;
+    let pos_offset = Vec3::new(
+        rng.gen_range(-drop_spread..drop_spread),
+        rng.gen_range(0.0..drop_spread) + 10.,
+        2.,
+    );
+    spawn_floating_text_with_shadow(
+        commands,
+        asset_server,
+        world_pos + pos_offset,
+        WHITE,
+        message,
+        floating_text_font_style(cheat_settings),
+    );
 }
 
 pub fn spawn_floating_text_with_shadow(

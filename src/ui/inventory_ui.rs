@@ -1313,7 +1313,7 @@ fn inv_slot_local_position(
             // exist in the container but are not spawned into the HUD (see `setup_hotbar_hud`).
             let half_span = (HUD_HOTBAR_SLOTS as f32 - 1.0) * 0.5;
             Vec2::new(
-                HUD_HOTBAR_CENTER_X + (slot_index as f32 - half_span) * INV_SLOT_SPACING_X,
+                HUD_HOTBAR_CENTER_X + (slot_index as f32 - half_span) * (INV_SLOT_SPACING_X - 5.0),
                 -game_height * 0.5 + HUD_ACTION_ROW_Y_FROM_BOTTOM,
             )
         }
@@ -1486,30 +1486,34 @@ pub fn spawn_inv_slot(
             .id()
     });
 
-    let mut slot_entity = commands.spawn(SpriteBundle {
-        texture: graphics.get_ui_element_texture(if slot_type.is_hotbar() {
-            UIElement::InventorySlotHotbar
-        } else if slot_type.is_furnace() {
-            UIElement::UpgradeSlot
-        } else {
-            UIElement::InventorySlot
-        }),
-
-        transform: Transform {
+    // HUD hotbar: anchor only — slot art is baked into `HudBar.png`.
+    let mut slot_entity = if slot_type.is_hotbar() {
+        commands.spawn(SpatialBundle::from_transform(Transform::from_translation(
             translation,
-            scale: Vec3::new(1., 1., 1.),
-            ..Default::default()
-        },
-        sprite: Sprite {
-            custom_size: Some(if slot_type.is_furnace() {
-                UI_UPGRADE_SLOT_SIZE
+        )))
+    } else {
+        commands.spawn(SpriteBundle {
+            texture: graphics.get_ui_element_texture(if slot_type.is_furnace() {
+                UIElement::UpgradeSlot
             } else {
-                UI_SLOT_SIZE
+                UIElement::InventorySlot
             }),
+            transform: Transform {
+                translation,
+                scale: Vec3::new(1., 1., 1.),
+                ..Default::default()
+            },
+            sprite: Sprite {
+                custom_size: Some(if slot_type.is_furnace() {
+                    UI_UPGRADE_SLOT_SIZE
+                } else {
+                    UI_SLOT_SIZE
+                }),
+                ..Default::default()
+            },
             ..Default::default()
-        },
-        ..Default::default()
-    });
+        })
+    };
     slot_entity
         .insert(RenderLayers::from_layers(&[3]))
         .insert(InventorySlotState {
@@ -1628,7 +1632,6 @@ pub fn update_inventory_ui(
     asset_server: Res<AssetServer>,
     inv: Query<&mut Inventory>,
     cont_param: UIContainersParam,
-    keybinds: Res<crate::keybinds::InputMappings>,
     resolution: Res<ScreenResolution>,
 ) {
     for (e, mut slot_state) in ui_elements.iter_mut() {
@@ -1701,20 +1704,8 @@ pub fn update_inventory_ui(
                 &resolution,
             );
 
-            // Re-attach the hotbar keybind badge (it lives as a child of the slot entity,
-            // so `despawn_recursive` above destroyed it). Only the first
-            // `HUD_HOTBAR_SLOTS` slots get a key binding; the rest are passive storage.
-            if slot_state.r#type.is_hotbar() && slot_state.slot_index < crate::ui::HUD_HOTBAR_SLOTS
-            {
-                crate::ui::player_hud::spawn_hotbar_keybind_badge_for_slot(
-                    &mut commands,
-                    &graphics,
-                    &asset_server,
-                    &keybinds,
-                    slot_state.slot_index,
-                    new_slot_entity,
-                );
-            }
+            // HUD hotbar keybind badges are spawned once in `setup_hotbar_hud` (bottom-anchored,
+            // not parented to slot entities) and updated via `update_hotbar_keybind_text`.
         }
     }
 }

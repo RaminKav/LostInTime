@@ -1,6 +1,6 @@
 use std::{
     fs::File,
-    io::{BufReader, BufWriter},
+    io::{BufReader, BufWriter, Read},
 };
 
 use bevy::{
@@ -155,10 +155,11 @@ impl Plugin for ClientPlugin {
                 (
                     // save_state.run_if(resource_exists::<AnalyticsData>()),
                     // tick_save_timer,
+                    persist_run_beastiary_on_game_over,
                     handle_append_run_data_after_death
                         .run_if(resource_exists::<AnalyticsData>())
-                        .after(check_first_run_achievement),
-                    persist_run_beastiary_on_game_over,
+                        .after(check_first_run_achievement)
+                        .after(persist_run_beastiary_on_game_over),
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
@@ -259,8 +260,22 @@ pub struct GameData {
 
 impl GameData {
     /// Deserialize `game_data.json` and drop tombstone tip entries from removed enum variants.
-    pub fn try_from_json_reader<R: std::io::Read>(reader: R) -> serde_json::Result<Self> {
-        let mut g: GameData = serde_json::from_reader(reader)?;
+    ///
+    /// If the file contains trailing data after the first JSON value (e.g. from a partial
+    /// double-write), only the first object is used and a warning is logged.
+    pub fn try_from_json_reader<R: Read>(mut reader: R) -> serde_json::Result<Self> {
+        let mut contents = String::new();
+        reader
+            .read_to_string(&mut contents)
+            .map_err(serde_json::Error::io)?;
+        let mut de = serde_json::Deserializer::from_str(&contents);
+        let mut g = GameData::deserialize(&mut de)?;
+        if let Err(err) = de.end() {
+            warn!(
+                "game_data.json has trailing data after the first JSON object; \
+                 using the first object only: {err}"
+            );
+        }
         g.sanitize_persistent_tips();
         Ok(g)
     }

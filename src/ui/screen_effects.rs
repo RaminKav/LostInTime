@@ -13,7 +13,7 @@ use bevy::{
 };
 
 use crate::{
-    attributes::{hunger::Hunger, CurrentHealth, MaxHealth},
+    attributes::hunger::Hunger,
     player::Player,
     ScreenResolution, GAME_HEIGHT,
 };
@@ -30,9 +30,6 @@ const SCREEN_BLEND: BlendState = BlendState {
         operation: BlendOperation::Add,
     },
 };
-#[derive(Component)]
-pub struct HealthScreenEffect;
-
 #[derive(Component)]
 pub struct HungerScreenEffect;
 
@@ -71,43 +68,24 @@ pub fn setup_screen_effects(
     asset_server: Res<AssetServer>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ScreenEffectMaterial>>,
-    player_stats: Query<(&CurrentHealth, &MaxHealth, &Hunger), With<Player>>,
-    existing_hp_effect: Query<Entity, With<HealthScreenEffect>>,
+    player_stats: Query<&Hunger, With<Player>>,
     existing_hunger_effect: Query<Entity, With<HungerScreenEffect>>,
     res: Res<ScreenResolution>,
 ) {
-    if existing_hp_effect.iter().next().is_some() || existing_hunger_effect.iter().next().is_some()
-    {
+    if existing_hunger_effect.iter().next().is_some() {
         return;
     }
 
-    let Ok((current_hp, max_hp, hunger)) = player_stats.get_single() else {
+    let Ok(hunger) = player_stats.get_single() else {
         return;
     };
-    let hp_percent = (current_hp.0 as f32 / max_hp.0 as f32).clamp(0.0, 1.0);
     let hunger_percent = (hunger.current as f32 / hunger.max as f32).clamp(0.0, 1.0);
 
-    let hp_handle = asset_server.load("ui/HealthScreenEffect.png");
-    let hp_effect_material = materials.add(ScreenEffectMaterial {
-        source_texture: Some(hp_handle),
-        opacity: (1.0 - hp_percent).clamp(0.0, 1.0),
-    });
     let hunger_handle = asset_server.load("ui/HungerScreenEffect.png");
     let hunger_effect_material = materials.add(ScreenEffectMaterial {
         source_texture: Some(hunger_handle),
         opacity: (1.0 - hunger_percent).clamp(0.0, 1.0),
     });
-    commands.spawn((
-        Mesh2dHandle::from(meshes.add(Mesh::from(shape::Quad {
-            size: Vec2::new(res.game_width, GAME_HEIGHT),
-            ..Default::default()
-        }))),
-        hp_effect_material.clone(),
-        HealthScreenEffect,
-        RenderLayers::from_layers(&[3]),
-        Name::new("hp screen effect"),
-        SpatialBundle::from_transform(Transform::from_xyz(0., 0., 1.)),
-    ));
     commands.spawn((
         Mesh2dHandle::from(meshes.add(Mesh::from(shape::Quad {
             size: Vec2::new(res.game_width, GAME_HEIGHT),
@@ -122,20 +100,13 @@ pub fn setup_screen_effects(
 }
 
 pub fn handle_screen_effects(
-    player_stats: Query<(&CurrentHealth, &MaxHealth, &Hunger), With<Player>>,
+    player_stats: Query<&Hunger, With<Player>>,
     mut materials: ResMut<Assets<ScreenEffectMaterial>>,
-    hp_effect: Query<&Handle<ScreenEffectMaterial>, With<HealthScreenEffect>>,
     hunger_effect: Query<&Handle<ScreenEffectMaterial>, With<HungerScreenEffect>>,
 ) {
-    let Ok((current_hp, max_hp, hunger)) = player_stats.get_single() else {
+    let Ok(hunger) = player_stats.get_single() else {
         return;
     };
-    if let Ok(hp_mat_handle) = hp_effect.get_single() {
-        if let Some(hp_effect_material) = materials.get_mut(hp_mat_handle) {
-            let hp_percent = (current_hp.0 as f32 / max_hp.0 as f32).clamp(0.0, 1.0);
-            hp_effect_material.opacity = (1.0 - hp_percent).clamp(0.0, 1.0);
-        }
-    }
     if let Ok(hunger_mat_handle) = hunger_effect.get_single() {
         if let Some(hunger_effect_material) = materials.get_mut(hunger_mat_handle) {
             let hunger_percent = (hunger.current as f32 / hunger.max as f32).clamp(0.0, 1.0);
