@@ -1,5 +1,4 @@
 use crate::assets::{SpriteAnchor, SpriteSize, WorldObjectData};
-use crate::ecs_helpers::safe_set_parent;
 use crate::attributes::item_abilities::ItemAbility;
 use crate::chaos::ChaosTracker;
 use crate::client::analytics::{AnalyticsTrigger, AnalyticsUpdateEvent};
@@ -9,6 +8,7 @@ use crate::colors::{
     SHIELD_BLUE, SNOW_BLUE, SNOW_DARK, SNOW_GREEN, WHITE, YELLOW,
 };
 use crate::combat::ObjBreakEvent;
+use crate::ecs_helpers::safe_set_parent;
 
 use crate::container::ContainerRegistry;
 use crate::enemy::Mob;
@@ -965,6 +965,11 @@ impl WorldObject {
             WorldObject::BerryBush => true,
             WorldObject::BlueberryBush => true,
             WorldObject::DeadSapling => true,
+            WorldObject::RedMushroom => true,
+            WorldObject::BrownMushroom => true,
+            WorldObject::RedFlower => true,
+            WorldObject::YellowFlower => true,
+
             WorldObject::Era2BerryBush => true,
             WorldObject::Era2DeadBranch => true,
             WorldObject::Era2Pebble => true,

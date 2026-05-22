@@ -14,7 +14,14 @@ use crate::{
     bounce::spawn_desert_tornado,
     collisions::DamagesWorldObjects,
     animations::enemy_sprites::spawn_attack_warning_aseprite,
-    combat::status_effects::MobStatusEffects,
+    combat::{
+        pickup_radius::{pull_all_eligible_ground_items_to_player, BeingPulledToPlayer},
+        status_effects::MobStatusEffects,
+    },
+    inventory::{Inventory, ItemStack},
+    item::ItemDrop,
+    pets::state::Pet,
+    proto::proto_param::ProtoParam,
     ecs_helpers::SafeHierarchyExt,
     enemy::{
         red_mushking::DeathState, spawner::MobSpawningPaused, FollowSpeed, Mob, MobIsAttacking,
@@ -1104,6 +1111,10 @@ pub fn handle_scorpion_death(
     mut boss_kill_tracker: ResMut<BossKillTracker>,
     era_timer: Res<EraTimer>,
     mut mob_spawning_paused: ResMut<MobSpawningPaused>,
+    item_drop_query: Query<(Entity, &ItemStack), (With<ItemDrop>, Without<BeingPulledToPlayer>)>,
+    inv: Query<&Inventory, With<Player>>,
+    pets: Query<(), With<Pet>>,
+    proto: ProtoParam,
 ) {
     for (entity, mut anim, mob, mut current_tag) in death.iter_mut() {
         if mob != &Mob::Scorpion {
@@ -1118,6 +1129,15 @@ pub fn handle_scorpion_death(
         {
             mob_spawning_paused.paused = true;
         }
+
+        pull_all_eligible_ground_items_to_player(
+            &mut commands,
+            &item_drop_query,
+            &inv,
+            &pets,
+            &proto,
+        );
+
         commands.entity(entity).despawn_recursive();
     }
 }

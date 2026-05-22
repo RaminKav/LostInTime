@@ -5,11 +5,11 @@ use rand::{seq::IteratorRandom, Rng};
 
 use crate::{
     assets::{Graphics, SpriteAnchor},
-    combat::pickup_radius::BeingPulledToPlayer,
+    combat::pickup_radius::{pull_all_eligible_ground_items_to_player, BeingPulledToPlayer},
     custom_commands::CommandsExt,
-    inventory::{player_can_accept_ground_item_pickup, Inventory, ItemStack},
-    pets::state::Pet,
+    inventory::{Inventory, ItemStack},
     item::{object_actions::ObjectAction, ItemDrop},
+    pets::state::Pet,
     player::Player,
     proto::proto_param::ProtoParam,
     ui::{
@@ -50,10 +50,7 @@ pub fn handle_gamble_shrine_rewards(
     mut commands: Commands,
     mut game: GameParam,
     mut minimap_event: EventWriter<UpdateMiniMapEvent>,
-    item_drop_query: Query<
-        (Entity, &ItemStack),
-        (With<ItemDrop>, Without<BeingPulledToPlayer>),
-    >,
+    item_drop_query: Query<(Entity, &ItemStack), (With<ItemDrop>, Without<BeingPulledToPlayer>)>,
     inv: Query<&Inventory, With<Player>>,
     pets: Query<(), With<Pet>>,
 ) {
@@ -79,23 +76,13 @@ pub fn handle_gamble_shrine_rewards(
                 //     Some(game.get_player_level()),
                 // );
 
-                // Pull items on the map by adding BeingPulledToPlayer (skip if inv can't accept)
-                if let Ok(inv) = inv.get_single() {
-                    let player_has_pet = pets.iter().next().is_some();
-                    for (item_entity, item_stack) in item_drop_query.iter() {
-                        if !player_can_accept_ground_item_pickup(
-                            item_stack,
-                            inv,
-                            player_has_pet,
-                            &proto,
-                        ) {
-                            continue;
-                        }
-                        commands
-                            .entity(item_entity)
-                            .insert(BeingPulledToPlayer::default());
-                    }
-                }
+                pull_all_eligible_ground_items_to_player(
+                    &mut commands,
+                    &item_drop_query,
+                    &inv,
+                    &pets,
+                    &proto,
+                );
 
                 commands
                     .entity(e)

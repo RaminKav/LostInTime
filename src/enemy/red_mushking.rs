@@ -1,8 +1,11 @@
 use crate::{
-    combat::{combat_helpers::DespawnTimer, pickup_radius::BeingPulledToPlayer},
+    combat::{
+        combat_helpers::DespawnTimer,
+        pickup_radius::{pull_all_eligible_ground_items_to_player, BeingPulledToPlayer},
+    },
     custom_commands::CommandsExt,
     enemy::{spawn_helpers::can_spawn_mob_here, spawner::MobSpawningPaused},
-    inventory::{player_can_accept_ground_item_pickup, Inventory, ItemStack},
+    inventory::{Inventory, ItemStack},
     item::{boss_shrine::BossSummonIndex, ItemDrop, LootTable, WorldObject},
     juice::ShakeEffect,
     night::{EraTimer, InfiniteModeStartedEvent},
@@ -567,24 +570,13 @@ pub fn handle_death(
                 }
             }
 
-            // Map-wide loot pull: pull all eligible ground items to the player,
-            // mirroring the behavior of `handle_gamble_shrine_rewards`.
-            if let Ok(inv) = inv.get_single() {
-                let player_has_pet = pets.iter().next().is_some();
-                for (item_entity, item_stack) in item_drop_query.iter() {
-                    if !player_can_accept_ground_item_pickup(
-                        item_stack,
-                        inv,
-                        player_has_pet,
-                        &proto,
-                    ) {
-                        continue;
-                    }
-                    commands
-                        .entity(item_entity)
-                        .insert(BeingPulledToPlayer::default());
-                }
-            }
+            pull_all_eligible_ground_items_to_player(
+                &mut commands,
+                &item_drop_query,
+                &inv,
+                &pets,
+                &proto,
+            );
 
             commands.entity(entity).despawn_recursive();
         }

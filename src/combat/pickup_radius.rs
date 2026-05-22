@@ -160,6 +160,28 @@ pub const BASE_MAGNET_COOLDOWN: f32 = 25.0;
 pub const MAGNET_COOLDOWN_REDUCTION_PER_STACK: f32 = 2.5;
 pub const MIN_MAGNET_COOLDOWN: f32 = 5.0;
 
+/// Map-wide loot pull: marks every eligible ground item for pickup (boss kills, gamble shrine, etc.).
+pub fn pull_all_eligible_ground_items_to_player(
+    commands: &mut Commands,
+    item_drop_query: &Query<(Entity, &ItemStack), (With<ItemDrop>, Without<BeingPulledToPlayer>)>,
+    inv: &Query<&Inventory, With<Player>>,
+    pets: &Query<(), With<Pet>>,
+    proto: &ProtoParam,
+) {
+    let Ok(inv) = inv.get_single() else {
+        return;
+    };
+    let player_has_pet = pets.iter().next().is_some();
+    for (item_entity, item_stack) in item_drop_query.iter() {
+        if !player_can_accept_ground_item_pickup(item_stack, inv, player_has_pet, proto) {
+            continue;
+        }
+        commands
+            .entity(item_entity)
+            .insert(BeingPulledToPlayer::default());
+    }
+}
+
 /// System that periodically pulls all item drops to the player
 /// Adds BeingPulledToPlayer component to all items when the timer triggers
 pub fn handle_magnet_pull(

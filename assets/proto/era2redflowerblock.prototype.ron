@@ -3,7 +3,6 @@
   templates: ["item_drop.prototype.ron"],
   schematics: {
   "survival_rogue_like::item::WorldObject": Era2RedFlowerBlock,
-  "survival_rogue_like::item::item_actions::ItemActions": (actions: [PlacesInto(Era2RedFlower)]),
   "survival_rogue_like::item::item_actions::ConsumableItem": (),
   "survival_rogue_like::inventory::ItemStack": (
         obj_type: Era2RedFlowerBlock,

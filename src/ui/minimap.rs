@@ -1,11 +1,13 @@
 use crate::assets::Graphics;
 use crate::client::GameOverEvent;
-use crate::colors::{DESERT_TILE, DESERT_WATER, SNOW_TILE, SNOW_WATER};
+use crate::colors::{DARK_WOOD_BROWN, DESERT_TILE, DESERT_WATER, SNOW_TILE, SNOW_WATER};
 use crate::item::WorldObject;
 use crate::world::dimension::{ActiveDimension, Era, SpawnDimension};
 use crate::world::dungeon::Dungeon;
-use crate::world::world_helpers::{camera_pos_to_chunk_pos, camera_pos_to_tile_pos};
-use crate::world::{TileMapPosition, CHUNK_SIZE, ISLAND_SIZE};
+use crate::world::world_helpers::{
+    camera_pos_to_chunk_pos, camera_pos_to_tile_pos, tile_pos_to_world_pos, world_pos_to_tile_pos,
+};
+use crate::world::{TileMapPosition, CHUNK_SIZE, ISLAND_SIZE, TILE_SIZE};
 use crate::{CustomFlush, GameParam, GameState, InputMappings, Player, DEBUG};
 use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
@@ -75,8 +77,49 @@ impl Plugin for MinimapPlugin {
                     .run_if(in_state(GameState::Main))
                     .run_if(|dungeon: Query<&Dungeon>| dungeon.is_empty()),
             )
-            .add_system(close_map_on_game_over.run_if(in_state(GameState::Main)));
+            .add_system(close_map_on_game_over.run_if(in_state(GameState::Main)))
+            .add_system(
+                setup_hud_minimap
+                    .run_if(in_state(GameState::Main))
+                    .run_if(|dungeon: Query<&Dungeon>| dungeon.is_empty()),
+            )
+            .add_system(
+                update_hud_minimap_texture
+                    .after(setup_hud_minimap)
+                    .run_if(in_state(GameState::Main))
+                    .run_if(|dungeon: Query<&Dungeon>| dungeon.is_empty()),
+            )
+            .add_system(
+                update_hud_minimap_icons
+                    .after(update_hud_minimap_texture)
+                    .run_if(in_state(GameState::Main))
+                    .run_if(|dungeon: Query<&Dungeon>| dungeon.is_empty()),
+            )
+            .add_system(despawn_hud_minimap_in_dungeon.run_if(in_state(GameState::Main)));
     }
+}
+
+pub const HUD_MINIMAP_RADIUS_TILES: i32 = 18;
+const HUD_MINIMAP_PIXELS_PER_TILE: u32 = 2;
+const HUD_MINIMAP_DISPLAY_SIZE: f32 = 67.0;
+const HUD_MINIMAP_ICON_SIZE: f32 = 11.0;
+const HUD_MINIMAP_PADDING: f32 = 8.0;
+
+#[derive(Component)]
+pub struct HudMinimap {
+    pub image_handle: Handle<Image>,
+}
+
+#[derive(Component)]
+pub struct HudMinimapSprite;
+
+#[derive(Component)]
+pub struct HudMinimapPlayerMarker;
+
+#[derive(Component)]
+pub struct HudMinimapIcon {
+    pub tile_pos: TileMapPosition,
+    pub object_type: WorldObject,
 }
 
 #[derive(Resource)]
@@ -131,6 +174,34 @@ fn minimap_base_terrain_color_for_era(obj: WorldObject, era: &Era) -> Color {
         },
     }
 }
+fn get_icon_for_object(obj: &WorldObject) -> Option<UIElement> {
+    match obj {
+        WorldObject::BossShrine => Some(UIElement::MinimapSkullIcon),
+        WorldObject::TimePortal => Some(UIElement::MinimapPortalIcon),
+        WorldObject::DungeonEntrance => Some(UIElement::MinimapDungeonIcon),
+        WorldObject::TimeGate => Some(UIElement::MinimapPortalIcon),
+        WorldObject::CombatShrine
+        | WorldObject::HeirloomShrine
+        | WorldObject::GambleShrine
+        | WorldObject::ActiveSkillShrine
+        | WorldObject::WeaponShrine
+        | WorldObject::ArmorShrine
+        | WorldObject::AccessoryShrine
+        | WorldObject::MicrowaveShrine
+        | WorldObject::BlacksmithMerchant => Some(UIElement::MinimapStarIcon),
+        WorldObject::CombatShrineDone
+        | WorldObject::HeirloomShrineDone
+        | WorldObject::GambleShrineDone
+        | WorldObject::ActiveSkillShrineDone
+        | WorldObject::WeaponShrineDone
+        | WorldObject::ArmorShrineDone
+        | WorldObject::AccessoryShrineDone
+        | WorldObject::MicrowaveShrineDone
+        | WorldObject::BlacksmithMerchantDone => None,
+        _ => None,
+    }
+}
+
 fn is_grass_obj(obj: &WorldObject) -> bool {
     [
         WorldObject::Grass,
@@ -190,6 +261,7 @@ fn clear_cache_for_new_dimensions(
     map_query: Query<Entity, With<IslandMap>>,
     fog_query: Query<Entity, With<IslandMapFogOverlay>>,
     marker_query: Query<Entity, With<IslandMapPlayerMarker>>,
+    hud_query: Query<Entity, With<HudMinimap>>,
     dungeon_check: Query<&Dungeon>,
     game: GameParam,
 ) {
@@ -213,6 +285,9 @@ fn clear_cache_for_new_dimensions(
         }
         for marker in marker_query.iter() {
             commands.entity(marker).despawn_recursive();
+        }
+        for hud in hud_query.iter() {
+            commands.entity(hud).despawn_recursive();
         }
 
         if is_dungeon_transition {
@@ -680,32 +755,6 @@ fn update_object_icons_on_map(
     );
     let scale_factor = map_display_size / total_pixels as f32;
 
-    fn get_icon_for_object(obj: &WorldObject) -> Option<UIElement> {
-        match obj {
-            WorldObject::BossShrine => Some(UIElement::MinimapSkullIcon),
-            WorldObject::TimePortal => Some(UIElement::MinimapPortalIcon),
-            WorldObject::DungeonEntrance => Some(UIElement::MinimapDungeonIcon),
-            WorldObject::TimeGate => Some(UIElement::MinimapPortalIcon),
-            WorldObject::CombatShrine
-            | WorldObject::HeirloomShrine
-            | WorldObject::GambleShrine
-            | WorldObject::ActiveSkillShrine
-            | WorldObject::WeaponShrine
-            | WorldObject::ArmorShrine
-            | WorldObject::AccessoryShrine
-            | WorldObject::BlacksmithMerchant => Some(UIElement::MinimapStarIcon),
-            WorldObject::CombatShrineDone
-            | WorldObject::HeirloomShrineDone
-            | WorldObject::GambleShrineDone
-            | WorldObject::ActiveSkillShrineDone
-            | WorldObject::WeaponShrineDone
-            | WorldObject::ArmorShrineDone
-            | WorldObject::AccessoryShrineDone
-            | WorldObject::BlacksmithMerchantDone => None,
-            _ => None,
-        }
-    }
-
     let mut desired_icons: HashMap<TileMapPosition, WorldObject> = HashMap::new();
     desired_icons.insert(
         TileMapPosition::new(IVec2::ZERO, TilePos { x: 0, y: 0 }),
@@ -1025,6 +1074,290 @@ fn close_map_on_dungeon_entry(
     if !dungeon_query.is_empty() {
         map_open.0 = false;
         info!("Closed minimap on dungeon entry");
+    }
+}
+
+/// Spawns the HUD minimap entity once when the player exists and we're not in a dungeon.
+fn setup_hud_minimap(
+    mut commands: Commands,
+    mut assets: ResMut<Assets<Image>>,
+    existing: Query<Entity, With<HudMinimap>>,
+    player_query: Query<Entity, With<Player>>,
+    game: GameParam,
+) {
+    if !existing.is_empty() || player_query.is_empty() {
+        return;
+    }
+
+    let diameter_tiles = (HUD_MINIMAP_RADIUS_TILES * 2 + 1) as u32;
+    let total_pixels = diameter_tiles * HUD_MINIMAP_PIXELS_PER_TILE;
+
+    let size = Extent3d {
+        width: total_pixels,
+        height: total_pixels,
+        depth_or_array_layers: 1,
+    };
+    let data = vec![0u8; (total_pixels * total_pixels * 4) as usize];
+    let image = Image::new(
+        size,
+        TextureDimension::D2,
+        data,
+        TextureFormat::Rgba8UnormSrgb,
+    );
+    let image_handle = assets.add(image);
+
+    let res = &game.resolution;
+    let pos_x = res.game_width / 2.0 - HUD_MINIMAP_DISPLAY_SIZE / 2.0 - HUD_MINIMAP_PADDING + 4.;
+    let pos_y = res.game_height / 2.0 - HUD_MINIMAP_DISPLAY_SIZE / 2.0 - HUD_MINIMAP_PADDING;
+
+    let scale = HUD_MINIMAP_DISPLAY_SIZE / total_pixels as f32;
+
+    let container = commands
+        .spawn((
+            SpatialBundle {
+                transform: Transform::from_translation(Vec3::new(pos_x, pos_y, 6.0)),
+                ..default()
+            },
+            HudMinimap {
+                image_handle: image_handle.clone(),
+            },
+            RenderLayers::from_layers(&[3]),
+            Name::new("HUD_MINIMAP"),
+        ))
+        .id();
+
+    // SpriteBundle (not MaterialMesh2d): ColorMaterial bind groups only refresh on
+    // material asset changes, not when the Image texture is updated each frame.
+    let map_sprite = commands
+        .spawn((
+            SpriteBundle {
+                texture: image_handle.clone(),
+                sprite: Sprite {
+                    custom_size: Some(Vec2::splat(HUD_MINIMAP_DISPLAY_SIZE)),
+                    ..default()
+                },
+                transform: Transform::from_translation(Vec3::new(0., 0., 0.)),
+                ..default()
+            },
+            HudMinimapSprite,
+            RenderLayers::from_layers(&[3]),
+            Name::new("HUD_MINIMAP_IMAGE"),
+        ))
+        .id();
+    commands.entity(container).add_child(map_sprite);
+
+    let marker = commands
+        .spawn((
+            SpriteBundle {
+                sprite: Sprite {
+                    color: Color::rgb(1.0, 1.0, 0.4),
+                    custom_size: Some(Vec2::splat(
+                        2.0 * HUD_MINIMAP_PIXELS_PER_TILE as f32 * scale,
+                    )),
+                    ..default()
+                },
+                transform: Transform::from_translation(Vec3::new(0., 0., 2.0)),
+                ..default()
+            },
+            HudMinimapPlayerMarker,
+            RenderLayers::from_layers(&[3]),
+            Name::new("HUD_MINIMAP_PLAYER_MARKER"),
+        ))
+        .id();
+    commands.entity(container).add_child(marker);
+}
+
+/// Re-renders the HUD minimap texture each frame around the player position with sub-tile precision.
+fn update_hud_minimap_texture(
+    mut assets: ResMut<Assets<Image>>,
+    hud_query: Query<&HudMinimap>,
+    player_query: Query<&GlobalTransform, With<Player>>,
+    cache: Res<MinimapTileCache>,
+    game: GameParam,
+) {
+    let Ok(hud) = hud_query.get_single() else {
+        return;
+    };
+    let Ok(player_t) = player_query.get_single() else {
+        return;
+    };
+    let Some(image) = assets.get_mut(&hud.image_handle) else {
+        return;
+    };
+
+    let player_world = player_t.translation().truncate();
+    let diameter_tiles = (HUD_MINIMAP_RADIUS_TILES * 2 + 1) as u32;
+    let total_pixels = diameter_tiles * HUD_MINIMAP_PIXELS_PER_TILE;
+    let center_pixel = total_pixels as f32 / 2.0;
+    let radius_pixels =
+        (HUD_MINIMAP_RADIUS_TILES as f32 + 0.5) * HUD_MINIMAP_PIXELS_PER_TILE as f32;
+    let border_thickness: f32 = 1.5;
+    let era = game.era.current_era.clone();
+
+    let data = &mut image.data;
+    let mut idx = 0usize;
+    for py in 0..total_pixels {
+        for px in 0..total_pixels {
+            let dx = px as f32 + 0.5 - center_pixel;
+            let dy = center_pixel - (py as f32 + 0.5);
+            let dist = (dx * dx + dy * dy).sqrt();
+
+            if dist > radius_pixels {
+                data[idx] = 0;
+                data[idx + 1] = 0;
+                data[idx + 2] = 0;
+                data[idx + 3] = 0;
+                idx += 4;
+                continue;
+            }
+            if dist > radius_pixels - border_thickness {
+                data[idx] = (DARK_WOOD_BROWN.r() * 255.0) as u8;
+                data[idx + 1] = (DARK_WOOD_BROWN.g() * 255.0) as u8;
+                data[idx + 2] = (DARK_WOOD_BROWN.b() * 255.0) as u8;
+                data[idx + 3] = 255;
+                idx += 4;
+                continue;
+            }
+
+            let world_offset = Vec2::new(
+                dx / HUD_MINIMAP_PIXELS_PER_TILE as f32 * TILE_SIZE.x,
+                dy / HUD_MINIMAP_PIXELS_PER_TILE as f32 * TILE_SIZE.y,
+            );
+            let sample_pos = player_world + world_offset;
+            let map_pos = world_pos_to_tile_pos(sample_pos);
+
+            let tile_world = tile_pos_to_world_pos(map_pos, false);
+            let local = sample_pos - tile_world + Vec2::new(TILE_SIZE.x / 2.0, TILE_SIZE.y / 2.0);
+            let qx = if local.x >= TILE_SIZE.x / 2.0 { 1 } else { 0 };
+            let qy_top = local.y >= TILE_SIZE.y / 2.0;
+            let quadrant = if qy_top { qx } else { 2 + qx };
+
+            let color = if let Some(obj) = cache.cache.get(&map_pos) {
+                if !is_grass_obj(obj) {
+                    obj.get_obj_color()
+                } else if let Some(terrain) = cache.explored_terrain.get(&map_pos) {
+                    minimap_base_terrain_color_for_era(terrain[quadrant], &era)
+                } else {
+                    Color::rgb(0.16, 0.16, 0.16)
+                }
+            } else if let Some(terrain) = cache.explored_terrain.get(&map_pos) {
+                minimap_base_terrain_color_for_era(terrain[quadrant], &era)
+            } else {
+                Color::rgb(0.16, 0.16, 0.16)
+            };
+
+            data[idx] = (color.r() * 255.0) as u8;
+            data[idx + 1] = (color.g() * 255.0) as u8;
+            data[idx + 2] = (color.b() * 255.0) as u8;
+            data[idx + 3] = 255;
+            idx += 4;
+        }
+    }
+}
+
+/// Spawns / repositions / removes object icons on the HUD minimap each frame.
+fn update_hud_minimap_icons(
+    mut commands: Commands,
+    cache: Res<MinimapTileCache>,
+    graphics: Res<Graphics>,
+    container_query: Query<Entity, With<HudMinimap>>,
+    mut icon_query: Query<(Entity, &HudMinimapIcon, &mut Transform)>,
+    player_query: Query<&GlobalTransform, With<Player>>,
+) {
+    let Ok(player_t) = player_query.get_single() else {
+        return;
+    };
+    let Ok(container) = container_query.get_single() else {
+        return;
+    };
+
+    let player_world = player_t.translation().truncate();
+    let radius_world = HUD_MINIMAP_RADIUS_TILES as f32 * TILE_SIZE.x;
+    let diameter_tiles = (HUD_MINIMAP_RADIUS_TILES * 2 + 1) as u32;
+    let total_pixels = diameter_tiles * HUD_MINIMAP_PIXELS_PER_TILE;
+    let scale = HUD_MINIMAP_DISPLAY_SIZE / total_pixels as f32;
+
+    let mut desired: HashMap<TileMapPosition, WorldObject> = HashMap::new();
+    desired.insert(
+        TileMapPosition::new(IVec2::ZERO, TilePos { x: 0, y: 0 }),
+        WorldObject::TimePortal,
+    );
+    for (pos, obj) in cache.cache.iter() {
+        if get_icon_for_object(obj).is_some() {
+            desired.insert(*pos, *obj);
+        }
+    }
+
+    desired.retain(|pos, _| {
+        let world = tile_pos_to_world_pos(*pos, false);
+        (world - player_world).length() <= radius_world + TILE_SIZE.x
+    });
+
+    let mut existing_keys: HashSet<TileMapPosition> = HashSet::new();
+    for (entity, icon, _) in icon_query.iter() {
+        let keep = matches!(desired.get(&icon.tile_pos), Some(o) if *o == icon.object_type);
+        if keep {
+            existing_keys.insert(icon.tile_pos);
+        } else {
+            commands.entity(entity).despawn_recursive();
+        }
+    }
+
+    for (pos, obj) in desired.iter() {
+        let world = tile_pos_to_world_pos(*pos, false);
+        let offset = world - player_world;
+        let pixel_offset_x = offset.x / TILE_SIZE.x * HUD_MINIMAP_PIXELS_PER_TILE as f32;
+        let pixel_offset_y = offset.y / TILE_SIZE.y * HUD_MINIMAP_PIXELS_PER_TILE as f32;
+        let local_x = pixel_offset_x * scale;
+        let local_y = pixel_offset_y * scale;
+
+        if existing_keys.contains(pos) {
+            for (_, icon, mut tx) in icon_query.iter_mut() {
+                if icon.tile_pos == *pos && icon.object_type == *obj {
+                    tx.translation.x = local_x;
+                    tx.translation.y = local_y;
+                    break;
+                }
+            }
+        } else {
+            let Some(ui_element) = get_icon_for_object(obj) else {
+                continue;
+            };
+            let icon_entity = commands
+                .spawn((
+                    SpriteBundle {
+                        texture: graphics.get_ui_element_texture(ui_element),
+                        sprite: Sprite {
+                            custom_size: Some(Vec2::splat(HUD_MINIMAP_ICON_SIZE)),
+                            ..default()
+                        },
+                        transform: Transform::from_translation(Vec3::new(local_x, local_y, 1.0)),
+                        ..default()
+                    },
+                    HudMinimapIcon {
+                        tile_pos: *pos,
+                        object_type: *obj,
+                    },
+                    RenderLayers::from_layers(&[3]),
+                    Name::new(format!("HUD_MINIMAP_ICON_{:?}", obj)),
+                ))
+                .id();
+            commands.entity(container).add_child(icon_entity);
+        }
+    }
+}
+
+/// Despawns the HUD minimap when entering a dungeon (rebuilt on exit).
+fn despawn_hud_minimap_in_dungeon(
+    mut commands: Commands,
+    dungeon_query: Query<&Dungeon, Added<Dungeon>>,
+    hud_query: Query<Entity, With<HudMinimap>>,
+) {
+    if dungeon_query.is_empty() {
+        return;
+    }
+    for entity in hud_query.iter() {
+        commands.entity(entity).despawn_recursive();
     }
 }
 

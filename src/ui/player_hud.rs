@@ -23,8 +23,9 @@ use super::{
 use crate::{
     assets::Graphics,
     attributes::{
-        attribute_helpers::skill_power_multiplier, ActiveConsumableBuffs, BonusAttackSpeed,
-        CritChance, CurrentHealth, CurrentMana, MaxHealth, MaxMana, SkillPower, Speed,
+        attribute_helpers::skill_power_multiplier, ActiveConsumableBuffs, AttackSpeed,
+        BonusAttackSpeed, CritChance, CurrentHealth, CurrentMana, MaxHealth, MaxMana, SkillPower,
+        Speed,
     },
     audio::{AudioSoundEffect, SoundSpawner},
     blessings::OwnedBlessings,
@@ -44,8 +45,8 @@ use crate::{
         combat_heirlooms::{CrateBreakDamageTracker, MaxHPHuntTracker, SkillPowerHuntTracker},
         levels::PlayerLevel,
         skills::{
-            ActiveSkill, ActiveSkillChoiceState, ActiveSkillUsedEvent, ClassSkillSlots, Heirloom,
-            HeirloomRarity, PlayerSkills,
+            effective_player_attack_speed_multiplier, ActiveSkill, ActiveSkillChoiceState,
+            ActiveSkillUsedEvent, ClassSkillSlots, Heirloom, HeirloomRarity, PlayerSkills,
             VISIBLE_CLASS_SKILL_COUNT,
         },
         CoinCurrency, Player, RunScore, TimeFragmentCurrency,
@@ -1467,6 +1468,7 @@ pub fn handle_active_skill_hud_tooltip(
             &MaxMana,
             &MaxHealth,
             Option<&BonusAttackSpeed>,
+            Option<&AttackSpeed>,
             &CritChance,
             &Speed,
         ),
@@ -1548,9 +1550,12 @@ pub fn handle_active_skill_hud_tooltip(
             .set_parent(container)
             .id();
 
-        let (skill_power, blessings, max_mana, max_health, bonus_as, crit, spd) =
+        let (skill_power, blessings, max_mana, max_health, bonus_as, attack_speed, crit, spd) =
             skill_power.single();
-        let bonus_as_mult = bonus_as.map(|b| b.get_multiplier()).unwrap_or(1.0);
+        let bonus_as_mult = effective_player_attack_speed_multiplier(
+            attack_speed.map(|a| a.0).unwrap_or(0),
+            bonus_as.map(|b| b.get_multiplier()).unwrap_or(1.0),
+        );
         spawn_skill_tooltip_content(
             &mut commands,
             &graphics,
@@ -2454,7 +2459,7 @@ pub fn setup_era_timer_hud(
                     },
                 ),
                 transform: Transform {
-                    translation: Vec3::new(0., -12., 1.), // Below the ENDLESS text
+                    translation: Vec3::new(0., -10., 1.), // Below the ENDLESS text
                     scale: Vec3::new(1., 1., 1.),
                     ..Default::default()
                 },

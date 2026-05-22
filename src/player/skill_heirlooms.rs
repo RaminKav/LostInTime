@@ -10,8 +10,8 @@ use crate::{
     animations::{player_sprite::PlayerAnimation, AttackEvent},
     attributes::{
         attribute_helpers::skill_power_multiplier, ActiveConsumableBuffs, Attack,
-        AttributeChangeEvent, BonusAttackSpeed, ConsumableBuffEffect, ConsumableBuffEntry,
-        CurrentHealth, CurrentMana, MaxHealth, SkillPower, Speed,
+        AttackSpeed, AttributeChangeEvent, BonusAttackSpeed, ConsumableBuffEffect,
+        ConsumableBuffEntry, CurrentHealth, CurrentMana, MaxHealth, SkillPower, Speed,
     },
     audio::{AudioSoundEffect, SoundSpawner},
     blessings::{Blessing, OwnedBlessings},
@@ -43,7 +43,8 @@ use crate::{
                 TRIPLE_THROW,
             },
             arrow_volley_scaling,
-            fury_throw_speed_multiplier, FURY_DURATION_SECS, FURY_THROW_TIMER_EFFECTIVE_SECS,
+            effective_player_attack_speed_multiplier, fury_throw_speed_multiplier,
+            FURY_DURATION_SECS, FURY_THROW_TIMER_EFFECTIVE_SECS,
             grant_skill_charge_after_cooldown_complete, ActiveSkill, ActiveSkillUsedEvent,
             ArrowVolleyState, BombState, BuckshotSkillState, ClassSkillSlots,
             DaggerThrowKillTracker, DaggerThrowState, DruidTreeSkillState, FirePillarState,
@@ -1414,15 +1415,22 @@ pub fn tick_class_skill_hit_clear_timers(
 pub fn tick_fury_duration_and_throw(
     time: Res<Time>,
     mut fury: Query<&mut FuryState, With<Player>>,
-    bonus_attack_speed: Query<&BonusAttackSpeed, With<Player>>,
+    player_as: Query<(Option<&AttackSpeed>, Option<&BonusAttackSpeed>), With<Player>>,
 ) {
     for mut f in fury.iter_mut() {
         f.duration.tick(time.delta());
-        let bonus_mult = bonus_attack_speed
+        let (attack_speed_stat, bonus_mult) = player_as
             .get_single()
-            .map(|b| b.get_multiplier())
-            .unwrap_or(1.0);
-        let throw_speed_mult = fury_throw_speed_multiplier(bonus_mult);
+            .map(|(as_stat, bonus)| {
+                (
+                    as_stat.map(|a| a.0).unwrap_or(0),
+                    bonus.map(|b| b.get_multiplier()).unwrap_or(1.0),
+                )
+            })
+            .unwrap_or((0, 1.0));
+        let effective_mult =
+            effective_player_attack_speed_multiplier(attack_speed_stat, bonus_mult);
+        let throw_speed_mult = fury_throw_speed_multiplier(effective_mult);
         let scaled_delta = time.delta().mul_f32(throw_speed_mult);
         f.throw_timer.tick(scaled_delta);
     }
@@ -1573,6 +1581,111 @@ pub fn handle_possessed_blade_kill_lifesteal(
                 modify_health.send(crate::attributes::modifiers::ModifyHealthEvent(1));
                 healed = true;
                 break;
+            }
+        }
+    }
+}
+
+/// Attach return-flight component to newly spawned PiercingStar projectiles
+/// (uses `Projectile::ThrowingStarLarge`). Mirrors the PossessedBlade
+/// boomerang behavior: the star flies out, decelerates, then returns to
+/// the player.
+pub fn handle_attach_piercing_star_return(
+    mut commands: Commands,
+    new_stars: Query<
+        (
+            Entity,
+            &Projectile,
+            &crate::item::projectile::ProjectileState,
+        ),
+        Added<Projectile>,
+    >,
+    player: Query<Entity, With<Player>>,
+) {
+    let Ok(player_e) = player.get_single() else {
+        return;
+    };
+    for (entity, proj, proj_state) in new_stars.iter() {
+        if *proj != Projectile::ThrowingStarLarge {
+            continue;
+        }
+        commands.entity(entity).insert(PiercingStarReturn {
+            phase: PiercingStarPhase::Outgoing,
+            elapsed: 0.0,
+            outgoing_duration: 0.9,
+            base_speed: proj_state.speed,
+            owner: player_e,
+        });
+    }
+}
+
+/// Phases of the piercing star flight path.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum PiercingStarPhase {
+    Outgoing,
+    Returning,
+}
+
+/// Attached to the PiercingStar (`ThrowingStarLarge`) projectile entity to
+/// drive its decel/return arc.
+#[derive(Component)]
+pub struct PiercingStarReturn {
+    pub phase: PiercingStarPhase,
+    pub elapsed: f32,
+    pub outgoing_duration: f32,
+    pub base_speed: f32,
+    pub owner: Entity,
+}
+
+pub fn tick_piercing_star_movement(
+    mut commands: Commands,
+    time: Res<Time>,
+    mut stars: Query<(
+        Entity,
+        &mut Transform,
+        &mut PiercingStarReturn,
+        &mut crate::item::projectile::ProjectileState,
+    )>,
+    player_pos_q: Query<&GlobalTransform, With<Player>>,
+) {
+    let dt = time.delta_seconds();
+    let Ok(player_txfm) = player_pos_q.get_single() else {
+        return;
+    };
+    let player_pos = player_txfm.translation().truncate();
+
+    for (entity, mut transform, mut star, mut proj_state) in stars.iter_mut() {
+        star.elapsed += dt;
+
+        match star.phase {
+            PiercingStarPhase::Outgoing => {
+                let t = (star.elapsed / star.outgoing_duration).min(1.0);
+                let speed = star.base_speed * (1.0 - t) * (1.0 - t);
+                proj_state.speed = speed;
+
+                if t >= 1.0 {
+                    star.phase = PiercingStarPhase::Returning;
+                    star.elapsed = 0.0;
+                    proj_state.speed = 0.0;
+                    proj_state.hit_entities.clear();
+                }
+            }
+            PiercingStarPhase::Returning => {
+                let star_pos = transform.translation.truncate();
+                let to_player = player_pos - star_pos;
+                let dist = to_player.length();
+
+                if dist < 10.0 {
+                    commands.entity(entity).despawn_recursive();
+                    continue;
+                }
+
+                let dir = to_player.normalize_or_zero();
+                let speed = (star.base_speed * 0.3 + star.elapsed * 400.0).min(600.0);
+                let movement = dir * speed * dt;
+                transform.translation += movement.extend(0.0);
+                proj_state.speed = 0.0;
+                proj_state.direction = dir;
             }
         }
     }

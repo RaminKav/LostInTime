@@ -296,6 +296,8 @@ impl Plugin for PlayerPlugin {
                     skill_heirlooms::handle_rapidfire_slow_remove.run_if(is_not_paused),
                     skill_heirlooms::handle_attach_possessed_blade_return.run_if(is_not_paused),
                     skill_heirlooms::tick_possessed_blade_movement.run_if(is_not_paused),
+                    skill_heirlooms::handle_attach_piercing_star_return.run_if(is_not_paused),
+                    skill_heirlooms::tick_piercing_star_movement.run_if(is_not_paused),
                     skill_heirlooms::handle_possessed_blade_kill_lifesteal
                         .after(handle_hits)
                         .run_if(is_not_paused),

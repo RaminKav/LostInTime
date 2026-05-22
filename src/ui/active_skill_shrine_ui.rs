@@ -3,7 +3,8 @@ use bevy::{prelude::*, render::view::RenderLayers};
 use crate::{
     assets::Graphics,
     attributes::{
-        attribute_helpers::skill_power_multiplier, BonusAttackSpeed, CritChance, MaxHealth,
+        attribute_helpers::skill_power_multiplier, AttackSpeed, BonusAttackSpeed, CritChance,
+        MaxHealth,
         MaxMana, SkillPower, Speed,
     },
     blessings::OwnedBlessings,
@@ -11,7 +12,7 @@ use crate::{
     item::active_skill_shrine::{ActiveSkillShrineOverwrite, ActiveSkillShrineSelection},
     player::{
         skills::{
-            ActiveSkillChoiceState, PlayerSkills,
+            effective_player_attack_speed_multiplier, ActiveSkillChoiceState, PlayerSkills,
         },
         Player,
     },
@@ -50,6 +51,7 @@ pub fn setup_active_skill_shrine_ui(
             &MaxMana,
             &MaxHealth,
             Option<&BonusAttackSpeed>,
+            Option<&AttackSpeed>,
             &CritChance,
             &Speed,
         ),
@@ -171,9 +173,12 @@ pub fn setup_active_skill_shrine_ui(
             .insert(Name::new(format!("SKILL_BANNER_{}", index)))
             .set_parent(container)
             .id();
-        let (skill_power, blessings, max_mana, max_health, bonus_as, crit, spd) =
+        let (skill_power, blessings, max_mana, max_health, bonus_as, attack_speed, crit, spd) =
             skill_power.single();
-        let bonus_as_mult = bonus_as.map(|b| b.get_multiplier()).unwrap_or(1.0);
+        let bonus_as_mult = effective_player_attack_speed_multiplier(
+            attack_speed.map(|a| a.0).unwrap_or(0),
+            bonus_as.map(|b| b.get_multiplier()).unwrap_or(1.0),
+        );
         spawn_skill_tooltip_content(
             &mut commands,
             &graphics,
@@ -306,6 +311,7 @@ pub fn setup_active_skill_shrine_overwrite_ui(
             &MaxMana,
             &MaxHealth,
             Option<&BonusAttackSpeed>,
+            Option<&AttackSpeed>,
             &CritChance,
             &Speed,
         ),
@@ -363,9 +369,12 @@ pub fn setup_active_skill_shrine_overwrite_ui(
         .insert(Name::new("SKILL_VIEW4_BACKGROUND"))
         .id();
 
-    let (skills, skill_power, blessings, max_mana, max_health, bonus_as, crit, spd) =
+    let (skills, skill_power, blessings, max_mana, max_health, bonus_as, attack_speed, crit, spd) =
         skills.single();
-    let bonus_as_mult = bonus_as.map(|b| b.get_multiplier()).unwrap_or(1.0);
+    let bonus_as_mult = effective_player_attack_speed_multiplier(
+        attack_speed.map(|a| a.0).unwrap_or(0),
+        bonus_as.map(|b| b.get_multiplier()).unwrap_or(1.0),
+    );
     let choices = vec![
         skills.active_skill_slot_0.clone(),
         skills.active_skill_slot_1.clone(),

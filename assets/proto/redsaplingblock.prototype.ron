@@ -3,7 +3,6 @@
   templates: ["item_drop.prototype.ron"],
   schematics: {
   "survival_rogue_like::item::WorldObject": RedSaplingBlock,
-  "survival_rogue_like::item::item_actions::ItemActions": (actions: [PlacesInto(RedSaplingStage1)]),
   "survival_rogue_like::item::item_actions::ConsumableItem": (),
   "survival_rogue_like::inventory::ItemStack": (
         obj_type: RedSaplingBlock,

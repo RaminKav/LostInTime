@@ -352,6 +352,21 @@ pub fn fury_throw_speed_multiplier(bonus_attack_speed_mult: f32) -> f32 {
     raw.clamp(FURY_THROW_SPEED_MIN_MULT, FURY_THROW_SPEED_MAX_MULT)
 }
 
+/// Combine the player's flat [`AttackSpeed`] gear stat (percent integer) with
+/// their multiplicative [`BonusAttackSpeed`] component into a single effective
+/// attack-speed multiplier. Mirrors how `attack_speed_mod` is computed in
+/// `ItemAttributes::update_attributes` (without dodge-crit / tiny-blessing
+/// adjustments, which are transient).
+///
+/// Used as the `bonus_attack_speed_mult` input to Fury so it scales with
+/// gear-based AS, not just blessing/potion AS.
+pub fn effective_player_attack_speed_multiplier(
+    attack_speed_stat: i32,
+    bonus_attack_speed_mult: f32,
+) -> f32 {
+    (1.0 + attack_speed_stat as f32 / 100.0) * bonus_attack_speed_mult
+}
+
 /// Approximate kunai spawned over one Fury (duration matches [`FURY_DURATION_SECS`]).
 pub fn fury_estimated_kunai_per_cast(bonus_attack_speed_mult: f32) -> f32 {
     let m = fury_throw_speed_multiplier(bonus_attack_speed_mult);
