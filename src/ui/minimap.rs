@@ -99,7 +99,7 @@ impl Plugin for MinimapPlugin {
     }
 }
 
-pub const HUD_MINIMAP_RADIUS_TILES: i32 = 18;
+pub const HUD_MINIMAP_RADIUS_TILES: i32 = 22;
 const HUD_MINIMAP_PIXELS_PER_TILE: u32 = 2;
 const HUD_MINIMAP_DISPLAY_SIZE: f32 = 67.0;
 const HUD_MINIMAP_ICON_SIZE: f32 = 11.0;

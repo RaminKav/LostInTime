@@ -41,7 +41,7 @@ use crate::{
         melee_skills::{Parried, ParryState, ParrySuccessEvent, SpearAttack},
     },
     proto::proto_param::ProtoParam,
-    ui::{damage_numbers::DodgeEvent, FlashExpBarEvent},
+    ui::{damage_numbers::DodgeEvent, item_chest::ItemChestState, FlashExpBarEvent},
     CustomFlush, GameParam, GameState, Player, ScreenResolution,
 };
 use bevy::prelude::*;
@@ -916,6 +916,13 @@ pub fn check_item_drop_collisions(
         commands.spawn(SoundSpawner::new(AudioSoundEffect::ItemPickup, 0.15));
     }
 }
+fn is_touch_trigger_chest(action: &TouchTriggerObjectAction) -> bool {
+    matches!(
+        action,
+        TouchTriggerObjectAction::ItemChest | TouchTriggerObjectAction::HeirloomChest
+    )
+}
+
 pub fn check_object_trigger_collisions(
     mut commands: Commands,
     player: Query<Entity, With<Player>>,
@@ -940,6 +947,7 @@ pub fn check_object_trigger_collisions(
     >,
     rapier_context: Res<RapierContext>,
     items_query: Query<&TouchTriggerObjectAction>,
+    item_chest_state: Option<Res<ItemChestState>>,
     game: GameParam,
     mut item_action_param: ItemActionParam,
     mut flower_anim_query: Query<
@@ -950,17 +958,26 @@ pub fn check_object_trigger_collisions(
     if !game.player().is_moving {
         return;
     }
+    // A chest reward UI is already in progress — don't consume another ground chest.
+    if item_chest_state.is_some() {
+        return;
+    }
     let player_e = player.single();
     let player_pos = player_txfm.single().translation.truncate();
+    let mut opened_chest = false;
 
-    // Collider-backed triggers (e.g. PinkFlower): use Rapier overlap so the sensor position matches gameplay.
-    for (e1, e2, _) in rapier_context.intersections_with(player_e) {
+    // Collider-backed triggers (chest drops, PinkFlower, etc.): Rapier overlap matches sensor position.
+    'collider_triggers: for (e1, e2, _) in rapier_context.intersections_with(player_e) {
         for (e1, e2) in [(e1, e2), (e2, e1)] {
             let Ok(_) = player.get(e1) else { continue };
             if !allowed_targets_with_collider.contains(e2) {
                 continue;
             }
             let action = items_query.get(e2).unwrap();
+
+            if is_touch_trigger_chest(action) && opened_chest {
+                continue;
+            }
 
             if matches!(action, TouchTriggerObjectAction::Bounce) {
                 if let Ok(mut anim) = flower_anim_query.get_mut(e2) {
@@ -969,10 +986,19 @@ pub fn check_object_trigger_collisions(
             }
 
             action.run_action(e2, &mut commands, &mut item_action_param);
+
+            if is_touch_trigger_chest(action) {
+                opened_chest = true;
+                break 'collider_triggers;
+            }
         }
     }
 
-    // No collider (e.g. chests using item_drop template): distance check only.
+    if opened_chest {
+        return;
+    }
+
+    // Legacy no-collider triggers: distance check only.
     for (entity, obj_txfm, action) in trigger_objects_no_collider.iter() {
         let obj_pos = obj_txfm.translation.truncate();
         if player_pos.distance_squared(obj_pos) > ITEM_PICKUP_DISTANCE * ITEM_PICKUP_DISTANCE {
@@ -986,6 +1012,10 @@ pub fn check_object_trigger_collisions(
         }
 
         action.run_action(entity, &mut commands, &mut item_action_param);
+
+        if is_touch_trigger_chest(action) {
+            break;
+        }
     }
 }
 fn check_mob_to_player_collisions(

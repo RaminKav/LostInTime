@@ -200,7 +200,7 @@ pub const INV_DROP_FILTER_TITLE_ROW_HEIGHT: f32 = 14.0;
 pub const INV_DROP_FILTER_BUTTON_ROW_HEIGHT: f32 = 14.0;
 pub const INV_DROP_FILTER_BUTTON_SPACING: f32 = 36.0;
 /// Drop-filter panel Z; sits above inventory chrome (panel Z = 10) and slot icons (Z ≈ 12-14).
-pub const INV_DROP_FILTER_PANEL_Z: f32 = 30.0;
+pub const INV_DROP_FILTER_PANEL_Z: f32 = 60.0;
 
 /// Crafting grid inside crafting/furnace-style panels (8 columns).
 pub const INV_CRAFTING_COLS: usize = 8;

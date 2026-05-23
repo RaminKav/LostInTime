@@ -522,7 +522,7 @@ fn spawn_player(
         .insert(ActiveConsumableBuffs::default())
         .insert(FoodAttributeBonuses::default())
         .insert(ClawUpgradeMultiThrow(
-            Timer::from_seconds(0.12, TimerMode::Once),
+            Timer::from_seconds(0.07, TimerMode::Once),
             0,
         ))
         .id();

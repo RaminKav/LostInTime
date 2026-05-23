@@ -1586,6 +1586,10 @@ pub fn handle_possessed_blade_kill_lifesteal(
     }
 }
 
+/// Outbound flight time before Piercing Star turns back (~25% longer than the
+/// original 0.9s). Distance scales with this and prototype speed (260).
+const PIERCING_STAR_OUTGOING_DURATION: f32 = 1.125;
+
 /// Attach return-flight component to newly spawned PiercingStar projectiles
 /// (uses `Projectile::ThrowingStarLarge`). Mirrors the PossessedBlade
 /// boomerang behavior: the star flies out, decelerates, then returns to
@@ -1612,7 +1616,7 @@ pub fn handle_attach_piercing_star_return(
         commands.entity(entity).insert(PiercingStarReturn {
             phase: PiercingStarPhase::Outgoing,
             elapsed: 0.0,
-            outgoing_duration: 0.9,
+            outgoing_duration: PIERCING_STAR_OUTGOING_DURATION,
             base_speed: proj_state.speed,
             owner: player_e,
         });
