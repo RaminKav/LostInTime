@@ -432,3 +432,36 @@ Heirlooms:
 - [QoL] Remove some of the lame skills that are not part of any class base kit, from the shrine pool
 - [Bug] Fix the sudden night overlay change when entering a new Era
 - [Bug] Fix crash related to poison, again
+
+## 0.19.2
+
+- Improved Game HUD layout and art
+- Add hover tooltip system, first versions added to the 3 buttons on the left of inventory
+- Nerf Claw dmg and attack speed
+
+## 0.19.3
+
+- fix desert scorpion crash
+- negative hp regen can no longer kill you
+- add global text pop ups at start of run and after boss kill to guide player objectives
+- fix fury scaling, now scales purly on bonus attack speed stat, not weapon base attack speed
+
+## 0.19.4
+
+- [Feature] Minimap! Let me know what you think!
+- [QoL] Ensure some items dont make it into the hotbar on pickup
+- [Bug] Desert Golem triggers magnet effect on death properly
+- [Bug] Fix issue where Heirloom Swap Shrine did not show Star on maps
+- [Balance] Buff Piercing Star Skill: Goes further, and boomerangs back to you now! Feels a lot more fun, try it out
+- [Balance] Claw spacing of 2 stars per attack tightened, feels more like a "double throw" now
+- [Feature] Improved Item Filters UI, can now pick individual items to filter from a menu
+- [New Heirloom] Underworld's Hat: Legendary, shoots a homing fireball every 150 dmg you deal. Part of the base pool for now
+- [Bug] Fix a bug where chests would get deleted on pickup if you had more than 1 underneath you at once.
+- [QoL] Tweak and improve the HUD ui a bit
+- [QoL] Upgrade System Reworked: drag and drop tomes and orbs on the equipment to apply them now, removed the ui slots for upgrading
+- [Bug] Thorns properly triggers off negative hp regen and pet damage (Porkipine)
+- [Balance] Pet weapon slot now grants the bonus stats to you
+- [Bug] Fixed an issue where some heirlooms did not get turned off from the toggle in options
+- [QoL] Click to Consume items in your hotbar in the HUD! Alternative to using the keybinds.
+- [QoL] Improve text spacing on descriptions and recipes
+- [Feature] Tornados now spawn in the desert biome (Era 2), which knock the player up briefly.

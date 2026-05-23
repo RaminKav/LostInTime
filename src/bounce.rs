@@ -5,6 +5,8 @@ use bevy_rapier2d::prelude::{
     KinematicCharacterController, RapierContext, Sensor,
 };
 
+use rand::Rng;
+
 use crate::{
     animations::player_sprite::PlayerAnimation,
     ecs_helpers::SafeHierarchyExt,
@@ -13,7 +15,11 @@ use crate::{
     inputs::MovementVector,
     item::{Equipment, WorldObject},
     player::Player,
-    world::{chunk::Chunk, y_sort::YSort},
+    world::{
+        chunk::Chunk,
+        dimension::Era,
+        y_sort::YSort,
+    },
     GameParam, MainCamera, PLAYER_MOVE_SPEED,
 };
 
@@ -427,6 +433,60 @@ pub fn handle_tornado_player_overlap(
             break;
         }
     }
+}
+
+/// Periodically spawns wandering desert tornadoes in the desert biome (Era::Second)
+/// as a natural environmental hazard, independent of the Scorpion boss.
+#[derive(Resource)]
+pub struct NaturalTornadoSpawner {
+    pub timer: Timer,
+}
+
+impl Default for NaturalTornadoSpawner {
+    fn default() -> Self {
+        Self {
+            timer: Timer::from_seconds(NATURAL_TORNADO_INTERVAL, TimerMode::Repeating),
+        }
+    }
+}
+
+const NATURAL_TORNADO_INTERVAL: f32 = 20.0;
+const NATURAL_TORNADO_LIFETIME: f32 = 30.0;
+const NATURAL_TORNADO_SPEED: f32 = 45.0;
+/// Spawn radius around the player (just past typical screen edge so it drifts in).
+const NATURAL_TORNADO_SPAWN_RADIUS: f32 = 260.0;
+
+/// Spawn a wandering tornado near the player every [`NATURAL_TORNADO_INTERVAL`] seconds
+/// while the current era is the desert biome. The tornado retargets the player periodically
+/// via [`update_desert_tornadoes`], so a random initial heading is sufficient.
+pub fn spawn_natural_desert_tornadoes(
+    mut commands: Commands,
+    mut spawner: ResMut<NaturalTornadoSpawner>,
+    asset_server: Res<AssetServer>,
+    game: GameParam,
+    time: Res<Time>,
+) {
+    if game.era.current_era != Era::Second {
+        return;
+    }
+    spawner.timer.tick(time.delta());
+    if !spawner.timer.just_finished() {
+        return;
+    }
+    let player_pos = game.player().position.truncate();
+    let mut rng = rand::thread_rng();
+    let spawn_angle: f32 = rng.gen_range(0.0..std::f32::consts::TAU);
+    let spawn_offset = Vec2::new(spawn_angle.cos(), spawn_angle.sin()) * NATURAL_TORNADO_SPAWN_RADIUS;
+    let spawn_pos = player_pos + spawn_offset;
+    let dir = (player_pos - spawn_pos).normalize_or_zero();
+    spawn_desert_tornado(
+        &mut commands,
+        &asset_server,
+        spawn_pos,
+        dir,
+        NATURAL_TORNADO_SPEED,
+        NATURAL_TORNADO_LIFETIME,
+    );
 }
 
 /// System to spawn Aseprite animation for pink flowers when they're created

@@ -638,9 +638,17 @@ impl BreakDropFilter {
 #[derive(Resource, Default, Clone, Copy, Debug)]
 pub struct MaterialDropFilterMenuOpen(pub bool);
 
+/// Whether damage/mob stat trackers are shown on the right of the main inventory panel.
+#[derive(Resource, Default, Clone, Copy, Debug)]
+pub struct DamageTrackerMenuOpen(pub bool);
+
 /// Marker for the filter button under SORT — opens/closes [`MaterialDropFilterMenuOpen`].
 #[derive(Component, Clone, Debug)]
 pub struct MaterialDropsToggleButton;
+
+/// Marker for the DMG button under the filter button — toggles [`DamageTrackerMenuOpen`].
+#[derive(Component, Clone, Debug)]
+pub struct DamageTrackerToggleButton;
 
 /// Root panel entity for the drop-filter menu (right of inventory).
 /// Stores its on-screen "open" position so the toggle handler can move the panel off-screen

@@ -438,7 +438,52 @@ pub fn spawn_floating_text_with_shadow(
     text: String,
     font_style: FontStyle,
 ) -> Entity {
+    spawn_floating_text_with_shadow_inner(commands, asset_server, pos, color, text, font_style, None)
+        .1
+}
+
+/// Same as [`spawn_floating_text_with_shadow`] but also inserts the given
+/// `RenderLayers` onto BOTH the colored text entity (the parent that carries
+/// the `DamageNumber` component) and its black shadow child.
+///
+/// Use this when spawning floating text in HUD/UI space (e.g. layer 3).
+/// Inserting `RenderLayers` only on the entity returned by
+/// `spawn_floating_text_with_shadow` would leave the colored parent on the
+/// default layer, causing only the shadow to be visible.
+///
+/// Returns the colored parent entity (the one with `DamageNumber`).
+pub fn spawn_floating_text_with_shadow_on_layer(
+    commands: &mut Commands,
+    asset_server: &AssetServer,
+    pos: Vec3,
+    color: Color,
+    text: String,
+    font_style: FontStyle,
+    render_layers: RenderLayers,
+) -> Entity {
+    spawn_floating_text_with_shadow_inner(
+        commands,
+        asset_server,
+        pos,
+        color,
+        text,
+        font_style,
+        Some(render_layers),
+    )
+    .0
+}
+
+fn spawn_floating_text_with_shadow_inner(
+    commands: &mut Commands,
+    asset_server: &AssetServer,
+    pos: Vec3,
+    color: Color,
+    text: String,
+    font_style: FontStyle,
+    render_layers: Option<RenderLayers>,
+) -> (Entity, Entity) {
     let mut shadow_e = Entity::from_raw(0);
+    let mut parent_e = Entity::from_raw(0);
     for i in 0..2 {
         let entity = spawn_text(
             commands,
@@ -454,6 +499,9 @@ pub fn spawn_floating_text_with_shadow(
             font_style,
             0,
         );
+        if let Some(layers) = render_layers {
+            commands.entity(entity).insert(layers);
+        }
         if i == 0 {
             shadow_e = entity;
         } else {
@@ -466,9 +514,10 @@ pub fn spawn_floating_text_with_shadow(
                     move_velocity: 0.0,
                 })
                 .add_child(shadow_e);
+            parent_e = entity;
         }
     }
-    shadow_e
+    (parent_e, shadow_e)
 }
 
 /// System to process queued floating texts, similar to handle_ui_time_fragments

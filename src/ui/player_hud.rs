@@ -1764,12 +1764,12 @@ pub fn handle_update_player_skills(
             let heirloom_row_y = hud_heirloom_row_y(res.game_height);
             let heirloom_start_x = hud_heirloom_first_icon_x(res.game_width);
 
+            let max_icons_per_row = super::hud_heirloom_max_per_row(res.game_width).max(1);
             for (i, (heirloom, count)) in ordered_heirlooms.iter().enumerate() {
-                const MAX_ICONS_PER_ROW: usize = 37;
                 const ROW_SPACING: f32 = 16.;
 
-                let row = i / MAX_ICONS_PER_ROW;
-                let col = i % MAX_ICONS_PER_ROW;
+                let row = i / max_icons_per_row;
+                let col = i % max_icons_per_row;
 
                 let offset = Vec2::new(
                     heirloom_start_x + col as f32 * HUD_HEIRLOOM_ICON_SPACING,
@@ -3479,6 +3479,33 @@ pub fn spawn_pet_skill_tooltip_content(
                 .insert(Name::new("PET SKILL TOOLTIP DESCRIPTION LINE"))
                 .set_parent(parent_entity);
             line_index += 1;
+        }
+    }
+}
+
+/// Hide the HUD heirloom row whenever an inventory-style menu is open so the inventory panel and
+/// its overlay visually sit on top of (i.e. fully cover) the heirloom icons.
+pub fn sync_heirloom_hud_visibility(
+    ui_state: Res<State<UIState>>,
+    mut icons: Query<&mut Visibility, With<SkillHudIcon>>,
+) {
+    let hide = matches!(
+        ui_state.0,
+        UIState::Inventory
+            | UIState::InventoryCrafting
+            | UIState::Chest
+            | UIState::Scrapper
+            | UIState::Crafting
+            | UIState::Furnace
+    );
+    for mut vis in icons.iter_mut() {
+        let target = if hide {
+            Visibility::Hidden
+        } else {
+            Visibility::Inherited
+        };
+        if *vis != target {
+            *vis = target;
         }
     }
 }

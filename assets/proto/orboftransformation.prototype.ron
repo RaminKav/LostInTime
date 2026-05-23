@@ -7,8 +7,8 @@
   "survival_rogue_like::inventory::ItemStack": (
         obj_type: OrbOfTransformation,
         metadata: (
-            name: "Orb Of ???", 
-            desc: ["A mysterious orb.", "It seems to be", "drawn to your", "equipment..."],
+            name: "Mysterious Orb",
+            desc: ["A mysterious orb...", "Drag and Drop on any", "equipment to re-roll", "its stats. Has a chance", "to increase its rarity."],
         ),
         count: 1,
         rarity: Legendary

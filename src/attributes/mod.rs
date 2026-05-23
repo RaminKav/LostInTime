@@ -1360,6 +1360,11 @@ impl Plugin for AttributesPlugin {
                     .in_set(OnUpdate(GameState::Main)),
             )
             .add_system(
+                update_attributes_with_pet_slot_change
+                    .before(handle_player_item_attribute_change_events)
+                    .in_set(OnUpdate(GameState::Main)),
+            )
+            .add_system(
                 tick_active_consumable_buffs
                     .run_if(is_not_paused)
                     .before(handle_player_item_attribute_change_events)
@@ -1625,8 +1630,9 @@ fn handle_player_item_attribute_change_events(
             .items
             .iter()
             .chain(inv.accessory_items.items.iter())
+            .chain(inv.pet_items.items.iter())
             .flatten()
-            .map(|e| e.item_stack.attributes.clone())
+            .map(|e| e.item_stack.get_attributes())
             .collect();
 
         for a in eqp_attributes.iter().chain(equips.iter()) {
@@ -1806,6 +1812,36 @@ fn update_attributes_with_held_item_change(
         att_event.send(AttributeChangeEvent);
     }
 }
+
+/// Sends an attribute refresh when the pet equipment slot changes so its bonus stats
+/// are included in `handle_player_item_attribute_change_events` (alongside armor/accessories).
+fn update_attributes_with_pet_slot_change(
+    inv: Query<&Inventory>,
+    mut att_event: EventWriter<AttributeChangeEvent>,
+    mut prev_pet_weapon: Local<Option<ItemStack>>,
+) {
+    let Ok(inv) = inv.get_single() else {
+        return;
+    };
+    let current = inv
+        .pet_items
+        .items
+        .get(0)
+        .and_then(|slot| slot.as_ref())
+        .map(|stack| stack.item_stack.clone());
+
+    let changed = match (&*prev_pet_weapon, &current) {
+        (None, None) => false,
+        (Some(prev), Some(curr)) => prev != curr,
+        _ => true,
+    };
+
+    if changed {
+        *prev_pet_weapon = current;
+        att_event.send(AttributeChangeEvent);
+    }
+}
+
 ///Tracks player equip or accessory inventory slot changes,
 ///spawns new held equipment entity, and updates player attributes
 fn update_attributes_and_sprite_with_equipment_change(

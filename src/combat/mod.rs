@@ -34,7 +34,7 @@ use crate::{
     attributes::{
         modifiers::{ModifyHealthEvent, ModifyManaEvent},
         Attack, AttackCooldown, AttributeChangeEvent, CurrentHealth, CurrentShield,
-        InvincibilityCooldown, ManaRegen, MaxHealth, ShieldRegen,
+        InvincibilityCooldown, ManaRegen, MaxHealth, ShieldRegen, Thorns,
     },
     audio::{AudioSoundEffect, SoundSpawner},
     client::{
@@ -58,7 +58,7 @@ use crate::{
     },
     juice::bounce::BounceOnHit,
     player::{
-        combat_heirlooms::{HallucinationStatType, HallucinationStats},
+        combat_heirlooms::{HallucinationStatType, HallucinationStats, ThornsOnDamageTracker},
         levels::PlayerLevel,
         mage_skills::{spawn_ice_explosion_hitbox, IceExplosionDmg, IceFloor},
         skills::{Heirloom, HeirloomTriggerCounts, PlayerSkills},
@@ -242,6 +242,8 @@ impl Plugin for CombatPlugin {
                     handle_enemy_death.after(handle_hits),
                     handle_lifesteal,
                     handle_thorns_on_damage_tracker.after(handle_hits),
+                    handle_thorns_on_self_damage
+                        .after(crate::attributes::modifiers::handle_modify_health_event),
                     damage_tracker::track_player_damage,
                 )
                     .in_set(OnUpdate(GameState::Main)),
@@ -254,35 +256,36 @@ impl Plugin for CombatPlugin {
 pub fn update_anim_visibility(
     settings: Res<CheatSettings>,
     mut all: Query<(&AnimVisualCategory, &mut Visibility)>,
-    added: Query<Entity, Added<AnimVisualCategory>>,
+    added_category: Query<Entity, Added<AnimVisualCategory>>,
+    // bevy_aseprite's `insert_sprite_sheet` inserts a fresh `SpriteSheetBundle`
+    // (which contains a default `VisibilityBundle`) onto the entity once the
+    // atlas finishes loading. That overwrites any `Visibility::Hidden` we set
+    // earlier, so we must re-apply when the sprite first appears.
+    added_sprite: Query<Entity, Added<bevy::sprite::TextureAtlasSprite>>,
 ) {
+    let apply = |category: &AnimVisualCategory, vis: &mut Visibility| {
+        let should_hide = match category {
+            AnimVisualCategory::Attack => settings.hide_attack_anims,
+            AnimVisualCategory::Skill => settings.hide_skill_anims,
+            AnimVisualCategory::Heirloom => settings.hide_heirloom_anims,
+        };
+        *vis = if should_hide {
+            Visibility::Hidden
+        } else {
+            Visibility::Inherited
+        };
+    };
+
     if settings.is_changed() {
         for (category, mut vis) in all.iter_mut() {
-            let should_hide = match category {
-                AnimVisualCategory::Attack => settings.hide_attack_anims,
-                AnimVisualCategory::Skill => settings.hide_skill_anims,
-                AnimVisualCategory::Heirloom => settings.hide_heirloom_anims,
-            };
-            *vis = if should_hide {
-                Visibility::Hidden
-            } else {
-                Visibility::Inherited
-            };
+            apply(category, &mut vis);
         }
-    } else if !added.is_empty() {
-        for e in added.iter() {
-            if let Ok((category, mut vis)) = all.get_mut(e) {
-                let should_hide = match category {
-                    AnimVisualCategory::Attack => settings.hide_attack_anims,
-                    AnimVisualCategory::Skill => settings.hide_skill_anims,
-                    AnimVisualCategory::Heirloom => settings.hide_heirloom_anims,
-                };
-                *vis = if should_hide {
-                    Visibility::Hidden
-                } else {
-                    Visibility::Inherited
-                };
-            }
+        return;
+    }
+
+    for e in added_category.iter().chain(added_sprite.iter()) {
+        if let Ok((category, mut vis)) = all.get_mut(e) {
+            apply(category, &mut vis);
         }
     }
 }
@@ -1293,6 +1296,103 @@ pub fn handle_thorns_on_damage_tracker(
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+/// Spawn the ThornsSpikes radial spike volley around the player. Shared by the
+/// mob-collision path ([`collisions::check_mob_to_player_collisions`]) and the
+/// self-damage path ([`handle_thorns_on_self_damage`]) so the spawn logic stays
+/// in one place and any tuning (spike count, angle jitter, damage formula)
+/// applies uniformly to every source of player damage.
+pub fn trigger_thorns_spikes(
+    player_e: Entity,
+    player_skills: &PlayerSkills,
+    player_attack: i32,
+    thorns: i32,
+    ranged_attack_event: &mut EventWriter<RangedAttackEvent>,
+    trigger_counts: &mut HeirloomTriggerCounts,
+) {
+    let thorns_spikes_stacks = player_skills.get_count(Heirloom::ThornsSpikes);
+    if thorns_spikes_stacks <= 0 {
+        return;
+    }
+    trigger_counts.increment(Heirloom::ThornsSpikes);
+
+    let spike_damage = f32::ceil(player_attack as f32 * thorns as f32 / 100.) as i32;
+    let num_spikes = thorns_spikes_stacks * 2;
+
+    let mut rng = rand::thread_rng();
+    for i in 0..num_spikes {
+        let base_angle = (i as f32 / num_spikes as f32) * std::f32::consts::TAU;
+        let angle_offset =
+            rng.gen_range(-std::f32::consts::PI / 6.0..std::f32::consts::PI / 6.0);
+        let angle = base_angle + angle_offset;
+        let direction = Vec2::new(angle.cos(), angle.sin());
+
+        ranged_attack_event.send(RangedAttackEvent {
+            projectile: Projectile::ThornsProjectile,
+            direction,
+            from_enemy: false,
+            is_followup_proj: false,
+            mana_cost: None,
+            from_entity: Some(player_e),
+            dmg_override: Some(spike_damage),
+            pos_override: Some(direction * 10.0),
+            spawn_delay: 0.0,
+        });
+    }
+}
+
+/// Triggers thorns effects (`ThornsSpikes` + `ThornsOnDamage` tracker) when the
+/// player loses HP from a source that flows through [`ModifyHealthEvent`] —
+/// e.g. negative `HealthRegen`, the Porkipine pet's self-damage tick, or any
+/// future self-damage effect. Mob-collision damage is handled inline in
+/// [`collisions::check_mob_to_player_collisions`] (it bypasses
+/// `ModifyHealthEvent` and needs the attacker entity for thorns reflection).
+pub fn handle_thorns_on_self_damage(
+    mut events: EventReader<ModifyHealthEvent>,
+    mut player: Query<
+        (
+            Entity,
+            &Thorns,
+            &Attack,
+            &PlayerSkills,
+            Option<&mut ThornsOnDamageTracker>,
+        ),
+        With<Player>,
+    >,
+    mut ranged_attack_event: EventWriter<RangedAttackEvent>,
+    mut trigger_counts: ResMut<HeirloomTriggerCounts>,
+    mut attribute_events: EventWriter<AttributeChangeEvent>,
+) {
+    let Ok((player_e, thorns, attack, skills, mut tracker_opt)) = player.get_single_mut() else {
+        return;
+    };
+
+    for event in events.iter() {
+        if event.0 >= 0 {
+            continue;
+        }
+
+        if thorns.0 > 0 {
+            trigger_thorns_spikes(
+                player_e,
+                skills,
+                attack.0,
+                thorns.0,
+                &mut ranged_attack_event,
+                &mut trigger_counts,
+            );
+        }
+
+        let on_damage_stacks = skills.get_count(Heirloom::ThornsOnDamage);
+        if on_damage_stacks > 0 {
+            if let Some(ref mut tracker) = tracker_opt {
+                tracker.thorns_gained += on_damage_stacks;
+                attribute_events.send(AttributeChangeEvent);
+                trigger_counts.increment(Heirloom::ThornsOnDamage);
             }
         }
     }

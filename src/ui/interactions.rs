@@ -4,9 +4,12 @@ use crate::{
     attributes::MAX_GEAR_LEVEL,
     blessings::{Blessing, HeirloomStatsBonuses},
     chaos::ChaosTracker,
+    colors::WHITE,
     player::Player,
     ui::{
-        damage_numbers::spawn_floating_text_with_shadow,
+        damage_numbers::{
+            spawn_floating_text_with_shadow, spawn_floating_text_with_shadow_on_layer,
+        },
         game_fonts::FLOATING_TEXT,
         tips::{SeenTips, Tip, TipEvent},
     },
@@ -29,11 +32,12 @@ use crate::{
     cursor::CursorPos,
     inventory::{
         shift_move_equipped_slot_to_main_items, sort_main_inventory,
-        try_shift_quick_equip_from_inventory_source, BreakDropFilter, Inventory,
-        InventoryItemStack, InventoryShiftClickSource, ItemStack, MaterialDropFilterAllButton,
-        MaterialDropFilterEntry, MaterialDropFilterEntryX, MaterialDropFilterMenuOpen,
-        MaterialDropFilterNoneButton, MaterialDropFilterPanel, MaterialDropsToggleButton,
-        ShiftQuickEquipResult, SortInventoryButton, BREAK_DROP_FILTER_ITEMS,
+        try_shift_quick_equip_from_inventory_source, BreakDropFilter, DamageTrackerMenuOpen,
+        DamageTrackerToggleButton, Inventory, InventoryItemStack, InventoryShiftClickSource,
+        ItemStack, MaterialDropFilterAllButton, MaterialDropFilterEntry, MaterialDropFilterEntryX,
+        MaterialDropFilterMenuOpen, MaterialDropFilterNoneButton, MaterialDropFilterPanel,
+        MaterialDropsToggleButton, ShiftQuickEquipResult, SortInventoryButton,
+        BREAK_DROP_FILTER_ITEMS,
     },
     item::{heirloom_shrine::HeirloomShrineState, CraftedItemEvent, EquipmentType, WorldObject},
     pets::state::Pet,
@@ -196,7 +200,7 @@ pub enum UIElement {
     MinimapSkullIcon,
     MinimapPortalIcon,
     TipBox,
-    UpgradePanel,
+    CraftButtonContainer,
     EquipmentPanel,
     BlueprintsPanel,
     /// Side panel shown in `UIState::InventoryCrafting` in place of the `UpgradePanel`.
@@ -546,9 +550,75 @@ pub fn handle_dragging(
     // updates are decoupled so programmatically-spawned drags — e.g. the inventory-craft
     // result slot — also follow the cursor.)
     for mut t in drag_query.iter_mut() {
-        t.translation = cursor_pos.ui_coords.truncate().extend(998.);
+        // NOTE: child entities (stack-count text, rarity glow) live at icon-local z up to
+        // +3, so the icon's global z must leave at least that much headroom under the UI
+        // camera's far plane (default 1000.0). 995 keeps both icon and child text safely
+        // inside the frustum while still rendering above the rest of the UI.
+        t.translation = cursor_pos.ui_coords.truncate().extend(995.);
     }
 }
+
+/// Keeps the stack-count label on dragged item icons in sync with the dragged
+/// [`ItemStack`]'s `count`, mirroring how slot icons render their count via a child
+/// `Text2dBundle`. The text is spawned the first time `count > 1` and updated / removed
+/// as the dragged stack changes (e.g. partial drops, upgrade-material consumption).
+pub fn update_dragged_item_stack_count_text(
+    mut commands: Commands,
+    dragged: Query<(Entity, &ItemStack, Option<&Children>), With<DraggedItem>>,
+    mut text_q: Query<&mut Text, With<crate::ui::StackCountText>>,
+    marker_q: Query<(), With<crate::ui::StackCountText>>,
+    asset_server: Res<AssetServer>,
+) {
+    for (icon_e, stack, children) in dragged.iter() {
+        let mut existing_text: Option<Entity> = None;
+        if let Some(children) = children {
+            for child in children.iter() {
+                if marker_q.get(*child).is_ok() {
+                    existing_text = Some(*child);
+                    break;
+                }
+            }
+        }
+
+        if stack.count > 1 {
+            let new_str = stack.count.to_string();
+            if let Some(text_e) = existing_text {
+                if let Ok(mut text) = text_q.get_mut(text_e) {
+                    if text.sections.first().map(|s| s.value.as_str()) != Some(new_str.as_str()) {
+                        if let Some(section) = text.sections.first_mut() {
+                            section.value = new_str;
+                        }
+                    }
+                }
+            } else {
+                let text = commands
+                    .spawn((
+                        Text2dBundle {
+                            text: Text::from_section(
+                                new_str,
+                                TextStyle {
+                                    font: asset_server.load("fonts/4x5.ttf"),
+                                    font_size: 5.0,
+                                    color: Color::WHITE,
+                                },
+                            )
+                            .with_alignment(TextAlignment::Center),
+                            transform: Transform::from_translation(Vec3::new(7., -5.5, 3.)),
+                            ..default()
+                        },
+                        Name::new("ITEM STACK TEXT"),
+                        crate::ui::StackCountText,
+                        bevy::render::view::RenderLayers::from_layers(&[3]),
+                    ))
+                    .id();
+                commands.entity(icon_e).push_children(&[text]);
+            }
+        } else if let Some(text_e) = existing_text {
+            commands.entity(text_e).despawn_recursive();
+        }
+    }
+}
+
 pub fn handle_hovering(
     mut interactables: Query<(
         Entity,
@@ -1593,17 +1663,15 @@ pub fn handle_cursor_inventory_upgrade_button(
                                 && gear_level >= MAX_GEAR_LEVEL
                             {
                                 let btn_pos = button_transform.translation();
-                                let text = spawn_floating_text_with_shadow(
+                                spawn_floating_text_with_shadow_on_layer(
                                     &mut commands,
                                     &asset_server,
-                                    btn_pos + Vec3::new(0., 10., 10.),
-                                    RED,
+                                    btn_pos + Vec3::new(50., 10., 10.),
+                                    WHITE,
                                     "Max Level Reached".to_string(),
                                     FLOATING_TEXT,
+                                    bevy::render::view::RenderLayers::from_layers(&[3]),
                                 );
-                                commands
-                                    .entity(text)
-                                    .insert(bevy::render::view::RenderLayers::from_layers(&[3]));
                                 continue;
                             }
 
@@ -2143,6 +2211,70 @@ pub fn handle_material_drops_toggle_button_click(
                             } else {
                                 Vec3::new(50_000.0, 50_000.0, panel.open_translation.z)
                             };
+                        }
+                        commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.25));
+                    }
+                }
+                _ => (),
+            },
+            _ => {
+                if matches!(interactable.current(), Interaction::Hovering) {
+                    interactable.change(Interaction::None);
+                    commands
+                        .entity(e)
+                        .insert(graphics.get_ui_element_texture(UIElement::InventorySlot));
+                }
+            }
+        }
+    }
+}
+
+/// Hover + click on the DMG button (under the drop-filter button). Toggles
+/// [`DamageTrackerMenuOpen`], shifts the inventory panel, and shows or hides side stat trackers.
+pub fn handle_damage_tracker_toggle_button_click(
+    cursor_pos: Res<CursorPos>,
+    mouse_input: Res<Input<MouseButton>>,
+    ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
+    mut toggle_button: Query<
+        (Entity, &mut Interactable),
+        (With<DamageTrackerToggleButton>, Without<InventorySlotState>),
+    >,
+    mut commands: Commands,
+    graphics: Res<Graphics>,
+    mut menu_open: ResMut<DamageTrackerMenuOpen>,
+    mut inv_ui: Query<&mut Transform, With<crate::ui::inventory_ui::InventoryUI>>,
+    ui_state: Res<State<UIState>>,
+    side_stats: Query<Entity, With<crate::ui::InventorySideStatsPanel>>,
+    mut tracker_refresh: EventWriter<crate::ui::DamageTrackerRefreshEvent>,
+) {
+    if !matches!(ui_state.0, UIState::Inventory | UIState::InventoryCrafting) {
+        return;
+    }
+    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
+
+    for (e, mut interactable) in toggle_button.iter_mut() {
+        match hit_test {
+            Some(hit_ent) if hit_ent.0 == e => match interactable.current() {
+                Interaction::None => {
+                    interactable.change(Interaction::Hovering);
+                    commands
+                        .entity(e)
+                        .insert(graphics.get_ui_element_texture(UIElement::InventorySlotHover));
+                    commands.spawn(SoundSpawner::new(AudioSoundEffect::UISlotHover, 0.2));
+                }
+                Interaction::Hovering => {
+                    if left_mouse_pressed {
+                        menu_open.0 = !menu_open.0;
+                        let center_x = crate::ui::inventory_panel_center_x(menu_open.0);
+                        for mut tf in inv_ui.iter_mut() {
+                            tf.translation.x = center_x;
+                        }
+                        for panel in side_stats.iter() {
+                            commands.entity(panel).despawn_recursive();
+                        }
+                        if menu_open.0 && ui_state.0 == UIState::Inventory {
+                            tracker_refresh.send_default();
                         }
                         commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.25));
                     }

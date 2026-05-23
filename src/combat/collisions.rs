@@ -1181,35 +1181,18 @@ fn check_mob_to_player_collisions(
                 });
             }
 
-            // ThornsSpikes heirloom: spawn 2 spikes per stack in a circle around the player
-            let thorns_spikes_stacks = player_skills.get_count(Heirloom::ThornsSpikes);
-
-            if thorns_spikes_stacks > 0 && in_i_frame.get(e1).is_err() {
-                trigger_counts.increment(Heirloom::ThornsSpikes);
-                let spike_damage =
-                    f32::ceil(player_attack.0 as f32 * thorns.0 as f32 / 100.) as i32;
-                let num_spikes = thorns_spikes_stacks * 2;
-
-                let mut rng = rand::thread_rng();
-                for i in 0..num_spikes {
-                    let base_angle = (i as f32 / num_spikes as f32) * std::f32::consts::TAU;
-                    let angle_offset =
-                        rng.gen_range(-std::f32::consts::PI / 6.0..std::f32::consts::PI / 6.0);
-                    let angle = base_angle + angle_offset;
-                    let direction = Vec2::new(angle.cos(), angle.sin());
-
-                    ranged_attack_event.send(RangedAttackEvent {
-                        projectile: Projectile::ThornsProjectile,
-                        direction,
-                        from_enemy: false,
-                        is_followup_proj: false,
-                        mana_cost: None,
-                        from_entity: Some(player_e),
-                        dmg_override: Some(spike_damage),
-                        pos_override: Some(direction * 10.0),
-                        spawn_delay: 0.0,
-                    });
-                }
+            // ThornsSpikes heirloom: spawn radial spikes around the player.
+            // Shared with the self-damage path (negative regen, Porkipine pet, etc.)
+            // via `combat::trigger_thorns_spikes` so the spawn logic lives in one place.
+            if in_i_frame.get(e1).is_err() {
+                crate::combat::trigger_thorns_spikes(
+                    player_e,
+                    player_skills,
+                    player_attack.0,
+                    thorns.0,
+                    &mut ranged_attack_event,
+                    &mut trigger_counts,
+                );
             }
         }
     }

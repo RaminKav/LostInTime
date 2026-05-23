@@ -1,6 +1,8 @@
 use crate::assets::Graphics;
 use crate::client::GameOverEvent;
-use crate::colors::{DARK_WOOD_BROWN, DESERT_TILE, DESERT_WATER, SNOW_TILE, SNOW_WATER};
+use crate::colors::{
+    DARK_BROWN, DARK_WOOD_BROWN, DESERT_TILE, DESERT_WATER, LIGHT_BROWN, SNOW_TILE, SNOW_WATER,
+};
 use crate::item::WorldObject;
 use crate::world::dimension::{ActiveDimension, Era, SpawnDimension};
 use crate::world::dungeon::Dungeon;
@@ -99,11 +101,47 @@ impl Plugin for MinimapPlugin {
     }
 }
 
-pub const HUD_MINIMAP_RADIUS_TILES: i32 = 22;
+pub const HUD_MINIMAP_RADIUS_TILES: i32 = 26;
 const HUD_MINIMAP_PIXELS_PER_TILE: u32 = 2;
-const HUD_MINIMAP_DISPLAY_SIZE: f32 = 67.0;
-const HUD_MINIMAP_ICON_SIZE: f32 = 11.0;
-const HUD_MINIMAP_PADDING: f32 = 8.0;
+pub const HUD_MINIMAP_DISPLAY_SIZE: f32 = 70.0;
+const HUD_MINIMAP_ICON_SIZE: f32 = 16.0;
+/// Extra inset so icon sprites are hidden before they overlap the circular edge.
+const HUD_MINIMAP_ICON_CLIP_INSET: f32 = -4.0;
+pub const HUD_MINIMAP_PADDING: f32 = 8.0;
+/// Horizontal nudge applied when positioning the HUD minimap from the right edge.
+pub const HUD_MINIMAP_RIGHT_NUDGE: f32 = 4.0;
+
+/// World-space x for the LEFT edge of the HUD minimap sprite.
+pub fn hud_minimap_left_edge_x(game_width: f32) -> f32 {
+    let center_x = game_width * 0.5 - HUD_MINIMAP_DISPLAY_SIZE * 0.5 - HUD_MINIMAP_PADDING
+        + HUD_MINIMAP_RIGHT_NUDGE;
+    center_x - HUD_MINIMAP_DISPLAY_SIZE * 0.5
+}
+const HUD_MINIMAP_SHADOW_THICKNESS: f32 = 2.0;
+const HUD_MINIMAP_SHADOW_RGB: (f32, f32, f32) = (0.1, 0.1, 0.1);
+const HUD_MINIMAP_SHADOW_ALPHA: f32 = 0.45;
+
+fn hud_minimap_map_diameter_pixels() -> u32 {
+    (HUD_MINIMAP_RADIUS_TILES * 2 + 1) as u32 * HUD_MINIMAP_PIXELS_PER_TILE
+}
+
+/// Extra margin on each side of the texture so the outer shadow ring is not
+/// clipped where the circle meets the square bounds (top/bottom/left/right).
+fn hud_minimap_texture_padding_pixels() -> u32 {
+    (HUD_MINIMAP_SHADOW_THICKNESS + 0.5).ceil() as u32
+}
+
+fn hud_minimap_texture_pixels() -> u32 {
+    hud_minimap_map_diameter_pixels() + 2 * hud_minimap_texture_padding_pixels()
+}
+
+fn hud_minimap_radius_pixels() -> f32 {
+    (HUD_MINIMAP_RADIUS_TILES as f32 + 0.5) * HUD_MINIMAP_PIXELS_PER_TILE as f32
+}
+
+fn hud_minimap_max_icon_center_distance(scale: f32) -> f32 {
+    hud_minimap_radius_pixels() * scale - HUD_MINIMAP_ICON_SIZE / 2.0 - HUD_MINIMAP_ICON_CLIP_INSET
+}
 
 #[derive(Component)]
 pub struct HudMinimap {
@@ -1089,8 +1127,7 @@ fn setup_hud_minimap(
         return;
     }
 
-    let diameter_tiles = (HUD_MINIMAP_RADIUS_TILES * 2 + 1) as u32;
-    let total_pixels = diameter_tiles * HUD_MINIMAP_PIXELS_PER_TILE;
+    let total_pixels = hud_minimap_texture_pixels();
 
     let size = Extent3d {
         width: total_pixels,
@@ -1107,7 +1144,8 @@ fn setup_hud_minimap(
     let image_handle = assets.add(image);
 
     let res = &game.resolution;
-    let pos_x = res.game_width / 2.0 - HUD_MINIMAP_DISPLAY_SIZE / 2.0 - HUD_MINIMAP_PADDING + 4.;
+    let pos_x = res.game_width / 2.0 - HUD_MINIMAP_DISPLAY_SIZE / 2.0 - HUD_MINIMAP_PADDING
+        + HUD_MINIMAP_RIGHT_NUDGE;
     let pos_y = res.game_height / 2.0 - HUD_MINIMAP_DISPLAY_SIZE / 2.0 - HUD_MINIMAP_PADDING;
 
     let scale = HUD_MINIMAP_DISPLAY_SIZE / total_pixels as f32;
@@ -1186,12 +1224,10 @@ fn update_hud_minimap_texture(
     };
 
     let player_world = player_t.translation().truncate();
-    let diameter_tiles = (HUD_MINIMAP_RADIUS_TILES * 2 + 1) as u32;
-    let total_pixels = diameter_tiles * HUD_MINIMAP_PIXELS_PER_TILE;
+    let total_pixels = hud_minimap_texture_pixels();
     let center_pixel = total_pixels as f32 / 2.0;
-    let radius_pixels =
-        (HUD_MINIMAP_RADIUS_TILES as f32 + 0.5) * HUD_MINIMAP_PIXELS_PER_TILE as f32;
-    let border_thickness: f32 = 1.5;
+    let radius_pixels = hud_minimap_radius_pixels();
+    let border_thickness: f32 = 2.;
     let era = game.era.current_era.clone();
 
     let data = &mut image.data;
@@ -1202,7 +1238,7 @@ fn update_hud_minimap_texture(
             let dy = center_pixel - (py as f32 + 0.5);
             let dist = (dx * dx + dy * dy).sqrt();
 
-            if dist > radius_pixels {
+            if dist > radius_pixels + HUD_MINIMAP_SHADOW_THICKNESS {
                 data[idx] = 0;
                 data[idx + 1] = 0;
                 data[idx + 2] = 0;
@@ -1210,10 +1246,18 @@ fn update_hud_minimap_texture(
                 idx += 4;
                 continue;
             }
+            if dist > radius_pixels {
+                data[idx] = (HUD_MINIMAP_SHADOW_RGB.0 * 255.0) as u8;
+                data[idx + 1] = (HUD_MINIMAP_SHADOW_RGB.1 * 255.0) as u8;
+                data[idx + 2] = (HUD_MINIMAP_SHADOW_RGB.2 * 255.0) as u8;
+                data[idx + 3] = (HUD_MINIMAP_SHADOW_ALPHA * 255.0) as u8;
+                idx += 4;
+                continue;
+            }
             if dist > radius_pixels - border_thickness {
-                data[idx] = (DARK_WOOD_BROWN.r() * 255.0) as u8;
-                data[idx + 1] = (DARK_WOOD_BROWN.g() * 255.0) as u8;
-                data[idx + 2] = (DARK_WOOD_BROWN.b() * 255.0) as u8;
+                data[idx] = (DARK_BROWN.r() * 255.0) as u8;
+                data[idx + 1] = (DARK_BROWN.g() * 255.0) as u8;
+                data[idx + 2] = (DARK_BROWN.b() * 255.0) as u8;
                 data[idx + 3] = 255;
                 idx += 4;
                 continue;
@@ -1272,10 +1316,9 @@ fn update_hud_minimap_icons(
     };
 
     let player_world = player_t.translation().truncate();
-    let radius_world = HUD_MINIMAP_RADIUS_TILES as f32 * TILE_SIZE.x;
-    let diameter_tiles = (HUD_MINIMAP_RADIUS_TILES * 2 + 1) as u32;
-    let total_pixels = diameter_tiles * HUD_MINIMAP_PIXELS_PER_TILE;
+    let total_pixels = hud_minimap_texture_pixels();
     let scale = HUD_MINIMAP_DISPLAY_SIZE / total_pixels as f32;
+    let max_icon_center_dist = hud_minimap_max_icon_center_distance(scale);
 
     let mut desired: HashMap<TileMapPosition, WorldObject> = HashMap::new();
     desired.insert(
@@ -1290,7 +1333,12 @@ fn update_hud_minimap_icons(
 
     desired.retain(|pos, _| {
         let world = tile_pos_to_world_pos(*pos, false);
-        (world - player_world).length() <= radius_world + TILE_SIZE.x
+        let offset = world - player_world;
+        let pixel_offset = Vec2::new(
+            offset.x / TILE_SIZE.x * HUD_MINIMAP_PIXELS_PER_TILE as f32,
+            offset.y / TILE_SIZE.y * HUD_MINIMAP_PIXELS_PER_TILE as f32,
+        );
+        pixel_offset.length() * scale <= max_icon_center_dist
     });
 
     let mut existing_keys: HashSet<TileMapPosition> = HashSet::new();

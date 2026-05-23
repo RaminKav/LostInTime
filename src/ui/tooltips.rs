@@ -5,9 +5,7 @@ use crate::{
     assets::{asset_helpers::spawn_sprite, Graphics},
     attributes::{
         add_item_glows,
-        health_regen::{
-            effective_regen_period_secs, HealthRegenTimer, ManaRegenTimer,
-        },
+        health_regen::{effective_regen_period_secs, HealthRegenTimer, ManaRegenTimer},
         set_bonus::{EquipmentSet, SET_PIECES_REQUIRED},
         Attack, AttackSpeed, AttributeQuality, AttributeValue, BonusDamage, CritChance, CritDamage,
         CurrentHealth, CurrentMana, Defence, Dodge, Healing, HealthRegen, ItemAttributes,
@@ -41,7 +39,7 @@ use crate::{
 use super::{
     item_chest::ItemChestUI, EssenceUI, InventoryUI, UIElement, UIState, CHEST_INVENTORY_UI_SIZE,
     CRAFTING_INVENTORY_UI_SIZE, ESSENCE_UI_SIZE, FURNACE_INVENTORY_UI_SIZE, INVENTORY_UI_SIZE,
-    INVENTORY_Y_OFFSET,
+    INVENTORY_Y_OFFSET, INV_SIDE_STATS_BG_ALPHA, INV_SIDE_STATS_BG_PADDING,
 };
 
 aseprite!(pub InventoryStatHighlightCommon, "textures/effects/InventoryStatHighlightCommon.ase");
@@ -96,6 +94,10 @@ pub struct ShowInvPlayerStatsEvent {
     pub stat: Option<StatType>,
     pub ignore_timer: bool,
 }
+
+/// Rebuilds inventory damage/mob stat side panels without touching the player stats tooltip.
+#[derive(Debug, Clone, Default)]
+pub struct DamageTrackerRefreshEvent;
 
 #[derive(Debug, Clone)]
 pub struct TooltipTextProps {
@@ -229,7 +231,8 @@ pub fn handle_spawn_inv_item_tooltip(
             //     right side, so this is the only free space.
             //   - Normal item tooltips (hovering an inventory/hotbar slot) keep the same
             //     right-side position as `UIState::Inventory`.
-            // The inventory panel center is at `(-185, INVENTORY_Y_OFFSET)` (see
+            // The inventory panel center uses `INVENTORY_PANEL_CENTER_X` when the DMG
+            // tracker is open (see
             // `setup_inv_ui` `pos_offset`). We bias the recipe tooltip slightly right of
             // the panel center so its left edge doesn't hug the screen edge.
             UIState::InventoryCrafting => {
@@ -427,7 +430,7 @@ pub fn handle_spawn_inv_item_tooltip(
                         ),
                         text_anchor: Anchor::CenterLeft,
                         transform: Transform {
-                            translation: Vec3::new(-57., 20., 1.),
+                            translation: Vec3::new(-58., -36., 1.),
                             scale: Vec3::new(1., 1., 1.),
                             ..Default::default()
                         },
@@ -551,30 +554,6 @@ pub fn handle_spawn_inv_item_tooltip(
                     paths::SLKSCR.to_string(),
                 ));
             }
-
-            // Tooltip Inspect ICON
-            let tooltip_icon = spawn_item_stack_icon(
-                &mut commands,
-                &graphics,
-                &ItemStack::crate_icon_stack(WorldObject::TooltipInspect),
-                &asset_server,
-                Vec2::new(TOOLTIP_UI_SIZE.x + 16., 0.),
-                Vec2::new(0., 0.),
-                3,
-            );
-            commands.entity(tooltip_icon).set_parent(tooltip);
-            commands
-                .spawn(SpriteBundle {
-                    texture: asset_server.load("textures/ShiftKey.png"),
-                    transform: Transform::from_translation(Vec3::new(0.0, 13., 1.)),
-                    sprite: Sprite {
-                        custom_size: Some(Vec2::new(26., 10.)),
-                        ..Default::default()
-                    },
-                    ..Default::default()
-                })
-                .insert(RenderLayers::from_layers(&[3]))
-                .set_parent(tooltip_icon);
         } else {
             if item.is_recipe {
                 //======== "Description" sub-header (body text is white below) ========
@@ -586,7 +565,7 @@ pub fn handle_spawn_inv_item_tooltip(
                                 TextStyle {
                                     font: gf::TOOLTIP_CARD_SUBHEAD_BOLD.load_font(asset_server),
                                     font_size: gf::TOOLTIP_CARD_SUBHEAD_BOLD.size,
-                                    color: TOOLTIP_BLACK,
+                                    color: YELLOW_2,
                                 },
                             ),
                             text_anchor: Anchor::CenterLeft,
@@ -617,7 +596,7 @@ pub fn handle_spawn_inv_item_tooltip(
                     -10. + if item.is_recipe {
                         65. + 6. * (i) as f32
                     } else {
-                        0.
+                        65. + 6. * (i) as f32
                     },
                     if item.is_recipe {
                         AttributeQuality::Low
@@ -629,11 +608,15 @@ pub fn handle_spawn_inv_item_tooltip(
                 ));
             }
         }
-
+        let y_spacing = if !should_show_attributes || item.is_recipe {
+            5.
+        } else {
+            9.
+        };
         for (i, props) in tooltip_text.iter().enumerate() {
             let text_pos = Vec3::new(
                 -size.x / 2. + 28.,
-                size.y / 2. - 126. - (i as f32 * 9.) - props.offset,
+                size.y / 2. - 126. - (i as f32 * y_spacing) - props.offset,
                 2.,
             );
 
@@ -1258,31 +1241,18 @@ pub fn spawn_stats_tooltip_at(
 #[derive(Component)]
 pub struct InventorySideStatsPanel;
 
-pub fn spawn_damage_tracker_in_inventory(
-    mut commands: Commands,
-    asset_server: Res<AssetServer>,
-    mut updates: EventReader<ShowInvPlayerStatsEvent>,
-    inv: Query<Entity, With<InventoryUI>>,
-    ui_state: Res<State<UIState>>,
-    old_panels: Query<Entity, With<InventorySideStatsPanel>>,
-    tracker: Res<DamageTracker>,
-    mob_tracker: Res<MobStatTracker>,
-    pet_stats: Option<Res<PetAbilityStats>>,
+fn spawn_inventory_damage_tracker_panels(
+    commands: &mut Commands,
+    asset_server: &AssetServer,
+    inv_entity: Entity,
+    old_panels: &Query<Entity, With<InventorySideStatsPanel>>,
+    tracker: &DamageTracker,
+    mob_tracker: &MobStatTracker,
+    pet_stats: Option<&PetAbilityStats>,
 ) {
-    if ui_state.0 != UIState::Inventory {
-        return;
-    }
-    if updates.iter().next().is_none() {
-        return;
-    }
-
     for e in old_panels.iter() {
         commands.entity(e).despawn_recursive();
     }
-
-    let Ok(inv_entity) = inv.get_single() else {
-        return;
-    };
 
     let panel_x = (INVENTORY_UI_SIZE.x
         + TOOLTIP_UI_SIZE.x
@@ -1294,9 +1264,10 @@ pub fn spawn_damage_tracker_in_inventory(
     let start_y = INVENTORY_UI_SIZE.y / 2. - 8.;
     let stats_width = 80.0;
     let mut next_y = start_y;
+    let mut bottom_y = start_y;
 
     if let Some((entities, dmg_bottom_y)) = spawn_damage_tracker_ui(
-        &mut commands,
+        commands,
         &asset_server,
         &tracker,
         Transform::from_translation(Vec3::new(panel_x, next_y, 2.)),
@@ -1308,11 +1279,12 @@ pub fn spawn_damage_tracker_in_inventory(
             commands.entity(*panel).insert(InventorySideStatsPanel);
             commands.entity(inv_entity).add_child(*panel);
         }
-        next_y += dmg_bottom_y - 10.0;
+        bottom_y = next_y + dmg_bottom_y;
+        next_y = bottom_y - 10.0;
     }
 
-    if let Some((entities, _)) = spawn_mob_stat_tracker_ui(
-        &mut commands,
+    if let Some((entities, mob_bottom_y)) = spawn_mob_stat_tracker_ui(
+        commands,
         &asset_server,
         &mob_tracker,
         Transform::from_translation(Vec3::new(panel_x, next_y, 2.)),
@@ -1323,7 +1295,80 @@ pub fn spawn_damage_tracker_in_inventory(
             commands.entity(*panel).insert(InventorySideStatsPanel);
             commands.entity(inv_entity).add_child(*panel);
         }
+        bottom_y = next_y + mob_bottom_y;
     }
+
+    let content_height = (start_y - bottom_y).abs();
+    if content_height > 0.0 {
+        let bg_w = stats_width + INV_SIDE_STATS_BG_PADDING * 2.0;
+        let bg_h = content_height + INV_SIDE_STATS_BG_PADDING * 2.0;
+        let bg_center_y = (start_y + bottom_y) * 0.5;
+        let bg = commands
+            .spawn((
+                SpriteBundle {
+                    sprite: Sprite {
+                        color: Color::rgba(0.15, 0.12, 0.10, INV_SIDE_STATS_BG_ALPHA),
+                        custom_size: Some(Vec2::new(bg_w, bg_h)),
+                        ..Default::default()
+                    },
+                    transform: Transform::from_translation(Vec3::new(
+                        panel_x + 6.,
+                        bg_center_y,
+                        1.5,
+                    )),
+                    ..Default::default()
+                },
+                RenderLayers::from_layers(&[3]),
+                InventorySideStatsPanel,
+                Name::new("INVENTORY SIDE STATS BACKGROUND"),
+            ))
+            .id();
+        commands.entity(inv_entity).add_child(bg);
+    }
+}
+
+pub fn spawn_damage_tracker_in_inventory(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    mut stats_updates: EventReader<ShowInvPlayerStatsEvent>,
+    mut tracker_refresh: EventReader<DamageTrackerRefreshEvent>,
+    inv: Query<Entity, With<InventoryUI>>,
+    ui_state: Res<State<UIState>>,
+    damage_tracker_menu: Res<crate::inventory::DamageTrackerMenuOpen>,
+    old_panels: Query<Entity, With<InventorySideStatsPanel>>,
+    tracker: Res<DamageTracker>,
+    mob_tracker: Res<MobStatTracker>,
+    pet_stats: Option<Res<PetAbilityStats>>,
+) {
+    if ui_state.0 != UIState::Inventory {
+        return;
+    }
+    let should_refresh =
+        tracker_refresh.iter().next().is_some() || stats_updates.iter().next().is_some();
+    if !should_refresh {
+        return;
+    }
+
+    if !damage_tracker_menu.0 {
+        for e in old_panels.iter() {
+            commands.entity(e).despawn_recursive();
+        }
+        return;
+    }
+
+    let Ok(inv_entity) = inv.get_single() else {
+        return;
+    };
+
+    spawn_inventory_damage_tracker_panels(
+        &mut commands,
+        &asset_server,
+        inv_entity,
+        &old_panels,
+        &tracker,
+        &mob_tracker,
+        pet_stats.as_deref(),
+    );
 }
 
 /// Icon (2× scale), optional rarity glow, and title row — same layout as inventory item tooltip header.

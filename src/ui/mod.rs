@@ -44,6 +44,7 @@ mod achievement_banner;
 mod active_skill_shrine_ui;
 mod interactions;
 mod inventory_ui;
+pub mod upgrade_drag;
 pub mod minimap;
 pub mod hud_bar_fill;
 mod player_hud;
@@ -113,7 +114,6 @@ use crate::{
         active_skill_shrine::ActiveSkillShrineOverwrite,
         heirloom_shrine::handle_heirloom_shrine_ui_setup, item_actions::ActionSuccessEvent,
     },
-    night::NightTracker,
     player::skills::HeirloomChoiceQueue,
     player::unlocks::RunUnlockState,
     player::RunScore,
@@ -133,14 +133,24 @@ use self::{
 
 /// Full inventory panel sprite size (match background art).
 pub const INVENTORY_UI_SIZE: Vec2 = Vec2::new(162., 312.);
-pub const INVENTORY_UPGRADE_UI_SIZE: Vec2 = Vec2::new(134., 166.);
+pub const INVENTORY_UPGRADE_UI_SIZE: Vec2 = Vec2::new(134., 78.);
 /// Side panel art shown in `UIState::InventoryCrafting` in place of the upgrade panel.
 pub const INVENTORY_CRAFTING_PANEL_UI_SIZE: Vec2 = Vec2::new(126., 184.);
 pub const INVENTORY_EQUIPMENT_UI_SIZE: Vec2 = Vec2::new(130., 140.);
 /// Side panel that replaces the stats tooltip in `UIState::InventoryCrafting`.
 /// Matches the art height of the stats panel so it occupies the same slot on-screen.
 pub const INVENTORY_BLUEPRINT_UI_SIZE: Vec2 = Vec2::new(192., 312.);
-pub const INVENTORY_Y_OFFSET: f32 = -13.;
+pub const INVENTORY_Y_OFFSET: f32 = -6.;
+
+/// Horizontal center of the main inventory panel; shifts left when side stat trackers are shown.
+#[inline]
+pub fn inventory_panel_center_x(damage_tracker_visible: bool) -> f32 {
+    if damage_tracker_visible {
+        INVENTORY_PANEL_CENTER_X
+    } else {
+        INVENTORY_PANEL_CENTER_X_COMPACT
+    }
+}
 /// Pixel extent of the main item slot grid (4 columns × 7 rows).
 pub const INVENTORY_GRID_COLS: usize = 4;
 pub const SKILLS_CHOICE_UI_SIZE: Vec2 = Vec2::new(164., 191.);
@@ -168,7 +178,7 @@ pub const INV_CHEST_SCRAPPER_GRID_OFFSET_Y: f32 = 4.0 * INV_SLOT_SPACING_Y + 11.
 // --- Equipment panel 3×3 grid (panel-local; aligned to built-in slot art in `EquipmentPanel.png`) ---
 /// Offset from the inventory panel center to the equipment panel center (kept in sync with the
 /// `equip_panel` sprite spawn in `setup_inv_ui`).
-pub const INV_EQUIP_PANEL_OFFSET_X: f32 = 150.0;
+pub const INV_EQUIP_PANEL_OFFSET_X: f32 = 147.0;
 pub const INV_EQUIP_PANEL_OFFSET_Y: f32 = 86.0;
 /// Spacing between 3×3 grid columns / rows (centers).
 pub const INV_EQUIP_GRID_SPACING: f32 = 30.0;
@@ -189,6 +199,21 @@ pub const INV_SORT_BUTTON_OFFSET_Y: f32 = INV_TRASH_OFFSET_Y - UI_SLOT_SIZE.y - 
 /// Material-drops toggle — directly under the sort button, same x as trash/sort column.
 pub const INV_MATERIAL_DROPS_TOGGLE_OFFSET_X: f32 = INV_SORT_BUTTON_OFFSET_X;
 pub const INV_MATERIAL_DROPS_TOGGLE_OFFSET_Y: f32 = INV_SORT_BUTTON_OFFSET_Y - UI_SLOT_SIZE.y - 6.0;
+
+/// Damage-tracker toggle — directly under the material-drops filter button.
+pub const INV_DAMAGE_TRACKER_TOGGLE_OFFSET_X: f32 = INV_MATERIAL_DROPS_TOGGLE_OFFSET_X;
+pub const INV_DAMAGE_TRACKER_TOGGLE_OFFSET_Y: f32 =
+    INV_MATERIAL_DROPS_TOGGLE_OFFSET_Y - UI_SLOT_SIZE.y - 6.0;
+
+/// Main inventory panel center X when damage/mob stat side panels are visible.
+pub const INVENTORY_PANEL_CENTER_X: f32 = -193.;
+/// Shift right when side stat panels are hidden (more centered on screen).
+pub const INVENTORY_PANEL_CENTER_X_COMPACT: f32 = INVENTORY_PANEL_CENTER_X + 45.;
+
+/// Padding around the combined damage + mob stat tracker background panel.
+pub const INV_SIDE_STATS_BG_PADDING: f32 = 10.0;
+/// Black backdrop opacity behind inventory side stat trackers.
+pub const INV_SIDE_STATS_BG_ALPHA: f32 = 0.85;
 
 /// Drop-filter side panel (right of inventory panel).
 pub const INV_DROP_FILTER_PANEL_GAP: f32 = 6.0;
@@ -310,25 +335,38 @@ pub fn hud_currency_second_center_x(game_width: f32) -> f32 {
     hud_currency_first_center_x(game_width) + CURRENCY_BACKGROUND_SIZE.x + HUD_CURRENCY_BACKGROUND_GAP
 }
 
-/// Progress bar center X, placed immediately after the coin currency slot.
-pub fn hud_progress_bar_center_x(game_width: f32) -> f32 {
-    hud_currency_second_center_x(game_width)
-        + CURRENCY_BACKGROUND_SIZE.x * 0.5
-        + HUD_PROGRESS_AFTER_CURRENCY_GAP
-        + PROGRESS_BACKGROUND_SIZE.x * 0.5
+/// Era timeline center X — anchored to the screen center so the timeline sits in the middle
+/// of the HUD row regardless of resolution.
+pub fn hud_timeline_center_x(_game_width: f32) -> f32 {
+    0.0
 }
 
-/// Era timeline center X, placed after the progress bar.
-pub fn hud_timeline_center_x(game_width: f32) -> f32 {
-    hud_progress_bar_center_x(game_width)
-        + PROGRESS_BACKGROUND_SIZE.x * 0.5
-        + HUD_TIMELINE_AFTER_PROGRESS_GAP
-        + HUD_TIMELINE_SIZE.x * 0.5
+/// Right edge X of the second (coin) currency background — the right boundary of the
+/// left-aligned currency block.
+pub fn hud_currency_block_right_edge_x(game_width: f32) -> f32 {
+    hud_currency_second_center_x(game_width) + CURRENCY_BACKGROUND_SIZE.x * 0.5
+}
+
+/// Symmetric padding between the centered timeline and the score/currency blocks on either
+/// side. Computed as the gap between the right edge of the currency block and the timeline's
+/// left edge (clamped to a sensible minimum so things don't collide on tiny windows).
+pub fn hud_timeline_side_padding(game_width: f32) -> f32 {
+    let timeline_left_edge = hud_timeline_center_x(game_width) - HUD_TIMELINE_SIZE.x * 0.5;
+    let gap = timeline_left_edge - hud_currency_block_right_edge_x(game_width);
+    gap.max(HUD_PROGRESS_AFTER_CURRENCY_GAP)
+}
+
+/// Score / chaos progress bar center X — placed to the right of the centered timeline using the
+/// same padding as the gap between the currency block and the timeline on the left side.
+pub fn hud_progress_bar_center_x(game_width: f32) -> f32 {
+    let timeline_right_edge = hud_timeline_center_x(game_width) + HUD_TIMELINE_SIZE.x * 0.5;
+    let minimap_left_edge = minimap::hud_minimap_left_edge_x(game_width);
+    (timeline_right_edge + minimap_left_edge) * 0.5
 }
 
 /// Endless-mode timer center X, flush against the timeline's right edge.
 pub fn hud_era_timer_center_x(game_width: f32, timer_width: f32) -> f32 {
-    hud_timeline_center_x(game_width) + HUD_TIMELINE_SIZE.x * 0.5 + timer_width * 0.5
+    hud_timeline_center_x(game_width) - HUD_TIMELINE_SIZE.x * 0.5 - timer_width * 0.5
 }
 
 /// Gap between the bottom of the progress bar row and the heirloom icon row.
@@ -343,7 +381,7 @@ pub const HUD_HEIRLOOM_ICON_SPACING: f32 = 16.0;
 pub const HUD_HEIRLOOM_LEFT_PADDING: f32 = 4.0;
 
 /// Nudge the heirloom row upward from its default position below the progress bar.
-pub const HUD_HEIRLOOM_ROW_Y_NUDGE: f32 = 10.0;
+pub const HUD_HEIRLOOM_ROW_Y_NUDGE: f32 = 9.0;
 
 /// World-space Y for the heirloom icon row (below the progress / currency HUD row).
 pub fn hud_heirloom_row_y(game_height: f32) -> f32 {
@@ -357,6 +395,24 @@ pub fn hud_heirloom_row_y(game_height: f32) -> f32 {
 /// First heirloom icon center X (near the left screen edge).
 pub fn hud_heirloom_first_icon_x(game_width: f32) -> f32 {
     -game_width * 0.5 + HUD_HEIRLOOM_ICON_HALF + HUD_HEIRLOOM_LEFT_PADDING
+}
+
+/// Padding kept clear between the right-most heirloom icon and the left edge of the HUD minimap
+/// so heirlooms never tuck under the minimap circle.
+pub const HUD_HEIRLOOM_MINIMAP_PADDING: f32 = 6.0;
+
+/// Largest number of heirloom icons that fit on a single HUD row at the current screen width,
+/// leaving [`HUD_HEIRLOOM_MINIMAP_PADDING`] of clearance to the left of the minimap.
+pub fn hud_heirloom_max_per_row(game_width: f32) -> usize {
+    let first_x = hud_heirloom_first_icon_x(game_width);
+    let minimap_left_edge = minimap::hud_minimap_left_edge_x(game_width);
+    let max_center_x =
+        minimap_left_edge - HUD_HEIRLOOM_MINIMAP_PADDING - HUD_HEIRLOOM_ICON_HALF;
+    if max_center_x <= first_x {
+        return 1;
+    }
+    let usable = max_center_x - first_x;
+    1 + (usable / HUD_HEIRLOOM_ICON_SPACING).floor() as usize
 }
 
 /// Parent offset when the inventory UI is in crafting mode (whole panel nudge).
@@ -449,6 +505,7 @@ impl Plugin for UIPlugin {
             .init_resource::<SelectedCraftingRecipe>()
             .init_resource::<crate::ui::inventory_ui::BlueprintsPagination>()
             .init_resource::<crate::inventory::MaterialDropFilterMenuOpen>()
+            .init_resource::<crate::inventory::DamageTrackerMenuOpen>()
             .insert_resource(ClassSelectionState::default())
             .init_resource::<ClassUnlockHoverState>()
             .init_resource::<ClassUnlockConfirmState>()
@@ -482,6 +539,7 @@ impl Plugin for UIPlugin {
             .init_resource::<SelectedBeastiaryMob>()
             .add_event::<TooltipTeardownEvent>()
             .add_event::<ShowInvPlayerStatsEvent>()
+            .add_event::<DamageTrackerRefreshEvent>()
             .add_event::<SubmitEssenceChoice>()
             .add_event::<DropInWorldEvent>()
             .add_event::<MenuButtonClickEvent>()
@@ -659,9 +717,13 @@ impl Plugin for UIPlugin {
                     handle_item_drop_clicks,
                     handle_drop_dragged_items_on_inv_close,
                     handle_dragging,
+                    update_dragged_item_stack_count_text,
                     handle_drop_on_slot_events.after(handle_item_drop_clicks),
                     handle_drop_in_world_events.after(handle_item_drop_clicks),
                     handle_interaction_clicks
+                        .before(handle_item_drop_clicks)
+                        .run_if(not(in_state(UIState::Closed))),
+                    upgrade_drag::handle_drag_upgrade_material_on_equipment
                         .before(handle_item_drop_clicks)
                         .run_if(not(in_state(UIState::Closed))),
                     handle_icon_hover_tooltips
@@ -897,6 +959,7 @@ impl Plugin for UIPlugin {
             .add_systems(
                 (
                     player_hud::sync_consumable_buff_hud,
+                    player_hud::sync_heirloom_hud_visibility,
                     player_hud::tick_consumable_buff_hud_overlays.run_if(is_not_paused),
                     handle_heirloom_hud_tooltip,
                     player_hud::handle_consumable_buff_hud_tooltip,
@@ -1138,6 +1201,14 @@ impl Plugin for UIPlugin {
                         in_state(UIState::Inventory)
                             .or_else(in_state(UIState::InventoryCrafting))
                             .or_else(in_state(UIState::Crafting)),
+                    )
+                    .in_set(OnUpdate(GameState::Main)),
+            )
+            .add_system(
+                handle_damage_tracker_toggle_button_click
+                    .run_if(
+                        in_state(UIState::Inventory)
+                            .or_else(in_state(UIState::InventoryCrafting)),
                     )
                     .in_set(OnUpdate(GameState::Main)),
             )

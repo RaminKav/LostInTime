@@ -79,7 +79,7 @@ pub enum TutorialContent {
 
     Equipment,
     UpgradeTomes,
-    Orbs,
+    InventoryStats,
 
     ShrinesExplore,
     PinkFlowers,
@@ -93,7 +93,7 @@ impl TutorialContent {
         TutorialContent::Heirlooms,
         TutorialContent::Equipment,
         TutorialContent::UpgradeTomes,
-        TutorialContent::Orbs,
+        TutorialContent::InventoryStats,
         TutorialContent::ShrinesExplore,
         TutorialContent::PinkFlowers,
         TutorialContent::Crafting,
@@ -105,8 +105,8 @@ impl TutorialContent {
             TutorialContent::Skills => "Skills",
             TutorialContent::Heirlooms => "Heirlooms",
             TutorialContent::Equipment => "Equipment",
-            TutorialContent::UpgradeTomes => "Tomes",
-            TutorialContent::Orbs => "Orbs",
+            TutorialContent::UpgradeTomes => "Tomes & Orbs",
+            TutorialContent::InventoryStats => "Inventory Stats",
             TutorialContent::ShrinesExplore => "Shrines",
             TutorialContent::PinkFlowers => "Biomes",
             TutorialContent::Crafting => "Crafting",
@@ -129,10 +129,10 @@ impl TutorialContent {
                 "Equipment can be equipped to boost\n\nyour stats. Upgrade them to make\n\nthem stronger!"
             }
             TutorialContent::UpgradeTomes => {
-                "Tomes will level up gear, granting\n\nmore base stats, and improving\n\nrandom bonus stats each level."
+                "Drag and Drop Tomes & Orbs onto\n\nEquipment to improve their bonus\n\nstats and rarity!"
             }
-            TutorialContent::Orbs => {
-                "Orbs will re-roll the bonus stats\n\non gear, with a chance to upgrade\n\ntheir rarity too!"
+            TutorialContent::InventoryStats => {
+                "Place Extra gear in your inventory.\n\nYou will still gain the highlighted\n\nstat, shown here in purple!"
             }
             TutorialContent::ShrinesExplore => {
                 "Explore the island and interact\n\nwith shrines, which offer various\n\nchoices or challenges."
@@ -472,7 +472,7 @@ fn tutorial_content_aseprite_tag(content: TutorialContent) -> &'static str {
         TutorialContent::Heirlooms => TutorialAnims::tags::HEIRLOOMS,
         TutorialContent::Equipment => TutorialAnims::tags::EQUIPMENT,
         TutorialContent::UpgradeTomes => TutorialAnims::tags::TOME,
-        TutorialContent::Orbs => TutorialAnims::tags::ORB,
+        TutorialContent::InventoryStats => TutorialAnims::tags::INVENTORY_STATS,
         TutorialContent::ShrinesExplore => TutorialAnims::tags::SHRINE,
         TutorialContent::PinkFlowers => TutorialAnims::tags::PINK_FLOWER,
         TutorialContent::Crafting => TutorialAnims::tags::CRAFTING,

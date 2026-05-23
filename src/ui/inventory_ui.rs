@@ -42,13 +42,14 @@ use crate::{
         AttributeChangeEvent,
     },
     inventory::{
-        try_auto_equip_from_upgrade_slot, BreakDropFilter, Inventory, InventoryItemStack,
-        ItemStack, MaterialDropFilterAllButton, MaterialDropFilterEntry, MaterialDropFilterEntryX,
+        try_auto_equip_from_upgrade_slot, BreakDropFilter, DamageTrackerMenuOpen,
+        DamageTrackerToggleButton, Inventory, InventoryItemStack, ItemStack,
+        MaterialDropFilterAllButton, MaterialDropFilterEntry, MaterialDropFilterEntryX,
         MaterialDropFilterMenuOpen, MaterialDropFilterNoneButton, MaterialDropFilterPanel,
         MaterialDropsToggleButton, SortInventoryButton, BREAK_DROP_FILTER_ITEMS,
     },
     item::{CraftedItemEvent, Recipes, WorldObject},
-    ui::{crafting_ui::UpgradeButton, FurnaceState, CHEST_INVENTORY_UI_SIZE, INVENTORY_UI_SIZE},
+    ui::{FurnaceState, CHEST_INVENTORY_UI_SIZE, INVENTORY_UI_SIZE},
     ScreenResolution,
 };
 
@@ -56,6 +57,7 @@ use super::{
     crafting_ui::CraftingContainer,
     icon_hover_tooltips::IconHoverTooltipText,
     interactions::{Interactable, Interaction},
+    inventory_panel_center_x,
     options_ui::CheatSettings,
     player_hud::FlashExpBarEvent,
     ui_helpers::{spawn_ui_overlay, Z_DEPTH_HUD_ACTIVE_SKILLS},
@@ -63,6 +65,7 @@ use super::{
     FURNACE_INVENTORY_UI_SIZE, HUD_ACTION_ROW_Y_FROM_BOTTOM, HUD_HOTBAR_CENTER_X, HUD_HOTBAR_SLOTS,
     INVENTORY_GRID_COLS, INV_CHEST_SCRAPPER_GRID_OFFSET_Y, INV_CRAFTING_BASE_Y, INV_CRAFTING_COLS,
     INV_CRAFTING_NUDGE_IN_MAIN_INV, INV_CRAFTING_ROW_GAP, INV_CRAFTING_X_ANCHOR,
+    INV_DAMAGE_TRACKER_TOGGLE_OFFSET_X, INV_DAMAGE_TRACKER_TOGGLE_OFFSET_Y,
     INV_DROP_FILTER_BUTTON_ROW_HEIGHT, INV_DROP_FILTER_BUTTON_SPACING, INV_DROP_FILTER_ICON_GAP,
     INV_DROP_FILTER_ICON_SIZE, INV_DROP_FILTER_PANEL_COLS, INV_DROP_FILTER_PANEL_GAP,
     INV_DROP_FILTER_PANEL_PADDING, INV_DROP_FILTER_PANEL_Z, INV_DROP_FILTER_TITLE_ROW_HEIGHT,
@@ -299,12 +302,16 @@ pub fn setup_inv_ui(
     proto_param: ProtoParam,
     era_manager: Res<crate::world::dimension::EraManager>,
     blueprints_pagination: Res<BlueprintsPagination>,
+    damage_tracker_menu: Res<DamageTrackerMenuOpen>,
 ) {
     let (size, texture, pos_offset) = match cur_inv_state.0 {
         UIState::Inventory | UIState::InventoryCrafting => (
             INVENTORY_UI_SIZE,
             graphics.get_ui_element_texture(UIElement::Inventory),
-            Vec2::new(-185., INVENTORY_Y_OFFSET),
+            Vec2::new(
+                inventory_panel_center_x(damage_tracker_menu.0),
+                INVENTORY_Y_OFFSET,
+            ),
         ),
         UIState::Chest => (
             CHEST_INVENTORY_UI_SIZE,
@@ -406,12 +413,12 @@ pub fn setup_inv_ui(
     let (side_panel_size, side_panel_element) = if is_crafting_mode {
         (INVENTORY_CRAFTING_PANEL_UI_SIZE, UIElement::CraftingPanel)
     } else {
-        (INVENTORY_UPGRADE_UI_SIZE, UIElement::UpgradePanel)
+        (INVENTORY_UPGRADE_UI_SIZE, UIElement::CraftButtonContainer)
     };
     let upgrade_panel_y_local = if is_crafting_mode {
         INV_UPGRADE_PANEL_OFFSET_Y_CRAFTING
     } else {
-        -75.0
+        -35.0
     };
     let upgrade_panel = commands
         .spawn(SpriteBundle {
@@ -421,53 +428,44 @@ pub fn setup_inv_ui(
                 ..Default::default()
             },
             transform: Transform {
-                translation: Vec3::new(
-                    pos_offset.x + 150.,
-                    pos_offset.y + upgrade_panel_y_local,
-                    10.,
-                ),
+                translation: Vec3::new(INV_EQUIP_PANEL_OFFSET_X, upgrade_panel_y_local, 0.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
             ..Default::default()
         })
         .insert(cur_inv_state.0.clone())
-        .insert(Name::new(if is_crafting_mode {
-            "CRAFTING PANEL"
-        } else {
-            "UPGRADES"
-        }))
+        .insert(Name::new("CRAFTING PANEL"))
         .insert(side_panel_element)
         .insert(RenderLayers::from_layers(&[3]))
         .id();
-    let upgrade_title = if is_crafting_mode {
-        "CRAFTING"
-    } else {
-        "UPGRADES"
-    };
-    let _upgrade_text = commands
-        .spawn(Text2dBundle {
-            text: Text::from_section(
-                upgrade_title,
-                TextStyle {
-                    font: asset_server.load("fonts/alagard.ttf"),
-                    font_size: 15.0,
-                    color: EQUIP_TITLE,
+    commands.entity(inv).add_child(upgrade_panel);
+    if is_crafting_mode {
+        let upgrade_title = "CRAFTING";
+        let _upgrade_text = commands
+            .spawn(Text2dBundle {
+                text: Text::from_section(
+                    upgrade_title,
+                    TextStyle {
+                        font: asset_server.load("fonts/alagard.ttf"),
+                        font_size: 15.0,
+                        color: EQUIP_TITLE,
+                    },
+                ),
+                text_anchor: Anchor::Center,
+                transform: Transform {
+                    translation: Vec3::new(0., side_panel_size.y / 2. - 12., 1.),
+                    scale: Vec3::new(1., 1., 1.),
+                    ..Default::default()
                 },
-            ),
-            text_anchor: Anchor::Center,
-            transform: Transform {
-                translation: Vec3::new(0., side_panel_size.y / 2. - 12., 1.),
-                scale: Vec3::new(1., 1., 1.),
-                ..Default::default()
-            },
-            ..default()
-        })
-        .insert(RenderLayers::from_layers(&[3]))
-        .insert(Name::new("upgrade/crafting TITLE"))
-        .insert(cur_inv_state.0.clone())
-        .set_parent(upgrade_panel)
-        .id();
+                ..default()
+            })
+            .insert(RenderLayers::from_layers(&[3]))
+            .insert(Name::new("upgrade/crafting TITLE"))
+            .insert(cur_inv_state.0.clone())
+            .set_parent(upgrade_panel)
+            .id();
+    }
 
     // Equipment panel (only in standard Inventory mode — crafting mode hides equipment).
     if cur_inv_state.0 == UIState::Inventory {
@@ -479,7 +477,7 @@ pub fn setup_inv_ui(
                     ..Default::default()
                 },
                 transform: Transform {
-                    translation: Vec3::new(pos_offset.x + 150., pos_offset.y + 86., 10.),
+                    translation: Vec3::new(INV_EQUIP_PANEL_OFFSET_X, INV_EQUIP_PANEL_OFFSET_Y, 0.),
                     scale: Vec3::new(1., 1., 1.),
                     ..Default::default()
                 },
@@ -489,6 +487,7 @@ pub fn setup_inv_ui(
             .insert(Name::new("EQUIPMENTS"))
             .insert(RenderLayers::from_layers(&[3]))
             .id();
+        commands.entity(inv).add_child(equip_panel);
         let _eqp_text = commands
             .spawn(Text2dBundle {
                 text: Text::from_section(
@@ -682,63 +681,6 @@ pub fn setup_inv_ui(
     }
 
     inv_state.inv_size = size;
-    // Furnace "accept" arrow button — only meaningful in standard Inventory mode (upgrades).
-    // Hidden in Scrapper (no upgrade flow) and InventoryCrafting (panel contents differ).
-    if cur_inv_state.0 == UIState::Inventory {
-        let upgrade_button = commands
-            .spawn(SpriteBundle {
-                texture: graphics
-                    .get_ui_element_texture(UIElement::UpgradeButton)
-                    .clone(),
-                sprite: Sprite {
-                    custom_size: Some(Vec2::new(100., 20.)),
-                    ..Default::default()
-                },
-                transform: Transform {
-                    translation: Vec3::new(-1., -INVENTORY_UPGRADE_UI_SIZE.y / 2. + 66., 1.),
-                    scale: Vec3::new(1., 1., 1.),
-                    ..Default::default()
-                },
-                ..Default::default()
-            })
-            .insert(RenderLayers::from_layers(&[3]))
-            .insert(UIElement::UpgradeButton)
-            .insert(Interactable::default())
-            .insert(UIState::Inventory)
-            .insert(UpgradeButton)
-            .insert(Name::new("UPGRADE BUTTON"))
-            .id();
-        commands
-            .entity(upgrade_panel)
-            .push_children(&[upgrade_button]);
-
-        let upgrade_material_text = commands
-            .spawn(Text2dBundle {
-                text: Text::from_section(
-                    "Add Materials",
-                    TextStyle {
-                        font: asset_server.load("fonts/slkscrbold.ttf"),
-                        font_size: 8.4,
-                        color: YELLOW_2,
-                    },
-                ),
-                text_anchor: Anchor::Center,
-                transform: Transform {
-                    translation: Vec3::new(0., 0., 1.),
-                    scale: Vec3::new(1., 1., 1.),
-                    ..Default::default()
-                },
-                ..default()
-            })
-            .insert(RenderLayers::from_layers(&[3]))
-            .insert(Name::new("upgrade material prompt"))
-            .insert(UIState::Inventory)
-            .insert(UpgradeMaterialPromptText)
-            .id();
-        commands
-            .entity(upgrade_button)
-            .push_children(&[upgrade_material_text]);
-    }
 
     // CRAFT / UPGRADE toggle button — shown on both `Inventory` and `InventoryCrafting`
     // so the player can flip between the two side-panel layouts.  The visual is the
@@ -880,6 +822,7 @@ pub fn setup_inv_slots_ui(
     resolution: Res<ScreenResolution>,
     break_drop_filter: Res<BreakDropFilter>,
     menu_open: Res<MaterialDropFilterMenuOpen>,
+    damage_tracker_menu: Res<DamageTrackerMenuOpen>,
     proto_param: ProtoParam,
 ) {
     if inv_spawn_check.get_single().is_err() {
@@ -988,27 +931,6 @@ pub fn setup_inv_slots_ui(
         );
     }
     if inv_state.0 != UIState::Scrapper {
-        // Upgrade tome / orb slots live on the upgrade side panel; in `InventoryCrafting`
-        // the side panel is replaced by the three crafting inputs so we skip these.
-        if inv_state.0 != UIState::InventoryCrafting {
-            if let Some(furnace_items) = inv.single_mut().furnace_items.clone().into() {
-                for (slot_index, item) in furnace_items.items.iter().enumerate() {
-                    spawn_inv_slot(
-                        &mut commands,
-                        &inv_state,
-                        &graphics,
-                        slot_index,
-                        Interaction::None,
-                        &inv_state_res,
-                        &inv_query,
-                        &asset_server,
-                        InventorySlotType::Furnace,
-                        item.to_owned(),
-                        &resolution,
-                    );
-                }
-            }
-        }
         // In crafting mode the upgrade panel is replaced by the `CraftingPanel`, which hosts
         // three ingredient *display* slots plus the craft result slot. Those are spawned by
         // `spawn_inventory_crafting_side_panel_slots` since they are not regular droppable
@@ -1054,7 +976,17 @@ pub fn setup_inv_slots_ui(
                 &inv_query,
                 inv_state_res.inv_size,
             );
-            let (panel_pos_offset, panel_inv_size) = inventory_panel_layout(&inv_state.0);
+            if inv_state.0 == UIState::Inventory || inv_state.0 == UIState::InventoryCrafting {
+                spawn_damage_tracker_toggle_button(
+                    &mut commands,
+                    &graphics,
+                    &asset_server,
+                    &inv_query,
+                    inv_state_res.inv_size,
+                );
+            }
+            let (panel_pos_offset, panel_inv_size) =
+                inventory_panel_layout(&inv_state.0, damage_tracker_menu.0);
             spawn_material_drop_filter_panel(
                 &mut commands,
                 &graphics,
@@ -1071,11 +1003,15 @@ pub fn setup_inv_slots_ui(
 }
 
 /// Panel center offset and size for the active inventory-family UI state.
-fn inventory_panel_layout(ui_state: &UIState) -> (Vec2, Vec2) {
+fn inventory_panel_layout(ui_state: &UIState, damage_tracker_visible: bool) -> (Vec2, Vec2) {
     match ui_state {
-        UIState::Inventory | UIState::InventoryCrafting => {
-            (Vec2::new(-185., INVENTORY_Y_OFFSET), INVENTORY_UI_SIZE)
-        }
+        UIState::Inventory | UIState::InventoryCrafting => (
+            Vec2::new(
+                inventory_panel_center_x(damage_tracker_visible),
+                INVENTORY_Y_OFFSET,
+            ),
+            INVENTORY_UI_SIZE,
+        ),
         UIState::Crafting => (
             Vec2::new(22.5, INVENTORY_Y_OFFSET),
             CRAFTING_INVENTORY_UI_SIZE,
@@ -1229,6 +1165,72 @@ fn spawn_material_drops_toggle_button(
         .id();
 
     commands.entity(button).push_children(&[icon]);
+
+    if let Ok(inv_e) = inv_query.get_single() {
+        commands.entity(button).set_parent(inv_e);
+    }
+}
+
+/// DMG button under the drop-filter button — toggles damage/mob stat side panels.
+fn spawn_damage_tracker_toggle_button(
+    commands: &mut Commands,
+    graphics: &Graphics,
+    asset_server: &AssetServer,
+    inv_query: &Query<Entity, With<InventoryUI>>,
+    inv_size: Vec2,
+) {
+    let hw = inv_size.x * 0.5;
+    let hh = inv_size.y * 0.5;
+    let translation = Vec3::new(
+        -hw + INV_DAMAGE_TRACKER_TOGGLE_OFFSET_X,
+        hh + INV_DAMAGE_TRACKER_TOGGLE_OFFSET_Y,
+        1.,
+    );
+
+    let button = commands
+        .spawn(SpriteBundle {
+            texture: graphics.get_ui_element_texture(UIElement::InventorySlot),
+            transform: Transform {
+                translation,
+                scale: Vec3::new(1., 1., 1.),
+                ..Default::default()
+            },
+            sprite: Sprite {
+                custom_size: Some(UI_SLOT_SIZE),
+                ..Default::default()
+            },
+            ..Default::default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(Interactable::default())
+        .insert(DamageTrackerToggleButton)
+        .insert(IconHoverTooltipText(&["Toggle damage tracker"]))
+        .insert(Name::new("DAMAGE TRACKER TOGGLE BUTTON"))
+        .id();
+
+    let label = commands
+        .spawn(Text2dBundle {
+            text: Text::from_section(
+                "DMG",
+                TextStyle {
+                    font: asset_server.load("fonts/4x5.ttf"),
+                    font_size: 5.0,
+                    color: YELLOW_2,
+                },
+            )
+            .with_alignment(TextAlignment::Center),
+            text_anchor: Anchor::Center,
+            transform: Transform {
+                translation: Vec3::new(0., 0., 1.),
+                scale: Vec3::new(1., 1., 1.),
+                ..Default::default()
+            },
+            ..default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(Name::new("DMG LABEL"))
+        .id();
+    commands.entity(button).push_children(&[label]);
 
     if let Ok(inv_e) = inv_query.get_single() {
         commands.entity(button).set_parent(inv_e);
@@ -1670,17 +1672,24 @@ pub fn spawn_inv_slot(
         let obj_type = *item.get_obj();
         item_type_option = Some(obj_type);
         item_count_option = Some(item.item_stack.count);
+        let mut count_text_offset =
+            if slot_index % INVENTORY_GRID_COLS == 3 || slot_index % INVENTORY_GRID_COLS == 2 {
+                Vec2::new(0.5, 0.)
+            } else {
+                Vec2::ZERO
+            };
+        // HUD hotbar count labels sit near the slot's bottom edge — nudge them down a bit
+        // so they don't overlap the inventory UI overlay when the inventory is opened.
+        if slot_type.is_hotbar() {
+            count_text_offset.y -= 2.0;
+        }
         item_icon_option = Some(spawn_item_stack_icon(
             commands,
             graphics,
             &item.item_stack,
             asset_server,
             Vec2::ZERO,
-            if slot_index % INVENTORY_GRID_COLS == 3 || slot_index % INVENTORY_GRID_COLS == 2 {
-                Vec2::new(0.5, 0.)
-            } else {
-                Vec2::ZERO
-            },
+            count_text_offset,
             3,
         ));
     }
@@ -1812,6 +1821,12 @@ pub fn spawn_inv_slot(
     }
     slot_entity.id()
 }
+/// Marker on the `Text2dBundle` child that renders an item stack's count number on top of
+/// an icon. Used by `update_dragged_item_stack_count_text` to find / update / despawn the
+/// label on dragged items without relying on the entity's `Name`.
+#[derive(Component)]
+pub struct StackCountText;
+
 pub fn spawn_item_stack_icon(
     commands: &mut Commands,
     graphics: &Graphics,
@@ -1875,6 +1890,7 @@ pub fn spawn_item_stack_icon(
                     ..default()
                 },
                 Name::new("ITEM STACK TEXT"),
+                StackCountText,
                 RenderLayers::from_layers(&[render_layer]),
             ))
             .id();

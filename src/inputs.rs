@@ -75,6 +75,7 @@ impl Plugin for InputsPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(CursorPos::default())
             .insert_resource(AutoAttackState::load())
+            .insert_resource(crate::bounce::NaturalTornadoSpawner::default())
             .register_type::<CursorPos>()
             .add_event::<BounceEvent>()
             // .add_plugin(ResourceInspectorPlugin::<CursorPos>::default())
@@ -88,6 +89,7 @@ impl Plugin for InputsPlugin {
                     update_bounce_effect,
                     crate::bounce::update_desert_tornadoes.run_if(is_not_paused),
                     crate::bounce::handle_tornado_player_overlap.run_if(is_not_paused),
+                    crate::bounce::spawn_natural_desert_tornadoes.run_if(is_not_paused),
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
@@ -96,8 +98,12 @@ impl Plugin for InputsPlugin {
                     player_move_inputs.run_if(is_not_paused),
                     turn_player.run_if(is_not_paused),
                     mouse_click_system.run_if(is_not_paused).after(CustomFlush),
-                    dispatch_active_skill_events.run_if(is_not_paused),
-                    handle_hotbar_consume_keys.run_if(is_not_paused),
+                    dispatch_active_skill_events
+                        .run_if(is_not_paused)
+                        .after(handle_hotbar_consume_keys),
+                    handle_hotbar_consume_keys
+                        .run_if(is_not_paused)
+                        .before(dispatch_active_skill_events),
                     tick_dash_timer.run_if(is_not_paused),
                     manage_ability_phasing.run_if(is_not_paused),
                     handle_open_essence_ui,
@@ -783,16 +789,40 @@ pub fn toggle_inventory(
 /// Slots 4-5 are still part of the hotbar container for passive storage but have no binding.
 pub fn handle_hotbar_consume_keys(
     key_input: Res<Input<KeyCode>>,
-    mouse_input: Res<Input<MouseButton>>,
+    mut mouse_input: ResMut<Input<MouseButton>>,
     keybinds: Res<InputMappings>,
     mut game: GameParam,
     proto_param: ProtoParam,
     mut commands: Commands,
     inv: Query<&Inventory>,
     mut item_action_param: ItemActionParam,
+    cursor_pos: Res<CursorPos>,
+    ui_state: Res<State<UIState>>,
+    resolution: Res<ScreenResolution>,
 ) {
+    // Left-clicking a HUD hotbar slot (while the inventory is closed) triggers the same
+    // consume action as pressing that slot's bound key.
+    let mut clicked_slot: Option<usize> = None;
+    if ui_state.0 == UIState::Closed && mouse_input.just_pressed(MouseButton::Left) {
+        let cursor = cursor_pos.ui_coords.truncate();
+        let slot_y = -resolution.game_height * 0.5 + crate::ui::HUD_ACTION_ROW_Y_FROM_BOTTOM;
+        let half = crate::ui::UI_SLOT_SIZE * 0.5;
+        for slot in 0..HOTBAR_CONSUME_SLOT_COUNT {
+            let slot_x = crate::ui::hud_hotbar_slot_center_x(slot);
+            if (cursor.x - slot_x).abs() <= half.x && (cursor.y - slot_y).abs() <= half.y {
+                clicked_slot = Some(slot);
+                break;
+            }
+        }
+        if clicked_slot.is_some() {
+            // Prevent this click from also triggering a player attack.
+            mouse_input.clear_just_pressed(MouseButton::Left);
+        }
+    }
+
     for slot in 0..HOTBAR_CONSUME_SLOT_COUNT {
-        if !keybinds.check_hotbar_input(slot, &key_input, &mouse_input) {
+        let triggered_by_click = clicked_slot == Some(slot);
+        if !triggered_by_click && !keybinds.check_hotbar_input(slot, &key_input, &mouse_input) {
             continue;
         }
         let held_item_option = inv.single().items.items[slot].clone();
