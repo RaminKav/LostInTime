@@ -1,11 +1,13 @@
 use std::{collections::HashSet, f32::consts::TAU};
 
 use bevy::prelude::*;
+use bevy_aseprite::{anim::AsepriteAnimation, aseprite, AsepriteBundle};
 use bevy_proto::prelude::ProtoCommands;
 use bevy_rapier2d::prelude::{Collider, RapierContext, RigidBody, Sensor};
 use rand::{seq::SliceRandom, Rng};
 
 use crate::{
+    animations::DoneAnimation,
     assets::Graphics,
     attributes::{
         modifiers::ModifyManaEvent, Attack, CurrentHealth, CurrentMana, ManaRegen, MaxHealth,
@@ -13,13 +15,16 @@ use crate::{
     },
     audio::{AudioSoundEffect, SoundSpawner},
     combat::{
+        combat_helpers::DespawnTimer,
         status_effects::{Burning, MobStatusEffects, StatusEffect, StatusEffectEvent},
         EnemyDeathEvent, HitEvent, ObjBreakEvent,
     },
     custom_commands::CommandsExt,
     enemy::{EliteMob, Mob},
     item::{
-        projectile::{AnimVisualCategory, Projectile, RangedAttackEvent},
+        projectile::{
+            AnimVisualCategory, HomingEnergyBall, Projectile, ProjectileState, RangedAttackEvent,
+        },
         ItemDrop, WorldObject,
     },
     player::{
@@ -2261,5 +2266,250 @@ pub fn handle_mana_regen_lightning(
                 trigger_counts.increment(Heirloom::ManaRegenLightning);
             }
         }
+    }
+}
+
+// ============================================================================
+// EnergyBallBarrage (Voltaic Core) - homing energy balls every 150 damage dealt
+// ============================================================================
+
+aseprite!(pub EnergyBallEffect, "textures/effects/EnergyBall.ase");
+
+pub const ENERGY_BALL_DAMAGE_THRESHOLD: i32 = 150;
+pub const ENERGY_BALL_INITIAL_SPEED: f32 = 90.0;
+pub const ENERGY_BALL_LOCK_DELAY: f32 = 0.55;
+
+const ENERGY_BALL_TARGET_RANGE: f32 = 420.0;
+const ENERGY_BALL_MAX_SPEED: f32 = 520.0;
+const ENERGY_BALL_ACCEL: f32 = 380.0;
+const ENERGY_BALL_SWERVE_STRENGTH: f32 = 0.9;
+const ENERGY_BALL_SWERVE_FREQ: f32 = 9.5;
+const ENERGY_BALL_ARC_BLEND: f32 = 1.35;
+const ENERGY_BALL_MUZZLE_DURATION: f32 = 0.35;
+/// Distance from the player to spawn the muzzle flash, in the direction of fire.
+const ENERGY_BALL_MUZZLE_OFFSET: f32 = 18.0;
+
+/// Accumulates non-energy-ball player damage toward the next homing shot.
+#[derive(Component, Default)]
+#[component(storage = "SparseSet")]
+pub struct EnergyBallBarrageTracker {
+    pub accumulated: i32,
+}
+
+fn is_energy_ball_damage_hit(hit: &HitEvent) -> bool {
+    hit.hit_with_projectile.as_ref() == Some(&Projectile::EnergyBall)
+        || hit.from_heirloom_effect == Some(Heirloom::EnergyBallBarrage)
+}
+
+/// Spawns the muzzle flash at the player's position. Purely visual — no
+/// collider, no damage — so we spawn it as a bare `AsepriteBundle` +
+/// `DespawnTimer`, the same pattern as other one-shot visual effects.
+fn spawn_energy_ball_muzzle(
+    commands: &mut Commands,
+    asset_server: &AssetServer,
+    player_pos: Vec3,
+    direction: Vec2,
+) {
+    // Nudge the muzzle along the projectile's heading so it doesn't overlap
+    // the player sprite, then rotate it to face that direction.
+    let offset = direction.normalize_or_zero() * ENERGY_BALL_MUZZLE_OFFSET;
+    let angle = direction.y.atan2(direction.x);
+    commands.spawn((
+        AsepriteBundle {
+            aseprite: asset_server.load(EnergyBallEffect::PATH),
+            animation: AsepriteAnimation::from(EnergyBallEffect::tags::MUZZLE),
+            transform: Transform::from_translation(player_pos + offset.extend(0.))
+                .with_rotation(Quat::from_rotation_z(angle)),
+            ..default()
+        },
+        AnimVisualCategory::Heirloom,
+        DespawnTimer(Timer::from_seconds(
+            ENERGY_BALL_MUZZLE_DURATION,
+            TimerMode::Once,
+        )),
+        DoneAnimation,
+        Name::new("EnergyBallMuzzle"),
+    ));
+}
+
+/// Every 150 damage dealt (any source except energy balls) fires a homing
+/// energy ball.  The ball itself is spawned through the standard
+/// `RangedAttackEvent` → proto pipeline so it gets proper physics, collision,
+/// and the aseprite swap that happens in `spawn_projectile_from_proto`.
+pub fn handle_energy_ball_barrage(
+    mut hit_events: EventReader<HitEvent>,
+    in_i_frame: Query<&crate::combat::InvincibilityTimer>,
+    mut player_query: Query<
+        (
+            &PlayerSkills,
+            &GlobalTransform,
+            &Attack,
+            &mut EnergyBallBarrageTracker,
+        ),
+        With<Player>,
+    >,
+    mobs: Query<Entity, With<Mob>>,
+    mut ranged_attack_events: EventWriter<RangedAttackEvent>,
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    mut trigger_counts: ResMut<HeirloomTriggerCounts>,
+) {
+    let Ok((skills, player_transform, attack, mut tracker)) = player_query.get_single_mut() else {
+        return;
+    };
+    if skills.get_count(Heirloom::EnergyBallBarrage) <= 0 {
+        return;
+    }
+
+    let player_pos = player_transform.translation();
+    let stacks = skills.get_count(Heirloom::EnergyBallBarrage);
+    let mut rng = rand::thread_rng();
+    let mut fired = 0u32;
+
+    for hit in hit_events.iter() {
+        if hit.hit_by_mob.is_some() {
+            continue;
+        }
+        if is_energy_ball_damage_hit(hit) {
+            continue;
+        }
+        if mobs.get(hit.hit_entity).is_err() {
+            continue;
+        }
+        if in_i_frame.get(hit.hit_entity).is_ok() {
+            continue;
+        }
+
+        let dmg = if hit.damage <= 0 { 1 } else { hit.damage };
+        tracker.accumulated += dmg;
+
+        while tracker.accumulated >= ENERGY_BALL_DAMAGE_THRESHOLD {
+            tracker.accumulated -= ENERGY_BALL_DAMAGE_THRESHOLD;
+
+            for _ in 0..stacks {
+                // Random initial heading — the homing component steers it toward
+                // the nearest enemy once the lock-on delay elapses.
+                let initial_dir = Vec2::from_angle(rng.gen_range(0.0..TAU));
+
+                // Muzzle flash: purely visual, spawned directly (no physics needed).
+                spawn_energy_ball_muzzle(
+                    &mut commands,
+                    &asset_server,
+                    player_pos + Vec3::new(0., 0., 0.15),
+                    initial_dir,
+                );
+
+                // Actual projectile through the standard pipeline.
+                ranged_attack_events.send(RangedAttackEvent {
+                    projectile: Projectile::EnergyBall,
+                    direction: initial_dir,
+                    mana_cost: None,
+                    from_enemy: false,
+                    from_entity: None,
+                    is_followup_proj: true,
+                    dmg_override: Some(attack.0),
+                    pos_override: Some(player_pos.truncate()),
+                    spawn_delay: 0.0,
+                });
+
+                fired += 1;
+            }
+
+            commands.spawn(SoundSpawner::new(
+                AudioSoundEffect::LightningStaffCast,
+                0.15,
+            ));
+        }
+    }
+
+    if fired > 0 {
+        for _ in 0..fired {
+            trigger_counts.increment(Heirloom::EnergyBallBarrage);
+        }
+    }
+}
+
+/// Steers every `HomingEnergyBall` entity each frame: arcs outward, then
+/// curves toward the nearest enemy with a swerving path.  Translation is
+/// updated directly here; `handle_translate_projectiles` is excluded via
+/// `Without<HomingEnergyBall>` so the two systems don't fight.
+pub fn update_homing_energy_balls(
+    time: Res<Time>,
+    mut balls: Query<(&mut Transform, &mut HomingEnergyBall, &mut ProjectileState)>,
+    mobs: Query<(Entity, &GlobalTransform, &CurrentHealth), With<Mob>>,
+) {
+    for (mut transform, mut ball, mut proj_state) in balls.iter_mut() {
+        let dt = time.delta_seconds();
+
+        ball.lock_elapsed = (ball.lock_elapsed + dt).min(ball.lock_duration);
+        let lock_t = (ball.lock_elapsed / ball.lock_duration.max(0.001)).clamp(0., 1.);
+
+        let pos = transform.translation.truncate();
+
+        // Re-acquire target if we don't have one (or it died).
+        let target_valid = ball.target.map_or(false, |e| {
+            mobs.get(e).map(|(_, _, h)| h.0 > 0).unwrap_or(false)
+        });
+        if !target_valid {
+            ball.target = None;
+            let mut best_dist_sq = ENERGY_BALL_TARGET_RANGE * ENERGY_BALL_TARGET_RANGE;
+            for (mob_e, mob_txfm, health) in mobs.iter() {
+                if health.0 <= 0 {
+                    continue;
+                }
+                let d = mob_txfm.translation().truncate().distance_squared(pos);
+                if d < best_dist_sq {
+                    best_dist_sq = d;
+                    ball.target = Some(mob_e);
+                }
+            }
+        }
+
+        // Desired direction: straight ahead until lock-on delay passes, then home.
+        let desired_dir = if let Some(target_e) = ball.target {
+            if let Ok((_, target_txfm, _)) = mobs.get(target_e) {
+                let to_target = target_txfm.translation().truncate() - pos;
+                if to_target.length_squared() > 1.0 {
+                    to_target.normalize()
+                } else {
+                    ball.initial_direction
+                }
+            } else {
+                ball.initial_direction
+            }
+        } else {
+            ball.initial_direction
+        };
+
+        // Blend from initial direction → homing direction as lock-on completes.
+        let blended = ball
+            .initial_direction
+            .lerp(
+                desired_dir,
+                (lock_t * lock_t * ENERGY_BALL_ARC_BLEND).min(1.0),
+            )
+            .normalize_or_zero();
+
+        // Add perpendicular swerve for the classic missile feel.
+        ball.swerve_phase += ENERGY_BALL_SWERVE_FREQ * dt;
+        let perp = Vec2::new(-blended.y, blended.x);
+        // Swerve is stronger before lock-on (arcing phase), gentler after.
+        let swerve_mag = ENERGY_BALL_SWERVE_STRENGTH * (1.0 + (1.0 - lock_t) * 0.6);
+        let steering = (blended + perp * ball.swerve_phase.sin() * swerve_mag).normalize_or_zero();
+
+        // Accelerate up to max speed.
+        ball.speed = (ball.speed + ENERGY_BALL_ACCEL * dt).min(ENERGY_BALL_MAX_SPEED);
+
+        let velocity = steering * ball.speed;
+        transform.translation += velocity.extend(0.0) * dt;
+
+        // Rotate sprite to face the direction of travel.
+        if velocity.length_squared() > 0.01 {
+            transform.rotation = Quat::from_rotation_z(velocity.y.atan2(velocity.x));
+        }
+
+        // Keep ProjectileState direction in sync so collision knockback is
+        // calculated in the right direction.
+        proj_state.direction = velocity.normalize_or_zero();
     }
 }

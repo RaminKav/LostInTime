@@ -1058,6 +1058,8 @@ pub enum Heirloom {
     DamageDealtMp,
     /// Additive multiplier to base Mana Orb drop chance (1 + stacks: 2x, 3x, ...).
     ManaOrbDropMult,
+    /// Every 150 player damage dealt fires a homing energy ball (not from energy balls).
+    EnergyBallBarrage,
 }
 
 pub enum HeirloomTrait {
@@ -1193,6 +1195,7 @@ impl Heirloom {
             Heirloom::ChaosStats => "Chaotic Candle".to_string(),
             Heirloom::ManaOrbs => "Mana Dust".to_string(),
             Heirloom::ManaOrbAttack => "Wizard Hat".to_string(),
+            Heirloom::EnergyBallBarrage => "Underworld's Hat".to_string(),
             Heirloom::ItemPickupRadius => "Magnet".to_string(),
             Heirloom::GravityScales => "Gravity Scales".to_string(),
             Heirloom::MagnetPull => "Gravitation Tome".to_string(),
@@ -1655,6 +1658,12 @@ impl Heirloom {
                 "permanently gives".to_string(),
                 "+1.5% damage.".to_string(),
             ],
+            Heirloom::EnergyBallBarrage => vec![
+                "Every 150 damage you".to_string(),
+                "deal fires a homing".to_string(),
+                "fire ball at a".to_string(),
+                "nearby enemy.".to_string(),
+            ],
             Heirloom::TomeDoubleUpgrade => vec![
                 "Upgrade Tomes".to_string(),
                 "level up gear".to_string(),
@@ -1914,6 +1923,13 @@ impl Heirloom {
                     commands
                         .entity(entity)
                         .insert(crate::player::combat_heirlooms::ManaRegenPoisonTracker::default());
+                }
+            }
+            Heirloom::EnergyBallBarrage => {
+                if skills.get_count(Heirloom::EnergyBallBarrage) == 1 {
+                    commands.entity(entity).insert(
+                        crate::player::combat_heirlooms::EnergyBallBarrageTracker::default(),
+                    );
                 }
             }
 
@@ -2236,6 +2252,7 @@ impl HeirloomChoiceQueue {
             HeirloomChoiceState::new(Heirloom::DeathDefiance, HeirloomRarity::Legendary),
             HeirloomChoiceState::new(Heirloom::LifestealCoins, HeirloomRarity::Legendary),
             HeirloomChoiceState::new(Heirloom::CrateBreakDamage, HeirloomRarity::Legendary),
+            HeirloomChoiceState::new(Heirloom::EnergyBallBarrage, HeirloomRarity::Legendary),
         ]
     }
 

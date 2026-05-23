@@ -13,7 +13,7 @@ use crate::ecs_helpers::safe_set_parent;
 use crate::container::ContainerRegistry;
 use crate::enemy::Mob;
 
-use crate::inventory::{ItemStack, SuppressNonMobBreakDrops};
+use crate::inventory::{BreakDropFilter, ItemStack};
 use crate::item::ammo::AmmoMemory;
 use crate::juice::{spawn_obj_death_particles, spawn_xp_particles};
 use crate::player::levels::ExperienceReward;
@@ -1444,7 +1444,7 @@ impl Plugin for ItemsPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(WorldObjectResource::new())
             .init_resource::<BossSummonTracker>()
-            .init_resource::<SuppressNonMobBreakDrops>()
+            .init_resource::<BreakDropFilter>()
             .insert_resource(AmmoMemory::default())
             .add_event::<PlaceItemEvent>()
             .add_event::<UpdateObjectEvent>()
@@ -1718,14 +1718,14 @@ pub fn handle_break_object(
     >,
     mut chaos_tracker: ResMut<ChaosTracker>,
     mut flash_event: EventWriter<FlashExpBarEvent>,
-    suppress_non_mob_drops: Res<SuppressNonMobBreakDrops>,
+    break_drop_filter: Res<BreakDropFilter>,
     mobs: Query<&Mob>,
 ) {
     for broken in obj_break_events.iter() {
         let mut rng = rand::thread_rng();
         let world_pos = tile_pos_to_world_pos(broken.pos, false);
         let is_mob = mobs.get(broken.entity).is_ok();
-        let block_non_mob_drops = suppress_non_mob_drops.0 && !is_mob;
+        let filter_non_mob_drops = !is_mob && !break_drop_filter.0.is_empty();
         // Chest
 
         // Water Placeable Objs
@@ -1771,13 +1771,20 @@ pub fn handle_break_object(
         if !broken.give_drops_and_xp {
             continue;
         }
-        // Item Drops (skipped for non-mobs when [`SuppressNonMobBreakDrops`] is enabled)
-        if !block_non_mob_drops || broken.obj.override_material_drop_toggle() {
-            if let Ok(loot_table) = loot_tables.get(broken.entity) {
-                for drop in
-                    LootTablePlugin::get_drops(loot_table, &proto_param, 0, None, false, false)
+        // Item drops: per-item filter for non-mobs; crate-like objects bypass the filter.
+        if let Ok(loot_table) = loot_tables.get(broken.entity) {
+            let bypass_filter =
+                is_mob || broken.obj.override_material_drop_toggle();
+            for drop in
+                LootTablePlugin::get_drops(loot_table, &proto_param, 0, None, false, false)
+            {
+                if filter_non_mob_drops
+                    && !bypass_filter
+                    && break_drop_filter.is_blocked(drop.obj_type)
                 {
-                    let pos = if broken.obj.is_medium_size(&proto_param) {
+                    continue;
+                }
+                let pos = if broken.obj.is_medium_size(&proto_param) {
                         tile_pos_to_world_pos(
                             TileMapPosition::new(broken.pos.chunk_pos, broken.pos.tile_pos),
                             true,
@@ -1792,14 +1799,13 @@ pub fn handle_break_object(
                         pos.y + rng.gen_range(-drop_spread..drop_spread),
                         0.,
                     );
-                    proto_commands.spawn_item_from_proto(
-                        drop.obj_type,
-                        &proto_param,
-                        pos.truncate(),
-                        drop.count,
-                        Some(game.get_player_level()),
-                    );
-                }
+                proto_commands.spawn_item_from_proto(
+                    drop.obj_type,
+                    &proto_param,
+                    pos.truncate(),
+                    drop.count,
+                    Some(game.get_player_level()),
+                );
             }
         }
 

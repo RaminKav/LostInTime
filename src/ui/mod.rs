@@ -190,6 +190,18 @@ pub const INV_SORT_BUTTON_OFFSET_Y: f32 = INV_TRASH_OFFSET_Y - UI_SLOT_SIZE.y - 
 pub const INV_MATERIAL_DROPS_TOGGLE_OFFSET_X: f32 = INV_SORT_BUTTON_OFFSET_X;
 pub const INV_MATERIAL_DROPS_TOGGLE_OFFSET_Y: f32 = INV_SORT_BUTTON_OFFSET_Y - UI_SLOT_SIZE.y - 6.0;
 
+/// Drop-filter side panel (right of inventory panel).
+pub const INV_DROP_FILTER_PANEL_GAP: f32 = 6.0;
+pub const INV_DROP_FILTER_PANEL_PADDING: f32 = 6.0;
+pub const INV_DROP_FILTER_PANEL_COLS: usize = 8;
+pub const INV_DROP_FILTER_ICON_SIZE: f32 = 16.0;
+pub const INV_DROP_FILTER_ICON_GAP: f32 = 2.0;
+pub const INV_DROP_FILTER_TITLE_ROW_HEIGHT: f32 = 14.0;
+pub const INV_DROP_FILTER_BUTTON_ROW_HEIGHT: f32 = 14.0;
+pub const INV_DROP_FILTER_BUTTON_SPACING: f32 = 36.0;
+/// Drop-filter panel Z; sits above inventory chrome (panel Z = 10) and slot icons (Z ≈ 12-14).
+pub const INV_DROP_FILTER_PANEL_Z: f32 = 30.0;
+
 /// Crafting grid inside crafting/furnace-style panels (8 columns).
 pub const INV_CRAFTING_COLS: usize = 8;
 pub const INV_CRAFTING_ROW_GAP: f32 = 1.0;
@@ -436,6 +448,7 @@ impl Plugin for UIPlugin {
             .insert_resource(InventoryState::default())
             .init_resource::<SelectedCraftingRecipe>()
             .init_resource::<crate::ui::inventory_ui::BlueprintsPagination>()
+            .init_resource::<crate::inventory::MaterialDropFilterMenuOpen>()
             .insert_resource(ClassSelectionState::default())
             .init_resource::<ClassUnlockHoverState>()
             .init_resource::<ClassUnlockConfirmState>()
@@ -655,6 +668,7 @@ impl Plugin for UIPlugin {
                         .after(handle_interaction_clicks)
                         .after(handle_sort_inventory_button_click)
                         .after(handle_material_drops_toggle_button_click)
+                        .after(handle_material_drop_filter_menu_click)
                         .run_if(in_state(GameState::Main)),
                     handle_spawn_inv_item_tooltip,
                     update_inventory_ui.after(CustomFlush),
@@ -1127,6 +1141,15 @@ impl Plugin for UIPlugin {
                     )
                     .in_set(OnUpdate(GameState::Main)),
             )
+            .add_system(
+                handle_material_drop_filter_menu_click
+                    .run_if(
+                        in_state(UIState::Inventory)
+                            .or_else(in_state(UIState::InventoryCrafting))
+                            .or_else(in_state(UIState::Crafting)),
+                    )
+                    .in_set(OnUpdate(GameState::Main)),
+            )
             .add_system(handle_hovering.run_if(ui_hover_interactions_condition))
             .add_system(handle_cursor_main_menu_buttons)
             .add_system(update_achievements_notification_icon.run_if(in_state(GameState::MainMenu)));
@@ -1213,6 +1236,7 @@ pub fn handle_new_ui_state(
     mut hotbar_slots: Query<(&mut Visibility, &mut InventorySlotState), Without<Interactable>>,
     tip_boxes: Query<Entity, With<tips::TipBox>>,
     minimap_open: Res<minimap::IslandMapOpen>,
+    mut drop_filter_menu_open: ResMut<crate::inventory::MaterialDropFilterMenuOpen>,
 ) {
     if next_ui_state.0.is_none() {
         return;
@@ -1231,6 +1255,17 @@ pub fn handle_new_ui_state(
     if next_ui == curr_ui_state.0 {
         next_ui_state.set(UIState::Closed);
         should_close_self = true;
+    }
+
+    // Close the drop-filter side menu whenever the player leaves the standard Inventory state
+    // (closes UI, swaps to crafting/blueprints, opens chest/scrapper/furnace, etc). The panel
+    // entity itself is despawned by the loop below; this just resets the resource so the next
+    // time setup_inv_ui spawns the panel it starts off-screen and the filter button reflects
+    // the closed state.
+    let leaving_inventory = should_close_self
+        || (curr_ui_state.0 == UIState::Inventory && next_ui != UIState::Inventory);
+    if leaving_inventory && drop_filter_menu_open.0 {
+        drop_filter_menu_open.0 = false;
     }
     for (e, ui) in old_ui.iter() {
         if *ui != next_ui || should_close_self {

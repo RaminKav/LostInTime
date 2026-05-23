@@ -1952,6 +1952,11 @@
             size: (16., 16.),
             anchor: None,
         ),
+        EnergyBallBarrage: WorldObjectData(
+            texture_pos: (12., 23.),
+            size: (16., 16.),
+            anchor: None,
+        ),
         SkillChargeIncrease: WorldObjectData(
             texture_pos: (15., 20.),
             size: (16., 16.),

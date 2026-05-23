@@ -3,9 +3,9 @@ use std::cmp::min;
 
 use crate::{
     animations::{AnimationPosTracker, AnimationTimer},
-    ecs_helpers::SafeHierarchyExt,
     attributes::{add_item_glows, AttributeModifier, ItemAttributes, ItemRarity},
     container::{main_inv_bag_slot_indices_top_to_bottom, Container},
+    ecs_helpers::SafeHierarchyExt,
     inputs::FacingDirection,
     item::{
         item_actions::{proto_item_allows_hotbar_band, ItemActions},
@@ -615,24 +615,61 @@ impl ItemStack {
 #[derive(Component, Default, Clone, Debug)]
 pub struct SortInventoryButton;
 
-/// Toggles whether breakable world entities without [`crate::enemy::Mob`] spawn loot (chest
-/// contents and loot-table item drops). XP from [`crate::player::levels::ExperienceReward`]
-/// is unchanged. Read in `item::handle_break_object`; toggled from the inventory UI.
-#[derive(Resource, Default, Clone, Copy, Debug)]
-pub struct SuppressNonMobBreakDrops(pub bool);
+/// Per-item block list for non-mob break loot (materials + consumables). Read in
+/// `item::handle_break_object`; edited from the inventory drop-filter side panel.
+#[derive(Resource, Default, Clone, Debug)]
+pub struct BreakDropFilter(pub std::collections::HashSet<WorldObject>);
 
-/// Marker for the material-drops toggle slot under the sort button (`handle_material_drops_toggle_button_click`).
+impl BreakDropFilter {
+    pub fn is_blocked(&self, obj: WorldObject) -> bool {
+        self.0.contains(&obj)
+    }
+
+    pub fn set_blocked(&mut self, obj: WorldObject, blocked: bool) {
+        if blocked {
+            self.0.insert(obj);
+        } else {
+            self.0.remove(&obj);
+        }
+    }
+}
+
+/// Whether the drop-filter side panel (right of inventory) is visible.
+#[derive(Resource, Default, Clone, Copy, Debug)]
+pub struct MaterialDropFilterMenuOpen(pub bool);
+
+/// Marker for the filter button under SORT — opens/closes [`MaterialDropFilterMenuOpen`].
 #[derive(Component, Clone, Debug)]
 pub struct MaterialDropsToggleButton;
 
-/// Red "X" overlay child; visible when [`SuppressNonMobBreakDrops`] is true.
+/// Root panel entity for the drop-filter menu (right of inventory).
+/// Stores its on-screen "open" position so the toggle handler can move the panel off-screen
+/// when closed (cheaper than re-spawning, and avoids the hidden hitboxes blocking clicks).
 #[derive(Component, Clone, Debug)]
-pub struct MaterialDropsToggleXOverlay;
+pub struct MaterialDropFilterPanel {
+    pub open_translation: Vec3,
+}
+
+/// One filterable item icon row in the side panel.
+#[derive(Component, Clone, Debug)]
+pub struct MaterialDropFilterEntry {
+    pub obj: WorldObject,
+}
+
+/// Red "X" overlay on a [`MaterialDropFilterEntry`] when that item is blocked.
+#[derive(Component, Clone, Debug)]
+pub struct MaterialDropFilterEntryX;
+
+#[derive(Component, Clone, Debug)]
+pub struct MaterialDropFilterAllButton;
+
+#[derive(Component, Clone, Debug)]
+pub struct MaterialDropFilterNoneButton;
 
 /// Sort priority bucket for the inventory-sort button. Lower values sort first.
 /// Sub-field ordering is alphabetical on the item's display name.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-enum SortBucket {
+pub enum SortBucket {
     Weapon,
     Chestplate,
     Pants,
@@ -654,7 +691,7 @@ fn item_actions_are_consumable(actions: &ItemActions) -> bool {
     actions.actions.iter().len() > 0
 }
 
-fn sort_bucket_for_item(stack: &ItemStack, proto: &ProtoParam) -> SortBucket {
+pub fn sort_bucket_for_item(stack: &ItemStack, proto: &ProtoParam) -> SortBucket {
     let obj = stack.obj_type;
     let equip_type = proto.get_component::<EquipmentType, _>(obj).cloned();
     match equip_type {
@@ -680,6 +717,32 @@ fn sort_bucket_for_item(stack: &ItemStack, proto: &ProtoParam) -> SortBucket {
     }
     SortBucket::Material
 }
+
+/// Items shown in the inventory drop-filter panel (fixed list).
+/// Only includes items that actually drop as loot (inventory-able variants),
+/// not the world-object plant/block that breaks.
+pub const BREAK_DROP_FILTER_ITEMS: &[WorldObject] = &[
+    WorldObject::Stick,
+    WorldObject::PlantFibre,
+    WorldObject::Log,
+    WorldObject::Apple,
+    WorldObject::PebbleBlock,
+    WorldObject::YellowFlowerBlock,
+    WorldObject::RedFlowerBlock,
+    WorldObject::PinkFlowerBlock,
+    WorldObject::SnowFlowerBlock,
+    WorldObject::SnowFlower2Block,
+    WorldObject::RedMushroomBlock,
+    WorldObject::BrownMushroomBlock,
+    WorldObject::Era2BrownMushroomBlock,
+    WorldObject::Era2RedMushroomBlock,
+    WorldObject::BlueMushroom,
+    WorldObject::Berries,
+    WorldObject::YellowBerries,
+    WorldObject::CactusBerry,
+    WorldObject::CactusFlower,
+    WorldObject::Bones,
+];
 
 /// Alphabetical sub-key for items within the same [`SortBucket`]. Uses the display name when
 /// present, falling back to the `WorldObject` debug name so sorts are stable across saves even

@@ -85,6 +85,7 @@ pub enum DamageSource {
     StoneTooth,
     SummonRing,
     ReaperSoul,
+    EnergyBall,
 }
 
 impl DamageSource {
@@ -132,7 +133,8 @@ impl DamageSource {
             | DamageSource::SummonRing
             | DamageSource::StoneTooth
             | DamageSource::Arc
-            | DamageSource::ReaperSoul => DamageSourceCategory::Heirloom,
+            | DamageSource::ReaperSoul
+            | DamageSource::EnergyBall => DamageSourceCategory::Heirloom,
         }
     }
 
@@ -178,6 +180,7 @@ impl DamageSource {
             DamageSource::SummonRing => "Piercing Ring",
             DamageSource::StoneTooth => "Stone Tooth",
             DamageSource::ReaperSoul => "Reaper Soul",
+            DamageSource::EnergyBall => "Underworld's Hat",
         }
     }
 
@@ -205,6 +208,7 @@ impl DamageSource {
             Heirloom::SummonRing => Some(DamageSource::SummonRing),
             Heirloom::StoneTooth => Some(DamageSource::StoneTooth),
             Heirloom::Reaper => Some(DamageSource::ReaperSoul),
+            Heirloom::EnergyBallBarrage => Some(DamageSource::EnergyBall),
             _ => None,
         }
     }
@@ -261,6 +265,7 @@ impl DamageSource {
             Projectile::ThornsProjectile => Some(DamageSource::Thorns),
             Projectile::Lightning => Some(DamageSource::Lightning),
             Projectile::ManaOrbProjectile => Some(DamageSource::ManaOrb),
+            Projectile::EnergyBall => Some(DamageSource::EnergyBall),
 
             _ => None,
         }

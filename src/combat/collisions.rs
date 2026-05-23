@@ -366,6 +366,7 @@ fn check_projectile_hit_mob_collisions(
             let heirloom_source = match proj {
                 Projectile::IceExplosionAOE => Some(Heirloom::FrozenAoE),
                 Projectile::Echo => Some(Heirloom::OnHitEcho),
+                Projectile::EnergyBall => Some(Heirloom::EnergyBallBarrage),
                 _ => None,
             };
 
@@ -404,7 +405,9 @@ fn check_projectile_hit_mob_collisions(
                     || proj.clone() == Projectile::FireRing
                 {
                     commands.spawn(SoundSpawner::new(AudioSoundEffect::IceStaffHit, 0.2));
-                } else if proj.clone() == Projectile::Electricity {
+                } else if proj.clone() == Projectile::Electricity
+                    || proj.clone() == Projectile::EnergyBall
+                {
                     commands.spawn(SoundSpawner::new(AudioSoundEffect::LightningStaffHit, 0.2));
                 } else {
                     commands.spawn(SoundSpawner::new(AudioSoundEffect::DefaultEnemyHit, 0.2));

@@ -11,13 +11,13 @@ use bevy_rapier2d::{
 use combat_heirlooms::{
     break_crates_with_roll, handle_ant_farm_state, handle_boss_hit_mana_orb_drops,
     handle_crate_break_damage, handle_death_defiance_freeze, handle_dodge_crit_activation,
-    handle_dodge_crit_next_hit_reset, handle_mana_charge_damage, handle_mana_charge_damage_reset,
-    handle_mana_orb_attack, handle_mana_orb_drops, handle_mana_regen_lightning,
-    handle_mana_regen_poison, handle_max_hp_hunt, handle_reaper_soul_spawns,
-    handle_skill_mana_regen, handle_skill_power_hunt, handle_summon_ring_state,
-    handle_trigger_summons_on_heal, tick_dodge_crit_buff, tick_stand_still_state,
-    update_ant_farm_ants, update_reaper_souls, update_stone_tooth, update_summon_ring,
-    TriggerSummonsEvent,
+    handle_dodge_crit_next_hit_reset, handle_energy_ball_barrage, handle_mana_charge_damage,
+    handle_mana_charge_damage_reset, handle_mana_orb_attack, handle_mana_orb_drops,
+    handle_mana_regen_lightning, handle_mana_regen_poison, handle_max_hp_hunt,
+    handle_reaper_soul_spawns, handle_skill_mana_regen, handle_skill_power_hunt,
+    handle_summon_ring_state, handle_trigger_summons_on_heal, tick_dodge_crit_buff,
+    tick_stand_still_state, update_ant_farm_ants, update_homing_energy_balls, update_reaper_souls,
+    update_stone_tooth, update_summon_ring, TriggerSummonsEvent,
 };
 use melee_skills::{
     handle_delayed_heirloom_casts, handle_echo_after_heal, handle_parry, handle_parry_success,
@@ -239,6 +239,15 @@ impl Plugin for PlayerPlugin {
                     handle_skill_power_hunt.run_if(is_not_paused),
                     skill_heirlooms::track_enemy_hit_projectiles.run_if(is_not_paused),
                     skill_heirlooms::track_dagger_throw_kills.run_if(is_not_paused),
+                )
+                    .in_set(OnUpdate(GameState::Main)),
+            )
+            .add_systems(
+                (
+                    handle_energy_ball_barrage
+                        .run_if(is_not_paused)
+                        .after(crate::handle_hits),
+                    update_homing_energy_balls.run_if(is_not_paused),
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )

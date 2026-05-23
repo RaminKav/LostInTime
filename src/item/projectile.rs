@@ -104,6 +104,10 @@ pub enum Projectile {
     PossessedBlade,
     ArrowVolleyShot,
     ScorpionProjectile,
+    /// Voltaic Core heirloom homing shot (bullet animation).
+    EnergyBall,
+    /// Voltaic Core muzzle flash (stationary, no damage).
+    EnergyBallMuzzle,
 }
 
 impl Projectile {
@@ -173,7 +177,9 @@ impl Projectile {
             | Projectile::Arc
             | Projectile::Echo
             | Projectile::IceExplosionAOE
-            | Projectile::IceFloor => AnimVisualCategory::Heirloom,
+            | Projectile::IceFloor
+            | Projectile::EnergyBall
+            | Projectile::EnergyBallMuzzle => AnimVisualCategory::Heirloom,
 
             Projectile::FireRing
             | Projectile::IceWall
@@ -319,6 +325,23 @@ fn goliath_spawn_scale_multiplier(
 #[component(storage = "SparseSet")]
 pub struct BombTarget {
     pub target_pos: Vec2,
+}
+
+/// Inserted on every spawned `Projectile::EnergyBall` entity.
+/// `update_homing_energy_balls` reads this to steer the projectile each frame.
+/// Stored `SparseSet` because it's only ever on a small number of transient
+/// projectile entities.
+#[derive(Component)]
+#[component(storage = "SparseSet")]
+pub struct HomingEnergyBall {
+    pub target: Option<Entity>,
+    /// Direction the ball was originally fired in (used for the arc-in phase).
+    pub initial_direction: Vec2,
+    pub speed: f32,
+    pub swerve_phase: f32,
+    /// Counts up to `lock_duration`; once elapsed the ball fully locks on.
+    pub lock_elapsed: f32,
+    pub lock_duration: f32,
 }
 
 fn handle_ranged_attack_event(
@@ -485,7 +508,10 @@ fn handle_ranged_attack_event(
     }
 }
 fn handle_translate_projectiles(
-    mut query: Query<(&mut Transform, &ProjectileState), With<Projectile>>,
+    mut query: Query<
+        (&mut Transform, &ProjectileState),
+        (With<Projectile>, Without<HomingEnergyBall>),
+    >,
     speed_modifiers: Query<&ArrowSpeedUpgrade>,
     time: Res<Time>,
 ) {
@@ -563,6 +589,20 @@ fn handle_spawn_projectiles_after_delay(
                     || proj.proj == Projectile::PlasmaBall
                 {
                     commands.spawn(SoundSpawner::new(AudioSoundEffect::LightningStaffCast, 0.2));
+                }
+
+                // Homing setup for EnergyBall: attach behaviour component so
+                // update_homing_energy_balls can steer it every frame.
+                if proj.proj == Projectile::EnergyBall && !proj.from_enemy {
+                    let mut rng = rand::thread_rng();
+                    commands.entity(p).insert(HomingEnergyBall {
+                        target: None,
+                        initial_direction: proj.direction,
+                        speed: crate::player::combat_heirlooms::ENERGY_BALL_INITIAL_SPEED,
+                        swerve_phase: rng.gen_range(0.0..std::f32::consts::TAU),
+                        lock_elapsed: 0.0,
+                        lock_duration: crate::player::combat_heirlooms::ENERGY_BALL_LOCK_DELAY,
+                    });
                 }
 
                 if proj.from_enemy {

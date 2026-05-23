@@ -32,8 +32,8 @@ use crate::{
     chaos::ChaosTracker,
     client::GameOverEvent,
     colors::{
-        overwrite_alpha, BLACK, DARK_WOOD_BROWN, LEVEL_BLUE, LEVEL_DARK_BLUE, LIGHT_GREY, RED,
-        TOOLTIP_BLACK, WHITE, YELLOW,
+        overwrite_alpha, DARK_WOOD_BROWN, LEVEL_BLUE, LEVEL_DARK_BLUE, LIGHT_GREY, RED, WHITE,
+        YELLOW,
     },
     cursor::CursorPos,
     inventory::{Inventory, ItemStack},
@@ -42,7 +42,10 @@ use crate::{
     keybinds::InputBinding,
     night::{EraTimer, InfiniteMode, ERA_TIMER_SECONDS},
     player::{
-        combat_heirlooms::{CrateBreakDamageTracker, MaxHPHuntTracker, SkillPowerHuntTracker},
+        combat_heirlooms::{
+            CrateBreakDamageTracker, EnergyBallBarrageTracker, MaxHPHuntTracker,
+            SkillPowerHuntTracker,
+        },
         levels::PlayerLevel,
         skills::{
             effective_player_attack_speed_multiplier, ActiveSkill, ActiveSkillChoiceState,
@@ -1209,6 +1212,8 @@ pub fn handle_heirloom_hud_tooltip(
             Option<&crate::player::combat_heirlooms::CrateBreakDamageTracker>,
             Option<&crate::player::combat_heirlooms::ThornsOnDamageTracker>,
             Option<&crate::player::combat_heirlooms::SkillPowerHuntTracker>,
+            Option<&crate::player::combat_heirlooms::EnergyBallBarrageTracker>,
+            &crate::attributes::PickupRange,
         ),
         With<Player>,
     >,
@@ -1261,6 +1266,8 @@ pub fn handle_heirloom_hud_tooltip(
                 crate_tracker,
                 thorns_tracker,
                 skill_power_hunt_tracker,
+                energy_ball_tracker,
+                pickup_range,
             )) = player_query.get_single()
             else {
                 *last_hovered = hovered_heirloom;
@@ -1283,6 +1290,8 @@ pub fn handle_heirloom_hud_tooltip(
                 crate_tracker,
                 thorns_tracker,
                 skill_power_hunt_tracker,
+                energy_ball_tracker,
+                pickup_range.0,
             );
 
             let trigger_count = trigger_counts.get(heirloom);
@@ -1585,6 +1594,8 @@ fn get_heirloom_scaling_text(
     crate_tracker: Option<&CrateBreakDamageTracker>,
     thorns_tracker: Option<&crate::player::combat_heirlooms::ThornsOnDamageTracker>,
     skill_power_hunt_tracker: Option<&SkillPowerHuntTracker>,
+    energy_ball_tracker: Option<&EnergyBallBarrageTracker>,
+    pickup_range: i32,
 ) -> Option<String> {
     match heirloom {
         Heirloom::GoldIntoDamage => {
@@ -1644,6 +1655,23 @@ fn get_heirloom_scaling_text(
                 } else {
                     None
                 }
+            } else {
+                None
+            }
+        }
+        Heirloom::EnergyBallBarrage => {
+            let tracker = energy_ball_tracker?;
+            Some(format!(
+                "(Next cast: {}/{})",
+                tracker.accumulated,
+                crate::player::combat_heirlooms::ENERGY_BALL_DAMAGE_THRESHOLD
+            ))
+        }
+        Heirloom::GravityScales => {
+            let stacks = skills.get_count(Heirloom::GravityScales);
+            if stacks > 0 {
+                let size_bonus = pickup_range * 25 * stacks / 100;
+                Some(format!("(+{} Size)", size_bonus))
             } else {
                 None
             }

@@ -42,9 +42,10 @@ use crate::{
         AttributeChangeEvent,
     },
     inventory::{
-        try_auto_equip_from_upgrade_slot, Inventory, InventoryItemStack, ItemStack,
-        MaterialDropsToggleButton, MaterialDropsToggleXOverlay, SortInventoryButton,
-        SuppressNonMobBreakDrops,
+        try_auto_equip_from_upgrade_slot, BreakDropFilter, Inventory, InventoryItemStack,
+        ItemStack, MaterialDropFilterAllButton, MaterialDropFilterEntry, MaterialDropFilterEntryX,
+        MaterialDropFilterMenuOpen, MaterialDropFilterNoneButton, MaterialDropFilterPanel,
+        MaterialDropsToggleButton, SortInventoryButton, BREAK_DROP_FILTER_ITEMS,
     },
     item::{CraftedItemEvent, Recipes, WorldObject},
     ui::{crafting_ui::UpgradeButton, FurnaceState, CHEST_INVENTORY_UI_SIZE, INVENTORY_UI_SIZE},
@@ -62,12 +63,16 @@ use super::{
     FURNACE_INVENTORY_UI_SIZE, HUD_ACTION_ROW_Y_FROM_BOTTOM, HUD_HOTBAR_CENTER_X, HUD_HOTBAR_SLOTS,
     INVENTORY_GRID_COLS, INV_CHEST_SCRAPPER_GRID_OFFSET_Y, INV_CRAFTING_BASE_Y, INV_CRAFTING_COLS,
     INV_CRAFTING_NUDGE_IN_MAIN_INV, INV_CRAFTING_ROW_GAP, INV_CRAFTING_X_ANCHOR,
-    INV_EQUIP_GRID_ROW_BOT_Y, INV_EQUIP_GRID_ROW_MID_Y, INV_EQUIP_GRID_ROW_TOP_Y,
-    INV_EQUIP_GRID_SPACING, INV_EQUIP_PANEL_OFFSET_X, INV_EQUIP_PANEL_OFFSET_Y, INV_FURNACE_SLOT_0,
-    INV_FURNACE_SLOT_1, INV_GRID_FIRST_ROW_NUDGE_Y, INV_GRID_INSET_BOTTOM, INV_GRID_INSET_LEFT,
-    INV_MATERIAL_DROPS_TOGGLE_OFFSET_X, INV_MATERIAL_DROPS_TOGGLE_OFFSET_Y, INV_SLOT_SPACING_X,
-    INV_SLOT_SPACING_Y, INV_SORT_BUTTON_OFFSET_X, INV_SORT_BUTTON_OFFSET_Y, INV_TRASH_OFFSET_X,
-    INV_TRASH_OFFSET_Y, INV_UI_PARENT_OFFSET_CRAFTING, UI_SLOT_SIZE,
+    INV_DROP_FILTER_BUTTON_ROW_HEIGHT, INV_DROP_FILTER_BUTTON_SPACING, INV_DROP_FILTER_ICON_GAP,
+    INV_DROP_FILTER_ICON_SIZE,  INV_DROP_FILTER_PANEL_COLS,
+    INV_DROP_FILTER_PANEL_GAP, INV_DROP_FILTER_PANEL_PADDING, INV_DROP_FILTER_PANEL_Z,
+    INV_DROP_FILTER_TITLE_ROW_HEIGHT, INV_EQUIP_GRID_ROW_BOT_Y, INV_EQUIP_GRID_ROW_MID_Y,
+    INV_EQUIP_GRID_ROW_TOP_Y, INV_EQUIP_GRID_SPACING, INV_EQUIP_PANEL_OFFSET_X,
+    INV_EQUIP_PANEL_OFFSET_Y, INV_FURNACE_SLOT_0, INV_FURNACE_SLOT_1, INV_GRID_FIRST_ROW_NUDGE_Y,
+    INV_GRID_INSET_BOTTOM, INV_GRID_INSET_LEFT, INV_MATERIAL_DROPS_TOGGLE_OFFSET_X,
+    INV_MATERIAL_DROPS_TOGGLE_OFFSET_Y, INV_SLOT_SPACING_X, INV_SLOT_SPACING_Y,
+    INV_SORT_BUTTON_OFFSET_X, INV_SORT_BUTTON_OFFSET_Y, INV_TRASH_OFFSET_X, INV_TRASH_OFFSET_Y,
+    INV_UI_PARENT_OFFSET_CRAFTING, UI_SLOT_SIZE,
 };
 
 #[derive(Clone, Eq, PartialEq, Debug, Hash, Default, States, Component)]
@@ -874,7 +879,9 @@ pub fn setup_inv_slots_ui(
     mut inv: Query<&mut Inventory>,
     crafting_container: Option<Res<CraftingContainer>>,
     resolution: Res<ScreenResolution>,
-    suppress_non_mob_break_drops: Res<SuppressNonMobBreakDrops>,
+    break_drop_filter: Res<BreakDropFilter>,
+    menu_open: Res<MaterialDropFilterMenuOpen>,
+    proto_param: ProtoParam,
 ) {
     if inv_spawn_check.get_single().is_err() {
         return;
@@ -1047,9 +1054,34 @@ pub fn setup_inv_slots_ui(
                 &asset_server,
                 &inv_query,
                 inv_state_res.inv_size,
-                suppress_non_mob_break_drops.0,
+            );
+            let (panel_pos_offset, panel_inv_size) = inventory_panel_layout(&inv_state.0);
+            spawn_material_drop_filter_panel(
+                &mut commands,
+                &graphics,
+                &asset_server,
+                &proto_param,
+                &inv_state,
+                panel_pos_offset,
+                panel_inv_size,
+                &break_drop_filter,
+                menu_open.0,
             );
         }
+    }
+}
+
+/// Panel center offset and size for the active inventory-family UI state.
+fn inventory_panel_layout(ui_state: &UIState) -> (Vec2, Vec2) {
+    match ui_state {
+        UIState::Inventory | UIState::InventoryCrafting => {
+            (Vec2::new(-185., INVENTORY_Y_OFFSET), INVENTORY_UI_SIZE)
+        }
+        UIState::Crafting => (
+            Vec2::new(22.5, INVENTORY_Y_OFFSET),
+            CRAFTING_INVENTORY_UI_SIZE,
+        ),
+        _ => (Vec2::ZERO, INVENTORY_UI_SIZE),
     }
 }
 
@@ -1125,14 +1157,13 @@ fn spawn_sort_inventory_button(
     }
 }
 
-/// Toggle under the sort button: plant-fibre icon, red Alagard "X" when non-mob drops are suppressed.
+/// Filter button under the sort button — opens the drop-filter side panel.
 fn spawn_material_drops_toggle_button(
     commands: &mut Commands,
     graphics: &Graphics,
     asset_server: &AssetServer,
     inv_query: &Query<Entity, With<InventoryUI>>,
     inv_size: Vec2,
-    suppress_drops: bool,
 ) {
     let hw = inv_size.x * 0.5;
     let hh = inv_size.y * 0.5;
@@ -1179,10 +1210,7 @@ fn spawn_material_drops_toggle_button(
         .insert(RenderLayers::from_layers(&[3]))
         .insert(Interactable::default())
         .insert(MaterialDropsToggleButton)
-        .insert(IconHoverTooltipText(&[
-            "Filter: toggle all material",
-            "and Food Drops.",
-        ]))
+        .insert(IconHoverTooltipText(&["Open drop filter menu"]))
         .insert(Name::new("MATERIAL DROPS TOGGLE BUTTON"))
         .id();
 
@@ -1201,37 +1229,261 @@ fn spawn_material_drops_toggle_button(
         .insert(Name::new("MATERIAL DROPS TOGGLE ICON"))
         .id();
 
-    let x_vis = if suppress_drops {
-        Visibility::Visible
-    } else {
-        Visibility::Hidden
-    };
-    let x_overlay = commands
-        .spawn(Text2dBundle {
-            text: Text::from_section(
-                "X",
-                TextStyle {
-                    font: asset_server.load("fonts/alagard.ttf"),
-                    font_size: 15.0,
-                    color: RED,
-                },
-            )
-            .with_alignment(TextAlignment::Center),
-            text_anchor: Anchor::Center,
-            visibility: x_vis,
-            transform: Transform::from_translation(Vec3::new(0., 0., 2.)),
-            ..default()
-        })
-        .insert(RenderLayers::from_layers(&[3]))
-        .insert(MaterialDropsToggleXOverlay)
-        .insert(Name::new("MATERIAL DROPS TOGGLE X"))
-        .id();
-
-    commands.entity(button).push_children(&[icon, x_overlay]);
+    commands.entity(button).push_children(&[icon]);
 
     if let Ok(inv_e) = inv_query.get_single() {
         commands.entity(button).set_parent(inv_e);
     }
+}
+
+/// Side panel anchored to the right of the drop-filter button. When closed it is translated
+/// off-screen so its child hit-boxes never block clicks on the inventory underneath.
+fn spawn_material_drop_filter_panel(
+    commands: &mut Commands,
+    graphics: &Graphics,
+    asset_server: &AssetServer,
+    proto_param: &ProtoParam,
+    inv_state: &State<UIState>,
+    inv_pos_offset: Vec2,
+    inv_size: Vec2,
+    break_drop_filter: &BreakDropFilter,
+    menu_open: bool,
+) {
+    let items = BREAK_DROP_FILTER_ITEMS;
+    let cols = INV_DROP_FILTER_PANEL_COLS;
+    let rows = items.len().div_ceil(cols).max(1);
+    let cell = INV_DROP_FILTER_ICON_SIZE + INV_DROP_FILTER_ICON_GAP;
+    let grid_w = cols as f32 * INV_DROP_FILTER_ICON_SIZE
+        + (cols.saturating_sub(1) as f32) * INV_DROP_FILTER_ICON_GAP;
+    let grid_h = rows as f32 * INV_DROP_FILTER_ICON_SIZE
+        + (rows.saturating_sub(1) as f32) * INV_DROP_FILTER_ICON_GAP;
+    let panel_w = grid_w + INV_DROP_FILTER_PANEL_PADDING * 2.0;
+    let panel_h = INV_DROP_FILTER_PANEL_PADDING * 2.0
+        + INV_DROP_FILTER_TITLE_ROW_HEIGHT
+        + INV_DROP_FILTER_BUTTON_ROW_HEIGHT
+        + 4.0
+        + grid_h;
+
+    // Anchor to the filter button: button is at inv-local (-hw + OFFSET_X, hh + OFFSET_Y) and
+    // in world space at inv_pos_offset + that local. Panel sits to the right of the button.
+    let hw = inv_size.x * 0.5;
+    let hh = inv_size.y * 0.5;
+    let button_world_x = inv_pos_offset.x + (-hw + INV_MATERIAL_DROPS_TOGGLE_OFFSET_X);
+    let button_world_y = inv_pos_offset.y + (hh + INV_MATERIAL_DROPS_TOGGLE_OFFSET_Y);
+    let panel_open_x =
+        button_world_x + UI_SLOT_SIZE.x * 0.5 + INV_DROP_FILTER_PANEL_GAP + panel_w * 0.5;
+    let panel_open_y = button_world_y - panel_h * 0.5 + UI_SLOT_SIZE.y * 0.5;
+    let open_translation = Vec3::new(panel_open_x, panel_open_y, INV_DROP_FILTER_PANEL_Z);
+    let closed_translation = Vec3::new(50_000.0, 50_000.0, INV_DROP_FILTER_PANEL_Z);
+    let initial_translation = if menu_open {
+        open_translation
+    } else {
+        closed_translation
+    };
+
+    let panel = commands
+        .spawn((
+            SpriteBundle {
+                sprite: Sprite {
+                    color: Color::rgba(0.22, 0.18, 0.14, 0.95),
+                    custom_size: Some(Vec2::new(panel_w, panel_h)),
+                    ..Default::default()
+                },
+                transform: Transform::from_translation(initial_translation),
+                ..Default::default()
+            },
+            RenderLayers::from_layers(&[3]),
+            MaterialDropFilterPanel { open_translation },
+            inv_state.0.clone(),
+            Name::new("DROP FILTER PANEL"),
+        ))
+        .id();
+
+    let top_y = panel_h * 0.5 - INV_DROP_FILTER_PANEL_PADDING;
+    let title_y = top_y - INV_DROP_FILTER_TITLE_ROW_HEIGHT * 0.5;
+    commands
+        .spawn((
+            Text2dBundle {
+                text: Text::from_section(
+                    "Toggle Item Drop Filters",
+                    TextStyle {
+                        font: asset_server.load("fonts/4x5.ttf"),
+                        font_size: 5.0,
+                        color: YELLOW_2,
+                    },
+                )
+                .with_alignment(TextAlignment::Center),
+                text_anchor: Anchor::Center,
+                transform: Transform::from_translation(Vec3::new(0., title_y, 11.)),
+                ..default()
+            },
+            RenderLayers::from_layers(&[3]),
+            inv_state.0.clone(),
+            Name::new("DROP FILTER TITLE"),
+        ))
+        .set_parent(panel);
+
+    let button_row_y = title_y
+        - INV_DROP_FILTER_TITLE_ROW_HEIGHT * 0.5
+        - INV_DROP_FILTER_BUTTON_ROW_HEIGHT * 0.5
+        - 2.0;
+    for (label, x_offset, is_all) in [
+        ("ALL", -INV_DROP_FILTER_BUTTON_SPACING * 0.5, true),
+        ("NONE", INV_DROP_FILTER_BUTTON_SPACING * 0.5, false),
+    ] {
+        let hit_w = 28.0;
+        let hit_h = 12.0;
+        let mut btn_ec = commands.spawn(SpriteBundle {
+            sprite: Sprite {
+                color: Color::NONE,
+                custom_size: Some(Vec2::new(hit_w, hit_h)),
+                ..Default::default()
+            },
+            transform: Transform::from_translation(Vec3::new(x_offset, button_row_y, 1.)),
+            ..Default::default()
+        });
+        btn_ec.insert(RenderLayers::from_layers(&[3]));
+        btn_ec.insert(Interactable::default());
+        btn_ec.insert(inv_state.0.clone());
+        btn_ec.insert(Name::new(if is_all {
+            "DROP FILTER ALL"
+        } else {
+            "DROP FILTER NONE"
+        }));
+        if is_all {
+            btn_ec.insert(MaterialDropFilterAllButton);
+        } else {
+            btn_ec.insert(MaterialDropFilterNoneButton);
+        }
+        let btn = btn_ec.id();
+        let text = commands
+            .spawn(Text2dBundle {
+                text: Text::from_section(
+                    label,
+                    TextStyle {
+                        font: asset_server.load("fonts/4x5.ttf"),
+                        font_size: 5.0,
+                        color: Color::WHITE,
+                    },
+                )
+                .with_alignment(TextAlignment::Center),
+                text_anchor: Anchor::Center,
+                transform: Transform::from_translation(Vec3::new(0., 0., 1.)),
+                ..default()
+            })
+            .insert(RenderLayers::from_layers(&[3]))
+            .id();
+        commands
+            .entity(btn)
+            .push_children(&[text])
+            .set_parent(panel);
+    }
+
+    let grid_top_y = button_row_y
+        - INV_DROP_FILTER_BUTTON_ROW_HEIGHT * 0.5
+        - 4.0
+        - INV_DROP_FILTER_ICON_SIZE * 0.5;
+    let grid_left_x = -grid_w * 0.5 + INV_DROP_FILTER_ICON_SIZE * 0.5;
+
+    for (i, &obj) in items.iter().enumerate() {
+        let col = i % cols;
+        let row = i / cols;
+        let x = grid_left_x + col as f32 * cell;
+        let y = grid_top_y - row as f32 * cell;
+
+        let entry = commands
+            .spawn(SpriteBundle {
+                sprite: Sprite {
+                    color: Color::NONE,
+                    custom_size: Some(Vec2::splat(INV_DROP_FILTER_ICON_SIZE)),
+                    ..Default::default()
+                },
+                transform: Transform::from_translation(Vec3::new(x, y, 1.)),
+                ..Default::default()
+            })
+            .insert(RenderLayers::from_layers(&[3]))
+            .insert(Interactable::default())
+            .insert(MaterialDropFilterEntry { obj })
+            .insert(inv_state.0.clone())
+            .insert(Name::new(format!("DROP FILTER ENTRY {:?}", obj)))
+            .id();
+
+        let icon_stack = proto_param
+            .get_item_data(obj)
+            .map(|d| d.copy_with_count(1))
+            .unwrap_or_else(|| ItemStack::crate_icon_stack(obj));
+        let icon = spawn_drop_filter_icon(commands, graphics, &icon_stack);
+        commands.entity(icon).set_parent(entry);
+
+        let blocked = break_drop_filter.is_blocked(obj);
+        let x_vis = if blocked {
+            Visibility::Visible
+        } else {
+            Visibility::Hidden
+        };
+        let x_overlay = commands
+            .spawn(Text2dBundle {
+                text: Text::from_section(
+                    "X",
+                    TextStyle {
+                        font: asset_server.load("fonts/alagard.ttf"),
+                        font_size: 15.0,
+                        color: RED,
+                    },
+                )
+                .with_alignment(TextAlignment::Center),
+                text_anchor: Anchor::Center,
+                visibility: x_vis,
+                transform: Transform::from_translation(Vec3::new(0., 0., 3.)),
+                ..default()
+            })
+            .insert(RenderLayers::from_layers(&[3]))
+            .insert(MaterialDropFilterEntryX)
+            .id();
+        commands
+            .entity(entry)
+            .push_children(&[x_overlay])
+            .set_parent(panel);
+    }
+}
+
+/// 16×16 item icon for the drop-filter grid (no slot chrome).
+fn spawn_drop_filter_icon(
+    commands: &mut Commands,
+    graphics: &Graphics,
+    item_stack: &ItemStack,
+) -> Entity {
+    let obj = item_stack.obj_type;
+    let sprite = graphics
+        .icons
+        .as_ref()
+        .and_then(|icons| icons.get(&obj).cloned())
+        .or_else(|| {
+            graphics
+                .spritesheet_map
+                .as_ref()
+                .and_then(|m| m.get(&obj).cloned())
+        })
+        .unwrap_or_else(|| {
+            graphics
+                .spritesheet_map
+                .as_ref()
+                .unwrap()
+                .get(&WorldObject::Stick)
+                .cloned()
+                .expect("fallback sprite for drop-filter icon")
+        });
+    let mut sprite = sprite;
+    sprite.custom_size = Some(Vec2::splat(INV_DROP_FILTER_ICON_SIZE));
+    commands
+        .spawn(SpriteSheetBundle {
+            sprite,
+            texture_atlas: graphics.texture_atlas.as_ref().unwrap().clone(),
+            transform: Transform::from_translation(Vec3::new(0., 0., 2.)),
+            ..Default::default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .id()
 }
 
 /// Center of a main-grid slot (`Normal`, and base for chest/scrapper) in inventory panel space.

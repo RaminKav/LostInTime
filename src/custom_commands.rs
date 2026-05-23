@@ -214,6 +214,14 @@ impl<'w, 's> CommandsExt<'w, 's> for ProtoCommands<'w, 's> {
                         .remove::<TextureAtlasSprite>()
                         .remove::<Handle<TextureAtlas>>()
                         .remove::<AnimationTimer>();
+                } else if proj == &Projectile::EnergyBall {
+                    // Swap the placeholder spritesheet for the aseprite Bullet animation.
+                    spawned_entity_commands
+                        .insert(AsepriteAnimation::from("Bullet"))
+                        .insert(asset_server.load::<Aseprite, _>("textures/effects/EnergyBall.ase"))
+                        .remove::<TextureAtlasSprite>()
+                        .remove::<Handle<TextureAtlas>>()
+                        .remove::<AnimationTimer>();
                 }
             }
 

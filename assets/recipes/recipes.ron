@@ -21,8 +21,8 @@
     // (FurnaceBlock, ([(item: StoneChunk, count: 4),(item: Coal, count: 2)], CraftingTable, 1)),
     // (AlchemyTableBlock, ([(item: WoodPlank, count: 8),(item: Log, count: 4),(item: Stick, count: 2),(item: LargePotion, count: 1),], CraftingTable, 1)),
     (RedStew, ([(item: RedMushroomBlock, count: 1),(item: Berries, count: 1),(item: RedFlowerBlock, count: 1)], Inventory, 1)),
-    (PinkFlowerStew, ([(item: PinkFlowerBlock, count: 2)], Inventory, 1)),
-    (YellowFlowerStew, ([(item: YellowFlowerBlock, count: 2),(item: BrownMushroomBlock, count: 3)], Inventory, 1)),
+    // (PinkFlowerStew, ([(item: PinkFlowerBlock, count: 2)], Inventory, 1)),
+    // (YellowFlowerStew, ([(item: YellowFlowerBlock, count: 2),(item: BrownMushroomBlock, count: 3)], Inventory, 1)),
     (BerryJam, ([(item: Berries, count: 2),(item: Blueberries, count: 2)], Inventory, 1)),
 
     // --- Stat foods (Era-gated; require [`MagicGem`] + biome ingredients).  Effect (perma stat)

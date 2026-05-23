@@ -25,16 +25,17 @@ use crate::{
     },
     audio::{AudioSoundEffect, SoundSpawner},
     blessings::OwnedBlessings,
-    colors::{DARK_GREEN, RED},
+    colors::{DARK_GREEN, RED, YELLOW_2},
     cursor::CursorPos,
     inventory::{
         shift_move_equipped_slot_to_main_items, sort_main_inventory,
-        try_shift_quick_equip_from_inventory_source, Inventory, InventoryItemStack,
-        InventoryShiftClickSource, ItemStack, MaterialDropsToggleButton,
-        MaterialDropsToggleXOverlay, ShiftQuickEquipResult, SortInventoryButton,
-        SuppressNonMobBreakDrops,
+        try_shift_quick_equip_from_inventory_source, BreakDropFilter, Inventory,
+        InventoryItemStack, InventoryShiftClickSource, ItemStack, MaterialDropFilterAllButton,
+        MaterialDropFilterEntry, MaterialDropFilterEntryX, MaterialDropFilterMenuOpen,
+        MaterialDropFilterNoneButton, MaterialDropFilterPanel, MaterialDropsToggleButton,
+        ShiftQuickEquipResult, SortInventoryButton, BREAK_DROP_FILTER_ITEMS,
     },
-    item::{heirloom_shrine::HeirloomShrineState, CraftedItemEvent, EquipmentType},
+    item::{heirloom_shrine::HeirloomShrineState, CraftedItemEvent, EquipmentType, WorldObject},
     pets::state::Pet,
     player::{
         combat_heirlooms::HallucinationStatType,
@@ -2100,8 +2101,9 @@ pub fn handle_sort_inventory_button_click(
     }
 }
 
-/// Hover + click on the material-drops toggle (under SORT). Toggles [`SuppressNonMobBreakDrops`]
-/// and shows or hides the red Alagard "X" overlay on the button.
+/// Hover + click on the filter button (under SORT). Toggles [`MaterialDropFilterMenuOpen`]
+/// by translating the panel between its stored open position and a far-off-screen position
+/// (so the panel's invisible icon hit-boxes don't block clicks on the inventory when closed).
 pub fn handle_material_drops_toggle_button_click(
     cursor_pos: Res<CursorPos>,
     mouse_input: Res<Input<MouseButton>>,
@@ -2110,11 +2112,10 @@ pub fn handle_material_drops_toggle_button_click(
         (Entity, &mut Interactable),
         (With<MaterialDropsToggleButton>, Without<InventorySlotState>),
     >,
-    children: Query<&Children>,
     mut commands: Commands,
     graphics: Res<Graphics>,
-    mut suppress: ResMut<SuppressNonMobBreakDrops>,
-    mut x_overlays: Query<&mut Visibility, With<MaterialDropsToggleXOverlay>>,
+    mut menu_open: ResMut<MaterialDropFilterMenuOpen>,
+    mut filter_panel: Query<(&mut Transform, &MaterialDropFilterPanel)>,
     ui_state: Res<State<UIState>>,
 ) {
     if !ui_state.0.is_inv_open() {
@@ -2135,18 +2136,13 @@ pub fn handle_material_drops_toggle_button_click(
                 }
                 Interaction::Hovering => {
                     if left_mouse_pressed {
-                        suppress.0 = !suppress.0;
-                        let vis = if suppress.0 {
-                            Visibility::Visible
-                        } else {
-                            Visibility::Hidden
-                        };
-                        if let Ok(kids) = children.get(e) {
-                            for &child in kids.iter() {
-                                if let Ok(mut v) = x_overlays.get_mut(child) {
-                                    *v = vis;
-                                }
-                            }
+                        menu_open.0 = !menu_open.0;
+                        for (mut tf, panel) in filter_panel.iter_mut() {
+                            tf.translation = if menu_open.0 {
+                                panel.open_translation
+                            } else {
+                                Vec3::new(50_000.0, 50_000.0, panel.open_translation.z)
+                            };
                         }
                         commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.25));
                     }
@@ -2161,6 +2157,180 @@ pub fn handle_material_drops_toggle_button_click(
                         .insert(graphics.get_ui_element_texture(UIElement::InventorySlot));
                 }
             }
+        }
+    }
+}
+
+fn set_material_drop_filter_entry_x(
+    entry_entity: Entity,
+    blocked: bool,
+    children: &Query<&Children>,
+    x_overlays: &mut Query<&mut Visibility, With<MaterialDropFilterEntryX>>,
+) {
+    let vis = if blocked {
+        Visibility::Visible
+    } else {
+        Visibility::Hidden
+    };
+    if let Ok(kids) = children.get(entry_entity) {
+        for &child in kids.iter() {
+            if let Ok(mut v) = x_overlays.get_mut(child) {
+                *v = vis;
+            }
+        }
+    }
+}
+
+fn handle_drop_filter_panel_hover(
+    hit_entity: Option<Entity>,
+    button_entity: Entity,
+    interactable: &mut Interactable,
+    commands: &mut Commands,
+    left_mouse_pressed: bool,
+    label_entity: Option<Entity>,
+    texts: &mut Query<&mut Text>,
+    on_click: impl FnOnce(),
+) {
+    match hit_entity {
+        Some(hit_ent) if hit_ent == button_entity => match interactable.current() {
+            Interaction::None => {
+                interactable.change(Interaction::Hovering);
+                commands.spawn(SoundSpawner::new(AudioSoundEffect::UISlotHover, 0.2));
+                if let Some(te) = label_entity {
+                    if let Ok(mut t) = texts.get_mut(te) {
+                        t.sections[0].style.color = YELLOW_2;
+                    }
+                }
+            }
+            Interaction::Hovering => {
+                if left_mouse_pressed {
+                    on_click();
+                    commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.25));
+                }
+            }
+            _ => (),
+        },
+        _ => {
+            if matches!(interactable.current(), Interaction::Hovering) {
+                interactable.change(Interaction::None);
+                if let Some(te) = label_entity {
+                    if let Ok(mut t) = texts.get_mut(te) {
+                        t.sections[0].style.color = Color::WHITE;
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Hover + click on the drop-filter side panel (entries, ALL, NONE).
+pub fn handle_material_drop_filter_menu_click(
+    cursor_pos: Res<CursorPos>,
+    mouse_input: Res<Input<MouseButton>>,
+    ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
+    mut filter_ui: ParamSet<(
+        Query<
+            (Entity, &mut Interactable, &MaterialDropFilterEntry),
+            (
+                Without<InventorySlotState>,
+                Without<MaterialDropFilterAllButton>,
+                Without<MaterialDropFilterNoneButton>,
+            ),
+        >,
+        Query<
+            (Entity, &mut Interactable),
+            (
+                With<MaterialDropFilterAllButton>,
+                Without<InventorySlotState>,
+                Without<MaterialDropFilterEntry>,
+                Without<MaterialDropFilterNoneButton>,
+            ),
+        >,
+        Query<
+            (Entity, &mut Interactable),
+            (
+                With<MaterialDropFilterNoneButton>,
+                Without<InventorySlotState>,
+                Without<MaterialDropFilterEntry>,
+                Without<MaterialDropFilterAllButton>,
+            ),
+        >,
+        Query<(Entity,), (With<MaterialDropFilterEntry>, Without<InventorySlotState>)>,
+    )>,
+    children: Query<&Children>,
+    mut commands: Commands,
+    mut break_drop_filter: ResMut<BreakDropFilter>,
+    mut x_overlays: Query<&mut Visibility, With<MaterialDropFilterEntryX>>,
+    mut texts: Query<&mut Text>,
+    menu_open: Res<MaterialDropFilterMenuOpen>,
+    ui_state: Res<State<UIState>>,
+) {
+    if !ui_state.0.is_inv_open() || !menu_open.0 {
+        return;
+    }
+    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
+    let hit_entity = hit_test.map(|(e, _, _)| e);
+
+    for (e, mut interactable, entry) in filter_ui.p0().iter_mut() {
+        let obj = entry.obj;
+        handle_drop_filter_panel_hover(
+            hit_entity,
+            e,
+            &mut interactable,
+            &mut commands,
+            left_mouse_pressed,
+            None,
+            &mut texts,
+            || {
+                let blocked = !break_drop_filter.is_blocked(obj);
+                break_drop_filter.set_blocked(obj, blocked);
+                set_material_drop_filter_entry_x(e, blocked, &children, &mut x_overlays);
+            },
+        );
+    }
+
+    let mut block_all = false;
+    let mut unblock_all = false;
+
+    for (e, mut interactable) in filter_ui.p1().iter_mut() {
+        let label_e = children.get(e).ok().and_then(|kids| kids.first().copied());
+        handle_drop_filter_panel_hover(
+            hit_entity,
+            e,
+            &mut interactable,
+            &mut commands,
+            left_mouse_pressed,
+            label_e,
+            &mut texts,
+            || block_all = true,
+        );
+    }
+    for (e, mut interactable) in filter_ui.p2().iter_mut() {
+        let label_e = children.get(e).ok().and_then(|kids| kids.first().copied());
+        handle_drop_filter_panel_hover(
+            hit_entity,
+            e,
+            &mut interactable,
+            &mut commands,
+            left_mouse_pressed,
+            label_e,
+            &mut texts,
+            || unblock_all = true,
+        );
+    }
+
+    if block_all {
+        for &obj in BREAK_DROP_FILTER_ITEMS {
+            break_drop_filter.set_blocked(obj, true);
+        }
+        for (entry_e,) in filter_ui.p3().iter() {
+            set_material_drop_filter_entry_x(entry_e, true, &children, &mut x_overlays);
+        }
+    } else if unblock_all {
+        break_drop_filter.0.clear();
+        for (entry_e,) in filter_ui.p3().iter() {
+            set_material_drop_filter_entry_x(entry_e, false, &children, &mut x_overlays);
         }
     }
 }
