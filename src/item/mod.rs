@@ -1075,10 +1075,10 @@ impl WorldObject {
     }
     pub fn get_ammo(&self) -> (u32, f32) {
         match self {
-            // WorldObject::Gun => (6, 0.9),
-            // WorldObject::WoodBow => (6, 1.25),
-            // WorldObject::Claw => (10, 1.25),
-            // WorldObject::Blowdart => (8, 1.25),
+            WorldObject::Gun => (6, 0.9),
+            WorldObject::WoodBow => (6, 1.25),
+            WorldObject::Claw => (10, 1.25),
+            WorldObject::Blowdart => (8, 1.25),
             _ => (0, 0.0),
         }
     }

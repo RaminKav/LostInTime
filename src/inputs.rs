@@ -999,7 +999,7 @@ pub fn mouse_click_system(
                     },
                     spawn_delay: if obj == &WorldObject::WoodBow {
                         if i == 0 {
-                            0.36
+                            0.12
                         } else {
                             0.2
                         }
