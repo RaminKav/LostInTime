@@ -734,7 +734,7 @@ pub const BREAK_DROP_FILTER_ITEMS: &[WorldObject] = &[
     WorldObject::PlantFibre,
     WorldObject::Log,
     WorldObject::Apple,
-    WorldObject::PebbleBlock,
+    WorldObject::StoneChunk,
     WorldObject::YellowFlowerBlock,
     WorldObject::RedFlowerBlock,
     WorldObject::PinkFlowerBlock,

@@ -3,7 +3,7 @@
 # crash if it fails lol
 set -euo pipefail
 
-APP_NAME="Lost In Time"
+APP_NAME="Willow: The Last Archivist"
 OUT_FOLDER="build"
 RUST_CRATE_NAME="survival-rogue-like" # from ur cargo toml
 
@@ -27,4 +27,4 @@ cargo build --release --features release-bundle --target aarch64-apple-darwin # 
 # combine the executables into a single file and put it in the right place for macos
 lipo "target/x86_64-apple-darwin/release/${RUST_CRATE_NAME}" \
      "target/aarch64-apple-darwin/release/${RUST_CRATE_NAME}" \
-     -create -output "${APP_CONTENTS_PATH}/MacOS/Lost In Time"
+     -create -output "${APP_CONTENTS_PATH}/MacOS/Willow: The Last Archivist"

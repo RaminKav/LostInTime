@@ -5,17 +5,17 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-	<string>Lost In Time</string>
+	<string>Willow: The Last Archivist</string>
 	<key>CFBundleExecutable</key>
-	<string>Lost In Time</string>
+	<string>Willow: The Last Archivist</string>
 	<key>CFBundleIconFile</key>
 	<string>AppIcon.icns</string>
 	<key>CFBundleIdentifier</key>
-	<string>com.raminkaviani.lostintime</string>
+	<string>com.raminkaviani.willow</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>Lost In Time</string>
+	<string>Willow: The Last Archivist</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>

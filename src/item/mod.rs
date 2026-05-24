@@ -1075,10 +1075,10 @@ impl WorldObject {
     }
     pub fn get_ammo(&self) -> (u32, f32) {
         match self {
-            WorldObject::Gun => (6, 0.9),
-            WorldObject::WoodBow => (6, 1.25),
-            WorldObject::Claw => (10, 1.25),
-            WorldObject::Blowdart => (8, 1.25),
+            // WorldObject::Gun => (6, 0.9),
+            // WorldObject::WoodBow => (6, 1.25),
+            // WorldObject::Claw => (10, 1.25),
+            // WorldObject::Blowdart => (8, 1.25),
             _ => (0, 0.0),
         }
     }
@@ -1773,10 +1773,8 @@ pub fn handle_break_object(
         }
         // Item drops: per-item filter for non-mobs; crate-like objects bypass the filter.
         if let Ok(loot_table) = loot_tables.get(broken.entity) {
-            let bypass_filter =
-                is_mob || broken.obj.override_material_drop_toggle();
-            for drop in
-                LootTablePlugin::get_drops(loot_table, &proto_param, 0, None, false, false)
+            let bypass_filter = is_mob || broken.obj.override_material_drop_toggle();
+            for drop in LootTablePlugin::get_drops(loot_table, &proto_param, 0, None, false, false)
             {
                 if filter_non_mob_drops
                     && !bypass_filter
@@ -1785,20 +1783,20 @@ pub fn handle_break_object(
                     continue;
                 }
                 let pos = if broken.obj.is_medium_size(&proto_param) {
-                        tile_pos_to_world_pos(
-                            TileMapPosition::new(broken.pos.chunk_pos, broken.pos.tile_pos),
-                            true,
-                        )
-                    } else {
-                        world_pos
-                    };
-                    let drop_spread = 10.;
+                    tile_pos_to_world_pos(
+                        TileMapPosition::new(broken.pos.chunk_pos, broken.pos.tile_pos),
+                        true,
+                    )
+                } else {
+                    world_pos
+                };
+                let drop_spread = 10.;
 
-                    let pos = Vec3::new(
-                        pos.x + rng.gen_range(-drop_spread..drop_spread),
-                        pos.y + rng.gen_range(-drop_spread..drop_spread),
-                        0.,
-                    );
+                let pos = Vec3::new(
+                    pos.x + rng.gen_range(-drop_spread..drop_spread),
+                    pos.y + rng.gen_range(-drop_spread..drop_spread),
+                    0.,
+                );
                 proto_commands.spawn_item_from_proto(
                     drop.obj_type,
                     &proto_param,

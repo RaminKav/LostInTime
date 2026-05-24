@@ -242,7 +242,7 @@ fn main() {
                 .set(WindowPlugin {
                     primary_window: Some(Window {
                         resolution: WindowResolution::new(WIDTH, HEIGHT),
-                        title: "Lost in Time".to_string(),
+                        title: "Willow: The Last Archivist".to_string(),
                         present_mode: PresentMode::Immediate,
                         resizable: true,
                         transparent: true,
@@ -260,9 +260,7 @@ fn main() {
             "class_unlocks.ron",
         ]))
         .add_plugin(RonAssetPlugin::<RecipeListProto>::new(&["ron"]))
-        .add_plugin(RonAssetPlugin::<world::grass_patches::GrassPatchesDesc>::new(
-            &["patches.ron"],
-        ))
+        .add_plugin(RonAssetPlugin::<world::grass_patches::GrassPatchesDesc>::new(&["patches.ron"]))
         .add_plugin(world::grass_patches::GrassPatchesPlugin)
         .insert_resource(Msaa::Off)
         .insert_resource(FixedTime::new_from_secs(TIME_STEP))
