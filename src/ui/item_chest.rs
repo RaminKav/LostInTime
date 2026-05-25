@@ -21,8 +21,11 @@ use crate::{
 
 use super::{
     heirloom_tooltip::{HeirloomTooltipRequest, HeirloomTooltipShow},
-    interactions::Interaction, ui_helpers, ui_helpers::spawn_ui_overlay, Interactable,
-    ToolTipUpdateEvent, TooltipTeardownEvent, UIElement, UIState, SKILLS_CHOICE_UI_SIZE,
+    interactions::Interaction,
+    ui_helpers,
+    ui_helpers::spawn_ui_overlay,
+    Interactable, ToolTipUpdateEvent, TooltipTeardownEvent, UIElement, UIState,
+    SKILLS_CHOICE_UI_SIZE,
 };
 
 aseprite!(pub SkillChoiceFlash, "ui/SkillChoiceFlash.aseprite");
@@ -483,8 +486,16 @@ pub fn handle_anim_events(
                                         && obj != &WorldObject::PlasmaStaff
                                 })
                                 .collect_vec();
-                            let pick_new_item =
-                                filtered_items.choose(&mut rng).expect("No items found");
+                            // Weight armor 2x so the pool isn't dominated by weapons
+                            let pick_new_item = filtered_items
+                                .choose_weighted(&mut rng, |obj| {
+                                    if obj.is_armor() || obj.is_accessory() {
+                                        3
+                                    } else {
+                                        1
+                                    }
+                                })
+                                .expect("No items found");
                             let mut stack =
                                 proto.get_item_data(pick_new_item.clone()).unwrap().clone();
                             let max_item_level = ((game.get_player_level() as i32 / 2) - 5)

@@ -428,7 +428,7 @@ pub fn setup_inv_ui(
                 ..Default::default()
             },
             transform: Transform {
-                translation: Vec3::new(INV_EQUIP_PANEL_OFFSET_X, upgrade_panel_y_local, 0.),
+                translation: Vec3::new(INV_EQUIP_PANEL_OFFSET_X + 3., upgrade_panel_y_local, 0.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },

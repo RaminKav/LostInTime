@@ -180,7 +180,7 @@ impl DamageSource {
             DamageSource::SummonRing => "Piercing Ring",
             DamageSource::StoneTooth => "Stone Tooth",
             DamageSource::ReaperSoul => "Reaper Soul",
-            DamageSource::EnergyBall => "Underworld's Hat",
+            DamageSource::EnergyBall => "UndWrld's Hat",
         }
     }
 

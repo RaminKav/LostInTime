@@ -1394,14 +1394,6 @@ impl WorldObject {
     }
     pub fn override_material_drop_toggle(&self) -> bool {
         match self {
-            WorldObject::Crate => true,
-            WorldObject::Crate2 => true,
-            WorldObject::DesertCrate => true,
-            WorldObject::DesertCrate2 => true,
-            WorldObject::SnowCrate1 => true,
-            WorldObject::SnowCrate2 => true,
-            WorldObject::SnowCrate3 => true,
-            WorldObject::SnowCrate4 => true,
             WorldObject::XPJug => true,
             WorldObject::SnowCrystalMed1 => true,
             WorldObject::SnowCrystalMed2 => true,
@@ -1771,7 +1763,8 @@ pub fn handle_break_object(
         if !broken.give_drops_and_xp {
             continue;
         }
-        // Item drops: per-item filter for non-mobs; crate-like objects bypass the filter.
+        // Item drops: per-item filter for non-mobs (and crates); special breakables bypass via
+        // `override_material_drop_toggle` (XP jugs, crystals, desert skulls).
         if let Ok(loot_table) = loot_tables.get(broken.entity) {
             let bypass_filter = is_mob || broken.obj.override_material_drop_toggle();
             for drop in LootTablePlugin::get_drops(loot_table, &proto_param, 0, None, false, false)

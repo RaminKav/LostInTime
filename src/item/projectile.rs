@@ -439,7 +439,9 @@ fn handle_ranged_attack_event(
             game.player_state.position.truncate()
         };
 
-        let size = if proj_event.projectile.is_anchored_to_player_pos() {
+        let size = if proj_event.from_enemy {
+            1.
+        } else if proj_event.projectile.is_anchored_to_player_pos() {
             proj_size.get_multiplier()
         } else {
             1.
@@ -508,19 +510,28 @@ fn handle_ranged_attack_event(
     }
 }
 fn handle_translate_projectiles(
-    mut query: Query<
+    mut player_projectiles: Query<
         (&mut Transform, &ProjectileState),
-        (With<Projectile>, Without<HomingEnergyBall>),
+        (With<Projectile>, Without<HomingEnergyBall>, Without<EnemyProjectile>),
+    >,
+    mut enemy_projectiles: Query<
+        (&mut Transform, &ProjectileState),
+        (With<Projectile>, Without<HomingEnergyBall>, With<EnemyProjectile>),
     >,
     speed_modifiers: Query<&ArrowSpeedUpgrade>,
     time: Res<Time>,
 ) {
-    for (mut transform, state) in query.iter_mut() {
-        let arrow_speed_upgrade = speed_modifiers
-            .get_single()
-            .unwrap_or(&ArrowSpeedUpgrade(1.))
-            .0;
-        let delta = state.direction * (state.speed * arrow_speed_upgrade) * time.delta_seconds();
+    let arrow_speed_upgrade = speed_modifiers
+        .get_single()
+        .unwrap_or(&ArrowSpeedUpgrade(1.))
+        .0;
+    for (mut transform, state) in &mut player_projectiles {
+        let delta =
+            state.direction * (state.speed * arrow_speed_upgrade) * time.delta_seconds();
+        transform.translation += delta.extend(0.0);
+    }
+    for (mut transform, state) in &mut enemy_projectiles {
+        let delta = state.direction * state.speed * time.delta_seconds();
         transform.translation += delta.extend(0.0);
     }
 }

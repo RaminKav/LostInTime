@@ -495,16 +495,15 @@ impl ItemStack {
             && self.rarity == other.rarity
     }
 
-    /// Get the item attributes, reconstructing from stat lines if they exist
-    /// This ensures attributes are always in sync with stat lines
+    /// Get the item attributes for this stack.
+    ///
+    /// `self.attributes` is authoritative: it's built from base + bonus + level-up bonuses in
+    /// `build_item_stack_with_parsed_attributes` and is kept in sync with `bonus_stat_lines` on
+    /// rerolls/modifiers (see `attribute_helpers`). Reconstructing from `bonus_stat_lines` alone
+    /// would drop the base attributes (e.g. armor health/defence/speed) since those lines only
+    /// store the bonus roll, which would silently strip those stats from equipped armor.
     pub fn get_attributes(&self) -> ItemAttributes {
-        if !self.metadata.bonus_stat_lines.is_empty() {
-            // Reconstruct from stat lines to ensure consistency
-            ItemAttributes::from_stat_lines(&self.metadata.bonus_stat_lines)
-        } else {
-            // Fall back to stored attributes
-            self.attributes.clone()
-        }
+        self.attributes.clone()
     }
     pub fn add_to_inventory(
         self,
@@ -745,6 +744,7 @@ pub const BREAK_DROP_FILTER_ITEMS: &[WorldObject] = &[
     WorldObject::Era2BrownMushroomBlock,
     WorldObject::Era2RedMushroomBlock,
     WorldObject::BlueMushroom,
+    WorldObject::Blueberries,
     WorldObject::Berries,
     WorldObject::YellowBerries,
     WorldObject::CactusBerry,

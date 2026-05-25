@@ -91,12 +91,49 @@ pub fn reroll_item_bonus_attributes(stack: &ItemStack, proto: &ProtoParam) -> It
     let mut final_att = parsed_bonus_att;
 
     final_att.max_durability = stack.attributes.max_durability;
-    final_att.attack = stack.attributes.attack;
     final_att.attack_cooldown = stack.attributes.attack_cooldown;
+
+    // Rescale base stats by the rarity-bonus ratio so an orb-upgraded item gains the
+    // higher rarity's base-stat bonus (e.g. Uncommon -> Rare bumps defence/health/speed).
+    // The per-level flat bonus (added in `build_item_stack_with_parsed_attributes`) is
+    // rarity-independent, so we strip it before scaling and add it back afterwards.
+    let old_ratio = stack.rarity.get_rarity_attributes_bonus();
+    let new_ratio = rarity.get_rarity_attributes_bonus();
+    let scale = new_ratio / old_ratio;
+
+    let is_weapon_or_tool = eqp_type.is_weapon() || eqp_type.is_tool();
+    let is_armor = eqp_type.is_equipment() && !eqp_type.is_accessory();
+    let lvl = level as i32;
+    let level_attack_bonus = if is_weapon_or_tool && lvl > 1 {
+        (lvl - 1) * stack.obj_type.get_weapon_levelup_upgrade()
+    } else {
+        0
+    };
+    let level_health_bonus = if is_armor && lvl > 1 {
+        max(0, (lvl * 2) - 1)
+    } else {
+        0
+    };
+    let level_defence_bonus = if is_armor && lvl > 1 {
+        max(0, lvl - 1)
+    } else {
+        0
+    };
+
+    let rescale = |value: i32, level_bonus: i32| -> i32 {
+        let base_only = value - level_bonus;
+        (base_only as f32 * scale).round() as i32 + level_bonus
+    };
+
+    final_att.attack = stack.attributes.attack;
+    final_att.attack.value = rescale(stack.attributes.attack.value, level_attack_bonus);
     final_att.defence = stack.attributes.defence;
+    final_att.defence.value = rescale(stack.attributes.defence.value, level_defence_bonus);
     final_att.health = stack.attributes.health;
+    final_att.health.value = rescale(stack.attributes.health.value, level_health_bonus);
     if raw_base_att.speed.is_some() {
         final_att.speed = stack.attributes.speed;
+        final_att.speed.value = rescale(stack.attributes.speed.value, 0);
     }
 
     let mut new_stack = stack.copy_with_attributes(&final_att);

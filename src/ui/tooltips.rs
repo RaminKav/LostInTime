@@ -390,13 +390,22 @@ pub fn handle_spawn_inv_item_tooltip(
             .set_parent(tooltip)
             .id();
 
-        // ======== header (Base Stats / Description — recipe uses ingredient row instead) ========
+        // Accessories don't have base stats (health/defence/attack/speed). To keep their
+        // tooltip clean we collapse to a single "Bonus Stats" section instead of showing an
+        // empty "Base Stats" header followed by all the bonus rolls.
+        let is_accessory_tooltip = equip_type.map_or(false, |e| e.is_accessory());
+
+        // ======== header (Base Stats / Bonus Stats / Description — recipe uses ingredient row instead) ========
         if should_show_attributes {
             let _header_text = commands
                 .spawn((
                     Text2dBundle {
                         text: Text::from_section(
-                            "Base Stats",
+                            if is_accessory_tooltip {
+                                "Bonus Stats"
+                            } else {
+                                "Base Stats"
+                            },
                             TextStyle {
                                 font: gf::TOOLTIP_CARD_SUBHEAD_BOLD.load_font(asset_server),
                                 font_size: gf::TOOLTIP_CARD_SUBHEAD_BOLD.size,
@@ -518,34 +527,76 @@ pub fn handle_spawn_inv_item_tooltip(
 
         if should_show_attributes {
             info!("SHOW ATTRIBUTES!");
-            //======== Header 2 ========
-            let _text = commands
-                .spawn((
-                    Text2dBundle {
-                        text: Text::from_section(
-                            "Bonus Stats".to_string(),
-                            TextStyle {
-                                font: gf::TOOLTIP_CARD_SUBHEAD_BOLD.load_font(asset_server),
-                                font_size: gf::TOOLTIP_CARD_SUBHEAD_BOLD.size,
-                                color: YELLOW_2,
+            // Skip the second "Bonus Stats" header for accessories — their stats render
+            // directly under the top header (which we've already retitled to "Bonus Stats").
+            if !is_accessory_tooltip {
+                //======== Header 2 ========
+                let _text = commands
+                    .spawn((
+                        Text2dBundle {
+                            text: Text::from_section(
+                                "Bonus Stats".to_string(),
+                                TextStyle {
+                                    font: gf::TOOLTIP_CARD_SUBHEAD_BOLD.load_font(asset_server),
+                                    font_size: gf::TOOLTIP_CARD_SUBHEAD_BOLD.size,
+                                    color: YELLOW_2,
+                                },
+                            ),
+                            text_anchor: Anchor::CenterLeft,
+                            transform: Transform {
+                                translation: Vec3::new(-58., -34., 1.),
+                                scale: Vec3::new(1., 1., 1.),
+                                ..Default::default()
                             },
-                        ),
-                        text_anchor: Anchor::CenterLeft,
-                        transform: Transform {
-                            translation: Vec3::new(-58., -34., 1.),
-                            scale: Vec3::new(1., 1., 1.),
-                            ..Default::default()
+                            ..default()
                         },
-                        ..default()
-                    },
-                    Name::new("TOOLTIP Rarity TEXT"),
-                    RenderLayers::from_layers(&[3]),
-                ))
-                .set_parent(tooltip)
-                .id();
+                        Name::new("TOOLTIP Rarity TEXT"),
+                        RenderLayers::from_layers(&[3]),
+                    ))
+                    .set_parent(tooltip)
+                    .id();
+            }
 
+            // Number of entries that belong to the "Base Stats" section. Base entries are
+            // emitted first by `get_tooltips_from_stat_lines` and have a non-empty range like
+            // "(X-Y)"; weapons also emit an "Attacks / sec" row with no range. Everything after
+            // that is a bonus roll and is pushed down past the "Bonus Stats" header.
+            //
+            // We can't hardcode this to 2 (health + defence) because metal armor has a 3rd
+            // base attribute (Speed). Accessories are rendered as a single bonus section so
+            // we force their base count to 0 here.
+            let num_base_stats = if is_accessory_tooltip {
+                0
+            } else {
+                let mut count = 0;
+                for (attr_name, range_text, _) in attributes.iter() {
+                    if !range_text.is_empty() || attr_name.contains("Attacks / sec") {
+                        count += 1;
+                    } else {
+                        break;
+                    }
+                }
+                count
+            };
+            // The bonus section anchors at a fixed y irrespective of how many base rows came
+            // before it (otherwise metal armor's 3rd base row leaves a one-row gap at the top
+            // of the bonus list). Position formula: text_y = base_y - i*y_spacing - d.
+            // We want bonus row j (= i - num_base_stats) to land at base_y - 54 - j*y_spacing
+            // (54 = original 2 base rows at 9px + 36 header gap). Solving for d:
+            //   d = 54 - num_base_stats * 9  (when i >= num_base_stats)
+            // Accessories use the single-section layout so all rows render in the upper slot
+            // with d=0.
+            let bonus_section_offset = if is_accessory_tooltip {
+                0.
+            } else {
+                54. - num_base_stats as f32 * 9.
+            };
             for (i, (a, range, q)) in attributes.iter().enumerate().clone() {
-                let d = if i >= 2 { 36. } else { 0. };
+                let d = if i >= num_base_stats {
+                    bonus_section_offset
+                } else {
+                    0.
+                };
                 tooltip_text.push(TooltipTextProps::new(
                     vec![a.to_string(), range.to_string()],
                     d,
@@ -637,8 +688,8 @@ pub fn handle_spawn_inv_item_tooltip(
                                     } else {
                                         match props.quality {
                                             AttributeQuality::Low => WHITE,
-                                            AttributeQuality::Average => YELLOW,
-                                            AttributeQuality::High => props.quality.get_color(),
+                                            AttributeQuality::Average => WHITE,
+                                            AttributeQuality::High => YELLOW,
                                         }
                                     },
                                 },
@@ -1541,25 +1592,24 @@ pub fn get_num_stars(
     if equip_type == Some(&EquipmentType::Cape) {
         return 3;
     }
-    if let Some(equip_type) = equip_type {
-        let num_atts = if equip_type.is_weapon() || equip_type.is_tool() {
-            total_atts - 1.
-        } else if equip_type.is_armor() {
-            total_atts - 2.
+    info!("Score {score:?} {total_atts:?}");
+    if let Some(_equip_type) = equip_type {
+        // `total_atts` already counts only the bonus stat lines (base attributes
+        // are not included in the score average), so we don't need to subtract
+        // them again here. The previous formula double-subtracted and hard-capped
+        // armor at 1 star and weapons at 2.
+        let _ = total_atts;
+        let _ = rarity;
+        let num_stars = if score >= 0.72 {
+            3
+        } else if score > 0.6 {
+            2
+        } else if score > 0.47 {
+            1
         } else {
-            total_atts
+            0
         };
-        let mut num_stars = 0.;
-        let max_possible_stars =
-            3. + num_atts - *rarity.get_num_bonus_attributes(equip_type).end() as f32;
-        if score >= 0.87 {
-            num_stars = 3.;
-        } else if score > 0.7 {
-            num_stars = 2.;
-        } else if score > 0.42 {
-            num_stars = 1.;
-        }
-        f32::min(f32::min(num_stars, max_possible_stars), 3.) as usize
+        num_stars
     } else {
         0
     }

@@ -4,9 +4,9 @@
   schematics: {
   "survival_rogue_like::item::WorldObject": MetalPants,
   "survival_rogue_like::attributes::RawItemBaseAttributes": (
-        health: Some((start: 16, end: 27)),
-        defence: Some((start: 12, end: 24)),
-        speed: Some((start: -16, end: -8)),
+        health: Some((start: 25, end: 33)),
+        defence: Some((start: 20, end: 30)),
+        speed: Some((start: -12, end: -8)),
   ),
   "survival_rogue_like::attributes::RawItemBonusAttributes": (
         crit_damage: Some((start: 5, end: 10)),
