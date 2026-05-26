@@ -448,9 +448,7 @@ impl ItemAttributes {
                 1. + self.bonus_damage.value as f32 / 100.
             ),
         ));
-        // Mitigation matches incoming damage scaling in combat (`damage * 0.997^defence`).
-        let defence_mitigation_pct =
-            ((1.0 - 0.997_f32.powi(self.defence.value)) * 100.0).round() as i32;
+        let defence_mitigation_pct = Defence(self.defence.value).mitigation_percent();
         tooltips.push((
             "Defence        ".to_string(),
             format!("{} ({defence_mitigation_pct}%)", self.defence),
@@ -1243,6 +1241,18 @@ pub struct Speed(pub i32);
 pub struct Lifesteal(pub i32);
 #[derive(Default, Component, Clone, Debug, Copy)]
 pub struct Defence(pub i32);
+impl Defence {
+    /// Per-point multiplier applied to incoming damage (`raw_damage * DAMAGE_FACTOR^defence`).
+    pub const DAMAGE_FACTOR_PER_POINT: f32 = 0.995;
+
+    pub fn apply_to_damage(self, raw_damage: i32) -> i32 {
+        f32::round(raw_damage as f32 * Self::DAMAGE_FACTOR_PER_POINT.powi(self.0)) as i32
+    }
+
+    pub fn mitigation_percent(self) -> i32 {
+        ((1.0 - Self::DAMAGE_FACTOR_PER_POINT.powi(self.0)) * 100.0).round() as i32
+    }
+}
 #[derive(Default, Component, Clone, Debug, Copy)]
 pub struct ProjectileSize(pub i32);
 impl ProjectileSize {

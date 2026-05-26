@@ -4,8 +4,9 @@
   schematics: {
   "survival_rogue_like::item::WorldObject": LeatherTunic,
   "survival_rogue_like::attributes::RawItemBaseAttributes": (
-        health: Some((start: 6, end: 10)),
-        defence: Some((start: 6, end: 10)),
+        health: Some((start: 15, end: 22)),
+        defence: Some((start: 12, end: 17)),
+        
   ),
   "survival_rogue_like::attributes::RawItemBonusAttributes": (
         crit_damage: Some((start: 5, end: 10)),

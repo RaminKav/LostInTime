@@ -126,7 +126,7 @@ fn check_contact_damage_collisions(
         let player_pos = player_txfm.translation().truncate();
         let hazard_pos = hazard_txfm.translation().truncate();
         let dir = (player_pos - hazard_pos).normalize_or_zero();
-        let damage = f32::round(contact_damage.0 as f32 * (0.997_f32.powi(defence.0))) as i32;
+        let damage = defence.apply_to_damage(contact_damage.0);
         hit_event.send(HitEvent {
             hit_entity: player_e,
             damage,
@@ -720,8 +720,7 @@ fn check_projectile_hit_player_collisions(
             if hit_successful {
                 // Apply defense reduction if the target is a player with defense stat
                 let final_damage = if let Some(defence) = defence_opt {
-                    // Same formula as mob-to-player collisions: damage * (0.99 ^ defense)
-                    f32::round(att.0 as f32 * (0.997_f32.powi(defence.0))) as i32
+                    defence.apply_to_damage(att.0)
                 } else {
                     att.0
                 };
@@ -1138,7 +1137,7 @@ fn check_mob_to_player_collisions(
                 hit_event.send(HitEvent {
                     hit_by_pet: None,
                     hit_entity: e1,
-                    damage: f32::round(attack.0 as f32 * (0.997_f32.powi(defence.0))) as i32,
+                    damage: defence.apply_to_damage(attack.0),
                     dir: delta.normalize_or_zero().truncate(),
                     hit_with_melee: None,
                     hit_with_projectile: None,

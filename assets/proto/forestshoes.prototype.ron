@@ -4,8 +4,8 @@
   schematics: {
   "survival_rogue_like::item::WorldObject": ForestShoes,
   "survival_rogue_like::attributes::RawItemBaseAttributes": (
-        health: Some((start: 10, end: 15)),
-        defence: Some((start: 8, end: 16)),
+        health: Some((start: 18, end: 25)),
+        defence: Some((start: 12, end: 18)),
   ),
   "survival_rogue_like::attributes::RawItemBonusAttributes": (
          crit_damage: Some((start: 13, end: 20)),

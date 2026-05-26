@@ -507,7 +507,7 @@ fn spawn_player(
         .insert(VisibilityBundle::default())
         .insert(FacingDirection::Down)
         .insert(ActiveEvents::COLLISION_EVENTS)
-        .insert(ManaRegenTimer(Timer::from_seconds(6., TimerMode::Once)))
+        .insert(ManaRegenTimer(Timer::from_seconds(2., TimerMode::Once)))
         .insert(RunDustTimer(Timer::from_seconds(0.25, TimerMode::Once)))
         .insert(RigidBody::KinematicPositionBased)
         .insert(PlayerLevel::new(1))
