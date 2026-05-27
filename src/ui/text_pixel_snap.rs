@@ -20,14 +20,32 @@
 //!
 //! ## What this does
 //! After Bevy lays out the text (in `PostUpdate`, after `update_text2d_layout`), for every glyph
-//! in every `TextLayoutInfo` on render layer 3, shift `position` so the glyph quad's bottom edge
-//! lands on an integer physical **Y** relative to the parent (same coordinate space as
-//! [`crate::ui::snap_layer3_visuals_to_pixel_grid`]).
+//! in every `TextLayoutInfo` on render layer 3:
 //!
-//! **Only Y is rounded.** Rounding each glyph's bottom-left **X** independently distorts
-//! horizontal spacing from `glyph_brush_layout` — different glyphs pick up different nudges, so
-//! letter gaps shrink or grow. On Windows (`scale_factor == 1`) that showed up as merged pairs in
-//! longer strings such as "View heirlooms"; macOS (`scale_factor == 2`) masked it.
+//! 1. **Per-text bulk X snap.** Compute one `alignment_offset.x` rounded to the physical pixel
+//!    grid (the offset that [`bevy::sprite::Anchor`] applies to center / right-anchor a
+//!    `Text2dBundle`). Apply the same delta to every glyph in the layout. Because every glyph
+//!    receives the *same* horizontal shift, the per-glyph spacing produced by `glyph_brush_layout`
+//!    is preserved exactly — only the rigid origin of the text moves onto an integer column.
+//! 2. **Per-glyph Y snap.** Round each glyph quad's bottom edge to an integer physical pixel
+//!    (glyphs of different heights / baselines need their own Y rounding).
+//!
+//! ### Why per-glyph X rounding is still avoided
+//! Rounding each glyph's bottom-left **X** independently distorts horizontal spacing from
+//! `glyph_brush_layout` — different glyphs pick up different nudges, so letter gaps shrink or
+//! grow. On Windows (`scale_factor == 1`) that showed up as merged pairs in longer strings such
+//! as "View heirlooms". This pass only snaps the *bulk* X (a single value applied uniformly).
+//!
+//! ### Why bulk X snap matters
+//! With [`bevy::sprite::Anchor::Center`] (used by every heirloom card title and the
+//! `Rerolls:` / `Banishes:` counters in [`crate::ui::skill_choice_ui`]) the alignment offset is
+//! `layout.size * -0.5`. When the rendered text width is **odd in font pixels**, that offset is a
+//! literal `n + 0.5` — a half-pixel in font units. At scale 3 (`1080p` Windows) that's
+//! `0.5 * 3 / 1 = 1.5 physical pixels`, which is enough for `nearest` sampling to slice or
+//! duplicate a single column of a glyph's atlas rect (the "U with a chipped top-right corner",
+//! "E with a bump on the middle bar", "Tempered Soul" looking stretched). Sibling description
+//! lines escape the artifact only because their widths happen to be even. Snapping the bulk X
+//! once per text removes the content-dependent half-pixel without touching glyph spacing.
 //!
 //! ## Scope
 //! Restricted to `RenderLayers::layer(3)` (the UI camera), which is also what
@@ -71,19 +89,32 @@ pub fn pixel_snap_text_glyphs(
         let text_anchor = -(anchor.as_vec() + 0.5);
         let alignment_offset = layout.size * text_anchor;
 
+        // Bulk X snap: round the text-level alignment offset to the physical pixel grid and
+        // apply the same delta to every glyph. Because every glyph receives the identical
+        // horizontal shift, `glyph_brush_layout` spacing is preserved exactly — only the rigid
+        // origin of the text moves onto an integer column. Fixes content-dependent half-pixel
+        // artifacts (chipped `U`, bumpy `E` middle bar, "Tempered Soul" stretchy look) on every
+        // `Anchor::Center` text. See module docs.
+        let alignment_offset_phys_x = alignment_offset.x / scale_factor * phys_per_world;
+        let bulk_dx_phys_x = alignment_offset_phys_x.round() - alignment_offset_phys_x;
+        let bulk_dx_font_x = bulk_dx_phys_x * font_per_phys;
+
         for g in layout.glyphs.iter_mut() {
             let center_offset_font = alignment_offset + g.position;
             let half_size_font = g.size * 0.5;
             let corner_offset_font = center_offset_font - half_size_font;
             let corner_offset_phys = corner_offset_font / scale_factor * phys_per_world;
 
-            // Y only — see module docs (preserve horizontal letter spacing).
-            let target_phys = Vec2::new(corner_offset_phys.x, corner_offset_phys.y.round());
-            let delta_phys = target_phys - corner_offset_phys;
-            if delta_phys.y.abs() < 1e-4 {
+            // Per-glyph Y snap (each glyph has its own baseline-relative Y). See module docs
+            // for why per-glyph X is *not* rounded.
+            let delta_phys_y = corner_offset_phys.y.round() - corner_offset_phys.y;
+            let delta_font_y = delta_phys_y * font_per_phys;
+
+            if bulk_dx_font_x.abs() < 1e-4 && delta_font_y.abs() < 1e-4 {
                 continue;
             }
-            g.position += delta_phys * font_per_phys;
+            g.position.x += bulk_dx_font_x;
+            g.position.y += delta_font_y;
         }
     }
 }
