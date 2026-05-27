@@ -428,6 +428,7 @@ pub fn handle_time_crystal_progress_ok_button(
 pub fn handle_time_crystal_unlock_hover_tooltip(
     mut tooltip_requests: EventWriter<HeirloomTooltipRequest>,
     ui_state: Res<State<UIState>>,
+    dev_heirloom_grid_open: Option<Res<crate::ui::inventory_ui::DevHeirloomGridOpen>>,
     cursor_pos: Res<CursorPos>,
     icon_hit_targets: Query<
         (Entity, &Sprite, &GlobalTransform),
@@ -454,6 +455,13 @@ pub fn handle_time_crystal_unlock_hover_tooltip(
     let tooltip_ui_state = match ui_state.0 {
         UIState::TimeCrystalProgress => UIState::TimeCrystalProgress,
         UIState::TimeCrystalsBrowser => UIState::TimeCrystalsBrowser,
+        UIState::Inventory => {
+            if !dev_heirloom_grid_open.map(|g| g.0).unwrap_or(false) {
+                tooltip_requests.send(HeirloomTooltipRequest::Clear);
+                return;
+            }
+            UIState::Inventory
+        }
         _ => return,
     };
 

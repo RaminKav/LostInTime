@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-
 use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
 
 use crate::{
@@ -8,13 +6,14 @@ use crate::{
     colors::{WHITE, YELLOW_2},
     cursor::CursorPos,
     player::{
-        skills::{
-            time_crystal_heirlooms, Heirloom, HeirloomChoiceQueue, HeirloomChoiceState,
-            HeirloomRarity,
-        },
+        skills::time_crystal_heirlooms,
         time_crystals::TimeCrystals,
     },
     ui::{
+        heirloom_browser_grid::{
+            despawn_heirloom_browser_grid_layers, sorted_grid_entries_with_unlock_state,
+            spawn_heirloom_grid_overlay, HeirloomBrowserGridLayer, HeirloomGridContext,
+        },
         interactions::{Interactable, Interaction},
         inventory_ui::UIState,
         time_crystal_progress_ui::CrystalUnlockIcon,
@@ -37,20 +36,11 @@ pub struct TimeCrystalsViewHeirloomsButton;
 #[derive(Resource, Default)]
 pub struct TimeCrystalsHeirloomGridOpen(pub bool);
 
-/// Marks every entity belonging to the heirloom grid overlay (backdrop + cells) for teardown.
-#[derive(Component)]
-pub struct HeirloomBrowserGridLayer;
-
 const OVERLAY_Z: f32 = 95.;
 const PANEL_Z: f32 = 96.;
 const CONTENT_Z: f32 = 97.;
 const ICON_SIZE: f32 = 14.;
 const ICON_SPACING: f32 = 20.;
-const GRID_COLS: usize = 7;
-const GRID_CELL: f32 = 22.;
-const GRID_ICON: f32 = 16.;
-const GRID_Z_BACKDROP: f32 = 98.5;
-const GRID_Z_CELL: f32 = 99.5;
 
 fn browser_panel_dimensions(
     resolution: &ScreenResolution,
@@ -75,42 +65,7 @@ fn browser_panel_dimensions(
     (inner_w, inner_h)
 }
 
-fn pool_pairs(pool: &[HeirloomChoiceState]) -> HashSet<(Heirloom, HeirloomRarity)> {
-    pool.iter()
-        .filter(|s| s.heirloom != Heirloom::None)
-        .map(|s| (s.heirloom.clone(), s.rarity.clone()))
-        .collect()
-}
-
-fn sorted_heirloom_grid_entries(
-    time_crystals: &TimeCrystals,
-) -> Vec<(Heirloom, HeirloomRarity, bool)> {
-    let full = pool_pairs(&HeirloomChoiceQueue::with_all_unlocks().pool);
-    let unlocked = pool_pairs(&HeirloomChoiceQueue::new_for_player(time_crystals).pool);
-    let mut v: Vec<_> = full
-        .into_iter()
-        .map(|(h, r)| {
-            let is_unlocked = unlocked.contains(&(h.clone(), r.clone()));
-            (h, r, is_unlocked)
-        })
-        .collect();
-    v.sort_by(|(h1, r1, _), (h2, r2, _)| {
-        r1.cmp(r2)
-            .then_with(|| format!("{h1:?}").cmp(&format!("{h2:?}")))
-    });
-    v
-}
-
-fn despawn_heirloom_grid_layers(
-    commands: &mut Commands,
-    layers: &Query<Entity, With<HeirloomBrowserGridLayer>>,
-) {
-    for e in layers.iter() {
-        commands.entity(e).despawn_recursive();
-    }
-}
-
-fn spawn_heirloom_grid_overlay(
+fn spawn_heirloom_grid_for_browser(
     commands: &mut Commands,
     asset_server: &AssetServer,
     graphics: &Graphics,
@@ -118,109 +73,18 @@ fn spawn_heirloom_grid_overlay(
     inner_w: f32,
     inner_h: f32,
 ) {
-    let entries = sorted_heirloom_grid_entries(time_crystals);
-    if entries.is_empty() {
-        return;
-    }
-
-    let rows = (entries.len() + GRID_COLS - 1) / GRID_COLS;
-    let grid_w = GRID_COLS as f32 * GRID_CELL;
-    let backdrop_w = (inner_w * 0.92).min(grid_w + 36.);
-    let backdrop_h = (inner_h * 0.78).max(273.);
-
-    commands.spawn((
-        SpriteBundle {
-            sprite: Sprite {
-                color: Color::rgba(35. / 255., 70. / 255., 70. / 255., 1.),
-                custom_size: Some(Vec2::new(backdrop_w, backdrop_h)),
-                ..Default::default()
-            },
-            transform: Transform::from_translation(Vec3::new(0., 8., GRID_Z_BACKDROP)),
-            ..Default::default()
-        },
-        RenderLayers::from_layers(&[3]),
-        TimeCrystalsBrowserUI,
-        UIState::TimeCrystalsBrowser,
-        HeirloomBrowserGridLayer,
-        Name::new("Heirloom grid backdrop"),
-    ));
-
-    let start_x = -grid_w * 0.5 + GRID_CELL * 0.5;
-    let start_y = 8. + backdrop_h * 0.5 - GRID_CELL * 0.65;
-
-    for (i, (heirloom, rarity, is_unlocked)) in entries.into_iter().enumerate() {
-        let col = i % GRID_COLS;
-        let row = i / GRID_COLS;
-        let x = start_x + col as f32 * GRID_CELL;
-        let y = start_y - row as f32 * GRID_CELL;
-
-        if is_unlocked {
-            commands.spawn((
-                SpriteSheetBundle {
-                    sprite: graphics.get_heirloom_icon(heirloom.clone()),
-                    texture_atlas: graphics.texture_atlas.as_ref().unwrap().clone(),
-                    transform: Transform::from_translation(Vec3::new(x, y, GRID_Z_CELL)),
-                    ..Default::default()
-                },
-                Sprite {
-                    custom_size: Some(Vec2::new(GRID_ICON, GRID_ICON)),
-                    ..Default::default()
-                },
-                RenderLayers::from_layers(&[3]),
-                TimeCrystalsBrowserUI,
-                UIState::TimeCrystalsBrowser,
-                HeirloomBrowserGridLayer,
-                Interactable::default(),
-                CrystalUnlockIcon {
-                    heirloom: heirloom.clone(),
-                    rarity: rarity.clone(),
-                },
-                Name::new("Heirloom grid icon"),
-            ));
-        } else {
-            let cell = commands
-                .spawn((
-                    SpriteBundle {
-                        sprite: Sprite {
-                            color: Color::rgba(0.08, 0.08, 0.1, 0.55),
-                            custom_size: Some(Vec2::new(GRID_CELL - 2., GRID_CELL - 2.)),
-                            ..Default::default()
-                        },
-                        transform: Transform::from_translation(Vec3::new(x, y, GRID_Z_CELL)),
-                        ..Default::default()
-                    },
-                    RenderLayers::from_layers(&[3]),
-                    TimeCrystalsBrowserUI,
-                    UIState::TimeCrystalsBrowser,
-                    HeirloomBrowserGridLayer,
-                    Interactable::default(),
-                    // HeirloomGridLockedCell {
-                    //     heirloom: heirloom.clone(),
-                    //     rarity: rarity.clone(),
-                    // },
-                    Name::new("Heirloom grid locked cell"),
-                ))
-                .id();
-            commands.entity(cell).with_children(|parent| {
-                parent.spawn((
-                    Text2dBundle {
-                        text: Text::from_section(
-                            "?",
-                            TextStyle {
-                                font: asset_server.load("fonts/alagard.ttf"),
-                                font_size: 15.0,
-                                color: WHITE,
-                            },
-                        ),
-                        text_anchor: Anchor::Center,
-                        transform: Transform::from_translation(Vec3::new(0., 0., 1.)),
-                        ..Default::default()
-                    },
-                    RenderLayers::from_layers(&[3]),
-                ));
-            });
-        }
-    }
+    let entries = sorted_grid_entries_with_unlock_state(time_crystals);
+    spawn_heirloom_grid_overlay(
+        commands,
+        asset_server,
+        graphics,
+        Vec2::new(0., 8.),
+        inner_w,
+        inner_h,
+        entries,
+        HeirloomGridContext::TimeCrystalsBrowser,
+        None,
+    );
 }
 
 fn crystal_entry_height(time_crystals: &TimeCrystals, idx: usize) -> f32 {
@@ -604,11 +468,11 @@ pub fn handle_time_crystals_view_heirlooms_button(
                 Interaction::Hovering => {
                     if left_mouse_released {
                         let show = !grid_open.0;
-                        despawn_heirloom_grid_layers(&mut commands, &grid_layers);
+                        despawn_heirloom_browser_grid_layers(&mut commands, &grid_layers);
                         if show {
                             let (inner_w, inner_h) =
                                 browser_panel_dimensions(&resolution, &time_crystals);
-                            spawn_heirloom_grid_overlay(
+                            spawn_heirloom_grid_for_browser(
                                 &mut commands,
                                 &asset_server,
                                 &graphics,
@@ -668,8 +532,10 @@ pub fn cleanup_time_crystals_browser_ui(
     query: Query<Entity, With<TimeCrystalsBrowserUI>>,
     tooltips: Query<Entity, With<super::heirloom_tooltip::HeirloomDynamicTooltip>>,
     mut grid_open: ResMut<TimeCrystalsHeirloomGridOpen>,
+    grid_layers: Query<Entity, With<HeirloomBrowserGridLayer>>,
 ) {
     grid_open.0 = false;
+    despawn_heirloom_browser_grid_layers(&mut commands, &grid_layers);
     for entity in query.iter() {
         commands.entity(entity).despawn_recursive();
     }

@@ -4,6 +4,7 @@ use rand::{seq::IteratorRandom, Rng};
 use serde::{Deserialize, Serialize};
 use std::{
     cmp::{max, min},
+    collections::HashSet,
     ops::{Add, RangeInclusive},
 };
 use strum_macros::{Display, EnumIter};
@@ -1533,6 +1534,92 @@ fn calculate_inventory_buffs(
     inventory_buffs
 }
 
+/// Proto-defined base stat names for an item (attack, armour health, etc.).
+/// Bonus stat lines matching these names are rolled duplicates of base stats and must not
+/// be applied twice when only bonus stats are desired (pet slot, inventory buff).
+fn base_attribute_names_for_item(stack: &ItemStack, proto: &ProtoParam) -> HashSet<String> {
+    let mut names = HashSet::new();
+    let Some(raw_base_att) = proto.get_component::<RawItemBaseAttributes, _>(stack.obj_type) else {
+        return names;
+    };
+    if raw_base_att.health.is_some() {
+        names.insert("health".to_string());
+    }
+    if raw_base_att.defence.is_some() {
+        names.insert("defence".to_string());
+    }
+    if raw_base_att.attack.is_some() {
+        names.insert("attack".to_string());
+    }
+    if raw_base_att.speed.is_some() {
+        names.insert("speed".to_string());
+    }
+    names
+}
+
+fn bonus_stat_line_to_item_attributes(stat_line: &BonusStatLine) -> Option<ItemAttributes> {
+    let mut buff_att = ItemAttributes::default();
+    let attr_value = AttributeValue::new(
+        stat_line.value,
+        stat_line.quality,
+        stat_line.range_percentage,
+    );
+
+    match stat_line.attribute_name.as_str() {
+        "health" => buff_att.health = attr_value,
+        "shield" => buff_att.shield = attr_value,
+        "attack" => buff_att.attack = attr_value,
+        "crit_chance" => buff_att.crit_chance = attr_value,
+        "crit_damage" => buff_att.crit_damage = attr_value,
+        "bonus_damage" => buff_att.bonus_damage = attr_value,
+        "health_regen" => buff_att.health_regen = attr_value,
+        "healing" => buff_att.healing = attr_value,
+        "thorns" => buff_att.thorns = attr_value,
+        "dodge" => buff_att.dodge = attr_value,
+        "speed" => buff_att.speed = attr_value,
+        "lifesteal" => buff_att.lifesteal = attr_value,
+        "defence" => buff_att.defence = attr_value,
+        "attack_speed" => buff_att.attack_speed = attr_value,
+        "loot_rate" => buff_att.loot_rate = attr_value,
+        "mana" => buff_att.mana = attr_value,
+        "size" | "projectile_size" => buff_att.size = attr_value,
+        "xp_rate" => buff_att.xp_rate = attr_value,
+        "mana_regen" => buff_att.mana_regen = attr_value,
+        "durability" => buff_att.durability = attr_value,
+        "max_durability" => buff_att.max_durability = attr_value,
+        "skill_power" => buff_att.skill_power = attr_value,
+        "pickup_range" => buff_att.pickup_range = attr_value,
+        _ => return None,
+    }
+
+    Some(buff_att)
+}
+
+/// Bonus rolls from the pet equipment weapon (not base attack or attacks/sec).
+fn calculate_pet_slot_bonuses(inv: &Inventory, proto: &ProtoParam) -> ItemAttributes {
+    let mut pet_bonuses = ItemAttributes::default();
+    let Some(item_stack) = inv
+        .pet_items
+        .items
+        .get(0)
+        .and_then(|slot| slot.as_ref())
+        .map(|inv_stack| &inv_stack.item_stack)
+    else {
+        return pet_bonuses;
+    };
+
+    let base_names = base_attribute_names_for_item(item_stack, proto);
+    for stat_line in &item_stack.metadata.bonus_stat_lines {
+        if base_names.contains(&stat_line.attribute_name) {
+            continue;
+        }
+        if let Some(buff_att) = bonus_stat_line_to_item_attributes(stat_line) {
+            pet_bonuses = pet_bonuses.combine(&buff_att);
+        }
+    }
+    pet_bonuses
+}
+
 /// Extract the attribute value from a specific bonus stat line index
 /// The line_index is an index into stack.metadata.bonus_stat_lines
 fn extract_inventory_buff_attribute(
@@ -1540,48 +1627,11 @@ fn extract_inventory_buff_attribute(
     line_index: usize,
     _proto: &crate::proto::proto_param::ProtoParam,
 ) -> Option<ItemAttributes> {
-    // Get the stat line directly from bonus_stat_lines
-    if let Some(stat_line) = stack.metadata.bonus_stat_lines.get(line_index) {
-        // Convert the single stat line to ItemAttributes
-        let mut buff_att = ItemAttributes::default();
-        let attr_value = AttributeValue::new(
-            stat_line.value,
-            stat_line.quality,
-            stat_line.range_percentage,
-        );
-
-        // Match attribute name to ItemAttributes field
-        match stat_line.attribute_name.as_str() {
-            "health" => buff_att.health = attr_value,
-            "shield" => buff_att.shield = attr_value,
-            "attack" => buff_att.attack = attr_value,
-            "crit_chance" => buff_att.crit_chance = attr_value,
-            "crit_damage" => buff_att.crit_damage = attr_value,
-            "bonus_damage" => buff_att.bonus_damage = attr_value,
-            "health_regen" => buff_att.health_regen = attr_value,
-            "healing" => buff_att.healing = attr_value,
-            "thorns" => buff_att.thorns = attr_value,
-            "dodge" => buff_att.dodge = attr_value,
-            "speed" => buff_att.speed = attr_value,
-            "lifesteal" => buff_att.lifesteal = attr_value,
-            "defence" => buff_att.defence = attr_value,
-            "attack_speed" => buff_att.attack_speed = attr_value,
-            "loot_rate" => buff_att.loot_rate = attr_value,
-            "mana" => buff_att.mana = attr_value,
-            "size" | "projectile_size" => buff_att.size = attr_value,
-            "xp_rate" => buff_att.xp_rate = attr_value,
-            "mana_regen" => buff_att.mana_regen = attr_value,
-            "durability" => buff_att.durability = attr_value,
-            "max_durability" => buff_att.max_durability = attr_value,
-            "skill_power" => buff_att.skill_power = attr_value,
-            "pickup_range" => buff_att.pickup_range = attr_value,
-            _ => return None, // Unknown attribute
-        }
-
-        Some(buff_att)
-    } else {
-        None
-    }
+    stack
+        .metadata
+        .bonus_stat_lines
+        .get(line_index)
+        .and_then(bonus_stat_line_to_item_attributes)
 }
 
 fn handle_player_item_attribute_change_events(
@@ -1640,7 +1690,6 @@ fn handle_player_item_attribute_change_events(
             .items
             .iter()
             .chain(inv.accessory_items.items.iter())
-            .chain(inv.pet_items.items.iter())
             .flatten()
             .map(|e| e.item_stack.get_attributes())
             .collect();
@@ -1648,6 +1697,9 @@ fn handle_player_item_attribute_change_events(
         for a in eqp_attributes.iter().chain(equips.iter()) {
             new_att = new_att.combine(a);
         }
+
+        // Pet slot weapons only grant rolled bonus stats to the player (not base attack / attacks per sec).
+        new_att = new_att.combine(&calculate_pet_slot_bonuses(&inv, &proto));
 
         // Combine hallucination stats from LethalBlow executes
         if let Some(hall_stats) = hallucination_stats {

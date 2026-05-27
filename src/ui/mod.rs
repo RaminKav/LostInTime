@@ -84,6 +84,8 @@ mod time_crystal_progress_ui;
 pub use time_crystal_progress_ui::*;
 mod time_crystals_browser_ui;
 pub use time_crystals_browser_ui::*;
+mod heirloom_browser_grid;
+pub use heirloom_browser_grid::*;
 mod beastiary_browser_ui;
 pub use beastiary_browser_ui::*;
 mod achievements_ui;
@@ -536,6 +538,7 @@ impl Plugin for UIPlugin {
             .init_resource::<BlacksmithPurchaseTracker>()
             .init_resource::<EssenceShopCache>()
             .init_resource::<TimeCrystalsHeirloomGridOpen>()
+            .init_resource::<DevHeirloomGridOpen>()
             .init_resource::<SelectedBeastiaryMob>()
             .add_event::<TooltipTeardownEvent>()
             .add_event::<ShowInvPlayerStatsEvent>()
@@ -621,6 +624,8 @@ impl Plugin for UIPlugin {
                 setup_inv_ui
                     .before(CustomFlush)
                     .run_if(state_changed::<UIState>().and_then(in_state(UIState::Inventory))),
+                cleanup_dev_heirloom_grid_on_inv_close
+                    .run_if(state_changed::<UIState>().and_then(not(in_state(UIState::Inventory)))),
                 reset_blueprints_pagination_on_open
                     .before(CustomFlush)
                     .run_if(state_changed::<UIState>().and_then(in_state(UIState::InventoryCrafting))),
@@ -1108,7 +1113,6 @@ impl Plugin for UIPlugin {
                     ),
                     update_upgrade_material_prompt_text.run_if(in_state(UIState::Inventory)),
                     handle_dev_button_clicks.run_if(in_state(UIState::Inventory)),
-                    apply_grant_heirloom_dev.run_if(in_state(UIState::Inventory)),
                     setup_furnace_slots_ui.run_if(in_state(UIState::Furnace)),
                     handle_blueprint_slot_interaction
                         .run_if(in_state(UIState::InventoryCrafting)),
@@ -1119,6 +1123,16 @@ impl Plugin for UIPlugin {
                     handle_crafting_result_slot_click
                         .before(handle_item_drop_clicks)
                         .run_if(in_state(UIState::InventoryCrafting)),
+                )
+                    .in_set(OnUpdate(GameState::Main)),
+            )
+            .add_systems(
+                (
+                    handle_dev_heirloom_picker_toggle.run_if(in_state(UIState::Inventory)),
+                    handle_dev_heirloom_picker_clicks.run_if(in_state(UIState::Inventory)),
+                    handle_time_crystal_unlock_hover_tooltip
+                        .run_if(in_state(UIState::Inventory)),
+                    apply_grant_heirloom_dev.run_if(in_state(UIState::Inventory)),
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )

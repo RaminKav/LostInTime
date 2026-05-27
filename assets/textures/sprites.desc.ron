@@ -292,7 +292,7 @@
         ),
         ChestBlock: WorldObjectData(
             texture_pos: (12., 14.),
-            size: (23., 18.),
+            size: (25., 18.),
             anchor: None,
         ),
         HeirloomChest: WorldObjectData(

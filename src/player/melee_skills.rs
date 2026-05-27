@@ -73,14 +73,8 @@ pub fn handle_second_split_attack(
         };
 
         let frail_stacks = status_option.map(|s| s.frail_stacks()).unwrap_or(0);
-        let (damage, was_crit, was_overcrit) = game.calculate_player_damage(
-            (frail_stacks * 5) as u32,
-            None,
-            0,
-            None,
-            frail_stacks,
-            0,
-        );
+        let (damage, was_crit, was_overcrit) =
+            game.calculate_player_damage((frail_stacks * 5) as u32, None, 0, None, frail_stacks, 0);
 
         let split_damage = f32::floor(damage as f32 / 2.) as i32;
 
@@ -197,14 +191,9 @@ pub fn handle_echo_after_heal(
                 }
             }
         }
-        // HealSummons: 20% chance to trigger all summons once (Ant Farm, Boulder, Piercing Ring). Trigger costs mana; summons are free.
+        // HealSummons: 10% chance to trigger all summons once (Ant Farm, Boulder, Piercing Ring). Trigger costs mana; summons are free.
         let count = skills.get_count(Heirloom::HealSummons);
-        let heal_summons_mana_cost = Heirloom::HealSummons.get_mana_cost();
-        if count > 0
-            && rng.gen_bool((0.2 * count as f64).clamp(0.0, 1.0))
-            && current_mana.0 >= heal_summons_mana_cost
-        {
-            current_mana.0 -= heal_summons_mana_cost;
+        if count > 0 && rng.gen_bool((0.1 * count as f64).clamp(0.0, 1.0)) {
             trigger_summons_events.send(TriggerSummonsEvent(e));
         }
     }
