@@ -95,6 +95,7 @@ pub fn pixel_snap_text_glyphs(
     res: Res<ScreenResolution>,
     windows: Query<&Window, With<PrimaryWindow>>,
     mut commands: Commands,
+    changed_text: Query<Entity, Changed<Text>>,
     mut text_q: Query<
         (
             Entity,
@@ -127,10 +128,11 @@ pub fn pixel_snap_text_glyphs(
 
         let prev_bulk_x = snap_state.as_ref().map(|s| s.bulk_x_font).unwrap_or(0.0);
         let content_key = text_content_key(text, layout.size);
-        let layout_rebuilt = snap_state
-            .as_ref()
-            .map(|s| s.content_key != content_key)
-            .unwrap_or(true);
+        let layout_rebuilt = changed_text.contains(entity)
+            || snap_state
+                .as_ref()
+                .map(|s| s.content_key != content_key)
+                .unwrap_or(true);
 
         // When Bevy rebuilds layout (text / size changed), glyph positions are fresh — do not
         // subtract a bulk-X offset we applied to the previous layout.

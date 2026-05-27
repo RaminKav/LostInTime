@@ -104,9 +104,9 @@ impl SkillClass {
 
     pub fn compute_cape_stats(&self, level: i32) -> ItemAttributes {
         let mut stats = ItemAttributes::default();
-        let quality = if level > 10 {
+        let quality = if level > 35 {
             AttributeQuality::High
-        } else if level >= 5 {
+        } else if level >= 10 {
             AttributeQuality::Average
         } else {
             AttributeQuality::Low
@@ -116,8 +116,8 @@ impl SkillClass {
 
         match self {
             SkillClass::Warrior => {
-                // +5 HP per level
-                stats.health = AttributeValue::new(level * 3, quality, 1.);
+                // +2 size per level
+                stats.size = AttributeValue::new(level * 2, quality, 1.);
             }
             SkillClass::Wizard => {
                 // +5 MP per level
@@ -298,22 +298,18 @@ pub fn fire_ring_duration_seconds(max_mana: i32) -> f32 {
     FIRE_RING_BASE_DURATION_SECS + (excess / 10.0) * FIRE_RING_EXTRA_SECS_PER_10_MAX_MANA
 }
 
-// --- ParrySpear (pull + HP cost; gameplay in `melee_skills::handle_spear`) ---
+// --- ParrySpear (pull radius scales with [`crate::attributes::ProjectileSize`];
+// gameplay in `melee_skills::handle_spear`) ---
 
 pub mod parry_spear_scaling {
     pub const BASE_PULL_RADIUS_PX: f32 = 64.0;
-    pub const PULL_RADIUS_PER_HP_DRAINED_PX: f32 = 4.0;
-    pub const HP_COST_FRACTION: f32 = 0.05;
+    /// Extra pull radius per point of Size ([`crate::attributes::ProjectileSize`]).
+    pub const PULL_RADIUS_PER_SIZE_PX: f32 = 0.6;
 }
 
-pub fn parry_spear_hp_drained(max_health: i32) -> i32 {
-    ((max_health as f32) * parry_spear_scaling::HP_COST_FRACTION).max(0.0) as i32
-}
-
-pub fn parry_spear_pull_radius_px(max_health: i32) -> f32 {
-    let hp = parry_spear_hp_drained(max_health);
+pub fn parry_spear_pull_radius_px(size: i32) -> f32 {
     parry_spear_scaling::BASE_PULL_RADIUS_PX
-        + parry_spear_scaling::PULL_RADIUS_PER_HP_DRAINED_PX * hp as f32
+        + parry_spear_scaling::PULL_RADIUS_PER_SIZE_PX * size.max(0) as f32
 }
 
 // --- Arrow Volley (waves / timing; crit bonus in `combat/collisions`) ---
@@ -588,6 +584,7 @@ impl ActiveSkill {
         bonus_attack_speed_mult: f32,
         crit_chance: i32,
         speed: i32,
+        size: i32,
     ) -> Vec<String> {
         use active_skill_scaling::{
             dagger_slash_total_slashes, ARROW_VOLLEY, BOMB, BUCKSHOT_PELLET, DAGGER_SLASH,
@@ -628,18 +625,15 @@ impl ActiveSkill {
                 "damage and stunning.".to_string(),
             ],
             ActiveSkill::ParrySpear => {
-                let pull_px = parry_spear_pull_radius_px(max_health);
+                let pull_px = parry_spear_pull_radius_px(size);
                 vec![
-                    "Launch a spear that drains 5% hp".to_string(),
+                    "Launch a spear that pulls enemies".to_string(),
                     format!(
-                        "to pull enemies from {} tiles towards",
+                        "from {} tiles towards the impact area,",
                         (pull_px / 16.).round()
                     ),
-                    format!(
-                        "the impact area, dealing {:.1}% damage.",
-                        skill_power * PARRY_SPEAR
-                    ),
-                    "Pull distance scales with hp drained.".to_string(),
+                    format!("dealing {:.1}% damage.", skill_power * PARRY_SPEAR),
+                    "Pull distance scales with Size.".to_string(),
                 ]
             }
             ActiveSkill::Sprint => vec![

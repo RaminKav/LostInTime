@@ -6,11 +6,11 @@
                 "Sword"
             ],
             stat_description: [
-                "Gain +3 Health per level" // 8 lvls, +5 would be 5 
+                "Gain +2 size per level" // 8 lvls, +5 would be 5 
             ],
             class_icon: RedPlayerSelectIcon,
             skill_icon: HealthIcon,
-            active_skills: (SpinAttack, Shout, ParrySpear,Heal), // consumes 5% hp, pulls in further distance per hp deducted
+            active_skills: (SpinAttack, Shout, ParrySpear,Heal), // pull radius scales with Size
             starting_weapons: [Sword, Spear, Hammer],
         ),
         Wizard: (

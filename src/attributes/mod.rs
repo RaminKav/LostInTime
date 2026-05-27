@@ -487,10 +487,7 @@ impl ItemAttributes {
             },
         ));
         tooltips.push(("Thorns           ".to_string(), format!("{}", self.thorns)));
-        tooltips.push((
-            "Dodge            ".to_string(),
-            format!("{}%", self.dodge),
-        ));
+        tooltips.push(("Dodge            ".to_string(), format!("{}%", self.dodge)));
         tooltips.push(("Speed          ".to_string(), format!("{}", self.speed)));
 
         tooltips.push(("Size           ".to_string(), format!("{}", self.size)));
@@ -708,9 +705,7 @@ impl ItemAttributes {
             0
         };
         entity.insert(ProjectileSize(
-            self.size.value
-                + skills.get_count(Heirloom::Gigantify) * 10
-                + gravity_size_bonus,
+            self.size.value + skills.get_count(Heirloom::Gigantify) * 10 + gravity_size_bonus,
         ));
         entity.insert(PickupRange(pickup_range_total));
         entity.insert(SkillPower(
@@ -2229,11 +2224,11 @@ pub fn handle_cape_att_increase_on_level_up(
             cape_stack.metadata.bonus_stat_lines = item_attributes_to_bonus_stat_lines(&cape_attrs);
 
             cape_stack.attributes = cape_attrs;
-            if level >= 11 {
+            if level >= 50 {
                 cape_stack.rarity = ItemRarity::Legendary;
-            } else if level >= 7 {
+            } else if level >= 35 {
                 cape_stack.rarity = ItemRarity::Rare;
-            } else if level >= 3 {
+            } else if level >= 12 {
                 cape_stack.rarity = ItemRarity::Uncommon;
             } else {
                 cape_stack.rarity = ItemRarity::Common;

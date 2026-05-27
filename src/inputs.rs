@@ -3,7 +3,6 @@ use crate::blessings::OwnedBlessings;
 use crate::chaos::ChaosTracker;
 use crate::cursor::CursorPos;
 use crate::ui::tips::SeenTips;
-use std::f32::consts::PI;
 use std::time::Duration;
 
 use crate::animations::player_sprite::PlayerAnimation;
@@ -246,24 +245,12 @@ fn turn_player(
     cursor_pos: Res<CursorPos>,
     mut commands: Commands,
 ) {
-    let angle = f32::atan(cursor_pos.ui_coords.x / cursor_pos.ui_coords.y).abs();
-    let dir = if cursor_pos.ui_coords.y > 0. {
-        if angle < PI / 4. {
-            FacingDirection::Up
-        } else if cursor_pos.ui_coords.x < 0. {
-            FacingDirection::Left
-        } else {
-            FacingDirection::Right
-        }
-    } else if angle < PI / 4. {
-        FacingDirection::Down
-    } else if cursor_pos.ui_coords.x < 0. {
-        FacingDirection::Left
-    } else {
-        FacingDirection::Right
-    };
-    //TODO: make center point based on player pos on screen?
-    //TODO: add some way for attack to know dir
+    let to_cursor =
+        cursor_pos.world_coords.truncate() - game.player_state.position.truncate();
+    if to_cursor.length_squared() < 1e-4 {
+        return;
+    }
+    let dir = FacingDirection::from_translation(to_cursor);
     let curr_dir = player_query.single();
     if &dir != curr_dir {
         commands.entity(game.player).insert(dir.clone());

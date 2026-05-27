@@ -25,8 +25,8 @@ use crate::{
     assets::Graphics,
     attributes::{
         attribute_helpers::skill_power_multiplier, ActiveConsumableBuffs, AttackSpeed,
-        BonusAttackSpeed, CritChance, CurrentHealth, CurrentMana, MaxHealth, MaxMana, SkillPower,
-        Speed,
+        BonusAttackSpeed, CritChance, CurrentHealth, CurrentMana, MaxHealth, MaxMana,
+        ProjectileSize, SkillPower, Speed,
     },
     audio::{AudioSoundEffect, SoundSpawner},
     blessings::OwnedBlessings,
@@ -1354,6 +1354,7 @@ pub fn spawn_skill_tooltip_content(
     bonus_attack_speed_mult: f32,
     crit_chance: i32,
     speed: i32,
+    size: i32,
 ) {
     const ICONS_X_OFFSET: f32 = -24.;
     const TEXT_Y_OFFSET: f32 = 12.;
@@ -1369,6 +1370,7 @@ pub fn spawn_skill_tooltip_content(
         bonus_attack_speed_mult,
         crit_chance,
         speed,
+        size,
     );
     let active_skill_name = active_skill.get_title();
     let desc_body_style = gf::SKILL_PANEL_BODY.text_style(asset_server, DARK_WOOD_BROWN);
@@ -1492,6 +1494,7 @@ pub fn handle_active_skill_hud_tooltip(
             Option<&AttackSpeed>,
             &CritChance,
             &Speed,
+            &ProjectileSize,
         ),
         With<Player>,
     >,
@@ -1571,7 +1574,7 @@ pub fn handle_active_skill_hud_tooltip(
             .set_parent(container)
             .id();
 
-        let (skill_power, blessings, max_mana, max_health, bonus_as, attack_speed, crit, spd) =
+        let (skill_power, blessings, max_mana, max_health, bonus_as, attack_speed, crit, spd, size) =
             skill_power.single();
         let bonus_as_mult = effective_player_attack_speed_multiplier(
             attack_speed.map(|a| a.0).unwrap_or(0),
@@ -1590,6 +1593,7 @@ pub fn handle_active_skill_hud_tooltip(
             bonus_as_mult,
             crit.0,
             spd.0,
+            size.0,
         );
     }
 

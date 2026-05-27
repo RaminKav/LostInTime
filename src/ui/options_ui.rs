@@ -1940,13 +1940,26 @@ pub fn handle_scale_button_click(
                 }
                 Interaction::Hovering => {
                     if left_mouse_released {
+                        let before = (
+                            display_scale.clamped_game_steps(),
+                            display_scale.clamped_ui_steps(),
+                        );
                         let zoom_in = scale_button.direction == VolumeDirection::Up;
                         match scale_button.channel {
                             ScaleChannel::Game => display_scale.nudge_game(zoom_in),
                             ScaleChannel::Ui => display_scale.nudge_ui(zoom_in),
                         }
-                        display_scale.save();
-                        commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.2));
+                        let after = (
+                            display_scale.clamped_game_steps(),
+                            display_scale.clamped_ui_steps(),
+                        );
+                        if before != after {
+                            display_scale.save();
+                            commands.spawn(SoundSpawner::new(
+                                AudioSoundEffect::ButtonClick,
+                                0.2,
+                            ));
+                        }
                     }
                 }
                 _ => {}
@@ -2155,22 +2168,27 @@ pub fn update_volume_text(
             VolumeChannel::Music => audio_volume.music,
             VolumeChannel::Sfx => audio_volume.sfx,
         };
-        text.sections[0].value = format!("{}", val);
+        let new_value = format!("{}", val);
+        if text.sections[0].value != new_value {
+            text.sections[0].value = new_value;
+        }
     }
 }
 
 pub fn update_scale_text(
     display_scale: Res<DisplayScaleSettings>,
-    resolution: Res<ScreenResolution>,
     mut texts: Query<(&ScaleValueText, &mut Text)>,
 ) {
-    if !display_scale.is_changed() && !resolution.is_changed() {
+    if !display_scale.is_changed() {
         return;
     }
     for (scale_text, mut text) in texts.iter_mut() {
-        text.sections[0].value = match scale_text.channel {
+        let new_value = match scale_text.channel {
             ScaleChannel::Game => display_scale.format_game_zoom_display(),
             ScaleChannel::Ui => display_scale.format_ui_zoom_display(),
         };
+        if text.sections[0].value != new_value {
+            text.sections[0].value = new_value;
+        }
     }
 }

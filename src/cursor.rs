@@ -3,7 +3,7 @@ use bevy::render::view::RenderLayers;
 use bevy::window::PrimaryWindow;
 
 use crate::assets::Graphics;
-use crate::inputs::{cursor_pos_in_ui, cursor_pos_in_world, player_move_inputs};
+use crate::inputs::{cursor_pos_in_ui, cursor_pos_in_world};
 use crate::item::WorldObject;
 use crate::{GameState, TextureCamera, UICamera, DEBUG};
 
@@ -36,7 +36,11 @@ fn use_custom_cursor() -> bool {
 
 impl Plugin for CustomCursorPlugin {
     fn build(&self, app: &mut App) {
-        app.add_system(update_cursor_pos.after(player_move_inputs))
+        app.add_system(
+            update_cursor_pos
+                .after(crate::inputs::move_camera_with_player)
+                .in_base_set(CoreSet::PostUpdate),
+        )
             // Setup cursor once graphics are loaded (after Loading state)
             .add_system(
                 setup_custom_cursor
@@ -122,6 +126,17 @@ pub fn update_cursor_pos(
     mut cursor_moved_events: EventReader<CursorMoved>,
     mut cursor_pos: ResMut<CursorPos>,
 ) {
+    for cursor_moved in cursor_moved_events.iter() {
+        cursor_pos.screen_coords = cursor_moved.position.extend(0.);
+    }
+
+    let Ok(window) = windows.get_single() else {
+        return;
+    };
+    if let Some(pos) = window.cursor_position() {
+        cursor_pos.screen_coords = pos.extend(0.);
+    }
+
     let Ok((world_cam_t, world_cam)) = world_camera_q.get_single() else {
         return;
     };
@@ -129,16 +144,8 @@ pub fn update_cursor_pos(
         return;
     };
 
-    for cursor_moved in cursor_moved_events.iter() {
-        *cursor_pos = CursorPos {
-            world_coords: cursor_pos_in_world(
-                &windows,
-                cursor_moved.position,
-                world_cam_t,
-                world_cam,
-            ),
-            ui_coords: cursor_pos_in_ui(&windows, cursor_moved.position, ui_cam),
-            screen_coords: cursor_moved.position.extend(0.),
-        };
-    }
+    let screen = cursor_pos.screen_coords.truncate();
+    cursor_pos.world_coords =
+        cursor_pos_in_world(&windows, screen, world_cam_t, world_cam);
+    cursor_pos.ui_coords = cursor_pos_in_ui(&windows, screen, ui_cam);
 }

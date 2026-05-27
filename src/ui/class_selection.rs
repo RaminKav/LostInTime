@@ -2004,6 +2004,7 @@ fn spawn_player_preview(
                 0.6,
                 10,
                 0,
+                0,
             );
         } else {
             spawn_locked_skill_content(

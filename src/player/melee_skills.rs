@@ -25,7 +25,7 @@ use crate::{
         mage_skills::spawn_ice_explosion_hitbox,
         skills::{
             active_skill_scaling::{attack_damage_multiplier, PARRY_SPEAR},
-            parry_spear_hp_drained, parry_spear_pull_radius_px,
+            parry_spear_pull_radius_px,
         },
     },
     status_effects::MobStatusEffects,
@@ -299,7 +299,7 @@ pub fn handle_spear(
             &GlobalTransform,
             &PlayerSkills,
             &Attack,
-            &MaxHealth,
+            &ProjectileSize,
             &mut SpearState,
             &mut KinematicCharacterController,
             &mut MovementVector,
@@ -310,9 +310,8 @@ pub fn handle_spear(
     time: Res<Time>,
     cursor_pos: Res<CursorPos>,
     mut ranged_attack_events: EventWriter<RangedAttackEvent>,
-    mut modify_health_event: EventWriter<ModifyHealthEvent>,
 ) {
-    let Ok((e, player_pos, skills, _dmg, max_health, mut spear_state, mut kcc, mut mv)) =
+    let Ok((e, player_pos, skills, _dmg, projectile_size, mut spear_state, mut kcc, mut mv)) =
         player.get_single_mut()
     else {
         return;
@@ -336,11 +335,7 @@ pub fn handle_spear(
         let direction = (cursor_pos.world_coords.truncate() - player_pos_2d).normalize_or_zero();
         let epicenter = player_pos_2d + direction * 1.7 * TILE_SIZE.x;
 
-        let hp_drained = parry_spear_hp_drained(max_health.0);
-        if hp_drained > 0 {
-            modify_health_event.send(ModifyHealthEvent(-hp_drained));
-        }
-        let pull_radius = parry_spear_pull_radius_px(max_health.0);
+        let pull_radius = parry_spear_pull_radius_px(projectile_size.0);
 
         commands.entity(e).insert(SpearPullDelay {
             delay_timer: Timer::from_seconds(0.45, TimerMode::Once),
@@ -480,7 +475,7 @@ pub fn handle_spear_pull_delay(
 
         // Pull all nearby enemies to the epicenter
         let epicenter = pull_delay.epicenter;
-        // Captured at cast time; scales with HP drained by the 5% max-HP cost.
+        // Captured at cast time; scales with Size at cast.
         let pull_radius = pull_delay.pull_radius;
 
         for (mob_e, mob_transform) in mobs.iter() {

@@ -5,7 +5,7 @@ use crate::{
     attributes::{
         attribute_helpers::skill_power_multiplier, AttackSpeed, BonusAttackSpeed, CritChance,
         MaxHealth,
-        MaxMana, SkillPower, Speed,
+        MaxMana, ProjectileSize, SkillPower, Speed,
     },
     blessings::OwnedBlessings,
     colors::DARK_WOOD_BROWN,
@@ -54,6 +54,7 @@ pub fn setup_active_skill_shrine_ui(
             Option<&AttackSpeed>,
             &CritChance,
             &Speed,
+            &ProjectileSize,
         ),
         With<Player>,
     >,
@@ -173,7 +174,7 @@ pub fn setup_active_skill_shrine_ui(
             .insert(Name::new(format!("SKILL_BANNER_{}", index)))
             .set_parent(container)
             .id();
-        let (skill_power, blessings, max_mana, max_health, bonus_as, attack_speed, crit, spd) =
+        let (skill_power, blessings, max_mana, max_health, bonus_as, attack_speed, crit, spd, size) =
             skill_power.single();
         let bonus_as_mult = effective_player_attack_speed_multiplier(
             attack_speed.map(|a| a.0).unwrap_or(0),
@@ -192,6 +193,7 @@ pub fn setup_active_skill_shrine_ui(
             bonus_as_mult,
             crit.0,
             spd.0,
+            size.0,
         );
     }
 
@@ -314,6 +316,7 @@ pub fn setup_active_skill_shrine_overwrite_ui(
             Option<&AttackSpeed>,
             &CritChance,
             &Speed,
+            &ProjectileSize,
         ),
         With<Player>,
     >,
@@ -369,7 +372,7 @@ pub fn setup_active_skill_shrine_overwrite_ui(
         .insert(Name::new("SKILL_VIEW4_BACKGROUND"))
         .id();
 
-    let (skills, skill_power, blessings, max_mana, max_health, bonus_as, attack_speed, crit, spd) =
+    let (skills, skill_power, blessings, max_mana, max_health, bonus_as, attack_speed, crit, spd, size) =
         skills.single();
     let bonus_as_mult = effective_player_attack_speed_multiplier(
         attack_speed.map(|a| a.0).unwrap_or(0),
@@ -444,6 +447,7 @@ pub fn setup_active_skill_shrine_overwrite_ui(
             bonus_as_mult,
             crit.0,
             spd.0,
+            size.0,
         );
     }
 
