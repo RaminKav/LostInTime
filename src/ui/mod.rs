@@ -30,6 +30,7 @@ mod fps_text;
 
 pub mod font_binarize;
 pub mod game_fonts;
+pub mod layout_sync;
 pub mod text_pixel_snap;
 pub mod key_input_guide;
 use key_input_guide::*;
@@ -549,6 +550,8 @@ impl Plugin for UIPlugin {
             .add_event::<GrantHeirloomDevEvent>()
             .add_event::<HeirloomTooltipRequest>()
             .add_plugin(Material2dPlugin::<ScreenEffectMaterial>::default())
+            .init_resource::<OptionsUiLayoutRevision>()
+            .init_resource::<layout_sync::UiLayoutSyncState>()
             .add_plugin(hud_bar_fill::HudBarFillPlugin)
             .register_type::<InventorySlotState>()
             .add_plugin(MinimapPlugin)
@@ -574,6 +577,30 @@ impl Plugin for UIPlugin {
                 fps_text::phase3_fps_atlas_dump
                     .in_base_set(CoreSet::PostUpdate)
                     .run_if(in_state(GameState::Main)),
+            )
+            .add_system(
+                layout_sync::bump_options_ui_revision_on_ui_layout_change
+                    .after(crate::update_pixel_perfect_viewport),
+            )
+            .add_system(
+                player_hud::sync_player_hud_layout_to_resolution
+                    .after(crate::update_pixel_perfect_viewport),
+            )
+            .add_system(
+                player_hud::sync_player_hud_progress_layout_to_resolution
+                    .after(player_hud::sync_player_hud_layout_to_resolution),
+            )
+            .add_system(
+                player_hud::sync_player_hud_slots_layout_to_resolution
+                    .after(player_hud::sync_player_hud_progress_layout_to_resolution),
+            )
+            .add_system(
+                minimap::sync_hud_minimap_layout_to_resolution
+                    .after(player_hud::sync_player_hud_slots_layout_to_resolution),
+            )
+            .add_system(
+                layout_sync::commit_ui_layout_sync_system
+                    .after(minimap::sync_hud_minimap_layout_to_resolution),
             )
             .add_system(
                 snap_layer3_visuals_to_pixel_grid
@@ -788,12 +815,6 @@ impl Plugin for UIPlugin {
                     update_unlocks_currency_text.run_if(in_state(UIState::Unlocks)),
                     refresh_unlock_button_states.run_if(in_state(UIState::Unlocks)),
                     
-                    setup_options_ui
-                        .before(CustomFlush)
-                        .run_if(state_changed::<UIState>().and_then(in_state(UIState::Options))),
-                    cleanup_options_ui
-                        .run_if(state_changed::<UIState>().and_then(not(in_state(UIState::Options)))),
-                    
                     setup_achievements_ui
                         .before(CustomFlush)
                         .run_if(state_changed::<UIState>().and_then(in_state(UIState::Achievements))),
@@ -813,17 +834,36 @@ impl Plugin for UIPlugin {
             )
             .add_systems(
                 (
+                    cleanup_options_ui.run_if(
+                        state_changed::<UIState>()
+                            .and_then(not(in_state(UIState::Options)))
+                            .or_else(
+                                in_state(UIState::Options)
+                                    .and_then(resource_changed::<OptionsUiLayoutRevision>()),
+                            ),
+                    ),
+                    setup_options_ui
+                        .before(CustomFlush)
+                        .run_if(
+                            state_changed::<UIState>()
+                                .and_then(in_state(UIState::Options))
+                                .or_else(
+                                    in_state(UIState::Options)
+                                        .and_then(resource_changed::<OptionsUiLayoutRevision>()),
+                                ),
+                        ),
+                )
+                    .chain()
+                    .after(layout_sync::bump_options_ui_revision_on_ui_layout_change)
+                    .in_set(OnUpdate(GameState::MainMenu)),
+            )
+            .add_systems(
+                (
                     setup_unlocks_ui
                         .before(CustomFlush)
                         .run_if(state_changed::<UIState>().and_then(in_state(UIState::Unlocks))),
                     cleanup_unlocks_ui
                         .run_if(state_changed::<UIState>().and_then(not(in_state(UIState::Unlocks)))),
-                   
-                    setup_options_ui
-                        .before(CustomFlush)
-                        .run_if(state_changed::<UIState>().and_then(in_state(UIState::Options))),
-                    cleanup_options_ui
-                        .run_if(state_changed::<UIState>().and_then(not(in_state(UIState::Options)))),
                    
                     setup_achievements_ui
                         .before(CustomFlush)
@@ -841,6 +881,31 @@ impl Plugin for UIPlugin {
                         .run_if(in_state(UIState::Achievements)),
                     
                 )
+                    .in_set(OnUpdate(GameState::Main)),
+            )
+            .add_systems(
+                (
+                    cleanup_options_ui.run_if(
+                        state_changed::<UIState>()
+                            .and_then(not(in_state(UIState::Options)))
+                            .or_else(
+                                in_state(UIState::Options)
+                                    .and_then(resource_changed::<OptionsUiLayoutRevision>()),
+                            ),
+                    ),
+                    setup_options_ui
+                        .before(CustomFlush)
+                        .run_if(
+                            state_changed::<UIState>()
+                                .and_then(in_state(UIState::Options))
+                                .or_else(
+                                    in_state(UIState::Options)
+                                        .and_then(resource_changed::<OptionsUiLayoutRevision>()),
+                                ),
+                        ),
+                )
+                    .chain()
+                    .after(layout_sync::bump_options_ui_revision_on_ui_layout_change)
                     .in_set(OnUpdate(GameState::Main)),
             )
             .add_systems(
@@ -916,6 +981,10 @@ impl Plugin for UIPlugin {
                     update_cheat_checkbox_visual.run_if(in_state(UIState::Options)),
                     handle_volume_button_click.run_if(in_state(UIState::Options)),
                     update_volume_text.run_if(in_state(UIState::Options)),
+                    handle_scale_button_click
+                        .run_if(in_state(UIState::Options))
+                        .before(crate::update_pixel_perfect_viewport),
+                    update_scale_text.run_if(in_state(UIState::Options)),
                     handle_achievement_row_clicks.run_if(in_state(UIState::Achievements)))
                 )
             .add_system(

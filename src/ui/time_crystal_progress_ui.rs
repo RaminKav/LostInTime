@@ -131,10 +131,7 @@ pub fn setup_time_crystal_progress_ui(
         SpriteBundle {
             sprite: Sprite {
                 color: Color::rgba(0., 0., 0., 0.7),
-                custom_size: Some(Vec2::new(
-                    resolution.game_width + 10.,
-                    resolution.game_height + 20.,
-                )),
+                custom_size: Some(crate::ui::ui_helpers::full_screen_overlay_size(&resolution)),
                 ..Default::default()
             },
             transform: Transform::from_translation(Vec3::new(0., 0., PANEL_Z - 1.)),

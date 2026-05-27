@@ -240,6 +240,8 @@ pub struct GameData {
     #[serde(default)]
     pub audio_volume: Option<crate::audio::AudioVolume>,
     #[serde(default)]
+    pub display_scale: Option<crate::DisplayScaleSettings>,
+    #[serde(default)]
     pub auto_attack: Option<crate::inputs::AutoAttackState>,
     /// Options screen: "Unlock All Classes" cheat (`CheatSettings::bypass_class_unlocks`).
     #[serde(default)]

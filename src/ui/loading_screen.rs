@@ -3,7 +3,8 @@ use bevy::sprite::Anchor;
 
 use crate::{
     colors::DARK_WOOD_BROWN, enemy::spawner::GlobalSpawners, player::Player,
-    world::chunk::DoneCreateChunkEvent, GameState, RenderLayers, ScreenResolution, GAME_HEIGHT,
+    ui::ui_helpers,
+    world::chunk::DoneCreateChunkEvent, GameState, RenderLayers, ScreenResolution,
 };
 
 #[derive(Component)]
@@ -19,7 +20,7 @@ pub fn setup_loading_screen(
         .spawn(SpriteBundle {
             sprite: Sprite {
                 color: Color::rgba(0., 0., 0., 1.0),
-                custom_size: Some(Vec2::new(res.game_width + 10., GAME_HEIGHT + 100.)),
+                custom_size: Some(ui_helpers::full_screen_overlay_size(&res)),
                 ..default()
             },
             transform: Transform {

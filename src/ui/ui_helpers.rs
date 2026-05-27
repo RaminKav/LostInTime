@@ -1,4 +1,4 @@
-use crate::{cursor::CursorPos, keybinds::InputBinding, world, Game};
+use crate::{cursor::CursorPos, keybinds::InputBinding, world, Game, ScreenResolution};
 use bevy::{prelude::*, render::view::RenderLayers};
 use bevy_ecs_tilemap::tiles::TilePos;
 
@@ -145,6 +145,22 @@ pub fn spawn_keybind_badge(
         .id();
 
     (key_bg, key_text)
+}
+
+/// Full-screen overlay dimensions with margin so edges stay covered at UI zoom-out.
+pub fn full_screen_overlay_size(res: &ScreenResolution) -> Vec2 {
+    const WIDTH_PAD: f32 = 24.0;
+    const HEIGHT_PAD: f32 = 120.0;
+    Vec2::new(res.game_width + WIDTH_PAD, res.game_height + HEIGHT_PAD)
+}
+
+pub fn spawn_full_screen_ui_overlay(
+    commands: &mut Commands,
+    res: &ScreenResolution,
+    alpha: f32,
+    depth: f32,
+) -> Entity {
+    spawn_ui_overlay(commands, full_screen_overlay_size(res), alpha, depth)
 }
 
 pub fn spawn_ui_overlay(commands: &mut Commands, size: Vec2, alpha: f32, depth: f32) -> Entity {

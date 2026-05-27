@@ -56,7 +56,7 @@ use super::{
     heirloom_tooltip::{HeirloomTooltipRequest, HeirloomTooltipShow},
     main_menu::spawn_back_button,
     spawn_item_stack_icon,
-    ui_helpers::spawn_ui_overlay,
+    ui_helpers::spawn_full_screen_ui_overlay,
     Interactable, UIElement, UIState, ESSENCE_UI_SIZE,
 };
 
@@ -169,9 +169,9 @@ pub fn setup_essence_ui(
         Vec2::new(3.5, 3.5),
     );
 
-    let overlay = spawn_ui_overlay(
+    let overlay = spawn_full_screen_ui_overlay(
         &mut commands,
-        Vec2::new(resolution.game_width + 10., resolution.game_height + 20.),
+        &resolution,
         0.8,
         -1.,
     );

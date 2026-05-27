@@ -13,7 +13,7 @@ use crate::{
     ui::{
         damage_numbers::spawn_floating_text_with_shadow,
         game_fonts::FLOATING_TEXT,
-        ui_helpers::{self, spawn_ui_overlay},
+        ui_helpers::{self, spawn_full_screen_ui_overlay},
         Interactable, Interaction, UIElement, UIState, SKILLS_CHOICE_UI_SIZE,
     },
     world::dimension::{DimensionSpawnEvent, Era},
@@ -77,9 +77,9 @@ pub fn setup_blessing_choice_ui(
         ))
         .id();
 
-    spawn_ui_overlay(
+    spawn_full_screen_ui_overlay(
         &mut commands,
-        Vec2::new(res.game_width + 10., GAME_HEIGHT + 100.),
+        &res,
         1.,
         9.,
     );

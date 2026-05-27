@@ -23,7 +23,7 @@ use super::{
     heirloom_tooltip::{HeirloomTooltipRequest, HeirloomTooltipShow},
     interactions::Interaction,
     ui_helpers,
-    ui_helpers::spawn_ui_overlay,
+    ui_helpers::spawn_full_screen_ui_overlay,
     Interactable, ToolTipUpdateEvent, TooltipTeardownEvent, UIElement, UIState,
     SKILLS_CHOICE_UI_SIZE,
 };
@@ -187,9 +187,9 @@ pub fn setup_item_chest_ui(
     //     .insert(UIState::Skills)
     //     .set_parent(title_sprite);
 
-    spawn_ui_overlay(
+    ui_helpers::spawn_full_screen_ui_overlay(
         &mut commands,
-        Vec2::new(res.game_width + 10., GAME_HEIGHT + 100.),
+        &res,
         0.8,
         9.,
     );

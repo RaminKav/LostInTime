@@ -80,10 +80,7 @@ pub fn setup_beastiary_browser_ui(
         SpriteBundle {
             sprite: Sprite {
                 color: Color::rgba(0., 0., 0., 0.82),
-                custom_size: Some(Vec2::new(
-                    resolution.game_width + 12.,
-                    resolution.game_height + 24.,
-                )),
+                custom_size: Some(crate::ui::ui_helpers::full_screen_overlay_size(&resolution)),
                 ..Default::default()
             },
             transform: Transform::from_translation(Vec3::new(0., 0., OVERLAY_Z)),

@@ -10,7 +10,7 @@ use crate::world::world_helpers::{
     camera_pos_to_chunk_pos, camera_pos_to_tile_pos, tile_pos_to_world_pos, world_pos_to_tile_pos,
 };
 use crate::world::{TileMapPosition, CHUNK_SIZE, ISLAND_SIZE, TILE_SIZE};
-use crate::{CustomFlush, GameParam, GameState, InputMappings, Player, DEBUG};
+use crate::{CustomFlush, GameParam, GameState, InputMappings, Player, ScreenResolution, DEBUG};
 use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 use bevy::render::view::RenderLayers;
@@ -1112,6 +1112,25 @@ fn close_map_on_dungeon_entry(
     if !dungeon_query.is_empty() {
         map_open.0 = false;
         info!("Closed minimap on dungeon entry");
+    }
+}
+
+/// Re-anchor the HUD minimap when the UI layout bucket changes.
+pub fn sync_hud_minimap_layout_to_resolution(
+    res: Res<ScreenResolution>,
+    sync_state: Res<super::layout_sync::UiLayoutSyncState>,
+    mut minimap: Query<&mut Transform, With<HudMinimap>>,
+) {
+    if !super::layout_sync::ui_layout_needs_sync(&res, &sync_state) {
+        return;
+    }
+
+    let pos_x = res.game_width / 2.0 - HUD_MINIMAP_DISPLAY_SIZE / 2.0 - HUD_MINIMAP_PADDING
+        + HUD_MINIMAP_RIGHT_NUDGE;
+    let pos_y = res.game_height / 2.0 - HUD_MINIMAP_DISPLAY_SIZE / 2.0 - HUD_MINIMAP_PADDING;
+    for mut transform in minimap.iter_mut() {
+        transform.translation.x = pos_x;
+        transform.translation.y = pos_y;
     }
 }
 

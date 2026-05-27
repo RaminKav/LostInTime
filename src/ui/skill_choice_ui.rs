@@ -22,7 +22,7 @@ use crate::{
 use super::{
     heirloom_tooltip::{spawn_heirloom_tooltip_card, HeirloomTooltipRequest, HeirloomTooltipShow},
     ui_helpers::{
-        spawn_ui_overlay, Z_DEPTH_HEIRLOOM_SKILL_CHOICE_CONTENT,
+        spawn_full_screen_ui_overlay, Z_DEPTH_HEIRLOOM_SKILL_CHOICE_CONTENT,
         Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND, Z_DEPTH_HEIRLOOM_SKILL_CHOICE_OVERLAY,
     },
     Interactable, UIElement, UIState, SKILLS_CHOICE_UI_SIZE,
@@ -320,9 +320,9 @@ pub fn setup_skill_choice_ui(
         .insert(UIState::Skills)
         .set_parent(title_sprite);
 
-    let heirloom_choice_overlay = spawn_ui_overlay(
+    let heirloom_choice_overlay = spawn_full_screen_ui_overlay(
         &mut commands,
-        Vec2::new(res.game_width + 10., GAME_HEIGHT + 100.),
+        &res,
         0.8,
         Z_DEPTH_HEIRLOOM_SKILL_CHOICE_OVERLAY,
     );

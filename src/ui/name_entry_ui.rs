@@ -78,9 +78,9 @@ pub fn setup_name_entry_ui(
     //     UIState::EnterName,
     //     Name::new("Name Entry Overlay"),
     // ));
-    let overlay = ui_helpers::spawn_ui_overlay(
+    let overlay = ui_helpers::spawn_full_screen_ui_overlay(
         &mut commands,
-        Vec2::new(resolution.game_width, resolution.game_height),
+        &resolution,
         0.99,
         100.,
     );

@@ -39,7 +39,7 @@ use super::{
     interactions::{Interactable, Interaction},
     inventory_ui::spawn_item_stack_icon,
     player_hud::spawn_skill_tooltip_content,
-    ui_helpers::spawn_ui_overlay,
+    ui_helpers::{full_screen_overlay_size, spawn_full_screen_ui_overlay},
 };
 
 const BODY_FONT: &str = "fonts/slkscr.ttf";
@@ -215,9 +215,9 @@ pub fn setup_class_selection_ui(
     _class_unlocks: Option<Res<ClassUnlockData>>,
     cheat_settings: Res<CheatSettings>,
 ) {
-    let overlay = spawn_ui_overlay(
+    let overlay = spawn_full_screen_ui_overlay(
         &mut commands,
-        Vec2::new(res.game_width + 10., res.game_height + 100.),
+        &res,
         1.,
         9.,
     );
@@ -2436,10 +2436,7 @@ pub fn handle_portal_animation(
                             .spawn(SpriteBundle {
                                 sprite: Sprite {
                                     color: Color::rgba(0., 0., 0., 0.),
-                                    custom_size: Some(Vec2::new(
-                                        screen_res.game_width + 10.,
-                                        screen_res.game_height + 20.,
-                                    )),
+                                    custom_size: Some(full_screen_overlay_size(&screen_res)),
                                     ..default()
                                 },
                                 transform: Transform {

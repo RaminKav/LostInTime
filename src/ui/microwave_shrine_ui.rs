@@ -95,7 +95,7 @@ pub fn setup_microwave_shrine_ui(
         .spawn(SpriteBundle {
             sprite: Sprite {
                 color: Color::rgba(0.1, 0.1, 0.1, 0.95),
-                custom_size: Some(Vec2::new(res.game_width, res.game_height)),
+                custom_size: Some(crate::ui::ui_helpers::full_screen_overlay_size(&res)),
                 ..default()
             },
             ..default()

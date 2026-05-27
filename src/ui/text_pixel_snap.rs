@@ -27,6 +27,8 @@
 //!    `Text2dBundle`). Apply the same delta to every glyph in the layout. Because every glyph
 //!    receives the *same* horizontal shift, the per-glyph spacing produced by `glyph_brush_layout`
 //!    is preserved exactly — only the rigid origin of the text moves onto an integer column.
+//!    The bulk-X offset is stored on [`TextGlyphPixelSnapState`] and reverted before re-applying
+//!    each frame so the delta is not accumulated when Bevy does not re-run layout.
 //! 2. **Per-glyph Y snap.** Round each glyph quad's bottom edge to an integer physical pixel
 //!    (glyphs of different heights / baselines need their own Y rounding).
 //!
@@ -61,11 +63,48 @@ use bevy::window::{PrimaryWindow, Window};
 
 use crate::ScreenResolution;
 
+/// Tracks bulk-X snap already applied to a text entity's [`TextLayoutInfo`].
+///
+/// Bevy only re-runs `update_text2d_layout` when the [`Text`] changes, but this system runs
+/// every frame. Without reverting the stored bulk-X offset first, `g.position.x += bulk_dx`
+/// accumulates and text flies off screen.
+#[derive(Component, Default)]
+pub(crate) struct TextGlyphPixelSnapState {
+    bulk_x_font: f32,
+    res_scale: u32,
+    /// Hash of text content + layout size; changes when Bevy rebuilds glyph positions.
+    content_key: u64,
+}
+
+fn text_content_key(text: &Text, layout_size: Vec2) -> u64 {
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
+
+    let mut hasher = DefaultHasher::new();
+    for section in &text.sections {
+        section.value.hash(&mut hasher);
+        section.style.font_size.to_bits().hash(&mut hasher);
+    }
+    layout_size.x.to_bits().hash(&mut hasher);
+    layout_size.y.to_bits().hash(&mut hasher);
+    hasher.finish()
+}
+
 /// Per-glyph pixel snap. See module docs.
 pub fn pixel_snap_text_glyphs(
     res: Res<ScreenResolution>,
     windows: Query<&Window, With<PrimaryWindow>>,
-    mut text_q: Query<(&Anchor, &mut TextLayoutInfo, &RenderLayers)>,
+    mut commands: Commands,
+    mut text_q: Query<
+        (
+            Entity,
+            &Anchor,
+            &Text,
+            &mut TextLayoutInfo,
+            &RenderLayers,
+            Option<&mut TextGlyphPixelSnapState>,
+        ),
+    >,
 ) {
     let Ok(window) = windows.get_single() else {
         return;
@@ -78,12 +117,27 @@ pub fn pixel_snap_text_glyphs(
     let font_per_phys = scale_factor / phys_per_world;
 
     let layer3 = RenderLayers::layer(3);
-    for (anchor, mut layout, layers) in text_q.iter_mut() {
+    for (entity, anchor, text, mut layout, layers, snap_state) in text_q.iter_mut() {
         if !layers.intersects(&layer3) {
             continue;
         }
         if layout.glyphs.is_empty() {
             continue;
+        }
+
+        let prev_bulk_x = snap_state.as_ref().map(|s| s.bulk_x_font).unwrap_or(0.0);
+        let content_key = text_content_key(text, layout.size);
+        let layout_rebuilt = snap_state
+            .as_ref()
+            .map(|s| s.content_key != content_key)
+            .unwrap_or(true);
+
+        // When Bevy rebuilds layout (text / size changed), glyph positions are fresh — do not
+        // subtract a bulk-X offset we applied to the previous layout.
+        if !layout_rebuilt && prev_bulk_x.abs() >= 1e-4 {
+            for g in layout.glyphs.iter_mut() {
+                g.position.x -= prev_bulk_x;
+            }
         }
 
         let text_anchor = -(anchor.as_vec() + 0.5);
@@ -110,11 +164,22 @@ pub fn pixel_snap_text_glyphs(
             let delta_phys_y = corner_offset_phys.y.round() - corner_offset_phys.y;
             let delta_font_y = delta_phys_y * font_per_phys;
 
-            if bulk_dx_font_x.abs() < 1e-4 && delta_font_y.abs() < 1e-4 {
-                continue;
-            }
             g.position.x += bulk_dx_font_x;
-            g.position.y += delta_font_y;
+            if delta_font_y.abs() >= 1e-4 {
+                g.position.y += delta_font_y;
+            }
+        }
+
+        if let Some(mut snap) = snap_state {
+            snap.bulk_x_font = bulk_dx_font_x;
+            snap.res_scale = res.scale;
+            snap.content_key = content_key;
+        } else {
+            commands.entity(entity).insert(TextGlyphPixelSnapState {
+                bulk_x_font: bulk_dx_font_x,
+                res_scale: res.scale,
+                content_key,
+            });
         }
     }
 }

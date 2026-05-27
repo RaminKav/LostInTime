@@ -68,7 +68,7 @@ use super::{
     inventory_panel_center_x,
     options_ui::CheatSettings,
     player_hud::FlashExpBarEvent,
-    ui_helpers::{spawn_ui_overlay, Z_DEPTH_HUD_ACTIVE_SKILLS},
+    ui_helpers::{spawn_full_screen_ui_overlay, spawn_ui_overlay, Z_DEPTH_HUD_ACTIVE_SKILLS},
     ShowInvPlayerStatsEvent, UIContainersParam, UIElement, CRAFTING_INVENTORY_UI_SIZE,
     FURNACE_INVENTORY_UI_SIZE, HUD_ACTION_ROW_Y_FROM_BOTTOM, HUD_HOTBAR_CENTER_X, HUD_HOTBAR_SLOTS,
     INVENTORY_GRID_COLS, INV_CHEST_SCRAPPER_GRID_OFFSET_Y, INV_CRAFTING_BASE_Y, INV_CRAFTING_COLS,
@@ -363,9 +363,9 @@ pub fn setup_inv_ui(
         _ => return,
     };
 
-    spawn_ui_overlay(
+    spawn_full_screen_ui_overlay(
         &mut commands,
-        Vec2::new(resolution.game_width + 10., resolution.game_height + 20.),
+        &resolution,
         0.8,
         9.,
     );

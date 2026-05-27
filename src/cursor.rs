@@ -5,8 +5,7 @@ use bevy::window::PrimaryWindow;
 use crate::assets::Graphics;
 use crate::inputs::{cursor_pos_in_ui, cursor_pos_in_world, player_move_inputs};
 use crate::item::WorldObject;
-use crate::GameState;
-use crate::{TextureCamera, DEBUG};
+use crate::{GameState, TextureCamera, UICamera, DEBUG};
 
 #[derive(Reflect, Resource, Debug)]
 #[reflect(Resource)]
@@ -118,20 +117,28 @@ fn update_custom_cursor_position(
 
 pub fn update_cursor_pos(
     windows: Query<&Window, With<PrimaryWindow>>,
-    camera_q: Query<(&Transform, &Camera), With<TextureCamera>>,
+    world_camera_q: Query<(&Transform, &Camera), With<TextureCamera>>,
+    ui_camera_q: Query<&Camera, With<UICamera>>,
     mut cursor_moved_events: EventReader<CursorMoved>,
     mut cursor_pos: ResMut<CursorPos>,
 ) {
+    let Ok((world_cam_t, world_cam)) = world_camera_q.get_single() else {
+        return;
+    };
+    let Ok(ui_cam) = ui_camera_q.get_single() else {
+        return;
+    };
+
     for cursor_moved in cursor_moved_events.iter() {
-        // To get the mouse's world position, we have to transform its window position by
-        // any transforms on the camera. This is done by projecting the cursor position into
-        // camera space (world space).
-        for (cam_t, cam) in camera_q.iter() {
-            *cursor_pos = CursorPos {
-                world_coords: cursor_pos_in_world(&windows, cursor_moved.position, cam_t, cam),
-                ui_coords: cursor_pos_in_ui(&windows, cursor_moved.position, cam),
-                screen_coords: cursor_moved.position.extend(0.),
-            };
-        }
+        *cursor_pos = CursorPos {
+            world_coords: cursor_pos_in_world(
+                &windows,
+                cursor_moved.position,
+                world_cam_t,
+                world_cam,
+            ),
+            ui_coords: cursor_pos_in_ui(&windows, cursor_moved.position, ui_cam),
+            screen_coords: cursor_moved.position.extend(0.),
+        };
     }
 }

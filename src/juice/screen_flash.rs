@@ -30,10 +30,7 @@ pub fn screen_flash_effect(
             .spawn(SpriteBundle {
                 sprite: Sprite {
                     color: flash_state.color,
-                    custom_size: Some(Vec2::new(
-                        resolution.game_width + 10.,
-                        resolution.game_height + 10.,
-                    )),
+                    custom_size: Some(crate::ui::ui_helpers::full_screen_overlay_size(&resolution)),
                     ..default()
                 },
                 transform: Transform {

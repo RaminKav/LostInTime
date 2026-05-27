@@ -276,9 +276,9 @@ pub fn setup_unlocks_ui(
     currency: Res<TimeFragmentCurrency>,
     upgrades: Res<UnlockUpgrades>,
 ) {
-    let overlay = ui_helpers::spawn_ui_overlay(
+    let overlay = ui_helpers::spawn_full_screen_ui_overlay(
         &mut commands,
-        Vec2::new(resolution.game_width, resolution.game_height),
+        &resolution,
         1.,
         10.,
     );

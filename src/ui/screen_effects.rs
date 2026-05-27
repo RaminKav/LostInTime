@@ -15,7 +15,7 @@ use bevy::{
 use crate::{
     attributes::hunger::Hunger,
     player::Player,
-    ScreenResolution, GAME_HEIGHT,
+    ScreenResolution,
 };
 
 const SCREEN_BLEND: BlendState = BlendState {
@@ -88,7 +88,7 @@ pub fn setup_screen_effects(
     });
     commands.spawn((
         Mesh2dHandle::from(meshes.add(Mesh::from(shape::Quad {
-            size: Vec2::new(res.game_width, GAME_HEIGHT),
+            size: Vec2::new(res.game_width, res.game_height),
             ..Default::default()
         }))),
         hunger_effect_material.clone(),

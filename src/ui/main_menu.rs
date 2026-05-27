@@ -42,7 +42,7 @@ use crate::{
         generation::WorldObjectCache,
         portal::BossKillTracker,
     },
-    DoNotDespawnOnGameOver, Game, GameState, ScreenResolution, DEBUG, GAME_HEIGHT,
+    DoNotDespawnOnGameOver, Game, GameState, ScreenResolution, DEBUG,
 };
 
 use super::{
@@ -153,7 +153,7 @@ pub fn display_main_menu(
             ..Default::default()
         },
         sprite: Sprite {
-            custom_size: Some(Vec2::new(res.game_width, GAME_HEIGHT)),
+            custom_size: Some(Vec2::new(res.game_width, res.game_height)),
             ..Default::default()
         },
         ..Default::default()

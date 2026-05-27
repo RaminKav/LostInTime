@@ -17,7 +17,7 @@ use crate::{
     ui::{
         interactions::Interaction, spawn_back_button, ui_helpers, Interactable, UIElement, UIState,
     },
-    InputBinding, ScreenResolution,
+    DisplayScaleSettings, InputBinding, ScreenResolution,
 };
 
 /// Resource to track cheat settings and accessibility options
@@ -127,6 +127,10 @@ pub fn boss_warning_indicator_color(settings: &CheatSettings) -> Color {
 #[derive(Component)]
 pub struct OptionsUI;
 
+/// Incremented when the options menu must rebuild at a new UI scale while staying open.
+#[derive(Resource, Default, Debug, Clone, Copy)]
+pub struct OptionsUiLayoutRevision(pub u32);
+
 /// Marker for the "Wipe Game Data" confirmation popup (overlay + panel + buttons).
 #[derive(Component)]
 pub struct WipeDataPopup;
@@ -178,6 +182,23 @@ pub struct VolumeButton {
 #[derive(Component)]
 pub struct VolumeValueText {
     pub channel: VolumeChannel,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum ScaleChannel {
+    Game,
+    Ui,
+}
+
+#[derive(Component)]
+pub struct ScaleButton {
+    pub channel: ScaleChannel,
+    pub direction: VolumeDirection,
+}
+
+#[derive(Component)]
+pub struct ScaleValueText {
+    pub channel: ScaleChannel,
 }
 
 pub fn handle_options_clicks(
@@ -380,11 +401,12 @@ pub fn setup_options_ui(
     game_state: Res<State<crate::GameState>>,
     cheat_settings: Res<CheatSettings>,
     audio_volume: Res<AudioVolume>,
+    display_scale: Res<DisplayScaleSettings>,
     auto_attack: Res<AutoAttackState>,
 ) {
-    let overlay = ui_helpers::spawn_ui_overlay(
+    let overlay = ui_helpers::spawn_full_screen_ui_overlay(
         &mut commands,
-        Vec2::new(resolution.game_width, resolution.game_height),
+        &resolution,
         1.,
         ui_helpers::Z_DEPTH_OPTIONS_OVERLAY,
     );
@@ -670,6 +692,62 @@ pub fn setup_options_ui(
         Vec3::new(
             center_side_x,
             sfx_vol_y,
+            ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
+        ),
+    );
+
+    // Display scale section (below volume rows)
+    let scale_section_y = sfx_vol_y - 22.;
+    commands.spawn((
+        Text2dBundle {
+            text: Text::from_section(
+                "Scale",
+                TextStyle {
+                    font: asset_server.load("fonts/alagard.ttf"),
+                    font_size: 15.0,
+                    color: crate::colors::DARK_WOOD_BROWN,
+                },
+            )
+            .with_alignment(TextAlignment::Left),
+            text_anchor: bevy::sprite::Anchor::CenterLeft,
+            transform: Transform::from_translation(Vec3::new(
+                center_side_x,
+                scale_section_y,
+                ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
+            )),
+            ..Default::default()
+        },
+        RenderLayers::from_layers(&[3]),
+        OptionsUI,
+        Name::new("Scale Section Title"),
+    ));
+
+    let game_scale_y = scale_section_y - 26.;
+    spawn_scale_row(
+        &mut commands,
+        &graphics,
+        &asset_server,
+        "Game:",
+        ScaleChannel::Game,
+        &display_scale.format_game_zoom_display(),
+        Vec3::new(
+            center_side_x,
+            game_scale_y,
+            ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
+        ),
+    );
+
+    let ui_scale_y = game_scale_y - 18.;
+    spawn_scale_row(
+        &mut commands,
+        &graphics,
+        &asset_server,
+        "UI:",
+        ScaleChannel::Ui,
+        &display_scale.format_ui_zoom_display(),
+        Vec3::new(
+            center_side_x,
+            ui_scale_y,
             ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
         ),
     );
@@ -1625,6 +1703,161 @@ fn spawn_volume_row(
         .set_parent(plus_entity);
 }
 
+fn spawn_scale_row(
+    commands: &mut Commands,
+    graphics: &Graphics,
+    asset_server: &AssetServer,
+    label: &str,
+    channel: ScaleChannel,
+    current_value: &str,
+    label_pos: Vec3,
+) {
+    commands.spawn((
+        Text2dBundle {
+            text: Text::from_section(
+                label,
+                TextStyle {
+                    font: asset_server.load("fonts/4x5.ttf"),
+                    font_size: 5.0,
+                    color: crate::colors::DARK_WOOD_BROWN,
+                },
+            )
+            .with_alignment(TextAlignment::Left),
+            text_anchor: bevy::sprite::Anchor::CenterLeft,
+            transform: Transform::from_translation(label_pos),
+            ..Default::default()
+        },
+        RenderLayers::from_layers(&[3]),
+        OptionsUI,
+        UIState::Options,
+        Name::new(format!("Scale Label {:?}", channel)),
+    ));
+
+    let controls_x = label_pos.x + 50.;
+
+    let minus_entity = commands
+        .spawn(SpriteBundle {
+            texture: graphics.get_ui_element_texture(UIElement::XLKey).clone(),
+            sprite: Sprite {
+                custom_size: Some(Vec2::new(14., 12.)),
+                ..Default::default()
+            },
+            transform: Transform::from_translation(Vec3::new(
+                controls_x,
+                label_pos.y - 3.5,
+                label_pos.z,
+            )),
+            visibility: Visibility::Visible,
+            ..Default::default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(UIState::Options)
+        .insert(UIElement::XLKey)
+        .insert(OptionsUI)
+        .insert(ScaleButton {
+            channel,
+            direction: VolumeDirection::Down,
+        })
+        .insert(Interactable::default())
+        .insert(Name::new(format!("Scale Down {:?}", channel)))
+        .id();
+
+    commands
+        .spawn((
+            Text2dBundle {
+                text: Text::from_section(
+                    "<",
+                    TextStyle {
+                        font: asset_server.load("fonts/4x5.ttf"),
+                        font_size: 5.0,
+                        color: crate::colors::WHITE,
+                    },
+                )
+                .with_alignment(TextAlignment::Center),
+                text_anchor: bevy::sprite::Anchor::Center,
+                transform: Transform::from_translation(Vec3::new(0., 0.5, 1.)),
+                ..Default::default()
+            },
+            RenderLayers::from_layers(&[3]),
+            UIState::Options,
+        ))
+        .set_parent(minus_entity);
+
+    commands.spawn((
+        Text2dBundle {
+            text: Text::from_section(
+                current_value.to_string(),
+                TextStyle {
+                    font: asset_server.load("fonts/4x5.ttf"),
+                    font_size: 5.0,
+                    color: crate::colors::YELLOW_2,
+                },
+            )
+            .with_alignment(TextAlignment::Center),
+            text_anchor: bevy::sprite::Anchor::Center,
+            transform: Transform::from_translation(Vec3::new(
+                controls_x + 18.,
+                label_pos.y - 3.,
+                label_pos.z,
+            )),
+            ..Default::default()
+        },
+        RenderLayers::from_layers(&[3]),
+        OptionsUI,
+        UIState::Options,
+        ScaleValueText { channel },
+        Name::new(format!("Scale Value {:?}", channel)),
+    ));
+
+    let plus_entity = commands
+        .spawn(SpriteBundle {
+            texture: graphics.get_ui_element_texture(UIElement::XLKey).clone(),
+            sprite: Sprite {
+                custom_size: Some(Vec2::new(14., 12.)),
+                ..Default::default()
+            },
+            transform: Transform::from_translation(Vec3::new(
+                controls_x + 36.,
+                label_pos.y - 3.5,
+                label_pos.z,
+            )),
+            visibility: Visibility::Visible,
+            ..Default::default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(UIState::Options)
+        .insert(UIElement::XLKey)
+        .insert(OptionsUI)
+        .insert(ScaleButton {
+            channel,
+            direction: VolumeDirection::Up,
+        })
+        .insert(Interactable::default())
+        .insert(Name::new(format!("Scale Up {:?}", channel)))
+        .id();
+
+    commands
+        .spawn((
+            Text2dBundle {
+                text: Text::from_section(
+                    ">",
+                    TextStyle {
+                        font: asset_server.load("fonts/4x5.ttf"),
+                        font_size: 5.0,
+                        color: crate::colors::WHITE,
+                    },
+                )
+                .with_alignment(TextAlignment::Center),
+                text_anchor: bevy::sprite::Anchor::Center,
+                transform: Transform::from_translation(Vec3::new(0., 0.5, 1.)),
+                ..Default::default()
+            },
+            RenderLayers::from_layers(&[3]),
+            UIState::Options,
+        ))
+        .set_parent(plus_entity);
+}
+
 pub fn handle_volume_button_click(
     cursor_pos: Res<CursorPos>,
     mouse_input: Res<Input<MouseButton>>,
@@ -1663,6 +1896,56 @@ pub fn handle_volume_button_click(
                             }
                         }
                         audio_volume.save();
+                        commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.2));
+                    }
+                }
+                _ => {}
+            },
+            _ => {
+                let Interaction::Hovering = interactable.current() else {
+                    continue;
+                };
+                interactable.change(Interaction::None);
+                commands
+                    .entity(entity)
+                    .insert(UIElement::XLKey)
+                    .insert(graphics.get_ui_element_texture(UIElement::XLKey));
+            }
+        }
+    }
+}
+
+pub fn handle_scale_button_click(
+    cursor_pos: Res<CursorPos>,
+    mouse_input: Res<Input<MouseButton>>,
+    ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
+    mut buttons: Query<(Entity, &mut Interactable, &ScaleButton), Without<VolumeButton>>,
+    mut display_scale: ResMut<DisplayScaleSettings>,
+    mut commands: Commands,
+    graphics: Res<Graphics>,
+) {
+    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    let left_mouse_released = mouse_input.just_released(MouseButton::Left);
+
+    for (entity, mut interactable, scale_button) in buttons.iter_mut() {
+        match hit_test {
+            Some(hit) if hit.0 == entity => match interactable.current() {
+                Interaction::None => {
+                    interactable.change(Interaction::Hovering);
+                    commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonHover, 0.05));
+                    commands
+                        .entity(entity)
+                        .insert(UIElement::XLKeyHover)
+                        .insert(graphics.get_ui_element_texture(UIElement::XLKeyHover));
+                }
+                Interaction::Hovering => {
+                    if left_mouse_released {
+                        let zoom_in = scale_button.direction == VolumeDirection::Up;
+                        match scale_button.channel {
+                            ScaleChannel::Game => display_scale.nudge_game(zoom_in),
+                            ScaleChannel::Ui => display_scale.nudge_ui(zoom_in),
+                        }
+                        display_scale.save();
                         commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.2));
                     }
                 }
@@ -1873,5 +2156,21 @@ pub fn update_volume_text(
             VolumeChannel::Sfx => audio_volume.sfx,
         };
         text.sections[0].value = format!("{}", val);
+    }
+}
+
+pub fn update_scale_text(
+    display_scale: Res<DisplayScaleSettings>,
+    resolution: Res<ScreenResolution>,
+    mut texts: Query<(&ScaleValueText, &mut Text)>,
+) {
+    if !display_scale.is_changed() && !resolution.is_changed() {
+        return;
+    }
+    for (scale_text, mut text) in texts.iter_mut() {
+        text.sections[0].value = match scale_text.channel {
+            ScaleChannel::Game => display_scale.format_game_zoom_display(),
+            ScaleChannel::Ui => display_scale.format_ui_zoom_display(),
+        };
     }
 }

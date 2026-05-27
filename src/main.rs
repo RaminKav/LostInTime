@@ -21,6 +21,7 @@ mod panic_handler;
 mod pets;
 mod vectorize;
 pub use bounce::*;
+pub use display_scale::DisplayScaleSettings;
 pub use ecs_helpers::*;
 pub use keybinds::*;
 pub use pets::*;
@@ -59,6 +60,7 @@ mod collider_load_test;
 mod colors;
 mod combat;
 mod custom_commands;
+mod display_scale;
 mod ecs_helpers;
 mod enemy;
 mod gameplay_load_tests;
@@ -120,7 +122,6 @@ use lazy_static::lazy_static;
 use logs_wheel::LogFileInitializer;
 use std::sync::Mutex;
 
-const ZOOM_SCALE: f32 = 1.2;
 const PLAYER_MOVE_SPEED: f32 = 85.;
 const PLAYER_DASH_SPEED: f32 = 375.;
 pub const TIME_STEP: f32 = 1.0 / 60.0;
@@ -128,7 +129,9 @@ pub const TIME_STEP: f32 = 1.0 / 60.0;
 pub const HEIGHT: f32 = 1080.;
 pub const ASPECT_RATIO: f32 = 16.0 / 10.0;
 pub const WIDTH: f32 = HEIGHT * ASPECT_RATIO;
-pub const GAME_HEIGHT: f32 = 300. * ZOOM_SCALE;
+/// Legacy reference layout height (`300 * 1.2`). Runtime UI/world integer scales come from
+/// [`DisplayScaleSettings`] in options; this constant is kept for fixed layout art anchors.
+pub const GAME_HEIGHT: f32 = display_scale::REFERENCE_VIEW_TARGET_HEIGHT;
 const GAME_WIDTH: f32 = GAME_HEIGHT * ASPECT_RATIO; //384 x 240
 lazy_static! {
     pub static ref DEBUG: bool = env::var("DEBUG").is_ok();
@@ -264,6 +267,7 @@ fn main() {
         .add_plugin(world::grass_patches::GrassPatchesPlugin)
         .insert_resource(Msaa::Off)
         .insert_resource(FixedTime::new_from_secs(TIME_STEP))
+        .insert_resource(DisplayScaleSettings::load())
         .add_plugin(panic_handler::PanicHandler::new().build())
         .add_plugin(AsepritePlugin)
         .add_plugin(FrameTimeDiagnosticsPlugin)
@@ -941,11 +945,23 @@ impl DerefMut for RawPosition {
 pub struct ScreenResolution {
     pub width: f32,
     pub height: f32,
+    /// UI camera view width in world units (1 unit == [`Self::scale`] physical pixels).
     pub game_width: f32,
+    /// UI camera view height in world units (1 unit == [`Self::scale`] physical pixels).
     pub game_height: f32,
     pub aspect_ratio: f32,
-    /// Integer scale factor used for pixel-perfect rendering
+    /// Integer scale factor used for the UI camera's pixel-perfect rendering. This is the value
+    /// every existing call site that does HUD / screen-edge math wants. World-camera math uses
+    /// [`Self::world_scale`] instead.
     pub scale: u32,
+    /// Game / world camera view width in world units (1 unit == [`Self::world_scale`] physical pixels).
+    pub world_view_width: f32,
+    /// Game / world camera view height in world units (1 unit == [`Self::world_scale`] physical pixels).
+    pub world_view_height: f32,
+    /// Integer scale factor used for the world / game camera's pixel-perfect rendering. Independent
+    /// of [`Self::scale`] (the UI scale); configured via [`DisplayScaleSettings`]. When this is
+    /// larger than [`Self::scale`] the game is zoomed in relative to the UI.
+    pub world_scale: u32,
     /// Actual render texture width (base width * scale)
     pub render_width: u32,
     /// Actual render texture height (base height * scale)
@@ -955,29 +971,47 @@ pub struct ScreenResolution {
     /// Size of the actual viewport (may be smaller than window due to letterboxing)
     pub viewport_size: Vec2,
 }
-/// Calculate pixel-perfect resolution by deriving game_height from the window size.
-/// Instead of forcing a fixed game_height into a viewport, we adjust game_height
-/// so that `window_height / game_height` is an exact integer (the scale factor).
-/// This means the camera renders to the full window — no viewport, no letterbox,
+/// Calculate pixel-perfect resolution by deriving `game_height` / `world_view_height` from the
+/// window size. Instead of forcing a fixed game_height into a viewport, we adjust each
+/// camera's visible-units so that `window_height / view_height` is an exact integer (the scale
+/// factor). This means each camera renders to the full window — no viewport, no letterbox,
 /// and guaranteed integer texel-to-pixel mapping.
-fn calculate_pixel_perfect_resolution(window_width: f32, window_height: f32) -> ScreenResolution {
-    let target_height = GAME_HEIGHT;
-
-    // Pick the integer scale closest to (window_height / target_height) that fits.
-    let scale = (window_height / target_height).floor().max(1.0) as u32;
-
-    // Derive the actual game dimensions so the window divides evenly.
-    // game_height * scale == window_height (exact), so each game unit == scale pixels.
+///
+/// The UI camera and the world camera each get their own integer scale from
+/// [`DisplayScaleSettings`], relative to the legacy `ZOOM_SCALE = 1.2` reference bucket.
+fn calculate_pixel_perfect_resolution(
+    window_width: f32,
+    window_height: f32,
+    display_scale: &DisplayScaleSettings,
+) -> ScreenResolution {
+    let scale = display_scale.ui_scale_for_window(window_height);
     let game_height = window_height / scale as f32;
     let game_width = window_width / scale as f32;
+
+    let world_scale = display_scale.game_scale_for_window(window_height);
+    let world_view_height = window_height / world_scale as f32;
+    let world_view_width = window_width / world_scale as f32;
+
     let aspect_ratio = window_width / window_height;
 
     let render_width = window_width as u32;
     let render_height = window_height as u32;
 
+    let reference = display_scale::reference_scale(window_height);
+
     info!(
-        "Pixel-perfect resolution: window={}x{}, scale={}, game={}x{} (target_height was {})",
-        window_width, window_height, scale, game_width, game_height, target_height
+        "Pixel-perfect resolution: window={}x{} | UI scale={} (ref {} step {:+}) game={}x{} | world scale={} (step {:+}) view={}x{}",
+        window_width,
+        window_height,
+        scale,
+        reference,
+        display_scale.clamped_ui_steps(),
+        game_width,
+        game_height,
+        world_scale,
+        display_scale.clamped_game_steps(),
+        world_view_width,
+        world_view_height,
     );
 
     let screen = ScreenResolution {
@@ -987,6 +1021,9 @@ fn calculate_pixel_perfect_resolution(window_width: f32, window_height: f32) -> 
         game_height,
         aspect_ratio,
         scale,
+        world_view_width,
+        world_view_height,
+        world_scale,
         render_width,
         render_height,
         viewport_offset: Vec2::ZERO,
@@ -1041,7 +1078,11 @@ fn phase1_log_window(context: &str, window: &Window, res: &ScreenResolution) {
     );
 }
 
-fn setup(mut commands: Commands, window_query: Query<&Window, With<PrimaryWindow>>) {
+fn setup(
+    mut commands: Commands,
+    window_query: Query<&Window, With<PrimaryWindow>>,
+    display_scale: Res<DisplayScaleSettings>,
+) {
     let window = window_query.get_single().ok();
     let resolution = if let Some(window) = window {
         let phys_w = window.resolution.physical_width() as f32;
@@ -1054,18 +1095,18 @@ fn setup(mut commands: Commands, window_query: Query<&Window, With<PrimaryWindow
             window.height(),
             window.resolution.scale_factor()
         );
-        let res = calculate_pixel_perfect_resolution(phys_w, phys_h);
+        let res = calculate_pixel_perfect_resolution(phys_w, phys_h, &display_scale);
         phase1_log_window("startup", window, &res);
         res
     } else {
         info!("No window found, using default resolution");
-        calculate_pixel_perfect_resolution(WIDTH, HEIGHT)
+        calculate_pixel_perfect_resolution(WIDTH, HEIGHT, &display_scale)
     };
     commands.insert_resource(resolution.clone());
 
     // Game camera — renders the game world directly to the full window.
-    // No viewport: game_height is derived from window_height / integer_scale,
-    // so the scaling is guaranteed integer.
+    // No viewport: `world_view_height` is derived from `window_height / world_scale`, so the
+    // scaling is guaranteed integer. Zoom is driven by [`DisplayScaleSettings`].
     commands.spawn((
         Camera2dBundle {
             camera: Camera {
@@ -1076,7 +1117,7 @@ fn setup(mut commands: Commands, window_query: Query<&Window, With<PrimaryWindow
                 clear_color: ClearColorConfig::Custom(Color::BLACK),
             },
             projection: OrthographicProjection {
-                scaling_mode: ScalingMode::FixedVertical(resolution.game_height),
+                scaling_mode: ScalingMode::FixedVertical(resolution.world_view_height),
                 scale: 1.0,
                 ..default()
             },
@@ -1088,7 +1129,9 @@ fn setup(mut commands: Commands, window_query: Query<&Window, With<PrimaryWindow
         RawPosition::default(),
     ));
 
-    // UI camera — renders UI elements (layer 3) on top.
+    // UI camera — renders UI elements (layer 3) on top. Uses the UI bucket (`scale`,
+    // `game_height`) so every existing HUD layout / screen-edge calculation keeps working
+    // regardless of how the world camera is zoomed.
     commands.spawn((
         Camera2dBundle {
             camera: Camera {
@@ -1114,13 +1157,18 @@ fn setup(mut commands: Commands, window_query: Query<&Window, With<PrimaryWindow
 /// Recalculates pixel-perfect scaling whenever the window or camera target size changes.
 /// Uses the actual Camera render target size (what wgpu renders to) instead of
 /// the window's reported size — these can differ on macOS Retina displays.
-fn update_pixel_perfect_viewport(
+///
+/// The UI camera ([`UICamera`]) and the game camera ([`TextureCamera`]) get **different**
+/// `FixedVertical` values — `game_height` vs `world_view_height` — so they can pick different
+/// integer pixel buckets. See [`calculate_pixel_perfect_resolution`] and [`DisplayScaleSettings`].
+pub fn update_pixel_perfect_viewport(
     windows: Query<&Window, With<PrimaryWindow>>,
     mut cameras: Query<
-        (&Camera, &mut OrthographicProjection),
+        (&Camera, &mut OrthographicProjection, Option<&UICamera>),
         Or<(With<TextureCamera>, With<UICamera>)>,
     >,
-    mut last_size: Local<UVec2>,
+    mut last_key: Local<(UVec2, i8, i8)>,
+    display_scale: Res<DisplayScaleSettings>,
     mut resolution: ResMut<ScreenResolution>,
 ) {
     let Ok(window) = windows.get_single() else {
@@ -1132,27 +1180,50 @@ fn update_pixel_perfect_viewport(
     let target_size = cameras
         .iter()
         .next()
-        .and_then(|(cam, _)| cam.physical_target_size())
+        .and_then(|(cam, _, _)| cam.physical_target_size())
         .unwrap_or(UVec2::new(
             window.resolution.physical_width(),
             window.resolution.physical_height(),
         ));
 
-    if *last_size == target_size {
+    let key = (
+        target_size,
+        display_scale.clamped_ui_steps(),
+        display_scale.clamped_game_steps(),
+    );
+
+    if *last_key == key {
         return;
     }
 
-    info!(
-        "Render target changed: {}x{} -> {}x{} | window physical: {}x{}, logical: {:.0}x{:.0}, scale_factor: {:.3}",
-        last_size.x, last_size.y, target_size.x, target_size.y,
-        window.resolution.physical_width(),
-        window.resolution.physical_height(),
-        window.width(), window.height(),
-        window.resolution.scale_factor()
-    );
-    *last_size = target_size;
+    let size_changed = last_key.0 != target_size;
+    if size_changed {
+        info!(
+            "Render target changed: {}x{} -> {}x{} | window physical: {}x{}, logical: {:.0}x{:.0}, scale_factor: {:.3}",
+            last_key.0.x,
+            last_key.0.y,
+            target_size.x,
+            target_size.y,
+            window.resolution.physical_width(),
+            window.resolution.physical_height(),
+            window.width(),
+            window.height(),
+            window.resolution.scale_factor()
+        );
+    } else if *DEBUG {
+        info!(
+            "Display scale changed: ui step {:+} game step {:+}",
+            display_scale.clamped_ui_steps(),
+            display_scale.clamped_game_steps(),
+        );
+    }
+    *last_key = key;
 
-    let new_res = calculate_pixel_perfect_resolution(target_size.x as f32, target_size.y as f32);
+    let new_res = calculate_pixel_perfect_resolution(
+        target_size.x as f32,
+        target_size.y as f32,
+        &display_scale,
+    );
 
     if *DEBUG {
         phase1_log_window("viewport_resize", &window, &new_res);
@@ -1171,8 +1242,12 @@ fn update_pixel_perfect_viewport(
         }
     }
 
-    for (_, mut proj) in cameras.iter_mut() {
-        proj.scaling_mode = ScalingMode::FixedVertical(new_res.game_height);
+    for (_, mut proj, ui_marker) in cameras.iter_mut() {
+        proj.scaling_mode = if ui_marker.is_some() {
+            ScalingMode::FixedVertical(new_res.game_height)
+        } else {
+            ScalingMode::FixedVertical(new_res.world_view_height)
+        };
     }
 
     *resolution = new_res;

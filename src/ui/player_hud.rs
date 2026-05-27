@@ -15,10 +15,11 @@ use super::{
     tooltips::spawn_world_item_tooltip_for_stack,
     tooltips::ConsumableBuffHudTooltip,
     ui_helpers::{spawn_keybind_badge, Z_DEPTH_HUD_ACTIVE_SKILLS, Z_DEPTH_HUD_HEIRLOOM_ICONS},
-    InventorySlotType, InventoryState, InventoryUI, UIElement, UIState, CURRENCY_BACKGROUND_SIZE,
+    InventorySlotState, InventorySlotType, InventoryState, InventoryUI, UIElement, UIState,
     HUD_ACTION_ROW_Y_FROM_BOTTOM, HUD_ERA_TIMER_ENDLESS_WIDTH, HUD_FRAME_Y_FROM_BOTTOM,
     HUD_HEIRLOOM_ICON_SPACING, HUD_HOTBAR_SLOTS, HUD_SKILLS_CENTER_X, HUD_SKILL_SLOT_HIT_SIZE,
-    HUD_SKILL_SPACING_X, HUD_TIMELINE_ARROWS_SIZE, HUD_TIMELINE_SIZE, PROGRESS_BACKGROUND_SIZE,
+    HUD_SKILL_SPACING_X, HUD_TIMELINE_ARROWS_SIZE, HUD_TIMELINE_SIZE, CURRENCY_BACKGROUND_SIZE,
+    PROGRESS_BACKGROUND_SIZE,
 };
 use crate::{
     assets::Graphics,
@@ -186,6 +187,14 @@ pub struct OptionsKeybindText;
 
 #[derive(Component)]
 pub struct OptionsKeyBackground;
+
+/// Bottom-left HUD corner icons (minimap / inventory / settings).
+#[derive(Component, Clone, Copy)]
+pub enum HudBottomCornerIcon {
+    Minimap,
+    Inventory,
+    Settings,
+}
 
 /// Center-to-center spacing between the minimap and inventory HUD corner icons.
 const HUD_CORNER_ICON_SPACING: f32 = 30.0;
@@ -648,6 +657,7 @@ pub fn setup_currency_ui(
             ..default()
         })
         .insert(RenderLayers::from_layers(&[3]))
+        .insert(HudBottomCornerIcon::Minimap)
         .insert(Name::new("MINIMAP HUD ICON"))
         .id();
 
@@ -674,6 +684,7 @@ pub fn setup_currency_ui(
             ..default()
         })
         .insert(RenderLayers::from_layers(&[3]))
+        .insert(HudBottomCornerIcon::Inventory)
         .insert(Name::new("INVENTORY HUD ICON"))
         .id();
 
@@ -700,6 +711,7 @@ pub fn setup_currency_ui(
             ..default()
         })
         .insert(RenderLayers::from_layers(&[3]))
+        .insert(HudBottomCornerIcon::Settings)
         .insert(Name::new("OPTIONS HUD ICON"))
         .id();
 
@@ -3507,5 +3519,181 @@ pub fn sync_heirloom_hud_visibility(
         if *vis != target {
             *vis = target;
         }
+    }
+}
+
+/// Re-anchor HUD elements when [`ScreenResolution::game_width`] / [`game_height`] change (UI
+/// zoom or window resize). Spawn systems only run once at run start; without this, the UI
+/// camera projection updates immediately but HUD transforms stay at the old coordinates.
+pub fn sync_player_hud_layout_to_resolution(
+    res: Res<ScreenResolution>,
+    sync_state: Res<super::layout_sync::UiLayoutSyncState>,
+    mut layout: ParamSet<(
+        Query<&mut Transform, With<HudFrame>>,
+        Query<(&mut Transform, &mut Sprite), (With<XPBar>, Without<XPBarBg>)>,
+        Query<
+            (&mut Transform, &mut Sprite),
+            (With<XPBarBg>, Without<XPBar>, Without<XPBarText>),
+        >,
+        Query<&mut Transform, (With<XPBarText>, Without<XPBar>, Without<XPBarBg>)>,
+        Query<(&HudBottomCornerIcon, &mut Transform)>,
+    )>,
+) {
+    if !super::layout_sync::ui_layout_needs_sync(&res, &sync_state) {
+        return;
+    }
+
+    let hud_row_y = -res.game_height * 0.5 + HUD_FRAME_Y_FROM_BOTTOM;
+    for mut transform in layout.p0().iter_mut() {
+        transform.translation.y = hud_row_y;
+    }
+
+    let xp_y = res.game_height / 2. - 3.;
+    let xp_x = -res.game_width / 2.;
+    for (mut transform, mut sprite) in layout.p1().iter_mut() {
+        transform.translation.x = xp_x;
+        transform.translation.y = xp_y;
+        sprite.custom_size = Some(Vec2::new(
+            sprite.custom_size.map(|s| s.x).unwrap_or(0.),
+            6.,
+        ));
+    }
+    for (mut transform, mut sprite) in layout.p2().iter_mut() {
+        transform.translation.x = xp_x;
+        transform.translation.y = xp_y;
+        sprite.custom_size = Some(Vec2::new(res.game_width, 6.));
+    }
+    for mut transform in layout.p3().iter_mut() {
+        transform.translation.y = xp_y;
+    }
+
+    let corner_y = -res.game_height / 2. + 18.;
+    let map_x = -res.game_width * 0.5 + HUD_CORNER_ICON_SIZE.x * 0.5 + HUD_CORNER_LEFT_PADDING;
+    let bag_x = map_x + HUD_CORNER_ICON_SPACING;
+    let settings_x = bag_x + HUD_CORNER_ICON_SPACING;
+    for (icon, mut transform) in layout.p4().iter_mut() {
+        transform.translation.y = corner_y;
+        transform.translation.x = match icon {
+            HudBottomCornerIcon::Minimap => map_x,
+            HudBottomCornerIcon::Inventory => bag_x,
+            HudBottomCornerIcon::Settings => settings_x,
+        };
+    }
+}
+
+pub fn sync_player_hud_progress_layout_to_resolution(
+    res: Res<ScreenResolution>,
+    sync_state: Res<super::layout_sync::UiLayoutSyncState>,
+    mut progress: ParamSet<(
+        Query<(&CurrencyHudSlotIndex, &mut Transform), With<CurrencyHudBackground>>,
+        Query<&mut Transform, With<ProgressHudBar>>,
+        Query<&mut Transform, With<TimelineHUD>>,
+        Query<&mut Transform, With<EraTimerHUD>>,
+    )>,
+) {
+    if !super::layout_sync::ui_layout_needs_sync(&res, &sync_state) {
+        return;
+    }
+
+    let progress_row_y = hud_row_below_xp_y(res.game_height);
+    let timeline_row_y = progress_row_y + 2.;
+    for (slot, mut transform) in progress.p0().iter_mut() {
+        transform.translation.x = match slot.0 {
+            0 => hud_currency_first_center_x(res.game_width),
+            1 => hud_currency_second_center_x(res.game_width),
+            _ => transform.translation.x,
+        };
+        transform.translation.y = progress_row_y;
+    }
+    for mut transform in progress.p1().iter_mut() {
+        transform.translation.x = hud_progress_bar_center_x(res.game_width);
+        transform.translation.y = progress_row_y + 1.;
+    }
+    for mut transform in progress.p2().iter_mut() {
+        transform.translation.x = hud_timeline_center_x(res.game_width);
+        transform.translation.y = timeline_row_y;
+    }
+    for mut transform in progress.p3().iter_mut() {
+        let timer_width = HUD_ERA_TIMER_ENDLESS_WIDTH;
+        transform.translation.x = hud_era_timer_center_x(res.game_width, timer_width);
+        transform.translation.y = timeline_row_y;
+    }
+}
+
+pub fn sync_player_hud_slots_layout_to_resolution(
+    res: Res<ScreenResolution>,
+    sync_state: Res<super::layout_sync::UiLayoutSyncState>,
+    mut slots: ParamSet<(
+        Query<(&InventorySlotState, &mut Transform)>,
+        Query<(&HotbarKeyBackground, &mut Transform)>,
+        Query<(&ActiveSkillSlotBg, &mut Transform)>,
+        Query<(&ActiveSkillKeyBackground, &mut Transform)>,
+        Query<&mut Transform, With<PetSkillSlotBg>>,
+        Query<&mut Transform, With<SkillHudIcon>>,
+        Query<&mut Transform, With<crate::ui::fps_text::FPSText>>,
+        Query<&mut Transform, With<ConsumableBuffHudMarker>>,
+    )>,
+) {
+    if !super::layout_sync::ui_layout_needs_sync(&res, &sync_state) {
+        return;
+    }
+
+    let action_row_y = -res.game_height * 0.5 + HUD_ACTION_ROW_Y_FROM_BOTTOM;
+    for (slot, mut transform) in slots.p0().iter_mut() {
+        if slot.r#type != InventorySlotType::Hotbar {
+            continue;
+        }
+        transform.translation.x = hud_hotbar_slot_center_x(slot.slot_index);
+        transform.translation.y = action_row_y;
+    }
+    for (key_bg, mut transform) in slots.p1().iter_mut() {
+        transform.translation.x = hud_hotbar_slot_center_x(key_bg.slot);
+        transform.translation.y = hud_keybind_badge_center_y(res.game_height);
+    }
+
+    let active_skill_count = slots.p2().iter().count();
+    if active_skill_count > 0 {
+        let num_skills = active_skill_count as f32 + 1.0;
+        let skill_half_span = (num_skills - 1.0) * 0.5;
+        for (bg, mut transform) in slots.p2().iter_mut() {
+            transform.translation.x = HUD_SKILLS_CENTER_X
+                + (bg.slot_index as f32 - skill_half_span) * HUD_SKILL_SPACING_X;
+            transform.translation.y = action_row_y;
+        }
+        for (key_bg, mut transform) in slots.p3().iter_mut() {
+            let skill_x =
+                HUD_SKILLS_CENTER_X + (key_bg.slot as f32 - skill_half_span) * HUD_SKILL_SPACING_X;
+            transform.translation.x = skill_x;
+            transform.translation.y = hud_keybind_badge_center_y(res.game_height);
+        }
+        let pet_x = HUD_SKILLS_CENTER_X + (3.0 - skill_half_span) * HUD_SKILL_SPACING_X;
+        for mut transform in slots.p4().iter_mut() {
+            transform.translation.x = pet_x;
+            transform.translation.y = action_row_y;
+        }
+    }
+
+    let heirloom_row_y = hud_heirloom_row_y(res.game_height);
+    let heirloom_start_x = hud_heirloom_first_icon_x(res.game_width);
+    let max_icons_per_row = super::hud_heirloom_max_per_row(res.game_width).max(1);
+    for (i, mut transform) in slots.p5().iter_mut().enumerate() {
+        let row = i / max_icons_per_row;
+        let col = i % max_icons_per_row;
+        transform.translation.x = heirloom_start_x + col as f32 * HUD_HEIRLOOM_ICON_SPACING;
+        transform.translation.y = heirloom_row_y - row as f32 * 16.;
+    }
+
+    let raw_fps = Vec2::new(
+        res.game_width / 2. - 28.5,
+        -res.game_height / 2. + 10.5,
+    );
+    for mut transform in slots.p6().iter_mut() {
+        transform.translation.x = super::snap_world_to_pixel_grid(raw_fps.x, res.scale);
+        transform.translation.y = super::snap_world_to_pixel_grid(raw_fps.y, res.scale);
+    }
+
+    let consumable_buff_y = -res.game_height / 2. + 14.;
+    for mut transform in slots.p7().iter_mut() {
+        transform.translation.y = consumable_buff_y;
     }
 }
