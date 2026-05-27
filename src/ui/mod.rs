@@ -1039,11 +1039,17 @@ impl Plugin for UIPlugin {
                     player_hud::handle_consumable_buff_hud_tooltip,
                     player_hud::handle_active_skill_hud_tooltip,
                     player_hud::update_skill_tooltip_cooldown.after(player_hud::handle_active_skill_hud_tooltip),
-                    player_hud::handle_active_skill_slot_drag_drop
-                        .after(player_hud::handle_active_skill_hud_tooltip)
-                        .after(crate::cursor::update_cursor_pos),
                 )
                     .in_set(OnUpdate(GameState::Main)),
+            )
+            // PostUpdate: `update_cursor_pos` runs here; ordering drag-drop after it from
+            // `OnUpdate` would create an Update ↔ PostUpdate cycle (UpdateFlush → physics →
+            // cursor → drag → UpdateFlush).
+            .add_system(
+                player_hud::handle_active_skill_slot_drag_drop
+                    .after(crate::cursor::update_cursor_pos)
+                    .run_if(in_state(GameState::Main))
+                    .in_base_set(CoreSet::PostUpdate),
             )
             .add_system(
                 handle_heirloom_hud_tooltip.in_set(OnUpdate(GameState::GameOver)),
