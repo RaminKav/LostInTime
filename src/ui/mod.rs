@@ -1142,6 +1142,7 @@ impl Plugin for UIPlugin {
             .add_systems(
                 (
                     handle_anim_events.run_if(in_state(UIState::ItemChest)),
+                    update_chest_button_label_hover.run_if(in_state(UIState::ItemChest)),
                     tick_skill_choice_interaction_lock_timers,
                 )
                     .in_set(OnUpdate(GameState::Main)),

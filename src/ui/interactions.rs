@@ -53,8 +53,8 @@ use crate::{
     ui::{
         crafting_ui::UpgradeButton,
         item_chest::{
-            ChestType, ItemChestAnimChangeEvent, ItemChestAnimState, ItemChestButton,
-            ItemChestState,
+            ChestButtonKind, ChestType, ItemChestAnimChangeEvent, ItemChestAnimState,
+            ItemChestButton, ItemChestState,
         },
         InventoryState,
     },
@@ -203,28 +203,20 @@ pub enum UIElement {
     CraftButtonContainer,
     EquipmentPanel,
     BlueprintsPanel,
-    /// Side panel shown in `UIState::InventoryCrafting` in place of the `UpgradePanel`.
-    /// Hosts the three ingredient display slots and the craft result slot.
     CraftingPanel,
-    /// Background sprite for one blueprint row in the blueprints panel (`InventoryCrafting`).
-    /// Clicking selects the recipe, hover opens the recipe tooltip.
     CraftingSlot,
     CraftingSlotHover,
-    /// Visual frame around the CRAFT / UPGRADE swap label that sits on the bottom of the
-    /// upgrade / crafting side panel. Decorative only — the click behaviour is driven by
-    /// `CraftModeToggleButton`.
     CraftButton,
     CraftButtonHover,
-    /// One row in the blueprints panel (`InventoryCrafting`). Houses the recipe icon and
-    /// name label. Clicking selects the recipe, hover opens the recipe tooltip.
     BlueprintSlot,
     BlueprintSlotHover,
-    /// Previous page on the blueprints panel (`assets/ui/ButtonPageUp.png`).
     ButtonPageUp,
     ButtonPageUpHover,
-    /// Next page on the blueprints panel (`assets/ui/ButtonPageDown.png`).
     ButtonPageDown,
     ButtonPageDownHover,
+    ChestContainer,
+    ChestButton,
+    ChestButtonBanish,
 }
 impl UIElement {
     pub fn get_hover_state(&self) -> Option<UIElement> {
@@ -534,6 +526,7 @@ pub fn handle_drop_on_slot_events(
                     item_stack: stack,
                     is_recipe: false,
                     show_range: false,
+                    ..Default::default()
                 });
             }
         }
@@ -678,6 +671,7 @@ pub fn handle_hovering(
                             item_stack: item.item_stack,
                             is_recipe: state.r#type.is_crafting(),
                             show_range: shift_key_pressed,
+                            ..Default::default()
                         });
                     }
                 }
@@ -704,6 +698,7 @@ pub fn handle_hovering(
                             item_stack: item.item_stack,
                             is_recipe: state.r#type.is_crafting(),
                             show_range: shift_key_pressed,
+                            ..Default::default()
                         });
                     }
                 }
@@ -1093,6 +1088,7 @@ pub fn handle_interaction_clicks(
                                                     item_stack: stack,
                                                     is_recipe: false,
                                                     show_range: false,
+                                                    ..Default::default()
                                                 },
                                             );
                                         }
@@ -1703,7 +1699,12 @@ pub fn handle_cursor_inventory_upgrade_button(
     }
 }
 
-/// Handles item chest button interactions (for ChestType::Item)
+/// Handles item chest button interactions (for ChestType::Item).
+///
+/// The chest UI spawns one [`ItemChestButton`] in the `Closed`/`Opening` phase
+/// (`ChestButtonKind::Open`) and a Take/Equip pair once the reward is revealed.
+/// Pressing the Interact keybind always advances the chest state (= Take semantics
+/// at Done) regardless of which button currently exists.
 pub fn handle_cursor_item_chest_button(
     cursor_pos: Res<CursorPos>,
     mouse_input: Res<Input<MouseButton>>,
@@ -1715,18 +1716,17 @@ pub fn handle_cursor_item_chest_button(
         Without<InventorySlotState>,
     >,
     mut commands: Commands,
-    graphics: Res<Graphics>,
     mut item_chest_state: ResMut<ItemChestState>,
     mut chest_event: EventWriter<ItemChestAnimChangeEvent>,
     mut game: GameParam,
     mut next_ui_state: ResMut<NextState<UIState>>,
+    mut inv: Query<&mut Inventory>,
+    proto: ProtoParam,
 ) {
-    // Only handle Item chests in this system
     if item_chest_state.chest_type != ChestType::Item {
         return;
     }
 
-    // Interact key advances the chest state directly, bypassing hover
     if keybinds.check_interact_input(&key_input, &mouse_input) {
         advance_item_chest_state(
             &mut item_chest_state,
@@ -1741,41 +1741,48 @@ pub fn handle_cursor_item_chest_button(
     let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
 
-    for (e, mut interactable, _) in item_chest_button.iter_mut() {
+    for (e, mut interactable, button) in item_chest_button.iter_mut() {
+        let kind = button.kind;
         match hit_test {
             Some(hit_ent) if hit_ent.0 == e => match interactable.current() {
                 Interaction::None => {
                     interactable.change(Interaction::Hovering);
-                    let ui_element = UIElement::UpgradeButtonHover;
-                    commands
-                        .entity(e)
-                        .insert(ui_element.clone())
-                        .insert(graphics.get_ui_element_texture(ui_element));
                 }
                 Interaction::Hovering => {
                     if left_mouse_pressed {
-                        advance_item_chest_state(
-                            &mut item_chest_state,
-                            &mut chest_event,
-                            &mut game,
-                            &mut commands,
-                            &mut next_ui_state,
-                        );
+                        match kind {
+                            ChestButtonKind::Open => advance_item_chest_state(
+                                &mut item_chest_state,
+                                &mut chest_event,
+                                &mut game,
+                                &mut commands,
+                                &mut next_ui_state,
+                            ),
+                            ChestButtonKind::Take => take_item_chest_reward(
+                                &mut item_chest_state,
+                                &mut game,
+                                &mut commands,
+                                &mut next_ui_state,
+                            ),
+                            ChestButtonKind::Equip => equip_item_chest_reward(
+                                &mut item_chest_state,
+                                &mut game,
+                                &mut commands,
+                                &mut next_ui_state,
+                                &mut inv,
+                                &proto,
+                            ),
+                            // Banish is heirloom-only; ignore on item chests.
+                            ChestButtonKind::Banish => (),
+                        }
                     }
                 }
                 _ => (),
             },
             _ => {
-                let Interaction::Hovering = interactable.current() else {
-                    continue;
-                };
-                let ui_element = UIElement::UpgradeButton;
-
-                interactable.change(Interaction::None);
-                commands
-                    .entity(e)
-                    .insert(ui_element.clone())
-                    .insert(graphics.get_ui_element_texture(ui_element));
+                if matches!(interactable.current(), Interaction::Hovering) {
+                    interactable.change(Interaction::None);
+                }
             }
         }
     }
@@ -1800,19 +1807,124 @@ fn advance_item_chest_state(
             handle_chest_opening_click(item_chest_state, chest_event);
         }
         ItemChestAnimState::Done => {
-            let pos = game.player().position.truncate();
-            item_chest_state
-                .picked_item
-                .clone()
-                .unwrap()
-                .spawn_as_drop(commands, game, pos);
-            next_ui_state.set(UIState::Closed);
-            commands.remove_resource::<ItemChestState>();
+            take_item_chest_reward(item_chest_state, game, commands, next_ui_state);
         }
     }
 }
 
-/// Handles heirloom chest button interactions (for ChestType::Heirloom)
+/// Drop the picked item next to the player and close the chest UI.
+fn take_item_chest_reward(
+    item_chest_state: &mut ResMut<ItemChestState>,
+    game: &mut GameParam,
+    commands: &mut Commands,
+    next_ui_state: &mut ResMut<NextState<UIState>>,
+) {
+    let pos = game.player().position.truncate();
+    item_chest_state
+        .picked_item
+        .clone()
+        .unwrap()
+        .spawn_as_drop(commands, game, pos);
+    next_ui_state.set(UIState::Closed);
+    commands.remove_resource::<ItemChestState>();
+}
+
+/// Auto-equip the picked item into its matching slot. If every valid slot is
+/// occupied, displace the first-slot item into the main inventory; if that is
+/// also full, drop the displaced item next to the player.
+fn equip_item_chest_reward(
+    item_chest_state: &mut ResMut<ItemChestState>,
+    game: &mut GameParam,
+    commands: &mut Commands,
+    next_ui_state: &mut ResMut<NextState<UIState>>,
+    inv: &mut Query<&mut Inventory>,
+    proto: &ProtoParam,
+) {
+    let picked = item_chest_state.picked_item.clone().unwrap();
+    let Ok(mut inventory) = inv.get_single_mut() else {
+        take_item_chest_reward(item_chest_state, game, commands, next_ui_state);
+        return;
+    };
+
+    let eq_type = proto
+        .get_component::<EquipmentType, _>(picked.obj_type)
+        .cloned();
+    let resolved = match eq_type {
+        Some(EquipmentType::None) | None => {
+            if picked.obj_type.is_weapon() {
+                Some(EquipmentType::Weapon)
+            } else {
+                None
+            }
+        }
+        Some(other) => Some(other),
+    };
+
+    let Some(eq_type) = resolved else {
+        // Item isn't equippable for some reason - fall back to dropping it.
+        take_item_chest_reward(item_chest_state, game, commands, next_ui_state);
+        return;
+    };
+    let slot_type = eq_type.get_valid_slot_type();
+    let valid_slots = eq_type.get_valid_slots();
+    if slot_type == super::InventorySlotType::Normal || valid_slots.is_empty() {
+        take_item_chest_reward(item_chest_state, game, commands, next_ui_state);
+        return;
+    }
+
+    // Prefer the first empty valid slot; otherwise displace the first valid slot.
+    let empty_slot = {
+        let container = inventory.get_items_from_slot_type(slot_type);
+        valid_slots
+            .iter()
+            .copied()
+            .find(|i| container.items.get(*i).map_or(false, |s| s.is_none()))
+    };
+    let dest_slot = empty_slot.unwrap_or_else(|| valid_slots[0]);
+
+    let displaced = {
+        let container = inventory.get_mut_items_from_slot_type(slot_type);
+        container.items.get_mut(dest_slot).and_then(|s| s.take())
+    };
+
+    InventoryItemStack {
+        item_stack: picked,
+        slot: dest_slot,
+    }
+    .add_to_container(
+        inventory.get_mut_items_from_slot_type(slot_type),
+        slot_type,
+        &mut game.inv_slot_query,
+    );
+
+    if let Some(displaced) = displaced {
+        // Equipment isn't valid in the hotbar band (slots 0-5 — keys 1-4 plus the two
+        // passive consumable cells), so route the displaced piece into the main bag area.
+        // Falls through to a floor drop if the bag is full.
+        if let Some(empty) = inventory.items.get_first_empty_non_hotbar_slot() {
+            InventoryItemStack {
+                item_stack: displaced.item_stack,
+                slot: empty,
+            }
+            .add_to_container(
+                &mut inventory.items,
+                super::InventorySlotType::Normal,
+                &mut game.inv_slot_query,
+            );
+        } else {
+            let pos = game.player().position.truncate();
+            displaced.item_stack.spawn_as_drop(commands, game, pos);
+        }
+    }
+
+    next_ui_state.set(UIState::Closed);
+    commands.remove_resource::<ItemChestState>();
+}
+
+/// Handles heirloom chest button interactions (for ChestType::Heirloom).
+///
+/// Mirrors [`handle_cursor_item_chest_button`] but dispatches to the heirloom-specific
+/// Take (`grant_heirloom_from_pool`) and Banish (pool-ban + `banishes_remaining--`) paths.
 pub fn handle_cursor_heirloom_chest_button(
     cursor_pos: Res<CursorPos>,
     mouse_input: Res<Input<MouseButton>>,
@@ -1824,22 +1936,20 @@ pub fn handle_cursor_heirloom_chest_button(
         Without<InventorySlotState>,
     >,
     mut commands: Commands,
-    graphics: Res<Graphics>,
     mut item_chest_state: ResMut<ItemChestState>,
     mut chest_event: EventWriter<ItemChestAnimChangeEvent>,
     mut next_ui_state: ResMut<NextState<UIState>>,
     mut skill_queue: ResMut<HeirloomChoiceQueue>,
+    mut run_unlocks: ResMut<RunUnlockState>,
     mut player_query: Query<(Entity, &Transform, &mut PlayerSkills, &PlayerLevel), With<Player>>,
     proto: ProtoParam,
     mut proto_commands: ProtoCommands,
     mut att_event: EventWriter<AttributeChangeEvent>,
 ) {
-    // Only handle Heirloom chests in this system
     if item_chest_state.chest_type != ChestType::Heirloom {
         return;
     }
 
-    // Interact key advances the chest state directly, bypassing hover
     if keybinds.check_interact_input(&key_input, &mouse_input) {
         advance_heirloom_chest_state(
             &mut item_chest_state,
@@ -1858,45 +1968,59 @@ pub fn handle_cursor_heirloom_chest_button(
     let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
 
-    for (e, mut interactable, _) in item_chest_button.iter_mut() {
+    for (e, mut interactable, button) in item_chest_button.iter_mut() {
+        let kind = button.kind;
         match hit_test {
             Some(hit_ent) if hit_ent.0 == e => match interactable.current() {
                 Interaction::None => {
                     interactable.change(Interaction::Hovering);
-                    let ui_element = UIElement::UpgradeButtonHover;
-                    commands
-                        .entity(e)
-                        .insert(ui_element.clone())
-                        .insert(graphics.get_ui_element_texture(ui_element));
                 }
                 Interaction::Hovering => {
                     if left_mouse_pressed {
-                        advance_heirloom_chest_state(
-                            &mut item_chest_state,
-                            &mut chest_event,
-                            &mut commands,
-                            &mut next_ui_state,
-                            &mut skill_queue,
-                            &mut player_query,
-                            &proto,
-                            &mut proto_commands,
-                            &mut att_event,
-                        );
+                        match kind {
+                            ChestButtonKind::Open => advance_heirloom_chest_state(
+                                &mut item_chest_state,
+                                &mut chest_event,
+                                &mut commands,
+                                &mut next_ui_state,
+                                &mut skill_queue,
+                                &mut player_query,
+                                &proto,
+                                &mut proto_commands,
+                                &mut att_event,
+                            ),
+                            ChestButtonKind::Take => take_heirloom_chest_reward(
+                                &mut item_chest_state,
+                                &mut commands,
+                                &mut next_ui_state,
+                                &mut skill_queue,
+                                &mut player_query,
+                                &proto,
+                                &mut proto_commands,
+                                &mut att_event,
+                            ),
+                            ChestButtonKind::Banish => {
+                                if run_unlocks.banishes_remaining > 0 {
+                                    banish_heirloom_chest_reward(
+                                        &mut item_chest_state,
+                                        &mut commands,
+                                        &mut next_ui_state,
+                                        &mut skill_queue,
+                                        &mut run_unlocks,
+                                    );
+                                }
+                            }
+                            // Equip is item-only; ignore on heirloom chests.
+                            ChestButtonKind::Equip => (),
+                        }
                     }
                 }
                 _ => (),
             },
             _ => {
-                let Interaction::Hovering = interactable.current() else {
-                    continue;
-                };
-                let ui_element = UIElement::UpgradeButton;
-
-                interactable.change(Interaction::None);
-                commands
-                    .entity(e)
-                    .insert(ui_element.clone())
-                    .insert(graphics.get_ui_element_texture(ui_element));
+                if matches!(interactable.current(), Interaction::Hovering) {
+                    interactable.change(Interaction::None);
+                }
             }
         }
     }
@@ -1925,28 +2049,68 @@ fn advance_heirloom_chest_state(
             handle_chest_opening_click(item_chest_state, chest_event);
         }
         ItemChestAnimState::Done => {
-            if let Ok((player_entity, transform, mut skills, level)) = player_query.get_single_mut()
-            {
-                let picked_heirloom = item_chest_state.picked_heirloom.clone().unwrap();
-                skill_queue.grant_heirloom_from_pool(
-                    picked_heirloom.clone(),
-                    proto_commands,
-                    proto,
-                    transform.translation.truncate(),
-                    &mut skills,
-                    level.level,
-                );
-                picked_heirloom.heirloom.add_heirloom_components(
-                    player_entity,
-                    commands,
-                    skills.clone(),
-                );
-                att_event.send(AttributeChangeEvent);
-            }
-            next_ui_state.set(UIState::Closed);
-            commands.remove_resource::<ItemChestState>();
+            take_heirloom_chest_reward(
+                item_chest_state,
+                commands,
+                next_ui_state,
+                skill_queue,
+                player_query,
+                proto,
+                proto_commands,
+                att_event,
+            );
         }
     }
+}
+
+fn take_heirloom_chest_reward(
+    item_chest_state: &mut ResMut<ItemChestState>,
+    commands: &mut Commands,
+    next_ui_state: &mut ResMut<NextState<UIState>>,
+    skill_queue: &mut ResMut<HeirloomChoiceQueue>,
+    player_query: &mut Query<(Entity, &Transform, &mut PlayerSkills, &PlayerLevel), With<Player>>,
+    proto: &ProtoParam,
+    proto_commands: &mut ProtoCommands,
+    att_event: &mut EventWriter<AttributeChangeEvent>,
+) {
+    if let Ok((player_entity, transform, mut skills, level)) = player_query.get_single_mut() {
+        let picked_heirloom = item_chest_state.picked_heirloom.clone().unwrap();
+        skill_queue.grant_heirloom_from_pool(
+            picked_heirloom.clone(),
+            proto_commands,
+            proto,
+            transform.translation.truncate(),
+            &mut skills,
+            level.level,
+        );
+        picked_heirloom
+            .heirloom
+            .add_heirloom_components(player_entity, commands, skills.clone());
+        att_event.send(AttributeChangeEvent);
+    }
+    next_ui_state.set(UIState::Closed);
+    commands.remove_resource::<ItemChestState>();
+}
+
+/// Ban the picked heirloom from the pool without granting it, then close the UI.
+/// Mirrors [`HeirloomChoiceQueue::banish_slot`] but operates on the chest's
+/// already-picked heirloom (which lives outside the level-up queue).
+fn banish_heirloom_chest_reward(
+    item_chest_state: &mut ResMut<ItemChestState>,
+    commands: &mut Commands,
+    next_ui_state: &mut ResMut<NextState<UIState>>,
+    skill_queue: &mut ResMut<HeirloomChoiceQueue>,
+    run_unlocks: &mut ResMut<RunUnlockState>,
+) {
+    let picked = item_chest_state.picked_heirloom.clone().unwrap();
+    skill_queue.banned.insert(picked.heirloom.clone());
+    skill_queue.pool.retain(|x| x.heirloom != picked.heirloom);
+    skill_queue.banished_heirlooms.push(picked.clone());
+    run_unlocks.banishes_remaining = run_unlocks.banishes_remaining.saturating_sub(1);
+    commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.35));
+
+    next_ui_state.set(UIState::Closed);
+    commands.remove_resource::<ItemChestState>();
 }
 
 /// Helper to handle the "Opening" state click - speeds up the animation

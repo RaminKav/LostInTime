@@ -14,8 +14,8 @@ use crate::{
         XpRateBonus,
     },
     colors::{
-        LIGHT_GREEN, LIGHT_GREY, ORANGE, STATS_TITLE, TOOLTIP_BLACK, TOOLTIP_BLACK_2, WHITE,
-        YELLOW, YELLOW_2,
+        DARK_WOOD_BROWN, LIGHT_GREEN, LIGHT_GREY, ORANGE, STATS_TITLE, TOOLTIP_BLACK,
+        TOOLTIP_BLACK_2, WHITE, YELLOW, YELLOW_2,
     },
     combat::damage_tracker::{
         spawn_damage_tracker_ui, spawn_mob_stat_tracker_ui, DamageTracker, MobStatTracker,
@@ -80,12 +80,21 @@ pub struct TooltipsManager {
     pub stats_respawn_delay: Option<Timer>,
 }
 
-#[derive(Debug, Clone)]
-
+#[derive(Debug, Clone, Default)]
 pub struct ToolTipUpdateEvent {
     pub item_stack: ItemStack,
     pub is_recipe: bool,
     pub show_range: bool,
+    /// When `Some`, the tooltip card is placed at exactly this `(x, y)` offset relative to
+    /// the inventory / essence / item-chest parent, bypassing the `UIState`-based default
+    /// position. Also marks this event as a *secondary* tooltip: the dispatcher skips the
+    /// "despawn previous `ItemOrRecipeTooltip` entities" step so a secondary card can live
+    /// alongside the primary hover card (used by the item chest "Currently Equipped" panel).
+    pub position_override: Option<Vec2>,
+    /// When `Some`, this string is rendered as a header above the tooltip card in the
+    /// `TOOLTIP_ITEM_TITLE` font (alagard 15) in `DARK_WOOD_BROWN`. Used by the chest's
+    /// secondary tooltip to label it "Currently Equipped".
+    pub header_text: Option<String>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -171,6 +180,7 @@ pub fn handle_tooltip_teardown(
                 item_stack: item.item_stack.clone(),
                 is_recipe: false,
                 show_range: false,
+                ..Default::default()
             });
         } else {
             for t in tooltip.iter() {
@@ -208,8 +218,13 @@ pub fn handle_spawn_inv_item_tooltip(
     for item in updates.iter() {
         let asset_server = asset_server.as_ref();
         tooltip_manager.stats_respawn_delay = None;
-        for t in old_tooltips.iter() {
-            commands.entity(t).despawn_recursive();
+        // Secondary tooltips (e.g. the chest's "Currently Equipped" side card) explicitly
+        // opt-in via `position_override` and must NOT despawn the primary card alongside
+        // them. Primary tooltips clear any previous card before rendering.
+        if item.position_override.is_none() {
+            for t in old_tooltips.iter() {
+                commands.entity(t).despawn_recursive();
+            }
         }
         // Standard "right of inventory UI" tooltip anchor — used for normal inventory
         // items in both `Inventory` and `InventoryCrafting` modes.
@@ -223,37 +238,31 @@ pub fn handle_spawn_inv_item_tooltip(
                 .floor(),
             0.,
         );
-        let parent_offset = match cur_inv_state.0 {
-            UIState::Inventory => right_side_offset,
-            // In `InventoryCrafting` mode:
-            //   - Recipe tooltips (hovering a blueprint row) render on the LEFT, anchored
-            //     on top of the main inventory panel. The BlueprintsPanel occupies the
-            //     right side, so this is the only free space.
-            //   - Normal item tooltips (hovering an inventory/hotbar slot) keep the same
-            //     right-side position as `UIState::Inventory`.
-            // The inventory panel center uses `INVENTORY_PANEL_CENTER_X` when the DMG
-            // tracker is open (see
-            // `setup_inv_ui` `pos_offset`). We bias the recipe tooltip slightly right of
-            // the panel center so its left edge doesn't hug the screen edge.
-            UIState::InventoryCrafting => {
-                if item.is_recipe {
-                    Vec2::new(0., INVENTORY_Y_OFFSET)
-                } else {
-                    right_side_offset
+        let parent_offset = if let Some(p) = item.position_override {
+            p
+        } else {
+            match cur_inv_state.0 {
+                UIState::Inventory => right_side_offset,
+                UIState::InventoryCrafting => {
+                    if item.is_recipe {
+                        Vec2::new(0., INVENTORY_Y_OFFSET)
+                    } else {
+                        right_side_offset
+                    }
                 }
+                UIState::Chest => Vec2::new(
+                    -CHEST_INVENTORY_UI_SIZE.x - 20.,
+                    -CHEST_INVENTORY_UI_SIZE.y / 2. + 40.,
+                ),
+                UIState::Crafting => CRAFTING_INVENTORY_UI_SIZE,
+                UIState::Furnace => FURNACE_INVENTORY_UI_SIZE,
+                UIState::Essence => ESSENCE_UI_SIZE,
+                UIState::ItemChest => Vec2::new(
+                    -CHEST_INVENTORY_UI_SIZE.x - 20.,
+                    -CHEST_INVENTORY_UI_SIZE.y / 2. + 40.,
+                ),
+                _ => continue,
             }
-            UIState::Chest => Vec2::new(
-                -CHEST_INVENTORY_UI_SIZE.x - 20.,
-                -CHEST_INVENTORY_UI_SIZE.y / 2. + 40.,
-            ),
-            UIState::Crafting => CRAFTING_INVENTORY_UI_SIZE,
-            UIState::Furnace => FURNACE_INVENTORY_UI_SIZE,
-            UIState::Essence => ESSENCE_UI_SIZE,
-            UIState::ItemChest => Vec2::new(
-                -CHEST_INVENTORY_UI_SIZE.x - 20.,
-                -CHEST_INVENTORY_UI_SIZE.y / 2. + 40.,
-            ),
-            _ => continue,
         };
 
         if cur_inv_state.0 == UIState::Inventory {
@@ -897,6 +906,36 @@ pub fn handle_spawn_inv_item_tooltip(
             );
             commands.entity(star).set_parent(tooltip);
         }
+        // Optional header rendered above the card (e.g. "Currently Equipped" on the chest
+        // secondary tooltip). Parented to the tooltip sprite so it inherits transform +
+        // teardown lifecycle.
+        if let Some(header) = item.header_text.as_ref() {
+            commands
+                .spawn((
+                    Text2dBundle {
+                        text: Text::from_section(
+                            header.clone(),
+                            TextStyle {
+                                font: gf::TOOLTIP_ITEM_TITLE.load_font(asset_server),
+                                font_size: gf::TOOLTIP_ITEM_TITLE.size,
+                                color: DARK_WOOD_BROWN,
+                            },
+                        )
+                        .with_alignment(TextAlignment::Center),
+                        text_anchor: Anchor::Center,
+                        transform: Transform::from_translation(Vec3::new(
+                            0.,
+                            size.y / 2. + 12.,
+                            2.,
+                        )),
+                        ..default()
+                    },
+                    RenderLayers::from_layers(&[3]),
+                    Name::new("TOOLTIP HEADER"),
+                ))
+                .set_parent(tooltip);
+        }
+
         // add tooltip to inventory, essence, or item chest ui
         if let Ok(inv) = inv.get_single() {
             commands.entity(inv).add_child(tooltip);

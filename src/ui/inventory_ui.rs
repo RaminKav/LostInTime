@@ -2502,6 +2502,7 @@ pub fn handle_blueprint_slot_interaction(
                             item_stack: item_data.clone(),
                             is_recipe: true,
                             show_range: false,
+                            ..Default::default()
                         });
                     }
                 }

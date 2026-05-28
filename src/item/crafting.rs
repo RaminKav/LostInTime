@@ -389,6 +389,7 @@ pub fn handle_furnace_slot_update(
                 item_stack: inv.furnace_items.items[1].clone().unwrap().item_stack,
                 is_recipe: false,
                 show_range: false,
+                ..Default::default()
             });
         }
     }

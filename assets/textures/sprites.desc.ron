@@ -292,12 +292,12 @@
         ),
         ChestBlock: WorldObjectData(
             texture_pos: (12., 14.),
-            size: (25., 18.),
+            size: (19., 16.),
             anchor: None,
         ),
         HeirloomChest: WorldObjectData(
-                texture_pos: (14., 15.),
-            size: (23., 18.),
+            texture_pos: (12., 15.),
+            size: (21., 16.),
             anchor: None,
         ),
         HeirloomChestBlock: WorldObjectData(

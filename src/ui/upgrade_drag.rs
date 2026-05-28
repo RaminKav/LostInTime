@@ -254,6 +254,7 @@ pub fn handle_drag_upgrade_material_on_equipment(
             item_stack: stack,
             is_recipe: false,
             show_range: false,
+            ..Default::default()
         });
     }
 
