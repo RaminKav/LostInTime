@@ -147,6 +147,52 @@ pub fn spawn_keybind_badge(
     (key_bg, key_text)
 }
 
+/// Spawn a HUD label badge: same 19×9 grey box as keybind badges, with a static label.
+pub fn spawn_hud_label_badge(
+    commands: &mut Commands,
+    asset_server: &AssetServer,
+    label: &str,
+    transform: Transform,
+    parent: Option<Entity>,
+    render_layer: u8,
+) -> (Entity, Entity) {
+    let mut key_bg = commands.spawn(SpriteBundle {
+        sprite: Sprite {
+            color: crate::ui::KEYBIND_BADGE_COLOR,
+            custom_size: Some(crate::ui::KEYBIND_BADGE_SIZE),
+            ..default()
+        },
+        transform,
+        ..default()
+    });
+    key_bg.insert(RenderLayers::from_layers(&[render_layer]));
+    if let Some(parent) = parent {
+        key_bg.set_parent(parent);
+    }
+    let key_bg = key_bg.id();
+
+    let key_text = commands
+        .spawn(Text2dBundle {
+            text: Text::from_section(
+                label.to_string(),
+                TextStyle {
+                    font: asset_server.load("fonts/slkscr.ttf"),
+                    font_size: 8.4,
+                    color: crate::colors::WHITE,
+                },
+            )
+            .with_alignment(TextAlignment::Center),
+            text_anchor: bevy::sprite::Anchor::Center,
+            transform: Transform::from_translation(Vec3::new(0., 0., 1.)),
+            ..Default::default()
+        })
+        .insert(RenderLayers::from_layers(&[render_layer]))
+        .set_parent(key_bg)
+        .id();
+
+    (key_bg, key_text)
+}
+
 /// Full-screen overlay dimensions with margin so edges stay covered at UI zoom-out.
 pub fn full_screen_overlay_size(res: &ScreenResolution) -> Vec2 {
     const WIDTH_PAD: f32 = 24.0;

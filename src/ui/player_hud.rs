@@ -14,7 +14,10 @@ use super::{
     spawn_inv_slot, spawn_item_stack_icon,
     tooltips::spawn_world_item_tooltip_for_stack,
     tooltips::ConsumableBuffHudTooltip,
-    ui_helpers::{spawn_keybind_badge, Z_DEPTH_HUD_ACTIVE_SKILLS, Z_DEPTH_HUD_HEIRLOOM_ICONS},
+    ui_helpers::{
+        spawn_hud_label_badge, spawn_keybind_badge, Z_DEPTH_HUD_ACTIVE_SKILLS,
+        Z_DEPTH_HUD_HEIRLOOM_ICONS,
+    },
     InventorySlotState, InventorySlotType, InventoryState, InventoryUI, UIElement, UIState,
     HUD_ACTION_ROW_Y_FROM_BOTTOM, HUD_ERA_TIMER_ENDLESS_WIDTH, HUD_FRAME_Y_FROM_BOTTOM,
     HUD_HEIRLOOM_ICON_SPACING, HUD_HOTBAR_SLOTS, HUD_SKILLS_CENTER_X, HUD_SKILL_SLOT_HIT_SIZE,
@@ -1170,10 +1173,14 @@ pub fn handle_skill_choice_ui_close(
 pub struct SkillHudIcon(pub Heirloom);
 
 /// Marker for the pet's 4th-slot HUD icon (background quad). Sits at the rightmost
-/// position of the skills group on the action row. Unlike class skill icons it has no
-/// keybind badge — the pet auto-casts its ability on an internal timer.
+/// position of the skills group on the action row. Uses a static "PET" label badge
+/// instead of a keybind — the pet auto-casts its ability on an internal timer.
 #[derive(Component)]
 pub struct PetSkillSlotBg;
+
+/// Static "PET" label badge under the pet skill slot (same style as skill keybind badges).
+#[derive(Component)]
+pub struct PetSkillLabelBackground;
 
 /// Marker for the pet's skill icon sprite (child of the pet skill slot anchor).
 #[derive(Component)]
@@ -3175,16 +3182,21 @@ fn pet_ability_cooldown(
 /// Spawns / refreshes the pet skill HUD slot. The slot sits at the rightmost position
 /// of the 4-wide skills group (reserved in `handle_update_player_skills` by adding `+1`
 /// to the centering count). Renders the pet's `skill_icon` from
-/// `class_pet_data.class.ron` with no keybind badge.
+/// `class_pet_data.class.ron` plus a static "PET" label badge (no keybind).
 pub fn update_pet_skill_hud_slot(
     mut commands: Commands,
+    asset_server: Res<AssetServer>,
     graphics: Res<Graphics>,
     pet_q: Query<&crate::pets::state::Pet>,
     existing: Query<(Entity, &PetSkillSlotFor), With<PetSkillSlotBg>>,
+    existing_label: Query<Entity, With<PetSkillLabelBackground>>,
     res: Res<ScreenResolution>,
 ) {
     let Some(pet) = pet_q.iter().next() else {
         for (e, _) in existing.iter() {
+            commands.entity(e).despawn_recursive();
+        }
+        for e in existing_label.iter() {
             commands.entity(e).despawn_recursive();
         }
         return;
@@ -3197,6 +3209,9 @@ pub fn update_pet_skill_hud_slot(
     for (e, _) in existing.iter() {
         commands.entity(e).despawn_recursive();
     }
+    for e in existing_label.iter() {
+        commands.entity(e).despawn_recursive();
+    }
 
     let pet_data = graphics.get_pet_data(pet.clone());
 
@@ -3206,6 +3221,20 @@ pub fn update_pet_skill_hud_slot(
     let skill_half_span = (num_skills - 1.0) * 0.5;
     let x = HUD_SKILLS_CENTER_X + (3.0 - skill_half_span) * HUD_SKILL_SPACING_X;
     let y = -res.game_height / 2. + HUD_ACTION_ROW_Y_FROM_BOTTOM;
+
+    let (pet_label_bg, _) = spawn_hud_label_badge(
+        &mut commands,
+        &asset_server,
+        "PET",
+        Transform::from_translation(Vec3::new(
+            x,
+            hud_keybind_badge_center_y(res.game_height),
+            2.,
+        )),
+        None,
+        3,
+    );
+    commands.entity(pet_label_bg).insert(PetSkillLabelBackground);
 
     let slot_bg = commands
         .spawn(SpatialBundle::from_transform(Transform::from_translation(
