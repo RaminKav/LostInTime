@@ -476,3 +476,25 @@ Heirlooms:
 - [Bug] Added missing Blueberry to filter list
 - [Bug] Enemy projectiles no longer speed up with player projectile speed heirloom.
 - [Bug] Item drop filter now works on crates
+
+## 0.20.0
+
+- [Feature] New Thief skin is here! Check it out. Last 2 class skins coming very soon!!
+- [UI] New chest sprites, and polished Chest UI! Equip gear directly in the chest, banish heirlooms directly from chest, also view currently equiped gear to compare!
+- [Balance] Buff base Mana regen timer from 6s -> 2s
+- [Balance] Buff base defence/hp stats on armor
+- [Balance] Buff defence formula: defence now mitigates more % of dmg
+- [Balance] Buff Lightning Ring mana cost 7 -> 5
+- [Balance] Buff Summoning Wand from LEgendary -> Rare, 20% proc -> 10% proc
+- [Balance] Warrior now scales +2 Size per level, and Gravitational Spear scales with size.
+- [Balance] Buff drop rates of cards a tiny bit
+- [QoL/Bug] Fix text rendering on windows/larger monitors. Text should look clear now without being warped or "chizzled", etc
+- [QoL] Add Heirloom picker in dev tools: add any heirloom instantly, to test builds/theory craft
+- [QoL] Added setting to adjust game and UI render scale separatly! Zoom in our out the game view, and make ui smaller, or standard
+- [QoL] Pet skill now shows "PET" label for clarity/completeness
+- [QoL] Chunkers boulder now orbits further away as it scales with size
+- [QoL] Reskin Spike slime enemy to purple to stand out more
+- [Bug] Reposition cursor every frame, so if you dont move mouse and walk past your cursor, the targetting doesnt drift
+- [Bug] Assets were missing on Windows for Era3 (snow biome), should now see the leafless trees as intended!
+- [Bug] Piercing Star thief skill now properly tracks in damage tracker
+- [Bug] Some wep/animations were not hiding when toggling hid attacks/animations, fixed
