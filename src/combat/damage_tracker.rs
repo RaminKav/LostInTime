@@ -70,6 +70,7 @@ pub enum DamageSource {
     SpearGravity,
     ArrowVolley,
     PossessedBlade,
+    PiercingStar,
     Recall,
 
     // Heirloom effects
@@ -120,6 +121,7 @@ impl DamageSource {
             | DamageSource::SpearGravity
             | DamageSource::ArrowVolley
             | DamageSource::PossessedBlade
+            | DamageSource::PiercingStar
             | DamageSource::Recall => DamageSourceCategory::Skill,
 
             DamageSource::Echo
@@ -167,6 +169,7 @@ impl DamageSource {
             DamageSource::SpearGravity => "Grav. Spear",
             DamageSource::ArrowVolley => "Arrow Volley",
             DamageSource::PossessedBlade => "Possessed Blade",
+            DamageSource::PiercingStar => "Piercing Star",
             DamageSource::Recall => "Shadow Step",
             DamageSource::Echo => "Echo",
             DamageSource::IceExplosion => "Ice Explosion",
@@ -228,7 +231,8 @@ impl DamageSource {
             Projectile::Arrow => Some(DamageSource::Bow),
             Projectile::Bullet | Projectile::Buckshot => Some(DamageSource::Gun),
             Projectile::Dart => Some(DamageSource::Blowdart),
-            Projectile::ThrowingStar | Projectile::ThrowingStarLarge => Some(DamageSource::Claw),
+            Projectile::ThrowingStar => Some(DamageSource::Claw),
+            Projectile::ThrowingStarLarge => Some(DamageSource::PiercingStar),
             Projectile::IceShard => Some(DamageSource::IceStaff),
             Projectile::Fireball | Projectile::FireAttack => Some(DamageSource::FireStaff),
             Projectile::PlasmaBall | Projectile::PlasmaExplosion => Some(DamageSource::PlasmaStaff),

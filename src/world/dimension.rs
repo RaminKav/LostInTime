@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     attributes::AttributeChangeEvent,
+    bounce::DesertTornado,
     chaos::EraTransitionState,
     enemy::{spawner::MobSpawningPaused, Mob},
     item::{Equipment, ItemDrop},
@@ -161,7 +162,25 @@ impl Plugin for DimensionPlugin {
                     ),
             )
             .add_system(rebuild_attributes_on_new_dimension.in_schedule(OnEnter(GameState::Main)))
+            .add_system(log_drop_filter_on_dim_swap)
             .add_system(apply_system_buffers.in_set(CustomFlush));
+    }
+}
+
+/// TEMP DIAGNOSTIC (drop-filter leak): logs the break-drop filter contents whenever an era
+/// swap is requested. If size/contents persist across the era2 -> era3 transition, the
+/// resource is NOT being reset. Remove once the leak is resolved.
+fn log_drop_filter_on_dim_swap(
+    mut spawn_event: EventReader<DimensionSpawnEvent>,
+    break_drop_filter: Res<crate::inventory::BreakDropFilter>,
+) {
+    for new_dim in spawn_event.iter() {
+        warn!(
+            "[DROP-FILTER] era swap -> {:?} | filter_size={} contents={:?}",
+            new_dim.new_era,
+            break_drop_filter.0.len(),
+            break_drop_filter.0,
+        );
     }
 }
 impl DimensionPlugin {
@@ -350,7 +369,13 @@ impl DimensionPlugin {
         entity_query: Query<
             Entity,
             (
-                Or<(With<Mob>, With<Chunk>, With<TimePortal>, With<ItemDrop>)>,
+                Or<(
+                    With<Mob>,
+                    With<Chunk>,
+                    With<TimePortal>,
+                    With<ItemDrop>,
+                    With<DesertTornado>,
+                )>,
                 Without<Equipment>,
             ),
         >,

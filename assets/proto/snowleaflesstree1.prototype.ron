@@ -13,7 +13,7 @@
   "survival_rogue_like::player::levels::ExperienceReward": (5),
   "bevy_proto::custom::VisibilityBundle": (),
   "bevy_proto::custom::SpriteBundle": (
-      texture: AssetPath("SnowLeaflessTree1.png")
+      texture: AssetPath("snowleaflesstree1.png")
    ),
   "survival_rogue_like::item::loot_table::LootTable": (drops: [(item: Stick, min: 1, max: 2, rate: 0.5)]),
   }

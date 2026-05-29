@@ -1491,6 +1491,7 @@ pub fn handle_active_skill_hud_tooltip(
     )>,
     existing_tooltips: Query<Entity, With<ActiveSkillHudTooltip>>,
     mut last_hovered: Local<Option<ActiveSkill>>,
+    res: Res<ScreenResolution>,
     skill_power: Query<
         (
             &SkillPower,
@@ -1554,7 +1555,16 @@ pub fn handle_active_skill_hud_tooltip(
 
     // Spawn new tooltip if hovering
     if let Some((skill, slot_index, icon_pos)) = currently_hovered {
-        let tooltip_pos = Vec3::new(icon_pos.x - 30., icon_pos.y + 56., icon_pos.z + 10.);
+        // The container is a rootless `SpatialBundle` (no `Sprite`/`Text`), so it is skipped by
+        // `snap_layer3_visuals_to_pixel_grid`. Its child text inherits the container's world
+        // origin, and `pixel_snap_text_glyphs` can only correct glyph offsets *relative* to an
+        // on-grid origin — a fractional container origin chips the (left/right-anchored) glyphs.
+        // Snap the container onto the physical pixel grid so the text origin lands on-grid.
+        let tooltip_pos = Vec3::new(
+            super::snap_world_to_pixel_grid(icon_pos.x - 30., res.scale),
+            super::snap_world_to_pixel_grid(icon_pos.y + 56., res.scale),
+            icon_pos.z + 10.,
+        );
         let container = commands
             .spawn(RenderLayers::from_layers(&[3]))
             .insert(ActiveSkillHudTooltip)
@@ -3339,6 +3349,7 @@ pub fn handle_pet_skill_hud_tooltip(
     coin: Query<&crate::pets::pet_abilities::GoldenPigCoinTimer, With<crate::pets::state::Pet>>,
     mut last_hovered: Local<Option<crate::pets::state::Pet>>,
     mut tooltip_cooldown_text: Query<&mut Text, With<PetSkillTooltipCooldownText>>,
+    res: Res<ScreenResolution>,
 ) {
     use crate::ui::interactions::Interaction;
 
@@ -3395,7 +3406,13 @@ pub fn handle_pet_skill_hud_tooltip(
 
     if let Some((pet, pos)) = currently_hovered {
         let pet_data = graphics.get_pet_data(pet.clone());
-        let tooltip_pos = Vec3::new(pos.x - 30., pos.y + 56., pos.z + 10.);
+        // Snap the rootless container onto the physical pixel grid so the child tooltip text
+        // origin lands on-grid (see `handle_active_skill_hud_tooltip` for the rationale).
+        let tooltip_pos = Vec3::new(
+            super::snap_world_to_pixel_grid(pos.x - 30., res.scale),
+            super::snap_world_to_pixel_grid(pos.y + 56., res.scale),
+            pos.z + 10.,
+        );
 
         let container = commands
             .spawn(RenderLayers::from_layers(&[3]))

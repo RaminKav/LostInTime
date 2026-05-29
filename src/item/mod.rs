@@ -1775,6 +1775,21 @@ pub fn handle_break_object(
                 {
                     continue;
                 }
+                // TEMP DIAGNOSTIC (drop-filter leak): fires whenever a *filterable* material
+                // reaches the ground. Shows whether the filter is populated and why this item
+                // slipped through (not blocked vs. bypassed). Remove once the leak is resolved.
+                if !is_mob && crate::inventory::BREAK_DROP_FILTER_ITEMS.contains(&drop.obj_type) {
+                    warn!(
+                        "[DROP-FILTER] spawned {:?} from {:?} | filter_active={} bypass={} blocked={} filter_size={} contents={:?}",
+                        drop.obj_type,
+                        broken.obj,
+                        filter_non_mob_drops,
+                        bypass_filter,
+                        break_drop_filter.is_blocked(drop.obj_type),
+                        break_drop_filter.0.len(),
+                        break_drop_filter.0,
+                    );
+                }
                 let pos = if broken.obj.is_medium_size(&proto_param) {
                     tile_pos_to_world_pos(
                         TileMapPosition::new(broken.pos.chunk_pos, broken.pos.tile_pos),

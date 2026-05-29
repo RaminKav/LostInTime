@@ -249,7 +249,18 @@ impl Plugin for CombatPlugin {
                     .in_set(OnUpdate(GameState::Main)),
             )
             .add_system(apply_system_buffers.in_set(CustomFlush))
-            .add_system(update_anim_visibility.in_set(OnUpdate(GameState::Main)));
+            // Run in PostUpdate (after Update's command flush so freshly spawned
+            // projectiles/heirloom anims are queryable this frame) and before
+            // visibility propagation so the correct `Visibility` is picked up the
+            // same frame it spawns. Otherwise newly spawned hidden anims (e.g. the
+            // sword projectile, boulder) flash visible for one frame before being
+            // hidden.
+            .add_system(
+                update_anim_visibility
+                    .in_base_set(CoreSet::PostUpdate)
+                    .before(bevy::render::view::VisibilitySystems::VisibilityPropagate)
+                    .run_if(in_state(GameState::Main)),
+            );
     }
 }
 

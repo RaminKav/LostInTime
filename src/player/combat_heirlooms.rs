@@ -959,7 +959,10 @@ pub fn update_stone_tooth(
         let elapsed = lifetime.lifetime.elapsed().as_secs_f32();
         let angle = stone.base_angle + (elapsed / STONE_TOOTH_ORBIT_PERIOD) * TAU;
         // Expand outward from player over lifetime (0 -> STONE_TOOTH_TRAVEL_DISTANCE).
-        let radius = (elapsed / STONE_TOOTH_ROCK_LIFETIME) * STONE_TOOTH_TRAVEL_DISTANCE + 24.;
+        // Scale the orbit radius with the rock's size so larger rocks orbit
+        // further out instead of clipping into the player.
+        let radius = ((elapsed / STONE_TOOTH_ROCK_LIFETIME) * STONE_TOOTH_TRAVEL_DISTANCE + 24.)
+            * stone.size_multiplier;
         let offset = Vec2::from_angle(angle) * radius;
         transform.translation = Vec3::new(
             player_xy.x + offset.x,

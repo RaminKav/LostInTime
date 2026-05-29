@@ -12,7 +12,7 @@ use strum_macros::{Display, EnumIter};
 use crate::{
     animations::player_sprite::{
         PlayerBlueAseprite, PlayerGreenAseprite, PlayerGreyAseprite, PlayerRedAseprite,
-        PlayerRogueAseprite, PlayerSpriteHandles,
+        PlayerRogueAseprite, PlayerSpriteHandles, PlayerThiefAseprite,
     },
     attributes::{AttributeQuality, AttributeValue, ItemAttributes, ItemGlow},
     combat::pickup_radius::{
@@ -69,7 +69,7 @@ impl SkillClass {
             SkillClass::Warrior => (sprites.red.clone(), PlayerRedAseprite::tags::IDLE_FRONT),
             SkillClass::Wizard => (sprites.blue.clone(), PlayerBlueAseprite::tags::IDLE_FRONT),
             SkillClass::Rogue => (sprites.rogue.clone(), PlayerRogueAseprite::tags::IDLE_FRONT),
-            SkillClass::Thief => (sprites.grey.clone(), PlayerGreyAseprite::tags::IDLE_FRONT),
+            SkillClass::Thief => (sprites.thief.clone(), PlayerThiefAseprite::tags::IDLE_FRONT),
             SkillClass::Hunter => (sprites.green.clone(), PlayerGreenAseprite::tags::IDLE_FRONT),
             _ => (sprites.grey.clone(), PlayerGreyAseprite::tags::IDLE_FRONT),
         }

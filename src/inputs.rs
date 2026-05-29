@@ -245,8 +245,7 @@ fn turn_player(
     cursor_pos: Res<CursorPos>,
     mut commands: Commands,
 ) {
-    let to_cursor =
-        cursor_pos.world_coords.truncate() - game.player_state.position.truncate();
+    let to_cursor = cursor_pos.world_coords.truncate() - game.player_state.position.truncate();
     if to_cursor.length_squared() < 1e-4 {
         return;
     }
@@ -751,7 +750,7 @@ pub fn toggle_inventory(
             // proto_commands.spawn_item_from_proto(WorldObject::Claw, &proto, pos, 1, Some(5));
             // proto_commands.spawn_item_from_proto(WorldObject::IceStaff, &proto, pos, 1, Some(5));
             // proto_commands.spawn_item_from_proto(WorldObject::BasicStaff, &proto, pos, 1, Some(5));
-            proto_commands.spawn_from_proto(Mob::Scorpion, &proto.prototypes, pos);
+            proto_commands.spawn_from_proto(Mob::SpikeSlime, &proto.prototypes, pos);
             // proto_commands.spawn_from_proto(Mob::StingFly, &proto.prototypes, pos);
             // proto_commands.spawn_from_proto(Mob::FurDevil, &proto.prototypes, pos);
             // proto_commands.spawn_from_proto(Mob::Bushling, &proto.prototypes, pos);

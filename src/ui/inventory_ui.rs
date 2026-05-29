@@ -20,15 +20,15 @@ use crate::night::EraTimer;
 use crate::player::skills::{
     Heirloom, HeirloomChoiceQueue, HeirloomChoiceState, HeirloomRarity, PlayerSkills,
 };
+use crate::player::unlocks::RunUnlockState;
+use crate::player::ModifyCurencyEvent;
+use crate::proto::proto_param::ProtoParam;
 use crate::ui::heirloom_browser_grid::{
     despawn_dev_heirloom_picker_grid_layers, grid_backdrop_size, heirloom_choice_from_full_pool,
     sorted_full_pool_grid_entries, spawn_heirloom_grid_overlay, DevHeirloomPickerGridLayer,
     HeirloomGridContext,
 };
 use crate::ui::time_crystal_progress_ui::CrystalUnlockIcon;
-use crate::player::unlocks::RunUnlockState;
-use crate::player::ModifyCurencyEvent;
-use crate::proto::proto_param::ProtoParam;
 use crate::ui::{
     BLUEPRINT_PAGE_BTN_CENTER_Y, BLUEPRINT_PAGE_BTN_DOWN_X, BLUEPRINT_PAGE_BTN_SIZE,
     BLUEPRINT_PAGE_BTN_UP_X, INVENTORY_BLUEPRINT_UI_SIZE, INVENTORY_CRAFTING_PANEL_UI_SIZE,
@@ -219,6 +219,7 @@ pub enum DevButtonAction {
     GrantXp,
     GrantMoreXp,
     SpawnChest,
+    SpawnChestHeirloom,
     SpawnTome,
     SpawnOrb,
     TeleportEra2,
@@ -363,12 +364,7 @@ pub fn setup_inv_ui(
         _ => return,
     };
 
-    spawn_full_screen_ui_overlay(
-        &mut commands,
-        &resolution,
-        0.8,
-        9.,
-    );
+    spawn_full_screen_ui_overlay(&mut commands, &resolution, 0.8, 9.);
 
     let inv = commands
         .spawn(SpriteBundle {
@@ -771,10 +767,11 @@ pub fn setup_inv_ui(
         // Left of inventory panel in local space (inv center is 22, 0.5 in world; panel half-width 109)
         let dev_x = -INVENTORY_UI_SIZE.x / 2. - DEV_BUTTON_WIDTH / 2. - 0.;
         let start_y = 48.0f32;
-        let labels: [(DevButtonAction, &str); 13] = [
+        let labels: [(DevButtonAction, &str); 14] = [
             (DevButtonAction::GrantXp, "+250 xp"),
             (DevButtonAction::GrantMoreXp, "+1000 xp"),
             (DevButtonAction::SpawnChest, "chest"),
+            (DevButtonAction::SpawnChestHeirloom, "hrm chest"),
             (DevButtonAction::SpawnTome, "tome"),
             (DevButtonAction::SpawnOrb, "orb"),
             (DevButtonAction::TeleportEra2, "era2"),
@@ -2159,6 +2156,15 @@ pub fn handle_dev_button_clicks(
                             None,
                         );
                     }
+                    DevButtonAction::SpawnChestHeirloom => {
+                        let _ = proto_commands.spawn_item_from_proto(
+                            WorldObject::HeirloomChest,
+                            &proto,
+                            spawn_pos,
+                            1,
+                            None,
+                        );
+                    }
                     DevButtonAction::SpawnTome => {
                         let _ = proto_commands.spawn_item_from_proto(
                             WorldObject::UpgradeTome,
@@ -2244,7 +2250,10 @@ pub fn handle_dev_button_clicks(
 /// Applies dev-mode heirloom grants (separate system to avoid GameParam query conflict).
 pub fn apply_grant_heirloom_dev(
     mut grant_events: EventReader<GrantHeirloomDevEvent>,
-    mut player_query: Query<(Entity, &Transform, &mut PlayerSkills, &crate::PlayerLevel), With<Player>>,
+    mut player_query: Query<
+        (Entity, &Transform, &mut PlayerSkills, &crate::PlayerLevel),
+        With<Player>,
+    >,
     mut skill_queue: ResMut<HeirloomChoiceQueue>,
     mut commands: Commands,
     mut att_event: EventWriter<AttributeChangeEvent>,
@@ -2261,11 +2270,9 @@ pub fn apply_grant_heirloom_dev(
                 &mut skills,
                 level.level,
             );
-            choice.heirloom.add_heirloom_components(
-                player_entity,
-                &mut commands,
-                skills.clone(),
-            );
+            choice
+                .heirloom
+                .add_heirloom_components(player_entity, &mut commands, skills.clone());
             att_event.send(AttributeChangeEvent);
         }
     }
@@ -2307,8 +2314,7 @@ pub fn handle_dev_heirloom_picker_toggle(
                             .collect();
                         let entry_count = entries.len();
                         let (backdrop_w, _, _) = grid_backdrop_size(entry_count, 400., 320.);
-                        let grid_center_x =
-                            dev_x + DEV_BUTTON_WIDTH * 0.5 + 8. + backdrop_w * 0.5;
+                        let grid_center_x = dev_x + DEV_BUTTON_WIDTH * 0.5 + 8. + backdrop_w * 0.5;
                         spawn_heirloom_grid_overlay(
                             &mut commands,
                             &asset_server,

@@ -33,6 +33,7 @@ aseprite!(pub PlayerBlueAseprite, "textures/player/player_blue.aseprite");
 aseprite!(pub PlayerGreyAseprite, "textures/player/player_grey.aseprite");
 aseprite!(pub PlayerGreenAseprite, "textures/player/player_green.aseprite");
 aseprite!(pub PlayerRogueAseprite, "textures/player/player_rogue.aseprite");
+aseprite!(pub PlayerThiefAseprite, "textures/player/player_thief.aseprite");
 
 #[derive(Resource)]
 pub struct PlayerSpriteHandles {
@@ -41,6 +42,7 @@ pub struct PlayerSpriteHandles {
     pub green: Handle<Aseprite>,
     pub blue: Handle<Aseprite>,
     pub rogue: Handle<Aseprite>,
+    pub thief: Handle<Aseprite>,
 
     pub slime_pet: Handle<Aseprite>,
     pub fairy_pet: Handle<Aseprite>,
@@ -296,6 +298,7 @@ pub fn preload_player_sprites(mut commands: Commands, asset_server: Res<AssetSer
         red: asset_server.load(PlayerRedAseprite::PATH),
         green: asset_server.load(PlayerGreenAseprite::PATH),
         rogue: asset_server.load(PlayerRogueAseprite::PATH),
+        thief: asset_server.load(PlayerThiefAseprite::PATH),
         blue: asset_server.load(PlayerBlueAseprite::PATH),
         slime_pet: asset_server.load(SlimePetSprite::PATH),
         fairy_pet: asset_server.load(FairyPetSprite::PATH),
