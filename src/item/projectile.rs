@@ -81,6 +81,7 @@ pub enum Projectile {
     Buckshot,
     Smoke,
     IceWall,
+    Meteor,
     PoisonCloud,
     HealHearts,
     AttackSpeed,
@@ -154,6 +155,7 @@ impl Projectile {
             Projectile::IceExplosionAOE => true,
             Projectile::FireRing => true,
             Projectile::IceWall => true,
+            Projectile::Meteor => true,
             Projectile::Shout => true,
             Projectile::LaserBeam => true,
             Projectile::BombExplosion => true,
@@ -184,6 +186,7 @@ impl Projectile {
 
             Projectile::FireRing
             | Projectile::IceWall
+            | Projectile::Meteor
             | Projectile::Shout
             | Projectile::LaserBeam
             | Projectile::BombExplosion

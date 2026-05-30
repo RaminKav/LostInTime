@@ -60,6 +60,7 @@ pub enum DamageSource {
     Arc,
     FireRing,
     IceWall,
+    Meteors,
     Shout,
     LaserBeam,
     Bomb,
@@ -110,6 +111,7 @@ impl DamageSource {
 
             DamageSource::FireRing
             | DamageSource::IceWall
+            | DamageSource::Meteors
             | DamageSource::Shout
             | DamageSource::LaserBeam
             | DamageSource::Bomb
@@ -159,6 +161,7 @@ impl DamageSource {
             DamageSource::Arc => "Hero Sword",
             DamageSource::FireRing => "Fire Ring",
             DamageSource::IceWall => "Ice Wall",
+            DamageSource::Meteors => "Meteors",
             DamageSource::Shout => "Shout",
             DamageSource::LaserBeam => "Laser Beam",
             DamageSource::Bomb => "Bomb",
@@ -249,6 +252,7 @@ impl DamageSource {
             Projectile::Arc => Some(DamageSource::Arc),
             Projectile::FireRing => Some(DamageSource::FireRing),
             Projectile::IceWall => Some(DamageSource::IceWall),
+            Projectile::Meteor => Some(DamageSource::Meteors),
             Projectile::Shout => Some(DamageSource::Shout),
             Projectile::LaserBeam => Some(DamageSource::LaserBeam),
             Projectile::Bomb | Projectile::BombExplosion => Some(DamageSource::Bomb),

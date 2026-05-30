@@ -23,7 +23,7 @@
             ],
             class_icon: BluePlayerSelectIcon,
             skill_icon: ManaIcon,
-            active_skills: (Teleport, IceWall, FirePillar,Lightning), // 
+            active_skills: (Teleport, MeteorShower, FirePillar,Lightning), // 
             starting_weapons: [FireStaff, IceStaff, BasicStaff],
         ),
         Rogue: (

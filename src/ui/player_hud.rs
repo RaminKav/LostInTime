@@ -19,10 +19,10 @@ use super::{
         Z_DEPTH_HUD_HEIRLOOM_ICONS,
     },
     InventorySlotState, InventorySlotType, InventoryState, InventoryUI, UIElement, UIState,
-    HUD_ACTION_ROW_Y_FROM_BOTTOM, HUD_ERA_TIMER_ENDLESS_WIDTH, HUD_FRAME_Y_FROM_BOTTOM,
-    HUD_HEIRLOOM_ICON_SPACING, HUD_HOTBAR_SLOTS, HUD_SKILLS_CENTER_X, HUD_SKILL_SLOT_HIT_SIZE,
-    HUD_SKILL_SPACING_X, HUD_TIMELINE_ARROWS_SIZE, HUD_TIMELINE_SIZE, KEYBIND_BADGE_SIZE,
-    CURRENCY_BACKGROUND_SIZE, KEYBIND_BADGE_BOTTOM_INSET, PROGRESS_BACKGROUND_SIZE,
+    CURRENCY_BACKGROUND_SIZE, HUD_ACTION_ROW_Y_FROM_BOTTOM, HUD_ERA_TIMER_ENDLESS_WIDTH,
+    HUD_FRAME_Y_FROM_BOTTOM, HUD_HEIRLOOM_ICON_SPACING, HUD_HOTBAR_SLOTS, HUD_SKILLS_CENTER_X,
+    HUD_SKILL_SLOT_HIT_SIZE, HUD_SKILL_SPACING_X, HUD_TIMELINE_ARROWS_SIZE, HUD_TIMELINE_SIZE,
+    KEYBIND_BADGE_BOTTOM_INSET, KEYBIND_BADGE_SIZE, PROGRESS_BACKGROUND_SIZE,
 };
 use crate::{
     assets::Graphics,
@@ -52,6 +52,7 @@ use crate::{
         },
         levels::PlayerLevel,
         skills::{
+            active_skill_scaling::METEOR_SHOWER_BASE_COUNT,
             effective_player_attack_speed_multiplier, ActiveSkill, ActiveSkillChoiceState,
             ActiveSkillUsedEvent, ClassSkillSlots, Heirloom, HeirloomRarity, PlayerSkills,
             VISIBLE_CLASS_SKILL_COUNT,
@@ -1362,6 +1363,7 @@ pub fn spawn_skill_tooltip_content(
     crit_chance: i32,
     speed: i32,
     size: i32,
+    meteor_count: u32,
 ) {
     const ICONS_X_OFFSET: f32 = -24.;
     const TEXT_Y_OFFSET: f32 = 12.;
@@ -1378,6 +1380,7 @@ pub fn spawn_skill_tooltip_content(
         crit_chance,
         speed,
         size,
+        meteor_count,
     );
     let active_skill_name = active_skill.get_title();
     let desc_body_style = gf::SKILL_PANEL_BODY.text_style(asset_server, DARK_WOOD_BROWN);
@@ -1506,6 +1509,7 @@ pub fn handle_active_skill_hud_tooltip(
         ),
         With<Player>,
     >,
+    meteor_shower_state: Query<&crate::player::skills::MeteorShowerSkillState, With<Player>>,
 ) {
     use Interaction;
 
@@ -1611,6 +1615,10 @@ pub fn handle_active_skill_hud_tooltip(
             crit.0,
             spd.0,
             size.0,
+            meteor_shower_state
+                .get_single()
+                .map(|s| s.meteor_count)
+                .unwrap_or(METEOR_SHOWER_BASE_COUNT),
         );
     }
 
@@ -3247,7 +3255,9 @@ pub fn update_pet_skill_hud_slot(
         Some(slot_bg),
         3,
     );
-    commands.entity(pet_label_bg).insert(PetSkillLabelBackground);
+    commands
+        .entity(pet_label_bg)
+        .insert(PetSkillLabelBackground);
 
     commands
         .spawn(SpriteBundle {
@@ -3574,10 +3584,7 @@ pub fn sync_player_hud_layout_to_resolution(
     mut layout: ParamSet<(
         Query<&mut Transform, With<HudFrame>>,
         Query<(&mut Transform, &mut Sprite), (With<XPBar>, Without<XPBarBg>)>,
-        Query<
-            (&mut Transform, &mut Sprite),
-            (With<XPBarBg>, Without<XPBar>, Without<XPBarText>),
-        >,
+        Query<(&mut Transform, &mut Sprite), (With<XPBarBg>, Without<XPBar>, Without<XPBarText>)>,
         Query<&mut Transform, (With<XPBarText>, Without<XPBar>, Without<XPBarBg>)>,
         Query<(&HudBottomCornerIcon, &mut Transform)>,
     )>,
@@ -3596,10 +3603,7 @@ pub fn sync_player_hud_layout_to_resolution(
     for (mut transform, mut sprite) in layout.p1().iter_mut() {
         transform.translation.x = xp_x;
         transform.translation.y = xp_y;
-        sprite.custom_size = Some(Vec2::new(
-            sprite.custom_size.map(|s| s.x).unwrap_or(0.),
-            6.,
-        ));
+        sprite.custom_size = Some(Vec2::new(sprite.custom_size.map(|s| s.x).unwrap_or(0.), 6.));
     }
     for (mut transform, mut sprite) in layout.p2().iter_mut() {
         transform.translation.x = xp_x;
@@ -3726,10 +3730,7 @@ pub fn sync_player_hud_slots_layout_to_resolution(
         transform.translation.y = heirloom_row_y - row as f32 * 16.;
     }
 
-    let raw_fps = Vec2::new(
-        res.game_width / 2. - 28.5,
-        -res.game_height / 2. + 10.5,
-    );
+    let raw_fps = Vec2::new(res.game_width / 2. - 28.5, -res.game_height / 2. + 10.5);
     for mut transform in slots.p6().iter_mut() {
         transform.translation.x = super::snap_world_to_pixel_grid(raw_fps.x, res.scale);
         transform.translation.y = super::snap_world_to_pixel_grid(raw_fps.y, res.scale);

@@ -157,6 +157,7 @@ pub enum ActiveSkill {
     Heal,
     Buckshot,
     IceWall,
+    MeteorShower,
     DruidTree,
     Shout,
     PiercingStar,
@@ -237,6 +238,17 @@ pub mod active_skill_scaling {
     pub const LIGHTNING: f32 = 120.0;
     pub const FIRE_PILLAR: f32 = 95.0;
     pub const ICE_WALL: f32 = 300.0;
+    pub const METEOR_SHOWER: f32 = 85.0;
+    /// Number of meteors the first MeteorShower cast spawns; grows +1 per cast.
+    pub const METEOR_SHOWER_BASE_COUNT: u32 = 3;
+    /// Radius (tiles) around the player meteors can land within.
+    pub const METEOR_SHOWER_RADIUS_TILES: f32 = 12.0;
+    /// The first meteor of each cast always lands within this radius (tiles).
+    pub const METEOR_SHOWER_FIRST_RADIUS_TILES: f32 = 6.0;
+    /// Delay (seconds) between successive meteor spawns within a single cast.
+    /// The cast's cooldown is offset by `count * this` so it doesn't begin
+    /// regenerating until every meteor has been summoned.
+    pub const METEOR_SHOWER_SPAWN_INTERVAL_SECS: f32 = 0.12;
     pub const BUCKSHOT_PELLET: f32 = 100.0;
     pub const BOMB: f32 = 220.0;
     pub const PIERCING_STAR: f32 = 150.0;
@@ -399,6 +411,7 @@ impl ActiveSkill {
             ActiveSkill::Heal => 20.0,
             ActiveSkill::Buckshot => 2.3,
             ActiveSkill::IceWall => 7.0,
+            ActiveSkill::MeteorShower => 10.0,
             ActiveSkill::DruidTree => 11.0,
             ActiveSkill::Shout => 7.0,
             ActiveSkill::PiercingStar => 7.0,
@@ -464,6 +477,14 @@ pub struct BuckshotSkillState;
 #[derive(Component, Clone)]
 #[component(storage = "SparseSet")]
 pub struct IceWallSkillState;
+/// Tracks how many meteors the next MeteorShower cast spawns. Grows by 1 each
+/// cast. Stored `SparseSet` because it's only present on the player while the
+/// MeteorShower skill is equipped.
+#[derive(Component, Clone)]
+#[component(storage = "SparseSet")]
+pub struct MeteorShowerSkillState {
+    pub meteor_count: u32,
+}
 #[derive(Component, Clone)]
 #[component(storage = "SparseSet")]
 pub struct DruidTreeSkillState;
@@ -558,6 +579,7 @@ impl ActiveSkill {
             ActiveSkill::Heal => "Heal".to_string(),
             ActiveSkill::Buckshot => "Buckshot".to_string(),
             ActiveSkill::IceWall => "Ice Wall".to_string(),
+            ActiveSkill::MeteorShower => "Meteor Shower".to_string(),
             ActiveSkill::DruidTree => "Druid Tree".to_string(),
             ActiveSkill::Shout => "Shout".to_string(),
             ActiveSkill::PiercingStar => "Piercing Star".to_string(),
@@ -585,11 +607,12 @@ impl ActiveSkill {
         crit_chance: i32,
         speed: i32,
         size: i32,
+        meteor_count: u32,
     ) -> Vec<String> {
         use active_skill_scaling::{
             dagger_slash_total_slashes, ARROW_VOLLEY, BOMB, BUCKSHOT_PELLET, DAGGER_SLASH,
             DAGGER_THROW, FIRE_PILLAR, FURY, HEAL_MAX_HEALTH_PERCENT, ICE_WALL, LASER_BEAM,
-            LIGHTNING, PARRY_SPEAR, PIERCING_STAR, POSSESSED_BLADE,
+            LIGHTNING, METEOR_SHOWER, PARRY_SPEAR, PIERCING_STAR, POSSESSED_BLADE,
             RAPIDFIRE_ATTACK_SPEED_BONUS_PERCENT, RECALL, RECALL_REWIND_SECONDS, SHOUT,
             SPIN_ATTACK, SPRINT_LUNGE, TELEPORT_SHOCK_ATTACK_PERCENT, TRIPLE_THROW,
         };
@@ -699,6 +722,16 @@ impl ActiveSkill {
                 vec![
                     "Summon an ice pillar at target".to_string(),
                     format!("area dealing {:.1}% damage.", skill_power * ICE_WALL),
+                ]
+            }
+            ActiveSkill::MeteorShower => {
+                vec![
+                    format!("A meteor shower of {} meteors,", meteor_count),
+                    format!(
+                        "each dealing {:.1}% damage on impact.",
+                        skill_power * METEOR_SHOWER
+                    ),
+                    "Gain +1 meteor per cast.".to_string(),
                 ]
             }
             ActiveSkill::Buckshot => vec![
@@ -863,6 +896,11 @@ impl ActiveSkill {
             }
             ActiveSkill::IceWall => {
                 commands.entity(entity).insert(IceWallSkillState);
+            }
+            ActiveSkill::MeteorShower => {
+                commands.entity(entity).insert(MeteorShowerSkillState {
+                    meteor_count: active_skill_scaling::METEOR_SHOWER_BASE_COUNT,
+                });
             }
             ActiveSkill::DruidTree => {
                 commands.entity(entity).insert(DruidTreeSkillState);

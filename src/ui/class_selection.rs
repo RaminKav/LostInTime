@@ -22,7 +22,10 @@ use crate::{
         class_rank::ClassRankSystem,
         currency::TimeFragmentCurrency,
         score::HighScores,
-        skills::{HeirloomChoiceQueue, PlayerClass, SkillClass, VISIBLE_CLASS_SKILL_COUNT},
+        skills::{
+            active_skill_scaling::METEOR_SHOWER_BASE_COUNT, HeirloomChoiceQueue, PlayerClass,
+            SkillClass, VISIBLE_CLASS_SKILL_COUNT,
+        },
         time_crystals::TimeCrystals,
         unlocks::{persist_unlock_data, RunUnlockState, UnlockUpgrades, UnlockedSkills},
         ClassUnlockData, UnlockedClasses,
@@ -215,12 +218,7 @@ pub fn setup_class_selection_ui(
     _class_unlocks: Option<Res<ClassUnlockData>>,
     cheat_settings: Res<CheatSettings>,
 ) {
-    let overlay = spawn_full_screen_ui_overlay(
-        &mut commands,
-        &res,
-        1.,
-        9.,
-    );
+    let overlay = spawn_full_screen_ui_overlay(&mut commands, &res, 1., 9.);
 
     let currency_text = commands
         .spawn((
@@ -2005,6 +2003,7 @@ fn spawn_player_preview(
                 10,
                 0,
                 0,
+                METEOR_SHOWER_BASE_COUNT,
             );
         } else {
             spawn_locked_skill_content(

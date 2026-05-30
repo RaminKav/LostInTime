@@ -38,9 +38,11 @@ use crate::{
                 attack_damage_multiplier, dagger_slash_hit_interval_seconds,
                 dagger_slash_total_slashes, ARROW_VOLLEY, BOMB, BUCKSHOT_PELLET, DAGGER_SLASH,
                 DAGGER_THROW, FIRE_PILLAR, FURY,
-                HEAL_MAX_HEALTH_PERCENT, ICE_WALL, LASER_BEAM, LIGHTNING, PIERCING_STAR,
-                POSSESSED_BLADE, RAPIDFIRE_ATTACK_SPEED_BONUS_PERCENT, SHOUT, SPIN_ATTACK,
-                TRIPLE_THROW,
+                HEAL_MAX_HEALTH_PERCENT, ICE_WALL, LASER_BEAM, LIGHTNING, METEOR_SHOWER,
+                METEOR_SHOWER_BASE_COUNT, METEOR_SHOWER_FIRST_RADIUS_TILES,
+                METEOR_SHOWER_RADIUS_TILES, METEOR_SHOWER_SPAWN_INTERVAL_SECS, PIERCING_STAR,
+                POSSESSED_BLADE,
+                RAPIDFIRE_ATTACK_SPEED_BONUS_PERCENT, SHOUT, SPIN_ATTACK, TRIPLE_THROW,
             },
             arrow_volley_scaling,
             effective_player_attack_speed_multiplier, fury_throw_speed_multiplier,
@@ -49,7 +51,8 @@ use crate::{
             ArrowVolleyState, BombState, BuckshotSkillState, ClassSkillSlots,
             DaggerThrowKillTracker, DaggerThrowState, DruidTreeSkillState, FirePillarState,
             FuryState, HealSkillState, Heirloom, IceWallSkillState, LaserBeamState,
-            LastHitProjectile, LightningState, PhasingThroughEnemies, PiercingStarSkillState,
+            LastHitProjectile, LightningState, MeteorShowerSkillState, PhasingThroughEnemies,
+            PiercingStarSkillState,
             PlayerSkills, PossessedBladeSkillState, RapidfireState, ShoutSkillState, SlashState,
             SpinAttackState, StealthState, TripleThrowState,
         },
@@ -136,6 +139,7 @@ pub struct SkillStateQueries<'w, 's> {
     pub heal_states: Query<'w, 's, &'static HealSkillState, With<Player>>,
     pub buckshot_states: Query<'w, 's, &'static BuckshotSkillState, With<Player>>,
     pub icewall_states: Query<'w, 's, &'static IceWallSkillState, With<Player>>,
+    pub meteorshower_states: Query<'w, 's, &'static MeteorShowerSkillState, With<Player>>,
     pub druidtree_states: Query<'w, 's, &'static DruidTreeSkillState, With<Player>>,
     pub shout_states: Query<'w, 's, &'static ShoutSkillState, With<Player>>,
     pub piercing_star_states: Query<'w, 's, &'static PiercingStarSkillState, With<Player>>,
@@ -218,6 +222,7 @@ pub fn handle_active_skill_event(
             let heal_state = skill_states.heal_states.get(player_e).ok();
             let buckshot_state = skill_states.buckshot_states.get(player_e).ok();
             let icewall_state = skill_states.icewall_states.get(player_e).ok();
+            let meteorshower_state = skill_states.meteorshower_states.get(player_e).ok();
             let druidtree_state = skill_states.druidtree_states.get(player_e).ok();
             let shout_state = skill_states.shout_states.get(player_e).ok();
             // Credit Card
@@ -584,6 +589,63 @@ pub fn handle_active_skill_event(
                             pos_override: Some(pos),
                             spawn_delay: 0.0,
                         });
+                        commands.spawn(SoundSpawner::new(AudioSoundEffect::IceExplosion, 0.2));
+                    }
+                    ActiveSkill::MeteorShower => {
+                        // Read the running meteor count (grows +1 per cast).
+                        let meteor_count = meteorshower_state
+                            .map(|s| s.meteor_count)
+                            .unwrap_or(METEOR_SHOWER_BASE_COUNT)
+                            .max(1);
+                        if !should_start_cooldown {
+                            commands.entity(player_e).remove::<MeteorShowerSkillState>();
+                        }
+                        commands.entity(player_e).insert(MeteorShowerSkillState {
+                            meteor_count: meteor_count + 1,
+                        });
+                        // Offset the cooldown by the total summon time so it doesn't
+                        // begin regenerating until the last meteor has landed. Without
+                        // this, a high meteor count could finish its cooldown before the
+                        // shower is even done spawning.
+                        let total_summon_time =
+                            meteor_count as f32 * METEOR_SHOWER_SPAWN_INTERVAL_SECS;
+                        start_slot_cooldown_for_cast(
+                            &mut class_slots,
+                            ev.slot,
+                            skill_cd + total_summon_time,
+                            should_start_cooldown,
+                        );
+
+                        let base_dmg: i32 = attack_opt.map(|a| a.0).unwrap_or(10);
+                        let dmg = (base_dmg as f32
+                            * power_mult
+                            * attack_damage_multiplier(METEOR_SHOWER))
+                            as i32;
+                        let player_pos = player_txfm.translation().truncate();
+                        let mut rng = rand::thread_rng();
+                        let outer_radius = METEOR_SHOWER_RADIUS_TILES * TILE_SIZE.x;
+                        let first_radius = METEOR_SHOWER_FIRST_RADIUS_TILES * TILE_SIZE.x;
+                        for i in 0..meteor_count {
+                            // The first meteor always lands within the closer radius.
+                            let max_radius = if i == 0 { first_radius } else { outer_radius };
+                            let angle = rng.gen_range(0.0..std::f32::consts::TAU);
+                            // sqrt for uniform distribution across the disc.
+                            let dist = max_radius * rng.gen_range(0.0_f32..1.0).sqrt();
+                            let target = player_pos + Vec2::from_angle(angle) * dist;
+                            // Offset up so the meteor's impact (bottom of sprite) lands on target.
+                            let spawn_pos = target + Vec2::new(0., 80.);
+                            ranged_attack_events.send(RangedAttackEvent {
+                                projectile: Projectile::Meteor,
+                                direction: Vec2::ZERO,
+                                mana_cost: None,
+                                from_enemy: false,
+                                from_entity: None,
+                                is_followup_proj: false,
+                                dmg_override: Some(dmg),
+                                pos_override: Some(spawn_pos),
+                                spawn_delay: i as f32 * METEOR_SHOWER_SPAWN_INTERVAL_SECS,
+                            });
+                        }
                         commands.spawn(SoundSpawner::new(AudioSoundEffect::IceExplosion, 0.2));
                     }
                     ActiveSkill::DruidTree => {
@@ -1356,7 +1418,8 @@ fn remove_skill_state_after_slot_cooldown(
         ActiveSkill::PossessedBlade => {
             commands.entity(entity).remove::<PossessedBladeSkillState>();
         }
-        ActiveSkill::Rapidfire | ActiveSkill::Fury => {}
+        // MeteorShower keeps its state so the per-cast meteor count persists.
+        ActiveSkill::Rapidfire | ActiveSkill::Fury | ActiveSkill::MeteorShower => {}
         ActiveSkill::Teleport
         | ActiveSkill::Sprint
         | ActiveSkill::SprintLunge

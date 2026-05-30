@@ -4,14 +4,14 @@ use crate::{
     assets::Graphics,
     attributes::{
         attribute_helpers::skill_power_multiplier, AttackSpeed, BonusAttackSpeed, CritChance,
-        MaxHealth,
-        MaxMana, ProjectileSize, SkillPower, Speed,
+        MaxHealth, MaxMana, ProjectileSize, SkillPower, Speed,
     },
     blessings::OwnedBlessings,
     colors::DARK_WOOD_BROWN,
     item::active_skill_shrine::{ActiveSkillShrineOverwrite, ActiveSkillShrineSelection},
     player::{
         skills::{
+            active_skill_scaling::METEOR_SHOWER_BASE_COUNT,
             effective_player_attack_speed_multiplier, ActiveSkillChoiceState, PlayerSkills,
         },
         Player,
@@ -21,8 +21,8 @@ use crate::{
 
 use super::{
     interactions::Interaction, main_menu::spawn_back_button,
-    player_hud::spawn_skill_tooltip_content, ui_helpers::spawn_full_screen_ui_overlay, Interactable, UIElement,
-    UIState,
+    player_hud::spawn_skill_tooltip_content, ui_helpers::spawn_full_screen_ui_overlay,
+    Interactable, UIElement, UIState,
 };
 
 #[derive(Component)]
@@ -59,12 +59,7 @@ pub fn setup_active_skill_shrine_ui(
         With<Player>,
     >,
 ) {
-    let shrine_overlay = spawn_full_screen_ui_overlay(
-        &mut commands,
-        &res,
-        0.9,
-        9.,
-    );
+    let shrine_overlay = spawn_full_screen_ui_overlay(&mut commands, &res, 0.9, 9.);
     commands
         .entity(shrine_overlay)
         .insert(UIState::ActiveSkillShrine);
@@ -194,6 +189,7 @@ pub fn setup_active_skill_shrine_ui(
             crit.0,
             spd.0,
             size.0,
+            METEOR_SHOWER_BASE_COUNT,
         );
     }
 
@@ -321,12 +317,7 @@ pub fn setup_active_skill_shrine_overwrite_ui(
         With<Player>,
     >,
 ) {
-    let overwrite_overlay = spawn_full_screen_ui_overlay(
-        &mut commands,
-        &res,
-        0.9,
-        9.,
-    );
+    let overwrite_overlay = spawn_full_screen_ui_overlay(&mut commands, &res, 0.9, 9.);
     commands
         .entity(overwrite_overlay)
         .insert(UIState::ActiveSkills);
@@ -372,8 +363,18 @@ pub fn setup_active_skill_shrine_overwrite_ui(
         .insert(Name::new("SKILL_VIEW4_BACKGROUND"))
         .id();
 
-    let (skills, skill_power, blessings, max_mana, max_health, bonus_as, attack_speed, crit, spd, size) =
-        skills.single();
+    let (
+        skills,
+        skill_power,
+        blessings,
+        max_mana,
+        max_health,
+        bonus_as,
+        attack_speed,
+        crit,
+        spd,
+        size,
+    ) = skills.single();
     let bonus_as_mult = effective_player_attack_speed_multiplier(
         attack_speed.map(|a| a.0).unwrap_or(0),
         bonus_as.map(|b| b.get_multiplier()).unwrap_or(1.0),
@@ -448,6 +449,7 @@ pub fn setup_active_skill_shrine_overwrite_ui(
             crit.0,
             spd.0,
             size.0,
+            METEOR_SHOWER_BASE_COUNT,
         );
     }
 
