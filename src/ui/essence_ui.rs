@@ -502,8 +502,8 @@ pub fn handle_populate_essence_shop_on_new_spawn(
         shop.tile_pos = Some(tile_pos);
 
         let purchase_multiplier =
-            1.0 + player_atts.get_single().map(|a| a.1.level).unwrap_or(1) as f32 * 0.63;
-
+            1.0 + player_atts.get_single().map(|a| a.1.level).unwrap_or(1) as f32 * 0.6;
+        //3.52
         // Start from cache: keep non-banished items, reroll slots that contained banished heirlooms.
         // Re-apply current purchase_multiplier to cached options so prices scale after purchases.
         let mut shop_choices: Vec<EssenceOption> =
@@ -555,7 +555,7 @@ pub fn handle_populate_essence_shop_on_new_spawn(
             };
 
             let base_cost = 7.;
-            let random_adjustment = rand::thread_rng().gen_range(2.0..7.0) * rarity_cost_inc * 2.;
+            let random_adjustment = rand::thread_rng().gen_range(2.0..5.0) * rarity_cost_inc;
             let base_coin_cost = base_cost * rarity_cost_inc + random_adjustment;
             let final_cost = base_coin_cost * purchase_multiplier;
 
