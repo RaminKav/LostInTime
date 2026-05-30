@@ -160,6 +160,8 @@ pub enum Mob {
     BigCactus,
     Bull,
     Scorpion,
+    Lizard,
+    VoidCrawler,
 }
 
 impl Mob {
@@ -181,6 +183,8 @@ impl Mob {
             Mob::BigCactus => DARK_GREEN,
             Mob::Bull => LIGHT_BROWN,
             Mob::Scorpion => LIGHT_BROWN,
+            Mob::Lizard => DARK_GREEN,
+            Mob::VoidCrawler => PINK,
         }
     }
     pub fn get_base_kb(&self) -> f32 {
@@ -201,6 +205,8 @@ impl Mob {
             Mob::BigCactus => 50.,
             Mob::Bull => 30.,
             Mob::Scorpion => 0.,
+            Mob::Lizard => 100.,
+            Mob::VoidCrawler => 70.,
         }
     }
     pub fn is_boss(&self) -> bool {

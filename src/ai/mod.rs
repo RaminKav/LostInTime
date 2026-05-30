@@ -52,6 +52,7 @@ impl Plugin for AIPlugin {
                 (
                     aseprite_enemy::aseprite_follow.run_if(is_not_paused),
                     aseprite_enemy::aseprite_idle.run_if(is_not_paused),
+                    aseprite_enemy::aseprite_hit_react.run_if(is_not_paused),
                     aseprite_enemy::aseprite_leap_attack.run_if(is_not_paused),
                     aseprite_enemy::aseprite_projectile_attack.run_if(is_not_paused),
                     aseprite_enemy::aseprite_circle_attack.run_if(is_not_paused),

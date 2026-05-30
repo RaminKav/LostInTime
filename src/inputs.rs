@@ -61,8 +61,8 @@ use crate::{
     InputMappings, Player, ScreenResolution, DEBUG, PLAYER_DASH_SPEED, TIME_STEP,
 };
 use crate::{
-    custom_commands::CommandsExt, CustomFlush, GameParam, GameState, MainCamera,
-    RawPosition, TextureCamera, UICamera, PLAYER_MOVE_SPEED,
+    custom_commands::CommandsExt, CustomFlush, GameParam, GameState, MainCamera, RawPosition,
+    TextureCamera, UICamera, PLAYER_MOVE_SPEED,
 };
 
 /// Number of hotbar slots that are bound to a consume/use key. Keep in sync with the
@@ -752,7 +752,8 @@ pub fn toggle_inventory(
             // proto_commands.spawn_item_from_proto(WorldObject::Claw, &proto, pos, 1, Some(5));
             // proto_commands.spawn_item_from_proto(WorldObject::IceStaff, &proto, pos, 1, Some(5));
             // proto_commands.spawn_item_from_proto(WorldObject::BasicStaff, &proto, pos, 1, Some(5));
-            proto_commands.spawn_from_proto(Mob::SpikeSlime, &proto.prototypes, pos);
+            proto_commands.spawn_from_proto(Mob::VoidCrawler, &proto.prototypes, pos);
+            proto_commands.spawn_from_proto(Mob::Lizard, &proto.prototypes, pos);
             // proto_commands.spawn_from_proto(Mob::StingFly, &proto.prototypes, pos);
             // proto_commands.spawn_from_proto(Mob::FurDevil, &proto.prototypes, pos);
             // proto_commands.spawn_from_proto(Mob::Bushling, &proto.prototypes, pos);

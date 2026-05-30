@@ -120,6 +120,8 @@ pub fn mob_display_name(mob: &Mob) -> &'static str {
         Mob::Crow => "Crow",
         Mob::RedMushking => "Red Mushking",
         Mob::Scorpion => "Desert Scorpion",
+        Mob::Lizard => "Lizard",
+        Mob::VoidCrawler => "Void Crawler",
         Mob::None => "Unknown",
     }
 }

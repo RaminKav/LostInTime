@@ -28,6 +28,8 @@ pub const ELITE_SPAWN_RATE: f32 = 0.06;
 #[derive(Resource, Default, Debug)]
 pub struct SpawnerListEraTracker {
     pub era_at_last_build: Option<Era>,
+    /// Whether the currently-built spawner list is the endless-mode list.
+    pub endless_at_last_build: bool,
 }
 
 /// Overworld mob spawner rows for the given era (weights, timers, min day, batch size).  
@@ -84,7 +86,7 @@ fn spawners_era_main() -> Vec<Spawner> {
 fn spawners_era_second() -> Vec<Spawner> {
     vec![
         Spawner {
-            enemy: Mob::FurDevil,
+            enemy: Mob::Lizard,
             weight: 60.,
             spawn_timer: Timer::from_seconds(2.5, TimerMode::Once),
             min_days_to_spawn: 0,
@@ -117,6 +119,18 @@ fn spawners_era_second() -> Vec<Spawner> {
 /// Era 3: tune separately when ready; currently matches era 2 pool cadence.
 fn spawners_era_third() -> Vec<Spawner> {
     spawners_era_main()
+}
+
+/// Endless mode mob pool. The endless rework replaces all normal era enemies
+/// with Void Crawlers — only these spawn while [`InfiniteMode::active`].
+fn spawners_endless() -> Vec<Spawner> {
+    vec![Spawner {
+        enemy: Mob::VoidCrawler,
+        weight: 100.,
+        spawn_timer: Timer::from_seconds(2.5, TimerMode::Once),
+        min_days_to_spawn: 0,
+        num_to_spawn: Some(1),
+    }]
 }
 
 /// Resource to track if mob spawning should be paused (e.g., after boss defeat with time remaining)
@@ -241,7 +255,10 @@ fn add_spawners_to_new_chunks(
         spawners,
         initial_spawn_delay: Timer::from_seconds(5., TimerMode::Once),
     });
-    commands.insert_resource(SpawnerListEraTracker { era_at_last_build });
+    commands.insert_resource(SpawnerListEraTracker {
+        era_at_last_build,
+        endless_at_last_build: false,
+    });
 }
 
 /// Rebuild overworld spawner table when [`EraManager::current_era`] changes (not in dungeon).
@@ -250,6 +267,7 @@ fn sync_overworld_spawners_with_era(
     mut spawners: ResMut<GlobalSpawners>,
     mut tracker: ResMut<SpawnerListEraTracker>,
     maybe_dungeon: Query<&Dungeon, With<ActiveDimension>>,
+    infinite_mode: Res<InfiniteMode>,
 ) {
     if maybe_dungeon.get_single().is_ok() {
         return;
@@ -258,9 +276,23 @@ fn sync_overworld_spawners_with_era(
     if era.is_dungeon() {
         return;
     }
-    if tracker.era_at_last_build.as_ref() == Some(&era) {
+
+    // Endless mode rework: swap the entire spawner list for the Void Crawler-only
+    // endless pool while infinite mode is active, and restore the era pool when it ends.
+    if infinite_mode.active {
+        if tracker.endless_at_last_build {
+            return;
+        }
+        tracker.endless_at_last_build = true;
+        tracker.era_at_last_build = None;
+        spawners.spawners = spawners_endless();
         return;
     }
+
+    if !tracker.endless_at_last_build && tracker.era_at_last_build.as_ref() == Some(&era) {
+        return;
+    }
+    tracker.endless_at_last_build = false;
     tracker.era_at_last_build = Some(era.clone());
     spawners.spawners = overworld_spawners_for_era(era);
 }

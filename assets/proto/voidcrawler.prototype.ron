@@ -1,0 +1,89 @@
+(
+  name: "VoidCrawler",
+  templates: ["aseprite_mob_basic.prototype.ron"],
+  schematics: {
+    "survival_rogue_like::enemy::Mob": VoidCrawler,
+    "survival_rogue_like::enemy::CombatAlignment": Hostile,
+    "survival_rogue_like::enemy::FollowSpeed": (0.8),
+    "survival_rogue_like::enemy::LeapAttack": (activation_distance: 28., startup: 0.2, duration: 0.38, cooldown: 0.6, speed: 60.),
+    "survival_rogue_like::proto::ColliderCapsulProto": (x1: 0., y1: -1., x2: 0., y2: -1.5, r: 5.),
+    "survival_rogue_like::attributes::MaxHealth": (10),
+    "survival_rogue_like::attributes::Attack": (10),
+    "survival_rogue_like::player::levels::ExperienceReward": (20),
+    "survival_rogue_like::item::loot_table::LootTable": (
+        drops: [(
+                item: SmallPotion,
+                min: 1,
+                max: 1,
+                rate: 0.00045
+            ),
+            (
+                item: LargePotion,
+                min: 1,
+                max: 1,
+                rate: 0.00025
+            ),
+            (
+                item: AttackSpeedPotion,
+                min: 1,
+                max: 1,
+                rate: 0.0006
+            ),
+            (
+                item: MovementSpeedPotion,
+                min: 1,
+                max: 1,
+                rate: 0.0006
+            ),
+            (
+                item: ChestBlock,
+                min: 1,
+                max: 1,
+                rate: 0.0005
+            ),
+            (
+                item: HeirloomChest,
+                min: 1,
+                max: 1,
+                rate: 0.0006
+            ),
+            (
+                item: UpgradeTome,
+                min: 1,
+                max: 1,
+                rate: 0.002
+            ),
+            (
+                item: OrbOfTransformation,
+                min: 1,
+                max: 1,
+                rate: 0.00128
+            ),
+            (
+                item: Key,
+                min: 1,
+                max: 1,
+                rate: 0.00035
+            ),
+            (
+                item: TimeFragment,
+                min: 1,
+                max: 1,
+                rate: 0.002
+            ),
+            (
+                item: Coin,
+                min: 1,
+                max: 1,
+                rate: 0.22
+            ),
+            (
+                item: XPShard,
+                min: 1,
+                max: 1,
+                rate: 1.
+            ),
+            ]
+        ),
+  }
+)

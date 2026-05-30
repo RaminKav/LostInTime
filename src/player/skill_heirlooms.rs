@@ -39,8 +39,8 @@ use crate::{
                 dagger_slash_total_slashes, ARROW_VOLLEY, BOMB, BUCKSHOT_PELLET, DAGGER_SLASH,
                 DAGGER_THROW, FIRE_PILLAR, FURY,
                 HEAL_MAX_HEALTH_PERCENT, ICE_WALL, LASER_BEAM, LIGHTNING, METEOR_SHOWER,
-                METEOR_SHOWER_BASE_COUNT, METEOR_SHOWER_FIRST_RADIUS_TILES,
-                METEOR_SHOWER_RADIUS_TILES, METEOR_SHOWER_SPAWN_INTERVAL_SECS, PIERCING_STAR,
+                meteor_shower_spawn_interval_secs, METEOR_SHOWER_BASE_COUNT,
+                METEOR_SHOWER_FIRST_RADIUS_TILES, METEOR_SHOWER_RADIUS_TILES, PIERCING_STAR,
                 POSSESSED_BLADE,
                 RAPIDFIRE_ATTACK_SPEED_BONUS_PERCENT, SHOUT, SPIN_ATTACK, TRIPLE_THROW,
             },
@@ -603,19 +603,17 @@ pub fn handle_active_skill_event(
                         commands.entity(player_e).insert(MeteorShowerSkillState {
                             meteor_count: meteor_count + 1,
                         });
-                        // Offset the cooldown by the total summon time so it doesn't
-                        // begin regenerating until the last meteor has landed. Without
-                        // this, a high meteor count could finish its cooldown before the
-                        // shower is even done spawning.
-                        let total_summon_time =
-                            meteor_count as f32 * METEOR_SHOWER_SPAWN_INTERVAL_SECS;
                         start_slot_cooldown_for_cast(
                             &mut class_slots,
                             ev.slot,
-                            skill_cd + total_summon_time,
+                            skill_cd,
                             should_start_cooldown,
                         );
 
+                        // The whole shower finishes within a bounded window (well under
+                        // the cooldown), so at high counts meteors spawn closer together
+                        // rather than the skill coming back up mid-shower.
+                        let spawn_interval = meteor_shower_spawn_interval_secs(meteor_count);
                         let base_dmg: i32 = attack_opt.map(|a| a.0).unwrap_or(10);
                         let dmg = (base_dmg as f32
                             * power_mult
@@ -643,7 +641,7 @@ pub fn handle_active_skill_event(
                                 is_followup_proj: false,
                                 dmg_override: Some(dmg),
                                 pos_override: Some(spawn_pos),
-                                spawn_delay: i as f32 * METEOR_SHOWER_SPAWN_INTERVAL_SECS,
+                                spawn_delay: i as f32 * spawn_interval,
                             });
                         }
                         commands.spawn(SoundSpawner::new(AudioSoundEffect::IceExplosion, 0.2));

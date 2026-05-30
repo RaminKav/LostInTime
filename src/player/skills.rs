@@ -245,10 +245,25 @@ pub mod active_skill_scaling {
     pub const METEOR_SHOWER_RADIUS_TILES: f32 = 12.0;
     /// The first meteor of each cast always lands within this radius (tiles).
     pub const METEOR_SHOWER_FIRST_RADIUS_TILES: f32 = 6.0;
-    /// Delay (seconds) between successive meteor spawns within a single cast.
-    /// The cast's cooldown is offset by `count * this` so it doesn't begin
-    /// regenerating until every meteor has been summoned.
+    /// Default delay (seconds) between successive meteor spawns within a cast.
+    /// At low counts meteors spawn this far apart; at high counts the interval
+    /// shrinks so the whole shower still finishes within
+    /// [`METEOR_SHOWER_MAX_SUMMON_WINDOW_SECS`].
     pub const METEOR_SHOWER_SPAWN_INTERVAL_SECS: f32 = 0.12;
+    /// Upper bound (seconds) on how long a full shower takes to finish summoning.
+    /// Kept well below the skill's base cooldown so the shower always completes
+    /// before the skill comes back up, without extending the cooldown timer
+    /// itself (which would desync the per-slot cooldown/charge bookkeeping).
+    pub const METEOR_SHOWER_MAX_SUMMON_WINDOW_SECS: f32 = 2.5;
+
+    /// Per-meteor spawn delay for a shower of `count` meteors. Uses the default
+    /// interval until the total would exceed [`METEOR_SHOWER_MAX_SUMMON_WINDOW_SECS`],
+    /// then compresses so the shower always finishes within that window.
+    #[inline]
+    pub fn meteor_shower_spawn_interval_secs(count: u32) -> f32 {
+        let count = count.max(1) as f32;
+        (METEOR_SHOWER_MAX_SUMMON_WINDOW_SECS / count).min(METEOR_SHOWER_SPAWN_INTERVAL_SECS)
+    }
     pub const BUCKSHOT_PELLET: f32 = 100.0;
     pub const BOMB: f32 = 220.0;
     pub const PIERCING_STAR: f32 = 150.0;

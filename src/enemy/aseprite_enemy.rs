@@ -10,7 +10,7 @@ use crate::{
         LeapAttackState, MultiLeapAttackState, MultiLeapPhase, NightTimeAggro,
         ProjectileAttackState,
     },
-    animations::enemy_sprites::spawn_attack_warning_aseprite,
+    animations::{enemy_sprites::spawn_attack_warning_aseprite, HitAnimationTracker},
     attributes::Attack,
     combat::{combat_helpers::spawn_temp_collider, status_effects::MobStatusEffects},
     enemy::{
@@ -33,6 +33,8 @@ aseprite!(pub Crow, "textures/crow.ase");
 aseprite!(pub SmallCactusAse, "textures/cactus_small/cactus_small.ase");
 aseprite!(pub BigCactusAse, "textures/cactus_large/cactus_large.ase");
 aseprite!(pub BullAse, "textures/bull/bull.ase");
+aseprite!(pub LizardAse, "textures/lizard/lizard.ase");
+aseprite!(pub VoidCrawlerAse, "textures/VoidCrawler/voidcrawler.ase");
 
 /// Fixed animation tag names for the shared aseprite basic enemy behavior.
 /// Aseprite files must use these exact tag names: WalkUp, WalkDown, WalkSide, AttackUp, AttackDown, AttackSide.
@@ -45,6 +47,9 @@ const ATTACK_SIDE: &str = "AttackSide";
 const ATTACK_STOP_UP: &str = "AttackStopUp";
 const ATTACK_STOP_DOWN: &str = "AttackStopDown";
 const ATTACK_STOP_SIDE: &str = "AttackStopSide";
+const HIT_UP: &str = "HitUp";
+const HIT_DOWN: &str = "HitDown";
+const HIT_SIDE: &str = "HitSide";
 
 /// Marker for enemies that use the shared aseprite walk + lunge behavior.
 /// Setup is done in code via `get_aseprite_basic_config` (each such mob needs an `aseprite!` macro).
@@ -64,6 +69,8 @@ fn get_aseprite_basic_config(mob: &Mob) -> Option<(&'static str, &'static str)> 
         Mob::SmallCactus => Some((SmallCactusAse::PATH, WALK_DOWN)),
         Mob::BigCactus => Some((BigCactusAse::PATH, WALK_DOWN)),
         Mob::Bull => Some((BullAse::PATH, WALK_DOWN)),
+        Mob::Lizard => Some((LizardAse::PATH, WALK_DOWN)),
+        Mob::VoidCrawler => Some((VoidCrawlerAse::PATH, WALK_DOWN)),
         _ => None,
     }
 }
@@ -111,6 +118,20 @@ fn set_animation_tag(
             anim.play();
         }
         current_tag.0 = new_tag.to_string();
+    }
+}
+
+/// True if the tag is one of the directional walk tags (mob is in follow/idle, not attacking).
+fn is_walk_tag(tag: &str) -> bool {
+    matches!(tag, WALK_UP | WALK_DOWN | WALK_SIDE)
+}
+
+/// Maps the mob's facing direction to the matching hit-react tag.
+fn facing_to_hit_tag(facing: &FacingDirection) -> &'static str {
+    match facing {
+        FacingDirection::Up => HIT_UP,
+        FacingDirection::Down => HIT_DOWN,
+        FacingDirection::Left | FacingDirection::Right => HIT_SIDE,
     }
 }
 
@@ -421,6 +442,7 @@ pub fn aseprite_follow(
             Option<&MobStatusEffects>,
             Option<&Parried>,
             Option<&crate::player::combat_heirlooms::DeathDefianceFrozen>,
+            &HitAnimationTracker,
         ),
         With<AsepriteBasicEnemy>,
     >,
@@ -436,6 +458,7 @@ pub fn aseprite_follow(
         status_option,
         parried_option,
         defiance_frozen_option,
+        hit,
     ) in follows.iter_mut()
     {
         if defiance_frozen_option.is_some()
@@ -444,6 +467,10 @@ pub fn aseprite_follow(
             continue;
         }
         if parried_option.is_some() {
+            continue;
+        }
+        // Hit-react owns the animation/movement during its window (see `aseprite_hit_react`).
+        if hit.is_active {
             continue;
         }
 
@@ -514,6 +541,7 @@ pub fn aseprite_idle(
             &mut CurrentAsepriteTag,
             Option<&crate::player::combat_heirlooms::DeathDefianceFrozen>,
             Option<&MobStatusEffects>,
+            &HitAnimationTracker,
         ),
         With<AsepriteBasicEnemy>,
     >,
@@ -527,11 +555,16 @@ pub fn aseprite_idle(
         mut current_tag,
         defiance_frozen_option,
         status_option,
+        hit,
     ) in idles.iter_mut()
     {
         if defiance_frozen_option.is_some()
             || status_option.map(|s| s.is_frozen()).unwrap_or(false)
         {
+            continue;
+        }
+        // Hit-react owns the animation during its window (see `aseprite_hit_react`).
+        if hit.is_active {
             continue;
         }
 
@@ -572,6 +605,37 @@ pub fn aseprite_idle(
                 commands.entity(entity).insert(new_dir);
             }
         }
+    }
+}
+
+/// Shared hit-react animation for aseprite basic enemies (fixed tags HitUp / HitDown / HitSide).
+///
+/// Plays for the duration of the shared [`HitAnimationTracker`] window (set on hit in combat).
+/// Only engages while the mob is in a walk tag (i.e. following/idling), so it never interrupts an
+/// in-progress attack — matching the legacy spritesheet behavior. The knockback itself is applied
+/// by `animate_hit`; here we only swap the animation tag. When the window ends, `aseprite_follow` /
+/// `aseprite_idle` resume and restore the walk tag automatically.
+pub fn aseprite_hit_react(
+    mut hits: Query<
+        (
+            &HitAnimationTracker,
+            &FacingDirection,
+            &mut AsepriteAnimation,
+            &mut CurrentAsepriteTag,
+        ),
+        With<AsepriteBasicEnemy>,
+    >,
+) {
+    for (hit, facing, mut anim, mut current_tag) in hits.iter_mut() {
+        if !hit.is_active {
+            continue;
+        }
+        // Only start the hit clip from a walk tag; if attacking, leave the attack animation alone.
+        if !is_walk_tag(&current_tag.0) {
+            continue;
+        }
+        let hit_tag = facing_to_hit_tag(facing);
+        set_animation_tag(&mut anim, &mut current_tag, hit_tag);
     }
 }
 
@@ -648,13 +712,11 @@ pub fn aseprite_leap_attack(
             kcc.translation = Some(attack.dir.unwrap());
             attack.attack_duration_timer.tick(time.delta());
 
-            let attack_tag = if delta_xy.x.abs() > delta_xy.y.abs() * 1.1 {
-                ATTACK_SIDE
-            } else if delta_xy.y > 0. {
-                ATTACK_UP
-            } else {
-                ATTACK_DOWN
-            };
+            // Lock the attack-animation direction to the frozen leap direction so the
+            // tag stays constant for the whole lunge. Recomputing it from the live
+            // delta each frame makes the tag flip as the mob nears/passes the player,
+            // which resets the animation to frame 0 and looks like it plays twice.
+            let attack_tag = direction_to_attack_tag(attack.dir.unwrap_or(delta_xy));
             set_animation_tag(&mut anim, &mut current_tag, attack_tag);
             commands.entity(entity).insert(MobIsAttacking(mob.clone()));
         }
