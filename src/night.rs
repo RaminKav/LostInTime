@@ -8,10 +8,7 @@ use crate::{
     colors::{overwrite_alpha, NIGHT},
     enemy::spawner::MobSpawningPaused,
     run_once_per_run,
-    ui::{
-        tips::{SeenTips, Tip, TipEvent},
-        ui_helpers::full_screen_overlay_size,
-    },
+    ui::{layout_sync::UiLayoutKey, ui_helpers::night_overlay_size},
     world::dimension::EraManager,
     GameState, ScreenResolution,
 };
@@ -250,6 +247,7 @@ impl Plugin for NightPlugin {
             .add_system(reset_era_timer_on_new_run.in_schedule(OnEnter(GameState::MainMenu)))
             .add_systems(
                 (
+                    sync_night_overlay_size.after(crate::update_pixel_perfect_viewport),
                     sync_night_overlay_on_tracker_change,
                     tick_night_color.run_if(is_not_paused),
                     handle_infinite_mode_started,
@@ -278,7 +276,7 @@ pub fn spawn_night(
         .spawn(SpriteBundle {
             sprite: Sprite {
                 color: overwrite_alpha(NIGHT, night_tracker.get_alpha()),
-                custom_size: Some(full_screen_overlay_size(&res)),
+                custom_size: Some(night_overlay_size(&res)),
                 ..default()
             },
             transform: Transform {
@@ -291,6 +289,24 @@ pub fn spawn_night(
         .insert(RenderLayers::from_layers(&[3]))
         .insert(Night(Timer::from_seconds(9.5, TimerMode::Repeating)))
         .insert(Name::new("night"));
+}
+
+/// Resizes the night sprite when the UI camera bucket changes. Modal overlays get the correct
+/// size because they are spawned when opened; the night overlay is spawned once per run.
+fn sync_night_overlay_size(
+    resolution: Res<ScreenResolution>,
+    mut night_sprites: Query<&mut Sprite, With<Night>>,
+    mut last_layout: Local<Option<UiLayoutKey>>,
+) {
+    let key = UiLayoutKey::from_resolution(&resolution);
+    if last_layout.as_ref() == Some(&key) {
+        return;
+    }
+    *last_layout = Some(key);
+    let size = night_overlay_size(&resolution);
+    for mut sprite in night_sprites.iter_mut() {
+        sprite.custom_size = Some(size);
+    }
 }
 
 /// Keeps the night overlay in sync when `NightTracker` is changed externally (e.g. era transition).

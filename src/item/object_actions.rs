@@ -349,7 +349,7 @@ impl ObjectAction {
                     });
                 }
                 let mut rng = rand::thread_rng();
-                let num_days = 2 + item_action_param.night_tracker.days;
+                let num_days = 4 + item_action_param.night_tracker.days;
                 let num_spawns_left = rng.gen_range(num_days..=(num_days + 2)) as usize;
                 commands
                     .entity(e)

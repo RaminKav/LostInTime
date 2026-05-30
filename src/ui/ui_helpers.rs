@@ -200,6 +200,13 @@ pub fn full_screen_overlay_size(res: &ScreenResolution) -> Vec2 {
     Vec2::new(res.game_width + WIDTH_PAD, res.game_height + HEIGHT_PAD)
 }
 
+/// Night tint overlay — extra margin vs modal overlays; resized when the UI camera bucket changes.
+pub fn night_overlay_size(res: &ScreenResolution) -> Vec2 {
+    const WIDTH_PAD: f32 = 72.0;
+    const HEIGHT_PAD: f32 = 200.0;
+    Vec2::new(res.game_width + WIDTH_PAD, res.game_height + HEIGHT_PAD)
+}
+
 pub fn spawn_full_screen_ui_overlay(
     commands: &mut Commands,
     res: &ScreenResolution,

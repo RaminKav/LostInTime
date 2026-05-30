@@ -43,8 +43,7 @@ pub fn handle_combat_shrine_activate_animation(
         if anim.current_frame() == 55 {
             *anim = AsepriteAnimation::from(CombatShrineAnim::tags::DONE);
             let mut num_to_spawn = shrine.num_mobs_left;
-            let possible_spawns = [Mob::FurDevil, Mob::Bushling, Mob::StingFly, Mob::SpikeSlime];
-            let mut fallback_count = 0;
+            let possible_spawns = [Mob::Bushling, Mob::StingFly, Mob::SpikeSlime];
             let mut rng = rand::thread_rng();
             while num_to_spawn > 0 {
                 let offset = Vec2::new(rng.gen_range(-3. ..=3.), rng.gen_range(-3. ..=3.))
@@ -56,10 +55,9 @@ pub fn handle_combat_shrine_activate_animation(
                     &proto_param.prototypes,
                     spawn_pos,
                 ) {
-                    fallback_count = 0;
                     num_to_spawn -= 1;
                     //last mob is elite
-                    if num_to_spawn <= 1 {
+                    if num_to_spawn <= 2 {
                         commands.entity(mob).insert(EliteMob);
                     }
                     proto_param
@@ -106,7 +104,11 @@ pub fn handle_shrine_rewards(
     for event in shrine_mob_event.iter() {
         if let Ok((e, t, mut shrine, mut anim)) = shrines.get_mut(event.0) {
             shrine.num_mobs_left -= 1;
-            let drop_list = [WorldObject::ChestBlock, WorldObject::Coin];
+            let drop_list = [
+                WorldObject::ChestBlock,
+                WorldObject::HeirloomChest,
+                WorldObject::Coin,
+            ];
             if shrine.num_mobs_left == 0 {
                 // give rewards
                 let mut rng = rand::thread_rng();
