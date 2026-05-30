@@ -10,6 +10,7 @@ use crate::{
     },
     audio::{AudioSoundEffect, SoundSpawner},
     client::is_not_paused,
+    cursor::CursorPos,
     combat::AttackTimer,
     custom_commands::CommandsExt,
     enemy::Mob,
@@ -275,10 +276,10 @@ pub struct ProjectileSpawnMarker {
     pub from_entity: Option<Entity>,
     pub was_mana_bar_full: bool,
     pub is_followup_proj: bool,
-    /// When true, the projectile should spawn at the player's *current* position
-    /// once the spawn delay elapses rather than the position captured at event
-    /// time. Prevents arrows/bolts from spawning behind a moving player when
-    /// there is a non-trivial `spawn_delay`.
+    /// When true, spawn uses the player's *current* position and aim direction
+    /// once the spawn delay elapses, instead of values captured when the attack
+    /// started. Keeps delayed shots (e.g. bow arrows) responsive while moving
+    /// or adjusting the cursor during the wind-up.
     pub track_player_pos: bool,
     /// Extra scale on top of `ProjectileSize` (e.g. Goliath pet 1% double-size proc).
     pub extra_scale: f32,
@@ -446,10 +447,10 @@ fn handle_ranged_attack_event(
         } else {
             1.
         };
-        // Track the player's live position at spawn time only for unanchored,
+        // Recompute spawn position and aim at fire time for unanchored,
         // player-fired projectiles with a delay (e.g. bow arrows). Anything
         // using `pos_override`, coming from an enemy/pet/entity, or anchored to
-        // the player keeps its original positioning semantics.
+        // the player keeps the direction/position captured on the event.
         let track_player_pos = !proj_event.from_enemy
             && proj_event.from_entity.is_none()
             && proj_event.pos_override.is_none()
@@ -542,6 +543,7 @@ fn handle_spawn_projectiles_after_delay(
     proto: ProtoParam,
     mut proto_commands: ProtoCommands,
     game: GameParam,
+    cursor_pos: Res<CursorPos>,
     mut commands: Commands,
     player: Query<Entity, With<Player>>,
     max_mana_q: Query<&MaxMana, With<Player>>,
@@ -555,18 +557,21 @@ fn handle_spawn_projectiles_after_delay(
     for (e, mut proj) in projectiles.iter_mut() {
         proj.timer.tick(time.delta());
         if proj.timer.just_finished() {
-            // For delayed player-fired projectiles, use the player's current
-            // position so the projectile doesn't spawn back where they clicked.
-            let spawn_pos = if proj.track_player_pos {
-                game.player().position.truncate()
+            // For delayed player-fired projectiles, use live player position and
+            // cursor aim so wind-up shots stay responsive.
+            let (spawn_pos, spawn_direction) = if proj.track_player_pos {
+                let player_pos = game.player().position.truncate();
+                let direction = (cursor_pos.world_coords.truncate() - player_pos)
+                    .normalize_or_zero();
+                (player_pos, direction)
             } else {
-                proj.pos
+                (proj.pos, proj.direction)
             };
             let p = proto_commands.spawn_projectile_from_proto(
                 proj.proj.clone(),
                 &proto,
                 spawn_pos,
-                proj.direction,
+                spawn_direction,
                 proj.was_mana_bar_full,
                 &asset_server,
                 if proj.from_enemy {
@@ -608,7 +613,7 @@ fn handle_spawn_projectiles_after_delay(
                     let mut rng = rand::thread_rng();
                     commands.entity(p).insert(HomingEnergyBall {
                         target: None,
-                        initial_direction: proj.direction,
+                        initial_direction: spawn_direction,
                         speed: crate::player::combat_heirlooms::ENERGY_BALL_INITIAL_SPEED,
                         swerve_phase: rng.gen_range(0.0..std::f32::consts::TAU),
                         lock_elapsed: 0.0,
