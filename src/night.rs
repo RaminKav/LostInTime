@@ -8,7 +8,10 @@ use crate::{
     colors::{overwrite_alpha, NIGHT},
     enemy::spawner::MobSpawningPaused,
     run_once_per_run,
-    ui::tips::{SeenTips, Tip, TipEvent},
+    ui::{
+        tips::{SeenTips, Tip, TipEvent},
+        ui_helpers::full_screen_overlay_size,
+    },
     world::dimension::EraManager,
     GameState, ScreenResolution,
 };
@@ -275,7 +278,7 @@ pub fn spawn_night(
         .spawn(SpriteBundle {
             sprite: Sprite {
                 color: overwrite_alpha(NIGHT, night_tracker.get_alpha()),
-                custom_size: Some(Vec2::new(res.game_width, res.game_height)),
+                custom_size: Some(full_screen_overlay_size(&res)),
                 ..default()
             },
             transform: Transform {
