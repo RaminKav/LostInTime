@@ -325,7 +325,6 @@ impl Plugin for PlayerPlugin {
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
-            .add_system(handle_mob_death_out_of_run_currency.in_set(OnUpdate(GameState::Main)))
             .add_system(
                 skill_heirlooms::initialize_class_skill_slots
                     .run_if(is_not_paused)

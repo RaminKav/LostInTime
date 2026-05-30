@@ -22,7 +22,7 @@ use crate::{
 };
 
 /// Resource to track how many purchases the player has made at blacksmith merchants
-/// This determines price scaling (25% increase per purchase)
+/// This determines price scaling (~49% increase per purchase)
 #[derive(Resource, Default, Debug, Clone)]
 pub struct BlacksmithPurchaseTracker {
     pub purchases_made: u32,
@@ -30,9 +30,9 @@ pub struct BlacksmithPurchaseTracker {
 
 impl BlacksmithPurchaseTracker {
     /// Get the price multiplier based on purchases made
-    /// Each purchase increases prices by 25%
+    /// Each purchase increases prices by ~49%
     pub fn get_price_multiplier(&self) -> f32 {
-        1.75_f32.powi(self.purchases_made as i32)
+        1.4875_f32.powi(self.purchases_made as i32)
     }
 }
 
@@ -169,12 +169,7 @@ pub fn setup_essence_ui(
         Vec2::new(3.5, 3.5),
     );
 
-    let overlay = spawn_full_screen_ui_overlay(
-        &mut commands,
-        &resolution,
-        0.8,
-        -1.,
-    );
+    let overlay = spawn_full_screen_ui_overlay(&mut commands, &resolution, 0.8, -1.);
     let _title_text = commands
         .spawn((
             Text2dBundle {
@@ -507,7 +502,7 @@ pub fn handle_populate_essence_shop_on_new_spawn(
         shop.tile_pos = Some(tile_pos);
 
         let purchase_multiplier =
-            1.0 + player_atts.get_single().map(|a| a.1.level).unwrap_or(1) as f32 * 0.75;
+            1.0 + player_atts.get_single().map(|a| a.1.level).unwrap_or(1) as f32 * 0.63;
 
         // Start from cache: keep non-banished items, reroll slots that contained banished heirlooms.
         // Re-apply current purchase_multiplier to cached options so prices scale after purchases.

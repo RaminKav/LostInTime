@@ -1,7 +1,7 @@
 use rand::Rng;
-use std::time::Duration;
 
 use crate::animations::player_sprite::PlayerAnimation;
+use crate::animations::AttackEvent;
 use crate::assets::Graphics;
 use crate::attributes::{
     modifiers::ModifyHealthEvent, CurrentHealth, CurrentMana, ItemAttributes, ProjectileSize,
@@ -53,18 +53,27 @@ pub struct IceExplosionThrottle {
     sound_played: bool,
 }
 
+/// Fires the claw's bonus throwing stars after a real attack.
+///
+/// This is driven by [`AttackEvent`] rather than by polling `AttackTimer` presence. The old
+/// approach free-ran whenever the player had no `AttackTimer` (e.g. mid/after a movement skill
+/// like Roll or SpinAttack, or during a frame drop) and auto-attack was on, spamming stars.
+/// Keying off the actual attack event means a follow-up volley can only ever start as the
+/// direct result of an attack, so it cannot spam.
 pub fn handle_delayed_ranged_attack(
     wep_query: Query<(&RangedAttack, Option<&Ammo>), With<MainHand>>,
     mut ranged_attack_event: EventWriter<RangedAttackEvent>,
+    mut attack_events: EventReader<AttackEvent>,
     game: GameParam,
-    mouse_button_input: Res<Input<MouseButton>>,
-    auto_attack: Res<AutoAttackState>,
     cursor_pos: Res<CursorPos>,
     time: Res<Time>,
-    mut att_cooldown_query: Query<(&mut ClawUpgradeMultiThrow, Option<&AttackTimer>), With<Player>>,
-    mut count: Local<u8>,
+    mut multi_throw_query: Query<&mut ClawUpgradeMultiThrow, With<Player>>,
+    mut remaining: Local<u8>,
 ) {
+    let attacked = attack_events.iter().count() > 0;
+
     let Ok((ranged_attack, ammo_option)) = wep_query.get_single() else {
+        *remaining = 0;
         return;
     };
     if let Some(ammo) = ammo_option {
@@ -72,39 +81,37 @@ pub fn handle_delayed_ranged_attack(
             return;
         }
     }
-
-    let Ok((mut delayed_ranged_attack, cooldown_option)) = att_cooldown_query.get_single_mut()
-    else {
+    let Ok(mut multi_throw) = multi_throw_query.get_single_mut() else {
         return;
     };
-    if cooldown_option.is_some() && delayed_ranged_attack.0.percent() == 0. {
-        *count = 0;
-        return;
-    }
     if ranged_attack.0 == Projectile::Arrow || ranged_attack.0 == Projectile::Electricity {
         return;
     }
-    let num_bonus_projs = delayed_ranged_attack.1
+    let num_bonus_projs = multi_throw.1
         + if ranged_attack.0 == Projectile::ThrowingStar {
             1
         } else {
             0
         };
-    // TODO: add custom delays per proj type
     if num_bonus_projs == 0 {
         return;
     }
-    if mouse_button_input.pressed(MouseButton::Left)
-        || auto_attack.0
-        || delayed_ranged_attack.0.percent() != 0.
-    {
-        delayed_ranged_attack.0.tick(time.delta());
-        if delayed_ranged_attack.0.just_finished() {
-            *count += 1;
+
+    // Begin a fresh volley only on a real attack this frame.
+    if attacked {
+        *remaining = num_bonus_projs;
+        multi_throw.0.reset();
+    }
+
+    if *remaining > 0 {
+        multi_throw.0.tick(time.delta());
+        if multi_throw.0.just_finished() {
+            *remaining -= 1;
             ranged_attack_event.send(RangedAttackEvent {
                 projectile: ranged_attack.0.clone(),
-                direction: (cursor_pos.world_coords.truncate() - game.player().position.truncate())
-                    .normalize_or_zero(),
+                direction: (cursor_pos.world_coords.truncate()
+                    - game.player().position.truncate())
+                .normalize_or_zero(),
                 from_enemy: false,
                 is_followup_proj: true,
                 mana_cost: None,
@@ -113,11 +120,7 @@ pub fn handle_delayed_ranged_attack(
                 pos_override: None,
                 spawn_delay: 0.05,
             });
-
-            delayed_ranged_attack.0.reset();
-            if *count < num_bonus_projs as u8 {
-                delayed_ranged_attack.0.tick(Duration::from_millis(10));
-            }
+            multi_throw.0.reset();
         }
     }
 }

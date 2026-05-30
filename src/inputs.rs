@@ -61,7 +61,7 @@ use crate::{
     InputMappings, Player, ScreenResolution, DEBUG, PLAYER_DASH_SPEED, TIME_STEP,
 };
 use crate::{
-    custom_commands::CommandsExt, AppExt, CustomFlush, GameParam, GameState, MainCamera,
+    custom_commands::CommandsExt, CustomFlush, GameParam, GameState, MainCamera,
     RawPosition, TextureCamera, UICamera, PLAYER_MOVE_SPEED,
 };
 
@@ -77,10 +77,12 @@ impl Plugin for InputsPlugin {
             .insert_resource(crate::bounce::NaturalTornadoSpawner::default())
             .register_type::<CursorPos>()
             .add_event::<BounceEvent>()
-            // .add_plugin(ResourceInspectorPlugin::<CursorPos>::default())
-            .with_default_schedule(CoreSchedule::FixedUpdate, |app| {
-                app.add_event::<AttackEvent>();
-            })
+            // AttackEvent must live on Update (default schedule), not FixedUpdate. Writers
+            // (`mouse_click_system`, sprint run-attack) and readers (`handle_attack_cooldowns`,
+            // stealth break, item abilities) all run on Update. FixedUpdate catch-up rotates
+            // the event buffer multiple times per render frame when FPS drops, dropping events
+            // before `handle_attack_cooldowns` inserts `AttackTimer` — causing burst attacks.
+            .add_event::<AttackEvent>()
             .add_systems(
                 (
                     bounce_player.run_if(is_not_paused),

@@ -21,8 +21,8 @@ use super::{
     InventorySlotState, InventorySlotType, InventoryState, InventoryUI, UIElement, UIState,
     HUD_ACTION_ROW_Y_FROM_BOTTOM, HUD_ERA_TIMER_ENDLESS_WIDTH, HUD_FRAME_Y_FROM_BOTTOM,
     HUD_HEIRLOOM_ICON_SPACING, HUD_HOTBAR_SLOTS, HUD_SKILLS_CENTER_X, HUD_SKILL_SLOT_HIT_SIZE,
-    HUD_SKILL_SPACING_X, HUD_TIMELINE_ARROWS_SIZE, HUD_TIMELINE_SIZE, CURRENCY_BACKGROUND_SIZE,
-    PROGRESS_BACKGROUND_SIZE,
+    HUD_SKILL_SPACING_X, HUD_TIMELINE_ARROWS_SIZE, HUD_TIMELINE_SIZE, KEYBIND_BADGE_SIZE,
+    CURRENCY_BACKGROUND_SIZE, KEYBIND_BADGE_BOTTOM_INSET, PROGRESS_BACKGROUND_SIZE,
 };
 use crate::{
     assets::Graphics,
@@ -3199,14 +3199,10 @@ pub fn update_pet_skill_hud_slot(
     graphics: Res<Graphics>,
     pet_q: Query<&crate::pets::state::Pet>,
     existing: Query<(Entity, &PetSkillSlotFor), With<PetSkillSlotBg>>,
-    existing_label: Query<Entity, With<PetSkillLabelBackground>>,
     res: Res<ScreenResolution>,
 ) {
     let Some(pet) = pet_q.iter().next() else {
         for (e, _) in existing.iter() {
-            commands.entity(e).despawn_recursive();
-        }
-        for e in existing_label.iter() {
             commands.entity(e).despawn_recursive();
         }
         return;
@@ -3219,9 +3215,6 @@ pub fn update_pet_skill_hud_slot(
     for (e, _) in existing.iter() {
         commands.entity(e).despawn_recursive();
     }
-    for e in existing_label.iter() {
-        commands.entity(e).despawn_recursive();
-    }
 
     let pet_data = graphics.get_pet_data(pet.clone());
 
@@ -3232,20 +3225,6 @@ pub fn update_pet_skill_hud_slot(
     let x = HUD_SKILLS_CENTER_X + (3.0 - skill_half_span) * HUD_SKILL_SPACING_X;
     let y = -res.game_height / 2. + HUD_ACTION_ROW_Y_FROM_BOTTOM;
 
-    let (pet_label_bg, _) = spawn_hud_label_badge(
-        &mut commands,
-        &asset_server,
-        "PET",
-        Transform::from_translation(Vec3::new(
-            x,
-            hud_keybind_badge_center_y(res.game_height),
-            2.,
-        )),
-        None,
-        3,
-    );
-    commands.entity(pet_label_bg).insert(PetSkillLabelBackground);
-
     let slot_bg = commands
         .spawn(SpatialBundle::from_transform(Transform::from_translation(
             Vec3::new(x, y, Z_DEPTH_HUD_ACTIVE_SKILLS),
@@ -3255,6 +3234,20 @@ pub fn update_pet_skill_hud_slot(
         .insert(PetSkillSlotFor(pet.clone()))
         .insert(Name::new("PET SKILL SLOT"))
         .id();
+
+    // Parented to the slot so `sync_player_hud_slots_layout_to_resolution` keeps the label
+    // aligned when UI scale / resolution changes (same pattern as corner icon keybinds).
+    let label_local_y =
+        KEYBIND_BADGE_BOTTOM_INSET + KEYBIND_BADGE_SIZE.y * 0.5 - HUD_ACTION_ROW_Y_FROM_BOTTOM;
+    let (pet_label_bg, _) = spawn_hud_label_badge(
+        &mut commands,
+        &asset_server,
+        "PET",
+        Transform::from_translation(Vec3::new(0., label_local_y, 2.)),
+        Some(slot_bg),
+        3,
+    );
+    commands.entity(pet_label_bg).insert(PetSkillLabelBackground);
 
     commands
         .spawn(SpriteBundle {

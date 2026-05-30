@@ -193,18 +193,6 @@ pub fn handle_modify_currency(
     }
 }
 
-pub fn handle_mob_death_out_of_run_currency(
-    mut death_events: EventReader<EnemyDeathEvent>,
-    mut currency: ResMut<TimeFragmentCurrency>,
-) {
-    for _ in death_events.iter() {
-        if rand::thread_rng().gen_bool(0.02) {
-            info!("CURRENCY GAINED!");
-            currency.time_fragments = currency.time_fragments.saturating_add(1);
-        }
-    }
-}
-
 pub fn reset_time_fragment_counters(mut currency: ResMut<TimeFragmentCurrency>) {
     currency.total_collected_time_fragments_this_run = 0;
     currency.bounce_timer.reset();
