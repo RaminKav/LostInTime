@@ -1,7 +1,7 @@
 use crate::{
     animations::AnimationTimer,
     assets::{SpriteAnchor, SpriteSize},
-    attributes::ItemLevel,
+    attributes::{add_item_glows, ItemLevel, RawItemBaseAttributes},
     inventory::ItemStack,
     item::{
         projectile::{ArcProjectileData, Projectile},
@@ -72,10 +72,18 @@ impl<'w, 's> CommandsExt<'w, 's> for ProtoCommands<'w, 's> {
                 return None; // Entity was already despawned
             };
 
+            let mut glow_rarity = None;
             if let Some(proto_data) = params.get_item_data(obj.clone()) {
                 // modify the item stack count
                 let mut proto_data = proto_data.clone();
                 proto_data.count = count;
+                // Gear with raw attributes gets rarity + glow in `handle_new_items_raw_attributes`.
+                if params
+                    .get_component::<RawItemBaseAttributes, _>(obj.clone())
+                    .is_none()
+                {
+                    glow_rarity = Some(proto_data.rarity.clone());
+                }
                 spawned_entity_commands.insert(proto_data).insert(ItemDrop);
                 // Add despawn timer to reduce lag in endless mode
                 spawned_entity_commands.insert(crate::item::ItemDropDespawnTimer(
@@ -102,6 +110,15 @@ impl<'w, 's> CommandsExt<'w, 's> for ProtoCommands<'w, 's> {
                             .insert(sprite.clone());
                     }
                 }
+            }
+
+            if let Some(rarity) = glow_rarity {
+                add_item_glows(
+                    self.commands(),
+                    &params.graphics,
+                    spawned_entity,
+                    rarity,
+                );
             }
 
             return Some(spawned_entity);

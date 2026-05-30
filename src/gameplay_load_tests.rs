@@ -28,7 +28,6 @@ use rand::Rng;
 use crate::{
     animations::ui_animaitons::MoveUIAnimation,
     assets::Graphics,
-    attributes::add_item_glows,
     audio::SoundSpawner,
     client::is_not_paused,
     collider_load_test::WAVE_INTERVAL_SECS as COLLIDER_WAVE_INTERVAL_SECS,
@@ -784,7 +783,6 @@ fn loot_cycle_load_test_burst(
     player: Query<&GlobalTransform, With<Player>>,
     mut proto_commands: ProtoCommands,
     proto_param: ProtoParam,
-    graphics: Res<Graphics>,
     dungeon: Query<&Dungeon, With<ActiveDimension>>,
 ) {
     if !active.active {
@@ -827,7 +825,6 @@ fn loot_cycle_load_test_burst(
             );
 
             if let Some(drop_e) = drop_e {
-                add_item_glows(&mut commands, &graphics, drop_e, drop.rarity.clone());
                 commands
                     .entity(drop_e)
                     .insert(ItemDropDespawnTimer(Timer::from_seconds(

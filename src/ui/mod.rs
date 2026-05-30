@@ -361,9 +361,10 @@ pub fn hud_timeline_side_padding(game_width: f32) -> f32 {
 
 /// Score / chaos progress bar center X — placed to the right of the centered timeline using the
 /// same padding as the gap between the currency block and the timeline on the left side.
-pub fn hud_progress_bar_center_x(game_width: f32) -> f32 {
-    let timeline_right_edge = hud_timeline_center_x(game_width) + HUD_TIMELINE_SIZE.x * 0.5;
-    let minimap_left_edge = minimap::hud_minimap_left_edge_x(game_width);
+pub fn hud_progress_bar_center_x(res: &ScreenResolution) -> f32 {
+    let timeline_right_edge =
+        hud_timeline_center_x(res.game_width) + HUD_TIMELINE_SIZE.x * 0.5;
+    let minimap_left_edge = minimap::hud_minimap_left_edge_x_from_res(res);
     (timeline_right_edge + minimap_left_edge) * 0.5
 }
 
@@ -406,9 +407,9 @@ pub const HUD_HEIRLOOM_MINIMAP_PADDING: f32 = 6.0;
 
 /// Largest number of heirloom icons that fit on a single HUD row at the current screen width,
 /// leaving [`HUD_HEIRLOOM_MINIMAP_PADDING`] of clearance to the left of the minimap.
-pub fn hud_heirloom_max_per_row(game_width: f32) -> usize {
-    let first_x = hud_heirloom_first_icon_x(game_width);
-    let minimap_left_edge = minimap::hud_minimap_left_edge_x(game_width);
+pub fn hud_heirloom_max_per_row(res: &ScreenResolution) -> usize {
+    let first_x = hud_heirloom_first_icon_x(res.game_width);
+    let minimap_left_edge = minimap::hud_minimap_left_edge_x_from_res(res);
     let max_center_x =
         minimap_left_edge - HUD_HEIRLOOM_MINIMAP_PADDING - HUD_HEIRLOOM_ICON_HALF;
     if max_center_x <= first_x {

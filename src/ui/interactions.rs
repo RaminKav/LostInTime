@@ -1722,6 +1722,7 @@ pub fn handle_cursor_item_chest_button(
     mut next_ui_state: ResMut<NextState<UIState>>,
     mut inv: Query<&mut Inventory>,
     proto: ProtoParam,
+    mut att_event: EventWriter<AttributeChangeEvent>,
 ) {
     if item_chest_state.chest_type != ChestType::Item {
         return;
@@ -1771,6 +1772,7 @@ pub fn handle_cursor_item_chest_button(
                                 &mut next_ui_state,
                                 &mut inv,
                                 &proto,
+                                &mut att_event,
                             ),
                             // Banish is heirloom-only; ignore on item chests.
                             ChestButtonKind::Banish => (),
@@ -1839,6 +1841,7 @@ fn equip_item_chest_reward(
     next_ui_state: &mut ResMut<NextState<UIState>>,
     inv: &mut Query<&mut Inventory>,
     proto: &ProtoParam,
+    att_event: &mut EventWriter<AttributeChangeEvent>,
 ) {
     let picked = item_chest_state.picked_item.clone().unwrap();
     let Ok(mut inventory) = inv.get_single_mut() else {
@@ -1917,6 +1920,7 @@ fn equip_item_chest_reward(
         }
     }
 
+    att_event.send(AttributeChangeEvent);
     next_ui_state.set(UIState::Closed);
     commands.remove_resource::<ItemChestState>();
 }

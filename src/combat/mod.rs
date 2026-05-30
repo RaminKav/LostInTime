@@ -17,7 +17,7 @@ use status_effects::*;
 pub mod collisions;
 pub mod damage_tracker;
 pub mod pickup_radius;
-use crate::attributes::{add_item_glows, CurrentMana, Lifesteal, ProjectileSize};
+use crate::attributes::{CurrentMana, Lifesteal, ProjectileSize};
 use crate::NO_DROPS;
 
 pub mod combat_helpers;
@@ -335,7 +335,6 @@ fn handle_enemy_death(
     mut player_xp: Query<(&PlayerLevel, &PlayerSkills, &OwnedBlessings)>,
     mut proto_commands: ProtoCommands,
     mut commands: Commands,
-    graphics: Res<Graphics>,
     infinite_mode: Res<InfiniteMode>,
     enemies: Query<(Entity, &GlobalTransform), (With<Mob>, Without<Player>)>,
     mut player_query: Query<(&GlobalTransform, &Attack, &mut CurrentMana), With<Player>>,
@@ -401,7 +400,6 @@ fn handle_enemy_death(
                         );
 
                         if let Some(drop_e) = drop_e {
-                            add_item_glows(&mut commands, &graphics, drop_e, drop.rarity.clone());
                             commands
                                 .entity(drop_e)
                                 .insert(crate::item::ItemDropDespawnTimer(Timer::from_seconds(

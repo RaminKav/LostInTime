@@ -492,7 +492,7 @@ pub fn setup_currency_ui(
 
     let first_center_x = hud_currency_first_center_x(res.game_width);
     let second_center_x = hud_currency_second_center_x(res.game_width);
-    let progress_center_x = hud_progress_bar_center_x(res.game_width);
+    let progress_center_x = hud_progress_bar_center_x(&res);
 
     // Time fragments slot
     {
@@ -1797,7 +1797,7 @@ pub fn handle_update_player_skills(
             let heirloom_row_y = hud_heirloom_row_y(res.game_height);
             let heirloom_start_x = hud_heirloom_first_icon_x(res.game_width);
 
-            let max_icons_per_row = super::hud_heirloom_max_per_row(res.game_width).max(1);
+            let max_icons_per_row = super::hud_heirloom_max_per_row(&res).max(1);
             for (i, (heirloom, count)) in ordered_heirlooms.iter().enumerate() {
                 const ROW_SPACING: f32 = 16.;
 
@@ -2579,7 +2579,7 @@ pub fn handle_update_era_timer_hud(
         transform.translation.y = progress_row_y;
     }
     for mut progress_txfm in hud_transforms.p4().iter_mut() {
-        progress_txfm.translation.x = hud_progress_bar_center_x(res.game_width);
+        progress_txfm.translation.x = hud_progress_bar_center_x(&res);
         progress_txfm.translation.y = progress_row_y + 1.;
     }
 
@@ -3649,7 +3649,7 @@ pub fn sync_player_hud_progress_layout_to_resolution(
         transform.translation.y = progress_row_y;
     }
     for mut transform in progress.p1().iter_mut() {
-        transform.translation.x = hud_progress_bar_center_x(res.game_width);
+        transform.translation.x = hud_progress_bar_center_x(&res);
         transform.translation.y = progress_row_y + 1.;
     }
     for mut transform in progress.p2().iter_mut() {
@@ -3718,7 +3718,7 @@ pub fn sync_player_hud_slots_layout_to_resolution(
 
     let heirloom_row_y = hud_heirloom_row_y(res.game_height);
     let heirloom_start_x = hud_heirloom_first_icon_x(res.game_width);
-    let max_icons_per_row = super::hud_heirloom_max_per_row(res.game_width).max(1);
+    let max_icons_per_row = super::hud_heirloom_max_per_row(&res).max(1);
     for (i, mut transform) in slots.p5().iter_mut().enumerate() {
         let row = i / max_icons_per_row;
         let col = i % max_icons_per_row;

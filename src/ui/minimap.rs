@@ -18,7 +18,8 @@ use bevy::sprite::MaterialMesh2dBundle;
 use bevy::utils::{HashMap, HashSet};
 use bevy_ecs_tilemap::prelude::*;
 
-use super::UIElement;
+use super::{layout_sync::UiLayoutKey, UIElement};
+
 pub struct MinimapPlugin;
 
 impl Plugin for MinimapPlugin {
@@ -97,12 +98,17 @@ impl Plugin for MinimapPlugin {
                     .run_if(in_state(GameState::Main))
                     .run_if(|dungeon: Query<&Dungeon>| dungeon.is_empty()),
             )
-            .add_system(despawn_hud_minimap_in_dungeon.run_if(in_state(GameState::Main)));
+            .add_system(despawn_hud_minimap_in_dungeon.run_if(in_state(GameState::Main)))
+            .add_system(
+                invalidate_island_map_on_ui_layout_change
+                    .after(crate::update_pixel_perfect_viewport),
+            );
     }
 }
 
 pub const HUD_MINIMAP_RADIUS_TILES: i32 = 26;
 const HUD_MINIMAP_PIXELS_PER_TILE: u32 = 2;
+/// HUD minimap diameter in UI world units (tuned at Large / reference UI scale).
 pub const HUD_MINIMAP_DISPLAY_SIZE: f32 = 70.0;
 const HUD_MINIMAP_ICON_SIZE: f32 = 16.0;
 /// Extra inset so icon sprites are hidden before they overlap the circular edge.
@@ -111,11 +117,24 @@ pub const HUD_MINIMAP_PADDING: f32 = 8.0;
 /// Horizontal nudge applied when positioning the HUD minimap from the right edge.
 pub const HUD_MINIMAP_RIGHT_NUDGE: f32 = 4.0;
 
+/// HUD minimap diameter — fixed at [`HUD_MINIMAP_DISPLAY_SIZE`] so it matches the legacy Large UI look.
+pub fn hud_minimap_display_size(_res: &ScreenResolution) -> f32 {
+    HUD_MINIMAP_DISPLAY_SIZE
+}
+
+/// Full island map panel size (square) for the current UI camera bucket.
+pub fn island_map_display_size(res: &ScreenResolution) -> f32 {
+    f32::min(res.game_height * 0.85, res.game_width * 0.85)
+}
+
 /// World-space x for the LEFT edge of the HUD minimap sprite.
-pub fn hud_minimap_left_edge_x(game_width: f32) -> f32 {
-    let center_x = game_width * 0.5 - HUD_MINIMAP_DISPLAY_SIZE * 0.5 - HUD_MINIMAP_PADDING
-        + HUD_MINIMAP_RIGHT_NUDGE;
-    center_x - HUD_MINIMAP_DISPLAY_SIZE * 0.5
+pub fn hud_minimap_left_edge_x(game_width: f32, display_size: f32) -> f32 {
+    let center_x = game_width * 0.5 - display_size * 0.5 - HUD_MINIMAP_PADDING + HUD_MINIMAP_RIGHT_NUDGE;
+    center_x - display_size * 0.5
+}
+
+pub fn hud_minimap_left_edge_x_from_res(res: &ScreenResolution) -> f32 {
+    hud_minimap_left_edge_x(res.game_width, hud_minimap_display_size(res))
 }
 const HUD_MINIMAP_SHADOW_THICKNESS: f32 = 2.0;
 const HUD_MINIMAP_SHADOW_RGB: (f32, f32, f32) = (0.1, 0.1, 0.1);
@@ -150,6 +169,9 @@ pub struct HudMinimap {
 
 #[derive(Component)]
 pub struct HudMinimapSprite;
+
+#[derive(Component)]
+pub struct IslandMapImage;
 
 #[derive(Component)]
 pub struct HudMinimapPlayerMarker;
@@ -372,11 +394,9 @@ fn setup_island_map(
     mut commands: Commands,
     graphics: Res<Graphics>,
     mut assets: ResMut<Assets<Image>>,
-    mut color_mat: ResMut<Assets<ColorMaterial>>,
     game: GameParam,
     minimap_cache: Res<MinimapTileCache>,
     old_map: Query<Entity, With<IslandMap>>,
-    mut meshes: ResMut<Assets<Mesh>>,
     dungeon_check: Query<&Dungeon, With<ActiveDimension>>,
     map_open: Res<IslandMapOpen>,
     mut minimap_events: EventReader<UpdateMiniMapEvent>,
@@ -591,13 +611,9 @@ fn setup_island_map(
         data,
         TextureFormat::Rgba8UnormSrgb,
     );
-    let handle = assets.add(image);
-    let mat = color_mat.add(ColorMaterial::from(handle));
+    let image_handle = assets.add(image);
 
-    let map_display_size = f32::min(
-        game.resolution.game_height * 0.85,
-        game.resolution.game_width * 0.85,
-    );
+    let map_display_size = island_map_display_size(&game.resolution);
 
     let map_border = commands
         .spawn(SpriteBundle {
@@ -614,22 +630,20 @@ fn setup_island_map(
         .insert(Name::new("ISLAND_MAP_BORDER"))
         .id();
 
+    // SpriteBundle + `custom_size` so the map image matches the frame/fog (MaterialMesh2d
+    // quads were not respecting the intended display size on some UI layout buckets).
     let map = commands
         .spawn((
-            MaterialMesh2dBundle {
-                mesh: meshes
-                    .add(
-                        shape::Quad {
-                            size: Vec2::new(map_display_size, map_display_size),
-                            ..Default::default()
-                        }
-                        .into(),
-                    )
-                    .into(),
+            SpriteBundle {
+                texture: image_handle,
+                sprite: Sprite {
+                    custom_size: Some(Vec2::splat(map_display_size)),
+                    ..default()
+                },
                 transform: Transform::from_translation(Vec3::new(0., 0., 2.)),
-                material: mat,
                 ..default()
             },
+            IslandMapImage,
             RenderLayers::from_layers(&[3]),
             Name::new("ISLAND_MAP_IMAGE"),
         ))
@@ -701,10 +715,7 @@ fn update_player_marker_on_map(
     let image_x = tile_x_in_island * pixels_per_tile;
     let image_y = tile_y_in_island * pixels_per_tile;
 
-    let map_display_size = f32::min(
-        game.resolution.game_height * 0.85,
-        game.resolution.game_width * 0.85,
-    );
+    let map_display_size = island_map_display_size(&game.resolution);
 
     let scale_factor = map_display_size / total_pixels as f32;
 
@@ -787,10 +798,7 @@ fn update_object_icons_on_map(
     let total_tiles = total_chunks * tiles_per_chunk;
     let total_pixels = total_tiles * pixels_per_tile;
 
-    let map_display_size = f32::min(
-        game.resolution.game_height * 0.85,
-        game.resolution.game_width * 0.85,
-    );
+    let map_display_size = island_map_display_size(&game.resolution);
     let scale_factor = map_display_size / total_pixels as f32;
 
     let mut desired_icons: HashMap<TileMapPosition, WorldObject> = HashMap::new();
@@ -1076,10 +1084,7 @@ fn update_fog_overlay_on_map(
     let handle = assets.add(image);
     let mat = color_mat.add(ColorMaterial::from(handle));
 
-    let map_display_size = f32::min(
-        game.resolution.game_height * 0.85,
-        game.resolution.game_width * 0.85,
-    );
+    let map_display_size = island_map_display_size(&game.resolution);
 
     if map_border_query.iter().next().is_some() {
         commands.spawn((
@@ -1115,22 +1120,59 @@ fn close_map_on_dungeon_entry(
     }
 }
 
-/// Re-anchor the HUD minimap when the UI layout bucket changes.
+/// Re-anchor and resize the HUD minimap when the UI layout bucket changes.
 pub fn sync_hud_minimap_layout_to_resolution(
     res: Res<ScreenResolution>,
     sync_state: Res<super::layout_sync::UiLayoutSyncState>,
     mut minimap: Query<&mut Transform, With<HudMinimap>>,
+    mut sprites: ParamSet<(
+        Query<&mut Sprite, With<HudMinimapSprite>>,
+        Query<&mut Sprite, With<HudMinimapPlayerMarker>>,
+        Query<&mut Sprite, With<HudMinimapIcon>>,
+    )>,
 ) {
     if !super::layout_sync::ui_layout_needs_sync(&res, &sync_state) {
         return;
     }
 
-    let pos_x = res.game_width / 2.0 - HUD_MINIMAP_DISPLAY_SIZE / 2.0 - HUD_MINIMAP_PADDING
-        + HUD_MINIMAP_RIGHT_NUDGE;
-    let pos_y = res.game_height / 2.0 - HUD_MINIMAP_DISPLAY_SIZE / 2.0 - HUD_MINIMAP_PADDING;
+    let display_size = hud_minimap_display_size(&res);
+    let pos_x =
+        res.game_width / 2.0 - display_size / 2.0 - HUD_MINIMAP_PADDING + HUD_MINIMAP_RIGHT_NUDGE;
+    let pos_y = res.game_height / 2.0 - display_size / 2.0 - HUD_MINIMAP_PADDING;
+    let total_pixels = hud_minimap_texture_pixels();
+    let scale = display_size / total_pixels as f32;
+    let marker_size = 2.0 * HUD_MINIMAP_PIXELS_PER_TILE as f32 * scale;
     for mut transform in minimap.iter_mut() {
         transform.translation.x = pos_x;
         transform.translation.y = pos_y;
+    }
+    for mut sprite in sprites.p0().iter_mut() {
+        sprite.custom_size = Some(Vec2::splat(display_size));
+    }
+    for mut sprite in sprites.p1().iter_mut() {
+        sprite.custom_size = Some(Vec2::splat(marker_size));
+    }
+    for mut sprite in sprites.p2().iter_mut() {
+        sprite.custom_size = Some(Vec2::splat(HUD_MINIMAP_ICON_SIZE));
+    }
+}
+
+/// Despawn the full island map so `setup_island_map` rebuilds it at the new UI bucket size.
+fn invalidate_island_map_on_ui_layout_change(
+    res: Res<ScreenResolution>,
+    mut last_layout: Local<Option<UiLayoutKey>>,
+    mut commands: Commands,
+    maps: Query<Entity, With<IslandMap>>,
+    fog: Query<Entity, With<IslandMapFogOverlay>>,
+) {
+    let key = UiLayoutKey::from_resolution(&res);
+    if last_layout.as_ref() == Some(&key) {
+        return;
+    }
+    *last_layout = Some(key);
+
+    for entity in maps.iter().chain(fog.iter()) {
+        commands.entity(entity).despawn_recursive();
     }
 }
 
@@ -1163,11 +1205,12 @@ fn setup_hud_minimap(
     let image_handle = assets.add(image);
 
     let res = &game.resolution;
-    let pos_x = res.game_width / 2.0 - HUD_MINIMAP_DISPLAY_SIZE / 2.0 - HUD_MINIMAP_PADDING
-        + HUD_MINIMAP_RIGHT_NUDGE;
-    let pos_y = res.game_height / 2.0 - HUD_MINIMAP_DISPLAY_SIZE / 2.0 - HUD_MINIMAP_PADDING;
+    let display_size = hud_minimap_display_size(res);
+    let pos_x =
+        res.game_width / 2.0 - display_size / 2.0 - HUD_MINIMAP_PADDING + HUD_MINIMAP_RIGHT_NUDGE;
+    let pos_y = res.game_height / 2.0 - display_size / 2.0 - HUD_MINIMAP_PADDING;
 
-    let scale = HUD_MINIMAP_DISPLAY_SIZE / total_pixels as f32;
+    let scale = display_size / total_pixels as f32;
 
     let container = commands
         .spawn((
@@ -1190,7 +1233,7 @@ fn setup_hud_minimap(
             SpriteBundle {
                 texture: image_handle.clone(),
                 sprite: Sprite {
-                    custom_size: Some(Vec2::splat(HUD_MINIMAP_DISPLAY_SIZE)),
+                    custom_size: Some(Vec2::splat(display_size)),
                     ..default()
                 },
                 transform: Transform::from_translation(Vec3::new(0., 0., 0.)),
@@ -1323,6 +1366,7 @@ fn update_hud_minimap_icons(
     mut commands: Commands,
     cache: Res<MinimapTileCache>,
     graphics: Res<Graphics>,
+    resolution: Res<ScreenResolution>,
     container_query: Query<Entity, With<HudMinimap>>,
     mut icon_query: Query<(Entity, &HudMinimapIcon, &mut Transform)>,
     player_query: Query<&GlobalTransform, With<Player>>,
@@ -1336,9 +1380,9 @@ fn update_hud_minimap_icons(
 
     let player_world = player_t.translation().truncate();
     let total_pixels = hud_minimap_texture_pixels();
-    let scale = HUD_MINIMAP_DISPLAY_SIZE / total_pixels as f32;
+    let display_size = hud_minimap_display_size(&resolution);
+    let scale = display_size / total_pixels as f32;
     let max_icon_center_dist = hud_minimap_max_icon_center_distance(scale);
-
     let mut desired: HashMap<TileMapPosition, WorldObject> = HashMap::new();
     desired.insert(
         TileMapPosition::new(IVec2::ZERO, TilePos { x: 0, y: 0 }),
