@@ -454,7 +454,12 @@ pub fn handle_time_crystal_unlock_hover_tooltip(
         UIState::TimeCrystalsBrowser => UIState::TimeCrystalsBrowser,
         UIState::Inventory => {
             if !dev_heirloom_grid_open.map(|g| g.0).unwrap_or(false) {
-                tooltip_requests.send(HeirloomTooltipRequest::Clear);
+                // Only clear tooltips this system owns (dev picker grid icons). Do not
+                // broadcast Clear every frame — that fights HUD heirloom hover tooltips.
+                if last_hovered.is_some() {
+                    *last_hovered = None;
+                    tooltip_requests.send(HeirloomTooltipRequest::Clear);
+                }
                 return;
             }
             UIState::Inventory

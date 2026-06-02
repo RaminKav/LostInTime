@@ -1609,6 +1609,16 @@
             size: (16., 24.),
             anchor: None,
         ),
+        LizardCard: WorldObjectData(
+           texture_pos: (9., 38.),
+            size: (16., 24.),
+            anchor: None,
+        ),
+        VoidCrawlerCard: WorldObjectData(
+           texture_pos: (10., 38.),
+            size: (16., 24.),
+            anchor: None,
+        ),
 
     },
     heirlooms: {

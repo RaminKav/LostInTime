@@ -52,6 +52,7 @@ use crate::{
     },
     ui::{
         tips::{SeenTips, Tip},
+        tutorial_ui::{seen_tutorial_chunks_from_game_data, SeenTutorialChunks},
         ChestContainer, FurnaceContainer,
     },
     vectorize::{vectorize, vectorize_inner},
@@ -256,6 +257,10 @@ pub struct GameData {
     pub time_crystals: TimeCrystals,
     #[serde(default)]
     pub has_seen_tutorial: bool,
+    #[serde(default)]
+    pub seen_tutorial_chunks: std::collections::HashSet<
+        crate::ui::tutorial_ui::TutorialContent,
+    >,
     #[serde(default)]
     pub beastiary: Beastiary,
 }
@@ -779,20 +784,24 @@ pub fn load_game_data_for_ui(mut commands: Commands) {
                 // Insert bounce tracker as a resource
                 commands.insert_resource(game_data.bounce_tracker.clone());
                 let seen_tips_set = game_data.seen_tips.clone();
+                let seen_tutorial_chunks = seen_tutorial_chunks_from_game_data(&game_data);
                 // Insert GameData as a resource so achievements UI can access cumulative_analytics
                 commands.insert_resource(game_data);
                 commands.insert_resource(SeenTips {
                     seen: seen_tips_set,
                 });
+                commands.insert_resource(seen_tutorial_chunks);
             }
             Err(_) => {
                 // Insert default GameData if file can't be read
                 commands.insert_resource(GameData::default());
+                commands.insert_resource(SeenTutorialChunks::default());
             }
         }
     } else {
         // Insert default GameData if file doesn't exist
         commands.insert_resource(GameData::default());
+        commands.insert_resource(SeenTutorialChunks::default());
     }
 }
 

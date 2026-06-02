@@ -428,9 +428,26 @@ pub fn setup_item_chest_ui(
 pub fn toggle_item_chest_visibility(
     mut next_inv_state: ResMut<NextState<UIState>>,
     curr_ui_state: Res<State<UIState>>,
+    chest_state: Option<Res<ItemChestState>>,
+    mut tutorial_popup_events: EventWriter<crate::ui::tutorial_ui::TutorialPopupEvent>,
+    seen_tutorial_chunks: Option<Res<crate::ui::tutorial_ui::SeenTutorialChunks>>,
+    tutorial_ui: Query<(), With<crate::ui::tutorial_ui::TutorialUI>>,
 ) {
     if curr_ui_state.0 == UIState::ActiveSkills || curr_ui_state.0 == UIState::ItemChest {
         return;
+    }
+    if chest_state
+        .as_ref()
+        .map(|c| c.chest_type == ChestType::Item)
+        .unwrap_or(false)
+    {
+        if let Some(seen_tutorial_chunks) = seen_tutorial_chunks.as_ref() {
+            crate::ui::tutorial_ui::try_equipment_chest_tutorial(
+                &mut tutorial_popup_events,
+                seen_tutorial_chunks,
+                &tutorial_ui,
+            );
+        }
     }
     next_inv_state.set(UIState::ItemChest);
 }
@@ -1139,7 +1156,7 @@ pub fn handle_heirloom_chest_final_item_hover(
                     interactable.change(Interaction::Hovering);
 
                     let icon_pos = transform.translation();
-                    let tooltip_pos = Vec3::new(icon_pos.x - 130., icon_pos.y + 12., 15.);
+                    let tooltip_pos = Vec3::new(icon_pos.x - 140., icon_pos.y + 12., 15.);
 
                     tooltip_requests.send(HeirloomTooltipRequest::Show(HeirloomTooltipShow {
                         heirloom: heirloom_data.heirloom.heirloom.clone(),

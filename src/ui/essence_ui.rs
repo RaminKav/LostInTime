@@ -59,7 +59,6 @@ use super::{
     heirloom_tooltip::{HeirloomTooltipRequest, HeirloomTooltipShow},
     main_menu::spawn_back_button,
     spawn_item_stack_icon,
-    ui_helpers::spawn_full_screen_ui_overlay,
     Interactable, UIElement, UIState, ESSENCE_UI_SIZE,
 };
 
@@ -172,7 +171,9 @@ pub fn setup_essence_ui(
         Vec2::new(3.5, 3.5),
     );
 
-    let overlay = spawn_full_screen_ui_overlay_tuned(&mut commands, &resolution, 0.0, 0.95, -1.);
+    // z=9 matches other modal backdrops; previously -1 was local to the shop panel (parent z=10).
+    let overlay = spawn_full_screen_ui_overlay_tuned(&mut commands, &resolution, 0.0, 0.95, 9.);
+    commands.entity(overlay).insert(UIState::Essence);
     let _title_text = commands
         .spawn((
             Text2dBundle {
@@ -235,7 +236,7 @@ pub fn setup_essence_ui(
                     TextStyle {
                         font: asset_server.load("fonts/alagard.ttf"),
                         font_size: 15.0,
-                        color: DARK_WOOD_BROWN,
+                        color: WHITE,
                     },
                 )
                 .with_alignment(TextAlignment::Left),
@@ -378,8 +379,6 @@ pub fn setup_essence_ui(
         &asset_server,
     );
     commands.entity(back_button).insert(UIState::Essence);
-
-    commands.entity(essence_ui_e).push_children(&[overlay]);
 }
 
 pub fn handle_submit_essence_choice(

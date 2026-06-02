@@ -199,6 +199,7 @@ pub enum UIElement {
     MinimapStarIcon,
     MinimapSkullIcon,
     MinimapPortalIcon,
+    PlayerMinimapIcon,
     TipBox,
     CraftButtonContainer,
     EquipmentPanel,

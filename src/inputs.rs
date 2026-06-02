@@ -2,7 +2,6 @@ use crate::attributes::ActiveConsumableBuffs;
 use crate::blessings::OwnedBlessings;
 use crate::chaos::ChaosTracker;
 use crate::cursor::CursorPos;
-use crate::ui::tips::SeenTips;
 use std::time::Duration;
 
 use crate::animations::player_sprite::PlayerAnimation;
@@ -48,8 +47,7 @@ use crate::item::projectile::{RangedAttack, RangedAttackEvent};
 use crate::item::{Equipment, WorldObject};
 use crate::proto::proto_param::ProtoParam;
 use crate::ui::{
-    tips::{Tip, TipEvent},
-    EssenceShopChoices, FlashExpBarEvent, UIState,
+    tutorial_ui::PendingInventoryTutorialCheck, EssenceShopChoices, FlashExpBarEvent, UIState,
 };
 use crate::world::chunk::Chunk;
 
@@ -633,8 +631,6 @@ pub fn toggle_inventory(
     mut flash_event: EventWriter<FlashExpBarEvent>,
     keybinds: Res<InputMappings>,
     mut chaos_tracker: ResMut<ChaosTracker>,
-    mut tip_event: EventWriter<TipEvent>,
-    seen_tips: Res<SeenTips>,
 ) {
     if keybinds.check_inv_input(&key_input, &mouse_input) {
         // Don't allow opening inventory while item chest is open
@@ -647,65 +643,12 @@ pub fn toggle_inventory(
             } else {
                 UIState::Inventory
             };
+            let opening_inventory =
+                curr_ui_state.0 == UIState::Closed && target == UIState::Inventory;
             next_ui_state.set(target);
 
-            if let Ok(inventory) = inv.get_single() {
-                let occupied_slots = inventory
-                    .items
-                    .items
-                    .iter()
-                    .filter(|slot| slot.is_some())
-                    .count();
-                if occupied_slots >= 6 && !seen_tips.has_seen(&Tip::Recipes) {
-                    tip_event.send(TipEvent {
-                        tip: Tip::Recipes,
-                        pos: Vec3::new(-184., -116., 85.),
-                    });
-                }
-
-                // UpgradingGear tip: has UpgradeTome or OrbOfTransformation
-                let has_upgrade_item = inventory.items.items.iter().any(|slot| {
-                    if let Some(item) = slot {
-                        let obj = item.get_obj();
-                        *obj == WorldObject::UpgradeTome || *obj == WorldObject::OrbOfTransformation
-                    } else {
-                        false
-                    }
-                });
-                if has_upgrade_item && !seen_tips.has_seen(&Tip::UpgradingGear) {
-                    tip_event.send(TipEvent {
-                        tip: Tip::UpgradingGear,
-                        pos: Vec3::new(-184., -116., 80.),
-                    });
-                }
-
-                // InventoryStats tip: has gear in inventory slots (6+) that's not in hotbar
-                let has_inventory_gear =
-                    inventory.items.items.iter().enumerate().any(|(idx, slot)| {
-                        if idx >= 6 && slot.is_some() {
-                            if let Some(item) = slot {
-                                let obj = item.get_obj();
-                                // Check if it's equipment (weapon, armor, accessory)
-                                if let Some(equip_type) = obj.get_equip_type(&proto) {
-                                    equip_type.is_weapon()
-                                        || equip_type.is_armor()
-                                        || equip_type.is_accessory()
-                                } else {
-                                    false
-                                }
-                            } else {
-                                false
-                            }
-                        } else {
-                            false
-                        }
-                    });
-                if has_inventory_gear && !seen_tips.has_seen(&Tip::InventoryStats) {
-                    tip_event.send(TipEvent {
-                        tip: Tip::InventoryStats,
-                        pos: Vec3::new(-184., -116., 75.),
-                    });
-                }
+            if opening_inventory {
+                commands.insert_resource(PendingInventoryTutorialCheck);
             }
         }
     }

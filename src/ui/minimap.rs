@@ -1,8 +1,6 @@
 use crate::assets::Graphics;
 use crate::client::GameOverEvent;
-use crate::colors::{
-    DARK_BROWN, DARK_WOOD_BROWN, DESERT_TILE, DESERT_WATER, LIGHT_BROWN, SNOW_TILE, SNOW_WATER,
-};
+use crate::colors::{DARK_BROWN, DESERT_TILE, DESERT_WATER, SNOW_TILE, SNOW_WATER, WHITE};
 use crate::item::WorldObject;
 use crate::world::dimension::{ActiveDimension, Era, SpawnDimension};
 use crate::world::dungeon::Dungeon;
@@ -14,6 +12,7 @@ use crate::{CustomFlush, GameParam, GameState, InputMappings, Player, ScreenReso
 use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 use bevy::render::view::RenderLayers;
+use bevy::sprite::Anchor;
 use bevy::sprite::MaterialMesh2dBundle;
 use bevy::utils::{HashMap, HashSet};
 use bevy_ecs_tilemap::prelude::*;
@@ -66,6 +65,12 @@ impl Plugin for MinimapPlugin {
             .add_system(
                 sync_island_map_overlay
                     .after(setup_island_map)
+                    .run_if(in_state(GameState::Main).or_else(in_state(GameState::Initializing)))
+                    .run_if(|dungeon: Query<&Dungeon>| dungeon.is_empty()),
+            )
+            .add_system(
+                sync_island_map_legend
+                    .after(sync_island_map_overlay)
                     .run_if(in_state(GameState::Main).or_else(in_state(GameState::Initializing)))
                     .run_if(|dungeon: Query<&Dungeon>| dungeon.is_empty()),
             )
@@ -147,6 +152,43 @@ const HUD_MINIMAP_SHADOW_THICKNESS: f32 = 2.0;
 const HUD_MINIMAP_SHADOW_RGB: (f32, f32, f32) = (0.1, 0.1, 0.1);
 const HUD_MINIMAP_SHADOW_ALPHA: f32 = 0.45;
 
+/// On-map icon draw size (16×16 source sprites).
+const MINIMAP_ICON_DISPLAY_SIZE: f32 = 16.0;
+/// Legend entries show icons at 2× native sprite size.
+const MINIMAP_LEGEND_ICON_DISPLAY_SIZE: f32 = 32.0;
+const MINIMAP_LEGEND_ROW_HEIGHT: f32 = 36.0;
+const MINIMAP_LEGEND_GAP_FROM_MAP: f32 = 12.0;
+const MINIMAP_LEGEND_PANEL_HALF_WIDTH: f32 = 48.0;
+const MINIMAP_LEGEND_TEXT_OFFSET_X: f32 = 22.0;
+
+struct MinimapLegendRow {
+    icon: UIElement,
+    label: &'static str,
+}
+
+const MINIMAP_LEGEND_ROWS: &[MinimapLegendRow] = &[
+    MinimapLegendRow {
+        icon: UIElement::PlayerMinimapIcon,
+        label: "Player",
+    },
+    MinimapLegendRow {
+        icon: UIElement::MinimapSkullIcon,
+        label: "Boss Shrine",
+    },
+    MinimapLegendRow {
+        icon: UIElement::MinimapPortalIcon,
+        label: "Portal",
+    },
+    MinimapLegendRow {
+        icon: UIElement::MinimapDungeonIcon,
+        label: "Dungeon",
+    },
+    MinimapLegendRow {
+        icon: UIElement::MinimapStarIcon,
+        label: "Shrine",
+    },
+];
+
 fn hud_minimap_map_diameter_pixels() -> u32 {
     (HUD_MINIMAP_RADIUS_TILES * 2 + 1) as u32 * HUD_MINIMAP_PIXELS_PER_TILE
 }
@@ -210,6 +252,10 @@ pub struct IslandMapFogOverlay;
 /// Full-screen radial backdrop behind the island map (same tuning as item chest UI).
 #[derive(Component)]
 pub struct IslandMapOverlay;
+
+/// Icon legend panel shown to the left of the full island map.
+#[derive(Component)]
+pub struct IslandMapLegend;
 
 #[derive(Component)]
 pub struct IslandMapObjectIcon {
@@ -333,6 +379,7 @@ fn clear_cache_for_new_dimensions(
     fog_query: Query<Entity, With<IslandMapFogOverlay>>,
     marker_query: Query<Entity, With<IslandMapPlayerMarker>>,
     overlay_query: Query<Entity, With<IslandMapOverlay>>,
+    legend_query: Query<Entity, With<IslandMapLegend>>,
     hud_query: Query<Entity, With<HudMinimap>>,
     dungeon_check: Query<&Dungeon>,
     game: GameParam,
@@ -360,6 +407,9 @@ fn clear_cache_for_new_dimensions(
         }
         for overlay in overlay_query.iter() {
             commands.entity(overlay).despawn_recursive();
+        }
+        for legend in legend_query.iter() {
+            commands.entity(legend).despawn_recursive();
         }
         for hud in hud_query.iter() {
             commands.entity(hud).despawn_recursive();
@@ -690,11 +740,121 @@ fn sync_island_map_overlay(
     }
 }
 
+fn spawn_island_map_legend(
+    commands: &mut Commands,
+    graphics: &Graphics,
+    asset_server: &AssetServer,
+    map_display_size: f32,
+) {
+    let row_count = MINIMAP_LEGEND_ROWS.len() as f32;
+    let total_height = row_count * MINIMAP_LEGEND_ROW_HEIGHT;
+    let legend_center_x =
+        -map_display_size * 0.5 - MINIMAP_LEGEND_GAP_FROM_MAP - MINIMAP_LEGEND_PANEL_HALF_WIDTH;
+
+    let root = commands
+        .spawn((
+            SpatialBundle {
+                transform: Transform::from_translation(Vec3::new(legend_center_x, 0., 901.)),
+                ..default()
+            },
+            IslandMapLegend,
+            RenderLayers::from_layers(&[3]),
+            Name::new("ISLAND_MAP_LEGEND"),
+        ))
+        .id();
+
+    for (i, row) in MINIMAP_LEGEND_ROWS.iter().enumerate() {
+        let row_y = total_height * 0.5 - (i as f32 + 0.5) * MINIMAP_LEGEND_ROW_HEIGHT;
+        let row_entity = commands
+            .spawn(SpatialBundle {
+                transform: Transform::from_translation(Vec3::new(0., row_y, 0.)),
+                ..default()
+            })
+            .id();
+        commands.entity(root).add_child(row_entity);
+
+        commands
+            .spawn((
+                SpriteBundle {
+                    texture: graphics.get_ui_element_texture(row.icon.clone()),
+                    sprite: Sprite {
+                        custom_size: Some(Vec2::splat(MINIMAP_LEGEND_ICON_DISPLAY_SIZE)),
+                        ..default()
+                    },
+                    transform: Transform::from_translation(Vec3::new(
+                        -MINIMAP_LEGEND_TEXT_OFFSET_X,
+                        0.,
+                        0.,
+                    )),
+                    ..default()
+                },
+                RenderLayers::from_layers(&[3]),
+            ))
+            .set_parent(row_entity);
+
+        commands
+            .spawn((
+                Text2dBundle {
+                    text: Text::from_section(
+                        row.label,
+                        TextStyle {
+                            font: asset_server.load("fonts/4x5.ttf"),
+                            font_size: 5.0,
+                            color: WHITE,
+                        },
+                    )
+                    .with_alignment(TextAlignment::Left),
+                    text_anchor: Anchor::CenterLeft,
+                    transform: Transform::from_translation(Vec3::new(-2., 0., 1.)),
+                    ..default()
+                },
+                RenderLayers::from_layers(&[3]),
+            ))
+            .set_parent(row_entity);
+    }
+}
+
+/// Spawns/despawns the map icon legend when the island map is toggled open/closed.
+fn sync_island_map_legend(
+    mut commands: Commands,
+    map_open: Res<IslandMapOpen>,
+    res: Res<ScreenResolution>,
+    graphics: Res<Graphics>,
+    asset_server: Res<AssetServer>,
+    dungeon_check: Query<&Dungeon, With<ActiveDimension>>,
+    existing: Query<Entity, With<IslandMapLegend>>,
+) {
+    let should_show = map_open.0 && dungeon_check.is_empty();
+
+    if !should_show {
+        for entity in existing.iter() {
+            commands.entity(entity).despawn_recursive();
+        }
+        return;
+    }
+
+    if !existing.is_empty() && !map_open.is_changed() && !res.is_changed() {
+        return;
+    }
+
+    for entity in existing.iter() {
+        commands.entity(entity).despawn_recursive();
+    }
+
+    spawn_island_map_legend(
+        &mut commands,
+        &graphics,
+        &asset_server,
+        island_map_display_size(&res),
+    );
+}
+
 /// System to dynamically update the player marker on the map
 /// This runs every frame when the map is open, updating the player's position
 fn update_player_marker_on_map(
     mut commands: Commands,
     map_open: Res<IslandMapOpen>,
+    graphics: Res<Graphics>,
     player_query: Query<&GlobalTransform, With<Player>>,
     marker_query: Query<Entity, With<IslandMapPlayerMarker>>,
     map_border_query: Query<Entity, With<IslandMap>>,
@@ -764,38 +924,35 @@ fn update_player_marker_on_map(
         (total_pixels as f32 / 2.0 - image_y as f32 - tile_fraction_y * pixels_per_tile as f32)
             * scale_factor;
 
+    let player_texture = graphics.get_ui_element_texture(UIElement::PlayerMinimapIcon);
+    let marker_sprite = Sprite {
+        custom_size: Some(Vec2::splat(MINIMAP_ICON_DISPLAY_SIZE)),
+        ..default()
+    };
+
     if let Some(marker_entity) = marker_query.iter().next() {
         commands
             .entity(marker_entity)
             .insert(Transform::from_translation(Vec3::new(
                 screen_x, screen_y, 5.0,
             )))
-            .insert(Sprite {
-                color: Color::rgb(1.0, 1.0, 0.4),
-                custom_size: Some(Vec2::new(6.0 * scale_factor, 6.0 * scale_factor)),
-                ..Default::default()
-            });
-    } else {
-        if let Some(map_border) = map_border_query.iter().next() {
-            let marker = commands
-                .spawn((
-                    SpriteBundle {
-                        sprite: Sprite {
-                            color: Color::rgb(1.0, 1.0, 0.4), // Bright yellow
-                            custom_size: Some(Vec2::new(6.0 * scale_factor, 6.0 * scale_factor)), // 3x3 tiles * 2 pixels/tile = 6 pixels, scaled
-                            ..Default::default()
-                        },
-                        transform: Transform::from_translation(Vec3::new(screen_x, screen_y, 5.0)),
-                        ..Default::default()
-                    },
-                    RenderLayers::from_layers(&[3]),
-                    IslandMapPlayerMarker,
-                    Name::new("ISLAND_MAP_PLAYER_MARKER"),
-                ))
-                .id();
+            .insert(marker_sprite);
+    } else if let Some(map_border) = map_border_query.iter().next() {
+        let marker = commands
+            .spawn((
+                SpriteBundle {
+                    texture: player_texture,
+                    sprite: marker_sprite,
+                    transform: Transform::from_translation(Vec3::new(screen_x, screen_y, 5.0)),
+                    ..default()
+                },
+                RenderLayers::from_layers(&[3]),
+                IslandMapPlayerMarker,
+                Name::new("ISLAND_MAP_PLAYER_MARKER"),
+            ))
+            .id();
 
-            commands.entity(map_border).add_child(marker);
-        }
+        commands.entity(map_border).add_child(marker);
     }
 }
 
@@ -925,8 +1082,8 @@ fn update_object_icons_on_map(
                 SpriteBundle {
                     texture: graphics.get_ui_element_texture(ui_element),
                     sprite: Sprite {
-                        custom_size: Some(Vec2::new(16.0, 16.0)),
-                        ..Default::default()
+                        custom_size: Some(Vec2::splat(MINIMAP_ICON_DISPLAY_SIZE)),
+                        ..default()
                     },
                     transform: Transform::from_translation(Vec3::new(screen_x, screen_y, 2.5)), // Between map (2) and player (5)
                     ..Default::default()
@@ -1179,7 +1336,6 @@ pub fn sync_hud_minimap_layout_to_resolution(
     let pos_y = res.game_height / 2.0 - display_size / 2.0 - HUD_MINIMAP_PADDING;
     let total_pixels = hud_minimap_texture_pixels();
     let scale = display_size / total_pixels as f32;
-    let marker_size = 2.0 * HUD_MINIMAP_PIXELS_PER_TILE as f32 * scale;
     for mut transform in minimap.iter_mut() {
         transform.translation.x = pos_x;
         transform.translation.y = pos_y;
@@ -1188,7 +1344,7 @@ pub fn sync_hud_minimap_layout_to_resolution(
         sprite.custom_size = Some(Vec2::splat(display_size));
     }
     for mut sprite in sprites.p1().iter_mut() {
-        sprite.custom_size = Some(Vec2::splat(marker_size));
+        sprite.custom_size = Some(Vec2::splat(HUD_MINIMAP_ICON_SIZE));
     }
     for mut sprite in sprites.p2().iter_mut() {
         sprite.custom_size = Some(Vec2::splat(HUD_MINIMAP_ICON_SIZE));
@@ -1203,6 +1359,7 @@ fn invalidate_island_map_on_ui_layout_change(
     maps: Query<Entity, With<IslandMap>>,
     fog: Query<Entity, With<IslandMapFogOverlay>>,
     overlay: Query<Entity, With<IslandMapOverlay>>,
+    legend: Query<Entity, With<IslandMapLegend>>,
 ) {
     let key = UiLayoutKey::from_resolution(&res);
     if last_layout.as_ref() == Some(&key) {
@@ -1214,6 +1371,7 @@ fn invalidate_island_map_on_ui_layout_change(
         .iter()
         .chain(fog.iter())
         .chain(overlay.iter())
+        .chain(legend.iter())
     {
         commands.entity(entity).despawn_recursive();
     }
@@ -1223,6 +1381,7 @@ fn invalidate_island_map_on_ui_layout_change(
 fn setup_hud_minimap(
     mut commands: Commands,
     mut assets: ResMut<Assets<Image>>,
+    graphics: Res<Graphics>,
     existing: Query<Entity, With<HudMinimap>>,
     player_query: Query<Entity, With<Player>>,
     game: GameParam,
@@ -1252,8 +1411,6 @@ fn setup_hud_minimap(
     let pos_x =
         res.game_width / 2.0 - display_size / 2.0 - HUD_MINIMAP_PADDING + HUD_MINIMAP_RIGHT_NUDGE;
     let pos_y = res.game_height / 2.0 - display_size / 2.0 - HUD_MINIMAP_PADDING;
-
-    let scale = display_size / total_pixels as f32;
 
     let container = commands
         .spawn((
@@ -1292,11 +1449,9 @@ fn setup_hud_minimap(
     let marker = commands
         .spawn((
             SpriteBundle {
+                texture: graphics.get_ui_element_texture(UIElement::PlayerMinimapIcon),
                 sprite: Sprite {
-                    color: Color::rgb(1.0, 1.0, 0.4),
-                    custom_size: Some(Vec2::splat(
-                        2.0 * HUD_MINIMAP_PIXELS_PER_TILE as f32 * scale,
-                    )),
+                    custom_size: Some(Vec2::splat(HUD_MINIMAP_ICON_SIZE)),
                     ..default()
                 },
                 transform: Transform::from_translation(Vec3::new(0., 0., 2.0)),

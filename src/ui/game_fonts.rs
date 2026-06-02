@@ -184,6 +184,11 @@ pub const GLOBAL_MESSAGE: FontStyle = FontStyle {
     path: paths::ALAGARD,
     size: 30.0,
 };
+/// Subtitle line under [`GLOBAL_MESSAGE`] (`alagard` 15).
+pub const GLOBAL_MESSAGE_SUBTEXT: FontStyle = FontStyle {
+    path: paths::ALAGARD,
+    size: 15.0,
+};
 
 /// Default logical size for a tooltip font path when building [`crate::ui::tooltips::TooltipTextProps`].
 #[inline]

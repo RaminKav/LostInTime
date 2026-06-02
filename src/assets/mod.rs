@@ -37,6 +37,7 @@ use crate::player::{
 };
 use crate::status_effects::StatusEffect;
 use crate::ui::tips::SeenTips;
+use crate::ui::tutorial_ui::{seen_tutorial_chunks_from_game_data, SeenTutorialChunks};
 use crate::ui::{BlacksmithMerchant, UIElement};
 use crate::world::portal::{Portal, UIPortal};
 use crate::{datafiles, GameState, ImageAssets};
@@ -397,6 +398,7 @@ impl GameAssetsPlugin {
                     commands.insert_resource(class_ranks);
                     commands.insert_resource(high_scores);
                     commands.insert_resource(achievements);
+                    let seen_tutorial_chunks = seen_tutorial_chunks_from_game_data(&game_data);
                     // Store GameData as a resource so achievements UI can access cumulative analytics
                     commands.insert_resource(game_data);
                     let mut unlocked = UnlockedClasses::new(unlocked_classes_vec);
@@ -412,6 +414,7 @@ impl GameAssetsPlugin {
                     commands.insert_resource(SeenTips {
                         seen: seen_tips_set,
                     });
+                    commands.insert_resource(seen_tutorial_chunks);
                     commands.insert_resource(time_crystals);
                     commands.insert_resource(beastiary);
                     commands.insert_resource(crate::player::beastiary::RunBeastiary::default());
@@ -430,6 +433,7 @@ impl GameAssetsPlugin {
                     commands.insert_resource(Achievements::default());
                     commands.insert_resource(TimeFragmentCurrency::default());
                     commands.insert_resource(SeenTips::default());
+                    commands.insert_resource(SeenTutorialChunks::default());
                     commands.insert_resource(TimeCrystals::default());
                     commands.insert_resource(crate::player::beastiary::Beastiary::default());
                     commands.insert_resource(crate::player::beastiary::RunBeastiary::default());
@@ -448,6 +452,7 @@ impl GameAssetsPlugin {
             commands.insert_resource(Achievements::default());
             commands.insert_resource(TimeFragmentCurrency::default());
             commands.insert_resource(SeenTips::default());
+            commands.insert_resource(SeenTutorialChunks::default());
             commands.insert_resource(TimeCrystals::default());
             commands.insert_resource(crate::player::beastiary::Beastiary::default());
             commands.insert_resource(crate::player::beastiary::RunBeastiary::default());

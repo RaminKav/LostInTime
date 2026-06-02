@@ -84,8 +84,10 @@ pub const Z_DEPTH_HEIRLOOM_SKILL_CHOICE_OVERLAY: f32 = 52.0;
 pub const Z_DEPTH_HEIRLOOM_SKILL_CHOICE_CONTENT: f32 = 54.0;
 /// Reroll/banish count labels (slightly in front of sibling UI on the same screen).
 pub const Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND: f32 = 58.0;
-/// HUD heirloom icons (top-left): above heirloom selection UI, still below options menu.
-pub const Z_DEPTH_HUD_HEIRLOOM_ICONS: f32 = 62.0;
+/// HUD heirloom icons during normal play: above the XP/currency row, below inventory/shrine overlays (z ≈ 9+).
+pub const Z_DEPTH_HUD_HEIRLOOM_ICONS: f32 = 8.0;
+/// HUD heirloom icons when they must render above full-screen overlays (e.g. game over at z ≈ 58).
+pub const Z_DEPTH_HUD_HEIRLOOM_ICONS_FOREGROUND: f32 = 62.0;
 /// Options menu backdrop + content sit above gameplay HUD (including skills/heirlooms).
 /// Kept below name-entry / loading overlays (z ≈ 100+).
 pub const Z_DEPTH_OPTIONS_OVERLAY: f32 = 85.0;
@@ -270,7 +272,7 @@ pub fn full_screen_overlay_size(res: &ScreenResolution) -> Vec2 {
     // so `game_width` x `game_height` covers the screen exactly. A couple of pixels of
     // overscan guarantees the (darkest) edge of the radial gradient sits just off-screen,
     // avoiding any hard seam from sub-pixel rounding.
-    const OVERSCAN: f32 = 4.0;
+    const OVERSCAN: f32 = 8.0;
     Vec2::new(res.game_width + OVERSCAN, res.game_height + OVERSCAN)
 }
 

@@ -28,7 +28,7 @@ pub struct BeastiaryBrowserUI;
 #[derive(Component)]
 pub struct BeastiaryBrowserDoneButton;
 
-/// One clickable card cell in the 3x3 grid.
+/// One clickable card cell in the 4x4 grid.
 #[derive(Component, Clone, Copy)]
 pub struct BeastiaryCardCell {
     pub mob_index: usize,
@@ -48,8 +48,8 @@ const OVERLAY_Z: f32 = 95.;
 const PANEL_Z: f32 = 96.;
 const CONTENT_Z: f32 = 97.;
 
-const GRID_COLS: usize = 3;
-const GRID_ROWS: usize = 3;
+const GRID_COLS: usize = 4;
+const GRID_ROWS: usize = 4;
 /// Card sprite native dimensions in pixels (matches `sprites.desc.ron` entry size).
 const CARD_BASE_W: f32 = 16.;
 const CARD_BASE_H: f32 = 24.;
@@ -132,7 +132,7 @@ pub fn setup_beastiary_browser_ui(
         Name::new("Beastiary Browser Title"),
     ));
 
-    // Left 2/3 of the panel hosts the 3x3 grid; right 1/3 hosts the details.
+    // Left 2/3 of the panel hosts the 4x4 grid; right 1/3 hosts the details.
     let split_x = -half_w + inner_w * (2. / 3.);
     let grid_center_x = (-half_w + split_x) * 0.5;
     let grid_h = GRID_ROWS as f32 * GRID_CELL_H;
@@ -335,6 +335,14 @@ fn spawn_grid_cell(
 }
 
 /// Read base HP and Attack from the mob's prototype components.
+/// Extra space between the mob preview and the first detail line (large sprites).
+fn detail_text_offset_below_preview(mob: &Mob) -> f32 {
+    match mob {
+        Mob::StoneGolem => 40.,
+        _ => 0.,
+    }
+}
+
 fn mob_base_hp_and_attack(proto: &ProtoParam, mob: &Mob) -> Option<(i32, i32)> {
     let hp = proto
         .get_component::<crate::attributes::MaxHealth, _>(mob.clone())
@@ -433,7 +441,7 @@ fn spawn_detail_panel(
         preview_y,
     );
 
-    let mut y = preview_y - 32.;
+    let mut y = preview_y - 32. - detail_text_offset_below_preview(mob);
     commands.spawn((
         Text2dBundle {
             text: Text::from_section(
@@ -613,13 +621,17 @@ fn preview_sheet_data(mob: &Mob) -> Option<(Vec2, usize, usize, usize, usize)> {
 /// `bevy_aseprite` plugin animates these automatically in every `GameState`,
 /// so no local animator system is needed for them.
 fn preview_aseprite_data(mob: &Mob) -> Option<(&'static str, &'static str)> {
-    use crate::enemy::aseprite_enemy::{BigCactusAse, BullAse, SmallCactusAse};
+    use crate::enemy::aseprite_enemy::{
+        BigCactusAse, BullAse, LizardAse, SmallCactusAse, VoidCrawlerAse,
+    };
     use crate::enemy::red_mushling::RedMushling;
     use crate::enemy::stone_golem::StoneGolem;
     match mob {
         Mob::Bull => Some((BullAse::PATH, "WalkDown")),
         Mob::BigCactus => Some((BigCactusAse::PATH, "WalkDown")),
         Mob::SmallCactus => Some((SmallCactusAse::PATH, "WalkDown")),
+        Mob::Lizard => Some((LizardAse::PATH, "WalkDown")),
+        Mob::VoidCrawler => Some((VoidCrawlerAse::PATH, "WalkDown")),
         Mob::StoneGolem => Some((StoneGolem::PATH, "WalkFront")),
         Mob::RedMushling => Some((RedMushling::PATH, "IDLE_FRONT")),
         _ => None,
@@ -648,7 +660,7 @@ pub struct BeastiaryPreviewSheet {
 ///    `animate_beastiary_previews` system cycles frames. The global
 ///    `animate_character_spritesheet_animations` only runs in
 ///    `GameState::Main`, so we can't reuse it here.
-/// 2. **Aseprite mobs** (Bull, BigCactus, SmallCactus, StoneGolem, RedMushling):
+/// 2. **Aseprite mobs** (Bull, cacti, Lizard, VoidCrawler, StoneGolem, RedMushling):
 ///    spawn `AsepriteBundle` with the matching walk tag. `bevy_aseprite`'s
 ///    plugin advances animations every frame in every `GameState`.
 fn spawn_mob_preview(

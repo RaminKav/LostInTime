@@ -98,7 +98,8 @@ use crate::ui::damage_numbers::{
     handle_clamp_screen_locked_icons_worldpos, BeaconGuidanceRegistry,
 };
 use crate::ui::global_text_message::{
-    handle_global_text_message_events, tick_global_text_messages, GlobalTextMessageEvent,
+    handle_global_text_message_events, show_run_start_era_announcement,
+    tick_global_text_messages, GlobalTextMessageEvent,
 };
 pub use achievements_ui::*;
 
@@ -734,6 +735,10 @@ impl Plugin for UIPlugin {
                     .in_set(OnUpdate(GameState::Main)),
             )
             .add_systems((
+                show_run_start_era_announcement
+                    .run_if(in_state(GameState::Main))
+                    .run_if(resource_exists::<global_text_message::PendingRunStartEraAnnouncement>())
+                    .before(handle_global_text_message_events),
                 handle_queued_floating_texts
                     .run_if(in_state(GameState::Main).or_else(in_state(GameState::BlessingChoice))),
                 tick_damage_numbers
@@ -1038,7 +1043,7 @@ impl Plugin for UIPlugin {
             .add_systems(
                 (
                     player_hud::sync_consumable_buff_hud,
-                    player_hud::sync_heirloom_hud_visibility,
+                    player_hud::sync_heirloom_hud_depth,
                     player_hud::tick_consumable_buff_hud_overlays.run_if(is_not_paused),
                     handle_heirloom_hud_tooltip,
                     player_hud::handle_consumable_buff_hud_tooltip,
@@ -1056,8 +1061,13 @@ impl Plugin for UIPlugin {
                     .run_if(in_state(GameState::Main))
                     .in_base_set(CoreSet::PostUpdate),
             )
-            .add_system(
-                handle_heirloom_hud_tooltip.in_set(OnUpdate(GameState::GameOver)),
+            .add_systems(
+                (
+                    handle_heirloom_hud_tooltip,
+                    player_hud::sync_heirloom_hud_depth,
+                    process_heirloom_tooltip_requests,
+                )
+                    .in_set(OnUpdate(GameState::GameOver)),
             )
             .add_system(
                 player_hud::hide_xp_bar_in_game_over.in_set(OnUpdate(GameState::Main)),

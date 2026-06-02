@@ -66,9 +66,11 @@ pub const BEASTIARY_MOBS: &[(WorldObject, Mob)] = &[
     (WorldObject::SpikeSlimeCard, Mob::SpikeSlime),
     (WorldObject::StingflyCard, Mob::StingFly),
     (WorldObject::RedMushlingCard, Mob::RedMushling),
+    (WorldObject::LizardCard, Mob::Lizard),
     (WorldObject::SmallCactusCard, Mob::SmallCactus),
     (WorldObject::LargeCactusCard, Mob::BigCactus),
     (WorldObject::BullCard, Mob::Bull),
+    (WorldObject::VoidCrawlerCard, Mob::VoidCrawler),
     (WorldObject::StoneGolemCard, Mob::StoneGolem),
 ];
 

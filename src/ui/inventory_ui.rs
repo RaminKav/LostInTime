@@ -2429,6 +2429,9 @@ pub fn handle_cursor_inventory_craft_toggle_button(
     mut inv: Query<&mut Inventory>,
     mut inv_slots: Query<&mut InventorySlotState>,
     proto: ProtoParam,
+    mut tutorial_popup_events: EventWriter<crate::ui::tutorial_ui::TutorialPopupEvent>,
+    seen_tutorial_chunks: Option<Res<crate::ui::tutorial_ui::SeenTutorialChunks>>,
+    tutorial_ui: Query<(), With<crate::ui::tutorial_ui::TutorialUI>>,
 ) {
     let hit_test = super::ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
@@ -2454,6 +2457,13 @@ pub fn handle_cursor_inventory_craft_toggle_button(
                         {
                             if let Ok(mut inv) = inv.get_single_mut() {
                                 try_auto_equip_from_upgrade_slot(&mut inv, &proto, &mut inv_slots);
+                            }
+                            if let Some(seen_tutorial_chunks) = seen_tutorial_chunks.as_ref() {
+                                crate::ui::tutorial_ui::try_craft_button_tutorial(
+                                    &mut tutorial_popup_events,
+                                    seen_tutorial_chunks,
+                                    &tutorial_ui,
+                                );
                             }
                         }
                         next_ui_state.set(target);

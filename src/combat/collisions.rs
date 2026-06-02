@@ -5,14 +5,6 @@ use crate::combat::LifestealEvent;
 use crate::player::combat_heirlooms::ThornsOnDamageTracker;
 use crate::player::skill_heirlooms::{handle_fire_pillar_hit_clear, handle_laser_beam_hit_clear};
 use crate::player::skills::{Heirloom, PlayerSkills};
-use crate::{
-    attributes::ItemRarity,
-    player::beastiary::mob_display_name,
-    ui::{
-        damage_numbers::FloatingTextQueue,
-        global_text_message::GlobalTextMessageEvent,
-    },
-};
 use crate::NO_XP;
 use crate::{
     animations::{player_sprite::PlayerAnimation, ui_animaitons::UIIconMover},
@@ -43,6 +35,11 @@ use crate::{
     proto::proto_param::ProtoParam,
     ui::{damage_numbers::DodgeEvent, item_chest::ItemChestState, FlashExpBarEvent},
     CustomFlush, GameParam, GameState, Player, ScreenResolution,
+};
+use crate::{
+    attributes::ItemRarity,
+    player::beastiary::mob_display_name,
+    ui::{damage_numbers::FloatingTextQueue, global_text_message::GlobalTextMessageEvent},
 };
 use bevy::prelude::*;
 use bevy_rapier2d::prelude::{Collider, CollisionEvent, RapierContext};
@@ -808,7 +805,8 @@ pub fn check_item_drop_collisions(
                     format!("{} Card Obtained!", mob_display_name(&mob)),
                     text_color,
                 )
-                .with_icon(obj),
+                .with_icon(obj)
+                .with_panel_width(440.0),
             );
             continue;
         }

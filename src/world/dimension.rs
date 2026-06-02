@@ -7,8 +7,9 @@ use crate::{
     attributes::AttributeChangeEvent,
     bounce::DesertTornado,
     chaos::EraTransitionState,
+    colors::{DESERT_TILE, SNOW_TILE},
     enemy::{spawner::MobSpawningPaused, Mob},
-    item::{Equipment, ItemDrop},
+    item::{Equipment, ItemDrop, WorldObject},
     night::NightTracker,
     player::{MovePlayerEvent, Player},
     world::{
@@ -123,6 +124,25 @@ impl Era {
             Era::Second => 8.0, // era2: slightly harder (+3 over previous 10)
             Era::Third => 22.0, // era3: +10 over previous 20
             Era::DungeonMain => 1.0,
+        }
+    }
+
+    /// Title shown at run start; matches overworld era progression.
+    pub fn run_start_announcement_label(&self) -> Option<&'static str> {
+        match self {
+            Era::Main => Some("Forest Era"),
+            Era::Second => Some("Desert Era"),
+            Era::Third => Some("Snow Era"),
+            Era::DungeonMain => None,
+        }
+    }
+
+    /// Grass-tile minimap fill for this era (see [`crate::ui::minimap`]).
+    pub fn minimap_grass_background_color(&self) -> Color {
+        match self {
+            Era::Main | Era::DungeonMain => WorldObject::GrassTile.get_obj_color(),
+            Era::Second => DESERT_TILE,
+            Era::Third => SNOW_TILE,
         }
     }
 }

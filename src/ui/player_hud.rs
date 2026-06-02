@@ -16,7 +16,7 @@ use super::{
     tooltips::ConsumableBuffHudTooltip,
     ui_helpers::{
         spawn_hud_label_badge, spawn_keybind_badge, Z_DEPTH_HUD_ACTIVE_SKILLS,
-        Z_DEPTH_HUD_HEIRLOOM_ICONS,
+        Z_DEPTH_HUD_HEIRLOOM_ICONS, Z_DEPTH_HUD_HEIRLOOM_ICONS_FOREGROUND,
     },
     InventorySlotState, InventorySlotType, InventoryState, InventoryUI, UIElement, UIState,
     CURRENCY_BACKGROUND_SIZE, HUD_ACTION_ROW_Y_FROM_BOTTOM, HUD_ERA_TIMER_ENDLESS_WIDTH,
@@ -3548,29 +3548,19 @@ pub fn spawn_pet_skill_tooltip_content(
     }
 }
 
-/// Hide the HUD heirloom row whenever an inventory-style menu is open so the inventory panel and
-/// its overlay visually sit on top of (i.e. fully cover) the heirloom icons.
-pub fn sync_heirloom_hud_visibility(
-    ui_state: Res<State<UIState>>,
-    mut icons: Query<&mut Visibility, With<SkillHudIcon>>,
+/// Keep HUD heirloom icons below modal overlays during play, but above the game-over fade.
+pub fn sync_heirloom_hud_depth(
+    game_state: Res<State<GameState>>,
+    mut icons: Query<&mut Transform, With<SkillHudIcon>>,
 ) {
-    let hide = matches!(
-        ui_state.0,
-        UIState::Inventory
-            | UIState::InventoryCrafting
-            | UIState::Chest
-            | UIState::Scrapper
-            | UIState::Crafting
-            | UIState::Furnace
-    );
-    for mut vis in icons.iter_mut() {
-        let target = if hide {
-            Visibility::Hidden
-        } else {
-            Visibility::Inherited
-        };
-        if *vis != target {
-            *vis = target;
+    let target_z = if game_state.0 == GameState::GameOver {
+        Z_DEPTH_HUD_HEIRLOOM_ICONS_FOREGROUND
+    } else {
+        Z_DEPTH_HUD_HEIRLOOM_ICONS
+    };
+    for mut transform in icons.iter_mut() {
+        if transform.translation.z != target_z {
+            transform.translation.z = target_z;
         }
     }
 }

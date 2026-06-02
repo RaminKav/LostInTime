@@ -707,9 +707,11 @@ pub enum WorldObject {
     SpikeSlimeCard,
     StingflyCard,
     RedMushlingCard,
+    LizardCard,
     SmallCactusCard,
     LargeCactusCard,
     BullCard,
+    VoidCrawlerCard,
     StoneGolemCard,
 }
 

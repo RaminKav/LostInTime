@@ -3,22 +3,15 @@ use bevy_proto::prelude::ProtoCommands;
 use rand::Rng;
 
 use crate::{
-    colors::RED,
+    colors::{LIGHT_RED, RED},
     custom_commands::CommandsExt,
     enemy::Mob,
     inventory::ItemStack,
     juice::{FlashEffect, ShakeEffect},
     player::{ModifyCurencyEvent, Player},
     proto::proto_param::ProtoParam,
-    ui::{
-        global_text_message::GlobalTextMessageEvent,
-        key_input_guide::InteractionGuideTrigger,
-    },
-    world::{
-        dimension::Era,
-        dungeon::Dungeon,
-        world_helpers::tile_pos_to_world_pos,
-    },
+    ui::{global_text_message::GlobalTextMessageEvent, key_input_guide::InteractionGuideTrigger},
+    world::{dimension::Era, dungeon::Dungeon, world_helpers::tile_pos_to_world_pos},
     GameParam, InputMappings, TextureCamera,
 };
 
@@ -124,7 +117,8 @@ pub fn handle_pay_shrine_cost(
                 delta: -cost,
                 obj: WorldObject::Coin,
             });
-            global_text_events.send(GlobalTextMessageEvent::new("WARNING!", RED));
+            global_text_events
+                .send(GlobalTextMessageEvent::new("WARNING!", LIGHT_RED).with_panel_width(164.0));
             let summon_index = summon_tracker.summon_count;
             summon_tracker.summon_count += 1;
             commands.insert_resource(DelayedSpawn {
