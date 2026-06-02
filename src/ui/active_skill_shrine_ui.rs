@@ -7,7 +7,7 @@ use crate::{
         MaxHealth, MaxMana, ProjectileSize, SkillPower, Speed,
     },
     blessings::OwnedBlessings,
-    colors::DARK_WOOD_BROWN,
+    colors::WHITE,
     item::active_skill_shrine::{ActiveSkillShrineOverwrite, ActiveSkillShrineSelection},
     player::{
         skills::{
@@ -16,6 +16,7 @@ use crate::{
         },
         Player,
     },
+    ui::ui_helpers::spawn_full_screen_ui_overlay_tuned,
     ScreenResolution,
 };
 
@@ -59,7 +60,7 @@ pub fn setup_active_skill_shrine_ui(
         With<Player>,
     >,
 ) {
-    let shrine_overlay = spawn_full_screen_ui_overlay(&mut commands, &res, 0.9, 9.);
+    let shrine_overlay = spawn_full_screen_ui_overlay_tuned(&mut commands, &res, 0.0, 0.95, 9.);
     commands
         .entity(shrine_overlay)
         .insert(UIState::ActiveSkillShrine);
@@ -71,7 +72,7 @@ pub fn setup_active_skill_shrine_ui(
                     TextStyle {
                         font: asset_server.load("fonts/alagard.ttf"),
                         font_size: 30.0,
-                        color: DARK_WOOD_BROWN,
+                        color: WHITE,
                     },
                 ),
                 transform: Transform {
@@ -93,7 +94,7 @@ pub fn setup_active_skill_shrine_ui(
                     TextStyle {
                         font: asset_server.load("fonts/alagard.ttf"),
                         font_size: 15.0,
-                        color: DARK_WOOD_BROWN,
+                        color: WHITE,
                     },
                 ),
                 transform: Transform {
@@ -317,7 +318,7 @@ pub fn setup_active_skill_shrine_overwrite_ui(
         With<Player>,
     >,
 ) {
-    let overwrite_overlay = spawn_full_screen_ui_overlay(&mut commands, &res, 0.9, 9.);
+    let overwrite_overlay = spawn_full_screen_ui_overlay_tuned(&mut commands, &res, 0.0, 0.95, 9.);
     commands
         .entity(overwrite_overlay)
         .insert(UIState::ActiveSkills);
@@ -329,7 +330,7 @@ pub fn setup_active_skill_shrine_overwrite_ui(
                     TextStyle {
                         font: asset_server.load("fonts/alagard.ttf"),
                         font_size: 30.0,
-                        color: DARK_WOOD_BROWN,
+                        color: WHITE,
                     },
                 ),
                 transform: Transform {

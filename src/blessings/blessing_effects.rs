@@ -155,7 +155,12 @@ pub fn handle_blessing_selected(
     mut blessings: Query<&mut OwnedBlessings>,
     mut blessing_item_rewards: ResMut<BlessingItemRewards>,
     heirloom_queue: Res<HeirloomChoiceQueue>,
-    mut player: Query<(Entity, &mut PlayerSkills, &GlobalTransform)>,
+    mut player: Query<(
+        Entity,
+        &mut PlayerSkills,
+        &GlobalTransform,
+        &crate::player::levels::PlayerLevel,
+    )>,
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     mut blessing_transition_state: ResMut<BlessingTransitionState>,
@@ -164,7 +169,9 @@ pub fn handle_blessing_selected(
         let mut blessings = blessings.get_single_mut().unwrap();
         blessings.add_blessing(event.blessing);
         let mut rng = rand::thread_rng();
-        let (player_entity, mut player_skills, player_transform) = player.get_single_mut().unwrap();
+        let (player_entity, mut player_skills, player_transform, player_level) =
+            player.get_single_mut().unwrap();
+        let player_level = player_level.level;
         match event.blessing {
             Blessing::OrbsAndTomes => {
                 for _ in 0..5 {
@@ -196,7 +203,12 @@ pub fn handle_blessing_selected(
                 };
                 for _ in 0..count {
                     if let Some(picked_rare_heirloom) =
-                        heirloom_queue.get_skill_of_rarity(rarity.clone(), &mut rng, &|_| true)
+                        heirloom_queue.get_skill_of_rarity(
+                            rarity.clone(),
+                            &mut rng,
+                            player_level,
+                            &|_| true,
+                        )
                     {
                         let heirloom_with_rarity = HeirloomWithRarity {
                             heirloom: picked_rare_heirloom.heirloom.clone(),

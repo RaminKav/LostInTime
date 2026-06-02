@@ -1,20 +1,153 @@
-use bevy::{prelude::*, render::view::RenderLayers};
+use bevy::{
+    prelude::*,
+    reflect::TypeUuid,
+    render::{
+        mesh::MeshVertexBufferLayout,
+        render_resource::{
+            AsBindGroup, BlendComponent, BlendFactor, BlendOperation, BlendState,
+            RenderPipelineDescriptor, ShaderRef, SpecializedMeshPipelineError,
+        },
+    },
+    sprite::{Material2d, Material2dKey, Material2dPlugin, MaterialMesh2dBundle, Mesh2dHandle},
+};
 use serde::{Deserialize, Serialize};
 
 use crate::{
     audio::{BGMPicker, UpdateBGMTrackEvent},
     chaos::ChaosTracker,
     client::is_not_paused,
-    colors::{overwrite_alpha, NIGHT},
     enemy::spawner::MobSpawningPaused,
+    player::Player,
     run_once_per_run,
-    ui::{layout_sync::UiLayoutKey, ui_helpers::night_overlay_size},
     world::dimension::EraManager,
-    GameState, ScreenResolution,
+    GameState, ScreenResolution, TextureCamera,
 };
 
 #[derive(Component)]
 pub struct Night(Timer);
+
+impl Night {
+    /// Progress through the current in-game hour (0–1). Used for smooth overlay visuals only.
+    #[inline]
+    pub fn hour_progress(&self) -> f32 {
+        self.0.percent().clamp(0.0, 1.0)
+    }
+}
+
+/// Marker for the full-screen night overlay mesh entity.
+#[derive(Component)]
+pub struct NightOverlay;
+
+/// Desired world-space z for the overlay. Gameplay sprites sit in ~0..900 via [`YSort`]; the
+/// camera far plane is 1000. We target just under that so the tint draws above everything.
+const NIGHT_OVERLAY_WORLD_Z: f32 = 999.0;
+/// A few world units of overscan so the darkened edge sits just off-screen with no seam.
+const NIGHT_OVERLAY_OVERSCAN: f32 = 4.0;
+/// Radius (in uv units) of the clear bubble kept around the player at night.
+const NIGHT_BUBBLE_RADIUS: f32 = 0.65;
+/// How soft the edge of the player bubble is (0 = hard ring, 1 = fully gradual).
+const NIGHT_BUBBLE_SOFTNESS: f32 = 0.85;
+/// How much extra darkening is layered toward the screen edges (vignette).
+const NIGHT_EDGE_BOOST: f32 = 0.35;
+/// Shader tint saturation (< 1 desaturates, 1 = as-authored).
+const TINT_SATURATION: f32 = 0.94;
+
+/// Hour when night BGM / mob-spawn night begins — keep in sync with [`NightTracker::is_night`].
+pub const NIGHT_PERIOD_START_HOUR: f32 = 15.0;
+/// Hour when night BGM ends.
+pub const NIGHT_PERIOD_END_HOUR: f32 = 18.0;
+/// How many in-game hours before night music the overlay begins fading in.
+const NIGHT_OVERLAY_LEADUP: f32 = 4.0;
+/// Overlay fade-in starts here (11) and finishes at [`NIGHT_PERIOD_START_HOUR`] (15).
+const NIGHT_FADE_IN_START: f32 = NIGHT_PERIOD_START_HOUR - NIGHT_OVERLAY_LEADUP;
+const NIGHT_FADE_IN_DURATION: f32 = NIGHT_OVERLAY_LEADUP;
+/// Overlay begins fading out when night music ends.
+const NIGHT_FADE_OUT_START: f32 = NIGHT_PERIOD_END_HOUR;
+/// Length of the dusk fade-out after night (intensity + tint fade together).
+const NIGHT_FADE_OUT_DURATION: f32 = 4.0;
+
+/// Muted sunset warmth.
+pub const DUSK_AMBER: Color = Color::rgb(0.38, 0.20, 0.12);
+/// Muted twilight purple.
+pub const TWILIGHT_PURPLE: Color = Color::rgb(0.26, 0.13, 0.24);
+/// Warm moonlit plum (less cool-blue than a straight indigo).
+pub const NIGHT_PLUM: Color = Color::rgb(0.18, 0.09, 0.22);
+/// Neutral warm shadow — fade-out target as the overlay disappears.
+const DAY_NEUTRAL: Color = Color::rgb(0.16, 0.13, 0.11);
+
+#[inline]
+fn lerp_color(a: Color, b: Color, t: f32) -> Color {
+    let t = t.clamp(0.0, 1.0);
+    Color::rgb(
+        a.r() + (b.r() - a.r()) * t,
+        a.g() + (b.g() - a.g()) * t,
+        a.b() + (b.b() - a.b()) * t,
+    )
+}
+
+#[inline]
+fn smoothstep01(t: f32) -> f32 {
+    let t = t.clamp(0.0, 1.0);
+    t * t * (3.0 - 2.0 * t)
+}
+
+#[inline]
+fn smooth_lerp_color(a: Color, b: Color, t: f32) -> Color {
+    lerp_color(a, b, smoothstep01(t))
+}
+
+/// Linear RGB + saturation boost packed for the night overlay shader.
+#[inline]
+fn night_overlay_color_uniform(color: Color) -> Vec4 {
+    let [r, g, b, _] = color.as_linear_rgba_f32();
+    Vec4::new(r, g, b, TINT_SATURATION)
+}
+
+const NIGHT_OVERLAY_BLEND: BlendState = BlendState {
+    color: BlendComponent {
+        src_factor: BlendFactor::SrcAlpha,
+        dst_factor: BlendFactor::OneMinusSrcAlpha,
+        operation: BlendOperation::Add,
+    },
+    alpha: BlendComponent {
+        src_factor: BlendFactor::One,
+        dst_factor: BlendFactor::OneMinusSrcAlpha,
+        operation: BlendOperation::Add,
+    },
+};
+
+/// Full-screen night overlay: time-of-day tint with a clear bubble around the player.
+/// `params`: x = intensity, y = bubble radius (uv), z = bubble softness, w = edge boost.
+/// `player_uv`: xy = player position in quad-uv space, z = aspect ratio (w/h).
+#[derive(AsBindGroup, TypeUuid, Debug, Clone)]
+#[uuid = "0c0f6b2a-6d3e-4a7b-9c5e-2f8a1d4b6e30"]
+pub struct NightOverlayMaterial {
+    #[uniform(0)]
+    pub params: Vec4,
+    #[uniform(1)]
+    pub tint: Vec4,
+    #[uniform(2)]
+    pub player_uv: Vec4,
+}
+
+impl Material2d for NightOverlayMaterial {
+    fn fragment_shader() -> ShaderRef {
+        "shaders/night_overlay.wgsl".into()
+    }
+
+    fn specialize(
+        descriptor: &mut RenderPipelineDescriptor,
+        _layout: &MeshVertexBufferLayout,
+        _key: Material2dKey<Self>,
+    ) -> Result<(), SpecializedMeshPipelineError> {
+        if let Some(fragment) = &mut descriptor.fragment {
+            if let Some(target_state) = &mut fragment.targets[0] {
+                target_state.blend = Some(NIGHT_OVERLAY_BLEND);
+            }
+        }
+        Ok(())
+    }
+}
 
 /// Resource to track infinite mode state (activated after defeating Era 3 boss or era timer expiration)
 #[derive(Default, Resource, Clone, Debug)]
@@ -199,22 +332,95 @@ pub struct NightTracker {
     pub time: f32,
 }
 impl NightTracker {
-    pub fn get_alpha(&self) -> f32 {
-        if self.time < 6. {
-            0.
-        } else if self.time >= 6. && self.time <= 14. {
-            return (self.time - 6.) * 0.09833333;
+    /// Peak overlay strength during full night.
+    const PEAK_OVERLAY_INTENSITY: f32 = 0.8;
+
+    #[inline]
+    fn overlay_fade_in(t: f32) -> f32 {
+        if t < NIGHT_FADE_IN_START {
+            0.0
+        } else if t < NIGHT_FADE_IN_START + NIGHT_FADE_IN_DURATION {
+            smoothstep01((t - NIGHT_FADE_IN_START) / NIGHT_FADE_IN_DURATION)
         } else {
-            return 0.8 - (self.time - 14.) * 0.11666666;
+            1.0
         }
     }
+
+    #[inline]
+    fn overlay_fade_out(t: f32) -> f32 {
+        if t < NIGHT_FADE_OUT_START {
+            1.0
+        } else if t >= NIGHT_FADE_OUT_START + NIGHT_FADE_OUT_DURATION {
+            0.0
+        } else {
+            1.0 - smoothstep01((t - NIGHT_FADE_OUT_START) / NIGHT_FADE_OUT_DURATION)
+        }
+    }
+
+    pub fn get_alpha(&self) -> f32 {
+        self.get_overlay_intensity()
+    }
+
+    /// Overlay darkness at fractional time `t` (0–24). Use [`Self::visual_time`] for smooth visuals.
+    pub fn get_overlay_intensity_at(&self, t: f32) -> f32 {
+        Self::PEAK_OVERLAY_INTENSITY * Self::overlay_fade_in(t) * Self::overlay_fade_out(t)
+    }
+
+    /// Overlay darkness: fade-in (11–15), peak during night music (15–18), fade-out (18–22).
+    pub fn get_overlay_intensity(&self) -> f32 {
+        self.get_overlay_intensity_at(self.time)
+    }
+
     /// Returns the alpha for infinite mode (always dark)
     pub fn get_infinite_mode_alpha(&self) -> f32 {
-        0.8 // Always full night darkness
+        Self::PEAK_OVERLAY_INTENSITY
+    }
+
+    /// Fractional time-of-day for overlay visuals only. Gameplay still uses whole-hour [`Self::time`].
+    pub fn visual_time(&self, hour_progress: f32) -> f32 {
+        (self.time + hour_progress.clamp(0.0, 1.0)).min(24.0)
+    }
+
+    /// Overlay tint at fractional time `t` (0–24).
+    pub fn get_tint_at(&self, t: f32) -> Color {
+        if t < NIGHT_FADE_IN_START {
+            return DAY_NEUTRAL;
+        }
+
+        let leadup_half = NIGHT_FADE_IN_DURATION * 0.5;
+
+        if t < NIGHT_FADE_IN_START + leadup_half {
+            smooth_lerp_color(
+                DUSK_AMBER,
+                TWILIGHT_PURPLE,
+                (t - NIGHT_FADE_IN_START) / leadup_half,
+            )
+        } else if t < NIGHT_PERIOD_START_HOUR {
+            smooth_lerp_color(
+                TWILIGHT_PURPLE,
+                NIGHT_PLUM,
+                (t - (NIGHT_FADE_IN_START + leadup_half)) / leadup_half,
+            )
+        } else if t < NIGHT_FADE_OUT_START {
+            NIGHT_PLUM
+        } else if t < NIGHT_FADE_OUT_START + NIGHT_FADE_OUT_DURATION {
+            let u = smoothstep01((t - NIGHT_FADE_OUT_START) / NIGHT_FADE_OUT_DURATION);
+            if u < 0.5 {
+                smooth_lerp_color(NIGHT_PLUM, TWILIGHT_PURPLE, u / 0.5)
+            } else {
+                smooth_lerp_color(TWILIGHT_PURPLE, DAY_NEUTRAL, (u - 0.5) / 0.5)
+            }
+        } else {
+            DAY_NEUTRAL
+        }
+    }
+
+    /// Time-of-day overlay tint; fade-out (18–22) shifts hue and dims in sync with intensity.
+    pub fn get_tint(&self) -> Color {
+        self.get_tint_at(self.time)
     }
     pub fn is_night(&self) -> bool {
-        // 12am to 6am ->
-        self.time >= 15. && self.time <= 18.
+        self.time >= NIGHT_PERIOD_START_HOUR && self.time <= NIGHT_PERIOD_END_HOUR
     }
     pub fn is_start_of_new_day(&self) -> bool {
         self.time == 0.
@@ -232,6 +438,7 @@ pub struct NewDayEvent;
 impl Plugin for NightPlugin {
     fn build(&self, app: &mut App) {
         app.register_type::<NightTracker>()
+            .add_plugin(Material2dPlugin::<NightOverlayMaterial>::default())
             .add_event::<NewDayEvent>()
             .add_event::<InfiniteModeStartedEvent>()
             .add_event::<EraTimerExpiredEvent>()
@@ -247,7 +454,7 @@ impl Plugin for NightPlugin {
             .add_system(reset_era_timer_on_new_run.in_schedule(OnEnter(GameState::MainMenu)))
             .add_systems(
                 (
-                    sync_night_overlay_size.after(crate::update_pixel_perfect_viewport),
+                    update_night_overlay,
                     sync_night_overlay_on_tracker_change,
                     tick_night_color.run_if(is_not_paused),
                     handle_infinite_mode_started,
@@ -269,65 +476,146 @@ pub struct EraTimerExpiredEvent;
 pub fn spawn_night(
     mut commands: Commands,
     night_tracker: Res<NightTracker>,
+    infinite_mode: Res<InfiniteMode>,
     res: Res<ScreenResolution>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<NightOverlayMaterial>>,
+    player: Query<Entity, With<Player>>,
 ) {
     info!("Spawning night overlay");
-    commands
-        .spawn(SpriteBundle {
-            sprite: Sprite {
-                color: overwrite_alpha(NIGHT, night_tracker.get_alpha()),
-                custom_size: Some(night_overlay_size(&res)),
+
+    let (intensity, tint) = if infinite_mode.active {
+        (night_tracker.get_infinite_mode_alpha(), NIGHT_PLUM)
+    } else {
+        (
+            night_tracker.get_overlay_intensity(),
+            night_tracker.get_tint(),
+        )
+    };
+    let aspect = res.world_view_width / res.world_view_height.max(1.0);
+
+    let material = materials.add(NightOverlayMaterial {
+        params: Vec4::new(
+            intensity,
+            NIGHT_BUBBLE_RADIUS,
+            NIGHT_BUBBLE_SOFTNESS,
+            NIGHT_EDGE_BOOST,
+        ),
+        tint: night_overlay_color_uniform(tint),
+        player_uv: Vec4::new(0.5, 0.5, aspect, 0.0),
+    });
+
+    // Unit quad scaled to the camera view each frame, so UVs stay 0..1 regardless of zoom.
+    let mesh = Mesh2dHandle::from(meshes.add(Mesh::from(shape::Quad {
+        size: Vec2::ONE,
+        ..default()
+    })));
+
+    let overlay = commands
+        .spawn((
+            MaterialMesh2dBundle {
+                mesh,
+                material,
+                transform: Transform {
+                    scale: Vec3::new(
+                        res.world_view_width + NIGHT_OVERLAY_OVERSCAN,
+                        res.world_view_height + NIGHT_OVERLAY_OVERSCAN,
+                        1.0,
+                    ),
+                    ..default()
+                },
                 ..default()
             },
-            transform: Transform {
-                translation: Vec3::new(0., 0., 1.),
-                scale: Vec3::new(1., 1., 1.),
-                ..Default::default()
-            },
-            ..default()
-        })
-        .insert(RenderLayers::from_layers(&[3]))
-        .insert(Night(Timer::from_seconds(9.5, TimerMode::Repeating)))
-        .insert(Name::new("night"));
+            NightOverlay,
+            Night(Timer::from_seconds(9.5, TimerMode::Repeating)),
+            Name::new("night"),
+        ))
+        .id();
+
+    // Parent to the player so the overlay follows the run; [`update_night_overlay`] offsets it
+    // to the camera centre and compensates z so it stays just under the far plane.
+    if let Ok(player_e) = player.get_single() {
+        commands.entity(player_e).add_child(overlay);
+    } else {
+        warn!("Night overlay spawned without a player parent — overlay may not render correctly");
+    }
 }
 
-/// Resizes the night sprite when the UI camera bucket changes. Modal overlays get the correct
-/// size because they are spawned when opened; the night overlay is spawned once per run.
-fn sync_night_overlay_size(
-    resolution: Res<ScreenResolution>,
-    mut night_sprites: Query<&mut Sprite, With<Night>>,
-    mut last_layout: Local<Option<UiLayoutKey>>,
+/// Drives the night overlay material each frame: time-of-day tint, darkness intensity, the
+/// player-centred clear bubble, and quad sizing/position to match the (zoom-dependent) camera view.
+fn update_night_overlay(
+    night_tracker: Res<NightTracker>,
+    infinite_mode: Res<InfiniteMode>,
+    res: Res<ScreenResolution>,
+    mut materials: ResMut<Assets<NightOverlayMaterial>>,
+    mut night_query: Query<
+        (&Handle<NightOverlayMaterial>, &mut Transform, &Night),
+        (With<NightOverlay>, With<Night>),
+    >,
+    camera_query: Query<&GlobalTransform, (With<TextureCamera>, Without<NightOverlay>)>,
+    player_query: Query<&GlobalTransform, (With<Player>, Without<NightOverlay>)>,
 ) {
-    let key = UiLayoutKey::from_resolution(&resolution);
-    if last_layout.as_ref() == Some(&key) {
-        return;
-    }
-    *last_layout = Some(key);
-    let size = night_overlay_size(&resolution);
-    for mut sprite in night_sprites.iter_mut() {
-        sprite.custom_size = Some(size);
+    let hour_progress = night_query
+        .iter()
+        .next()
+        .map(|(_, _, night)| night.hour_progress())
+        .unwrap_or(0.0);
+    let visual_time = night_tracker.visual_time(hour_progress);
+
+    let (intensity, tint) = if infinite_mode.active {
+        (night_tracker.get_infinite_mode_alpha(), NIGHT_PLUM)
+    } else {
+        (
+            night_tracker.get_overlay_intensity_at(visual_time),
+            night_tracker.get_tint_at(visual_time),
+        )
+    };
+    let aspect = res.world_view_width / res.world_view_height.max(1.0);
+
+    let (player_uv, camera_offset, player_world_z) =
+        match (camera_query.get_single(), player_query.get_single()) {
+            (Ok(cam), Ok(player)) => {
+                let cam = cam.translation();
+                let player = player.translation();
+                let dx = (player.x - cam.x) / res.world_view_width;
+                let dy = (player.y - cam.y) / res.world_view_height;
+                (
+                    Vec2::new(0.5 + dx, 0.5 - dy),
+                    Vec2::new(cam.x - player.x, cam.y - player.y),
+                    player.z,
+                )
+            }
+            _ => (Vec2::splat(0.5), Vec2::ZERO, 0.0),
+        };
+
+    for (handle, mut transform, _) in night_query.iter_mut() {
+        if let Some(material) = materials.get_mut(handle) {
+            material.params.x = intensity;
+            material.tint = night_overlay_color_uniform(tint);
+            material.player_uv = Vec4::new(player_uv.x, player_uv.y, aspect, 0.0);
+        }
+
+        // Centre the full-screen quad on the camera while parented to the player.
+        transform.translation.x = camera_offset.x;
+        transform.translation.y = camera_offset.y;
+        // YSort puts the player at z ≈ 0..900; a fixed local +800 would clip past the far
+        // plane (1000). Compensate each frame so the overlay stays just under it.
+        transform.translation.z = NIGHT_OVERLAY_WORLD_Z - player_world_z;
+        transform.scale.x = res.world_view_width + NIGHT_OVERLAY_OVERSCAN;
+        transform.scale.y = res.world_view_height + NIGHT_OVERLAY_OVERSCAN;
     }
 }
 
-/// Keeps the night overlay in sync when `NightTracker` is changed externally (e.g. era transition).
+/// Switches BGM when `NightTracker` is changed externally (e.g. era transition). Visuals are
+/// handled every frame by [`update_night_overlay`].
 fn sync_night_overlay_on_tracker_change(
     night_tracker: Res<NightTracker>,
     infinite_mode: Res<InfiniteMode>,
-    mut night_query: Query<&mut Sprite, With<Night>>,
     mut bgm_track_event: EventWriter<UpdateBGMTrackEvent>,
     bgm_tracker: Res<BGMPicker>,
 ) {
     if !night_tracker.is_changed() {
         return;
-    }
-
-    let alpha = if infinite_mode.active {
-        night_tracker.get_infinite_mode_alpha()
-    } else {
-        night_tracker.get_alpha()
-    };
-    for mut sprite in night_query.iter_mut() {
-        sprite.color = overwrite_alpha(NIGHT, alpha);
     }
 
     if infinite_mode.active {
@@ -346,7 +634,7 @@ fn sync_night_overlay_on_tracker_change(
 
 pub fn tick_night_color(
     time: Res<Time>,
-    mut query: Query<(&mut Night, &mut Sprite)>,
+    mut query: Query<&mut Night>,
     mut night_tracker: ResMut<NightTracker>,
     mut bgm_track_event: EventWriter<UpdateBGMTrackEvent>,
     bgm_tracker: Res<BGMPicker>,
@@ -358,9 +646,6 @@ pub fn tick_night_color(
 ) {
     // In infinite mode, keep it always night
     if infinite_mode.active {
-        for (_night_state, mut sprite) in query.iter_mut() {
-            sprite.color = overwrite_alpha(sprite.color, night_tracker.get_infinite_mode_alpha());
-        }
         // Always play night music in infinite mode
         if bgm_tracker.current_track != *"sounds/bgm_night.ogg" {
             bgm_track_event.send(UpdateBGMTrackEvent {
@@ -371,11 +656,10 @@ pub fn tick_night_color(
     }
 
     let mut music_changed = false;
-    for (mut night_state, mut sprite) in query.iter_mut() {
+    for mut night_state in query.iter_mut() {
         night_state.0.tick(time.delta());
         if night_state.0.finished() {
             night_tracker.time += 1.;
-            sprite.color = overwrite_alpha(sprite.color, night_tracker.get_alpha());
             if night_tracker.time == 24. {
                 night_tracker.days += 1;
                 chaos_tracker.add_chaos(1.);
@@ -594,7 +878,6 @@ fn transition_to_daytime_on_peaceful_mode(
     mut night_tracker: ResMut<NightTracker>,
     mut bgm_track_event: EventWriter<UpdateBGMTrackEvent>,
     infinite_mode: Res<InfiniteMode>,
-    mut night_query: Query<&mut Sprite, With<Night>>,
 ) {
     if infinite_mode.active {
         return;
@@ -606,10 +889,6 @@ fn transition_to_daytime_on_peaceful_mode(
             "Peaceful mode activated - transitioning to daytime (time: {})",
             night_tracker.time
         );
-
-        for mut sprite in night_query.iter_mut() {
-            sprite.color = overwrite_alpha(NIGHT, night_tracker.get_alpha());
-        }
 
         bgm_track_event.send(UpdateBGMTrackEvent {
             asset_path: "sounds/bgm_day.ogg".to_owned(),

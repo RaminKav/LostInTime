@@ -32,7 +32,8 @@ use crate::{
     },
     ui::{
         main_menu::GameStartFadein, options_ui::CheatSettings, spawn_back_button,
-        spawn_back_button_texture_only, MenuButton, UIElement, UIState,
+        spawn_back_button_texture_only, ui_helpers::spawn_full_screen_ui_overlay_tuned_colored,
+        MenuButton, UIElement, UIState,
     },
     world::{dimension::EraManager, portal::UIPortal},
     FairyPetSprite, Pet, RenderLayers, ScreenResolution, SlimePetSprite,
@@ -42,7 +43,7 @@ use super::{
     interactions::{Interactable, Interaction},
     inventory_ui::spawn_item_stack_icon,
     player_hud::spawn_skill_tooltip_content,
-    ui_helpers::{full_screen_overlay_size, spawn_full_screen_ui_overlay},
+    ui_helpers::full_screen_overlay_size,
 };
 
 const BODY_FONT: &str = "fonts/slkscr.ttf";
@@ -218,7 +219,15 @@ pub fn setup_class_selection_ui(
     _class_unlocks: Option<Res<ClassUnlockData>>,
     cheat_settings: Res<CheatSettings>,
 ) {
-    let overlay = spawn_full_screen_ui_overlay(&mut commands, &res, 1., 9.);
+    let overlay = spawn_full_screen_ui_overlay_tuned_colored(
+        &mut commands,
+        &res,
+        0.7,
+        0.99,
+        9.,
+        Color::rgba(3. / 255., 6. / 255., 6. / 255., 1.),
+        0.45,
+    );
 
     let currency_text = commands
         .spawn((
@@ -294,7 +303,7 @@ pub fn setup_class_selection_ui(
                 TextStyle {
                     font: asset_server.load("fonts/alagard.ttf"),
                     font_size: 30.0,
-                    color: DARK_WOOD_BROWN,
+                    color: WHITE,
                 },
             ),
             text_anchor: Anchor::Center,

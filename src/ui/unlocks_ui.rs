@@ -295,7 +295,7 @@ pub fn setup_unlocks_ui(
                 TextStyle {
                     font: asset_server.load("fonts/alagard.ttf"),
                     font_size: 30.0,
-                    color: crate::colors::YELLOW_2,
+                    color: crate::colors::WHITE,
                 },
             )
             .with_alignment(TextAlignment::Center),
@@ -391,7 +391,7 @@ fn spawn_unlock_row(
                 TextStyle {
                     font: asset_server.load("fonts/alagard.ttf"),
                     font_size: 15.0,
-                    color: crate::colors::DARK_WOOD_BROWN,
+                    color: crate::colors::WHITE,
                 },
             )
             .with_alignment(TextAlignment::Left),

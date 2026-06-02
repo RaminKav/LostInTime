@@ -108,12 +108,7 @@ pub fn setup_achievements_ui(
     pagination.page = 0;
 
     // Spawn overlay
-    let overlay = ui_helpers::spawn_full_screen_ui_overlay(
-        &mut commands,
-        &resolution,
-        0.9,
-        0.,
-    );
+    let overlay = ui_helpers::spawn_full_screen_ui_overlay(&mut commands, &resolution, 0.9, 0.);
     commands.entity(overlay).insert(AchievementsUI);
 
     // Title

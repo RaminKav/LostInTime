@@ -362,7 +362,7 @@ pub fn setup_item_chest_ui(
     //     .insert(UIState::Skills)
     //     .set_parent(title_sprite);
 
-    ui_helpers::spawn_full_screen_ui_overlay(&mut commands, &res, 0.8, 9.);
+    ui_helpers::spawn_full_screen_ui_overlay_tuned(&mut commands, &res, 0.0, 0.95, 9.);
 
     let ui_element = UIElement::ChestContainer;
 
@@ -799,6 +799,7 @@ pub fn handle_anim_events(
                             if let Some(picked_heirloom) = choices_queue.get_skill_of_rarity(
                                 target_rarity,
                                 &mut rng,
+                                game.get_player_level(),
                                 &|_| true, // No additional filter needed
                             ) {
                                 item_chest_state.picked_heirloom = Some(picked_heirloom);

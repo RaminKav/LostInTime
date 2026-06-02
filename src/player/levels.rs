@@ -83,7 +83,7 @@ pub fn handle_level_up(
             if player_level.level <= 50 {
                 let mut rng = rand::thread_rng();
                 let loot_bonus = player_atts.get_single().map(|a| a.0).unwrap_or(0);
-                skills_queue.add_new_skills_after_levelup(&mut rng, loot_bonus);
+                skills_queue.add_new_skills_after_levelup(&mut rng, loot_bonus, player_level.level);
                 next_inv_state.set(UIState::Skills);
             }
 

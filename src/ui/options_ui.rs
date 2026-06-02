@@ -364,7 +364,7 @@ pub fn update_keybind_text(
     for (key_text, mut text) in texts.iter_mut() {
         if waiting_binds.contains(&key_text.bind_type) {
             text.sections[0].value = "Press any key...".to_string();
-            text.sections[0].style.color = crate::colors::YELLOW_2;
+            text.sections[0].style.color = crate::colors::WHITE;
         } else {
             let key = match key_text.bind_type {
                 KeyBindType::ActiveSkill(slot) => keybinds.get_active_skill_key(slot),
@@ -384,6 +384,10 @@ pub fn cleanup_options_ui(
     query: Query<Entity, With<OptionsUI>>,
     popup: Query<Entity, With<WipeDataPopup>>,
 ) {
+    bevy::log::info!(
+        "[overlay] cleanup_options_ui despawning {} OptionsUI entities",
+        query.iter().count()
+    );
     for entity in query.iter() {
         commands.entity(entity).despawn_recursive();
     }
@@ -403,11 +407,25 @@ pub fn setup_options_ui(
     audio_volume: Res<AudioVolume>,
     display_scale: Res<DisplayScaleSettings>,
     auto_attack: Res<AutoAttackState>,
+    existing_options: Query<Entity, With<OptionsUI>>,
+    existing_popup: Query<Entity, With<WipeDataPopup>>,
 ) {
-    let overlay = ui_helpers::spawn_full_screen_ui_overlay(
+    // Idempotency guard: despawn any Options UI that's already present before rebuilding.
+    // `setup_options_ui` can fire twice for a single open (e.g. the first time its
+    // `resource_changed::<OptionsUiLayoutRevision>` run-condition is evaluated it reports a
+    // spurious change), which would otherwise stack two full UIs / overlays.
+    for entity in existing_options.iter() {
+        commands.entity(entity).despawn_recursive();
+    }
+    for entity in existing_popup.iter() {
+        commands.entity(entity).despawn_recursive();
+    }
+
+    let overlay = ui_helpers::spawn_full_screen_ui_overlay_tuned(
         &mut commands,
         &resolution,
-        1.,
+        0.88,
+        0.98,
         ui_helpers::Z_DEPTH_OPTIONS_OVERLAY,
     );
     commands
@@ -423,7 +441,7 @@ pub fn setup_options_ui(
                 TextStyle {
                     font: asset_server.load("fonts/alagard.ttf"),
                     font_size: 30.0,
-                    color: crate::colors::YELLOW_2,
+                    color: crate::colors::WHITE,
                 },
             )
             .with_alignment(TextAlignment::Center),
@@ -451,7 +469,7 @@ pub fn setup_options_ui(
                 TextStyle {
                     font: asset_server.load("fonts/alagard.ttf"),
                     font_size: 15.0,
-                    color: crate::colors::DARK_WOOD_BROWN,
+                    color: crate::colors::WHITE,
                 },
             )
             .with_alignment(TextAlignment::Left),
@@ -498,7 +516,7 @@ pub fn setup_options_ui(
                 TextStyle {
                     font: asset_server.load("fonts/alagard.ttf"),
                     font_size: 15.0,
-                    color: crate::colors::DARK_WOOD_BROWN,
+                    color: crate::colors::WHITE,
                 },
             )
             .with_alignment(TextAlignment::Left),
@@ -542,7 +560,7 @@ pub fn setup_options_ui(
                 TextStyle {
                     font: asset_server.load("fonts/alagard.ttf"),
                     font_size: 15.0,
-                    color: crate::colors::DARK_WOOD_BROWN,
+                    color: crate::colors::WHITE,
                 },
             )
             .with_alignment(TextAlignment::Left),
@@ -649,7 +667,7 @@ pub fn setup_options_ui(
                 TextStyle {
                     font: asset_server.load("fonts/alagard.ttf"),
                     font_size: 15.0,
-                    color: crate::colors::DARK_WOOD_BROWN,
+                    color: crate::colors::WHITE,
                 },
             )
             .with_alignment(TextAlignment::Left),
@@ -705,7 +723,7 @@ pub fn setup_options_ui(
                 TextStyle {
                     font: asset_server.load("fonts/alagard.ttf"),
                     font_size: 15.0,
-                    color: crate::colors::DARK_WOOD_BROWN,
+                    color: crate::colors::WHITE,
                 },
             )
             .with_alignment(TextAlignment::Left),
@@ -761,7 +779,7 @@ pub fn setup_options_ui(
                 TextStyle {
                     font: asset_server.load("fonts/alagard.ttf"),
                     font_size: 15.0,
-                    color: crate::colors::DARK_WOOD_BROWN,
+                    color: crate::colors::WHITE,
                 },
             )
             .with_alignment(TextAlignment::Left),
@@ -1113,7 +1131,7 @@ fn spawn_keybind_row(
                 TextStyle {
                     font: asset_server.load("fonts/4x5.ttf"),
                     font_size: 5.0,
-                    color: crate::colors::DARK_WOOD_BROWN,
+                    color: crate::colors::WHITE,
                 },
             )
             .with_alignment(TextAlignment::Left),
@@ -1213,7 +1231,7 @@ fn spawn_options_checkbox(
                 TextStyle {
                     font: asset_server.load("fonts/4x5.ttf"),
                     font_size: 5.0,
-                    color: crate::colors::DARK_WOOD_BROWN,
+                    color: crate::colors::WHITE,
                 },
             )
             .with_alignment(TextAlignment::Left),
@@ -1561,7 +1579,7 @@ fn spawn_volume_row(
                 TextStyle {
                     font: asset_server.load("fonts/4x5.ttf"),
                     font_size: 5.0,
-                    color: crate::colors::DARK_WOOD_BROWN,
+                    color: crate::colors::WHITE,
                 },
             )
             .with_alignment(TextAlignment::Left),
@@ -1634,7 +1652,7 @@ fn spawn_volume_row(
                 TextStyle {
                     font: asset_server.load("fonts/4x5.ttf"),
                     font_size: 5.0,
-                    color: crate::colors::YELLOW_2,
+                    color: crate::colors::WHITE,
                 },
             )
             .with_alignment(TextAlignment::Center),
@@ -1719,7 +1737,7 @@ fn spawn_scale_row(
                 TextStyle {
                     font: asset_server.load("fonts/4x5.ttf"),
                     font_size: 5.0,
-                    color: crate::colors::DARK_WOOD_BROWN,
+                    color: crate::colors::WHITE,
                 },
             )
             .with_alignment(TextAlignment::Left),
@@ -1790,7 +1808,7 @@ fn spawn_scale_row(
                 TextStyle {
                     font: asset_server.load("fonts/4x5.ttf"),
                     font_size: 5.0,
-                    color: crate::colors::YELLOW_2,
+                    color: crate::colors::WHITE,
                 },
             )
             .with_alignment(TextAlignment::Center),
@@ -1955,10 +1973,7 @@ pub fn handle_scale_button_click(
                         );
                         if before != after {
                             display_scale.save();
-                            commands.spawn(SoundSpawner::new(
-                                AudioSoundEffect::ButtonClick,
-                                0.2,
-                            ));
+                            commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.2));
                         }
                     }
                 }

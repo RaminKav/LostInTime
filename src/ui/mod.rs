@@ -156,7 +156,7 @@ pub fn inventory_panel_center_x(damage_tracker_visible: bool) -> f32 {
 }
 /// Pixel extent of the main item slot grid (4 columns × 7 rows).
 pub const INVENTORY_GRID_COLS: usize = 4;
-pub const SKILLS_CHOICE_UI_SIZE: Vec2 = Vec2::new(164., 191.);
+pub const SKILLS_CHOICE_UI_SIZE: Vec2 = Vec2::new(164., 192.);
 pub const ESSENCE_UI_SIZE: Vec2 = Vec2::new(157., 130.5);
 pub const TOOLTIP_UI_SIZE: Vec2 = Vec2::new(172., 312.);
 pub const CHEST_INVENTORY_UI_SIZE: Vec2 = Vec2::new(127., 142.);
@@ -551,6 +551,9 @@ impl Plugin for UIPlugin {
             .add_event::<GrantHeirloomDevEvent>()
             .add_event::<HeirloomTooltipRequest>()
             .add_plugin(Material2dPlugin::<ScreenEffectMaterial>::default())
+            .add_plugin(Material2dPlugin::<ui_helpers::RadialOverlayMaterial>::default())
+            .init_resource::<ui_helpers::RadialOverlayMeshCache>()
+            .init_resource::<ui_helpers::RadialOverlayMaterialCache>()
             .init_resource::<OptionsUiLayoutRevision>()
             .init_resource::<layout_sync::UiLayoutSyncState>()
             .add_plugin(hud_bar_fill::HudBarFillPlugin)
@@ -710,6 +713,7 @@ impl Plugin for UIPlugin {
                     .before(handle_screen_effects),
             )
             .add_system(handle_screen_effects.in_set(OnUpdate(GameState::Main)))
+            .add_system(ui_helpers::attach_radial_overlay_visuals.before(CustomFlush))
             .add_systems(
                 (
                     add_previous_health,

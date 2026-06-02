@@ -6,7 +6,7 @@ use rand::Rng;
 use crate::{
     assets::Graphics,
     attributes::{AttributeChangeEvent, LootRateBonus},
-    colors::DARK_WOOD_BROWN,
+    colors::{DARK_WOOD_BROWN, WHITE},
     custom_commands::CommandsExt,
     inventory::ItemStack,
     item::WorldObject,
@@ -17,7 +17,10 @@ use crate::{
         ModifyCurencyEvent, Player,
     },
     proto::proto_param::ProtoParam,
-    ui::{key_input_guide::InteractionGuideTrigger, minimap::UpdateMiniMapEvent},
+    ui::{
+        key_input_guide::InteractionGuideTrigger, minimap::UpdateMiniMapEvent,
+        ui_helpers::spawn_full_screen_ui_overlay_tuned,
+    },
     GameParam, ScreenResolution,
 };
 
@@ -169,7 +172,7 @@ pub fn setup_essence_ui(
         Vec2::new(3.5, 3.5),
     );
 
-    let overlay = spawn_full_screen_ui_overlay(&mut commands, &resolution, 0.8, -1.);
+    let overlay = spawn_full_screen_ui_overlay_tuned(&mut commands, &resolution, 0.0, 0.95, -1.);
     let _title_text = commands
         .spawn((
             Text2dBundle {
@@ -178,7 +181,7 @@ pub fn setup_essence_ui(
                     TextStyle {
                         font: asset_server.load("fonts/alagard.ttf"),
                         font_size: 30.0,
-                        color: DARK_WOOD_BROWN,
+                        color: WHITE,
                     },
                 ),
                 transform: Transform {
@@ -533,10 +536,13 @@ pub fn handle_populate_essence_shop_on_new_spawn(
 
             let already_chosen: Vec<Heirloom> =
                 shop_choices.iter().map(|o| o.heirloom.clone()).collect();
-            let picked_heirloom_choice =
-                heirloom_queue.get_skill_of_rarity(rarity.clone(), &mut rng, &|h| {
-                    !already_chosen.contains(&h.heirloom)
-                });
+            let shop_player_level = player_atts.get_single().map(|a| a.1.level).unwrap_or(1);
+            let picked_heirloom_choice = heirloom_queue.get_skill_of_rarity(
+                rarity.clone(),
+                &mut rng,
+                shop_player_level,
+                &|h| !already_chosen.contains(&h.heirloom),
+            );
 
             let Some(heirloom_choice) = picked_heirloom_choice else {
                 continue;

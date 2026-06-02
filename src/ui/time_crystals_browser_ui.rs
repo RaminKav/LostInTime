@@ -5,10 +5,7 @@ use crate::{
     audio::{AudioSoundEffect, SoundSpawner},
     colors::{WHITE, YELLOW_2},
     cursor::CursorPos,
-    player::{
-        skills::time_crystal_heirlooms,
-        time_crystals::TimeCrystals,
-    },
+    player::{skills::time_crystal_heirlooms, time_crystals::TimeCrystals},
     ui::{
         heirloom_browser_grid::{
             despawn_heirloom_browser_grid_layers, sorted_grid_entries_with_unlock_state,
@@ -379,7 +376,7 @@ pub fn setup_time_crystals_browser_ui(
                 TextStyle {
                     font: asset_server.load("fonts/4x5.ttf"),
                     font_size: 5.0,
-                    color: crate::colors::DARK_WOOD_BROWN,
+                    color: crate::colors::WHITE,
                 },
             )
             .with_alignment(TextAlignment::Center),
@@ -425,7 +422,7 @@ pub fn setup_time_crystals_browser_ui(
                 TextStyle {
                     font: asset_server.load("fonts/4x5.ttf"),
                     font_size: 5.0,
-                    color: crate::colors::DARK_WOOD_BROWN,
+                    color: crate::colors::WHITE,
                 },
             )
             .with_alignment(TextAlignment::Center),

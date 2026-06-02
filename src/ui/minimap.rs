@@ -18,7 +18,7 @@ use bevy::sprite::MaterialMesh2dBundle;
 use bevy::utils::{HashMap, HashSet};
 use bevy_ecs_tilemap::prelude::*;
 
-use super::{layout_sync::UiLayoutKey, UIElement};
+use super::{layout_sync::UiLayoutKey, ui_helpers, UIElement};
 
 pub struct MinimapPlugin;
 
@@ -60,6 +60,12 @@ impl Plugin for MinimapPlugin {
             .add_system(
                 setup_island_map
                     .after(CustomFlush)
+                    .run_if(in_state(GameState::Main).or_else(in_state(GameState::Initializing)))
+                    .run_if(|dungeon: Query<&Dungeon>| dungeon.is_empty()),
+            )
+            .add_system(
+                sync_island_map_overlay
+                    .after(setup_island_map)
                     .run_if(in_state(GameState::Main).or_else(in_state(GameState::Initializing)))
                     .run_if(|dungeon: Query<&Dungeon>| dungeon.is_empty()),
             )
@@ -109,7 +115,7 @@ impl Plugin for MinimapPlugin {
 pub const HUD_MINIMAP_RADIUS_TILES: i32 = 26;
 const HUD_MINIMAP_PIXELS_PER_TILE: u32 = 2;
 /// HUD minimap diameter in UI world units (tuned at Large / reference UI scale).
-pub const HUD_MINIMAP_DISPLAY_SIZE: f32 = 70.0;
+pub const HUD_MINIMAP_DISPLAY_SIZE: f32 = 90.0;
 const HUD_MINIMAP_ICON_SIZE: f32 = 16.0;
 /// Extra inset so icon sprites are hidden before they overlap the circular edge.
 const HUD_MINIMAP_ICON_CLIP_INSET: f32 = -4.0;
@@ -129,7 +135,8 @@ pub fn island_map_display_size(res: &ScreenResolution) -> f32 {
 
 /// World-space x for the LEFT edge of the HUD minimap sprite.
 pub fn hud_minimap_left_edge_x(game_width: f32, display_size: f32) -> f32 {
-    let center_x = game_width * 0.5 - display_size * 0.5 - HUD_MINIMAP_PADDING + HUD_MINIMAP_RIGHT_NUDGE;
+    let center_x =
+        game_width * 0.5 - display_size * 0.5 - HUD_MINIMAP_PADDING + HUD_MINIMAP_RIGHT_NUDGE;
     center_x - display_size * 0.5
 }
 
@@ -199,6 +206,10 @@ pub struct IslandMapPlayerMarker;
 
 #[derive(Component)]
 pub struct IslandMapFogOverlay;
+
+/// Full-screen radial backdrop behind the island map (same tuning as item chest UI).
+#[derive(Component)]
+pub struct IslandMapOverlay;
 
 #[derive(Component)]
 pub struct IslandMapObjectIcon {
@@ -321,6 +332,7 @@ fn clear_cache_for_new_dimensions(
     map_query: Query<Entity, With<IslandMap>>,
     fog_query: Query<Entity, With<IslandMapFogOverlay>>,
     marker_query: Query<Entity, With<IslandMapPlayerMarker>>,
+    overlay_query: Query<Entity, With<IslandMapOverlay>>,
     hud_query: Query<Entity, With<HudMinimap>>,
     dungeon_check: Query<&Dungeon>,
     game: GameParam,
@@ -345,6 +357,9 @@ fn clear_cache_for_new_dimensions(
         }
         for marker in marker_query.iter() {
             commands.entity(marker).despawn_recursive();
+        }
+        for overlay in overlay_query.iter() {
+            commands.entity(overlay).despawn_recursive();
         }
         for hud in hud_query.iter() {
             commands.entity(hud).despawn_recursive();
@@ -650,6 +665,29 @@ fn setup_island_map(
         .id();
 
     commands.entity(map_border).add_child(map);
+}
+
+/// Spawns/despawns the full-screen radial backdrop when the island map is toggled open/closed.
+fn sync_island_map_overlay(
+    mut commands: Commands,
+    map_open: Res<IslandMapOpen>,
+    res: Res<ScreenResolution>,
+    dungeon_check: Query<&Dungeon, With<ActiveDimension>>,
+    existing: Query<Entity, With<IslandMapOverlay>>,
+) {
+    let should_show = map_open.0 && dungeon_check.is_empty();
+
+    if should_show {
+        if existing.is_empty() {
+            let overlay =
+                ui_helpers::spawn_full_screen_ui_overlay_tuned(&mut commands, &res, 0.0, 0.95, 9.);
+            commands.entity(overlay).insert(IslandMapOverlay);
+        }
+    } else {
+        for entity in existing.iter() {
+            commands.entity(entity).despawn_recursive();
+        }
+    }
 }
 
 /// System to dynamically update the player marker on the map
@@ -1164,6 +1202,7 @@ fn invalidate_island_map_on_ui_layout_change(
     mut commands: Commands,
     maps: Query<Entity, With<IslandMap>>,
     fog: Query<Entity, With<IslandMapFogOverlay>>,
+    overlay: Query<Entity, With<IslandMapOverlay>>,
 ) {
     let key = UiLayoutKey::from_resolution(&res);
     if last_layout.as_ref() == Some(&key) {
@@ -1171,7 +1210,11 @@ fn invalidate_island_map_on_ui_layout_change(
     }
     *last_layout = Some(key);
 
-    for entity in maps.iter().chain(fog.iter()) {
+    for entity in maps
+        .iter()
+        .chain(fog.iter())
+        .chain(overlay.iter())
+    {
         commands.entity(entity).despawn_recursive();
     }
 }

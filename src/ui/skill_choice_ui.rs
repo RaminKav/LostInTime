@@ -6,24 +6,25 @@ use crate::{
     assets::Graphics,
     attributes::LootRateBonus,
     colors::{
-        BLACK, COMMON_TOOLTIP_TITLE, DARK_WOOD_BROWN, LEGENDARY_TOOLTIP_TITLE, RARE_TOOLTIP_TITLE,
-        UNCOMMON_TOOLTIP_TITLE, WHITE,
+        COMMON_TOOLTIP_TITLE, LEGENDARY_TOOLTIP_TITLE, RARE_TOOLTIP_TITLE, UNCOMMON_TOOLTIP_TITLE,
+        WHITE,
     },
     player::{
+        levels::PlayerLevel,
         skills::{Heirloom, HeirloomChoiceQueue, HeirloomChoiceState, HeirloomRarity},
         time_crystals::TimeCrystals,
         unlocks::RunUnlockState,
         Player,
     },
-    ui::{game_fonts as gf, CheatSettings},
-    ScreenResolution, DEBUG, GAME_HEIGHT,
+    ui::{game_fonts as gf, ui_helpers::spawn_full_screen_ui_overlay_tuned, CheatSettings},
+    ScreenResolution, DEBUG,
 };
 
 use super::{
     heirloom_tooltip::{spawn_heirloom_tooltip_card, HeirloomTooltipRequest, HeirloomTooltipShow},
     ui_helpers::{
-        spawn_full_screen_ui_overlay, Z_DEPTH_HEIRLOOM_SKILL_CHOICE_CONTENT,
-        Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND, Z_DEPTH_HEIRLOOM_SKILL_CHOICE_OVERLAY,
+        Z_DEPTH_HEIRLOOM_SKILL_CHOICE_CONTENT, Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND,
+        Z_DEPTH_HEIRLOOM_SKILL_CHOICE_OVERLAY,
     },
     Interactable, UIElement, UIState, SKILLS_CHOICE_UI_SIZE,
 };
@@ -84,7 +85,7 @@ fn build_banish_tracker_children(
     time_crystals: &TimeCrystals,
     root: Entity,
 ) {
-    let title_style = gf::SKILL_CHOICE_TRACKER_TITLE.text_style(asset_server, DARK_WOOD_BROWN);
+    let title_style = gf::SKILL_CHOICE_TRACKER_TITLE.text_style(asset_server, WHITE);
 
     let mut y: f32 = 0.;
     let title = commands
@@ -276,36 +277,15 @@ pub fn setup_skill_choice_ui(
     let choices = &choices_queue.queue[0];
     let t_offset = Vec2::new(4., 4.);
 
-    // title bar
-    let title_sprite = commands
-        .spawn(SpriteBundle {
-            texture: graphics.get_ui_element_texture(UIElement::TitleBar).clone(),
-            sprite: Sprite {
-                custom_size: Some(Vec2::new(168., 16.)),
-                ..Default::default()
-            },
-            transform: Transform {
-                translation: Vec3::new(0., 115., Z_DEPTH_HEIRLOOM_SKILL_CHOICE_CONTENT),
-                scale: Vec3::new(1., 1., 1.),
-                ..Default::default()
-            },
-            ..Default::default()
-        })
-        .insert(RenderLayers::from_layers(&[3]))
-        .insert(UIElement::TitleBar)
-        .insert(UIState::Skills)
-        .insert(Name::new("SKILL ICON!!"))
-        .id();
-
     let title_text = commands
         .spawn((
             Text2dBundle {
                 text: Text::from_section(
                     "Choose an Heirloom".to_string(),
-                    gf::MENU_TITLE.text_style(asset_server, BLACK),
+                    gf::MENU_TITLE.text_style(asset_server, WHITE),
                 ),
                 transform: Transform {
-                    translation: Vec3::new(0., -1., 1.),
+                    translation: Vec3::new(0., 115., Z_DEPTH_HEIRLOOM_SKILL_CHOICE_CONTENT),
                     scale: Vec3::new(1., 1., 1.),
                     ..Default::default()
                 },
@@ -315,15 +295,13 @@ pub fn setup_skill_choice_ui(
         ))
         .id();
 
-    commands
-        .entity(title_text)
-        .insert(UIState::Skills)
-        .set_parent(title_sprite);
+    commands.entity(title_text).insert(UIState::Skills);
 
-    let heirloom_choice_overlay = spawn_full_screen_ui_overlay(
+    let heirloom_choice_overlay = spawn_full_screen_ui_overlay_tuned(
         &mut commands,
         &res,
-        0.8,
+        0.0,
+        0.95,
         Z_DEPTH_HEIRLOOM_SKILL_CHOICE_OVERLAY,
     );
     commands
@@ -539,8 +517,8 @@ pub fn spawn_skill_choice_entities(
         }
         let index = (i + 1) as usize;
         let position = Vec3::new(
-            translation.x + t_offset.x,
-            translation.y + t_offset.y,
+            (translation.x + t_offset.x).round(),
+            (translation.y + t_offset.y).round(),
             Z_DEPTH_HEIRLOOM_SKILL_CHOICE_CONTENT,
         );
         let card_e = spawn_heirloom_tooltip_card(
@@ -574,7 +552,7 @@ pub fn toggle_skills_visibility(
     mut commands: Commands,
     graphics: Res<Graphics>,
     asset_server: Res<AssetServer>,
-    player_atts: Query<&LootRateBonus, With<Player>>,
+    player_atts: Query<(&LootRateBonus, &PlayerLevel), With<Player>>,
     cheat_settings: Option<Res<CheatSettings>>,
 ) {
     if curr_ui_state.0 == UIState::ActiveSkills {
@@ -595,8 +573,11 @@ pub fn toggle_skills_visibility(
         }
 
         let mut rng = rand::thread_rng();
-        let loot_bonus = player_atts.get_single().map(|a| a.0).unwrap_or(0);
-        queue.add_new_skills_after_levelup(&mut rng, loot_bonus);
+        let (loot_bonus, player_level) = player_atts
+            .get_single()
+            .map(|a| (a.0 .0, a.1.level))
+            .unwrap_or((0, 1));
+        queue.add_new_skills_after_levelup(&mut rng, loot_bonus, player_level);
         spawn_skill_choice_entities(
             &graphics,
             &mut commands,
@@ -613,13 +594,21 @@ pub fn handle_skill_reroll_after_flash(
     mut commands: Commands,
     graphics: Res<Graphics>,
     asset_server: Res<AssetServer>,
-    player_atts: Query<&LootRateBonus, With<Player>>,
+    player_atts: Query<(&LootRateBonus, &PlayerLevel), With<Player>>,
 ) {
     for (e, slot, anim) in flashes.iter() {
         if anim.current_frame() == 3 {
-            let loot_bonus = player_atts.get_single().map(|a| a.0).unwrap_or(0);
+            let (loot_bonus, player_level) = player_atts
+                .get_single()
+                .map(|a| (a.0 .0, a.1.level))
+                .unwrap_or((0, 1));
             commands.entity(e).remove::<RerollDice>();
-            skill_queue.handle_reroll_slot(slot.0, &mut rand::thread_rng(), loot_bonus);
+            skill_queue.handle_reroll_slot(
+                slot.0,
+                &mut rand::thread_rng(),
+                loot_bonus,
+                player_level,
+            );
             for e in old_skill_entities.iter() {
                 commands.entity(e).despawn_recursive();
             }

@@ -193,7 +193,7 @@ pub fn setup_beastiary_browser_ui(
                 TextStyle {
                     font: asset_server.load("fonts/4x5.ttf"),
                     font_size: 5.0,
-                    color: crate::colors::DARK_WOOD_BROWN,
+                    color: crate::colors::WHITE,
                 },
             )
             .with_alignment(TextAlignment::Center),

@@ -1144,6 +1144,15 @@ impl Heirloom {
             _ => 0,
         }
     }
+    /// Minimum player level required before this heirloom is allowed to appear in any
+    /// selection (level-ups, shrines, chests, essence shop, blessings). `0` means no gate.
+    pub fn min_player_level(&self) -> u8 {
+        match self {
+            Heirloom::MPRegen => 7,
+            Heirloom::ManaOrbs => 8,
+            _ => 0,
+        }
+    }
     pub fn get_title(&self) -> String {
         match self {
             Heirloom::None => "None".to_string(),
@@ -2159,7 +2168,18 @@ pub struct HeirloomChoiceQueue {
     /// Heirlooms banished this run (for UI). Pool math uses live counts; this is display-only.
     #[serde(default)]
     pub banished_heirlooms: Vec<HeirloomChoiceState>,
+    /// Number of consecutive level-up/shrine choice sets that offered NO uncommon heirloom.
+    /// Drives the uncommon pity system: odds ramp up per miss and an uncommon is guaranteed
+    /// once this reaches [`UNCOMMON_PITY_GUARANTEE`]. Chests/shop/blessings/rerolls don't touch it.
+    #[serde(default)]
+    pub choices_since_uncommon: u32,
 }
+
+/// After this many consecutive choice sets without an uncommon, the next set guarantees one.
+pub const UNCOMMON_PITY_GUARANTEE: u32 = 3;
+/// Each missed choice lowers the uncommon roll threshold by this many percentage points,
+/// gradually increasing uncommon odds before the hard guarantee kicks in.
+const UNCOMMON_PITY_STEP: f32 = 8.0;
 
 impl Default for HeirloomChoiceQueue {
     /// An empty queue/pool placeholder. Use [`HeirloomChoiceQueue::new_for_player`] to
@@ -2173,6 +2193,7 @@ impl Default for HeirloomChoiceQueue {
             pool: Vec::new(),
             banned: HashSet::default(),
             banished_heirlooms: Vec::new(),
+            choices_since_uncommon: 0,
         }
     }
 }
@@ -2208,8 +2229,8 @@ pub fn time_crystal_heirlooms(idx: usize) -> Vec<(Heirloom, HeirloomRarity)> {
         ],
         4 => vec![
             (Heirloom::MPBarDMG, HeirloomRarity::Rare),
+            (Heirloom::RegenLifesteal, HeirloomRarity::Uncommon),
             (Heirloom::FrozenMPRegen, HeirloomRarity::Rare),
-            (Heirloom::IceStaffAoE, HeirloomRarity::Rare),
         ],
         5 => vec![
             (Heirloom::CoinLightning, HeirloomRarity::Legendary),
@@ -2227,7 +2248,7 @@ pub fn time_crystal_heirlooms(idx: usize) -> Vec<(Heirloom, HeirloomRarity)> {
         ],
         8 => vec![
             (Heirloom::SlowStacks, HeirloomRarity::Uncommon),
-            (Heirloom::FrozenAoE, HeirloomRarity::Uncommon),
+            (Heirloom::IceStaffAoE, HeirloomRarity::Rare),
             (Heirloom::FrozenCrit, HeirloomRarity::Rare),
         ],
         9 => vec![
@@ -2270,12 +2291,12 @@ impl HeirloomChoiceQueue {
             HeirloomChoiceState::new(Heirloom::Chest, HeirloomRarity::Uncommon),
             HeirloomChoiceState::new(Heirloom::HPRegenCooldown, HeirloomRarity::Uncommon),
             HeirloomChoiceState::new(Heirloom::MPRegenCooldown, HeirloomRarity::Uncommon),
+            HeirloomChoiceState::new(Heirloom::FrozenAoE, HeirloomRarity::Uncommon),
             HeirloomChoiceState::new(Heirloom::HealEcho, HeirloomRarity::Uncommon),
             HeirloomChoiceState::new(Heirloom::AttackSpeed, HeirloomRarity::Uncommon),
             HeirloomChoiceState::new(Heirloom::PoisonStacks, HeirloomRarity::Uncommon),
             HeirloomChoiceState::new(Heirloom::StoneTooth, HeirloomRarity::Uncommon),
             HeirloomChoiceState::new(Heirloom::LoadedDice, HeirloomRarity::Uncommon),
-            HeirloomChoiceState::new(Heirloom::RegenLifesteal, HeirloomRarity::Uncommon),
             HeirloomChoiceState::new(Heirloom::ThornsSpikes, HeirloomRarity::Uncommon),
             HeirloomChoiceState::new(Heirloom::DamageDealtMp, HeirloomRarity::Uncommon),
             HeirloomChoiceState::new(Heirloom::KillLightning, HeirloomRarity::Uncommon),
@@ -2421,6 +2442,7 @@ impl HeirloomChoiceQueue {
             pool,
             banned: HashSet::default(),
             banished_heirlooms: Vec::new(),
+            choices_since_uncommon: 0,
         }
     }
 
@@ -2445,18 +2467,40 @@ impl HeirloomChoiceQueue {
         &mut self,
         rng: &mut rand::rngs::ThreadRng,
         loot_bonus: i32,
+        player_level: u8,
     ) {
         //only push if queue is empty
         if self.queue.is_empty() {
+            // Uncommon pity: ramp up uncommon odds per missed choice set, and once we've
+            // missed `UNCOMMON_PITY_GUARANTEE` times in a row, force one slot to be uncommon.
+            let missed = self.choices_since_uncommon;
+            let uncommon_bonus = missed as f32 * UNCOMMON_PITY_STEP;
+            let guarantee_uncommon = missed >= UNCOMMON_PITY_GUARANTEE;
+            let forced_uncommon_slot = if guarantee_uncommon {
+                rng.gen_range(0..3)
+            } else {
+                usize::MAX
+            };
+
             let mut new_skills: [HeirloomChoiceState; 3] = Default::default();
             let mut add_back_to_pool: Vec<HeirloomChoiceState> = vec![];
             for i in 0..3 {
-                let rarity = HeirloomChoiceQueue::gen_rarity(rng, loot_bonus);
-                if let Some(picked_skill) = self.get_skill_of_rarity(rarity.clone(), rng, &|s| {
-                    // Only check slots that have been explicitly set (0..i)
-                    // This avoids the issue where Default::default() initializes all slots with CritChance
-                    !new_skills[0..i].iter().any(|existing| existing == s)
-                }) {
+                let rarity = if i == forced_uncommon_slot {
+                    HeirloomRarity::Uncommon
+                } else {
+                    HeirloomChoiceQueue::gen_rarity_with_uncommon_bonus(
+                        rng,
+                        loot_bonus,
+                        uncommon_bonus,
+                    )
+                };
+                if let Some(picked_skill) =
+                    self.get_skill_of_rarity(rarity.clone(), rng, player_level, &|s| {
+                        // Only check slots that have been explicitly set (0..i)
+                        // This avoids the issue where Default::default() initializes all slots with CritChance
+                        !new_skills[0..i].iter().any(|existing| existing == s)
+                    })
+                {
                     if !picked_skill.is_one_time_heirloom {
                         add_back_to_pool.push(picked_skill.clone());
                     }
@@ -2471,6 +2515,16 @@ impl HeirloomChoiceQueue {
                 self.pool.push(skill.clone());
             }
 
+            // Update the pity counter based on what was actually offered.
+            let offered_uncommon = new_skills
+                .iter()
+                .any(|s| s.heirloom != Heirloom::default() && s.rarity == HeirloomRarity::Uncommon);
+            if offered_uncommon {
+                self.choices_since_uncommon = 0;
+            } else {
+                self.choices_since_uncommon = self.choices_since_uncommon.saturating_add(1);
+            }
+
             self.queue.push(new_skills.clone());
         }
     }
@@ -2478,6 +2532,7 @@ impl HeirloomChoiceQueue {
         &self,
         rarity: HeirloomRarity,
         rng: &mut rand::rngs::ThreadRng,
+        player_level: u8,
         filter: &dyn Fn(&HeirloomChoiceState) -> bool,
     ) -> Option<HeirloomChoiceState> {
         let filtered: Vec<_> = self
@@ -2487,7 +2542,12 @@ impl HeirloomChoiceQueue {
                 let matches_rarity = x.rarity == rarity;
                 let passes_filter = filter(x);
                 let not_banned = !self.banned.contains(&x.heirloom);
-                matches_rarity && passes_filter && not_banned && x.heirloom != Heirloom::default()
+                let level_unlocked = x.heirloom.min_player_level() <= player_level;
+                matches_rarity
+                    && passes_filter
+                    && not_banned
+                    && level_unlocked
+                    && x.heirloom != Heirloom::default()
             })
             .collect();
         // Convert back to owned values for choose
@@ -2496,6 +2556,17 @@ impl HeirloomChoiceQueue {
         owned_filtered.as_slice().choose(rng).cloned()
     }
     pub fn gen_rarity(rng: &mut rand::rngs::ThreadRng, loot_bonus: i32) -> HeirloomRarity {
+        Self::gen_rarity_with_uncommon_bonus(rng, loot_bonus, 0.0)
+    }
+
+    /// Like [`gen_rarity`](Self::gen_rarity) but lowers the uncommon threshold by
+    /// `uncommon_bonus` percentage points, increasing the odds of rolling Uncommon
+    /// (without affecting Rare/Legendary). Used by the uncommon pity system.
+    pub fn gen_rarity_with_uncommon_bonus(
+        rng: &mut rand::rngs::ThreadRng,
+        loot_bonus: i32,
+        uncommon_bonus: f32,
+    ) -> HeirloomRarity {
         // Base probabilities: Common 61%, Uncommon 23%, Rare 13%, Legendary 3%
         // Loot bonus increases higher rarity chances
         // Formula: each point of loot increases higher rarity chances by shifting thresholds
@@ -2506,7 +2577,10 @@ impl HeirloomChoiceQueue {
         // Calculate adjusted thresholds (lower threshold = more chance for that rarity)
         let legendary_threshold = (99.5 - loot_bonus_f * 0.02).max(0.0);
         let rare_threshold = (95.5 - loot_bonus_f * 0.06).max(0.0);
-        let uncommon_threshold = (75.0 - loot_bonus_f * 0.1).max(0.0);
+        // Clamp so the uncommon band can't cross into the rare band.
+        let uncommon_threshold = (75.0 - loot_bonus_f * 0.1 - uncommon_bonus)
+            .max(0.0)
+            .min(rare_threshold);
         let roll = rng.gen_range(0_f32..100_f32);
 
         if roll >= legendary_threshold {
@@ -2622,6 +2696,7 @@ impl HeirloomChoiceQueue {
         slot: usize,
         rng: &mut rand::rngs::ThreadRng,
         loot_bonus: i32,
+        player_level: u8,
     ) {
         if self.queue.is_empty() {
             return;
@@ -2629,7 +2704,9 @@ impl HeirloomChoiceQueue {
         let old_skill = self.queue[0][slot].clone();
         let rarity = HeirloomChoiceQueue::gen_rarity(rng, loot_bonus);
         if let Some(picked_skill) =
-            self.get_skill_of_rarity(rarity.clone(), rng, &|s| !self.queue[0].contains(s))
+            self.get_skill_of_rarity(rarity.clone(), rng, player_level, &|s| {
+                !self.queue[0].contains(s)
+            })
         {
             if picked_skill.is_one_time_heirloom {
                 self.pool.retain(|x| x != &picked_skill);
