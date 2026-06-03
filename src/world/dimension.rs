@@ -10,6 +10,7 @@ use crate::{
     colors::{DESERT_TILE, SNOW_TILE},
     enemy::{spawner::MobSpawningPaused, Mob},
     item::{Equipment, ItemDrop, WorldObject},
+    ui::global_text_message::PendingEraAnnouncement,
     night::NightTracker,
     player::{MovePlayerEvent, Player},
     world::{
@@ -285,11 +286,16 @@ impl DimensionPlugin {
 
                     // Set starting day based on era (only when entering a new era, not returning from dungeon)
                     if !returning_from_dungeon {
-                        // Era 1 (Main) = day 1, Era 2 (Second) = day 2, Era 3 (Third) = day 3
-                        let era_starting_day = (new_era.index() + 1) as u8;
+                        // 0-based internal days: Main=0, Second=1, Third=2 (display is +1).
+                        let era_starting_day = new_era.index() as u8;
                         night.days = era_starting_day;
                         night.time = 0.;
-                        info!("Era {:?} starting at day {}", new_era, era_starting_day);
+                        info!(
+                            "Era {:?} starting at internal day {} (display day {})",
+                            new_era,
+                            era_starting_day,
+                            era_starting_day + 1
+                        );
 
                         crate::night::reset_era_timer_and_infinite_mode(
                             &mut era_timer,
@@ -297,6 +303,12 @@ impl DimensionPlugin {
                             &mut mob_spawning_paused,
                         );
                         boss_summon_tracker.reset();
+
+                        if *new_era != Era::Main {
+                            commands.insert_resource(PendingEraAnnouncement::OnEraEnter(
+                                new_era.clone(),
+                            ));
+                        }
                     } else {
                         info!("Returning from dungeon to {:?}, keeping era timer", new_era);
                     }

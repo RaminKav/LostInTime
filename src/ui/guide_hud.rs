@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 
 use crate::{
-    colors::DARK_WOOD_BROWN,
+    colors::{DARK_WOOD_BROWN, WHITE},
     player::Player,
     ui::global_text_message::GlobalTextMessageEvent,
     world::{
@@ -63,7 +63,7 @@ pub fn handle_goal_state_updates(
                     *goal_state = GoalState::ReturnToPortal;
                     global_text_events.send(GlobalTextMessageEvent::new(
                         "Return to the portal...",
-                        DARK_WOOD_BROWN,
+                        WHITE,
                     ));
                 }
             }
@@ -98,10 +98,7 @@ pub fn handle_goal_reset_on_era_change(
 }
 
 /// Compact progress HUD omits objective text; despawn any legacy `GoalText` entities.
-pub fn display_goal_text(
-    mut commands: Commands,
-    goal_text_query: Query<Entity, With<GoalText>>,
-) {
+pub fn display_goal_text(mut commands: Commands, goal_text_query: Query<Entity, With<GoalText>>) {
     for entity in goal_text_query.iter() {
         commands.entity(entity).despawn_recursive();
     }

@@ -46,13 +46,13 @@ const NIGHT_OVERLAY_WORLD_Z: f32 = 999.0;
 const NIGHT_OVERLAY_OVERSCAN_FRAC: f32 = 0.25;
 const NIGHT_OVERLAY_OVERSCAN_MIN: f32 = 80.0;
 /// Radius (in uv units) of the clear bubble kept around the player at night.
-const NIGHT_BUBBLE_RADIUS: f32 = 0.65;
+const NIGHT_BUBBLE_RADIUS: f32 = 0.6;
 /// How soft the edge of the player bubble is (0 = hard ring, 1 = fully gradual).
 const NIGHT_BUBBLE_SOFTNESS: f32 = 0.85;
 /// How much extra darkening is layered toward the screen edges (vignette).
-const NIGHT_EDGE_BOOST: f32 = 0.35;
+const NIGHT_EDGE_BOOST: f32 = 0.4;
 /// Shader tint saturation (< 1 desaturates, 1 = as-authored).
-const TINT_SATURATION: f32 = 0.94;
+const TINT_SATURATION: f32 = 0.96;
 
 /// Hour when night BGM / mob-spawn night begins — keep in sync with [`NightTracker::is_night`].
 pub const NIGHT_PERIOD_START_HOUR: f32 = 15.0;
@@ -336,13 +336,24 @@ pub struct InfiniteModeMob;
 #[derive(Default)]
 pub struct InfiniteModeStartedEvent;
 
-#[derive(Default, Reflect, Resource, Clone, Debug, Serialize, Deserialize)]
+#[derive(Reflect, Resource, Clone, Debug, Serialize, Deserialize)]
 #[reflect(Resource)]
 pub struct NightTracker {
     pub days: u8,
     pub time: f32,
 }
+
+impl Default for NightTracker {
+    fn default() -> Self {
+        Self { days: 0, time: 0. }
+    }
+}
+
 impl NightTracker {
+    /// Player-facing day number (`days` is 0-based internally for scaling / chaos).
+    pub fn display_day(&self) -> u8 {
+        self.days.saturating_add(1)
+    }
     /// Peak overlay strength during full night.
     const PEAK_OVERLAY_INTENSITY: f32 = 0.8;
 
@@ -432,9 +443,6 @@ impl NightTracker {
     }
     pub fn is_night(&self) -> bool {
         self.time >= NIGHT_PERIOD_START_HOUR && self.time <= NIGHT_PERIOD_END_HOUR
-    }
-    pub fn is_start_of_new_day(&self) -> bool {
-        self.time == 0.
     }
     pub fn get_hour(&self) -> u8 {
         self.time as u8
@@ -663,19 +671,18 @@ pub fn tick_night_color(
         if night_state.0.finished() {
             let prev_time = night_tracker.time;
             night_tracker.time += 1.;
-            if night_tracker.time == 24. {
-                night_tracker.days += 1;
-                chaos_tracker.add_chaos(1.);
+            if night_tracker.time >= 24. {
                 night_tracker.time = 0.;
-            }
-            if night_tracker.is_start_of_new_day() && night_tracker.days > 0 {
-                new_day_event.send_default();
             }
             let was_night =
                 prev_time >= NIGHT_PERIOD_START_HOUR && prev_time <= NIGHT_PERIOD_END_HOUR;
-            if was_night && !night_tracker.is_night() && night_tracker.days > 0 {
+            // New day begins when a swarm night ends (BGM switches back to day), not at midnight.
+            if was_night && !night_tracker.is_night() {
+                night_tracker.days += 1;
+                chaos_tracker.add_chaos(1.);
+                new_day_event.send_default();
                 global_text_events.send(GlobalTextMessageEvent::day_announcement(
-                    night_tracker.days,
+                    night_tracker.display_day(),
                     WHITE,
                 ));
             }

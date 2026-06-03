@@ -98,7 +98,7 @@ use crate::ui::damage_numbers::{
     handle_clamp_screen_locked_icons_worldpos, BeaconGuidanceRegistry,
 };
 use crate::ui::global_text_message::{
-    handle_global_text_message_events, show_run_start_era_announcement,
+    handle_global_text_message_events, show_pending_era_announcement,
     tick_global_text_messages, GlobalTextMessageEvent,
 };
 pub use achievements_ui::*;
@@ -735,9 +735,9 @@ impl Plugin for UIPlugin {
                     .in_set(OnUpdate(GameState::Main)),
             )
             .add_systems((
-                show_run_start_era_announcement
+                show_pending_era_announcement
                     .run_if(in_state(GameState::Main))
-                    .run_if(resource_exists::<global_text_message::PendingRunStartEraAnnouncement>())
+                    .run_if(resource_exists::<global_text_message::PendingEraAnnouncement>())
                     .before(handle_global_text_message_events),
                 handle_queued_floating_texts
                     .run_if(in_state(GameState::Main).or_else(in_state(GameState::BlessingChoice))),

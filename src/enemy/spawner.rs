@@ -48,8 +48,8 @@ fn spawners_era_main() -> Vec<Spawner> {
         Spawner {
             enemy: Mob::SpikeSlime,
             weight: 100.,
-            spawn_timer: Timer::from_seconds(11., TimerMode::Once),
-            min_days_to_spawn: 3,
+            spawn_timer: Timer::from_seconds(20., TimerMode::Once),
+            min_days_to_spawn: 2,
             num_to_spawn: Some(1),
         },
         Spawner {

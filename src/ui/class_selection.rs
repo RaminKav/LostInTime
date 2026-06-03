@@ -31,7 +31,7 @@ use crate::{
         ClassUnlockData, UnlockedClasses,
     },
     ui::{
-        global_text_message::PendingRunStartEraAnnouncement, main_menu::GameStartFadein,
+        global_text_message::PendingEraAnnouncement, main_menu::GameStartFadein,
         options_ui::CheatSettings, spawn_back_button,
         spawn_back_button_texture_only, ui_helpers::spawn_full_screen_ui_overlay_tuned_colored,
         MenuButton, UIElement, UIState,
@@ -2459,7 +2459,7 @@ pub fn handle_portal_animation(
                             .insert(RenderLayers::from_layers(&[3]))
                             .insert(Name::new("overlay"))
                             .insert(GameStartFadein(Timer::from_seconds(3.0, TimerMode::Once)));
-                        commands.insert_resource(PendingRunStartEraAnnouncement);
+                        commands.insert_resource(PendingEraAnnouncement::DuringRunFadeIn);
                     }
                 }
             }

@@ -3,8 +3,13 @@ use bevy::render::view::RenderLayers;
 use bevy::sprite::Anchor;
 
 use crate::{
-    assets::Graphics, colors::WHITE, inventory::ItemStack, item::WorldObject,
-    world::dimension::Era, ScreenResolution,
+    assets::Graphics,
+    colors::WHITE,
+    inventory::ItemStack,
+    item::WorldObject,
+    night::NightTracker,
+    world::dimension::Era,
+    ScreenResolution,
 };
 
 use super::{
@@ -105,9 +110,14 @@ impl GlobalTextMessageEvent {
     }
 }
 
-/// Queued when a run fade-in overlay spawns; shown once gameplay is in [`crate::GameState::Main`].
+/// Queued when an era title should appear in [`crate::GameState::Main`].
 #[derive(Resource)]
-pub struct PendingRunStartEraAnnouncement;
+pub enum PendingEraAnnouncement {
+    /// New run: wait for [`super::main_menu::GameStartFadein`] before showing.
+    DuringRunFadeIn,
+    /// Era 2/3 portal transition: show as soon as Main loads (no run-start fade).
+    OnEraEnter(Era),
+}
 
 #[derive(Component)]
 pub struct GlobalTextMessage {
@@ -281,24 +291,36 @@ fn spawn_sub_text(
         .set_parent(parent);
 }
 
-pub fn show_run_start_era_announcement(
-    pending: Option<Res<PendingRunStartEraAnnouncement>>,
+pub fn show_pending_era_announcement(
+    pending: Option<Res<PendingEraAnnouncement>>,
     fade: Query<(), With<super::main_menu::GameStartFadein>>,
-    era: Res<crate::world::dimension::EraManager>,
+    night: Res<NightTracker>,
     mut events: EventWriter<GlobalTextMessageEvent>,
     mut commands: Commands,
 ) {
-    if pending.is_none() || fade.is_empty() {
+    let Some(pending) = pending else {
         return;
-    }
-    if let Some(event) = GlobalTextMessageEvent::era_start_announcement(era.current_era.clone()) {
+    };
+    let era = match &*pending {
+        PendingEraAnnouncement::DuringRunFadeIn => {
+            if fade.is_empty() {
+                return;
+            }
+            Era::Main
+        }
+        PendingEraAnnouncement::OnEraEnter(era) => era.clone(),
+    };
+    if let Some(event) = GlobalTextMessageEvent::era_start_announcement(era) {
         events.send(
             event
-                .with_sub_text("Day 1", WHITE)
+                .with_sub_text(
+                    format!("Day {}", night.display_day()),
+                    WHITE,
+                )
                 .with_sub_panel_width(80.),
         );
     }
-    commands.remove_resource::<PendingRunStartEraAnnouncement>();
+    commands.remove_resource::<PendingEraAnnouncement>();
 }
 
 pub fn handle_global_text_message_events(
