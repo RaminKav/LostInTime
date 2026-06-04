@@ -98,7 +98,7 @@ pub fn add_guide_to_unique_objs(
                 commands.entity(e).insert(InteractionGuideTrigger {
                     text: Some("Pay Offering".to_string()),
                     activation_distance: 32.,
-                    icon_stack: Some(ItemStack::crate_icon_stack(WorldObject::TimeFragment)),
+                    icon_stack: Some(ItemStack::crate_icon_stack(WorldObject::Coin)),
                 });
             }
             WorldObject::BlacksmithMerchant => {

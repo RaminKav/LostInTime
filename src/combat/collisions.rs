@@ -23,6 +23,7 @@ use crate::{
         object_actions::TouchTriggerObjectAction,
         projectile::{
             EnemyProjectile, PetProjectileMarker, Projectile, ProjectileState, RangedAttackEvent,
+            ARROW_MAX_WORLD_OBJECT_PIERCES,
         },
         Equipment, ItemDrop, MainHand, WorldObject,
     },
@@ -220,7 +221,7 @@ fn check_projectile_hit_mob_collisions(
     mut commands: Commands,
     player_attack: Query<(Entity, &Children), With<Player>>,
     allowed_targets: Query<
-        (Entity, &GlobalTransform),
+        (Entity, &GlobalTransform, Option<&WorldObject>),
         (
             Without<ItemStack>,
             Without<MainHand>,
@@ -332,7 +333,7 @@ fn check_projectile_hit_mob_collisions(
             if is_status_effected && game.has_skill(Heirloom::TeleportStatusDMG) {
                 damage = f32::ceil(damage as f32 * 1.2) as u32;
             }
-            let (_e, hit_txfm) = allowed_targets.get(*e2).unwrap();
+            let (_e, hit_txfm, hit_world_obj) = allowed_targets.get(*e2).unwrap();
             let enemy_pos = hit_txfm.translation().truncate();
             // Note: SpearAttack gravity pull is now handled proactively in handle_spear_pull_delay
             // The SpearAttack component is still used to identify the damage source
@@ -396,6 +397,18 @@ fn check_projectile_hit_mob_collisions(
                 was_overcrit,
                 from_heirloom_effect: heirloom_source,
             });
+
+            if matches!(*proj, Projectile::Arrow | Projectile::ArrowVolleyShot)
+                && nearby_mobs.get(*e2).is_err()
+                && hit_world_obj.is_some()
+            {
+                state.world_object_pierce_count += 1;
+                if state.world_object_pierce_count >= ARROW_MAX_WORLD_OBJECT_PIERCES {
+                    commands.entity(proj_entity).despawn_recursive();
+                    continue;
+                }
+            }
+
             if nearby_mobs.get(*e2).is_ok() {
                 if proj.clone() == Projectile::IceShard
                     || proj.clone() == Projectile::IceExplosionAOE

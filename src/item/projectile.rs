@@ -209,12 +209,15 @@ impl Projectile {
     }
 }
 
+pub const ARROW_MAX_WORLD_OBJECT_PIERCES: u8 = 3;
+
 #[derive(Component, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum AnimVisualCategory {
     Attack,
     Skill,
     Heirloom,
 }
+
 #[derive(Deserialize, FromReflect, Default, Reflect, Clone, Serialize, Component, Schematic)]
 #[reflect(Component, Schematic, Default)]
 pub struct ProjectileState {
@@ -225,6 +228,9 @@ pub struct ProjectileState {
     pub rotating: bool,
     pub mana_bar_full: bool,
     pub despawn_on_hit: bool,
+    /// Bow arrows only: despawn after piercing this many world objects (not mobs).
+    #[serde(default)]
+    pub world_object_pierce_count: u8,
 }
 
 #[derive(Deserialize, FromReflect, Default, Reflect, Clone, Serialize, Component, Schematic)]

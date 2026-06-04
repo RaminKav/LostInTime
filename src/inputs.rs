@@ -6,7 +6,7 @@ use std::time::Duration;
 
 use crate::animations::player_sprite::PlayerAnimation;
 use crate::animations::{AttackEvent, HitAnimationTracker};
-use crate::assets::SpriteAnchor;
+use crate::assets::{Graphics, SpriteAnchor};
 use crate::attributes::hunger::Hunger;
 use crate::audio::{AudioSoundEffect, AudioVolume, SoundSpawner};
 use crate::client::is_not_paused;
@@ -41,6 +41,9 @@ use crate::combat::{AttackTimer, HitEvent};
 use crate::enemy::Mob;
 use crate::inventory::Inventory;
 use crate::item::ammo::Ammo;
+use crate::item::bridge_placement::{
+    bridge_placement_blocks_player_attack, try_toggle_bridge_placement_mode, BridgePlacementMode,
+};
 use crate::item::item_actions::{ItemActionParam, ItemActions, ManaCost};
 use crate::item::object_actions::ObjectAction;
 use crate::item::projectile::{RangedAttack, RangedAttackEvent};
@@ -726,11 +729,13 @@ pub fn handle_hotbar_consume_keys(
     mut game: GameParam,
     proto_param: ProtoParam,
     mut commands: Commands,
+    graphics: Res<Graphics>,
     inv: Query<&Inventory>,
     mut item_action_param: ItemActionParam,
     cursor_pos: Res<CursorPos>,
     ui_state: Res<State<UIState>>,
     resolution: Res<ScreenResolution>,
+    mut bridge_mode: ResMut<BridgePlacementMode>,
 ) {
     // Left-clicking a HUD hotbar slot (while the inventory is closed) triggers the same
     // consume action as pressing that slot's bound key.
@@ -762,6 +767,15 @@ pub fn handle_hotbar_consume_keys(
             continue;
         };
         let held_obj = *held_item.get_obj();
+        if try_toggle_bridge_placement_mode(
+            slot,
+            &held_item.item_stack,
+            &mut bridge_mode,
+            &mut commands,
+            &graphics,
+        ) {
+            continue;
+        }
         let Some(item_actions) = proto_param.get_component::<ItemActions, _>(held_obj) else {
             continue;
         };
@@ -841,8 +855,12 @@ pub fn mouse_click_system(
     mut ranged_attack_event: EventWriter<RangedAttackEvent>,
     ammo_query_any: Query<&Ammo>,
     auto_attack: Res<AutoAttackState>,
+    bridge_mode: Res<BridgePlacementMode>,
 ) {
     if ui_state.0 != UIState::Closed {
+        return;
+    }
+    if bridge_placement_blocks_player_attack(bridge_mode) {
         return;
     }
 

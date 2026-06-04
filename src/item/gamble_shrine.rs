@@ -108,7 +108,7 @@ pub fn handle_gamble_shrine_rewards(
                 .insert(InteractionGuideTrigger {
                     text: Some("Interact".to_string()),
                     activation_distance: 32.,
-                    icon_stack: Some(ItemStack::crate_icon_stack(WorldObject::TimeFragment)),
+                    icon_stack: Some(ItemStack::crate_icon_stack(WorldObject::Coin)),
                 })
                 .insert(obj_action.clone());
         }

@@ -21,6 +21,7 @@ use crate::{
         spawn_damage_tracker_ui, spawn_mob_stat_tracker_ui, DamageTracker, MobStatTracker,
         PetAbilityStats,
     },
+    cursor::CursorPos,
     inventory::{Inventory, ItemStack},
     item::{item_actions::ItemActions, EquipmentType, WorldObject},
     player::{
@@ -37,9 +38,10 @@ use crate::{
 };
 
 use super::{
-    item_chest::ItemChestUI, EssenceUI, InventoryUI, UIElement, UIState, CHEST_INVENTORY_UI_SIZE,
-    CRAFTING_INVENTORY_UI_SIZE, ESSENCE_UI_SIZE, FURNACE_INVENTORY_UI_SIZE, INVENTORY_UI_SIZE,
-    INVENTORY_Y_OFFSET, INV_SIDE_STATS_BG_ALPHA, INV_SIDE_STATS_BG_PADDING,
+    item_chest::ItemChestUI, EssenceUI, InventoryUI, ScreenResolution, UIElement, UIState,
+    CHEST_INVENTORY_UI_SIZE, CRAFTING_INVENTORY_UI_SIZE, ESSENCE_UI_SIZE,
+    FURNACE_INVENTORY_UI_SIZE, INVENTORY_UI_SIZE, INVENTORY_Y_OFFSET, INV_SIDE_STATS_BG_ALPHA,
+    INV_SIDE_STATS_BG_PADDING,
 };
 
 aseprite!(pub InventoryStatHighlightCommon, "textures/effects/InventoryStatHighlightCommon.ase");
@@ -49,6 +51,8 @@ aseprite!(pub InventoryStatHighlightLegendary, "textures/effects/InventoryStatHi
 
 /// Panel size for `LargeTooltip*` sprites (inventory item card + consumable buff HUD hover).
 pub const ITEM_TOOLTIP_LARGE_CARD_SIZE: Vec2 = Vec2::new(172., 272.);
+/// Z for cursor-anchored inventory item tooltips (above the inventory panel at z=10).
+const INVENTORY_CURSOR_TOOLTIP_Z: f32 = 22.;
 /// Wait after an inventory item tooltip closes before showing the stats tooltip again
 /// (avoids flicker when moving quickly across slots).
 pub const STATS_TOOLTIP_RESPAWN_DELAY_SECS: f32 = 0.18;
@@ -59,6 +63,54 @@ pub fn clamp_tooltip_center_x(x: f32, half_width: f32, game_width: f32, edge_pad
     let min_x = -half_screen + half_width + edge_pad;
     let max_x = half_screen - half_width - edge_pad;
     x.clamp(min_x, max_x)
+}
+
+/// Clamps a center-anchored tooltip's Y so its half-height stays inside the game viewport.
+pub fn clamp_tooltip_center_y(y: f32, half_height: f32, game_height: f32, edge_pad: f32) -> f32 {
+    let half_screen = game_height * 0.5;
+    let min_y = -half_screen + half_height + edge_pad;
+    let max_y = half_screen - half_height - edge_pad;
+    y.clamp(min_y, max_y)
+}
+
+/// Cursor-anchored inventory item tooltip position (defaults to the right of the cursor).
+///
+/// X follows the cursor; Y tracks `anchor_y` (hovered slot center when available). The card
+/// is vertically centered on that row with a slight upward bias so the pointer sits in the
+/// upper portion of the tooltip. Top-edge placement was collapsing most rows to one Y because
+/// the large item card is taller than half the viewport.
+pub fn inventory_item_tooltip_cursor_offset(
+    cursor: Vec2,
+    anchor_y: f32,
+    tooltip_size: Vec2,
+    game_width: f32,
+    game_height: f32,
+) -> Vec2 {
+    const HORIZONTAL_GAP: f32 = 12.;
+    const EDGE_PAD: f32 = 8.;
+    /// Anchor sits this fraction below the tooltip top (upper third of the card).
+    const ANCHOR_FRAC_FROM_TOP: f32 = 0.22;
+    let half_w = tooltip_size.x * 0.5;
+    let half_h = tooltip_size.y * 0.5;
+    let screen_half_w = game_width * 0.5;
+
+    let right_x = cursor.x + half_w + HORIZONTAL_GAP;
+    let left_x = cursor.x - half_w - HORIZONTAL_GAP;
+    let x = if right_x + half_w <= screen_half_w - EDGE_PAD {
+        right_x
+    } else if left_x - half_w >= -screen_half_w + EDGE_PAD {
+        left_x
+    } else {
+        right_x
+    };
+
+    let anchor_bias = tooltip_size.y * ANCHOR_FRAC_FROM_TOP - half_h;
+    let y = clamp_tooltip_center_y(anchor_y + anchor_bias, half_h, game_height, EDGE_PAD);
+
+    Vec2::new(
+        clamp_tooltip_center_x(x, half_w, game_width, EDGE_PAD),
+        y,
+    )
 }
 
 #[derive(Component)]
@@ -85,6 +137,8 @@ pub struct ToolTipUpdateEvent {
     pub item_stack: ItemStack,
     pub is_recipe: bool,
     pub show_range: bool,
+    /// Hovered inventory slot center Y in UI space; used for cursor-anchored tooltip placement.
+    pub anchor_ui_y: Option<f32>,
     /// When `Some`, the tooltip card is placed at exactly this `(x, y)` offset relative to
     /// the inventory / essence / item-chest parent, bypassing the `UIState`-based default
     /// position. Also marks this event as a *secondary* tooltip: the dispatcher skips the
@@ -183,18 +237,12 @@ pub fn handle_tooltip_teardown(
                 ..Default::default()
             });
         } else {
+            let had_tooltips = tooltip.iter().next().is_some();
             for t in tooltip.iter() {
                 commands.entity(t).despawn_recursive();
             }
-            // begin delay for next tooltip
-            if tooltip.iter().count() > 0 {
+            if had_tooltips {
                 tooltip_manager.timer.reset();
-            }
-            if cur_ui_state.0 == UIState::Inventory {
-                tooltip_manager.stats_respawn_delay = Some(Timer::from_seconds(
-                    STATS_TOOLTIP_RESPAWN_DELAY_SECS,
-                    TimerMode::Once,
-                ));
             }
         }
     }
@@ -211,9 +259,10 @@ pub fn handle_spawn_inv_item_tooltip(
     cur_inv_state: Res<State<UIState>>,
     proto: ProtoParam,
     old_tooltips: Query<Entity, With<ItemOrRecipeTooltip>>,
-    player_stats_tooltips: Query<Entity, With<PlayerStatsTooltip>>,
     player_inv: Query<&Inventory, With<Player>>,
     mut tooltip_manager: ResMut<TooltipsManager>,
+    cursor_pos: Res<CursorPos>,
+    resolution: Res<ScreenResolution>,
 ) {
     for item in updates.iter() {
         let asset_server = asset_server.as_ref();
@@ -242,7 +291,14 @@ pub fn handle_spawn_inv_item_tooltip(
             p
         } else {
             match cur_inv_state.0 {
-                UIState::Inventory => right_side_offset,
+                UIState::Inventory => inventory_item_tooltip_cursor_offset(
+                    cursor_pos.ui_coords.truncate(),
+                    item.anchor_ui_y
+                        .unwrap_or(cursor_pos.ui_coords.y),
+                    ITEM_TOOLTIP_LARGE_CARD_SIZE,
+                    resolution.game_width,
+                    resolution.game_height,
+                ),
                 UIState::InventoryCrafting => {
                     if item.is_recipe {
                         Vec2::new(0., INVENTORY_Y_OFFSET)
@@ -265,11 +321,13 @@ pub fn handle_spawn_inv_item_tooltip(
             }
         };
 
-        if cur_inv_state.0 == UIState::Inventory {
-            for t in player_stats_tooltips.iter() {
-                commands.entity(t).despawn_recursive();
-            }
-        }
+        let use_absolute_inventory_tooltip =
+            cur_inv_state.0 == UIState::Inventory && item.position_override.is_none();
+        let tooltip_z = if use_absolute_inventory_tooltip {
+            INVENTORY_CURSOR_TOOLTIP_Z
+        } else {
+            10.
+        };
 
         let obj_type = item.item_stack.obj_type;
         let raw_base_attributes = proto.get_component::<RawItemBaseAttributes, _>(obj_type);
@@ -300,7 +358,7 @@ pub fn handle_spawn_inv_item_tooltip(
                     texture: graphics
                         .get_ui_element_texture(item_rarity.clone().get_tooltip_ui_element()),
                     transform: Transform {
-                        translation: Vec3::new(parent_offset.x, parent_offset.y, 10.),
+                        translation: Vec3::new(parent_offset.x, parent_offset.y, tooltip_z),
                         scale: Vec3::new(1., 1., 1.),
                         ..Default::default()
                     },
@@ -937,7 +995,9 @@ pub fn handle_spawn_inv_item_tooltip(
         }
 
         // add tooltip to inventory, essence, or item chest ui
-        if let Ok(inv) = inv.get_single() {
+        if use_absolute_inventory_tooltip {
+            // Absolute UI-space position near the cursor; stats panel stays visible.
+        } else if let Ok(inv) = inv.get_single() {
             commands.entity(inv).add_child(tooltip);
         } else if let Ok(essence) = essence.get_single() {
             commands.entity(essence).add_child(tooltip);
@@ -997,7 +1057,6 @@ pub fn handle_spawn_inv_player_stats(
     ui_state: Res<State<UIState>>,
     mut tooltip_manager: ResMut<TooltipsManager>,
     old_tooltips: Query<Entity, With<PlayerStatsTooltip>>,
-    item_or_recipe_tooltips: Query<Entity, With<ItemOrRecipeTooltip>>,
 ) {
     if ui_state.0 == UIState::Closed {
         let d = tooltip_manager.timer.duration();
@@ -1007,12 +1066,6 @@ pub fn handle_spawn_inv_player_stats(
     if updates.iter().len() > 0
         && (tooltip_manager.timer.finished() || updates.iter().next().unwrap().ignore_timer)
     {
-        // Inventory attribute refreshes send this event in PostUpdate; do not respawn the stats
-        // panel while an item tooltip is showing (e.g. furnace upgrade slot persistence).
-        if curr_ui_state.0 == UIState::Inventory && item_or_recipe_tooltips.iter().next().is_some()
-        {
-            return;
-        }
         for t in old_tooltips.iter() {
             commands.entity(t).despawn_recursive();
         }

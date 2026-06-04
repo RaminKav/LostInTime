@@ -74,6 +74,7 @@ pub mod item_actions;
 pub mod active_skill_shrine;
 pub mod ammo;
 pub mod boss_shrine;
+pub mod bridge_placement;
 pub mod combat_shrine;
 pub mod dungeon_shrine;
 pub mod gamble_shrine;
@@ -96,6 +97,9 @@ use strum_macros::{Display, EnumIter, IntoStaticStr};
 
 use self::ammo::tick_reload;
 use self::crafting::CraftingPlugin;
+use self::bridge_placement::{
+    handle_bridge_placement_mode, handle_bridge_preview_dragging, BridgePlacementMode,
+};
 use self::item_actions::handle_item_action_success;
 use self::item_upgrades::{
     handle_delayed_ranged_attack, handle_on_hit_upgrades, handle_spread_arrows_attack,
@@ -1440,6 +1444,7 @@ impl Plugin for ItemsPlugin {
             .init_resource::<BossSummonTracker>()
             .init_resource::<BreakDropFilter>()
             .insert_resource(AmmoMemory::default())
+            .init_resource::<BridgePlacementMode>()
             .add_event::<PlaceItemEvent>()
             .add_event::<UpdateObjectEvent>()
             .add_event::<CombatShrineMobDeathEvent>()
@@ -1479,6 +1484,16 @@ impl Plugin for ItemsPlugin {
                     check_freeze_on_slow_stacks.run_if(is_not_paused),
                     handle_combat_shrine_activate_animation,
                 )
+                    .in_set(OnUpdate(GameState::Main)),
+            )
+            .add_system(
+                handle_bridge_placement_mode
+                    .run_if(is_not_paused)
+                    .in_set(OnUpdate(GameState::Main)),
+            )
+            .add_system(
+                handle_bridge_preview_dragging
+                    .run_if(is_not_paused)
                     .in_set(OnUpdate(GameState::Main)),
             )
             .add_system(ensure_mob_status_effects.in_set(OnUpdate(GameState::Main)))

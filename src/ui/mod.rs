@@ -1127,6 +1127,9 @@ impl Plugin for UIPlugin {
                         .run_if(in_state(UIState::MicrowaveShrine)),
                     handle_microwave_shrine_heirloom_click
                         .run_if(in_state(UIState::MicrowaveShrine)),
+                    handle_microwave_shrine_heirloom_tooltip
+                        .after(handle_microwave_shrine_heirloom_click)
+                        .run_if(in_state(UIState::MicrowaveShrine)),
                     handle_active_skill_shrine_ui_interaction
                         .run_if(in_state(UIState::ActiveSkillShrine)),
                     active_skill_shrine_ui::tick_active_skill_slot_choice_ui_interaction_lock_timers
@@ -1413,6 +1416,7 @@ pub fn handle_new_ui_state(
     tip_boxes: Query<Entity, With<tips::TipBox>>,
     minimap_open: Res<minimap::IslandMapOpen>,
     mut drop_filter_menu_open: ResMut<crate::inventory::MaterialDropFilterMenuOpen>,
+    item_tooltips: Query<Entity, With<crate::ui::ItemOrRecipeTooltip>>,
 ) {
     if next_ui_state.0.is_none() {
         return;
@@ -1442,6 +1446,13 @@ pub fn handle_new_ui_state(
         || (curr_ui_state.0 == UIState::Inventory && next_ui != UIState::Inventory);
     if leaving_inventory && drop_filter_menu_open.0 {
         drop_filter_menu_open.0 = false;
+    }
+    if should_close_self || curr_ui_state.0 != next_ui {
+        for e in item_tooltips.iter() {
+            if let Some(ec) = commands.get_entity(e) {
+                ec.despawn_recursive();
+            }
+        }
     }
     for (e, ui) in old_ui.iter() {
         if *ui != next_ui || should_close_self {

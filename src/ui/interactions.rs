@@ -622,6 +622,7 @@ pub fn handle_hovering(
         Option<&EssenceOption>,
         Option<&StatsButtonState>,
     )>,
+    slot_transforms: Query<&GlobalTransform>,
     graphics: Res<Graphics>,
     mut commands: Commands,
     inv: Query<&Inventory>,
@@ -672,6 +673,10 @@ pub fn handle_hovering(
                             item_stack: item.item_stack,
                             is_recipe: state.r#type.is_crafting(),
                             show_range: shift_key_pressed,
+                            anchor_ui_y: slot_transforms
+                                .get(e)
+                                .ok()
+                                .map(|t| t.translation().y),
                             ..Default::default()
                         });
                     }
@@ -699,6 +704,10 @@ pub fn handle_hovering(
                             item_stack: item.item_stack,
                             is_recipe: state.r#type.is_crafting(),
                             show_range: shift_key_pressed,
+                            anchor_ui_y: slot_transforms
+                                .get(e)
+                                .ok()
+                                .map(|t| t.translation().y),
                             ..Default::default()
                         });
                     }
@@ -1724,6 +1733,7 @@ pub fn handle_cursor_item_chest_button(
     mut inv: Query<&mut Inventory>,
     proto: ProtoParam,
     mut att_event: EventWriter<AttributeChangeEvent>,
+    pets: Query<(), With<crate::pets::state::Pet>>,
 ) {
     if item_chest_state.chest_type != ChestType::Item {
         return;
@@ -1774,6 +1784,7 @@ pub fn handle_cursor_item_chest_button(
                                 &mut inv,
                                 &proto,
                                 &mut att_event,
+                                !pets.is_empty(),
                             ),
                             // Banish is heirloom-only; ignore on item chests.
                             ChestButtonKind::Banish => (),
@@ -1833,8 +1844,9 @@ fn take_item_chest_reward(
 }
 
 /// Auto-equip the picked item into its matching slot. If every valid slot is
-/// occupied, displace the first-slot item into the main inventory; if that is
-/// also full, drop the displaced item next to the player.
+/// occupied, displace the first-slot item into the pet weapon slot (when empty),
+/// otherwise the main inventory; if that is also full, drop the displaced item
+/// next to the player.
 fn equip_item_chest_reward(
     item_chest_state: &mut ResMut<ItemChestState>,
     game: &mut GameParam,
@@ -1843,6 +1855,7 @@ fn equip_item_chest_reward(
     inv: &mut Query<&mut Inventory>,
     proto: &ProtoParam,
     att_event: &mut EventWriter<AttributeChangeEvent>,
+    player_has_pet: bool,
 ) {
     let picked = item_chest_state.picked_item.clone().unwrap();
     let Ok(mut inventory) = inv.get_single_mut() else {
@@ -1902,17 +1915,34 @@ fn equip_item_chest_reward(
     );
 
     if let Some(displaced) = displaced {
-        // Equipment isn't valid in the hotbar band (slots 0-5 — keys 1-4 plus the two
-        // passive consumable cells), so route the displaced piece into the main bag area.
-        // Falls through to a floor drop if the bag is full.
-        if let Some(empty) = inventory.items.get_first_empty_non_hotbar_slot() {
+        if displaced.item_stack.obj_type.is_weapon()
+            && player_has_pet
+            && inventory
+                .pet_items
+                .items
+                .get(0)
+                .map_or(true, |s| s.is_none())
+        {
+            InventoryItemStack {
+                item_stack: displaced.item_stack,
+                slot: 0,
+            }
+            .add_to_container(
+                &mut inventory.pet_items,
+                InventorySlotType::Pet,
+                &mut game.inv_slot_query,
+            );
+        } else if let Some(empty) = inventory.items.get_first_empty_non_hotbar_slot() {
+            // Equipment isn't valid in the hotbar band (slots 0-5 — keys 1-4 plus the two
+            // passive consumable cells), so route the displaced piece into the main bag area.
+            // Falls through to a floor drop if the bag is full.
             InventoryItemStack {
                 item_stack: displaced.item_stack,
                 slot: empty,
             }
             .add_to_container(
                 &mut inventory.items,
-                super::InventorySlotType::Normal,
+                InventorySlotType::Normal,
                 &mut game.inv_slot_query,
             );
         } else {

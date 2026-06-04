@@ -1107,6 +1107,7 @@ pub fn handle_item_chest_final_item_hover(
                                     item_stack: displaced,
                                     is_recipe: false,
                                     show_range: false,
+                                    anchor_ui_y: None,
                                     position_override: Some(Vec2::new(
                                         CHEST_INVENTORY_UI_SIZE.x + 20.,
                                         -CHEST_INVENTORY_UI_SIZE.y / 2. + 40.,

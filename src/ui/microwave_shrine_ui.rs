@@ -14,6 +14,9 @@ use crate::{
     ui::{
         damage_numbers::spawn_floating_text_with_shadow,
         game_fonts::FLOATING_TEXT,
+        heirloom_tooltip::{
+            heirloom_hud_hover_tooltip_position, HeirloomTooltipRequest, HeirloomTooltipShow,
+        },
     },
     ui::{
         interactions::{Interactable, Interaction},
@@ -334,6 +337,10 @@ pub fn handle_microwave_shrine_rarity_click(
                                         transform: Transform::from_translation(offset.extend(1.)),
                                         ..default()
                                     })
+                                    .insert(Sprite {
+                                        custom_size: Some(Vec2::splat(HEIRLOOM_BUTTON_HIT_SIZE)),
+                                        ..default()
+                                    })
                                     .insert(RenderLayers::from_layers(&[3]))
                                     .insert(Interactable::default())
                                     .insert(MicrowaveHeirloomButton {
@@ -376,6 +383,63 @@ pub fn handle_microwave_shrine_rarity_click(
             }
         }
     }
+}
+
+/// Show the shared heirloom hover card for whichever swap icon is under the cursor.
+pub fn handle_microwave_shrine_heirloom_tooltip(
+    mut tooltip_requests: EventWriter<HeirloomTooltipRequest>,
+    buttons: Query<
+        (&MicrowaveHeirloomButton, &GlobalTransform, &Interactable),
+        With<MicrowaveHeirloomButton>,
+    >,
+    player_skills: Query<&PlayerSkills>,
+    res: Res<ScreenResolution>,
+    mut last_hovered: Local<Option<Heirloom>>,
+) {
+    let currently_hovered = buttons
+        .iter()
+        .find(|(_, _, interactable)| matches!(interactable.current(), Interaction::Hovering))
+        .map(|(btn, transform, _)| (btn.heirloom.clone(), transform.translation()));
+
+    let hovered_heirloom = currently_hovered.as_ref().map(|(h, _)| h.clone());
+    if *last_hovered == hovered_heirloom {
+        return;
+    }
+
+    match &currently_hovered {
+        None => tooltip_requests.send(HeirloomTooltipRequest::Clear),
+        Some((heirloom, icon_pos)) => {
+            let Ok(skills) = player_skills.get_single() else {
+                *last_hovered = hovered_heirloom;
+                return;
+            };
+
+            let rarity = skills
+                .heirlooms
+                .iter()
+                .find(|h| h.heirloom == *heirloom)
+                .map(|h| h.rarity)
+                .unwrap_or(HeirloomRarity::Common);
+
+            let (_, tooltip_size) = heirloom.get_ui_element(rarity);
+            let tooltip_pos = heirloom_hud_hover_tooltip_position(
+                *icon_pos,
+                tooltip_size.x * 0.5,
+                res.game_width,
+            );
+
+            tooltip_requests.send(HeirloomTooltipRequest::Show(HeirloomTooltipShow {
+                heirloom: heirloom.clone(),
+                rarity,
+                position: tooltip_pos,
+                scaling_text: None,
+                trigger_count_text: None,
+                ui_state: Some(UIState::MicrowaveShrine),
+            }));
+        }
+    }
+
+    *last_hovered = hovered_heirloom;
 }
 
 /// Hit size for heirloom icon buttons (SpriteSheetBundle has no Sprite with custom_size)

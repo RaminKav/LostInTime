@@ -69,6 +69,7 @@ pub fn spawn_temp_collider(
             rotating: false,
             mana_bar_full: false,
             despawn_on_hit: false,
+            world_object_pierce_count: 0,
         })
         .insert(collider)
         .id()
@@ -103,6 +104,7 @@ pub fn spawn_enemy_melee_hitbox(
             rotating: false,
             mana_bar_full: false,
             despawn_on_hit: false,
+            world_object_pierce_count: 0,
         },
     ));
     entity
