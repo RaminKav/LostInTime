@@ -68,7 +68,7 @@
         GambleShrine: (min: 1, max: 2),
         MicrowaveShrine: (min: 1, max: 2),
         HeirloomShrine: (min: 5, max: 5),
-        BlacksmithMerchant: (min: 1, max: 3),
+        BlacksmithMerchant: (min: 2, max: 3),
       },
       obj_allowed_tiles_map: {
         SmallGreenTree: [GrassTile],

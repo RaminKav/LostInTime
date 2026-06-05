@@ -38,11 +38,13 @@ use crate::{
 };
 
 use super::{
-    item_chest::ItemChestUI, EssenceUI, InventoryUI, ScreenResolution, UIElement, UIState,
-    CHEST_INVENTORY_UI_SIZE, CRAFTING_INVENTORY_UI_SIZE, ESSENCE_UI_SIZE,
-    FURNACE_INVENTORY_UI_SIZE, INVENTORY_UI_SIZE, INVENTORY_Y_OFFSET, INV_SIDE_STATS_BG_ALPHA,
-    INV_SIDE_STATS_BG_PADDING,
-    tooltip_info_boxes::{spawn_tooltip_info_boxes_with_resolution, TooltipInfoBoxAnchor, TooltipInfoBoxSpec},
+    item_chest::{ItemChestUI, CHEST_CONTAINER_UI_SIZE},
+    tooltip_info_boxes::{
+        spawn_tooltip_info_boxes_with_resolution, TooltipInfoBoxAnchor, TooltipInfoBoxSpec,
+    },
+    EssenceUI, InventoryUI, ScreenResolution, UIElement, UIState, CHEST_INVENTORY_UI_SIZE,
+    CRAFTING_INVENTORY_UI_SIZE, FURNACE_INVENTORY_UI_SIZE, INVENTORY_UI_SIZE, INVENTORY_Y_OFFSET,
+    INV_SIDE_STATS_BG_ALPHA, INV_SIDE_STATS_BG_PADDING,
 };
 
 aseprite!(pub InventoryStatHighlightCommon, "textures/effects/InventoryStatHighlightCommon.ase");
@@ -108,10 +110,7 @@ pub fn inventory_item_tooltip_cursor_offset(
     let anchor_bias = tooltip_size.y * ANCHOR_FRAC_FROM_TOP - half_h;
     let y = clamp_tooltip_center_y(anchor_y + anchor_bias, half_h, game_height, EDGE_PAD);
 
-    Vec2::new(
-        clamp_tooltip_center_x(x, half_w, game_width, EDGE_PAD),
-        y,
-    )
+    Vec2::new(clamp_tooltip_center_x(x, half_w, game_width, EDGE_PAD), y)
 }
 
 #[derive(Component)]
@@ -296,8 +295,7 @@ pub fn handle_spawn_inv_item_tooltip(
             match cur_inv_state.0 {
                 UIState::Inventory => inventory_item_tooltip_cursor_offset(
                     cursor_pos.ui_coords.truncate(),
-                    item.anchor_ui_y
-                        .unwrap_or(cursor_pos.ui_coords.y),
+                    item.anchor_ui_y.unwrap_or(cursor_pos.ui_coords.y),
                     ITEM_TOOLTIP_LARGE_CARD_SIZE,
                     resolution.game_width,
                     resolution.game_height,
@@ -315,7 +313,10 @@ pub fn handle_spawn_inv_item_tooltip(
                 ),
                 UIState::Crafting => CRAFTING_INVENTORY_UI_SIZE,
                 UIState::Furnace => FURNACE_INVENTORY_UI_SIZE,
-                UIState::Essence => ESSENCE_UI_SIZE,
+                UIState::Essence => Vec2::new(
+                    -CHEST_CONTAINER_UI_SIZE.x - 20.,
+                    -CHEST_CONTAINER_UI_SIZE.y / 2. + 40.,
+                ),
                 UIState::ItemChest => Vec2::new(
                     -CHEST_INVENTORY_UI_SIZE.x - 20.,
                     -CHEST_INVENTORY_UI_SIZE.y / 2. + 40.,
@@ -979,7 +980,7 @@ pub fn handle_spawn_inv_item_tooltip(
                             TextStyle {
                                 font: gf::TOOLTIP_ITEM_TITLE.load_font(asset_server),
                                 font_size: gf::TOOLTIP_ITEM_TITLE.size,
-                                color: DARK_WOOD_BROWN,
+                                color: WHITE,
                             },
                         )
                         .with_alignment(TextAlignment::Center),

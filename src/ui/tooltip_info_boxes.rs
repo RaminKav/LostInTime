@@ -47,7 +47,7 @@ impl TooltipDefinition {
     pub fn lines(self) -> [&'static str; 2] {
         match self {
             TooltipDefinition::Echo => ["Echo:", "AoE damage around you"],
-            TooltipDefinition::Summon => ["Summon:", "Auto triggers a summon"],
+            TooltipDefinition::Summon => ["Summon:", "Auto triggers an effect"],
             TooltipDefinition::Lightning => ["Lightning:", "Strikes a random enemy"],
             TooltipDefinition::IceExplosion => ["Ice Explosion:", "AoE damage at target"],
             TooltipDefinition::Poison => ["Poisoned enemies take", "damage over time"],

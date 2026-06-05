@@ -169,6 +169,8 @@ pub enum ChestButtonKind {
     Equip,
     /// Add the picked heirloom to the banned pool and decrement banishes_remaining (heirloom chest only).
     Banish,
+    /// Close the merchant shop without deactivating the world object.
+    Done,
 }
 
 #[derive(Component)]
@@ -227,12 +229,14 @@ pub fn spawn_chest_button(
     kind: ChestButtonKind,
     translation: Vec3,
     enabled: bool,
+    ui_state: UIState,
 ) -> Entity {
     let label = match kind {
         ChestButtonKind::Open => "OPEN",
         ChestButtonKind::Take => "TAKE",
         ChestButtonKind::Equip => "EQUIP",
         ChestButtonKind::Banish => "BANISH",
+        ChestButtonKind::Done => "DONE",
     };
     // Banish uses its own art so the destructive action reads as distinct from the
     // standard chest buttons; everything else shares `ChestButton.png`.
@@ -258,7 +262,7 @@ pub fn spawn_chest_button(
     });
     button
         .insert(ui_element)
-        .insert(UIState::ItemChest)
+        .insert(ui_state.clone())
         .insert(ItemChestButton { kind })
         .insert(RenderLayers::from_layers(&[3]))
         .insert(Name::new(format!("ITEM CHEST BUTTON {label}")));
@@ -290,7 +294,7 @@ pub fn spawn_chest_button(
                 ..Default::default()
             },
             RenderLayers::from_layers(&[3]),
-            UIState::ItemChest,
+            ui_state.clone(),
             ChestButtonLabel,
             Name::new(format!("ITEM CHEST BUTTON LABEL {label}")),
         ))
@@ -422,6 +426,7 @@ pub fn setup_item_chest_ui(
         ChestButtonKind::Open,
         Vec3::new(0., CHEST_BUTTON_Y, 1.),
         true,
+        UIState::ItemChest,
     );
 }
 
@@ -698,7 +703,7 @@ fn spawn_chest_reveal_text(
 /// Return the item that would be displaced if `picked` were equipped right now, or `None`
 /// if there is at least one empty valid slot. Mirrors [`equip_item_chest_reward`]'s slot
 /// resolution so the UI preview matches the action's behavior 1:1.
-fn displaced_equipped_item_stack(
+pub(crate) fn displaced_equipped_item_stack(
     inventory: &Inventory,
     picked: &ItemStack,
     proto: &ProtoParam,
@@ -912,6 +917,7 @@ pub fn handle_anim_events(
                         left_kind,
                         Vec3::new(-CHEST_BUTTON_X_OFFSET, CHEST_BUTTON_Y, 1.),
                         true,
+                        UIState::ItemChest,
                     );
                     let right_enabled = match right_kind {
                         ChestButtonKind::Banish => run_unlocks.banishes_remaining > 0,
@@ -925,6 +931,7 @@ pub fn handle_anim_events(
                         right_kind,
                         Vec3::new(CHEST_BUTTON_X_OFFSET, CHEST_BUTTON_Y, 1.),
                         right_enabled,
+                        UIState::ItemChest,
                     );
 
                     if matches!(item_chest_state.chest_type, ChestType::Heirloom) {

@@ -14,7 +14,6 @@ use crate::{
     proto::proto_param::ProtoParam,
     ui::{
         key_input_guide::InteractionGuideTrigger, minimap::UpdateMiniMapEvent, BlacksmithMerchant,
-        EssenceShopChoices,
     },
     world::{world_helpers::world_pos_to_tile_pos, TileMapPosition},
     GameParam,
@@ -155,7 +154,6 @@ pub fn add_gamble_visuals_on_spawn(
                     aseprite: graphics.blacksmith_merchant.as_ref().unwrap().clone(),
                     ..default()
                 })
-                .insert(EssenceShopChoices::default())
                 .insert(Name::new("BLACKSMITH"));
         } else if obj == &WorldObject::BlacksmithMerchantDone {
             commands

@@ -62,11 +62,14 @@ use crate::{
 };
 
 use super::{
-    crafting_ui::CraftingContainer, scrapper_ui::ScrapperContainer, spawn_item_stack_icon,
-    spawn_skill_choice_flash, stats_ui::StatsButtonState, ui_helpers, BanishButton, ChestContainer,
-    EssenceOption, InfoModal, InventorySlotState, InventorySlotType, MenuButton,
-    MenuButtonClickEvent, RerollDice, ShowInvPlayerStatsEvent, SkillChoiceUI, SubmitEssenceChoice,
-    ToolTipUpdateEvent, TooltipTeardownEvent, UIContainersParam, UIState, SKILLS_CHOICE_UI_SIZE,
+    bounce_merchant_slot_icon, crafting_ui::CraftingContainer, scrapper_ui::ScrapperContainer,
+    spawn_item_stack_icon, spawn_skill_choice_flash, stats_ui::StatsButtonState,
+    sync_merchant_shop_to_world, ui_helpers, BanishButton, BlacksmithRerollsText, ChestContainer,
+    EssenceShopChoices, InfoModal, InventorySlotState, InventorySlotType, MenuButton,
+    MenuButtonClickEvent, MerchantCategoryRerollButton, MerchantCategoryRerollEvent,
+    MerchantCategoryRerollIcon, MerchantDoneButton, MerchantShopSlotIndex, RerollDice,
+    ShowInvPlayerStatsEvent, SkillChoiceUI, SubmitMerchantPurchase, ToolTipUpdateEvent,
+    TooltipTeardownEvent, UIContainersParam, UIState, SKILLS_CHOICE_UI_SIZE,
 };
 
 #[derive(
@@ -217,6 +220,7 @@ pub enum UIElement {
     ButtonPageDown,
     ButtonPageDownHover,
     ChestContainer,
+    MerchantContainer,
     ChestButton,
     ChestButtonBanish,
 }
@@ -620,7 +624,6 @@ pub fn handle_hovering(
         &UIElement,
         &mut Interactable,
         Option<&InventorySlotState>,
-        Option<&EssenceOption>,
         Option<&StatsButtonState>,
     )>,
     slot_transforms: Query<&GlobalTransform>,
@@ -642,9 +645,7 @@ pub fn handle_hovering(
     let shift_key_just_released = key_input.just_released(KeyCode::LShift);
     let mut spawning_new_tooltips_this_frame = false;
     let mut tearing_down_tooltips_this_frame = false;
-    for (e, ui, interactable, state_option, essence_option, stats_option) in
-        interactables.iter_mut()
-    {
+    for (e, ui, interactable, state_option, stats_option) in interactables.iter_mut() {
         if let Interaction::Hovering = interactable.current() {
             if ui == &UIElement::InventorySlot {
                 let state = state_option.unwrap();
@@ -674,10 +675,7 @@ pub fn handle_hovering(
                             item_stack: item.item_stack,
                             is_recipe: state.r#type.is_crafting(),
                             show_range: shift_key_pressed,
-                            anchor_ui_y: slot_transforms
-                                .get(e)
-                                .ok()
-                                .map(|t| t.translation().y),
+                            anchor_ui_y: slot_transforms.get(e).ok().map(|t| t.translation().y),
                             ..Default::default()
                         });
                     }
@@ -705,10 +703,7 @@ pub fn handle_hovering(
                             item_stack: item.item_stack,
                             is_recipe: state.r#type.is_crafting(),
                             show_range: shift_key_pressed,
-                            anchor_ui_y: slot_transforms
-                                .get(e)
-                                .ok()
-                                .map(|t| t.translation().y),
+                            anchor_ui_y: slot_transforms.get(e).ok().map(|t| t.translation().y),
                             ..Default::default()
                         });
                     }
@@ -726,16 +721,6 @@ pub fn handle_hovering(
                     )),
                     ignore_timer: true,
                 });
-            }
-            if ui == &UIElement::EssenceButton {
-                // swap to hover img
-                commands.entity(e).insert(UIElement::EssenceButtonHover);
-                commands
-                    .entity(e)
-                    .insert(graphics.get_ui_element_texture(UIElement::EssenceButtonHover));
-
-                // Skip tooltip for heirlooms - the name is already displayed in the UI
-                // let _essence = essence_option.expect("essence buttons have essence state");
             }
             // Generic sprite-swap hover for UI elements whose only hover effect is a texture
             // swap (no tooltip side-effects, no state routing). Tooltip + click side-effects
@@ -768,15 +753,6 @@ pub fn handle_hovering(
                     .insert(UIElement::StatsButton)
                     .insert(graphics.get_ui_element_texture(UIElement::StatsButton));
                 stats_update_events.send_default();
-            }
-            if ui == &UIElement::EssenceButtonHover {
-                // swap to base img
-                commands
-                    .entity(e)
-                    .insert(UIElement::EssenceButton)
-                    .insert(graphics.get_ui_element_texture(UIElement::EssenceButton));
-
-                tooltip_teardown_events.send_default();
             }
             // Generic reverse-swap for elements handled above.
             if ui == &UIElement::CraftButtonHover || ui == &UIElement::BlueprintSlotHover {
@@ -1789,6 +1765,7 @@ pub fn handle_cursor_item_chest_button(
                             ),
                             // Banish is heirloom-only; ignore on item chests.
                             ChestButtonKind::Banish => (),
+                            ChestButtonKind::Done => (),
                         }
                     }
                 }
@@ -2048,6 +2025,7 @@ pub fn handle_cursor_heirloom_chest_button(
                             }
                             // Equip is item-only; ignore on heirloom chests.
                             ChestButtonKind::Equip => (),
+                            ChestButtonKind::Done => (),
                         }
                     }
                 }
@@ -2667,39 +2645,167 @@ pub fn handle_material_drop_filter_menu_click(
     }
 }
 
-pub fn handle_cursor_essence_buttons(
+pub fn handle_merchant_shop_interactions(
     cursor_pos: Res<CursorPos>,
     mouse_input: Res<Input<MouseButton>>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
-    mut essence_buttons: Query<(Entity, &mut Interactable, &EssenceOption)>,
-    mut essence_event: EventWriter<SubmitEssenceChoice>,
+    mut shop_slots: Query<(Entity, &mut Interactable, &MerchantShopSlotIndex)>,
+    parents: Query<&Parent>,
+    children: Query<&Children>,
+    icons: Query<Entity, With<super::MerchantSlotIcon>>,
+    mut purchase_event: EventWriter<SubmitMerchantPurchase>,
+    mut commands: Commands,
 ) {
     let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
 
-    for (e, mut interactable, essence_option) in essence_buttons.iter_mut() {
+    for (e, mut interactable, slot_index) in shop_slots.iter_mut() {
         match hit_test {
             Some(hit_ent) if hit_ent.0 == e => match interactable.current() {
                 Interaction::None => {
                     interactable.change(Interaction::Hovering);
+                    bounce_merchant_slot_icon(&mut commands, e, &parents, &children, &icons);
                 }
                 Interaction::Hovering => {
                     if left_mouse_pressed {
-                        essence_event.send(SubmitEssenceChoice {
-                            choice: essence_option.clone(),
+                        purchase_event.send(SubmitMerchantPurchase {
+                            slot_index: slot_index.0,
                         });
                     }
                 }
                 _ => (),
             },
             _ => {
-                // reset hovering states if we stop hovering ?
                 let Interaction::Hovering = interactable.current() else {
                     continue;
                 };
-
                 interactable.change(Interaction::None);
             }
+        }
+    }
+}
+
+pub fn handle_merchant_done_button(
+    cursor_pos: Res<CursorPos>,
+    mouse_input: Res<Input<MouseButton>>,
+    ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
+    mut done_buttons: Query<(Entity, &mut Interactable), With<MerchantDoneButton>>,
+    mut next_ui_state: ResMut<NextState<UIState>>,
+    shop: Res<EssenceShopChoices>,
+    mut cache: ResMut<super::EssenceShopCache>,
+    mut commands: Commands,
+) {
+    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
+
+    for (e, mut interactable) in done_buttons.iter_mut() {
+        match hit_test {
+            Some(hit_ent) if hit_ent.0 == e => match interactable.current() {
+                Interaction::None => interactable.change(Interaction::Hovering),
+                Interaction::Hovering => {
+                    if left_mouse_pressed {
+                        sync_merchant_shop_to_world(&shop, &mut commands, &mut cache);
+                        next_ui_state.set(UIState::Closed);
+                    }
+                }
+                _ => (),
+            },
+            _ => {
+                if matches!(interactable.current(), Interaction::Hovering) {
+                    interactable.change(Interaction::None);
+                }
+            }
+        }
+    }
+}
+
+pub fn handle_merchant_category_reroll_buttons(
+    cursor_pos: Res<CursorPos>,
+    mouse_input: Res<Input<MouseButton>>,
+    mut sprites: ParamSet<(
+        Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
+        Query<&mut Sprite, With<MerchantCategoryRerollIcon>>,
+    )>,
+    mut reroll_buttons: Query<(
+        Entity,
+        &mut Interactable,
+        &MerchantCategoryRerollButton,
+        &Children,
+    )>,
+    mut reroll_text: Query<&mut Text, With<BlacksmithRerollsText>>,
+    mut commands: Commands,
+    mut run_unlocks: ResMut<RunUnlockState>,
+    shop: Res<EssenceShopChoices>,
+    mut reroll_event: EventWriter<MerchantCategoryRerollEvent>,
+) {
+    let hit_entity = {
+        let ui_sprites = sprites.p0();
+        ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None).map(|(e, _, _)| e)
+    };
+    let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
+
+    let mut any_hovered = false;
+
+    for (e, mut interactable, btn, btn_children) in reroll_buttons.iter_mut() {
+        let rerolls_available = run_unlocks.rerolls_remaining > 0;
+        let category_available = !shop.category_fully_purchased(btn.0);
+        let enabled = rerolls_available && category_available;
+        let icon_color = if enabled {
+            Color::WHITE
+        } else {
+            Color::rgb(0.45, 0.45, 0.45)
+        };
+
+        match hit_entity {
+            Some(hit_ent) if hit_ent == e => match interactable.current() {
+                Interaction::None => {
+                    if enabled {
+                        interactable.change(Interaction::Hovering);
+                        commands.spawn(SoundSpawner::new(AudioSoundEffect::UISlotHover, 0.2));
+                        for child in btn_children.iter() {
+                            if let Ok(mut sprite) = sprites.p1().get_mut(*child) {
+                                sprite.color = YELLOW_2;
+                            }
+                        }
+                    }
+                }
+                Interaction::Hovering => {
+                    any_hovered = true;
+                    if left_mouse_pressed && enabled {
+                        run_unlocks.rerolls_remaining =
+                            run_unlocks.rerolls_remaining.saturating_sub(1);
+                        interactable.change(Interaction::None);
+                        commands.spawn(SoundSpawner::new(AudioSoundEffect::UISkillReRoll, 0.4));
+                        reroll_event.send(MerchantCategoryRerollEvent { category: btn.0 });
+                        for child in btn_children.iter() {
+                            if let Ok(mut sprite) = sprites.p1().get_mut(*child) {
+                                sprite.color = icon_color;
+                            }
+                        }
+                    }
+                }
+                _ => (),
+            },
+            _ => {
+                if matches!(interactable.current(), Interaction::Hovering) {
+                    interactable.change(Interaction::None);
+                    for child in btn_children.iter() {
+                        if let Ok(mut sprite) = sprites.p1().get_mut(*child) {
+                            sprite.color = icon_color;
+                        }
+                    }
+                }
+            }
+        }
+
+        if matches!(interactable.current(), Interaction::Hovering) {
+            any_hovered = true;
+        }
+    }
+
+    for mut text in reroll_text.iter_mut() {
+        if let Some(section) = text.sections.first_mut() {
+            section.style.color = if any_hovered { YELLOW_2 } else { WHITE };
         }
     }
 }

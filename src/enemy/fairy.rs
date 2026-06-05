@@ -5,7 +5,7 @@ use bevy_rapier2d::control::KinematicCharacterController;
 use rand::Rng;
 use seldom_state::{prelude::StateMachine, trigger::BoolTrigger};
 
-use crate::{ai::IdleState, inputs::FacingDirection, ui::SubmitEssenceChoice, PLAYER_MOVE_SPEED};
+use crate::{ai::IdleState, inputs::FacingDirection, ui::SubmitMerchantPurchase, PLAYER_MOVE_SPEED};
 use bevy_aseprite::{anim::AsepriteAnimation, aseprite, AsepriteBundle};
 
 use super::Mob;
@@ -148,7 +148,7 @@ pub fn trade_anim(
 pub struct PlayerFinishedTrade;
 
 impl BoolTrigger for PlayerFinishedTrade {
-    type Param<'w, 's> = EventReader<'w, 's, SubmitEssenceChoice>;
+    type Param<'w, 's> = EventReader<'w, 's, SubmitMerchantPurchase>;
 
     fn trigger(&self, _entity: Entity, trade_event: Self::Param<'_, '_>) -> bool {
         if !trade_event.is_empty() {

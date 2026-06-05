@@ -25,7 +25,7 @@ use crate::status_effects::{
     handle_frail_stack_ticks, handle_frozen_ticks, handle_slow_stack_ticks,
 };
 use crate::ui::minimap::UpdateMiniMapEvent;
-use crate::ui::{FlashExpBarEvent, InventorySlotType};
+use crate::ui::{EssenceShopChoices, FlashExpBarEvent, InventorySlotType};
 use crate::world::dimension::Era;
 use crate::world::dungeon::Dungeon;
 use crate::world::dungeon_generation::DUNGEON_GRID_SIZE;
@@ -1618,6 +1618,13 @@ pub fn handle_placing_world_object(
                         game.add_object_to_chunk_cache(tile_pos, place_event.obj);
                         //TODO: do what old game data did, add obj to registry
                         safe_set_parent(&mut commands, item_e, chunk);
+
+                        if place_event.obj == WorldObject::BlacksmithMerchant {
+                            commands.entity(item_e).insert(EssenceShopChoices {
+                                tile_pos: Some(tile_pos),
+                                ..default()
+                            });
+                        }
 
                         if place_event.obj.is_medium_size(&proto_param) {
                             minimap_event.send(UpdateMiniMapEvent {

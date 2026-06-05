@@ -549,13 +549,15 @@ impl Plugin for UIPlugin {
             .init_resource::<BeaconGuidanceRegistry>()
             .init_resource::<BlacksmithPurchaseTracker>()
             .init_resource::<EssenceShopCache>()
+            .init_resource::<MerchantShopUiDirty>()
             .init_resource::<TimeCrystalsHeirloomGridOpen>()
             .init_resource::<DevHeirloomGridOpen>()
             .init_resource::<SelectedBeastiaryMob>()
             .add_event::<TooltipTeardownEvent>()
             .add_event::<ShowInvPlayerStatsEvent>()
             .add_event::<DamageTrackerRefreshEvent>()
-            .add_event::<SubmitEssenceChoice>()
+            .add_event::<SubmitMerchantPurchase>()
+            .add_event::<MerchantCategoryRerollEvent>()
             .add_event::<DropInWorldEvent>()
             .add_event::<MenuButtonClickEvent>()
             .add_event::<GrantHeirloomDevEvent>()
@@ -1017,9 +1019,7 @@ impl Plugin for UIPlugin {
                     setup_chest_slots_ui.run_if(in_state(UIState::Chest)),
                     setup_scrapper_slots_ui.run_if(in_state(UIState::Scrapper)),
                     tick_tooltip_timer,
-                    handle_submit_essence_choice.run_if(resource_exists::<EssenceShopChoices>()),
                     handle_populate_essence_shop_on_new_spawn,
-                    handle_cursor_essence_buttons,
                     handle_cursor_skills_buttons.run_if(in_state(UIState::Skills)),
                     update_furnace_bar,
                     setup_skill_choice_ui
@@ -1041,8 +1041,36 @@ impl Plugin for UIPlugin {
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
+            .add_systems(
+                (
+                    handle_submit_merchant_purchase
+                        .run_if(resource_exists::<EssenceShopChoices>()),
+                    handle_merchant_shop_interactions.run_if(in_state(UIState::Essence)),
+                    handle_merchant_done_button.run_if(in_state(UIState::Essence)),
+                    handle_merchant_category_reroll_buttons.run_if(in_state(UIState::Essence)),
+                    handle_merchant_category_reroll_event.run_if(in_state(UIState::Essence)),
+                    refresh_merchant_shop_ui_dirty.run_if(in_state(UIState::Essence)),
+                    update_chest_button_label_hover.run_if(in_state(UIState::Essence)),
+                )
+                    .in_set(OnUpdate(GameState::Main)),
+            )
             .add_system(
                 update_blacksmith_coin_display
+                    .in_set(OnUpdate(GameState::Main))
+                    .run_if(in_state(UIState::Essence)),
+            )
+            .add_system(
+                update_blacksmith_reroll_display
+                    .in_set(OnUpdate(GameState::Main))
+                    .run_if(in_state(UIState::Essence)),
+            )
+            .add_system(
+                update_merchant_reroll_button_states
+                    .in_set(OnUpdate(GameState::Main))
+                    .run_if(in_state(UIState::Essence)),
+            )
+            .add_system(
+                update_merchant_price_text_colors
                     .in_set(OnUpdate(GameState::Main))
                     .run_if(in_state(UIState::Essence)),
             )
@@ -1110,7 +1138,15 @@ impl Plugin for UIPlugin {
             )
             .add_system(
                 handle_essence_heirloom_tooltip
-                    .in_set(OnUpdate(GameState::Main)),
+                    .in_set(OnUpdate(GameState::Main))
+                    .after(handle_merchant_shop_interactions)
+                    .run_if(in_state(UIState::Essence)),
+            )
+            .add_system(
+                handle_merchant_item_tooltip
+                    .in_set(OnUpdate(GameState::Main))
+                    .after(handle_merchant_shop_interactions)
+                    .run_if(in_state(UIState::Essence)),
             )
             .add_system(
                 handle_item_chest_final_item_hover
@@ -1429,6 +1465,8 @@ pub fn handle_new_ui_state(
     minimap_open: Res<minimap::IslandMapOpen>,
     mut drop_filter_menu_open: ResMut<crate::inventory::MaterialDropFilterMenuOpen>,
     item_tooltips: Query<Entity, With<crate::ui::ItemOrRecipeTooltip>>,
+    shop: Option<Res<EssenceShopChoices>>,
+    mut shop_cache: ResMut<EssenceShopCache>,
 ) {
     if next_ui_state.0.is_none() {
         return;
@@ -1501,6 +1539,11 @@ pub fn handle_new_ui_state(
         commands.remove_resource::<CraftingContainer>();
     }
     if next_ui != UIState::Essence {
+        if curr_ui_state.0 == UIState::Essence {
+            if let Some(shop) = shop.as_ref() {
+                sync_merchant_shop_to_world(shop, &mut commands, &mut shop_cache);
+            }
+        }
         commands.remove_resource::<EssenceShopChoices>();
     }
     if let Some(next_ui) = &next_ui_state.0 {
