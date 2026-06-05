@@ -94,6 +94,7 @@ pub enum UIElement {
     StatsButtonHover,
     HudBar,
     ProgressBackground,
+    TooltipInfoBox,
     CurrencyBackground,
     InventoryIcon,
     MapIcon,

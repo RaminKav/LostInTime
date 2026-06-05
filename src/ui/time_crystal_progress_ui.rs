@@ -515,7 +515,7 @@ pub fn handle_time_crystal_unlock_hover_tooltip(
                 rarity,
                 position: tooltip_pos,
                 scaling_text: None,
-                trigger_count_text: None,
+                trigger_count: 0,
                 ui_state: Some(tooltip_ui_state),
             }));
         }

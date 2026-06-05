@@ -27,7 +27,7 @@ use crate::{
     },
     player::time_crystals::TimeCrystals,
     proto::proto_param::ProtoParam,
-    ui::UIElement,
+    ui::{HeirloomDescLine, HeirloomDescLineKind, TooltipDefinition, UIElement},
     Pet,
 };
 
@@ -1271,57 +1271,136 @@ impl Heirloom {
             Heirloom::ManaOrbDropMult => "Purple Card".to_string(),
         }
     }
-    pub fn get_desc(&self) -> Vec<String> {
-        // max 13 char per line, space included
+
+    /// Side glossary info boxes for this heirloom (explicit per-variant; no desc parsing).
+    pub fn tooltip_definitions(&self) -> &'static [TooltipDefinition] {
+        use TooltipDefinition as D;
         match self {
+            // Self::CritChance
+            // | Self::CritHeal
+            // | Self::CritSkillCooldownReduction
+            // | Self::MPBarCrit => &[D::CritChance],
+            // Self::CritDamage => &[D::CritDamage],
+            // Self::Health | Self::HPRegen | Self::MaxHPHunt => &[D::Health],
+            Self::Mana
+            | Self::MPRegen
+            | Self::ManaOrbs
+            | Self::MPBarCrit
+            | Self::DamageDealtMp
+            | Self::MPRegenCooldown
+            | Self::ManaOrbDropMult
+            | Self::FrozenMPRegen => &[D::Mana],
+            Self::Thorns | Self::ThornsSpikes | Self::ThornsOnDamage | Self::ThornArmor => {
+                &[D::Thorns]
+            }
+            Self::FrailStacks => &[D::Frail],
+            Self::AntFarm | Self::StoneTooth | Self::SummonRing | Self::HealSummons => &[D::Summon],
+            Self::ThornsLifesteal => &[D::Thorns, D::Lifesteal],
+            Self::Lifesteal | Self::RegenLifesteal | Self::LifestealCoins => &[D::Lifesteal],
+            // Self::Speed => &[D::Speed],
+            Self::AttackSpeed => &[D::AttackSpeed],
+            Self::DodgeChance => &[D::Dodge],
+            Self::DodgeCrit => &[D::Dodge, D::AttackSpeed],
+            Self::Defence | Self::ReinforcedArmor => &[D::Defence],
+            // Self::Attack
+            // | Self::MaxHPDamage
+            // | Self::GoldIntoDamage
+            // | Self::LowHPDamage
+            // | Self::CrateBreakDamage
+            // | Self::StandStill
+            // | Self::MPBarDMG => &[D::Attack],
+            Self::SkillPower | Self::SkillPowerHunt => &[D::SkillPower],
+            // Self::ItemPickupRadius | Self::GravityScales => &[D::PickupRange],
+            Self::OnHitEcho | Self::HealEcho | Self::SkillEcho | Self::ParryEcho => &[D::Echo],
+            Self::CoinLightning | Self::KillLightning | Self::ManaRegenLightning => &[D::Lightning],
+
+            Self::IceStaffAoE => &[D::IceExplosion],
+            Self::FrozenAoE => &[D::IceExplosion, D::FreezeChance],
+            Self::SlowStacks | Self::FrozenMPRegen => &[D::FreezeChance],
+            Self::FrozenCrit => &[D::FreezeChance],
+
+            Self::PoisonStacks
+            | Self::ViralVenum
+            | Self::ManaRegenPoison
+            | Self::PoisonDuration
+            | Self::PoisonStrength => &[D::Poison],
+
+            Self::ChaosStats => &[D::Mana, D::Defence, D::Dodge],
+
+            _ => &[],
+        }
+    }
+
+    fn classify_desc_line(line: String) -> HeirloomDescLine {
+        if line.is_empty() {
+            return HeirloomDescLine::blank();
+        }
+        if line.starts_with("Costs ") {
+            return HeirloomDescLine::mana(line);
+        }
+        if line.starts_with('+') {
+            return HeirloomDescLine::stat(line);
+        }
+        HeirloomDescLine::effect(line)
+    }
+
+    /// Mana/stat header lines first, blank gap, then effect body.
+    fn typed_from_strings(lines: Vec<String>) -> Vec<HeirloomDescLine> {
+        let classified: Vec<HeirloomDescLine> =
+            lines.into_iter().map(Self::classify_desc_line).collect();
+
+        let mut mana = Vec::new();
+        let mut stats = Vec::new();
+        let mut effects = Vec::new();
+        for line in classified {
+            match line.kind {
+                HeirloomDescLineKind::Mana => mana.push(line),
+                HeirloomDescLineKind::Stat => stats.push(line),
+                HeirloomDescLineKind::Blank => {}
+                HeirloomDescLineKind::Effect => effects.push(line),
+            }
+        }
+
+        if effects.is_empty() || (mana.is_empty() && stats.is_empty()) {
+            return mana.into_iter().chain(stats).chain(effects).collect();
+        }
+
+        let mut result = mana;
+        result.extend(stats);
+        result.push(HeirloomDescLine::blank());
+        result.extend(effects);
+        result
+    }
+
+    pub fn desc_lines(&self) -> Vec<HeirloomDescLine> {
+        // max 13 char per line, space included
+        let lines = match self {
             Heirloom::None => vec!["No Heirloom".to_string()],
             Heirloom::Chest => vec!["Gain a Loot Chest".to_string()],
-            Heirloom::CritChance => vec![
-                "Gain +7% Critical".to_string(),
-                "Chance, ".to_string(),
-                "permanantly.".to_string(),
-            ],
-            Heirloom::CritDamage => vec![
-                "Gain +15% Critical".to_string(),
-                "Damage, permanently".to_string(),
-            ],
+            Heirloom::CritChance => vec!["+7% Critical Chance".to_string()],
+            Heirloom::CritDamage => vec!["+15% Critical Damage".to_string()],
             Heirloom::SkillCDReduction => {
                 vec!["Reduce skill".to_string(), "cooldowns by 8%.".to_string()]
             }
             Heirloom::LoadedDice => {
-                vec!["Gain +7 Luck,".to_string(), "permanently.".to_string()]
+                vec!["+7 Luck".to_string()]
             }
-            Heirloom::Health => vec!["Gain +25 Health,".to_string(), "permanently.".to_string()],
-            Heirloom::Mana => vec!["Gain +25 Mana,".to_string(), "permanently.".to_string()],
-            Heirloom::Shield => vec!["Gain +10 Shield,".to_string(), "permanently.".to_string()],
-            Heirloom::Speed => vec!["Gain +10 Speed,".to_string(), "permanently.".to_string()],
-            Heirloom::Thorns => vec!["Gain +25 Thorns, ".to_string(), "permanently.".to_string()],
+            Heirloom::Health => vec!["+25 Max Health".to_string()],
+            Heirloom::Mana => vec!["+25 Max Mana".to_string()],
+            Heirloom::Shield => vec!["+10 Shield".to_string()],
+            Heirloom::Speed => vec!["+10 Speed".to_string()],
+            Heirloom::Thorns => vec!["+25 Thorns ".to_string()],
             Heirloom::Lifesteal => {
-                vec![
-                    "Gain +3% Lifesteal,".to_string(),
-                    "permanently.".to_string(),
-                ]
+                vec!["+3% Lifesteal".to_string()]
             }
-            Heirloom::AttackSpeed => vec![
-                "Gain +15% Attack".to_string(),
-                "Speed, permanently. ".to_string(),
-            ],
-            Heirloom::XPGain => vec!["Gain +7% XP".to_string(), "permanently. ".to_string()],
+            Heirloom::AttackSpeed => vec!["+15% Attack speed".to_string()],
+            Heirloom::XPGain => vec!["+7% XP".to_string()],
             Heirloom::CreditCard => vec![
                 "Gain 1 Coin when".to_string(),
-                "you use your active".to_string(),
-                "skill.".to_string(),
+                "you use a skill.".to_string(),
             ],
-            Heirloom::DodgeChance => vec![
-                "Gain +7% Dodge".to_string(),
-                "Chance,".to_string(),
-                "permanently.".to_string(),
-            ],
-            Heirloom::Gigantify => vec![
-                "Your Attacks gain".to_string(),
-                "+10% Size".to_string(),
-                "permanently.".to_string(),
-            ],
+            Heirloom::DodgeChance => vec!["+7% Dodge Chance".to_string()],
+            Heirloom::Gigantify => vec!["+10% Size".to_string()],
 
             Heirloom::WaveAttack => vec![
                 "Your Attacks have".to_string(),
@@ -1329,21 +1408,18 @@ impl Heirloom {
                 "sonic wave attack".to_string(),
                 "that travels a".to_string(),
                 "short distance.".to_string(),
-                format!("Costs {} mana.", Heirloom::WaveAttack.get_mana_cost()),
+                format!("Costs {} mana", Heirloom::WaveAttack.get_mana_cost()),
             ],
             Heirloom::FrailStacks => vec![
                 "Your Attacks have".to_string(),
-                "a chance to apply".to_string(),
-                "a Frail stack that".to_string(),
-                "gives +10% Damage".to_string(),
-                "on hits.".to_string(),
+                "a +25% chance to".to_string(),
+                "apply a Frail".to_string(),
+                "stack.".to_string(),
             ],
             Heirloom::SlowStacks => vec![
                 "Your Attacks have".to_string(),
-                "+25% chance to apply".to_string(),
-                "a Freeze stack to".to_string(),
-                "enemies, reducing".to_string(),
-                "speed by 15% per".to_string(),
+                "a +25% chance to".to_string(),
+                "apply a Freeze".to_string(),
                 "stack.".to_string(),
             ],
             Heirloom::AntFarm => vec![
@@ -1351,45 +1427,40 @@ impl Heirloom {
                 "rush towards".to_string(),
                 "enemies, dealing".to_string(),
                 "damage.".to_string(),
-                format!("Costs {} mana.", Heirloom::AntFarm.get_mana_cost()),
+                format!("Costs {} mana", Heirloom::AntFarm.get_mana_cost()),
             ],
             Heirloom::StoneTooth => vec![
                 "Summon rocks that".to_string(),
                 "orbit you and deal".to_string(),
                 "damage to enemies".to_string(),
                 "they hit.".to_string(),
-                format!("Costs {} mana.", Heirloom::StoneTooth.get_mana_cost()),
+                format!("Costs {} mana", Heirloom::StoneTooth.get_mana_cost()),
             ],
             Heirloom::SummonRing => vec![
-                "Summon a ring that".to_string(),
-                "flies in a random".to_string(),
-                "direction, piercing".to_string(),
-                "enemies and bouncing".to_string(),
-                "off objects.".to_string(),
-                format!("Costs {} mana.", Heirloom::SummonRing.get_mana_cost()),
+                "Summon rings that".to_string(),
+                "pierce enemies and".to_string(),
+                "bounce off objects.".to_string(),
+                format!("Costs {} mana", Heirloom::SummonRing.get_mana_cost()),
             ],
             Heirloom::Reaper => vec![
                 "Soul fragments".to_string(),
                 "chase enemies".to_string(),
                 "after each kill,".to_string(),
                 "damaging them.".to_string(),
-                format!("Costs {} mana.", Heirloom::Reaper.get_mana_cost()),
+                format!("Costs {} mana", Heirloom::Reaper.get_mana_cost()),
             ],
             Heirloom::SkillEcho => {
                 vec![
-                    "Using a skill triggers".to_string(),
-                    "an echo that damages".to_string(),
-                    "enemies around you".to_string(),
-                    format!("Costs {} mana.", Heirloom::SkillEcho.get_mana_cost()),
+                    "Using a skill".to_string(),
+                    "triggers an echo.".to_string(),
+                    format!("Costs {} mana", Heirloom::SkillEcho.get_mana_cost()),
                 ]
             }
             Heirloom::PoisonStacks => vec![
                 "Your Attacks have".to_string(),
-                "a chance to apply".to_string(),
-                "Poison to enemies.".to_string(),
-                "Poisoned enemies".to_string(),
-                "lose health over".to_string(),
-                "time.".to_string(),
+                "a +25% chance to".to_string(),
+                "apply a Poison".to_string(),
+                "stack.".to_string(),
             ],
             Heirloom::LethalBlow => vec![
                 "0.5% chance to".to_string(),
@@ -1405,7 +1476,7 @@ impl Heirloom {
                 "active class skill.".to_string(),
             ],
             Heirloom::SkillPower => {
-                vec!["Increases skill".to_string(), "power by +15%".to_string()]
+                vec!["+15% Skill Power".to_string()]
             }
             Heirloom::CritSkillCooldownReduction => vec![
                 "Landing a critical".to_string(),
@@ -1466,15 +1537,14 @@ impl Heirloom {
                 "Your Attacks have".to_string(),
                 "a 7% chance to ".to_string(),
                 "trigger an ice".to_string(),
-                "explosion that".to_string(),
-                "damages enemies. ".to_string(),
-                format!("Costs {} mana.", Heirloom::IceStaffAoE.get_mana_cost()),
+                "explosion.".to_string(),
+                format!("Costs {} mana", Heirloom::IceStaffAoE.get_mana_cost()),
             ],
             Heirloom::BowArrowSpeed => {
                 vec!["Your Projectiles".to_string(), "move faster.".to_string()]
             }
-            Heirloom::Attack => vec!["Gain +10% Damage,".to_string(), "permanently.".to_string()],
-            Heirloom::Defence => vec!["Gain +10 Defence,".to_string(), "permanently.".to_string()],
+            Heirloom::Attack => vec!["+10% Damage".to_string()],
+            Heirloom::Defence => vec!["+10 Defence".to_string()],
             Heirloom::ParryHPRegen => vec![
                 "A successful".to_string(),
                 "parry triggers".to_string(),
@@ -1504,35 +1574,22 @@ impl Heirloom {
                 "your critical ".to_string(),
                 "damage.".to_string(),
             ],
-            Heirloom::HPRegen => vec![
-                "Gain +5 Health".to_string(),
-                "regeneration, ".to_string(),
-                "permanently.".to_string(),
-            ],
-            Heirloom::MPRegen => vec![
-                "Gain +5 Mana ".to_string(),
-                "regeneration,".to_string(),
-                "permanently.".to_string(),
-            ],
-            Heirloom::HPRegenCooldown => vec![
-                "Your Health".to_string(),
-                "regeneration".to_string(),
-                "cooldown is.".to_string(),
-                "reduced.".to_string(),
-            ],
+            Heirloom::HPRegen => vec!["+5 Health Regen".to_string()],
+            Heirloom::MPRegen => vec!["+5 Mana Regen".to_string()],
+            Heirloom::HPRegenCooldown => {
+                vec![
+                    "Your Health regen".to_string(),
+                    "cooldown is reduced.".to_string(),
+                ]
+            }
             Heirloom::MPRegenCooldown => vec![
-                "Your Mana".to_string(),
-                "regeneration".to_string(),
-                "cooldown is.".to_string(),
-                "reduced.".to_string(),
+                "Your Mana regen".to_string(),
+                "cooldown is reduced".to_string(),
             ],
             Heirloom::OnHitEcho => vec![
-                "After taking ".to_string(),
-                "damage, trigger ".to_string(),
-                "an echo that".to_string(),
-                "damages enemies ".to_string(),
-                "around you.".to_string(),
-                format!("Costs {} mana.", Heirloom::OnHitEcho.get_mana_cost()),
+                "After taking damage,".to_string(),
+                "trigger an echo.".to_string(),
+                format!("Costs {} mana", Heirloom::OnHitEcho.get_mana_cost()),
             ],
 
             Heirloom::Knockback => vec![
@@ -1558,23 +1615,23 @@ impl Heirloom {
 
             Heirloom::FrozenAoE => vec![
                 "Killing a frozen".to_string(),
-                "enemy has a 25% chance".to_string(),
-                "to trigger an ice".to_string(),
-                "explosion.".to_string(),
+                "enemy has a 25%".to_string(),
+                "chance to trigger an".to_string(),
+                "ice explosion.".to_string(),
                 "+25% freeze chance.".to_string(),
-                format!("Costs {} mana.", Heirloom::FrozenAoE.get_mana_cost()),
+                format!("Costs {} mana", Heirloom::FrozenAoE.get_mana_cost()),
             ],
             Heirloom::IceStaffFloor => vec![
                 "Killing an enemy has".to_string(),
                 "a 10% chance to leave".to_string(),
                 "a trail of ice that".to_string(),
                 "damages enemies. ".to_string(),
-                format!("Costs {} mana.", Heirloom::IceStaffFloor.get_mana_cost()),
+                format!("Costs {} mana", Heirloom::IceStaffFloor.get_mana_cost()),
             ],
             Heirloom::FrozenCrit => vec![
                 "Attacking frozen".to_string(),
                 "enemies gives you".to_string(),
-                "+15% critical hit".to_string(),
+                "a +15% critical hit".to_string(),
                 "chance.".to_string(),
                 "+25% freeze chance.".to_string(),
             ],
@@ -1594,14 +1651,14 @@ impl Heirloom {
                 "Killing a frozen".to_string(),
                 "enemy has a 20%".to_string(),
                 "chance to trigger".to_string(),
-                "mana regeneration.".to_string(),
+                "mana regen.".to_string(),
                 "+25% freeze chance.".to_string(),
             ],
             Heirloom::DodgeCrit => vec![
-                "Dodging grants".to_string(),
-                "+30% atk speed,".to_string(),
-                "+30 speed, next".to_string(),
-                "hit does 2x dmg.".to_string(),
+                "Dodging grants a".to_string(),
+                "burst of atk speed".to_string(),
+                "and speed. The next".to_string(),
+                "hit does 2x damage.".to_string(),
             ],
             Heirloom::PoisonDuration => vec![
                 "Your poison effect".to_string(),
@@ -1619,23 +1676,21 @@ impl Heirloom {
                 "poison to nearby".to_string(),
                 "enemies.".to_string(),
                 "+25% poison chance.".to_string(),
-                format!("Costs {} mana.", Heirloom::ViralVenum.get_mana_cost()),
+                format!("Costs {} mana", Heirloom::ViralVenum.get_mana_cost()),
             ],
             Heirloom::HealEcho => vec![
                 "Healing has a 10%".to_string(),
                 "chance to trigger an".to_string(),
-                "echo that damages".to_string(),
-                "enemies around you.".to_string(),
+                "echo.".to_string(),
                 "+5 Health regen.".to_string(),
-                format!("Costs {} mana.", Heirloom::HealEcho.get_mana_cost()),
+                format!("Costs {} mana", Heirloom::HealEcho.get_mana_cost()),
             ],
             Heirloom::HealSummons => vec![
                 "Healing has a 10%".to_string(),
                 "chance to trigger".to_string(),
-                "all summons once".to_string(),
-                "(Ant Farm, Boulder,".to_string(),
-                "Piercing Ring).".to_string(),
-                // format!("Costs {} mana.", Heirloom::HealSummons.get_mana_cost()),
+                "all summon heirlooms".to_string(),
+                "once.".to_string(),
+                // format!("Costs {} mana", Heirloom::HealSummons.get_mana_cost()),
             ],
             Heirloom::FullStomach => vec![
                 "You get hungry".to_string(),
@@ -1681,10 +1736,9 @@ impl Heirloom {
                 "freeze all enemies".to_string(),
                 "for 3 seconds.".to_string(),
             ],
-            Heirloom::RegenLifesteal => vec![
-                "Lose 7 HP Regen,".to_string(),
-                "gain 7% Lifesteal.".to_string(),
-            ],
+            Heirloom::RegenLifesteal => {
+                vec!["-7 HP Regen".to_string(), "+7% Lifesteal".to_string()]
+            }
             Heirloom::StandStill => vec![
                 "Standing still".to_string(),
                 "increases damage".to_string(),
@@ -1694,13 +1748,13 @@ impl Heirloom {
                 "Gain +10 Thorns".to_string(),
                 "for every 10".to_string(),
                 "Defence you have.".to_string(),
-                "Gain +10 Defence.".to_string(),
+                "+10 Defence.".to_string(),
             ],
             Heirloom::LifestealCoins => vec![
                 "Lifesteal triggers".to_string(),
                 "have a 10% chance to".to_string(),
                 "give you a coin.".to_string(),
-                "Gain +5% Lifesteal.".to_string(),
+                "+5% Lifesteal.".to_string(),
             ],
 
             // Wave 2 heirlooms
@@ -1710,9 +1764,9 @@ impl Heirloom {
                 "to heal 1 HP.".to_string(),
             ],
             Heirloom::CrateBreakDamage => vec![
-                "Breaking crates".to_string(),
+                "Breaking a crate".to_string(),
                 "permanently gives".to_string(),
-                "+1.5% damage.".to_string(),
+                "you +1.5% damage.".to_string(),
             ],
             Heirloom::EnergyBallBarrage => vec![
                 "Every 150 damage you".to_string(),
@@ -1732,9 +1786,9 @@ impl Heirloom {
             ],
             Heirloom::LowHPDamage => vec![
                 "Deal more damage".to_string(),
-                "the lower your".to_string(),
-                "HP is (up to".to_string(),
-                "+75% at 0 HP).".to_string(),
+                "the lower your HP".to_string(),
+                "is (up to +75%".to_string(),
+                "at 0 HP).".to_string(),
             ],
             Heirloom::ChaosStats => vec![
                 "+2 Chaos. +10 HP,".to_string(),
@@ -1744,17 +1798,17 @@ impl Heirloom {
             ],
             Heirloom::ManaOrbs => vec!["Mana Orbs restore".to_string(), "5 more Mana.".to_string()],
             Heirloom::ManaOrbAttack => vec![
-                "Mana regeneration".to_string(),
-                "shoots a mana orb".to_string(),
-                "at an enemy. It does".to_string(),
-                "damage equal to the".to_string(),
-                "amount regenerated.".to_string(),
-                format!("Costs {} mana.", Heirloom::ManaOrbAttack.get_mana_cost()),
+                "Mana regen shoots a".to_string(),
+                "mana orb at an enemy.".to_string(),
+                "It does damage equal".to_string(),
+                "to the amount".to_string(),
+                "regenerated.".to_string(),
+                format!("Costs {} mana", Heirloom::ManaOrbAttack.get_mana_cost()),
             ],
             Heirloom::ItemPickupRadius => vec![
+                "+25% pickup range".to_string(),
                 "Increases item".to_string(),
-                "pickup radius by".to_string(),
-                "+25%.".to_string(),
+                "pickup radius.".to_string(),
             ],
             Heirloom::GravityScales => vec![
                 "Converts 25% of".to_string(),
@@ -1773,13 +1827,12 @@ impl Heirloom {
             Heirloom::ThornsSpikes => vec![
                 "Taking damage shoots".to_string(),
                 "out 2 spikes. Damage".to_string(),
-                "scales with thorns".to_string(),
-                "stat.".to_string(),
+                "scales with thorns.".to_string(),
                 "+15 Thorns.".to_string(),
             ],
             Heirloom::ThornsOnDamage => vec![
                 "Gain +1 Thorns each".to_string(),
-                "time you take damage".to_string(),
+                "time you take damage.".to_string(),
             ],
             Heirloom::ThornsLifesteal => vec![
                 "Your thorns damage".to_string(),
@@ -1791,24 +1844,20 @@ impl Heirloom {
             Heirloom::CoinLightning => vec![
                 "Picking up coins".to_string(),
                 "spawns a lightning".to_string(),
-                "strike on a random".to_string(),
-                "nearby enemy.".to_string(),
-                format!("Costs {} mana.", Heirloom::CoinLightning.get_mana_cost()),
+                "strike".to_string(),
+                format!("Costs {} mana", Heirloom::CoinLightning.get_mana_cost()),
             ],
             Heirloom::KillLightning => vec![
                 "Killing an enemy".to_string(),
                 "has a 15% chance".to_string(),
                 "to spawn a lightning".to_string(),
-                "strike on a random".to_string(),
-                "nearby enemy.".to_string(),
-                format!("Costs {} mana.", Heirloom::KillLightning.get_mana_cost()),
+                "strike.".to_string(),
+                format!("Costs {} mana", Heirloom::KillLightning.get_mana_cost()),
             ],
             Heirloom::ManaRegenLightning => vec![
-                "Mana regeneration".to_string(),
-                "has a 20% chance to".to_string(),
-                "spawn a lightning".to_string(),
-                "strike on a random".to_string(),
-                "nearby enemy.".to_string(),
+                "Mana regen has a".to_string(),
+                "20% chance to Spawn".to_string(),
+                "a lightning strike".to_string(),
                 format!(
                     "Costs {} mana.",
                     Heirloom::ManaRegenLightning.get_mana_cost()
@@ -1824,8 +1873,7 @@ impl Heirloom {
             Heirloom::SkillManaRegen => vec![
                 "Using a skill has".to_string(),
                 "a 8% chance to".to_string(),
-                "trigger mana".to_string(),
-                "regeneration.".to_string(),
+                "trigger mana regen.".to_string(),
             ],
             Heirloom::DamageDealtMp => vec![
                 "Damage from Weapons".to_string(),
@@ -1835,11 +1883,21 @@ impl Heirloom {
             ],
             Heirloom::ManaOrbDropMult => vec![
                 "Mana Orb drop".to_string(),
-                "chance from enemiess".to_string(),
+                "chance from enemies".to_string(),
                 "is doubled.".to_string(),
             ],
-        }
+        };
+        Self::typed_from_strings(lines)
     }
+
+    pub fn get_desc(&self) -> Vec<String> {
+        self.desc_lines()
+            .into_iter()
+            .filter(|line| line.kind != HeirloomDescLineKind::Blank)
+            .map(|line| line.text)
+            .collect()
+    }
+
     pub fn get_instant_drop(&self) -> Option<(WorldObject, usize)> {
         match self {
             Heirloom::Chest => Some((WorldObject::ChestBlock, 1)),
@@ -2228,14 +2286,13 @@ pub fn time_crystal_heirlooms(idx: usize) -> Vec<(Heirloom, HeirloomRarity)> {
             (Heirloom::Lifesteal, HeirloomRarity::Common),
         ],
         4 => vec![
-            (Heirloom::MPBarDMG, HeirloomRarity::Rare),
             (Heirloom::RegenLifesteal, HeirloomRarity::Uncommon),
             (Heirloom::FrozenMPRegen, HeirloomRarity::Rare),
+            (Heirloom::LowHPDamage, HeirloomRarity::Rare),
         ],
         5 => vec![
             (Heirloom::CoinLightning, HeirloomRarity::Legendary),
             (Heirloom::GoldIntoDamage, HeirloomRarity::Rare),
-            (Heirloom::LowHPDamage, HeirloomRarity::Rare),
         ],
         6 => vec![
             (Heirloom::ThornsLifesteal, HeirloomRarity::Uncommon),

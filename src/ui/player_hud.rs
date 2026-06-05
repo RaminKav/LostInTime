@@ -1315,14 +1315,6 @@ pub fn handle_heirloom_hud_tooltip(
             );
 
             let trigger_count = trigger_counts.get(heirloom);
-            let trigger_count_text = if trigger_count > 0 {
-                Some(format!(
-                    "Triggered: {}",
-                    crate::ui::ui_helpers::format_number(trigger_count as i64)
-                ))
-            } else {
-                None
-            };
 
             let (_, tooltip_size) = heirloom.get_ui_element(rarity);
             let tooltip_pos = heirloom_hud_hover_tooltip_position(
@@ -1335,7 +1327,7 @@ pub fn handle_heirloom_hud_tooltip(
                 rarity,
                 position: tooltip_pos,
                 scaling_text,
-                trigger_count_text,
+                trigger_count,
                 ui_state: None,
             }));
         }

@@ -433,7 +433,7 @@ pub fn handle_microwave_shrine_heirloom_tooltip(
                 rarity,
                 position: tooltip_pos,
                 scaling_text: None,
-                trigger_count_text: None,
+                trigger_count: 0,
                 ui_state: Some(UIState::MicrowaveShrine),
             }));
         }

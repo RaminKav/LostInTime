@@ -5,11 +5,19 @@ use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
 
 use crate::{
     assets::Graphics,
-    colors::WHITE,
+    colors::{BLUE, LIGHT_BLUE, LIGHT_GREY, SHIELD_BLUE, WHITE, YELLOW_2},
     player::skills::{Heirloom, HeirloomRarity},
+    ScreenResolution,
 };
 
-use super::{game_fonts as gf, tooltips, UIState};
+use super::{
+    game_fonts as gf,
+    tooltip_info_boxes::{
+        build_tooltip_info_boxes, spawn_tooltip_info_boxes_with_resolution, HeirloomDescLineKind,
+        TooltipInfoBoxAnchor,
+    },
+    tooltips, UIState,
+};
 
 /// Vertical offset from the hovered HUD heirloom icon to the tooltip card center.
 pub const HEIRLOOM_HUD_HOVER_TOOLTIP_Y_OFFSET: f32 = -90.;
@@ -49,7 +57,7 @@ pub struct HeirloomTooltipShow {
     /// `GlobalTransform::translation()` + a per-UI offset). Used as-is by the processor.
     pub position: Vec3,
     pub scaling_text: Option<String>,
-    pub trigger_count_text: Option<String>,
+    pub trigger_count: u32,
     /// When set, tags the entity for `handle_new_ui_state` teardown.
     pub ui_state: Option<UIState>,
 }
@@ -61,18 +69,28 @@ pub enum HeirloomTooltipRequest {
     Show(HeirloomTooltipShow),
 }
 
-/// Spawns a single heirloom card (icon, title, description, optional scaling / trigger lines).
+fn desc_line_color(kind: HeirloomDescLineKind) -> Color {
+    match kind {
+        HeirloomDescLineKind::Mana => SHIELD_BLUE,
+        HeirloomDescLineKind::Stat => YELLOW_2,
+        HeirloomDescLineKind::Effect | HeirloomDescLineKind::Blank => WHITE,
+    }
+}
+
+/// Spawns a single heirloom card (icon, title, description, optional scaling / side info boxes).
 /// Does **not** insert [`UIState`] — callers or [`process_heirloom_tooltip_requests`] add it.
 /// Also used for non-hover cards (e.g. level-up choices) that attach their own components after.
 pub fn spawn_heirloom_tooltip_card(
     graphics: &Graphics,
     commands: &mut Commands,
     asset_server: &AssetServer,
+    resolution: &ScreenResolution,
     heirloom: Heirloom,
     rarity: HeirloomRarity,
     position: Vec3,
     scaling_text: Option<String>,
-    trigger_count_text: Option<String>,
+    trigger_count: u32,
+    show_info_boxes: bool,
 ) -> Entity {
     let (ui_element, size) = heirloom.get_ui_element(rarity);
     let card_e = commands
@@ -148,16 +166,49 @@ pub fn spawn_heirloom_tooltip_card(
     ));
     text_title.set_parent(card_e);
 
-    for (j, desc) in heirloom.get_desc().iter().enumerate() {
+    let desc_lines = heirloom.desc_lines();
+    let mut line_index = 0usize;
+    let mut desc_slots: Vec<usize> = Vec::new();
+    for line in &desc_lines {
+        if line.kind == HeirloomDescLineKind::Blank {
+            line_index += 1;
+            continue;
+        }
+        desc_slots.push(line_index);
+        line_index += 1;
+    }
+
+    let desc_y_offset = desc_slots
+        .first()
+        .zip(desc_slots.last())
+        .map(|(first_slot, last_slot)| {
+            let top = gf::heirloom_desc_first_line_y()
+                - *first_slot as f32 * gf::HEIRLOOM_CARD_DESC_LINE_STEP;
+            let bottom = gf::heirloom_desc_first_line_y()
+                - *last_slot as f32 * gf::HEIRLOOM_CARD_DESC_LINE_STEP;
+            gf::heirloom_desc_text_center_y() - (top + bottom) * 0.5
+        })
+        .unwrap_or(0.);
+
+    line_index = 0;
+    for line in &desc_lines {
+        if line.kind == HeirloomDescLineKind::Blank {
+            line_index += 1;
+            continue;
+        }
+        let color = desc_line_color(line.kind);
+        let y = gf::heirloom_desc_first_line_y()
+            - line_index as f32 * gf::HEIRLOOM_CARD_DESC_LINE_STEP
+            + desc_y_offset;
         let mut text_desc = commands.spawn((
             Text2dBundle {
                 text: Text::from_section(
-                    desc,
-                    gf::HEIRLOOM_CARD_BODY.text_style(asset_server, WHITE),
+                    line.text.as_str(),
+                    gf::HEIRLOOM_CARD_BODY.text_style(asset_server, color),
                 ),
                 text_anchor: Anchor::Center,
                 transform: Transform {
-                    translation: Vec3::new(0., -(j as f32 * 9.) - 4., 1.),
+                    translation: Vec3::new(0., y, 1.),
                     scale: Vec3::new(1., 1., 1.),
                     ..Default::default()
                 },
@@ -167,21 +218,23 @@ pub fn spawn_heirloom_tooltip_card(
             RenderLayers::from_layers(&[3]),
         ));
         text_desc.set_parent(card_e);
+        line_index += 1;
     }
 
-    let desc_count = heirloom.get_desc().len();
-    let mut extra_lines = 0;
-
     if let Some(scaling_text) = scaling_text {
+        let scaling_y = gf::heirloom_desc_first_line_y()
+            - line_index as f32 * gf::HEIRLOOM_CARD_DESC_LINE_STEP
+            - 1.0
+            + desc_y_offset;
         let mut text_scaling = commands.spawn((
             Text2dBundle {
                 text: Text::from_section(
                     scaling_text,
-                    gf::HEIRLOOM_CARD_META.text_style(asset_server, crate::colors::LIGHT_GREY),
+                    gf::HEIRLOOM_CARD_META.text_style(asset_server, LIGHT_GREY),
                 ),
                 text_anchor: Anchor::Center,
                 transform: Transform {
-                    translation: Vec3::new(0.5, -(desc_count as f32 * 9.) - 5.0, 1.),
+                    translation: Vec3::new(0.5, scaling_y, 1.),
                     scale: Vec3::new(1., 1., 1.),
                     ..Default::default()
                 },
@@ -191,29 +244,25 @@ pub fn spawn_heirloom_tooltip_card(
             RenderLayers::from_layers(&[3]),
         ));
         text_scaling.set_parent(card_e);
-        extra_lines += 1;
     }
 
-    if let Some(trigger_text) = trigger_count_text {
-        let y_offset = -(desc_count as f32 * 9.) - 5.0 - (extra_lines as f32 * 9.);
-        let mut text_trigger = commands.spawn((
-            Text2dBundle {
-                text: Text::from_section(
-                    trigger_text,
-                    gf::HEIRLOOM_CARD_META.text_style(asset_server, crate::colors::YELLOW_2),
-                ),
-                text_anchor: Anchor::Center,
-                transform: Transform {
-                    translation: Vec3::new(0.5, y_offset, 1.),
-                    scale: Vec3::new(1., 1., 1.),
-                    ..Default::default()
-                },
-                ..default()
+    if show_info_boxes {
+        let info_boxes = build_tooltip_info_boxes(heirloom.clone(), trigger_count);
+        if let Some(info_root) = spawn_tooltip_info_boxes_with_resolution(
+            commands,
+            graphics,
+            asset_server,
+            resolution,
+            TooltipInfoBoxAnchor {
+                center: position,
+                half_width: size.x * 0.5,
+                half_height: size.y * 0.5,
+                game_width: resolution.game_width,
             },
-            Name::new("Heirloom Trigger Count"),
-            RenderLayers::from_layers(&[3]),
-        ));
-        text_trigger.set_parent(card_e);
+            &info_boxes,
+        ) {
+            commands.entity(info_root).set_parent(card_e);
+        }
     }
 
     card_e
@@ -225,6 +274,7 @@ pub fn process_heirloom_tooltip_requests(
     mut events: EventReader<HeirloomTooltipRequest>,
     graphics: Res<Graphics>,
     asset_server: Res<AssetServer>,
+    resolution: Res<ScreenResolution>,
     existing: Query<Entity, With<HeirloomDynamicTooltip>>,
 ) {
     for ev in events.iter() {
@@ -238,11 +288,13 @@ pub fn process_heirloom_tooltip_requests(
                 &graphics,
                 &mut commands,
                 &asset_server,
+                &resolution,
                 spec.heirloom.clone(),
                 spec.rarity,
                 spec.position,
                 spec.scaling_text.clone(),
-                spec.trigger_count_text.clone(),
+                spec.trigger_count,
+                true,
             );
             let mut ec = commands.entity(card);
             ec.insert(HeirloomDynamicTooltip);

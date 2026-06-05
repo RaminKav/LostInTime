@@ -36,9 +36,15 @@ pub mod key_input_guide;
 use key_input_guide::*;
 pub mod furnace_ui;
 mod heirloom_tooltip;
+pub mod tooltip_info_boxes;
 pub use heirloom_tooltip::{
     process_heirloom_tooltip_requests,  
     HeirloomTooltipRequest, 
+};
+pub use tooltip_info_boxes::{
+    build_tooltip_info_boxes, spawn_tooltip_info_boxes, spawn_tooltip_info_boxes_with_resolution,
+    HeirloomDescLine, HeirloomDescLineKind, TooltipDefinition, TooltipInfoBox, TooltipInfoBoxAnchor,
+    TooltipInfoBoxKind, TooltipInfoBoxSpec,
 };
 pub use skill_choice_ui::*;
 mod achievement_banner;
@@ -290,6 +296,9 @@ pub const HUD_SKILL_SLOT_HIT_SIZE: Vec2 = Vec2::new(20., 20.);
 
 /// `assets/ui/ProgressBackground.png` draw size (compact HUD: score + chaos only).
 pub const PROGRESS_BACKGROUND_SIZE: Vec2 = Vec2::new(102., 24.);
+
+/// `assets/ui/TooltipInfoBox.png` draw size (side glossary boxes beside tooltips).
+pub const TOOLTIP_INFO_BOX_SIZE: Vec2 = Vec2::new(158., 30.);
 
 /// `assets/ui/CurrencyBackground.png` draw size.
 pub const CURRENCY_BACKGROUND_SIZE: Vec2 = Vec2::new(64., 26.);
@@ -1243,6 +1252,9 @@ impl Plugin for UIPlugin {
                 (
                     update_banish_tracker_ui.run_if(in_state(UIState::Skills)),
                     handle_banish_tracker_tooltip.run_if(in_state(UIState::Skills)),
+                    handle_skill_choice_info_box_hover
+                        .run_if(in_state(UIState::Skills))
+                        .after(handle_cursor_skills_buttons),
                     process_heirloom_tooltip_requests,
                 )
                     .in_set(OnUpdate(GameState::Main)),

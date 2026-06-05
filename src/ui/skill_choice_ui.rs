@@ -22,12 +22,20 @@ use crate::{
 
 use super::{
     heirloom_tooltip::{spawn_heirloom_tooltip_card, HeirloomTooltipRequest, HeirloomTooltipShow},
+    interactions::Interaction,
+    tooltip_info_boxes::{
+        build_tooltip_info_boxes, spawn_tooltip_info_boxes_with_resolution, TooltipInfoBoxAnchor,
+    },
     ui_helpers::{
         Z_DEPTH_HEIRLOOM_SKILL_CHOICE_CONTENT, Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND,
         Z_DEPTH_HEIRLOOM_SKILL_CHOICE_OVERLAY,
     },
     Interactable, UIElement, UIState, SKILLS_CHOICE_UI_SIZE,
 };
+
+/// Side info boxes spawned on hover for a level-up choice card (despawned on unhover).
+#[derive(Component)]
+pub struct SkillChoiceInfoBoxRoot;
 
 #[derive(Component)]
 pub struct SkillChoiceUI {
@@ -250,13 +258,72 @@ pub fn handle_banish_tracker_tooltip(
                 rarity: icon.rarity,
                 position: tooltip_pos,
                 scaling_text: None,
-                trigger_count_text: None,
+                trigger_count: 0,
                 ui_state: Some(UIState::Skills),
             }));
         }
     }
 
     *last_hovered = hovered_heirloom;
+}
+
+/// Spawns definition info boxes beside a level-up choice card only while it is hovered.
+pub fn handle_skill_choice_info_box_hover(
+    mut commands: Commands,
+    graphics: Res<Graphics>,
+    asset_server: Res<AssetServer>,
+    resolution: Res<ScreenResolution>,
+    cards: Query<(Entity, &SkillChoiceUI, &Interactable, &GlobalTransform)>,
+    existing_roots: Query<Entity, With<SkillChoiceInfoBoxRoot>>,
+    mut last_card: Local<Option<Entity>>,
+) {
+    let hovered = cards
+        .iter()
+        .find(|(_, _, interactable, _)| matches!(interactable.current(), Interaction::Hovering));
+
+    let hovered_card = hovered.map(|(e, _, _, _)| e);
+
+    if *last_card == hovered_card {
+        return;
+    }
+
+    for root in existing_roots.iter() {
+        commands.entity(root).despawn_recursive();
+    }
+
+    *last_card = hovered_card;
+
+    let Some((card_e, choice, _, transform)) = hovered else {
+        return;
+    };
+
+    let (_, size) = choice
+        .skill_choice
+        .heirloom
+        .get_ui_element(choice.skill_choice.rarity.clone());
+    let specs = build_tooltip_info_boxes(choice.skill_choice.heirloom.clone(), 0);
+    if specs.is_empty() {
+        return;
+    }
+
+    if let Some(root) = spawn_tooltip_info_boxes_with_resolution(
+        &mut commands,
+        &graphics,
+        &asset_server,
+        &resolution,
+        TooltipInfoBoxAnchor {
+            center: transform.translation(),
+            half_width: size.x * 0.5,
+            half_height: size.y * 0.5,
+            game_width: resolution.game_width,
+        },
+        &specs,
+    ) {
+        commands
+            .entity(root)
+            .insert(SkillChoiceInfoBoxRoot)
+            .set_parent(card_e);
+    }
 }
 
 pub fn setup_skill_choice_ui(
@@ -312,6 +379,7 @@ pub fn setup_skill_choice_ui(
         &graphics,
         &mut commands,
         &asset_server,
+        &res,
         choices.clone().to_vec(),
         t_offset,
     );
@@ -501,6 +569,7 @@ pub fn spawn_skill_choice_entities(
     graphics: &Graphics,
     commands: &mut Commands,
     asset_server: &AssetServer,
+    resolution: &ScreenResolution,
     choices: Vec<HeirloomChoiceState>,
     t_offset: Vec2,
 ) {
@@ -525,11 +594,13 @@ pub fn spawn_skill_choice_entities(
             graphics,
             commands,
             asset_server,
+            resolution,
             choice.heirloom.clone(),
             choice.rarity.clone(),
             position,
             None,
-            None,
+            0,
+            false,
         );
         commands
             .entity(card_e)
@@ -552,6 +623,7 @@ pub fn toggle_skills_visibility(
     mut commands: Commands,
     graphics: Res<Graphics>,
     asset_server: Res<AssetServer>,
+    res: Res<ScreenResolution>,
     player_atts: Query<(&LootRateBonus, &PlayerLevel), With<Player>>,
     cheat_settings: Option<Res<CheatSettings>>,
 ) {
@@ -582,6 +654,7 @@ pub fn toggle_skills_visibility(
             &graphics,
             &mut commands,
             &asset_server,
+            &res,
             queue.queue[0].clone().to_vec(),
             Vec2::new(4., 4.),
         );
@@ -594,6 +667,7 @@ pub fn handle_skill_reroll_after_flash(
     mut commands: Commands,
     graphics: Res<Graphics>,
     asset_server: Res<AssetServer>,
+    res: Res<ScreenResolution>,
     player_atts: Query<(&LootRateBonus, &PlayerLevel), With<Player>>,
 ) {
     for (e, slot, anim) in flashes.iter() {
@@ -616,6 +690,7 @@ pub fn handle_skill_reroll_after_flash(
                 &graphics,
                 &mut commands,
                 &asset_server,
+                &res,
                 skill_queue.queue[0].clone().to_vec(),
                 Vec2::new(4., 4.),
             );

@@ -42,6 +42,7 @@ use super::{
     CHEST_INVENTORY_UI_SIZE, CRAFTING_INVENTORY_UI_SIZE, ESSENCE_UI_SIZE,
     FURNACE_INVENTORY_UI_SIZE, INVENTORY_UI_SIZE, INVENTORY_Y_OFFSET, INV_SIDE_STATS_BG_ALPHA,
     INV_SIDE_STATS_BG_PADDING,
+    tooltip_info_boxes::{spawn_tooltip_info_boxes_with_resolution, TooltipInfoBoxAnchor, TooltipInfoBoxSpec},
 };
 
 aseprite!(pub InventoryStatHighlightCommon, "textures/effects/InventoryStatHighlightCommon.ase");
@@ -149,6 +150,8 @@ pub struct ToolTipUpdateEvent {
     /// `TOOLTIP_ITEM_TITLE` font (alagard 15) in `DARK_WOOD_BROWN`. Used by the chest's
     /// secondary tooltip to label it "Currently Equipped".
     pub header_text: Option<String>,
+    /// Optional side glossary / trigger info boxes rendered to the right of the card.
+    pub info_boxes: Vec<TooltipInfoBoxSpec>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -1003,6 +1006,24 @@ pub fn handle_spawn_inv_item_tooltip(
             commands.entity(essence).add_child(tooltip);
         } else if let Ok(chest) = item_chest.get_single() {
             commands.entity(chest).add_child(tooltip);
+        }
+
+        if !item.info_boxes.is_empty() {
+            if let Some(info_root) = spawn_tooltip_info_boxes_with_resolution(
+                &mut commands,
+                &graphics,
+                &asset_server,
+                &resolution,
+                TooltipInfoBoxAnchor {
+                    center: Vec3::new(parent_offset.x, parent_offset.y, tooltip_z),
+                    half_width: size.x * 0.5,
+                    half_height: size.y * 0.5,
+                    game_width: resolution.game_width,
+                },
+                &item.info_boxes,
+            ) {
+                commands.entity(info_root).set_parent(tooltip);
+            }
         }
     }
 }

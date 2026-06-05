@@ -131,7 +131,7 @@ pub fn handle_essence_heirloom_tooltip(
                         rarity: essence_option.get_rarity(),
                         position: Vec3::new(-130., 0., 15.),
                         scaling_text: None,
-                        trigger_count_text: None,
+                        trigger_count: 0,
                         ui_state: Some(UIState::Essence),
                     }));
                     break;

@@ -43,8 +43,28 @@ ICON_CENTER_OFF_X = 2.0
 ICON_CENTER_OFF_Y = 52.0
 TILE = 16
 
-# Title at (0, 20); desc line j at (0, -(j*9) - 4) — Bevy +Y up
+# Title at (0, 20); desc lines centered in the desc panel (~45% from card top, see game_fonts.rs).
 FONT_SIZE = 5
+DESC_LINE_STEP = 9.0
+CARD_H = 191
+DESC_BOX_TOP_FROM_CARD_TOP = 0.49
+DESC_BOX_HEIGHT = 34.0
+DESC_BOX_TOP_PADDING = 12.0
+
+
+def _heirloom_desc_box_top_y() -> float:
+    half_h = CARD_H / 2
+    return half_h - DESC_BOX_TOP_FROM_CARD_TOP * CARD_H
+
+
+def _heirloom_desc_text_center_y() -> float:
+    top = _heirloom_desc_box_top_y()
+    bottom = top - DESC_BOX_HEIGHT
+    return (top + bottom) * 0.5 - DESC_BOX_TOP_PADDING
+
+
+def _heirloom_desc_first_line_y() -> float:
+    return _heirloom_desc_box_top_y() - DESC_BOX_TOP_PADDING
 
 RARITY_TO_FRAME = {
     "Common": "SkillChoice",
@@ -167,8 +187,16 @@ def render_card(
 
     _draw_centered_line(draw, CENTER_X, CENTER_Y - 20, title, font, (255, 255, 255))
 
+    n = len(description_lines)
+    first_y = _heirloom_desc_first_line_y()
+    if n:
+        top = first_y
+        bottom = first_y - (n - 1) * DESC_LINE_STEP
+        y_offset = _heirloom_desc_text_center_y() - (top + bottom) * 0.5
+    else:
+        y_offset = 0.0
     for j, line in enumerate(description_lines):
-        bevy_y = -(j * 9) - 4
+        bevy_y = first_y - j * DESC_LINE_STEP + y_offset
         cy = CENTER_Y - bevy_y
         _draw_centered_line(draw, CENTER_X, cy, line, font, (255, 255, 255))
 

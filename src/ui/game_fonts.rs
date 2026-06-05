@@ -54,6 +54,39 @@ pub const HEIRLOOM_CARD_META: FontStyle = FontStyle {
     size: 5.0,
 };
 
+/// Vertical advance between heirloom card description lines ([`crate::ui::heirloom_tooltip::spawn_heirloom_tooltip_card`]).
+pub const HEIRLOOM_CARD_DESC_LINE_STEP: f32 = 9.0;
+/// Card sprite height for heirloom choice frames ([`crate::ui::SKILLS_CHOICE_UI_SIZE`].y).
+pub const HEIRLOOM_CARD_HEIGHT: f32 = 192.0;
+/// Description panel top edge: fraction of card height measured from the card's top edge.
+pub const HEIRLOOM_DESC_BOX_TOP_FROM_CARD_TOP: f32 = 0.49;
+/// Description panel height (`assets/ui/SmallDescriptionBox.png`).
+pub const HEIRLOOM_DESC_BOX_HEIGHT: f32 = 34.0;
+/// Inset below the inner top edge of the description panel before stacking lines.
+pub const HEIRLOOM_DESC_BOX_TOP_PADDING: f32 = 12.0;
+
+/// Card-local Y of the description panel's top inner edge (Bevy +Y up, origin at card center).
+#[inline]
+pub fn heirloom_desc_box_top_y() -> f32 {
+    let half_h = HEIRLOOM_CARD_HEIGHT * 0.5;
+    half_h - HEIRLOOM_DESC_BOX_TOP_FROM_CARD_TOP * HEIRLOOM_CARD_HEIGHT
+}
+
+/// Target Y to vertically center description lines inside the panel (below [`HEIRLOOM_DESC_BOX_TOP_PADDING`]).
+#[inline]
+pub fn heirloom_desc_text_center_y() -> f32 {
+    let top = heirloom_desc_box_top_y();
+    let bottom = top - HEIRLOOM_DESC_BOX_HEIGHT;
+    let box_center = (top + bottom) * 0.5;
+    box_center - HEIRLOOM_DESC_BOX_TOP_PADDING
+}
+
+/// Y of the first description line before multi-line centering (top of stack inside the panel).
+#[inline]
+pub fn heirloom_desc_first_line_y() -> f32 {
+    heirloom_desc_box_top_y() - HEIRLOOM_DESC_BOX_TOP_PADDING
+}
+
 // --- Skill choice UI (banish tracker, small labels) ---------------------------
 
 pub const SKILL_CHOICE_TRACKER_TITLE: FontStyle = FontStyle {
@@ -104,6 +137,11 @@ pub const HUD_MICRO: FontStyle = FontStyle {
 };
 /// Short icon hover labels (inventory trash / sort / filter, etc.).
 pub const ICON_HOVER_TOOLTIP: FontStyle = FontStyle {
+    path: paths::SLKSCR,
+    size: 8.5,
+};
+/// Side glossary / trigger info boxes beside tooltip cards.
+pub const TOOLTIP_INFO_BOX: FontStyle = FontStyle {
     path: paths::SLKSCR,
     size: 8.5,
 };

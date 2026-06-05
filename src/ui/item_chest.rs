@@ -1108,6 +1108,7 @@ pub fn handle_item_chest_final_item_hover(
                                     is_recipe: false,
                                     show_range: false,
                                     anchor_ui_y: None,
+                                    info_boxes: vec![],
                                     position_override: Some(Vec2::new(
                                         CHEST_INVENTORY_UI_SIZE.x + 20.,
                                         -CHEST_INVENTORY_UI_SIZE.y / 2. + 40.,
@@ -1164,7 +1165,7 @@ pub fn handle_heirloom_chest_final_item_hover(
                         rarity: heirloom_data.heirloom.rarity,
                         position: tooltip_pos,
                         scaling_text: None,
-                        trigger_count_text: None,
+                        trigger_count: 0,
                         ui_state: Some(super::UIState::ItemChest),
                     }));
                 }

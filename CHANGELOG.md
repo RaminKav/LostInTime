@@ -481,6 +481,9 @@ Heirlooms:
 
 - [Feature] New Thief skin is here! Check it out. Last 2 class skins coming very soon!!
 - [UI] New chest sprites, and polished Chest UI! Equip gear directly in the chest, banish heirlooms directly from chest, also view currently equiped gear to compare!
+- [Feature] New Skill: Meteor Shower! Replaces Ice Wall for Wizard. Rain down meteors around you, meteor count increases with every cast!
+- [Feature] New Enemy: Lizard! Found in Desert Era as the first enemy (replaces Fur Devils here). This concludes the Desert enemies!
+- [Feature] New Enemy: Void Crawler! Special enemy that spawns during endless. Endless mode now only spawns Void enemies, Void Crawler is the first to be added.
 - [Balance] Buff base Mana regen timer from 6s -> 2s
 - [Balance] Buff base defence/hp stats on armor
 - [Balance] Buff defence formula: defence now mitigates more % of dmg
@@ -488,7 +491,9 @@ Heirlooms:
 - [Balance] Buff Summoning Wand from LEgendary -> Rare, 20% proc -> 10% proc
 - [Balance] Warrior now scales +2 Size per level, and Gravitational Spear scales with size.
 - [Balance] Buff drop rates of cards a tiny bit
+- [Balance] Reduce shop prices/scaling.
 - [QoL/Bug] Fix text rendering on windows/larger monitors. Text should look clear now without being warped or "chizzled", etc
+- [QoL] Fixed Bow arrow firing delay. Bow should feel a lot more responsive to use now.
 - [QoL] Add Heirloom picker in dev tools: add any heirloom instantly, to test builds/theory craft
 - [QoL] Added setting to adjust game and UI render scale separatly! Zoom in our out the game view, and make ui smaller, or standard
 - [QoL] Pet skill now shows "PET" label for clarity/completeness
@@ -498,3 +503,4 @@ Heirlooms:
 - [Bug] Assets were missing on Windows for Era3 (snow biome), should now see the leafless trees as intended!
 - [Bug] Piercing Star thief skill now properly tracks in damage tracker
 - [Bug] Some wep/animations were not hiding when toggling hid attacks/animations, fixed
+- [Bug] Fix Magic Whip collider being too small
