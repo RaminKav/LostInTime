@@ -111,7 +111,7 @@
         Goliath: (
             name: "Goliath",
             skill_description: [
-                "Small chance for each weapon\nor skill to double in size."
+                "Small chance for each\nweapon or skill to double\nin size."
             ],
             skill_name: "Giant",
             passive_description: ["Gain +1% Size per\nlevel"],

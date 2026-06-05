@@ -11,14 +11,14 @@ use crate::{
     attributes::{ItemAttributes, ItemRarity},
     audio::{AudioSoundEffect, SoundSpawner},
     chaos::ChaosTracker,
-    colors::{DARK_WOOD_BROWN, GREY, WHITE},
+    colors::{DARK_WOOD_BROWN, WHITE},
     container::ContainerRegistry,
     cursor::CursorPos,
     inventory::ItemStack,
     item::{CraftingTracker, ItemDisplayMetaData, WorldObject},
     night::NightTracker,
     player::{
-        achievements::{is_pet_unlocked, Achievements},
+        achievements::Achievements,
         class_rank::ClassRankSystem,
         currency::TimeFragmentCurrency,
         score::HighScores,
@@ -327,21 +327,16 @@ pub fn setup_class_selection_ui(
         .filter(|class| *class != SkillClass::None)
         .collect::<Vec<_>>();
 
-    let achievements_ref = achievements.as_ref().map(|a| a.as_ref());
     let default_class = class_options
         .iter()
         .find(|class| unlocked_classes.contains(class))
         .cloned()
         .unwrap_or(SkillClass::Warrior);
 
-    let default_pet = Pet::iter().find(|pet| {
-        cheat_settings.bypass_class_unlocks
-            || achievements_ref
-                .map(|a| is_pet_unlocked(pet, a))
-                .unwrap_or(false)
-    });
+    // TODO: re-enable pet unlock checks via achievements once unlock flow is finalized
+    let default_pet = Pet::iter().next();
 
-    // Initialize the selection state with first unlocked class and first unlocked pet (if any)
+    // Initialize the selection state with first unlocked class and first pet
     commands.insert_resource(ClassSelectionState {
         selected_class: Some(default_class.clone()),
         selected_pet: default_pet.clone(),
@@ -483,12 +478,7 @@ pub fn setup_class_selection_ui(
 
     let pet_count = Pet::iter().count() as f32;
     for (i, pet) in Pet::iter().enumerate() {
-        // Check if pet is unlocked
-        let pet_unlocked = cheat_settings.bypass_class_unlocks
-            || achievements_ref
-                .map(|a| is_pet_unlocked(&pet, a))
-                .unwrap_or(false);
-        let pet_selected = pet_unlocked && default_pet.as_ref().is_some_and(|d| *d == pet);
+        let pet_selected = default_pet.as_ref().is_some_and(|d| *d == pet);
 
         // Pet option background
         let x_offset = (i as f32 - (pet_count - 1.) * 0.5) * 29.0 + 149.;
@@ -520,30 +510,20 @@ pub fn setup_class_selection_ui(
             .insert(RenderLayers::from_layers(&[3]))
             .insert(Name::new("PET OPTION"));
 
-        // Only add Interactable component for unlocked pets
-        if pet_unlocked {
-            slot_entity_commands.insert(super::Interactable::default());
-        }
+        slot_entity_commands.insert(super::Interactable::default());
 
         let icon_slot = slot_entity_commands.id();
 
-        // Pet icon - show actual icon if unlocked, or UnknownUnlockIcon if locked
         let pet_data = graphics.get_pet_data(pet.clone());
-        let icon_texture = if pet_unlocked {
-            graphics
-                .get_ui_element_texture(pet_data.pet_icon.clone())
-                .clone()
-        } else {
-            graphics
-                .get_ui_element_texture(UIElement::UnknownUnlockIcon)
-                .clone()
-        };
+        let icon_texture = graphics
+            .get_ui_element_texture(pet_data.pet_icon.clone())
+            .clone();
 
         let mut icon_entity_commands = commands.spawn(SpriteBundle {
             texture: icon_texture,
             sprite: Sprite {
                 custom_size: Some(Vec2::new(22., 22.)),
-                color: if pet_unlocked { Color::WHITE } else { GREY },
+                color: Color::WHITE,
                 ..Default::default()
             },
             transform: Transform {
@@ -561,9 +541,7 @@ pub fn setup_class_selection_ui(
             .insert(RenderLayers::from_layers(&[3]))
             .insert(Name::new("PET OPTION ICON"));
 
-        if pet_unlocked {
-            icon_entity_commands.insert(super::Interactable::default());
-        }
+        icon_entity_commands.insert(super::Interactable::default());
 
         icon_entity_commands.set_parent(icon_slot);
     }

@@ -2,7 +2,11 @@
 
 use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
 
-use crate::{assets::Graphics, colors::WHITE, player::skills::Heirloom};
+use crate::{
+    assets::Graphics,
+    colors::{WHITE, YELLOW_2},
+    player::skills::Heirloom,
+};
 
 use super::{game_fonts as gf, ui_helpers, ScreenResolution, UIElement, TOOLTIP_INFO_BOX_SIZE};
 
@@ -135,7 +139,10 @@ pub struct TooltipInfoBoxAnchor {
 fn info_box_text_lines(kind: &TooltipInfoBoxKind) -> [String; 2] {
     match kind {
         TooltipInfoBoxKind::TriggerCount { count } => {
-            let line1 = format!("Triggered: {}", ui_helpers::format_number(*count as i64));
+            let line1 = format!(
+                "\n\nTriggered {} times",
+                ui_helpers::format_number(*count as i64)
+            );
             [line1, String::new()]
         }
         TooltipInfoBoxKind::Definition(def) => {
@@ -215,6 +222,7 @@ pub fn spawn_tooltip_info_boxes(
         .id();
 
     let text_style = gf::TOOLTIP_INFO_BOX.text_style(asset_server, WHITE);
+    let text_style_trigger = gf::TOOLTIP_INFO_BOX.text_style(asset_server, YELLOW_2);
 
     for (i, spec) in specs.iter().enumerate() {
         let local_y = start_local_y - i as f32 * (box_h + INFO_BOX_STACK_GAP);
@@ -235,12 +243,23 @@ pub fn spawn_tooltip_info_boxes(
             .id();
 
         if !lines[0].is_empty() {
+            let is_trigger = lines[0].contains("Triggered");
+            let y_bonus = if lines[1].is_empty() { -4. } else { 0. };
+            let style = if is_trigger {
+                text_style_trigger.clone()
+            } else {
+                text_style.clone()
+            };
             commands
                 .spawn(Text2dBundle {
-                    text: Text::from_section(lines[0].clone(), text_style.clone())
+                    text: Text::from_section(lines[0].clone(), style)
                         .with_alignment(TextAlignment::Center),
                     text_anchor: Anchor::Center,
-                    transform: Transform::from_translation(Vec3::new(0., INFO_BOX_LINE1_Y, 2.)),
+                    transform: Transform::from_translation(Vec3::new(
+                        0.,
+                        INFO_BOX_LINE1_Y + y_bonus,
+                        2.,
+                    )),
                     ..default()
                 })
                 .insert(RenderLayers::from_layers(&[3]))
