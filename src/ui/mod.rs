@@ -112,6 +112,10 @@ pub use achievements_ui::*;
 pub fn reset_microwave_shrine_usages(mut usages: ResMut<MicrowaveShrineUsages>) {
     usages.0 = 0;
 }
+
+pub fn reset_break_drop_filter(mut break_drop_filter: ResMut<crate::inventory::BreakDropFilter>) {
+    break_drop_filter.0.clear();
+}
 use loading_screen::*;
 
 use crate::{
@@ -641,6 +645,7 @@ impl Plugin for UIPlugin {
             .add_system(cleanup_leaderboard_ui.in_schedule(OnExit(GameState::MainMenu)))
             .add_system(reset_blacksmith_tracker.in_schedule(OnEnter(GameState::MainMenu)))
             .add_system(reset_microwave_shrine_usages.in_schedule(OnEnter(GameState::MainMenu)))
+            .add_system(reset_break_drop_filter.in_schedule(OnEnter(GameState::MainMenu)))
             .add_system(cleanup_run_state.in_base_set(CoreSet::PreUpdate).run_if(not(in_state(GameState::MainMenu))))
             .add_systems((
                 // Clean up leaderboard when entering other UI states to avoid duplicates
@@ -1377,7 +1382,7 @@ impl Plugin for UIPlugin {
                     )
                     .in_set(OnUpdate(GameState::Main)),
             )
-            .add_system(handle_hovering.run_if(ui_hover_interactions_condition))
+            .add_system(handle_hovering.run_if(ui_hover_interactions_condition).after(crate::ui::inventory_ui::update_inventory_ui))
             .add_system(handle_cursor_main_menu_buttons)
             .add_system(update_achievements_notification_icon.run_if(in_state(GameState::MainMenu)));
 

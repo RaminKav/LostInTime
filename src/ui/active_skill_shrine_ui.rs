@@ -65,7 +65,7 @@ pub fn setup_active_skill_shrine_ui(
         With<Player>,
     >,
 ) {
-    let shrine_overlay = spawn_full_screen_ui_overlay_tuned(&mut commands, &res, 0.0, 0.95, 9.);
+    let shrine_overlay = spawn_full_screen_ui_overlay_tuned(&mut commands, &res, 0.0, 0.95, 20.);
     commands
         .entity(shrine_overlay)
         .insert(UIState::ActiveSkillShrine);
@@ -81,7 +81,7 @@ pub fn setup_active_skill_shrine_ui(
                     },
                 ),
                 transform: Transform {
-                    translation: Vec3::new(0., res.game_height / 2. - 40., 10.),
+                    translation: Vec3::new(0., res.game_height / 2. - 40., 21.),
                     scale: Vec3::new(1., 1., 1.),
                     ..Default::default()
                 },
@@ -103,7 +103,7 @@ pub fn setup_active_skill_shrine_ui(
                     },
                 ),
                 transform: Transform {
-                    translation: Vec3::new(0., res.game_height / 2. - 62., 10.),
+                    translation: Vec3::new(0., res.game_height / 2. - 62., 21.),
                     scale: Vec3::new(1., 1., 1.),
                     ..Default::default()
                 },
@@ -122,7 +122,7 @@ pub fn setup_active_skill_shrine_ui(
                 ..Default::default()
             },
             transform: Transform {
-                translation: Vec3::new(0., 0., 10.),
+                translation: Vec3::new(0., 0., 21.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
@@ -455,7 +455,7 @@ pub fn setup_active_skill_shrine_overwrite_ui(
                     },
                 ),
                 transform: Transform {
-                    translation: Vec3::new(0., res.game_height / 2. - 30., 10.),
+                    translation: Vec3::new(0., res.game_height / 2. - 30., 21.),
                     scale: Vec3::new(1., 1., 1.),
                     ..Default::default()
                 },
@@ -474,7 +474,7 @@ pub fn setup_active_skill_shrine_overwrite_ui(
                 ..Default::default()
             },
             transform: Transform {
-                translation: Vec3::new(0., 0., 10.),
+                translation: Vec3::new(0., 0., 21.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },

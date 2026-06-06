@@ -297,6 +297,7 @@ pub fn player_move_inputs(
     mut ammo_query: Query<&mut Ammo>,
     keybinds: Res<crate::keybinds::InputMappings>,
     proto_param: ProtoParam,
+    bridge_mode: Res<BridgePlacementMode>,
 ) {
     if audio_timer.duration() == Duration::ZERO {
         *audio_timer = Timer::from_seconds(0.2, TimerMode::Once);
@@ -353,29 +354,31 @@ pub fn player_move_inputs(
         player.is_moving = true;
     }
     //TODO: move this tick to animations.rs
-    if let Some(roll_slot) = skills.has_active_skill(ActiveSkill::Roll) {
-        if player.player_dash_cooldown.finished()
-            && keybinds.check_skill_input(roll_slot, &key_input, &mouse_input)
-        {
-            player.is_dashing = true;
-            player.ice_slide_direction = None;
-            player.ice_momentum_remaining = 0.0;
-            player.ice_momentum_direction = None;
-            player.ice_slide_speed_factor = 1.0;
-            let effective_cd = skills.effective_skill_cooldown(&ActiveSkill::Roll, blessings);
-            let effective_cd = effective_cd.max(0.0); // avoid negative Duration panic
-            active_skill_event.send(ActiveSkillUsedEvent {
-                slot: roll_slot,
-                cooldown: effective_cd,
-            });
-            player
-                .player_dash_cooldown
-                .set_duration(Duration::from_secs_f32(effective_cd));
-            player.player_dash_cooldown.reset();
-            commands
-                .entity(player_e)
-                .insert(PhasingThroughEnemies::new(0.28));
-            commands.spawn(SoundSpawner::new(AudioSoundEffect::Roll, 0.25));
+    if !bridge_mode.active {
+        if let Some(roll_slot) = skills.has_active_skill(ActiveSkill::Roll) {
+            if player.player_dash_cooldown.finished()
+                && keybinds.check_skill_input(roll_slot, &key_input, &mouse_input)
+            {
+                player.is_dashing = true;
+                player.ice_slide_direction = None;
+                player.ice_momentum_remaining = 0.0;
+                player.ice_momentum_direction = None;
+                player.ice_slide_speed_factor = 1.0;
+                let effective_cd = skills.effective_skill_cooldown(&ActiveSkill::Roll, blessings);
+                let effective_cd = effective_cd.max(0.0); // avoid negative Duration panic
+                active_skill_event.send(ActiveSkillUsedEvent {
+                    slot: roll_slot,
+                    cooldown: effective_cd,
+                });
+                player
+                    .player_dash_cooldown
+                    .set_duration(Duration::from_secs_f32(effective_cd));
+                player.player_dash_cooldown.reset();
+                commands
+                    .entity(player_e)
+                    .insert(PhasingThroughEnemies::new(0.28));
+                commands.spawn(SoundSpawner::new(AudioSoundEffect::Roll, 0.25));
+            }
         }
     }
     clear_ice_slide_when_stuck(&mut player, on_ice, d_raw, kcc_output);
@@ -492,7 +495,11 @@ pub fn dispatch_active_skill_events(
     player_q: Query<(&PlayerSkills, &ClassSkillSlots), With<Player>>,
     blessings_q: Query<&OwnedBlessings, With<Player>>,
     keybinds: Res<crate::keybinds::InputMappings>,
+    bridge_mode: Res<BridgePlacementMode>,
 ) {
+    if bridge_mode.active {
+        return;
+    }
     let Ok((skills, class_slots)) = player_q.get_single() else {
         return;
     };

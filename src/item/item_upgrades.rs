@@ -227,8 +227,11 @@ pub fn handle_on_hit_upgrades(
         return;
     };
     for hit in hits.iter() {
-        // Skip damage from heirloom effects (e.g., poison, burning)
-        if hit.from_heirloom_effect.is_some() {
+        // Skip DoT tick damage (e.g. poison) so it does not re-trigger on-hit effects.
+        if matches!(
+            hit.from_heirloom_effect,
+            Some(Heirloom::PoisonStacks)
+        ) {
             continue;
         }
         let mut rng = rand::thread_rng();
@@ -322,13 +325,17 @@ pub fn handle_on_hit_upgrades(
         // Calculate poison chance with blessing bonus
         let blessing_poison = player_blessings.get_poison_bonus_chance();
         let bonus_stack = if rng.gen_bool(blessing_poison) { 1 } else { 0 };
-        let total_poison_chance = (skills.calculate_poison_chance()).clamp(0., 1.);
-        if (hit.hit_with_projectile.clone().unwrap_or_default() == Projectile::Dart)
-            || rng.gen_bool(total_poison_chance)
-        {
+        let is_dart = hit.hit_with_projectile.clone().unwrap_or_default() == Projectile::Dart;
+        let mut stacks_to_apply = skills.roll_poison_stacks_from_chance(&mut rng);
+        if is_dart && stacks_to_apply == 0 {
+            stacks_to_apply = 1;
+        }
+        if is_dart || stacks_to_apply > 0 {
             if let Some(burning) = status.burning.as_mut() {
                 // Increment stacks and reset duration
-                burning.stacks = burning.stacks.saturating_add(1 + bonus_stack);
+                burning.stacks = burning.stacks.saturating_add(
+                    stacks_to_apply as u128 + bonus_stack as u128,
+                );
                 burning.duration_timer.reset();
                 let stacks = burning.stacks as i32;
                 events.p1().send(StatusEffectEvent {
@@ -338,16 +345,16 @@ pub fn handle_on_hit_upgrades(
                 });
             } else if Heirloom::PoisonStacks.is_obj_valid(main_hand.get_obj()) {
                 let duration_bonus = skills.get_count(Heirloom::PoisonDuration) as f32 * 0.5 + 1.;
-                // Start with 1 stack
+                let initial_stacks = stacks_to_apply.max(1) as u128;
                 status.burning = Some(Burning {
                     tick_timer: Timer::from_seconds(0.5, TimerMode::Repeating),
                     duration_timer: Timer::from_seconds(3.0 * duration_bonus, TimerMode::Once),
-                    stacks: 1,
+                    stacks: initial_stacks,
                 });
                 events.p1().send(StatusEffectEvent {
                     entity: hit_e,
                     effect: StatusEffect::Poison,
-                    num_stacks: 1,
+                    num_stacks: initial_stacks as i32,
                 });
             }
         }

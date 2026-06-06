@@ -32,7 +32,7 @@ use crate::{
     ui::{
         damage_numbers::spawn_floating_text_with_shadow_on_layer, game_fonts::FLOATING_TEXT,
         ui_helpers, DraggedItem, Interactable, Interaction, InventorySlotState, InventorySlotType,
-        InventoryState, ToolTipUpdateEvent, UIState,
+        InventoryState, UIState,
     },
     TextureCamera,
 };
@@ -67,7 +67,6 @@ fn slot_type_accepts_in_place_upgrade(slot_type: InventorySlotType) -> bool {
 pub struct UpgradeDragAssets<'w> {
     pub asset_server: Res<'w, AssetServer>,
     pub graphics: Res<'w, Graphics>,
-    pub tooltip_events: EventWriter<'w, ToolTipUpdateEvent>,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -241,21 +240,6 @@ pub fn handle_drag_upgrade_material_on_equipment(
         {
             state.dirty = true;
         }
-    }
-
-    // Refresh tooltip with the updated item.
-    let refreshed = inv
-        .get_items_from_slot_type(slot_type)
-        .items
-        .get(slot_index)
-        .and_then(|o| o.as_ref().map(|i| i.item_stack.clone()));
-    if let Some(stack) = refreshed {
-        assets.tooltip_events.send(ToolTipUpdateEvent {
-            item_stack: stack,
-            is_recipe: false,
-            show_range: false,
-            ..Default::default()
-        });
     }
 
     // Consume one upgrade material from the dragged stack.

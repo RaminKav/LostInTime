@@ -463,7 +463,8 @@ fn handle_ranged_attack_event(
         let track_player_pos = !proj_event.from_enemy
             && proj_event.from_entity.is_none()
             && proj_event.pos_override.is_none()
-            && !proj_event.projectile.is_anchored_to_player_pos();
+            && !proj_event.projectile.is_anchored_to_player_pos()
+            && proj_event.spawn_delay > 0.0;
         let goliath_extra = goliath_spawn_scale_multiplier(
             &player_class,
             &proj_event.projectile,

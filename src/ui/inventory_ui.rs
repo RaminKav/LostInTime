@@ -68,7 +68,8 @@ use super::{
     inventory_panel_center_x,
     options_ui::CheatSettings,
     player_hud::FlashExpBarEvent,
-    ui_helpers::{spawn_full_screen_ui_overlay, spawn_ui_overlay, Z_DEPTH_HUD_ACTIVE_SKILLS},
+    tooltips::ItemOrRecipeTooltip,
+    ui_helpers::{spawn_full_screen_ui_overlay, Z_DEPTH_HUD_ACTIVE_SKILLS},
     ShowInvPlayerStatsEvent, UIContainersParam, UIElement, CRAFTING_INVENTORY_UI_SIZE,
     FURNACE_INVENTORY_UI_SIZE, HUD_ACTION_ROW_Y_FROM_BOTTOM, HUD_HOTBAR_CENTER_X, HUD_HOTBAR_SLOTS,
     INVENTORY_GRID_COLS, INV_CHEST_SCRAPPER_GRID_OFFSET_Y, INV_CRAFTING_BASE_Y, INV_CRAFTING_COLS,
@@ -1973,7 +1974,9 @@ pub fn update_inventory_ui(
     inv: Query<&mut Inventory>,
     cont_param: UIContainersParam,
     resolution: Res<ScreenResolution>,
+    item_tooltips: Query<Entity, With<ItemOrRecipeTooltip>>,
 ) {
+    let mut despawned_item_tooltips = false;
     for (e, mut slot_state) in ui_elements.iter_mut() {
         // check current inventory state against that slot's state
         // if they do not match, delete and respawn
@@ -2025,6 +2028,12 @@ pub fn update_inventory_ui(
         };
 
         if slot_state.dirty || slot_state.count != real_count {
+            if !despawned_item_tooltips {
+                for tooltip in item_tooltips.iter() {
+                    commands.entity(tooltip).despawn_recursive();
+                }
+                despawned_item_tooltips = true;
+            }
             commands.entity(e).despawn_recursive();
             let new_slot_entity = spawn_inv_slot(
                 &mut commands,

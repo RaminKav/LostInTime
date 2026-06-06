@@ -15,6 +15,9 @@ use crate::{
         PlayerRogueAseprite, PlayerSpriteHandles, PlayerThiefAseprite,
     },
     attributes::{AttributeQuality, AttributeValue, ItemAttributes, ItemGlow},
+    colors::{
+        COMMON_TOOLTIP_TITLE, LEGENDARY_TOOLTIP_TITLE, RARE_TOOLTIP_TITLE, UNCOMMON_TOOLTIP_TITLE,
+    },
     combat::pickup_radius::{
         MagnetPullTimer, BASE_MAGNET_COOLDOWN, MAGNET_COOLDOWN_REDUCTION_PER_STACK,
         MIN_MAGNET_COOLDOWN,
@@ -1877,7 +1880,7 @@ impl Heirloom {
             ],
             Heirloom::DamageDealtMp => vec![
                 "Damage from Weapons".to_string(),
-                "or skills has a 3%".to_string(),
+                "or skills has a 4%".to_string(),
                 "chance to restore 1".to_string(),
                 "Mana.".to_string(),
             ],
@@ -2160,12 +2163,11 @@ impl HeirloomRarity {
     }
 
     pub fn get_color(&self) -> Color {
-        use crate::colors::{LIGHT_BLUE, LIGHT_GREY, LIGHT_RED, UNCOMMON_GREEN};
         match self {
-            HeirloomRarity::Common => LIGHT_GREY,
-            HeirloomRarity::Uncommon => UNCOMMON_GREEN,
-            HeirloomRarity::Rare => LIGHT_BLUE,
-            HeirloomRarity::Legendary => LIGHT_RED,
+            HeirloomRarity::Common => COMMON_TOOLTIP_TITLE,
+            HeirloomRarity::Uncommon => UNCOMMON_TOOLTIP_TITLE,
+            HeirloomRarity::Rare => RARE_TOOLTIP_TITLE,
+            HeirloomRarity::Legendary => LEGENDARY_TOOLTIP_TITLE,
         }
     }
 }
@@ -2888,6 +2890,21 @@ impl PlayerSkills {
             chance += self.get_count(skill.clone()) as f64 * 0.25;
         }
         chance
+    }
+
+    /// Rolls how many poison stacks to apply from total poison chance.
+    /// Values above 100% guarantee extra stacks (150% → 1 + 50% roll for 2, 300% → 3, etc.).
+    pub fn roll_poison_stacks_from_chance(&self, rng: &mut impl rand::Rng) -> u32 {
+        Self::roll_stacks_from_chance(self.calculate_poison_chance(), rng)
+    }
+
+    pub fn roll_stacks_from_chance(chance: f64, rng: &mut impl rand::Rng) -> u32 {
+        if chance <= 0.0 {
+            return 0;
+        }
+        let guaranteed = chance.floor() as u32;
+        let remainder = chance - guaranteed as f64;
+        guaranteed + u32::from(remainder > 0.0 && rng.gen_bool(remainder))
     }
     /// Hotkey slot for the equipped movement skill, if any.
     pub fn movement_skill_slot(&self) -> Option<usize> {

@@ -11,7 +11,7 @@ use crate::{
     proto::proto_param::ProtoParam,
     run_once_per_run,
     world::{
-        dimension::{ActiveDimension, DimensionSpawnEvent, Era},
+        dimension::{ActiveDimension, DimensionSpawnEvent, Era, EraManager},
         dungeon::Dungeon,
         TILE_SIZE,
     },
@@ -567,20 +567,37 @@ fn spawn_endless_stone_golem_timer(
     );
 }
 
-/// Reset Stone Golem spawn timer when changing eras/dimensions
+/// Reset Stone Golem spawn timer when advancing to a new overworld era.
+/// Dungeon entry/exit within the same era must not reset the timer.
 fn reset_stone_golem_timer_on_era_change(
     mut golem_timer: Option<ResMut<StoneGolemSpawnTimer>>,
     mut endless_golem_timer: Option<ResMut<EndlessStoneGolemSpawnTimer>>,
-    dimension_spawn_events: EventReader<DimensionSpawnEvent>,
+    mut dimension_spawn_events: EventReader<DimensionSpawnEvent>,
+    era: Option<Res<EraManager>>,
 ) {
-    if !dimension_spawn_events.is_empty() {
+    let Some(era) = era else {
+        return;
+    };
+    for event in dimension_spawn_events.iter() {
+        let Some(new_era) = &event.new_era else {
+            continue;
+        };
+        if new_era.is_dungeon() || era.current_era.is_dungeon() {
+            continue;
+        }
+        if era.current_era == *new_era {
+            continue;
+        }
         if let Some(ref mut timer) = golem_timer {
             timer.timer.reset();
         }
         if let Some(ref mut timer) = endless_golem_timer {
             timer.timer.reset();
         }
-        info!("Stone Golem spawn timers reset due to era/dimension change");
+        info!(
+            "Stone Golem spawn timers reset due to era change {:?} -> {:?}",
+            era.current_era, new_era
+        );
     }
 }
 
