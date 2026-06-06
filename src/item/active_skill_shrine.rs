@@ -4,8 +4,12 @@ use bevy_aseprite::{anim::AsepriteAnimation, aseprite, AsepriteBundle};
 use crate::{
     assets::Graphics,
     item::object_actions::ObjectAction,
-    player::skills::{
-        get_disabled_skills, ActiveSkill, ActiveSkillChoiceState, HeirloomRarity, PlayerSkills,
+    player::{
+        skills::{
+            get_disabled_skills, ActiveSkill, ActiveSkillChoiceState, HeirloomRarity, PlayerSkills,
+            SkillClass,
+        },
+        unlocks::UnlockedSkills,
     },
     ui::{key_input_guide::InteractionGuideTrigger, minimap::UpdateMiniMapEvent, UIState},
     world::TileMapPosition,
@@ -26,6 +30,9 @@ pub struct ActiveSkillShrineState {
     pub tile_pos: TileMapPosition,
 }
 
+/// Number of distinct skills offered at each active skill shrine.
+pub const ACTIVE_SKILL_SHRINE_OFFER_COUNT: usize = 3;
+
 /// Same filter as the shrine interaction: exclude these and anything the player already has.
 pub fn roll_active_skill_shrine_offer_skills(
     player_skills: Option<&PlayerSkills>,
@@ -35,9 +42,10 @@ pub fn roll_active_skill_shrine_offer_skills(
 
 /// Re-validate a cached shrine offer against the player's current active skills:
 /// drop any entries the player has acquired since the offer was rolled and top
-/// the result up to two distinct choices with fresh rolls. Used at interaction
-/// time so a previously rolled offer can't hand out duplicates of skills the
-/// player picked up between world-gen and visiting the shrine.
+/// the result up to [`ACTIVE_SKILL_SHRINE_OFFER_COUNT`] distinct choices with
+/// fresh rolls. Used at interaction time so a previously rolled offer can't hand
+/// out duplicates of skills the player picked up between world-gen and visiting
+/// the shrine.
 pub fn refresh_active_skill_shrine_offer_skills(
     cached_offer: &[ActiveSkill],
     player_skills: Option<&PlayerSkills>,
@@ -74,12 +82,13 @@ pub fn refresh_active_skill_shrine_offer_skills(
         .filter(|skill| {
             !get_disabled_skills().contains(skill)
                 && *skill != ActiveSkill::LaserBeam
+                && !skill.is_movement_skill()
                 && !player_current_skills.contains(skill)
                 && !chosen_skills.contains(skill)
         })
         .collect();
 
-    while chosen_skills.len() < 2 {
+    while chosen_skills.len() < ACTIVE_SKILL_SHRINE_OFFER_COUNT {
         if available_skills.is_empty() {
             break;
         }
@@ -95,6 +104,56 @@ pub fn skill_choices_from_offer_skills(skills: &[ActiveSkill]) -> Vec<ActiveSkil
         .iter()
         .map(|skill| ActiveSkillChoiceState::new(*skill, HeirloomRarity::Common))
         .collect()
+}
+
+/// Shrine assignment targets: slots 1–2 only. Slot 2 requires a Time Fragment
+/// purchase (or `bypass_unlocks`). Slot 0 (movement) is never assignable.
+pub fn shrine_assignable_slots(
+    class: &SkillClass,
+    unlocked: &UnlockedSkills,
+    bypass_unlocks: bool,
+) -> Vec<usize> {
+    let mut slots = vec![1];
+    if bypass_unlocks || unlocked.is_unlocked(class, 2) {
+        slots.push(2);
+    }
+    slots
+}
+
+pub enum ShrineAssignAction {
+    AutoFill(usize),
+    ShowSlotPicker,
+}
+
+/// After the player picks a shrine skill, decide whether to auto-fill the lone
+/// empty unlocked slot or show the slot picker (slots 1–2 only).
+pub fn shrine_assign_action(
+    skills: &PlayerSkills,
+    class: &SkillClass,
+    unlocked: &UnlockedSkills,
+    bypass_unlocks: bool,
+) -> ShrineAssignAction {
+    let assignable = shrine_assignable_slots(class, unlocked, bypass_unlocks);
+    let empty_slots: Vec<usize> = assignable
+        .iter()
+        .copied()
+        .filter(|&slot| skills.get_active_skill_in_slot(slot).is_none())
+        .collect();
+
+    if empty_slots.len() == 1 {
+        ShrineAssignAction::AutoFill(empty_slots[0])
+    } else {
+        ShrineAssignAction::ShowSlotPicker
+    }
+}
+
+/// Write a shrine skill into the given player slot index (1 or 2).
+pub fn assign_shrine_skill_to_slot(skills: &mut PlayerSkills, slot: usize, skill: ActiveSkillChoiceState) {
+    match slot {
+        1 => skills.active_skill_slot_1 = Some(skill),
+        2 => skills.active_skill_slot_2 = Some(skill),
+        _ => (),
+    }
 }
 
 /// Resource to hold the active skill choices from a shrine interaction

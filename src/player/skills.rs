@@ -2834,18 +2834,9 @@ impl Default for PlayerSkills {
                 ActiveSkill::Roll,
                 HeirloomRarity::Common,
             )),
-            active_skill_slot_1: Some(ActiveSkillChoiceState::new(
-                ActiveSkill::Roll,
-                HeirloomRarity::Common,
-            )),
-            active_skill_slot_2: Some(ActiveSkillChoiceState::new(
-                ActiveSkill::Roll,
-                HeirloomRarity::Common,
-            )),
-            active_skill_slot_3: Some(ActiveSkillChoiceState::new(
-                ActiveSkill::Roll,
-                HeirloomRarity::Common,
-            )),
+            active_skill_slot_1: None,
+            active_skill_slot_2: None,
+            active_skill_slot_3: None,
             active_skill_slot_4: None, // Bonus slot - unlocked by blessings
         }
     }

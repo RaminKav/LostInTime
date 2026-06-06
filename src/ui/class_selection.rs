@@ -797,6 +797,82 @@ fn spawn_class_unlock_confirm_ui(commands: &mut Commands, asset_server: &AssetSe
     // Don't spawn buttons here - they'll be spawned/despawned dynamically in update_class_unlock_confirm_panel
 }
 
+/// Renders an unlocked-but-empty skill slot in the class preview.
+fn spawn_empty_skill_slot_preview(
+    commands: &mut Commands,
+    asset_server: &AssetServer,
+    parent: Entity,
+) {
+    const ICONS_X_OFFSET: f32 = -24.;
+    const TITLE_Y: f32 = 20.;
+    const DESC_TEXT_X: f32 = ICONS_X_OFFSET + 12.;
+    const TEXT_Y_OFFSET: f32 = 10.;
+
+    commands
+        .spawn((
+            SpriteBundle {
+                sprite: Sprite {
+                    color: Color::rgba(0.08, 0.08, 0.1, 0.55),
+                    custom_size: Some(Vec2::new(20., 20.)),
+                    ..Default::default()
+                },
+                transform: Transform::from_translation(Vec3::new(ICONS_X_OFFSET, 0., 2.)),
+                ..Default::default()
+            },
+            RenderLayers::from_layers(&[3]),
+            ClassPreviewSkillEntry,
+            Name::new("EMPTY SKILL ICON"),
+        ))
+        .set_parent(parent);
+
+    commands
+        .spawn((
+            Text2dBundle {
+                text: Text::from_section(
+                    "—",
+                    TextStyle {
+                        font: asset_server.load("fonts/alagard.ttf"),
+                        font_size: 15.0,
+                        color: WHITE,
+                    },
+                ),
+                text_anchor: Anchor::TopLeft,
+                transform: Transform::from_translation(Vec3::new(DESC_TEXT_X, TITLE_Y, 2.)),
+                ..Default::default()
+            },
+            RenderLayers::from_layers(&[3]),
+            ClassPreviewSkillEntry,
+            Name::new("EMPTY SKILL TITLE"),
+        ))
+        .set_parent(parent);
+
+    commands
+        .spawn((
+            Text2dBundle {
+                text: Text::from_section(
+                    "Obtain more skills during the run!",
+                    TextStyle {
+                        font: asset_server.load(BODY_FONT),
+                        font_size: BODY_FONT_SIZE,
+                        color: DARK_WOOD_BROWN,
+                    },
+                )
+                .with_alignment(TextAlignment::Left),
+                text_anchor: Anchor::TopLeft,
+                transform: Transform::from_translation(Vec3::new(
+                    DESC_TEXT_X,
+                    TEXT_Y_OFFSET - 2.,
+                    2.,
+                )),
+                ..Default::default()
+            },
+            RenderLayers::from_layers(&[3]),
+            ClassPreviewSkillEntry,
+            Name::new("EMPTY SKILL DESC"),
+        ))
+        .set_parent(parent);
+}
+
 /// Renders a locked-skill placeholder inside the given `parent` skill container
 /// of the class preview. Mimics the `time_crystals_browser_ui` lock styling: a
 fn spawn_locked_skill_content(
@@ -1949,12 +2025,7 @@ fn spawn_player_preview(
         .max(1);
     let skill_y_span = CLASS_PREVIEW_SKILLS_Y_BOTTOM - CLASS_PREVIEW_SKILLS_Y_TOP;
 
-    for (skill_index, active_skill) in class_data
-        .active_skills
-        .iter()
-        .take(VISIBLE_CLASS_SKILL_COUNT)
-        .enumerate()
-    {
+    for skill_index in 0..VISIBLE_CLASS_SKILL_COUNT {
         let skill_y_offset = if skill_row_count <= 1 {
             CLASS_PREVIEW_SKILLS_Y_TOP + skill_y_span * 0.5
         } else {
@@ -1976,12 +2047,12 @@ fn spawn_player_preview(
 
         let is_unlocked =
             bypass_unlocks || unlocked_skills.is_unlocked(selected_class, skill_index);
-        if is_unlocked {
+        if skill_index == 0 {
             spawn_skill_tooltip_content(
                 commands,
                 graphics,
                 asset_server,
-                active_skill.clone(),
+                class_data.active_skills[0].clone(),
                 None,
                 skill_container,
                 1.,
@@ -1993,6 +2064,8 @@ fn spawn_player_preview(
                 0,
                 METEOR_SHOWER_BASE_COUNT,
             );
+        } else if is_unlocked {
+            spawn_empty_skill_slot_preview(commands, asset_server, skill_container);
         } else {
             spawn_locked_skill_content(
                 commands,

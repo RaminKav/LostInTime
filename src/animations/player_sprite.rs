@@ -315,8 +315,8 @@ pub fn change_player_class_visuals(
     player_class: Res<PlayerClass>,
     sprite_handles: Res<PlayerSpriteHandles>,
     graphics: Res<crate::assets::Graphics>,
-    unlocked_skills: Res<crate::player::unlocks::UnlockedSkills>,
-    cheat_settings: Res<crate::ui::CheatSettings>,
+    _unlocked_skills: Res<crate::player::unlocks::UnlockedSkills>,
+    _cheat_settings: Res<crate::ui::CheatSettings>,
 ) {
     for (e, mut player_skills) in player.iter_mut() {
         let class = &player_class.class;
@@ -326,39 +326,17 @@ pub fn change_player_class_visuals(
         let class_data = graphics.get_class_data(class.clone());
         let active_skills = &class_data.active_skills;
 
-        // Assign each class skill slot only if it's unlocked. Slots 0-1 are
-        // always free; slot 2 (third skill) may require Time Fragments
-        // unless `bypass_class_unlocks` cheat is set.
-        let bypass = cheat_settings.bypass_class_unlocks;
-        let slot_choice = |i: usize| -> Option<ActiveSkillChoiceState> {
-            if bypass || unlocked_skills.is_unlocked(class, i) {
-                Some(ActiveSkillChoiceState::new(
-                    active_skills[i].clone(),
-                    HeirloomRarity::Common,
-                ))
-            } else {
-                None
-            }
-        };
-        player_skills.active_skill_slot_0 = slot_choice(0);
-        player_skills.active_skill_slot_1 = slot_choice(1);
-        player_skills.active_skill_slot_2 = slot_choice(2);
-        player_skills.active_skill_slot_3 =
-            if crate::player::skills::VISIBLE_CLASS_SKILL_COUNT >= 4 {
-                slot_choice(3)
-            } else {
-                None
-            };
+        // Slot 0 is the class movement skill; slots 1–2 start empty and are filled
+        // at active skill shrines during the run.
+        player_skills.active_skill_slot_0 = Some(ActiveSkillChoiceState::new(
+            active_skills[0].clone(),
+            HeirloomRarity::Common,
+        ));
+        player_skills.active_skill_slot_1 = None;
+        player_skills.active_skill_slot_2 = None;
+        player_skills.active_skill_slot_3 = None;
 
-        // Only register skill components for slots the player actually has unlocked.
-        for (i, skill) in active_skills.iter().enumerate() {
-            if i >= crate::player::skills::VISIBLE_CLASS_SKILL_COUNT {
-                break;
-            }
-            if bypass || unlocked_skills.is_unlocked(class, i) {
-                skill.add_skill_components(e, &mut commands);
-            }
-        }
+        active_skills[0].add_skill_components(e, &mut commands);
 
         //att update event
         commands
