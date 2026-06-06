@@ -60,7 +60,7 @@ pub fn reset_blacksmith_tracker(mut tracker: ResMut<BlacksmithPurchaseTracker>) 
 }
 
 pub const MERCHANT_SLOT_COUNT: usize = 7;
-pub const MERCHANT_REROLL_ICON_PATH: &str = "ui/Icons/RerollIcon.png";
+pub const MERCHANT_REROLL_ICON_PATH: &str = "ui/icons/RerollIcon.png";
 pub const MERCHANT_REROLL_ICON_SIZE: Vec2 = Vec2::new(10., 10.);
 
 const MERCHANT_TITLE_Y: f32 = 72.;
