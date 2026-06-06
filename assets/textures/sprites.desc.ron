@@ -964,12 +964,12 @@
         ),
         DesertCrate: WorldObjectData(
             texture_pos: (14., 13.),
-            size: (16., 16.),
+            size: (16., 18.),
             anchor: None,
         ),
         DesertCrate2: WorldObjectData(
             texture_pos: (15., 13.),
-            size: (16., 19.),
+            size: (16., 21.),
             anchor: None,
         ),
         Bones: WorldObjectData(

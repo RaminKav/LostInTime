@@ -498,6 +498,8 @@ pub struct ImageAssets {
     pub grass_patches_sheet: Handle<Image>,
     #[asset(path = "textures/grass_patches.patches.ron")]
     pub grass_patches_desc: Handle<world::grass_patches::GrassPatchesDesc>,
+    #[asset(path = "textures/desert_patch.png")]
+    pub desert_patch_sheet: Handle<Image>,
 }
 
 #[derive(Component)]

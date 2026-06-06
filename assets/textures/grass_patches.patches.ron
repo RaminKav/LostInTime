@@ -1,18 +1,18 @@
 (
     patches: {
-        GrassPatch1: GrassPatchData(
+        GrassPatch1: GroundPatchData(
             texture_pos: (0., 0.),
             size: (48., 48.),
         ),
-        GrassPatch2: GrassPatchData(
+        GrassPatch2: GroundPatchData(
             texture_pos: (0., 5.),
             size: (48., 48.),
         ),
-        GrassPatch3: GrassPatchData(
+        GrassPatch3: GroundPatchData(
             texture_pos: (0., 10.),
             size: (48., 48.),
         ),
-        GrassPatch4: GrassPatchData(
+        GrassPatch4: GroundPatchData(
             texture_pos: (0., 15.),
             size: (48., 48.),
         ),
