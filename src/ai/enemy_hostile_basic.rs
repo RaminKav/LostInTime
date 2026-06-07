@@ -622,6 +622,7 @@ pub fn projectile_attack(
                 from_enemy: true,
                 is_followup_proj: false,
                 mana_cost: None,
+                mana_cost_heirloom: None,
                 dmg_override: Some(mob_attack.0),
                 pos_override: None,
                 spawn_delay: 0.1,

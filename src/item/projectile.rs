@@ -10,15 +10,15 @@ use crate::{
     },
     audio::{AudioSoundEffect, SoundSpawner},
     client::is_not_paused,
-    cursor::CursorPos,
     combat::AttackTimer,
+    cursor::CursorPos,
     custom_commands::CommandsExt,
     enemy::Mob,
     item::ItemDropDespawnTimer,
     player::{
         mage_skills::JustTeleported,
         skills::{
-            fire_ring_duration_seconds, Heirloom, PlayerClass, PlayerSkills, RapidfireState,
+            fire_ring_duration_seconds, Heirloom, HeirloomTriggerCounts, PlayerClass, PlayerSkills,
             FIRE_RING_BASE_DURATION_SECS,
         },
         Player,
@@ -27,7 +27,6 @@ use crate::{
     Game, GameParam, GameState, Pet,
 };
 
-use super::ammo::Ammo;
 use super::item_upgrades::ArrowSpeedUpgrade;
 
 #[derive(Component, Reflect, Schematic, FromReflect, Default, Clone)]
@@ -247,6 +246,8 @@ pub struct RangedAttackEvent {
     pub projectile: Projectile,
     pub direction: Vec2,
     pub mana_cost: Option<i32>,
+    /// When set, mana deducted for this shot is attributed to this heirloom in [`HeirloomTriggerCounts`].
+    pub mana_cost_heirloom: Option<Heirloom>,
     pub from_enemy: bool,
     pub from_entity: Option<Entity>,
     pub is_followup_proj: bool,
@@ -369,13 +370,12 @@ fn handle_ranged_attack_event(
         ),
         With<Player>,
     >,
-    rapidfire_state: Query<&RapidfireState, With<Player>>,
     transforms: Query<&GlobalTransform>,
     game: Res<Game>,
     player_class: Res<PlayerClass>,
     mut commands: Commands,
     mut modify_mana_event: EventWriter<ModifyManaEvent>,
-    mut ammo_query: Query<&mut Ammo>,
+    mut trigger_counts: ResMut<HeirloomTriggerCounts>,
 ) {
     for proj_event in events.iter() {
         let (
@@ -429,14 +429,16 @@ fn handle_ranged_attack_event(
             if mana_cost.abs() > current_mana.0 {
                 continue;
             }
-            modify_mana_event.send(ModifyManaEvent(
-                -(mana_cost as f32
-                    * if skills.has(Heirloom::DiscountMP) {
-                        0.75
-                    } else {
-                        1.
-                    }) as i32,
-            ));
+            let actual_cost = (mana_cost as f32
+                * if skills.has(Heirloom::DiscountMP) {
+                    0.75
+                } else {
+                    1.
+                }) as i32;
+            modify_mana_event.send(ModifyManaEvent(-actual_cost));
+            if let Some(heirloom) = proj_event.mana_cost_heirloom.clone() {
+                trigger_counts.record_mana(heirloom, actual_cost);
+            }
         }
 
         let spawn_transform = if let Some(entity) = proj_event.from_entity {
@@ -523,11 +525,19 @@ fn handle_ranged_attack_event(
 fn handle_translate_projectiles(
     mut player_projectiles: Query<
         (&mut Transform, &ProjectileState),
-        (With<Projectile>, Without<HomingEnergyBall>, Without<EnemyProjectile>),
+        (
+            With<Projectile>,
+            Without<HomingEnergyBall>,
+            Without<EnemyProjectile>,
+        ),
     >,
     mut enemy_projectiles: Query<
         (&mut Transform, &ProjectileState),
-        (With<Projectile>, Without<HomingEnergyBall>, With<EnemyProjectile>),
+        (
+            With<Projectile>,
+            Without<HomingEnergyBall>,
+            With<EnemyProjectile>,
+        ),
     >,
     speed_modifiers: Query<&ArrowSpeedUpgrade>,
     time: Res<Time>,
@@ -537,8 +547,7 @@ fn handle_translate_projectiles(
         .unwrap_or(&ArrowSpeedUpgrade(1.))
         .0;
     for (mut transform, state) in &mut player_projectiles {
-        let delta =
-            state.direction * (state.speed * arrow_speed_upgrade) * time.delta_seconds();
+        let delta = state.direction * (state.speed * arrow_speed_upgrade) * time.delta_seconds();
         transform.translation += delta.extend(0.0);
     }
     for (mut transform, state) in &mut enemy_projectiles {
@@ -571,8 +580,8 @@ fn handle_spawn_projectiles_after_delay(
             // cursor aim so wind-up shots stay responsive.
             let (spawn_pos, spawn_direction) = if proj.track_player_pos {
                 let player_pos = game.player().position.truncate();
-                let direction = (cursor_pos.world_coords.truncate() - player_pos)
-                    .normalize_or_zero();
+                let direction =
+                    (cursor_pos.world_coords.truncate() - player_pos).normalize_or_zero();
                 (player_pos, direction)
             } else {
                 (proj.pos, proj.direction)

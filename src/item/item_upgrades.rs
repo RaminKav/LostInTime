@@ -109,12 +109,12 @@ pub fn handle_delayed_ranged_attack(
             *remaining -= 1;
             ranged_attack_event.send(RangedAttackEvent {
                 projectile: ranged_attack.0.clone(),
-                direction: (cursor_pos.world_coords.truncate()
-                    - game.player().position.truncate())
-                .normalize_or_zero(),
+                direction: (cursor_pos.world_coords.truncate() - game.player().position.truncate())
+                    .normalize_or_zero(),
                 from_enemy: false,
                 is_followup_proj: true,
                 mana_cost: None,
+                mana_cost_heirloom: None,
                 from_entity: None,
                 dmg_override: None,
                 pos_override: None,
@@ -175,6 +175,7 @@ pub fn handle_spread_arrows_attack(
             from_enemy: false,
             is_followup_proj: true,
             mana_cost: None,
+            mana_cost_heirloom: None,
             from_entity: None,
             dmg_override: None,
             pos_override: None,
@@ -228,10 +229,7 @@ pub fn handle_on_hit_upgrades(
     };
     for hit in hits.iter() {
         // Skip DoT tick damage (e.g. poison) so it does not re-trigger on-hit effects.
-        if matches!(
-            hit.from_heirloom_effect,
-            Some(Heirloom::PoisonStacks)
-        ) {
+        if matches!(hit.from_heirloom_effect, Some(Heirloom::PoisonStacks)) {
             continue;
         }
         let mut rng = rand::thread_rng();
@@ -283,6 +281,7 @@ pub fn handle_on_hit_upgrades(
                 from_entity: None,
                 is_followup_proj: true,
                 mana_cost: None,
+                mana_cost_heirloom: None,
                 dmg_override: Some(hit.damage),
                 pos_override: Some(hit_entity_txfm.translation().truncate()),
                 spawn_delay: 0.1,
@@ -299,6 +298,7 @@ pub fn handle_on_hit_upgrades(
             let mana_cost = Heirloom::IceStaffAoE.get_mana_cost();
             if current_mana.0 >= mana_cost {
                 current_mana.0 -= mana_cost;
+                trigger_counts.record_mana(Heirloom::IceStaffAoE, mana_cost);
                 // Throttle explosions per frame to prevent lag when hitting many enemies
                 const MAX_ICE_EXPLOSIONS_PER_FRAME: u8 = 8;
                 if throttle.count < MAX_ICE_EXPLOSIONS_PER_FRAME {
@@ -333,9 +333,9 @@ pub fn handle_on_hit_upgrades(
         if is_dart || stacks_to_apply > 0 {
             if let Some(burning) = status.burning.as_mut() {
                 // Increment stacks and reset duration
-                burning.stacks = burning.stacks.saturating_add(
-                    stacks_to_apply as u128 + bonus_stack as u128,
-                );
+                burning.stacks = burning
+                    .stacks
+                    .saturating_add(stacks_to_apply as u128 + bonus_stack as u128);
                 burning.duration_timer.reset();
                 let stacks = burning.stacks as i32;
                 events.p1().send(StatusEffectEvent {

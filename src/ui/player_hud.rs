@@ -10,6 +10,7 @@ use super::{
     hud_heirloom_first_icon_x, hud_heirloom_row_y, hud_hotbar_slot_center_x,
     hud_keybind_badge_center_y, hud_progress_bar_center_x, hud_row_below_xp_y,
     hud_timeline_arrow_local_x, hud_timeline_center_x,
+    icon_hover_tooltips::ICON_HOVER_TOOLTIP_BG_COLOR,
     interactions::{DraggedItem, Interaction},
     spawn_inv_slot, spawn_item_stack_icon,
     tooltips::spawn_world_item_tooltip_for_stack,
@@ -54,8 +55,8 @@ use crate::{
         skills::{
             active_skill_scaling::METEOR_SHOWER_BASE_COUNT,
             effective_player_attack_speed_multiplier, ActiveSkill, ActiveSkillChoiceState,
-            ActiveSkillUsedEvent, ClassSkillSlots, Heirloom, HeirloomRarity, PlayerSkills,
-            VISIBLE_CLASS_SKILL_COUNT,
+            ActiveSkillUsedEvent, ClassSkillSlots, Heirloom, HeirloomRarity, HeirloomTriggerCounts,
+            PlayerSkills, VISIBLE_CLASS_SKILL_COUNT,
         },
         CoinCurrency, Player, RunScore, TimeFragmentCurrency,
     },
@@ -72,6 +73,14 @@ pub struct HealthBarText;
 pub struct ManaBar;
 #[derive(Component)]
 pub struct ManaBarText;
+
+/// Invisible hit target on the mana orb for the mana consumption tracker tooltip.
+#[derive(Component)]
+pub struct ManaOrbHudHover;
+
+/// Floating tooltip shown while hovering the mana orb.
+#[derive(Component)]
+pub struct ManaTrackerHudTooltip;
 
 /// Marker for the new bottom HUD frame sprite (replaces the old top "bars" frame).
 #[derive(Component)]
@@ -372,6 +381,22 @@ pub fn setup_bars_ui(
         .insert(RenderLayers::from_layers(&[3]))
         .insert(ManaBarText)
         .insert(Name::new("HUD MANA TEXT"))
+        .set_parent(mana_fill);
+
+    commands
+        .spawn(SpriteBundle {
+            sprite: Sprite {
+                color: Color::rgba(0., 0., 0., 0.),
+                custom_size: Some(HUD_FILL_PIXEL_SIZE),
+                ..default()
+            },
+            transform: Transform::from_translation(Vec3::new(0., 0., 3.)),
+            ..default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(ManaOrbHudHover)
+        .insert(Interactable::default())
+        .insert(Name::new("HUD MANA HOVER"))
         .set_parent(mana_fill);
 
     commands
@@ -1615,6 +1640,208 @@ pub fn handle_active_skill_hud_tooltip(
     }
 
     *last_hovered = hovered_skill;
+}
+
+const MANA_TRACKER_COLUMNS: usize = 2;
+const MANA_TRACKER_ICON_SIZE: f32 = 12.0;
+const MANA_TRACKER_COL_WIDTH: f32 = 54.0;
+const MANA_TRACKER_ROW_HEIGHT: f32 = 14.0;
+const MANA_TRACKER_TITLE_HEIGHT: f32 = 12.0;
+const MANA_TRACKER_PAD: f32 = 6.0;
+
+fn mana_tracker_tooltip_size(entry_count: usize) -> Vec2 {
+    let rows = entry_count.div_ceil(MANA_TRACKER_COLUMNS).max(1) as f32;
+    Vec2::new(
+        MANA_TRACKER_COL_WIDTH * MANA_TRACKER_COLUMNS as f32 + MANA_TRACKER_PAD * 2.,
+        MANA_TRACKER_TITLE_HEIGHT + rows * MANA_TRACKER_ROW_HEIGHT + MANA_TRACKER_PAD * 2.,
+    )
+}
+
+fn spawn_mana_tracker_tooltip(
+    commands: &mut Commands,
+    graphics: &Graphics,
+    asset_server: &AssetServer,
+    anchor_pos: Vec3,
+    tracker: &HeirloomTriggerCounts,
+) -> Entity {
+    let entries = tracker.sorted_mana_entries();
+    let size = mana_tracker_tooltip_size(entries.len());
+    let tooltip_pos = Vec3::new(
+        anchor_pos.x,
+        anchor_pos.y + HUD_FILL_PIXEL_SIZE.y * 0.5 + size.y * 0.5 + 6.,
+        anchor_pos.z + 10.,
+    );
+
+    let root = commands
+        .spawn((
+            SpatialBundle::from_transform(Transform::from_translation(tooltip_pos)),
+            RenderLayers::from_layers(&[3]),
+            ManaTrackerHudTooltip,
+            Name::new("MANA TRACKER TOOLTIP"),
+        ))
+        .id();
+
+    commands
+        .spawn(SpriteBundle {
+            sprite: Sprite {
+                color: ICON_HOVER_TOOLTIP_BG_COLOR,
+                custom_size: Some(size),
+                ..default()
+            },
+            ..default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .set_parent(root);
+
+    let title_y = size.y * 0.5 - MANA_TRACKER_PAD - MANA_TRACKER_TITLE_HEIGHT * 0.5;
+    commands
+        .spawn(Text2dBundle {
+            text: Text::from_section(
+                "Mana Tracker",
+                gf::ICON_HOVER_TOOLTIP.text_style(asset_server, WHITE),
+            )
+            .with_alignment(TextAlignment::Center),
+            text_anchor: Anchor::Center,
+            transform: Transform::from_translation(Vec3::new(0., title_y, 1.)),
+            ..default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .set_parent(root);
+
+    let grid_top = title_y - MANA_TRACKER_TITLE_HEIGHT * 0.5 - MANA_TRACKER_ROW_HEIGHT * 0.5;
+    let left_x = -size.x * 0.5 + MANA_TRACKER_PAD + MANA_TRACKER_COL_WIDTH * 0.5;
+
+    if entries.is_empty() {
+        commands
+            .spawn(Text2dBundle {
+                text: Text::from_section(
+                    "No mana spent yet",
+                    gf::HUD_MICRO.text_style(asset_server, LIGHT_GREY),
+                )
+                .with_alignment(TextAlignment::Center),
+                text_anchor: Anchor::Center,
+                transform: Transform::from_translation(Vec3::new(0., grid_top, 1.)),
+                ..default()
+            })
+            .insert(RenderLayers::from_layers(&[3]))
+            .set_parent(root);
+        return root;
+    }
+
+    let texture_atlas = graphics.texture_atlas.as_ref().unwrap().clone();
+    for (index, (heirloom, _amount)) in entries.iter().enumerate() {
+        let col = index % MANA_TRACKER_COLUMNS;
+        let row = index / MANA_TRACKER_COLUMNS;
+        let x = left_x + col as f32 * MANA_TRACKER_COL_WIDTH;
+        let y = grid_top - row as f32 * MANA_TRACKER_ROW_HEIGHT;
+        let pct = tracker.mana_consumed_percentage(heirloom);
+
+        let row_root = commands
+            .spawn(SpatialBundle::from_transform(Transform::from_translation(
+                Vec3::new(x, y, 1.),
+            )))
+            .insert(RenderLayers::from_layers(&[3]))
+            .set_parent(root)
+            .id();
+
+        commands
+            .spawn(SpriteSheetBundle {
+                texture_atlas: texture_atlas.clone(),
+                sprite: graphics.get_heirloom_icon(heirloom.clone()),
+                transform: Transform::from_translation(Vec3::new(
+                    -MANA_TRACKER_COL_WIDTH * 0.5 + MANA_TRACKER_ICON_SIZE * 0.5 + 2.,
+                    0.,
+                    1.,
+                )),
+                ..default()
+            })
+            .insert(Sprite {
+                custom_size: Some(Vec2::splat(MANA_TRACKER_ICON_SIZE)),
+                ..default()
+            })
+            .insert(RenderLayers::from_layers(&[3]))
+            .set_parent(row_root);
+
+        commands
+            .spawn(Text2dBundle {
+                text: Text::from_section(
+                    format!("{pct}%"),
+                    gf::HUD_MICRO.text_style(asset_server, WHITE),
+                )
+                .with_alignment(TextAlignment::Center),
+                text_anchor: Anchor::CenterLeft,
+                transform: Transform::from_translation(Vec3::new(
+                    -MANA_TRACKER_COL_WIDTH * 0.5 + MANA_TRACKER_ICON_SIZE + 6.,
+                    0.,
+                    2.,
+                )),
+                ..default()
+            })
+            .insert(RenderLayers::from_layers(&[3]))
+            .set_parent(row_root);
+    }
+
+    root
+}
+
+/// Shows a breakdown of mana spent per heirloom while hovering the mana orb.
+pub fn handle_mana_tracker_hud_tooltip(
+    mut commands: Commands,
+    graphics: Res<Graphics>,
+    asset_server: Res<AssetServer>,
+    cursor_pos: Res<CursorPos>,
+    trigger_counts: Res<HeirloomTriggerCounts>,
+    hit_detection_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
+    mut hover_targets: Query<(Entity, &GlobalTransform, &mut Interactable), With<ManaOrbHudHover>>,
+    existing_tooltips: Query<Entity, With<ManaTrackerHudTooltip>>,
+    mut last_hovered: Local<bool>,
+    mut last_total: Local<u64>,
+) {
+    use Interaction;
+
+    let hit_entity = super::ui_helpers::pointcast_2d(&cursor_pos, &hit_detection_sprites, None);
+
+    for (entity, _, mut interactable) in hover_targets.iter_mut() {
+        let is_hit = hit_entity
+            .as_ref()
+            .map(|(e, _s, _t)| *e == entity)
+            .unwrap_or(false);
+        if is_hit && !matches!(interactable.current(), Interaction::Hovering) {
+            interactable.change(Interaction::Hovering);
+        } else if !is_hit && matches!(interactable.current(), Interaction::Hovering) {
+            interactable.change(Interaction::None);
+        }
+    }
+
+    let hovering = hover_targets
+        .iter()
+        .any(|(_, _, interactable)| matches!(interactable.current(), Interaction::Hovering));
+
+    let total = trigger_counts.total_mana_consumed();
+    if hovering == *last_hovered && (!hovering || total == *last_total) {
+        return;
+    }
+    *last_hovered = hovering;
+    *last_total = total;
+
+    for tooltip_e in existing_tooltips.iter() {
+        commands.entity(tooltip_e).despawn_recursive();
+    }
+
+    if hovering {
+        let anchor_pos = hover_targets
+            .iter()
+            .find(|(_, _, interactable)| matches!(interactable.current(), Interaction::Hovering))
+            .map(|(_, transform, _)| transform.translation())
+            .unwrap_or(Vec3::ZERO);
+        spawn_mana_tracker_tooltip(
+            &mut commands,
+            &graphics,
+            &asset_server,
+            anchor_pos,
+            &trigger_counts,
+        );
+    }
 }
 
 /// Helper function to get current scaling value for heirlooms that scale

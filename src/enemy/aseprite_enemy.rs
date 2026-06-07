@@ -461,8 +461,7 @@ pub fn aseprite_follow(
         hit,
     ) in follows.iter_mut()
     {
-        if defiance_frozen_option.is_some()
-            || status_option.map(|s| s.is_frozen()).unwrap_or(false)
+        if defiance_frozen_option.is_some() || status_option.map(|s| s.is_frozen()).unwrap_or(false)
         {
             continue;
         }
@@ -548,18 +547,10 @@ pub fn aseprite_idle(
     mut commands: Commands,
     time: Res<Time>,
 ) {
-    for (
-        entity,
-        mut idle,
-        mut anim,
-        mut current_tag,
-        defiance_frozen_option,
-        status_option,
-        hit,
-    ) in idles.iter_mut()
+    for (entity, mut idle, mut anim, mut current_tag, defiance_frozen_option, status_option, hit) in
+        idles.iter_mut()
     {
-        if defiance_frozen_option.is_some()
-            || status_option.map(|s| s.is_frozen()).unwrap_or(false)
+        if defiance_frozen_option.is_some() || status_option.map(|s| s.is_frozen()).unwrap_or(false)
         {
             continue;
         }
@@ -675,8 +666,7 @@ pub fn aseprite_leap_attack(
         defiance_frozen_option,
     ) in attacks.iter_mut()
     {
-        if defiance_frozen_option.is_some()
-            || status_option.map(|s| s.is_frozen()).unwrap_or(false)
+        if defiance_frozen_option.is_some() || status_option.map(|s| s.is_frozen()).unwrap_or(false)
         {
             continue;
         }
@@ -802,8 +792,7 @@ pub fn aseprite_projectile_attack(
         status_option,
     ) in attacks.iter_mut()
     {
-        if defiance_frozen_option.is_some()
-            || status_option.map(|s| s.is_frozen()).unwrap_or(false)
+        if defiance_frozen_option.is_some() || status_option.map(|s| s.is_frozen()).unwrap_or(false)
         {
             continue;
         }
@@ -867,6 +856,7 @@ pub fn aseprite_projectile_attack(
                     from_enemy: true,
                     is_followup_proj: false,
                     mana_cost: None,
+                    mana_cost_heirloom: None,
                     dmg_override: Some(enemy_attack.0),
                     pos_override: None,
                     spawn_delay: 0.,
@@ -964,8 +954,7 @@ pub fn aseprite_circle_attack(
         status_option,
     ) in attacks.iter_mut()
     {
-        if defiance_frozen_option.is_some()
-            || status_option.map(|s| s.is_frozen()).unwrap_or(false)
+        if defiance_frozen_option.is_some() || status_option.map(|s| s.is_frozen()).unwrap_or(false)
         {
             continue;
         }
@@ -1080,8 +1069,7 @@ pub fn aseprite_multi_leap_attack(
         defiance_frozen_option,
     ) in attacks.iter_mut()
     {
-        if defiance_frozen_option.is_some()
-            || status_option.map(|s| s.is_frozen()).unwrap_or(false)
+        if defiance_frozen_option.is_some() || status_option.map(|s| s.is_frozen()).unwrap_or(false)
         {
             continue;
         }
@@ -1155,10 +1143,7 @@ pub fn aseprite_multi_leap_attack(
                 let attack_tag = direction_to_attack_tag(attack.dir.unwrap_or(delta_xy));
                 set_animation_tag(&mut anim, &mut current_tag, attack_tag);
                 if let Ok(mut tf) = local_transforms.get_mut(entity) {
-                    apply_horizontal_sprite_flip_for_dir(
-                        &mut tf,
-                        attack.dir.unwrap_or(delta_xy),
-                    );
+                    apply_horizontal_sprite_flip_for_dir(&mut tf, attack.dir.unwrap_or(delta_xy));
                 }
 
                 if attack.attack_duration_timer.finished() {
@@ -1244,8 +1229,7 @@ pub fn aseprite_bull_charge(
         defiance_frozen_option,
     ) in attacks.iter_mut()
     {
-        if defiance_frozen_option.is_some()
-            || status_option.map(|s| s.is_frozen()).unwrap_or(false)
+        if defiance_frozen_option.is_some() || status_option.map(|s| s.is_frozen()).unwrap_or(false)
         {
             continue;
         }

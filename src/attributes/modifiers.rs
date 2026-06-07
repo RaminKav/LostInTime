@@ -69,6 +69,7 @@ pub fn handle_modify_health_event(
                     break;
                 }
                 current_mana.0 -= mana_cost;
+                trigger_counts.record_mana(Heirloom::OnHitEcho, mana_cost);
                 trigger_counts.increment(Heirloom::OnHitEcho);
 
                 if i == 0 {

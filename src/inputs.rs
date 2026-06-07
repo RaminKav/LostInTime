@@ -932,6 +932,8 @@ pub fn mouse_click_system(
                 if current_mana.0 >= mana_cost {
                     current_mana.0 -= mana_cost;
                     game.heirloom_trigger_counts
+                        .record_mana(Heirloom::ChanceToProcExtraAttack, mana_cost);
+                    game.heirloom_trigger_counts
                         .increment(Heirloom::ChanceToProcExtraAttack);
                     2
                 } else {
@@ -948,6 +950,7 @@ pub fn mouse_click_system(
                     is_followup_proj: false,
                     from_entity: None,
                     mana_cost: mana_cost_option.map(|m| m.0),
+                    mana_cost_heirloom: None,
                     dmg_override: None,
                     pos_override: if ranged_tool.0.is_anchored_to_player_pos() {
                         Some(Vec2::ZERO)

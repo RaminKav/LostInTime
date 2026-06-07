@@ -227,6 +227,7 @@ pub fn handle_lunge(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     projectile_size: Query<&crate::attributes::ProjectileSize, With<Player>>,
+    mut trigger_counts: ResMut<crate::player::skills::HeirloomTriggerCounts>,
 ) {
     let activated_slots: Vec<usize> = active_skill_events.iter().map(|ev| ev.slot).collect();
 
@@ -312,6 +313,7 @@ pub fn handle_lunge(
                         break;
                     }
                     current_mana.0 -= mana_cost;
+                    trigger_counts.record_mana(Heirloom::SkillEcho, mana_cost);
 
                     if i == 0 {
                         crate::player::melee_skills::spawn_echo_hitbox(
@@ -806,6 +808,7 @@ pub fn handle_recall(
         projectile: Projectile::Smoke,
         direction: Vec2::ZERO,
         mana_cost: None,
+        mana_cost_heirloom: None,
         from_enemy: false,
         from_entity: Some(player_e),
         is_followup_proj: false,
@@ -907,6 +910,7 @@ pub fn tick_recall_dash(
             projectile: Projectile::Smoke,
             direction: Vec2::ZERO,
             mana_cost: None,
+            mana_cost_heirloom: None,
             from_enemy: false,
             from_entity: Some(player_e),
             is_followup_proj: false,

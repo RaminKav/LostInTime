@@ -9,9 +9,9 @@ use crate::{
     ai::FollowState,
     animations::{player_sprite::PlayerAnimation, AttackEvent},
     attributes::{
-        attribute_helpers::skill_power_multiplier, ActiveConsumableBuffs, Attack,
-        AttackSpeed, AttributeChangeEvent, BonusAttackSpeed, ConsumableBuffEffect,
-        ConsumableBuffEntry, CurrentHealth, CurrentMana, MaxHealth, SkillPower, Speed,
+        attribute_helpers::skill_power_multiplier, ActiveConsumableBuffs, Attack, AttackSpeed,
+        AttributeChangeEvent, BonusAttackSpeed, ConsumableBuffEffect, ConsumableBuffEntry,
+        CurrentHealth, CurrentMana, MaxHealth, SkillPower, Speed,
     },
     audio::{AudioSoundEffect, SoundSpawner},
     blessings::{Blessing, OwnedBlessings},
@@ -36,25 +36,22 @@ use crate::{
         skills::{
             active_skill_scaling::{
                 attack_damage_multiplier, dagger_slash_hit_interval_seconds,
-                dagger_slash_total_slashes, ARROW_VOLLEY, BOMB, BUCKSHOT_PELLET, DAGGER_SLASH,
-                DAGGER_THROW, FIRE_PILLAR, FURY,
+                dagger_slash_total_slashes, meteor_shower_spawn_interval_secs, ARROW_VOLLEY, BOMB,
+                BUCKSHOT_PELLET, DAGGER_SLASH, DAGGER_THROW, FIRE_PILLAR, FURY,
                 HEAL_MAX_HEALTH_PERCENT, ICE_WALL, LASER_BEAM, LIGHTNING, METEOR_SHOWER,
-                meteor_shower_spawn_interval_secs, METEOR_SHOWER_BASE_COUNT,
-                METEOR_SHOWER_FIRST_RADIUS_TILES, METEOR_SHOWER_RADIUS_TILES, PIERCING_STAR,
-                POSSESSED_BLADE,
+                METEOR_SHOWER_BASE_COUNT, METEOR_SHOWER_FIRST_RADIUS_TILES,
+                METEOR_SHOWER_RADIUS_TILES, PIERCING_STAR, POSSESSED_BLADE,
                 RAPIDFIRE_ATTACK_SPEED_BONUS_PERCENT, SHOUT, SPIN_ATTACK, TRIPLE_THROW,
             },
-            arrow_volley_scaling,
-            effective_player_attack_speed_multiplier, fury_throw_speed_multiplier,
-            FURY_DURATION_SECS, FURY_THROW_TIMER_EFFECTIVE_SECS,
-            grant_skill_charge_after_cooldown_complete, ActiveSkill, ActiveSkillUsedEvent,
-            ArrowVolleyState, BombState, BuckshotSkillState, ClassSkillSlots,
+            arrow_volley_scaling, effective_player_attack_speed_multiplier,
+            fury_throw_speed_multiplier, grant_skill_charge_after_cooldown_complete, ActiveSkill,
+            ActiveSkillUsedEvent, ArrowVolleyState, BombState, BuckshotSkillState, ClassSkillSlots,
             DaggerThrowKillTracker, DaggerThrowState, DruidTreeSkillState, FirePillarState,
-            FuryState, HealSkillState, Heirloom, IceWallSkillState, LaserBeamState,
-            LastHitProjectile, LightningState, MeteorShowerSkillState, PhasingThroughEnemies,
-            PiercingStarSkillState,
-            PlayerSkills, PossessedBladeSkillState, RapidfireState, ShoutSkillState, SlashState,
-            SpinAttackState, StealthState, TripleThrowState,
+            FuryState, HealSkillState, Heirloom, HeirloomTriggerCounts, IceWallSkillState,
+            LaserBeamState, LastHitProjectile, LightningState, MeteorShowerSkillState,
+            PhasingThroughEnemies, PiercingStarSkillState, PlayerSkills, PossessedBladeSkillState,
+            RapidfireState, ShoutSkillState, SlashState, SpinAttackState, StealthState,
+            TripleThrowState, FURY_DURATION_SECS, FURY_THROW_TIMER_EFFECTIVE_SECS,
         },
         Player,
     },
@@ -190,7 +187,7 @@ pub fn handle_active_skill_event(
     proto_param: ProtoParam,
     prototypes: Prototypes,
     enemies: Query<(Entity, &GlobalTransform), With<Mob>>,
-    mut trigger_counts: ResMut<crate::player::skills::HeirloomTriggerCounts>,
+    mut trigger_counts: ResMut<HeirloomTriggerCounts>,
     mut attribute_change: EventWriter<AttributeChangeEvent>,
     mut consumable_buffs_q: Query<&mut ActiveConsumableBuffs, With<Player>>,
 ) {
@@ -326,6 +323,7 @@ pub fn handle_active_skill_event(
                             projectile: Projectile::Smoke,
                             direction: Vec2::ZERO, // Smoke doesn't move
                             mana_cost: None,
+                            mana_cost_heirloom: None,
                             from_enemy: false,
                             from_entity: Some(player_e),
                             is_followup_proj: false,
@@ -364,6 +362,7 @@ pub fn handle_active_skill_event(
                             projectile: Projectile::AttackSpeed,
                             direction: Vec2::ZERO, // Doesn't move
                             mana_cost: None,
+                            mana_cost_heirloom: None,
                             from_enemy: false,
                             from_entity: Some(player_e),
                             is_followup_proj: false,
@@ -399,6 +398,7 @@ pub fn handle_active_skill_event(
                             projectile: Projectile::FireRing,
                             direction: Vec2::ZERO, // Fire ring doesn't move
                             mana_cost: None,
+                            mana_cost_heirloom: None,
                             from_enemy: false,
                             from_entity: None,
                             is_followup_proj: false,
@@ -434,6 +434,7 @@ pub fn handle_active_skill_event(
                             projectile: Projectile::LaserBeam,
                             direction,
                             mana_cost: None,
+                            mana_cost_heirloom: None,
                             from_enemy: false,
                             from_entity: Some(player_e),
                             is_followup_proj: false,
@@ -467,6 +468,7 @@ pub fn handle_active_skill_event(
                             projectile: Projectile::HealHearts,
                             direction: Vec2::ZERO, // Doesn't move
                             mana_cost: None,
+                            mana_cost_heirloom: None,
                             from_enemy: false,
                             from_entity: Some(player_e),
                             is_followup_proj: false,
@@ -504,6 +506,7 @@ pub fn handle_active_skill_event(
                             projectile: Projectile::Buckshot,
                             direction: direction_to_cursor,
                             mana_cost: None,
+                            mana_cost_heirloom: None,
                             from_enemy: false,
                             from_entity: Some(player_e),
                             is_followup_proj: false,
@@ -531,6 +534,7 @@ pub fn handle_active_skill_event(
                                 projectile: Projectile::Bullet,
                                 direction: bullet_dir,
                                 mana_cost: None,
+                                mana_cost_heirloom: None,
                                 from_enemy: false,
                                 from_entity: Some(player_e),
                                 is_followup_proj: true,
@@ -582,6 +586,7 @@ pub fn handle_active_skill_event(
                             projectile: Projectile::IceWall,
                             direction: Vec2::ZERO,
                             mana_cost: None,
+                            mana_cost_heirloom: None,
                             from_enemy: false,
                             from_entity: None,
                             is_followup_proj: false,
@@ -636,6 +641,7 @@ pub fn handle_active_skill_event(
                                 projectile: Projectile::Meteor,
                                 direction: Vec2::ZERO,
                                 mana_cost: None,
+                                mana_cost_heirloom: None,
                                 from_enemy: false,
                                 from_entity: None,
                                 is_followup_proj: false,
@@ -700,6 +706,7 @@ pub fn handle_active_skill_event(
                             projectile: Projectile::Shout,
                             direction: Vec2::ZERO, // AoE doesn't need direction
                             mana_cost: None,
+                            mana_cost_heirloom: None,
                             from_enemy: false,
                             from_entity: Some(player_e),
                             is_followup_proj: false,
@@ -746,6 +753,7 @@ pub fn handle_active_skill_event(
                             projectile: Projectile::ThrowingStarLarge,
                             direction: direction_to_cursor,
                             mana_cost: None,
+                            mana_cost_heirloom: None,
                             from_enemy: false,
                             from_entity: Some(player_e),
                             is_followup_proj: false,
@@ -877,6 +885,7 @@ pub fn handle_active_skill_event(
                                 projectile: Projectile::Lightning,
                                 direction: Vec2::ZERO,
                                 mana_cost: None,
+                                mana_cost_heirloom: None,
                                 from_enemy: false,
                                 from_entity: None,
                                 is_followup_proj: false,
@@ -942,6 +951,7 @@ pub fn handle_active_skill_event(
                                     projectile: Projectile::DaggerThrow,
                                     direction,
                                     mana_cost: None,
+                                    mana_cost_heirloom: None,
                                     from_enemy: false,
                                     from_entity: Some(player_e),
                                     is_followup_proj: false,
@@ -984,6 +994,7 @@ pub fn handle_active_skill_event(
                             projectile: Projectile::DaggerSlash,
                             direction,
                             mana_cost: None,
+                            mana_cost_heirloom: None,
                             from_enemy: false,
                             from_entity: None,
                             is_followup_proj: false,
@@ -1038,6 +1049,7 @@ pub fn handle_active_skill_event(
                                 projectile: Projectile::ThrowingStar,
                                 direction,
                                 mana_cost: None,
+                                mana_cost_heirloom: None,
                                 from_enemy: false,
                                 from_entity: Some(player_e),
                                 is_followup_proj: false,
@@ -1104,6 +1116,7 @@ pub fn handle_active_skill_event(
                             projectile: Projectile::Bomb,
                             direction,
                             mana_cost: None,
+                            mana_cost_heirloom: None,
                             from_enemy: false,
                             from_entity: Some(player_e),
                             is_followup_proj: false,
@@ -1149,6 +1162,7 @@ pub fn handle_active_skill_event(
                             projectile: Projectile::SpinAttack,
                             direction: Vec2::ZERO,
                             mana_cost: None,
+                            mana_cost_heirloom: None,
                             from_enemy: false,
                             from_entity: Some(player_e),
                             is_followup_proj: false,
@@ -1184,8 +1198,7 @@ pub fn handle_active_skill_event(
                         let base_direction = (cursor_pos - player_pos).normalize_or_zero();
                         let base_angle = base_direction.y.atan2(base_direction.x);
 
-                        let spread_angle =
-                            arrow_volley_scaling::FIRST_WAVE_SPREAD_DEG.to_radians();
+                        let spread_angle = arrow_volley_scaling::FIRST_WAVE_SPREAD_DEG.to_radians();
                         let base_dmg: i32 = attack_opt.map(|a| a.0).unwrap_or(10);
                         let dmg =
                             (base_dmg as f32 * power_mult * attack_damage_multiplier(ARROW_VOLLEY))
@@ -1198,6 +1211,7 @@ pub fn handle_active_skill_event(
                                 projectile: Projectile::ArrowVolleyShot,
                                 direction,
                                 mana_cost: None,
+                                mana_cost_heirloom: None,
                                 from_enemy: false,
                                 from_entity: Some(player_e),
                                 is_followup_proj: false,
@@ -1238,6 +1252,7 @@ pub fn handle_active_skill_event(
                             projectile: Projectile::PossessedBlade,
                             direction,
                             mana_cost: None,
+                            mana_cost_heirloom: None,
                             from_enemy: false,
                             from_entity: Some(player_e),
                             is_followup_proj: false,
@@ -1264,6 +1279,7 @@ pub fn handle_active_skill_event(
                             break;
                         }
                         current_mana.0 -= mana_cost;
+                        trigger_counts.record_mana(Heirloom::SkillEcho, mana_cost);
                         trigger_counts.increment(Heirloom::SkillEcho);
 
                         if i == 0 {
@@ -1799,6 +1815,7 @@ pub fn tick_arrow_volley(
                 projectile: Projectile::ArrowVolleyShot,
                 direction,
                 mana_cost: None,
+                mana_cost_heirloom: None,
                 from_enemy: false,
                 from_entity: Some(player_e),
                 is_followup_proj: false,
@@ -1846,6 +1863,7 @@ pub fn tick_pending_dagger_slashes(
             projectile: Projectile::DaggerSlash,
             direction,
             mana_cost: None,
+            mana_cost_heirloom: None,
             from_enemy: false,
             from_entity: None,
             is_followup_proj: false,
@@ -2296,6 +2314,7 @@ pub fn handle_fury_skill(
                 projectile: Projectile::FuryKunai,
                 direction,
                 mana_cost: None,
+                mana_cost_heirloom: None,
                 from_enemy: false,
                 from_entity: None,
                 is_followup_proj: false,
@@ -2375,6 +2394,7 @@ pub fn handle_bomb_explosion(
                     projectile: Projectile::BombExplosion,
                     direction: Vec2::ZERO,
                     mana_cost: None,
+                    mana_cost_heirloom: None,
                     from_enemy: false,
                     from_entity: None,
                     is_followup_proj: false,

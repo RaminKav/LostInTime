@@ -1090,6 +1090,7 @@ impl Plugin for UIPlugin {
                     handle_heirloom_hud_tooltip,
                     player_hud::handle_consumable_buff_hud_tooltip,
                     player_hud::handle_active_skill_hud_tooltip,
+                    player_hud::handle_mana_tracker_hud_tooltip,
                     player_hud::update_skill_tooltip_cooldown.after(player_hud::handle_active_skill_hud_tooltip),
                 )
                     .in_set(OnUpdate(GameState::Main)),

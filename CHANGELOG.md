@@ -504,3 +504,30 @@ Heirlooms:
 - [Bug] Piercing Star thief skill now properly tracks in damage tracker
 - [Bug] Some wep/animations were not hiding when toggling hid attacks/animations, fixed
 - [Bug] Fix Magic Whip collider being too small
+
+## 0.21.0
+
+- [Feature] Big overhaul to heirloom car text, as well as info boxes next to the tooltip explaining what key terms mean
+- [Feature] NEW night time effect! No longer dims the entire game, now slowly adds a gradient of darkness around the player. Much nicer than before!
+- [Feature] HUGE merchant rework. merchant shrine now offers 3 heirlooms, 2 equipments, and 2 materials. you can use a reroll on each of these 3 categories to refresh them.
+- [Feature] 8 New large cactus varients for teh desert, as well as some dark patches underneath objects to add contrast (same idea as in the forest). The desert will continue to improve to bring it to par with the forest biome.
+- [UI] New overlay system for UI (dark, soft gradient)
+- [UI] Add dark background on the big text pop ups in-game
+- [QoL] HUGE buff to bridge placement: Now, pressing the hotbar button puts you into bridge mode, and you can click and drag to place lots of bridges at once. press input again, or dont click for ~2s to exit bridge mode.
+- [QoL] Player icon for the map, as well as a icon legend
+- [QoL] Reworked starting tutorial to show in segments, as the player encounters the relevant tips, instead of displaying everything at once
+- [QoL] Add big text that shows the current day, and the biome when you enter a new era
+- [QoL] Heirloom hovers added to the swap shrine
+- [QoL] Magnet shrine cost changed from 1 time fragment to 10 coins
+- [QoL] Enable all pets by default for the purposes of playtesting
+- [Balance] EXPERIMENT: All classes now only have 1 class movement skill (unique to the class, cant find in the skill shrine), the 2nd and 3rd slots are EMPTY at the start, you can fill them up by visiting the skill shrine. (there are other ways to gain skills planned). Let me know how this one feels, the idea is to let the player discover and have more reason to try different skill combos, rather than giving the most broken combos right out of the gate.
+- [Balance] Nerf base mana regen from 2s -> 3.5s
+- [Balance] Spike slime shows up 1 day earlier in Era1
+- [Balance] Arrows only pierce 3 objects now, so you dont destroy the entire map (still pierce infinite enemies)
+- [Balance] Slow down fur devils and bushlings a tiny bit, to make era1 a bit easier to explore
+- [Balance] Buff Blue Card from 3% -> 4% proc chance (gain +1 mana on hit)
+- [Bug] Fix heirloom tooltips in inventory, and end game screen
+- [Bug] If taking a wep from the chest, it will put your old one into the pet slot if its empty
+- [Bug] Fix a bug where dungeon would reset the Blake Boulder spawn timer
+- [Bug] Bug fixes and improvements to poison: Going over 100% poison chance now lets you do multipel stacks of poison on each hit
+- [Bug] Drop filters now reset properly after a run ends

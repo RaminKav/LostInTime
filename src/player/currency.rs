@@ -8,7 +8,6 @@ use crate::{
     },
     audio::{AudioSoundEffect, SoundSpawner},
     client::persist_time_fragments,
-    combat::EnemyDeathEvent,
     enemy::Mob,
     item::{
         projectile::{Projectile, RangedAttackEvent},
@@ -158,6 +157,7 @@ pub fn handle_modify_currency(
                                         projectile: Projectile::Lightning,
                                         direction: Vec2::ZERO,
                                         mana_cost: Some(MANA_COST),
+                                        mana_cost_heirloom: Some(Heirloom::CoinLightning),
                                         from_enemy: false,
                                         from_entity: None,
                                         is_followup_proj: false,

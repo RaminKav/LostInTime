@@ -3016,10 +3016,12 @@ impl PlayerSkills {
     }
 }
 
-/// Tracks how many times each heirloom effect has successfully triggered during a run.
+/// Tracks how many times each heirloom effect has successfully triggered during a run,
+/// and cumulative mana spent by mana-consuming heirlooms.
 #[derive(Resource, Default, Clone, Debug)]
 pub struct HeirloomTriggerCounts {
     pub counts: HashMap<Heirloom, u32>,
+    pub mana_consumed: HashMap<Heirloom, u64>,
 }
 
 impl HeirloomTriggerCounts {
@@ -3028,5 +3030,38 @@ impl HeirloomTriggerCounts {
     }
     pub fn get(&self, heirloom: &Heirloom) -> u32 {
         self.counts.get(heirloom).copied().unwrap_or(0)
+    }
+
+    pub fn record_mana(&mut self, heirloom: Heirloom, amount: i32) {
+        if amount > 0 {
+            *self.mana_consumed.entry(heirloom).or_insert(0) += amount as u64;
+        }
+    }
+
+    pub fn total_mana_consumed(&self) -> u64 {
+        self.mana_consumed.values().sum()
+    }
+
+    pub fn mana_consumed_percentage(&self, heirloom: &Heirloom) -> u32 {
+        let total = self.total_mana_consumed();
+        if total == 0 {
+            return 0;
+        }
+        let amount = self.mana_consumed.get(heirloom).copied().unwrap_or(0);
+        ((amount as f64 / total as f64) * 100.0).round() as u32
+    }
+
+    pub fn sorted_mana_entries(&self) -> Vec<(Heirloom, u64)> {
+        let mut entries: Vec<_> = self
+            .mana_consumed
+            .iter()
+            .filter(|(_, amount)| **amount > 0)
+            .map(|(heirloom, amount)| (heirloom.clone(), *amount))
+            .collect();
+        entries.sort_by(|a, b| {
+            b.1.cmp(&a.1)
+                .then_with(|| a.0.get_title().cmp(&b.0.get_title()))
+        });
+        entries
     }
 }

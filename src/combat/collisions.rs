@@ -721,6 +721,7 @@ fn check_projectile_hit_player_collisions(
                         from_entity: None,
                         is_followup_proj: false,
                         mana_cost: None,
+                        mana_cost_heirloom: None,
                         dmg_override: Some(p_attack.unwrap().0),
                         pos_override: None,
                         spawn_delay: 0.,

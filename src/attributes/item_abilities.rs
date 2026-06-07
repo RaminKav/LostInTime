@@ -53,6 +53,8 @@ pub fn handle_item_abilitiy_on_attack(
             let mana_cost = Heirloom::WaveAttack.get_mana_cost();
             if current_mana.0 >= mana_cost {
                 current_mana.0 -= mana_cost;
+                game.heirloom_trigger_counts
+                    .record_mana(Heirloom::WaveAttack, mana_cost);
                 game.heirloom_trigger_counts.increment(Heirloom::WaveAttack);
                 ranged_attack_event.send(RangedAttackEvent {
                     projectile: Projectile::Arc,
@@ -61,6 +63,7 @@ pub fn handle_item_abilitiy_on_attack(
                     from_enemy: false,
                     is_followup_proj: true,
                     mana_cost: None,
+                    mana_cost_heirloom: None,
                     dmg_override: Some(dmg.0),
                     pos_override: None,
                     spawn_delay: 0.1,

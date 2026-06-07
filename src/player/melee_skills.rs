@@ -8,7 +8,7 @@ use crate::{
     assets::Graphics,
     attributes::{
         attribute_helpers::skill_power_multiplier, modifiers::ModifyHealthEvent, Attack,
-        CurrentHealth, CurrentMana, HealthRegen, MaxHealth, ProjectileSize, SkillPower,
+        CurrentHealth, CurrentMana, HealthRegen, ProjectileSize, SkillPower,
     },
     audio::{AudioSoundEffect, SoundSpawner},
     blessings::OwnedBlessings,
@@ -173,6 +173,7 @@ pub fn handle_echo_after_heal(
             let mana_cost = Heirloom::HealEcho.get_mana_cost();
             if current_mana.0 >= mana_cost {
                 current_mana.0 -= mana_cost;
+                trigger_counts.record_mana(Heirloom::HealEcho, mana_cost);
                 spawn_echo_hitbox(
                     &mut commands,
                     &asset_server,
@@ -346,6 +347,7 @@ pub fn handle_spear(
             projectile: Projectile::SpearGravity,
             direction: Vec2::ZERO,
             mana_cost: None,
+            mana_cost_heirloom: None,
             from_enemy: false,
             from_entity: None,
             is_followup_proj: false,

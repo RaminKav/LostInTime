@@ -51,13 +51,17 @@ pub struct PetSpawner {
 impl Pet {
     pub fn get_idle_anim(&self) -> &str {
         match self {
-            Pet::Slime | Pet::Porkipine | Pet::GoldenPig | Pet::Goliath => SlimePetSprite::tags::IDLE,
+            Pet::Slime | Pet::Porkipine | Pet::GoldenPig | Pet::Goliath => {
+                SlimePetSprite::tags::IDLE
+            }
             Pet::Fairy => FairyPetSprite::tags::IDLE,
         }
     }
     pub fn get_walk_anim(&self) -> &str {
         match self {
-            Pet::Slime | Pet::Porkipine | Pet::GoldenPig | Pet::Goliath => SlimePetSprite::tags::WALK,
+            Pet::Slime | Pet::Porkipine | Pet::GoldenPig | Pet::Goliath => {
+                SlimePetSprite::tags::WALK
+            }
             Pet::Fairy => FairyPetSprite::tags::WALK,
         }
     }
@@ -244,6 +248,7 @@ pub fn use_weapon(
                 from_entity: Some(pet_e),
                 is_followup_proj: false,
                 mana_cost: None,
+                mana_cost_heirloom: None,
                 dmg_override: Some(weapon_slot.attributes.attack.value),
                 pos_override: if pet_state.projectile.is_anchored_to_player_pos() {
                     Some(Vec2::ZERO)

@@ -9,29 +9,29 @@ use seldom_state::{prelude::StateMachine, trigger::BoolTrigger};
 
 use crate::{
     ai::{EnemyAttackCooldown, FollowState},
+    animations::enemy_sprites::spawn_attack_warning_aseprite,
     animations::HitAnimationTracker,
     attributes::Attack,
     bounce::spawn_desert_tornado,
     collisions::DamagesWorldObjects,
-    animations::enemy_sprites::spawn_attack_warning_aseprite,
     combat::{
         pickup_radius::{pull_all_eligible_ground_items_to_player, BeingPulledToPlayer},
         status_effects::MobStatusEffects,
     },
-    inventory::{Inventory, ItemStack},
-    item::ItemDrop,
-    pets::state::Pet,
-    proto::proto_param::ProtoParam,
     ecs_helpers::SafeHierarchyExt,
     enemy::{
         red_mushking::DeathState, spawner::MobSpawningPaused, FollowSpeed, Mob, MobIsAttacking,
     },
+    inventory::{Inventory, ItemStack},
+    item::ItemDrop,
     item::{
         boss_shrine::BossSummonIndex,
         projectile::{Projectile, RangedAttackEvent},
     },
     night::EraTimer,
+    pets::state::Pet,
     player::Player,
+    proto::proto_param::ProtoParam,
     world::{
         dimension::{Era, EraManager},
         portal::BossKillTracker,
@@ -1010,6 +1010,7 @@ pub fn handle_tail_attack(
                             from_enemy: true,
                             is_followup_proj: false,
                             mana_cost: None,
+                            mana_cost_heirloom: None,
                             dmg_override: Some(enemy_attack.0),
                             pos_override: None,
                             spawn_delay: 0.,

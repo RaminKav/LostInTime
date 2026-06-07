@@ -33,9 +33,9 @@ use seldom_state::{
 
 use crate::{
     ai::{EnemyAttackCooldown, FollowState, LeapAttackState},
-    ecs_helpers::SafeHierarchyExt,
     attributes::{Attack, CurrentHealth, MaxHealth},
     collisions::DamagesWorldObjects,
+    ecs_helpers::SafeHierarchyExt,
     item::projectile::{Projectile, RangedAttackEvent},
     player::Player,
     proto::proto_param::ProtoParam,
@@ -985,6 +985,7 @@ pub fn handle_aoe_attack(
                     projectile: Projectile::PoisonCloud,
                     direction: Vec2::ZERO,
                     mana_cost: None,
+                    mana_cost_heirloom: None,
                     from_enemy: true,
                     from_entity: Some(boss_entity),
                     is_followup_proj: false,

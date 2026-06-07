@@ -417,6 +417,7 @@ fn animate_spritesheet_animations(
                             from_enemy: false,
                             is_followup_proj: true,
                             mana_cost: None,
+                            mana_cost_heirloom: None,
                             dmg_override: None,
                             pos_override: Some(transform.translation().truncate()),
                             spawn_delay: 0.01,

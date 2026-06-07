@@ -484,6 +484,7 @@ fn handle_enemy_death(
                         projectile: crate::item::projectile::Projectile::Lightning,
                         direction: Vec2::ZERO,
                         mana_cost: Some(5),
+                        mana_cost_heirloom: Some(Heirloom::KillLightning),
                         from_enemy: false,
                         from_entity: None,
                         is_followup_proj: false,
@@ -505,6 +506,7 @@ fn handle_enemy_death(
                 let mana_cost = Heirloom::IceStaffFloor.get_mana_cost();
                 if current_mana.0 >= mana_cost {
                     current_mana.0 -= mana_cost;
+                    trigger_counts.record_mana(Heirloom::IceStaffFloor, mana_cost);
                     trigger_counts.increment(Heirloom::IceStaffFloor);
                     let pos = death_event.enemy_pos.extend(0.0);
                     let ice = spawn_one_time_aseprite_collider(
@@ -640,18 +642,21 @@ pub fn handle_hits(
                     .unwrap_or(false);
 
                 // Regular (non-skill) projectiles can use an in-inventory tool; skill projectiles cannot.
-                let player_has_required_tool =
-                    !is_skill_projectile && inventory_has_required_tool;
+                let player_has_required_tool = !is_skill_projectile && inventory_has_required_tool;
 
-                let queue_missing_tool_hint = |hit_outcome: &mut HitOutcomeEvents, required: &EquipmentType| {
-                    if hit.hit_by_mob.is_some() || hit.ignore_tool || inventory_has_required_tool {
-                        return;
-                    }
-                    hit_outcome.missing_tool_hint.send(MissingToolHintEvent {
-                        world_pos: t.translation(),
-                        required: required.clone(),
-                    });
-                };
+                let queue_missing_tool_hint =
+                    |hit_outcome: &mut HitOutcomeEvents, required: &EquipmentType| {
+                        if hit.hit_by_mob.is_some()
+                            || hit.ignore_tool
+                            || inventory_has_required_tool
+                        {
+                            return;
+                        }
+                        hit_outcome.missing_tool_hint.send(MissingToolHintEvent {
+                            world_pos: t.translation(),
+                            required: required.clone(),
+                        });
+                    };
 
                 // Allow projectile damage on breakable objects, OR on tool-gated objects when the
                 // player carries the matching tool (e.g. axe in inventory lets arrows chop trees).
@@ -833,6 +838,8 @@ pub fn handle_hits(
                                         break;
                                     }
                                     current_mana.0 -= mana_cost;
+                                    game.heirloom_trigger_counts
+                                        .record_mana(Heirloom::OnHitEcho, mana_cost);
                                     game.heirloom_trigger_counts.increment(Heirloom::OnHitEcho);
 
                                     if i == 0 {
@@ -1113,6 +1120,7 @@ pub fn cleanup_marked_for_death_entities(
                                 break;
                             }
                             current_mana.0 -= mana_cost;
+                            trigger_counts.record_mana(Heirloom::FrozenAoE, mana_cost);
                             trigger_counts.increment(Heirloom::FrozenAoE);
 
                             if i == 0 {
@@ -1148,6 +1156,7 @@ pub fn cleanup_marked_for_death_entities(
                         let mana_cost = Heirloom::ViralVenum.get_mana_cost();
                         if current_mana.0 >= mana_cost {
                             current_mana.0 -= mana_cost;
+                            trigger_counts.record_mana(Heirloom::ViralVenum, mana_cost);
                             trigger_counts.increment(Heirloom::ViralVenum);
                             // Defer nearby-mob status mutation out of this loop
                             // so we don't take overlapping borrows of `neaby_mobs`.
@@ -1335,8 +1344,7 @@ pub fn trigger_thorns_spikes(
     let mut rng = rand::thread_rng();
     for i in 0..num_spikes {
         let base_angle = (i as f32 / num_spikes as f32) * std::f32::consts::TAU;
-        let angle_offset =
-            rng.gen_range(-std::f32::consts::PI / 6.0..std::f32::consts::PI / 6.0);
+        let angle_offset = rng.gen_range(-std::f32::consts::PI / 6.0..std::f32::consts::PI / 6.0);
         let angle = base_angle + angle_offset;
         let direction = Vec2::new(angle.cos(), angle.sin());
 
@@ -1346,6 +1354,7 @@ pub fn trigger_thorns_spikes(
             from_enemy: false,
             is_followup_proj: false,
             mana_cost: None,
+            mana_cost_heirloom: None,
             from_entity: Some(player_e),
             dmg_override: Some(spike_damage),
             pos_override: Some(direction * 10.0),

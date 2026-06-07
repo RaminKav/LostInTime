@@ -510,6 +510,7 @@ pub fn handle_ant_farm_state(
 
     let count_usize = count_i32.max(0) as usize;
     let mut mana_opt = Some(&mut curr_mana.0);
+    let mana_cost_per = Heirloom::AntFarm.get_mana_cost();
     let spawned = spawn_ant_farm_ants(
         &mut commands,
         texture_atlas,
@@ -517,10 +518,11 @@ pub fn handle_ant_farm_state(
         player_pos,
         count_usize,
         &mut mana_opt,
-        Heirloom::AntFarm.get_mana_cost(),
+        mana_cost_per,
         size_mult,
     );
     if spawned > 0 {
+        trigger_counts.record_mana(Heirloom::AntFarm, mana_cost_per * spawned as i32);
         trigger_counts.increment(Heirloom::AntFarm);
     }
 }
@@ -580,6 +582,7 @@ pub fn handle_summon_ring_state(
 
     let count_usize = count_i32.max(0) as usize;
     let mut mana_opt = Some(&mut curr_mana.0);
+    let mana_cost_per = Heirloom::SummonRing.get_mana_cost();
     let spawned = spawn_summon_ring_rings(
         &mut commands,
         texture_atlas,
@@ -588,10 +591,11 @@ pub fn handle_summon_ring_state(
         player_pos,
         count_usize,
         &mut mana_opt,
-        Heirloom::SummonRing.get_mana_cost(),
+        mana_cost_per,
         size_mult,
     );
     if spawned > 0 {
+        trigger_counts.record_mana(Heirloom::SummonRing, mana_cost_per * spawned as i32);
         trigger_counts.increment(Heirloom::SummonRing);
     }
 }
@@ -1010,6 +1014,7 @@ pub fn update_stone_tooth(
         return;
     }
     let mut mana_opt = Some(&mut curr_mana.0);
+    let mana_cost_per = Heirloom::StoneTooth.get_mana_cost();
     let spawned = spawn_stone_tooth_rocks(
         &mut commands,
         texture_atlas,
@@ -1018,10 +1023,12 @@ pub fn update_stone_tooth(
         player_pos,
         stacks as usize,
         &mut mana_opt,
-        Heirloom::StoneTooth.get_mana_cost(),
+        mana_cost_per,
         size_mult,
     );
     if spawned > 0 {
+        game.heirloom_trigger_counts
+            .record_mana(Heirloom::StoneTooth, mana_cost_per * spawned as i32);
         game.heirloom_trigger_counts.increment(Heirloom::StoneTooth);
     }
 }
@@ -1173,6 +1180,7 @@ pub fn handle_reaper_soul_spawns(
             let mana_cost = Heirloom::Reaper.get_mana_cost();
             if curr_mana.0 >= mana_cost {
                 curr_mana.0 -= mana_cost;
+                trigger_counts.record_mana(Heirloom::Reaper, mana_cost);
             } else {
                 break;
             }
@@ -2047,6 +2055,7 @@ pub fn handle_mana_orb_attack(
                     projectile: crate::item::projectile::Projectile::ManaOrbProjectile,
                     direction,
                     mana_cost: None,
+                    mana_cost_heirloom: None,
                     from_enemy: false,
                     from_entity: None,
                     is_followup_proj: true,
@@ -2258,6 +2267,7 @@ pub fn handle_mana_regen_lightning(
                     projectile: Projectile::Lightning,
                     direction: Vec2::ZERO,
                     mana_cost: Some(MANA_COST),
+                    mana_cost_heirloom: Some(Heirloom::ManaRegenLightning),
                     from_enemy: false,
                     from_entity: None,
                     is_followup_proj: false,
@@ -2407,6 +2417,7 @@ pub fn handle_energy_ball_barrage(
                     projectile: Projectile::EnergyBall,
                     direction: initial_dir,
                     mana_cost: None,
+                    mana_cost_heirloom: None,
                     from_enemy: false,
                     from_entity: None,
                     is_followup_proj: true,
