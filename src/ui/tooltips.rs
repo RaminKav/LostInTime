@@ -1151,7 +1151,7 @@ pub fn handle_spawn_inv_player_stats(
             skills.get_count(Heirloom::HPRegenCooldown),
         );
 
-        let attributes = ItemAttributes {
+        let mut attributes = ItemAttributes {
             attack: AttributeValue::new(attack.0, AttributeQuality::Low, 0.),
             health: AttributeValue::new(max_health.0, AttributeQuality::Low, 0.),
             mana: AttributeValue::new(max_mana.0, AttributeQuality::Low, 0.),
@@ -1180,6 +1180,7 @@ pub fn handle_spawn_inv_player_stats(
             Some(mp_regen_period_secs),
             Some(hp_regen_period_secs),
         );
+        attributes.push(skills.poison_chance_stat_summary());
 
         let _ = spawn_stats_tooltip_at(
             &mut commands,

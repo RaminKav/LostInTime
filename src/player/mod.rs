@@ -164,6 +164,7 @@ impl Plugin for PlayerPlugin {
             .init_resource::<CoinCurrency>()
             .init_resource::<TimeFragmentCurrency>()
             .init_resource::<skills::HeirloomTriggerCounts>()
+            .init_resource::<skills::ManaTrackerResetTimer>()
             .init_resource::<score::RunTimer>()
             .init_resource::<time_crystals::TimeCrystals>()
             .with_default_schedule(CoreSchedule::FixedUpdate, |app| {
@@ -233,6 +234,7 @@ impl Plugin for PlayerPlugin {
                         .run_if(is_not_paused)
                         .after(handle_hits),
                     handle_mana_orb_attack.run_if(is_not_paused),
+                    skills::tick_mana_tracker_reset.run_if(is_not_paused),
                     handle_mana_regen_lightning.run_if(is_not_paused),
                     handle_mana_regen_poison.run_if(is_not_paused),
                     handle_skill_mana_regen.run_if(is_not_paused),

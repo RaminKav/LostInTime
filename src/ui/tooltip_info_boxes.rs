@@ -41,6 +41,8 @@ pub enum TooltipDefinition {
     Dodge,
     SkillPower,
     PickupRange,
+    Size,
+    Luck,
 }
 
 impl TooltipDefinition {
@@ -66,6 +68,10 @@ impl TooltipDefinition {
             TooltipDefinition::Dodge => ["Dodge is the chance to", "avoid hits"],
             TooltipDefinition::SkillPower => ["Skill Power Boosts", "skill damage or effects"],
             TooltipDefinition::PickupRange => ["Pickup Range", "Item pickup radius."],
+            TooltipDefinition::Size => {
+                ["Size makes attacks, skills", "and heirloom effects larger"]
+            }
+            TooltipDefinition::Luck => ["Luck increases the chance", "of rare heirlooms and gear"],
         }
     }
 }

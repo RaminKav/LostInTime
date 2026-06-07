@@ -1291,8 +1291,8 @@ impl Heirloom {
             | Self::MPBarCrit
             | Self::DamageDealtMp
             | Self::MPRegenCooldown
-            | Self::ManaOrbDropMult
-            | Self::FrozenMPRegen => &[D::Mana],
+            | Self::ManaOrbDropMult => &[D::Mana],
+            Self::FrozenMPRegen => &[D::Mana, D::FreezeChance],
             Self::Thorns | Self::ThornsSpikes | Self::ThornsOnDamage | Self::ThornArmor => {
                 &[D::Thorns]
             }
@@ -1319,8 +1319,7 @@ impl Heirloom {
 
             Self::IceStaffAoE => &[D::IceExplosion],
             Self::FrozenAoE => &[D::IceExplosion, D::FreezeChance],
-            Self::SlowStacks | Self::FrozenMPRegen => &[D::FreezeChance],
-            Self::FrozenCrit => &[D::FreezeChance],
+            Self::SlowStacks | Self::FrozenCrit => &[D::FreezeChance],
 
             Self::PoisonStacks
             | Self::ViralVenum
@@ -1329,6 +1328,8 @@ impl Heirloom {
             | Self::PoisonStrength => &[D::Poison],
 
             Self::ChaosStats => &[D::Mana, D::Defence, D::Dodge],
+            Self::Gigantify | Self::GravityScales => &[D::Size],
+            Self::LoadedDice => &[D::Luck],
 
             _ => &[],
         }
@@ -2892,6 +2893,14 @@ impl PlayerSkills {
         chance
     }
 
+    /// (label, value) row for the player stats tooltip.
+    pub fn poison_chance_stat_summary(&self) -> (String, String) {
+        (
+            "Poison Chance   ".to_string(),
+            format!("{:.0}%", self.calculate_poison_chance() * 100.0),
+        )
+    }
+
     /// Rolls how many poison stacks to apply from total poison chance.
     /// Values above 100% guarantee extra stacks (150% → 1 + 50% roll for 2, 300% → 3, etc.).
     pub fn roll_poison_stacks_from_chance(&self, rng: &mut impl rand::Rng) -> u32 {
@@ -3063,5 +3072,31 @@ impl HeirloomTriggerCounts {
                 .then_with(|| a.0.get_title().cmp(&b.0.get_title()))
         });
         entries
+    }
+
+    pub fn reset_mana_consumed(&mut self) {
+        self.mana_consumed.clear();
+    }
+}
+
+/// Repeating timer that clears [`HeirloomTriggerCounts::mana_consumed`] every minute so the
+/// HUD mana tracker reflects recent consumption rather than the full run.
+#[derive(Resource)]
+pub struct ManaTrackerResetTimer(pub Timer);
+
+impl Default for ManaTrackerResetTimer {
+    fn default() -> Self {
+        Self(Timer::from_seconds(60.0, TimerMode::Repeating))
+    }
+}
+
+pub fn tick_mana_tracker_reset(
+    time: Res<Time>,
+    mut timer: ResMut<ManaTrackerResetTimer>,
+    mut trigger_counts: ResMut<HeirloomTriggerCounts>,
+) {
+    timer.0.tick(time.delta());
+    if timer.0.just_finished() {
+        trigger_counts.reset_mana_consumed();
     }
 }
