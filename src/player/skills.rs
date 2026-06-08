@@ -119,23 +119,19 @@ impl SkillClass {
 
         match self {
             SkillClass::Warrior => {
-                // +2 size per level
-                stats.size = AttributeValue::new(level * 2, quality, 1.);
+                stats.size = AttributeValue::new(level * 5, quality, 1.);
             }
             SkillClass::Wizard => {
-                // +5 MP per level
-                stats.mana = AttributeValue::new(level * 3, quality, 1.);
+                stats.mana = AttributeValue::new(level * 10, quality, 1.);
             }
             SkillClass::Rogue => {
-                stats.speed = AttributeValue::new(level * 1, quality, 1.);
+                stats.speed = AttributeValue::new(level * 5, quality, 1.);
             }
             SkillClass::Thief => {
-                // +3% attack speed per level
-                stats.attack_speed = AttributeValue::new(level * 1, quality, 1.);
+                stats.attack_speed = AttributeValue::new(level * 5, quality, 1.);
             }
             SkillClass::Hunter => {
-                // +3% crit dmg per level
-                stats.crit_chance = AttributeValue::new(level * 1, quality, 1.);
+                stats.crit_chance = AttributeValue::new(level * 3, quality, 1.);
             }
             _ => (),
         }
