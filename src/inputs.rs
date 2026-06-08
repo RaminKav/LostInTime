@@ -75,6 +75,7 @@ impl Plugin for InputsPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(CursorPos::default())
             .insert_resource(AutoAttackState::load())
+            .insert_resource(AttackAutoTargetState::load())
             .insert_resource(crate::bounce::NaturalTornadoSpawner::default())
             .register_type::<CursorPos>()
             .add_event::<BounceEvent>()
@@ -111,6 +112,7 @@ impl Plugin for InputsPlugin {
                     handle_open_essence_ui,
                     diagnostics,
                     handle_interact_objects.run_if(is_not_paused),
+                    toggle_attack_auto_target.run_if(is_not_paused),
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
@@ -135,6 +137,103 @@ impl Default for AutoAttackState {
     fn default() -> Self {
         Self(true)
     }
+}
+
+#[derive(Resource, Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+pub struct AttackAutoTargetState(pub bool);
+
+impl Default for AttackAutoTargetState {
+    fn default() -> Self {
+        Self(false)
+    }
+}
+
+impl AttackAutoTargetState {
+    pub fn load() -> Self {
+        let path = crate::datafiles::game_data();
+        if let Ok(file) = std::fs::File::open(&path) {
+            let reader = std::io::BufReader::new(file);
+            if let Ok(game_data) = crate::client::GameData::try_from_json_reader(reader) {
+                return game_data.attack_auto_target.unwrap_or_default();
+            }
+        }
+        Self::default()
+    }
+
+    pub fn save(&self) {
+        let path = crate::datafiles::game_data();
+        let mut game_data = if let Ok(file) = std::fs::File::open(&path) {
+            let reader = std::io::BufReader::new(file);
+            crate::client::GameData::try_from_json_reader(reader).unwrap_or_default()
+        } else {
+            crate::client::GameData::default()
+        };
+
+        game_data.attack_auto_target = Some(*self);
+
+        if let Ok(file) = std::fs::File::create(&path) {
+            let _ = serde_json::to_writer_pretty(file, &game_data);
+        }
+    }
+}
+
+/// Aim direction for weapon attacks. When auto-target is enabled, aims at the
+/// nearest mob; otherwise uses the cursor position.
+pub fn attack_aim_direction(
+    player_pos: Vec2,
+    cursor_pos: Vec2,
+    auto_target: bool,
+    enemies: &Query<&GlobalTransform, With<Mob>>,
+) -> Vec2 {
+    if auto_target {
+        let mut nearest_pos = None;
+        let mut nearest_dist_sq = f32::MAX;
+        for enemy_txfm in enemies.iter() {
+            let enemy_pos = enemy_txfm.translation().truncate();
+            let dist_sq = player_pos.distance_squared(enemy_pos);
+            if dist_sq < nearest_dist_sq {
+                nearest_dist_sq = dist_sq;
+                nearest_pos = Some(enemy_pos);
+            }
+        }
+        if let Some(target_pos) = nearest_pos {
+            let dir = target_pos - player_pos;
+            if dir.length_squared() > 1e-4 {
+                return dir.normalize();
+            }
+        }
+    }
+    (cursor_pos - player_pos).normalize_or_zero()
+}
+
+pub fn weapon_projectile_spawn_delay(obj: &WorldObject, burst_index: usize) -> f32 {
+    if burst_index > 0 {
+        return 0.2;
+    }
+    if obj == &WorldObject::WoodBow {
+        0.12
+    } else {
+        0.01
+    }
+}
+
+fn toggle_attack_auto_target(
+    key_input: Res<Input<KeyCode>>,
+    mouse_input: Res<Input<MouseButton>>,
+    keybinds: Res<InputMappings>,
+    ui_state: Res<State<UIState>>,
+    mut auto_target: ResMut<AttackAutoTargetState>,
+    mut commands: Commands,
+) {
+    if ui_state.0 != UIState::Closed {
+        return;
+    }
+    if !keybinds.check_attack_auto_target_input(&key_input, &mouse_input) {
+        return;
+    }
+    auto_target.0 = !auto_target.0;
+    auto_target.save();
+    commands.spawn(SoundSpawner::new(AudioSoundEffect::UISkillSelection, 0.1));
 }
 
 impl AutoAttackState {
@@ -246,13 +345,21 @@ fn turn_player(
     mut game: ResMut<Game>,
     player_query: Query<&FacingDirection, With<Player>>,
     cursor_pos: Res<CursorPos>,
+    auto_target: Res<AttackAutoTargetState>,
+    enemies: Query<&GlobalTransform, With<Mob>>,
     mut commands: Commands,
 ) {
-    let to_cursor = cursor_pos.world_coords.truncate() - game.player_state.position.truncate();
-    if to_cursor.length_squared() < 1e-4 {
+    let player_pos = game.player_state.position.truncate();
+    let aim = attack_aim_direction(
+        player_pos,
+        cursor_pos.world_coords.truncate(),
+        auto_target.0,
+        &enemies,
+    );
+    if aim.length_squared() < 1e-4 {
         return;
     }
-    let dir = FacingDirection::from_translation(to_cursor);
+    let dir = FacingDirection::from_translation(aim);
     let curr_dir = player_query.single();
     if &dir != curr_dir {
         commands.entity(game.player).insert(dir.clone());
@@ -862,6 +969,8 @@ pub fn mouse_click_system(
     mut ranged_attack_event: EventWriter<RangedAttackEvent>,
     ammo_query_any: Query<&Ammo>,
     auto_attack: Res<AutoAttackState>,
+    auto_target: Res<AttackAutoTargetState>,
+    enemies: Query<&GlobalTransform, With<Mob>>,
     bridge_mode: Res<BridgePlacementMode>,
 ) {
     if ui_state.0 != UIState::Closed {
@@ -903,8 +1012,12 @@ pub fn mouse_click_system(
         if let Some(tool) = &game.player().main_hand_slot {
             main_hand_option = Some(tool.get_obj());
         }
-        let direction =
-            (cursor_pos.world_coords.truncate() - player_pos.truncate()).normalize_or_zero();
+        let direction = attack_aim_direction(
+            player_pos.truncate(),
+            cursor_pos.world_coords.truncate(),
+            auto_target.0,
+            &enemies,
+        );
         if let Ok((obj, ranged_tool)) = ranged_query.get_single() {
             // Gate ranged attacks on ammo availability for non-magic ranged weapons
             if obj.is_ranged_weapon() && !obj.is_magic_weapon() {
@@ -957,19 +1070,7 @@ pub fn mouse_click_system(
                     } else {
                         None
                     },
-                    spawn_delay: if obj == &WorldObject::WoodBow {
-                        if i == 0 {
-                            0.12
-                        } else {
-                            0.2
-                        }
-                    } else {
-                        if i == 0 {
-                            0.01
-                        } else {
-                            0.2
-                        }
-                    },
+                    spawn_delay: weapon_projectile_spawn_delay(obj, i),
                 })
             }
         }

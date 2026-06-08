@@ -244,6 +244,8 @@ pub struct GameData {
     pub display_scale: Option<crate::DisplayScaleSettings>,
     #[serde(default)]
     pub auto_attack: Option<crate::inputs::AutoAttackState>,
+    #[serde(default)]
+    pub attack_auto_target: Option<crate::inputs::AttackAutoTargetState>,
     /// Options screen: "Unlock All Classes" cheat (`CheatSettings::bypass_class_unlocks`).
     #[serde(default)]
     pub bypass_class_unlocks: Option<bool>,

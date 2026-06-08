@@ -531,3 +531,14 @@ Heirlooms:
 - [Bug] Fix a bug where dungeon would reset the Blake Boulder spawn timer
 - [Bug] Bug fixes and improvements to poison: Going over 100% poison chance now lets you do multipel stacks of poison on each hit
 - [Bug] Drop filters now reset properly after a run ends
+
+## 0.21.1
+
+- [Feature] Added keybind to toggle Weapon Auto Attack! Attacks can now auto aim to nearest enemy
+- [Feature] Health and Mana trackers, hover over the health or mana orbs in the HUD to view useful information about health gain sources, health regen/s, or mana draining sources, and mana regen/s. It resets every 60s.
+- [Balance] Buff class passive stat amounts significantly. For example, warrior gives +5 size isntead of +2. Should make the class passives feel very significant, and give them more identity, now that the base skills were removed.
+- [Balance] Fur devils and lizards spawn rate increased from 2.5 -> 2.0s per spawn, this is hand-in-hand with the change last patch that made some enemies slower.
+- [QoL] Add info boxes explaining Size, Luck, Chaos, and Attack stats
+- [QoL] Add % Poison chance stat to the stat viewer in inventory
+- [QoL] Decreased density of trees and big cactuses in all 3 biomes. Forest (Era 1) especially should feel more open
+- [Art] tweaked visuals for desert dirt patches

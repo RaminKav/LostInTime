@@ -149,6 +149,7 @@ pub enum KeyBindType {
     Inventory,
     Minimap,
     Interact,
+    AttackAutoTarget,
 }
 
 #[derive(Component)]
@@ -293,6 +294,9 @@ pub fn handle_key_rebind_input(
                 KeyBindType::Inventory => keybinds.set_inventory_key(InputBinding::KeyBinding(key)),
                 KeyBindType::Minimap => keybinds.set_minimap_key(InputBinding::KeyBinding(key)),
                 KeyBindType::Interact => keybinds.set_interact_key(InputBinding::KeyBinding(key)),
+                KeyBindType::AttackAutoTarget => {
+                    keybinds.set_attack_auto_target_key(InputBinding::KeyBinding(key))
+                }
             }
             keybinds.save();
             commands.entity(entity).remove::<WaitingForKeyInput>();
@@ -326,6 +330,9 @@ pub fn handle_key_rebind_input(
                 }
                 KeyBindType::Interact => {
                     keybinds.set_interact_key(InputBinding::MouseBinding(mouse_button))
+                }
+                KeyBindType::AttackAutoTarget => {
+                    keybinds.set_attack_auto_target_key(InputBinding::MouseBinding(mouse_button))
                 }
             }
             keybinds.save();
@@ -372,6 +379,7 @@ pub fn update_keybind_text(
                 KeyBindType::Inventory => keybinds.get_inventory_key(),
                 KeyBindType::Minimap => keybinds.get_minimap_key(),
                 KeyBindType::Interact => keybinds.get_interact_key(),
+                KeyBindType::AttackAutoTarget => keybinds.get_attack_auto_target_key(),
             };
             text.sections[0].value = crate::keybinds::get_key_display_name(key);
             text.sections[0].style.color = crate::colors::WHITE;
@@ -637,8 +645,28 @@ pub fn setup_options_ui(
         &keybinds,
     );
 
+    // Attack auto target keybind
+    let attack_auto_target_y = interact_y + row_spacing;
+    spawn_keybind_row(
+        &mut commands,
+        &graphics,
+        &asset_server,
+        KeyBindType::AttackAutoTarget,
+        Vec3::new(
+            left_side_x + 2.,
+            attack_auto_target_y,
+            ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
+        ),
+        Vec3::new(
+            left_side_x + 160.,
+            attack_auto_target_y - 3.5,
+            ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
+        ),
+        &keybinds,
+    );
+
     // Auto attack toggle checkbox (not a keybind anymore)
-    let auto_attack_y = interact_y + row_spacing;
+    let auto_attack_y = attack_auto_target_y + row_spacing;
     spawn_options_checkbox(
         &mut commands,
         &graphics,
@@ -1122,6 +1150,9 @@ fn spawn_keybind_row(
         KeyBindType::Inventory => ("Inventory:", keybinds.get_inventory_key()),
         KeyBindType::Minimap => ("Map:", keybinds.get_minimap_key()),
         KeyBindType::Interact => ("Interact:", keybinds.get_interact_key()),
+        KeyBindType::AttackAutoTarget => {
+            ("Attack Auto Target:", keybinds.get_attack_auto_target_key())
+        }
     };
 
     commands.spawn((

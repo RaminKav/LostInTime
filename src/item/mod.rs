@@ -31,11 +31,10 @@ use crate::world::dungeon::Dungeon;
 use crate::world::dungeon_generation::DUNGEON_GRID_SIZE;
 use crate::world::generation::WallBreakEvent;
 use crate::world::grass_patches::{
-    grass_patch_local_offset_for_shrine_anchor, spawn_ground_patch, GroundPatch,
-    GroundPatchesGraphics, GROUND_PATCH_CHILD_Z_OBJECT_BONUS, GROUND_PATCH_TREE_LOCAL_OFFSET_Y,
+    desert_patch_parent_local_offset, desert_patch_water_radius, grass_patch_parent_local_offset,
+    spawn_ground_patch, GroundPatch, GroundPatchPlacement, GroundPatchesGraphics,
+    GROUND_PATCH_CHILD_Z_OBJECT_BONUS, GROUND_PATCH_WATER_CHECK_RADIUS_TILES,
     GROUND_PATCH_YSORT_KEY_7, GROUND_PATCH_YSORT_KEY_8, GROUND_PATCH_YSORT_KEY_9,
-    desert_patch_parent_offset, DESERT_PATCH_CACTUS_LOCAL_OFFSET_Y,
-    DESERT_PATCH_WATER_CHECK_RADIUS_TILES, GROUND_PATCH_WATER_CHECK_RADIUS_TILES,
 };
 use crate::world::world_helpers::{
     can_object_be_placed_here, object_within_tile_radius_of_water, tile_pos_to_world_pos,
@@ -98,10 +97,10 @@ use serde::{Deserialize, Serialize};
 use strum_macros::{Display, EnumIter, IntoStaticStr};
 
 use self::ammo::tick_reload;
-use self::crafting::CraftingPlugin;
 use self::bridge_placement::{
     handle_bridge_placement_mode, handle_bridge_preview_dragging, BridgePlacementMode,
 };
+use self::crafting::CraftingPlugin;
 use self::item_actions::handle_item_action_success;
 use self::item_upgrades::{
     handle_delayed_ranged_attack, handle_on_hit_upgrades, handle_spread_arrows_attack,
@@ -860,12 +859,14 @@ pub const OBJECTS_WITH_GRASS_PATCH_7: &[WorldObject] = &[
     WorldObject::XPJug,
 ];
 
-/// Era 2 desert boulders that receive a sand patch under them when placed.
+/// Era 2 desert objects that receive a sand patch under them when placed.
 pub const OBJECTS_WITH_DESERT_PATCH_UNDER: &[WorldObject] = &[
     WorldObject::DesertMedBoulder1,
     WorldObject::DesertMedBoulder2,
     WorldObject::DesertMedBoulder3,
     WorldObject::DesertMetalBoulder,
+    WorldObject::DesertCrate,
+    WorldObject::DesertCrate2,
 ];
 
 impl WorldObject {
@@ -926,6 +927,40 @@ impl WorldObject {
 
     pub fn spawns_desert_patch_under(&self) -> bool {
         OBJECTS_WITH_DESERT_PATCH_UNDER.contains(self)
+    }
+
+    /// Era-2 objects that use the smaller 32×32 desert ground patch.
+    pub fn spawns_small_desert_patch(&self) -> bool {
+        matches!(
+            self,
+            WorldObject::HeirloomShrine
+                | WorldObject::HeirloomShrineDone
+                | WorldObject::ActiveSkillShrine
+                | WorldObject::ActiveSkillShrineDone
+                | WorldObject::DesertLargeCactus1
+                | WorldObject::DesertLargeCactus2
+                | WorldObject::DesertLargeCactus3
+                | WorldObject::DesertLargeCactus4
+                | WorldObject::DesertLargeCactus5
+                | WorldObject::DesertLargeCactus6
+                | WorldObject::DesertCrate
+                | WorldObject::DesertCrate2
+                | WorldObject::DesertSkull1
+                | WorldObject::DesertSkull2
+                | WorldObject::DesertSkull3
+                | WorldObject::DesertSkull4
+        )
+    }
+
+    /// Which desert ground patch to spawn under this object in era 2, if any.
+    pub fn desert_ground_patch(&self) -> Option<GroundPatch> {
+        if self.spawns_small_desert_patch() || self.spawns_grass_patch_9_shrine_under() {
+            return Some(GroundPatch::DesertPatchSmall);
+        }
+        if self.is_large_desert_cactus() || self.spawns_desert_patch_under() {
+            return Some(GroundPatch::DesertPatch1);
+        }
+        None
     }
 
     /// Shrines that get key-9 grass (`GroundPatch::GrassPatch4`) under them; offset from proto [`SpriteAnchor`].
@@ -1724,103 +1759,107 @@ pub fn handle_placing_world_object(
                             &proto_param,
                             GROUND_PATCH_WATER_CHECK_RADIUS_TILES,
                         );
-                        let suppress_desert_patch_near_water =
-                            object_within_tile_radius_of_water(
-                                tile_pos,
-                                place_event.obj,
-                                &game,
-                                &proto_param,
-                                DESERT_PATCH_WATER_CHECK_RADIUS_TILES,
-                            );
                         match game.era.current_era {
-                                Era::Main if !suppress_grass_patch_near_water => {
+                            Era::Main if !suppress_grass_patch_near_water => {
+                                let anchor = proto_param
+                                    .get_component::<SpriteAnchor, _>(place_event.obj)
+                                    .map(|a| a.0)
+                                    .unwrap_or(Vec2::ZERO);
+                                if let Some((patch, placement, y_sort, extra_child_z)) =
                                     if place_event.obj.is_tree() {
-                                        spawn_ground_patch(
-                                            &mut commands,
-                                            &ground_patch_graphics,
+                                        Some((
                                             GroundPatch::GrassPatch3,
-                                            pos,
+                                            GroundPatchPlacement::Tree,
                                             GROUND_PATCH_YSORT_KEY_8,
-                                            Some(item_e),
-                                            Vec2::new(0., GROUND_PATCH_TREE_LOCAL_OFFSET_Y),
                                             0.,
-                                        );
+                                        ))
                                     } else if place_event.obj.spawns_grass_patch_9_shrine_under()
                                     {
-                                        let anchor = proto_param
-                                            .get_component::<SpriteAnchor, _>(place_event.obj)
-                                            .map(|a| a.0)
-                                            .unwrap_or(Vec2::ZERO);
-                                        spawn_ground_patch(
-                                            &mut commands,
-                                            &ground_patch_graphics,
+                                        Some((
                                             GroundPatch::GrassPatch4,
-                                            pos,
+                                            GroundPatchPlacement::Shrine { anchor },
                                             GROUND_PATCH_YSORT_KEY_9,
-                                            Some(item_e),
-                                            grass_patch_local_offset_for_shrine_anchor(anchor),
                                             0.,
-                                        );
+                                        ))
                                     } else if place_event.obj.spawns_grass_patch_7_under() {
-                                        spawn_ground_patch(
-                                            &mut commands,
-                                            &ground_patch_graphics,
+                                        Some((
                                             GroundPatch::GrassPatch2,
-                                            pos,
+                                            GroundPatchPlacement::Object,
                                             GROUND_PATCH_YSORT_KEY_7,
-                                            Some(item_e),
-                                            Vec2::ZERO,
                                             GROUND_PATCH_CHILD_Z_OBJECT_BONUS,
-                                        );
+                                        ))
+                                    } else {
+                                        None
                                     }
+                                {
+                                    spawn_ground_patch(
+                                        &mut commands,
+                                        &ground_patch_graphics,
+                                        patch,
+                                        pos,
+                                        y_sort,
+                                        Some(item_e),
+                                        grass_patch_parent_local_offset(placement),
+                                        extra_child_z,
+                                    );
                                 }
-                                Era::Second if !suppress_desert_patch_near_water => {
-                                    if place_event.obj.is_large_desert_cactus() {
-                                        spawn_ground_patch(
-                                            &mut commands,
-                                            &ground_patch_graphics,
-                                            GroundPatch::DesertPatch1,
-                                            pos,
-                                            GROUND_PATCH_YSORT_KEY_8,
-                                            Some(item_e),
-                                            desert_patch_parent_offset(Vec2::new(
-                                                0.,
-                                                DESERT_PATCH_CACTUS_LOCAL_OFFSET_Y,
-                                            )),
-                                            0.,
+                            }
+                            Era::Second => {
+                                if let Some(desert_patch) = place_event.obj.desert_ground_patch() {
+                                    let suppress_desert_patch_near_water =
+                                        object_within_tile_radius_of_water(
+                                            tile_pos,
+                                            place_event.obj,
+                                            &game,
+                                            &proto_param,
+                                            desert_patch_water_radius(desert_patch),
                                         );
-                                    } else if place_event.obj.spawns_grass_patch_9_shrine_under()
-                                    {
+                                    if !suppress_desert_patch_near_water {
                                         let anchor = proto_param
                                             .get_component::<SpriteAnchor, _>(place_event.obj)
                                             .map(|a| a.0)
                                             .unwrap_or(Vec2::ZERO);
-                                        spawn_ground_patch(
-                                            &mut commands,
-                                            &ground_patch_graphics,
-                                            GroundPatch::DesertPatch1,
-                                            pos,
-                                            GROUND_PATCH_YSORT_KEY_9,
-                                            Some(item_e),
-                                            desert_patch_parent_offset(
-                                                grass_patch_local_offset_for_shrine_anchor(anchor),
+                                        let placement = if place_event.obj.is_large_desert_cactus()
+                                        {
+                                            GroundPatchPlacement::Tree
+                                        } else if place_event
+                                            .obj
+                                            .spawns_grass_patch_9_shrine_under()
+                                        {
+                                            GroundPatchPlacement::Shrine { anchor }
+                                        } else {
+                                            GroundPatchPlacement::Object
+                                        };
+                                        let (y_sort, extra_child_z) = match placement {
+                                            GroundPatchPlacement::Tree => {
+                                                (GROUND_PATCH_YSORT_KEY_8, 0.)
+                                            }
+                                            GroundPatchPlacement::Shrine { .. } => {
+                                                (GROUND_PATCH_YSORT_KEY_9, 0.)
+                                            }
+                                            GroundPatchPlacement::Object => (
+                                                GROUND_PATCH_YSORT_KEY_7,
+                                                GROUND_PATCH_CHILD_Z_OBJECT_BONUS,
                                             ),
-                                            0.,
-                                        );
-                                    } else if place_event.obj.spawns_desert_patch_under() {
+                                        };
                                         spawn_ground_patch(
                                             &mut commands,
                                             &ground_patch_graphics,
-                                            GroundPatch::DesertPatch1,
+                                            desert_patch,
                                             pos,
-                                            GROUND_PATCH_YSORT_KEY_7,
+                                            y_sort,
                                             Some(item_e),
-                                            desert_patch_parent_offset(Vec2::ZERO),
-                                            GROUND_PATCH_CHILD_Z_OBJECT_BONUS,
+                                            desert_patch_parent_local_offset(
+                                                placement,
+                                                desert_patch,
+                                                anchor,
+                                            ),
+                                            extra_child_z,
                                         );
                                     }
                                 }
-                                _ => {}
+                            }
+                            _ => {}
                         }
                     }
                     None => {

@@ -20,6 +20,9 @@ fn default_hotbar_slot_3() -> InputBinding {
 fn default_interact() -> InputBinding {
     InputBinding::KeyBinding(KeyCode::F)
 }
+fn default_attack_auto_target() -> InputBinding {
+    InputBinding::KeyBinding(KeyCode::T)
+}
 
 /// Hidden fourth skill slot (no HUD / options row while `VISIBLE_CLASS_SKILL_COUNT` is 3).
 fn default_active_skill_slot_3() -> InputBinding {
@@ -95,6 +98,8 @@ pub struct InputMappings {
     pub hotbar_slot_2: InputBinding,
     #[serde(default = "default_hotbar_slot_3")]
     pub hotbar_slot_3: InputBinding,
+    #[serde(default = "default_attack_auto_target")]
+    pub attack_auto_target: InputBinding,
 }
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 
@@ -118,6 +123,7 @@ impl Default for InputMappings {
             hotbar_slot_1: InputBinding::KeyBinding(KeyCode::Key2),
             hotbar_slot_2: InputBinding::KeyBinding(KeyCode::Key3),
             hotbar_slot_3: InputBinding::KeyBinding(KeyCode::Key4),
+            attack_auto_target: default_attack_auto_target(),
         }
     }
 }
@@ -235,6 +241,22 @@ impl InputMappings {
         mouse: &Input<MouseButton>,
     ) -> bool {
         check_binding_input(self.get_hotbar_key(slot), keys, mouse)
+    }
+
+    pub fn get_attack_auto_target_key(&self) -> InputBinding {
+        self.attack_auto_target
+    }
+
+    pub fn set_attack_auto_target_key(&mut self, key: InputBinding) {
+        self.attack_auto_target = key;
+    }
+
+    pub fn check_attack_auto_target_input(
+        &self,
+        keys: &Input<KeyCode>,
+        mouse: &Input<MouseButton>,
+    ) -> bool {
+        check_binding_input(self.get_attack_auto_target_key(), keys, mouse)
     }
 
     pub fn load() -> Self {

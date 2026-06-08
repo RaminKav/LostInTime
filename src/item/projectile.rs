@@ -291,6 +291,9 @@ pub struct ProjectileSpawnMarker {
     /// started. Keeps delayed shots (e.g. bow arrows) responsive while moving
     /// or adjusting the cursor during the wind-up.
     pub track_player_pos: bool,
+    /// When true, only aim direction is refreshed at spawn time (e.g. anchored
+    /// lightning staff bolts that stay parented to the player).
+    pub track_player_aim: bool,
     /// Extra scale on top of `ProjectileSize` (e.g. Goliath pet 1% double-size proc).
     pub extra_scale: f32,
 }
@@ -458,15 +461,16 @@ fn handle_ranged_attack_event(
         } else {
             1.
         };
-        // Recompute spawn position and aim at fire time for unanchored,
-        // player-fired projectiles with a delay (e.g. bow arrows). Anything
-        // using `pos_override`, coming from an enemy/pet/entity, or anchored to
-        // the player keeps the direction/position captured on the event.
-        let track_player_pos = !proj_event.from_enemy
+        // Recompute spawn position and aim at fire time for player-fired weapon
+        // projectiles with a delay (e.g. bow arrows). Anchored bolts (lightning
+        // staff) refresh aim only via `track_player_aim`.
+        let track_player_aim = !proj_event.from_enemy
             && proj_event.from_entity.is_none()
-            && proj_event.pos_override.is_none()
-            && !proj_event.projectile.is_anchored_to_player_pos()
+            && !proj_event.projectile.is_skill_projectile()
             && proj_event.spawn_delay > 0.0;
+        let track_player_pos = track_player_aim
+            && proj_event.pos_override.is_none()
+            && !proj_event.projectile.is_anchored_to_player_pos();
         let goliath_extra = goliath_spawn_scale_multiplier(
             &player_class,
             &proj_event.projectile,
@@ -487,6 +491,7 @@ fn handle_ranged_attack_event(
             was_mana_bar_full: current_mana.0 == max_mana.0,
             is_followup_proj: proj_event.is_followup_proj,
             track_player_pos,
+            track_player_aim,
             extra_scale: goliath_extra,
         });
 
@@ -511,6 +516,7 @@ fn handle_ranged_attack_event(
                 was_mana_bar_full: current_mana.0 == max_mana.0,
                 is_followup_proj: false,
                 track_player_pos,
+                track_player_aim,
                 extra_scale: goliath_extra_d2,
             });
         }
@@ -567,7 +573,9 @@ fn handle_spawn_projectiles_after_delay(
     player: Query<Entity, With<Player>>,
     max_mana_q: Query<&MaxMana, With<Player>>,
     pet_check: Query<Entity, With<Pet>>,
+    enemies: Query<&GlobalTransform, With<Mob>>,
     mobs: Query<&Mob>,
+    auto_target: Res<crate::inputs::AttackAutoTargetState>,
     asset_server: Res<AssetServer>,
     player_projectile_size: Query<&ProjectileSize, With<Player>>,
 ) {
@@ -577,12 +585,25 @@ fn handle_spawn_projectiles_after_delay(
         proj.timer.tick(time.delta());
         if proj.timer.just_finished() {
             // For delayed player-fired projectiles, use live player position and
-            // cursor aim so wind-up shots stay responsive.
+            // aim so wind-up shots stay responsive.
             let (spawn_pos, spawn_direction) = if proj.track_player_pos {
                 let player_pos = game.player().position.truncate();
-                let direction =
-                    (cursor_pos.world_coords.truncate() - player_pos).normalize_or_zero();
+                let direction = crate::inputs::attack_aim_direction(
+                    player_pos,
+                    cursor_pos.world_coords.truncate(),
+                    auto_target.0,
+                    &enemies,
+                );
                 (player_pos, direction)
+            } else if proj.track_player_aim {
+                let player_pos = game.player().position.truncate();
+                let direction = crate::inputs::attack_aim_direction(
+                    player_pos,
+                    cursor_pos.world_coords.truncate(),
+                    auto_target.0,
+                    &enemies,
+                );
+                (proj.pos, direction)
             } else {
                 (proj.pos, proj.direction)
             };

@@ -46,6 +46,7 @@ pub enum GroundPatch {
     GrassPatch3,
     GrassPatch4,
     DesertPatch1,
+    DesertPatchSmall,
 }
 
 /// RON asset describing each grass patch sprite location on the
@@ -63,6 +64,8 @@ pub struct GroundPatchesGraphics {
     pub grass_sprites: Option<HashMap<GroundPatch, TextureAtlasSprite>>,
     pub desert_atlas: Option<Handle<TextureAtlas>>,
     pub desert_sprites: Option<HashMap<GroundPatch, TextureAtlasSprite>>,
+    pub desert_small_atlas: Option<Handle<TextureAtlas>>,
+    pub desert_small_sprites: Option<HashMap<GroundPatch, TextureAtlasSprite>>,
 }
 
 /// Marker for spawned decorative ground patches.
@@ -78,17 +81,79 @@ pub const GROUND_PATCH_YSORT_KEY_9: f32 = -0.99;
 
 /// Local **Y** offset when grass is parented to a tree so the patch sits at the trunk base.
 pub const GROUND_PATCH_TREE_LOCAL_OFFSET_Y: f32 = -32.0;
-/// Local **Y** offset when a desert patch is parented under a large cactus.
-pub const DESERT_PATCH_CACTUS_LOCAL_OFFSET_Y: f32 = -16.0;
-/// Extra local **Y** nudge for all era-2 desert patches (negative = downward).
-pub const DESERT_PATCH_Y_NUDGE: f32 = -8.0;
+/// Extra Y offset for small-patch cactuses after negating anchor **y** (negative = patch lower).
+pub const DESERT_PATCH_SMALL_CACTUS_Y_ADJUST: f32 = -8.0;
+/// Extra Y offset for large-patch cactuses after negating anchor **y** (negative = patch lower).
+pub const DESERT_PATCH_LARGE_CACTUS_Y_ADJUST: f32 = -4.0;
+/// Vertical art correction for the large desert patch when used under objects (boulders).
+pub const DESERT_PATCH_LARGE_ART_OFFSET_Y: f32 = -8.0;
 /// Water exclusion radius (Chebyshev tiles) for era-1 grass ground patches.
 pub const GROUND_PATCH_WATER_CHECK_RADIUS_TILES: i8 = 1;
 /// Water exclusion radius for the larger era-2 desert ground patch.
 pub const DESERT_PATCH_WATER_CHECK_RADIUS_TILES: i8 = 2;
+/// Water exclusion radius for the smaller era-2 desert ground patch.
+pub const DESERT_PATCH_SMALL_WATER_CHECK_RADIUS_TILES: i8 = 1;
 
-pub fn desert_patch_parent_offset(base: Vec2) -> Vec2 {
-    base + Vec2::new(0., DESERT_PATCH_Y_NUDGE)
+pub fn desert_patch_water_radius(patch: GroundPatch) -> i8 {
+    match patch {
+        GroundPatch::DesertPatchSmall => DESERT_PATCH_SMALL_WATER_CHECK_RADIUS_TILES,
+        GroundPatch::DesertPatch1 => DESERT_PATCH_WATER_CHECK_RADIUS_TILES,
+        _ => GROUND_PATCH_WATER_CHECK_RADIUS_TILES,
+    }
+}
+
+/// How a parented ground patch is aligned relative to its object (shared by forest + desert).
+#[derive(Clone, Copy, Debug)]
+pub enum GroundPatchPlacement {
+    /// Tall plant (tree / large cactus): pull patch down to tile feet.
+    Tree,
+    /// Shrine: undo proto [`SpriteAnchor`] so the patch sits on the tile.
+    Shrine { anchor: Vec2 },
+    /// Boulder / crate / etc.: align to the object's visual pivot.
+    Object,
+}
+
+/// Era-1 parent-local offset. See [`GroundPatchPlacement`].
+pub fn grass_patch_parent_local_offset(placement: GroundPatchPlacement) -> Vec2 {
+    match placement {
+        GroundPatchPlacement::Tree => Vec2::new(0., GROUND_PATCH_TREE_LOCAL_OFFSET_Y),
+        GroundPatchPlacement::Shrine { anchor } => {
+            grass_patch_local_offset_for_shrine_anchor(anchor)
+        }
+        GroundPatchPlacement::Object => Vec2::ZERO,
+    }
+}
+
+fn desert_patch_art_offset_y(patch: GroundPatch) -> f32 {
+    match patch {
+        GroundPatch::DesertPatch1 => DESERT_PATCH_LARGE_ART_OFFSET_Y,
+        _ => 0.,
+    }
+}
+
+/// Era-2 parent-local offset. Matches forest rules: object patches sit at `(0, 0)` because the
+/// parent entity already includes proto [`SpriteAnchor`]. Only large-patch objects get a small Y
+/// art tweak; cactuses negate anchor **y** like forest trees.
+pub fn desert_patch_parent_local_offset(
+    placement: GroundPatchPlacement,
+    patch: GroundPatch,
+    anchor: Vec2,
+) -> Vec2 {
+    match placement {
+        GroundPatchPlacement::Tree => {
+            let y = -anchor.y
+                + match patch {
+                    GroundPatch::DesertPatchSmall => DESERT_PATCH_SMALL_CACTUS_Y_ADJUST,
+                    GroundPatch::DesertPatch1 => DESERT_PATCH_LARGE_CACTUS_Y_ADJUST,
+                    _ => 0.,
+                };
+            Vec2::new(0., y)
+        }
+        GroundPatchPlacement::Shrine { anchor } => {
+            grass_patch_local_offset_for_shrine_anchor(anchor)
+        }
+        GroundPatchPlacement::Object => Vec2::new(0., desert_patch_art_offset_y(patch)),
+    }
 }
 /// Local **Z** for ground patches parented under an object. Negative places the patch behind the parent's
 /// sprite (parent `YSort` sets world z; stacking adds local z). Not used with [`YSort`] on the patch.
@@ -153,6 +218,24 @@ fn load_ground_patches(
         GroundPatch::DesertPatch1,
         desert_sprite,
     )]));
+
+    let desert_small_patch_data = GroundPatchData {
+        texture_pos: Vec2::ZERO,
+        size: Vec2::new(32., 32.),
+    };
+    let mut desert_small_atlas = TextureAtlas::new_empty(
+        image_assets.desert_patch_small_sheet.clone(),
+        Vec2::new(32., 32.),
+    );
+    let mut desert_small_sprite = TextureAtlasSprite::new(
+        desert_small_atlas.add_texture(desert_small_patch_data.to_atlas_rect()),
+    );
+    desert_small_sprite.custom_size = Some(desert_small_patch_data.size);
+    ground_graphics.desert_small_atlas = Some(texture_atlases.add(desert_small_atlas));
+    ground_graphics.desert_small_sprites = Some(HashMap::from([(
+        GroundPatch::DesertPatchSmall,
+        desert_small_sprite,
+    )]));
 }
 
 /// Spawn a decorative ground patch (grass or desert).
@@ -177,6 +260,14 @@ pub fn spawn_ground_patch(
             ground_graphics.desert_atlas.as_ref()?.clone(),
             ground_graphics
                 .desert_sprites
+                .as_ref()?
+                .get(&patch)?
+                .clone(),
+        ),
+        GroundPatch::DesertPatchSmall => (
+            ground_graphics.desert_small_atlas.as_ref()?.clone(),
+            ground_graphics
+                .desert_small_sprites
                 .as_ref()?
                 .get(&patch)?
                 .clone(),
@@ -239,6 +330,8 @@ fn debug_spawn_ground_patches(
         GroundPatch::GrassPatch4
     } else if keys.just_pressed(KeyCode::Key0) {
         GroundPatch::DesertPatch1
+    } else if keys.just_pressed(KeyCode::Minus) {
+        GroundPatch::DesertPatchSmall
     } else {
         return;
     };
@@ -248,7 +341,7 @@ fn debug_spawn_ground_patches(
         GroundPatch::GrassPatch2 => GROUND_PATCH_YSORT_KEY_7,
         GroundPatch::GrassPatch3 => GROUND_PATCH_YSORT_KEY_8,
         GroundPatch::GrassPatch4 => GROUND_PATCH_YSORT_KEY_9,
-        GroundPatch::DesertPatch1 => GROUND_PATCH_YSORT_KEY_7,
+        GroundPatch::DesertPatch1 | GroundPatch::DesertPatchSmall => GROUND_PATCH_YSORT_KEY_7,
     };
 
     spawn_ground_patch(

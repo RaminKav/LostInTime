@@ -10,7 +10,7 @@ use crate::audio::{AudioSoundEffect, SoundSpawner};
 use crate::blessings::OwnedBlessings;
 use crate::custom_commands::CommandsExt;
 use crate::enemy::Mob;
-use crate::inputs::AutoAttackState;
+use crate::inputs::{attack_aim_direction, AttackAutoTargetState, AutoAttackState};
 use crate::item::ammo::Ammo;
 use crate::item::WorldObject;
 use crate::player::mage_skills::spawn_ice_explosion_hitbox;
@@ -66,6 +66,8 @@ pub fn handle_delayed_ranged_attack(
     mut attack_events: EventReader<AttackEvent>,
     game: GameParam,
     cursor_pos: Res<CursorPos>,
+    auto_target: Res<AttackAutoTargetState>,
+    enemies: Query<&GlobalTransform, With<Mob>>,
     time: Res<Time>,
     mut multi_throw_query: Query<&mut ClawUpgradeMultiThrow, With<Player>>,
     mut remaining: Local<u8>,
@@ -109,8 +111,12 @@ pub fn handle_delayed_ranged_attack(
             *remaining -= 1;
             ranged_attack_event.send(RangedAttackEvent {
                 projectile: ranged_attack.0.clone(),
-                direction: (cursor_pos.world_coords.truncate() - game.player().position.truncate())
-                    .normalize_or_zero(),
+                direction: attack_aim_direction(
+                    game.player().position.truncate(),
+                    cursor_pos.world_coords.truncate(),
+                    auto_target.0,
+                    &enemies,
+                ),
                 from_enemy: false,
                 is_followup_proj: true,
                 mana_cost: None,
@@ -130,7 +136,9 @@ pub fn handle_spread_arrows_attack(
     game: GameParam,
     mouse_button_input: Res<Input<MouseButton>>,
     auto_attack: Res<AutoAttackState>,
+    auto_target: Res<AttackAutoTargetState>,
     cursor_pos: Res<CursorPos>,
+    enemies: Query<&GlobalTransform, With<Mob>>,
     att_cooldown_query: Query<
         (&BowUpgradeSpread, &PlayerAnimation, Option<&AttackTimer>),
         With<Player>,
@@ -164,8 +172,12 @@ pub fn handle_spread_arrows_attack(
         let spread_factor = 0.2 * (f32::floor(*count as f32 / 2.0) + 1.);
         *count += 1;
         let flip = *count % 2 == 0;
-        let raw_dir = (cursor_pos.world_coords.truncate() - game.player().position.truncate())
-            .normalize_or_zero();
+        let raw_dir = attack_aim_direction(
+            game.player().position.truncate(),
+            cursor_pos.world_coords.truncate(),
+            auto_target.0,
+            &enemies,
+        );
 
         let new_dir = rotate(raw_dir, spread_factor * if flip { -1. } else { 1. });
 
