@@ -10,10 +10,10 @@
       sand_frequency: 0.32,
       dirt_frequency: 0.0,
       forest_params: (
-        tree_spacing_radius: 68.,
+        tree_spacing_radius: 72.,
         tree_density: 0.005,
         forest_radius: 5.,
-        max_trees_per_forest: 5,
+        max_trees_per_forest: 4,
         tree_weights: {
           DesertLargeCactus1: 1.0,
           DesertLargeCactus2: 1.0,
