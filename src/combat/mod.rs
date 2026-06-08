@@ -1257,6 +1257,10 @@ pub fn handle_lifesteal(
             }
 
             if heal_amount > 0 {
+                trigger_counts.record_health_gain(
+                    crate::player::skills::HealthGainSource::Lifesteal,
+                    heal_amount,
+                );
                 modify_health_events.send(ModifyHealthEvent(heal_amount));
 
                 // LifestealCoins: Spawn a coin for each lifesteal proc

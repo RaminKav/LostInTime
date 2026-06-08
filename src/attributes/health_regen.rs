@@ -3,7 +3,7 @@ use std::time::Duration;
 use bevy::prelude::*;
 
 use crate::player::{
-    skills::{Heirloom, PlayerSkills},
+    skills::{Heirloom, HealthGainSource, PlayerSkills},
     Player,
 };
 
@@ -46,6 +46,7 @@ pub fn handle_health_regen(
         With<Player>,
     >,
     mut modify_health_event: EventWriter<ModifyHealthEvent>,
+    mut trigger_counts: ResMut<crate::player::skills::HeirloomTriggerCounts>,
     time: Res<Time>,
 ) {
     let Ok((health_regen, mut timer, hunger, skills, current_health)) =
@@ -76,6 +77,9 @@ pub fn handle_health_regen(
                 timer.0.reset();
                 return;
             }
+        }
+        if regen_delta > 0 {
+            trigger_counts.record_health_gain(HealthGainSource::HealthRegen, regen_delta);
         }
         modify_health_event.send(ModifyHealthEvent(regen_delta));
         timer.0.reset();

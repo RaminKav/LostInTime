@@ -2007,12 +2007,12 @@ pub fn handle_mana_charge_damage_reset(
 /// System to spawn mana orb projectiles when mana is regenerated
 pub fn handle_mana_orb_attack(
     mut mana_events: EventReader<ModifyManaEvent>,
-    mut player_query: Query<(&PlayerSkills, &GlobalTransform), With<Player>>,
+    mut player_query: Query<(&PlayerSkills, &GlobalTransform, &mut CurrentMana), With<Player>>,
     mobs: Query<(Entity, &GlobalTransform, &CurrentHealth), With<Mob>>,
     mut ranged_attack_event: EventWriter<RangedAttackEvent>,
     mut trigger_counts: ResMut<HeirloomTriggerCounts>,
 ) {
-    let Ok((skills, player_transform)) = player_query.get_single_mut() else {
+    let Ok((skills, player_transform, mut current_mana)) = player_query.get_single_mut() else {
         return;
     };
 
@@ -2021,8 +2021,19 @@ pub fn handle_mana_orb_attack(
         return;
     }
 
+    let mana_cost_per_orb = (Heirloom::ManaOrbAttack.get_mana_cost() as f32
+        * if skills.has(Heirloom::DiscountMP) {
+            0.75
+        } else {
+            1.
+        }) as i32;
+    if mana_cost_per_orb <= 0 {
+        return;
+    }
+
     let player_pos = player_transform.translation().truncate();
     let mut rng = rand::thread_rng();
+    let mut remaining_mana = current_mana.0;
 
     for event in mana_events.iter() {
         // Only trigger on positive mana changes (regen, not consumption)
@@ -2042,12 +2053,20 @@ pub fn handle_mana_orb_attack(
         if nearby_mobs.is_empty() {
             continue;
         }
+
+        let orbs_to_fire =
+            (stacks as usize).min(remaining_mana as usize / mana_cost_per_orb as usize);
+        if orbs_to_fire == 0 {
+            continue;
+        }
+
+        let total_mana_cost = mana_cost_per_orb * orbs_to_fire as i32;
+        current_mana.0 -= total_mana_cost;
+        remaining_mana = current_mana.0;
+        trigger_counts.record_mana(Heirloom::ManaOrbAttack, total_mana_cost);
         trigger_counts.increment(Heirloom::ManaOrbAttack);
 
-        // Spawn +1 orb per stack
-        let orb_count = stacks as usize;
-        for i in 0..orb_count {
-            // Pick a random nearby enemy
+        for i in 0..orbs_to_fire {
             if let Some((_, target_transform, _)) = nearby_mobs.choose(&mut rng) {
                 let target_pos = target_transform.translation().truncate();
                 let direction = (target_pos - player_pos).normalize_or_zero();
@@ -2059,9 +2078,9 @@ pub fn handle_mana_orb_attack(
                     from_enemy: false,
                     from_entity: None,
                     is_followup_proj: true,
-                    dmg_override: Some(event.0), // Damage equals mana regen amount
+                    dmg_override: Some(event.0),
                     pos_override: Some(player_pos),
-                    spawn_delay: i as f32 * 0.1, // Slight delay between orbs
+                    spawn_delay: i as f32 * 0.1,
                 });
             }
         }

@@ -37,8 +37,8 @@ use crate::{
     chaos::ChaosTracker,
     client::GameOverEvent,
     colors::{
-        overwrite_alpha, DARK_WOOD_BROWN, LEVEL_BLUE, LEVEL_DARK_BLUE, LIGHT_GREY, RED, WHITE,
-        YELLOW,
+        overwrite_alpha, DARK_WOOD_BROWN, LEVEL_BLUE, LEVEL_DARK_BLUE, LIGHT_BLUE, LIGHT_GREY,
+        LIGHT_RED, RED, WHITE, YELLOW,
     },
     cursor::CursorPos,
     inventory::{Inventory, ItemStack},
@@ -56,7 +56,7 @@ use crate::{
             active_skill_scaling::METEOR_SHOWER_BASE_COUNT,
             effective_player_attack_speed_multiplier, ActiveSkill, ActiveSkillChoiceState,
             ActiveSkillUsedEvent, ClassSkillSlots, Heirloom, HeirloomRarity, HeirloomTriggerCounts,
-            PlayerSkills, VISIBLE_CLASS_SKILL_COUNT,
+            ManaTrackerResetTimer, PlayerSkills, VISIBLE_CLASS_SKILL_COUNT,
         },
         CoinCurrency, Player, RunScore, TimeFragmentCurrency,
     },
@@ -78,9 +78,17 @@ pub struct ManaBarText;
 #[derive(Component)]
 pub struct ManaOrbHudHover;
 
+/// Invisible hit target on the health orb for the health gain tracker tooltip.
+#[derive(Component)]
+pub struct HealthOrbHudHover;
+
 /// Floating tooltip shown while hovering the mana orb.
 #[derive(Component)]
 pub struct ManaTrackerHudTooltip;
+
+/// Floating tooltip shown while hovering the health orb.
+#[derive(Component)]
+pub struct HealthTrackerHudTooltip;
 
 /// Marker for the new bottom HUD frame sprite (replaces the old top "bars" frame).
 #[derive(Component)]
@@ -350,6 +358,22 @@ pub fn setup_bars_ui(
         .insert(RenderLayers::from_layers(&[3]))
         .insert(HealthBarText)
         .insert(Name::new("HUD HP TEXT"))
+        .set_parent(hp_fill);
+
+    commands
+        .spawn(SpriteBundle {
+            sprite: Sprite {
+                color: Color::rgba(0., 0., 0., 0.),
+                custom_size: Some(HUD_FILL_PIXEL_SIZE),
+                ..default()
+            },
+            transform: Transform::from_translation(Vec3::new(0., 0., 3.)),
+            ..default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(HealthOrbHudHover)
+        .insert(Interactable::default())
+        .insert(Name::new("HUD HP HOVER"))
         .set_parent(hp_fill);
 
     let mana_mesh: Mesh2dHandle = meshes
@@ -1642,19 +1666,47 @@ pub fn handle_active_skill_hud_tooltip(
     *last_hovered = hovered_skill;
 }
 
-const MANA_TRACKER_COLUMNS: usize = 2;
-const MANA_TRACKER_ICON_SIZE: f32 = 12.0;
-const MANA_TRACKER_COL_WIDTH: f32 = 54.0;
-const MANA_TRACKER_ROW_HEIGHT: f32 = 14.0;
-const MANA_TRACKER_TITLE_HEIGHT: f32 = 12.0;
-const MANA_TRACKER_PAD: f32 = 6.0;
+const ORB_TRACKER_COLUMNS: usize = 2;
+const ORB_TRACKER_ICON_SIZE: f32 = 12.0;
+const ORB_TRACKER_COL_WIDTH: f32 = 54.0;
+const ORB_TRACKER_ROW_HEIGHT: f32 = 14.0;
+const ORB_TRACKER_TITLE_HEIGHT: f32 = 12.0;
+const ORB_TRACKER_RATE_HEIGHT: f32 = 10.0;
+const ORB_TRACKER_PAD: f32 = 6.0;
 
-fn mana_tracker_tooltip_size(entry_count: usize) -> Vec2 {
-    let rows = entry_count.div_ceil(MANA_TRACKER_COLUMNS).max(1) as f32;
+fn orb_tracker_tooltip_size(entry_count: usize) -> Vec2 {
+    let rows = entry_count.div_ceil(ORB_TRACKER_COLUMNS).max(1) as f32;
     Vec2::new(
-        MANA_TRACKER_COL_WIDTH * MANA_TRACKER_COLUMNS as f32 + MANA_TRACKER_PAD * 2.,
-        MANA_TRACKER_TITLE_HEIGHT + rows * MANA_TRACKER_ROW_HEIGHT + MANA_TRACKER_PAD * 2.,
+        ORB_TRACKER_COL_WIDTH * ORB_TRACKER_COLUMNS as f32 + ORB_TRACKER_PAD * 2.,
+        ORB_TRACKER_TITLE_HEIGHT
+            + rows * ORB_TRACKER_ROW_HEIGHT
+            + ORB_TRACKER_RATE_HEIGHT
+            + ORB_TRACKER_PAD * 2.,
     )
+}
+
+fn spawn_orb_tracker_rate_line(
+    commands: &mut Commands,
+    asset_server: &AssetServer,
+    parent: Entity,
+    label: &str,
+    rate: f32,
+    panel_height: f32,
+) {
+    let y = -panel_height * 0.5 + ORB_TRACKER_PAD + ORB_TRACKER_RATE_HEIGHT * 0.5;
+    commands
+        .spawn(Text2dBundle {
+            text: Text::from_section(
+                format!("{label}: {rate:.1}/s"),
+                gf::HUD_MICRO.text_style(asset_server, LIGHT_GREY),
+            )
+            .with_alignment(TextAlignment::Center),
+            text_anchor: Anchor::Center,
+            transform: Transform::from_translation(Vec3::new(0., y, 1.)),
+            ..default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .set_parent(parent);
 }
 
 fn spawn_mana_tracker_tooltip(
@@ -1663,9 +1715,10 @@ fn spawn_mana_tracker_tooltip(
     asset_server: &AssetServer,
     anchor_pos: Vec3,
     tracker: &HeirloomTriggerCounts,
+    window_elapsed_secs: f32,
 ) -> Entity {
     let entries = tracker.sorted_mana_entries();
-    let size = mana_tracker_tooltip_size(entries.len());
+    let size = orb_tracker_tooltip_size(entries.len());
     let tooltip_pos = Vec3::new(
         anchor_pos.x,
         anchor_pos.y + HUD_FILL_PIXEL_SIZE.y * 0.5 + size.y * 0.5 + 6.,
@@ -1693,12 +1746,12 @@ fn spawn_mana_tracker_tooltip(
         .insert(RenderLayers::from_layers(&[3]))
         .set_parent(root);
 
-    let title_y = size.y * 0.5 - MANA_TRACKER_PAD - MANA_TRACKER_TITLE_HEIGHT * 0.5;
+    let title_y = size.y * 0.5 - ORB_TRACKER_PAD - ORB_TRACKER_TITLE_HEIGHT * 0.5;
     commands
         .spawn(Text2dBundle {
             text: Text::from_section(
                 "Mana Tracker",
-                gf::ICON_HOVER_TOOLTIP.text_style(asset_server, WHITE),
+                gf::ICON_HOVER_TOOLTIP.text_style(asset_server, LIGHT_BLUE),
             )
             .with_alignment(TextAlignment::Center),
             text_anchor: Anchor::Center,
@@ -1708,8 +1761,8 @@ fn spawn_mana_tracker_tooltip(
         .insert(RenderLayers::from_layers(&[3]))
         .set_parent(root);
 
-    let grid_top = title_y - MANA_TRACKER_TITLE_HEIGHT * 0.5 - MANA_TRACKER_ROW_HEIGHT * 0.5;
-    let left_x = -size.x * 0.5 + MANA_TRACKER_PAD + MANA_TRACKER_COL_WIDTH * 0.5;
+    let grid_top = title_y - ORB_TRACKER_TITLE_HEIGHT * 0.5 - ORB_TRACKER_ROW_HEIGHT * 0.5;
+    let left_x = -size.x * 0.5 + ORB_TRACKER_PAD + ORB_TRACKER_COL_WIDTH * 0.5;
 
     if entries.is_empty() {
         commands
@@ -1725,61 +1778,230 @@ fn spawn_mana_tracker_tooltip(
             })
             .insert(RenderLayers::from_layers(&[3]))
             .set_parent(root);
-        return root;
+    } else {
+        let texture_atlas = graphics.texture_atlas.as_ref().unwrap().clone();
+        for (index, (heirloom, _amount)) in entries.iter().enumerate() {
+            let col = index % ORB_TRACKER_COLUMNS;
+            let row = index / ORB_TRACKER_COLUMNS;
+            let x = left_x + col as f32 * ORB_TRACKER_COL_WIDTH;
+            let y = grid_top - row as f32 * ORB_TRACKER_ROW_HEIGHT;
+            let pct = tracker.mana_consumed_percentage(heirloom);
+
+            let row_root = commands
+                .spawn(SpatialBundle::from_transform(Transform::from_translation(
+                    Vec3::new(x, y, 1.),
+                )))
+                .insert(RenderLayers::from_layers(&[3]))
+                .set_parent(root)
+                .id();
+
+            commands
+                .spawn(SpriteSheetBundle {
+                    texture_atlas: texture_atlas.clone(),
+                    sprite: graphics.get_heirloom_icon(heirloom.clone()),
+                    transform: Transform::from_translation(Vec3::new(
+                        -ORB_TRACKER_COL_WIDTH * 0.5 + ORB_TRACKER_ICON_SIZE * 0.5 + 2.,
+                        0.,
+                        1.,
+                    )),
+                    ..default()
+                })
+                .insert(Sprite {
+                    custom_size: Some(Vec2::splat(ORB_TRACKER_ICON_SIZE)),
+                    ..default()
+                })
+                .insert(RenderLayers::from_layers(&[3]))
+                .set_parent(row_root);
+
+            commands
+                .spawn(Text2dBundle {
+                    text: Text::from_section(
+                        format!("{pct}%"),
+                        gf::HUD_MICRO.text_style(asset_server, WHITE),
+                    )
+                    .with_alignment(TextAlignment::Center),
+                    text_anchor: Anchor::CenterLeft,
+                    transform: Transform::from_translation(Vec3::new(
+                        -ORB_TRACKER_COL_WIDTH * 0.5 + ORB_TRACKER_ICON_SIZE + 6.,
+                        0.,
+                        2.,
+                    )),
+                    ..default()
+                })
+                .insert(RenderLayers::from_layers(&[3]))
+                .set_parent(row_root);
+        }
     }
 
-    let texture_atlas = graphics.texture_atlas.as_ref().unwrap().clone();
-    for (index, (heirloom, _amount)) in entries.iter().enumerate() {
-        let col = index % MANA_TRACKER_COLUMNS;
-        let row = index / MANA_TRACKER_COLUMNS;
-        let x = left_x + col as f32 * MANA_TRACKER_COL_WIDTH;
-        let y = grid_top - row as f32 * MANA_TRACKER_ROW_HEIGHT;
-        let pct = tracker.mana_consumed_percentage(heirloom);
+    spawn_orb_tracker_rate_line(
+        commands,
+        asset_server,
+        root,
+        "Gained",
+        tracker.mana_gained_per_second(window_elapsed_secs),
+        size.y,
+    );
 
-        let row_root = commands
-            .spawn(SpatialBundle::from_transform(Transform::from_translation(
-                Vec3::new(x, y, 1.),
-            )))
-            .insert(RenderLayers::from_layers(&[3]))
-            .set_parent(root)
-            .id();
+    root
+}
 
-        commands
-            .spawn(SpriteSheetBundle {
-                texture_atlas: texture_atlas.clone(),
-                sprite: graphics.get_heirloom_icon(heirloom.clone()),
-                transform: Transform::from_translation(Vec3::new(
-                    -MANA_TRACKER_COL_WIDTH * 0.5 + MANA_TRACKER_ICON_SIZE * 0.5 + 2.,
-                    0.,
-                    1.,
-                )),
+fn spawn_health_tracker_tooltip(
+    commands: &mut Commands,
+    graphics: &Graphics,
+    asset_server: &AssetServer,
+    anchor_pos: Vec3,
+    tracker: &HeirloomTriggerCounts,
+    window_elapsed_secs: f32,
+) -> Entity {
+    let entries = tracker.sorted_health_gain_entries();
+    let size = orb_tracker_tooltip_size(entries.len());
+    let tooltip_pos = Vec3::new(
+        anchor_pos.x,
+        anchor_pos.y + HUD_FILL_PIXEL_SIZE.y * 0.5 + size.y * 0.5 + 6.,
+        anchor_pos.z + 10.,
+    );
+
+    let root = commands
+        .spawn((
+            SpatialBundle::from_transform(Transform::from_translation(tooltip_pos)),
+            RenderLayers::from_layers(&[3]),
+            HealthTrackerHudTooltip,
+            Name::new("HEALTH TRACKER TOOLTIP"),
+        ))
+        .id();
+
+    commands
+        .spawn(SpriteBundle {
+            sprite: Sprite {
+                color: ICON_HOVER_TOOLTIP_BG_COLOR,
+                custom_size: Some(size),
                 ..default()
-            })
-            .insert(Sprite {
-                custom_size: Some(Vec2::splat(MANA_TRACKER_ICON_SIZE)),
-                ..default()
-            })
-            .insert(RenderLayers::from_layers(&[3]))
-            .set_parent(row_root);
+            },
+            ..default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .set_parent(root);
 
+    let title_y = size.y * 0.5 - ORB_TRACKER_PAD - ORB_TRACKER_TITLE_HEIGHT * 0.5;
+    commands
+        .spawn(Text2dBundle {
+            text: Text::from_section(
+                "Health Tracker",
+                gf::ICON_HOVER_TOOLTIP.text_style(asset_server, LIGHT_RED),
+            )
+            .with_alignment(TextAlignment::Center),
+            text_anchor: Anchor::Center,
+            transform: Transform::from_translation(Vec3::new(0., title_y, 1.)),
+            ..default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .set_parent(root);
+
+    let grid_top = title_y - ORB_TRACKER_TITLE_HEIGHT * 0.5 - ORB_TRACKER_ROW_HEIGHT * 0.5;
+    let left_x = -size.x * 0.5 + ORB_TRACKER_PAD + ORB_TRACKER_COL_WIDTH * 0.5;
+
+    if entries.is_empty() {
         commands
             .spawn(Text2dBundle {
                 text: Text::from_section(
-                    format!("{pct}%"),
-                    gf::HUD_MICRO.text_style(asset_server, WHITE),
+                    "No health gained yet",
+                    gf::HUD_MICRO.text_style(asset_server, LIGHT_GREY),
                 )
                 .with_alignment(TextAlignment::Center),
-                text_anchor: Anchor::CenterLeft,
-                transform: Transform::from_translation(Vec3::new(
-                    -MANA_TRACKER_COL_WIDTH * 0.5 + MANA_TRACKER_ICON_SIZE + 6.,
-                    0.,
-                    2.,
-                )),
+                text_anchor: Anchor::Center,
+                transform: Transform::from_translation(Vec3::new(0., grid_top, 1.)),
                 ..default()
             })
             .insert(RenderLayers::from_layers(&[3]))
-            .set_parent(row_root);
+            .set_parent(root);
+    } else {
+        let texture_atlas = graphics.texture_atlas.as_ref().unwrap().clone();
+        for (index, (source, _amount)) in entries.iter().enumerate() {
+            let col = index % ORB_TRACKER_COLUMNS;
+            let row = index / ORB_TRACKER_COLUMNS;
+            let x = left_x + col as f32 * ORB_TRACKER_COL_WIDTH;
+            let y = grid_top - row as f32 * ORB_TRACKER_ROW_HEIGHT;
+            let pct = tracker.health_gained_percentage(source);
+
+            let row_root = commands
+                .spawn(SpatialBundle::from_transform(Transform::from_translation(
+                    Vec3::new(x, y, 1.),
+                )))
+                .insert(RenderLayers::from_layers(&[3]))
+                .set_parent(root)
+                .id();
+            let mut is_icon = false;
+            if let Some(heirloom) = source.heirloom_icon() {
+                is_icon = true;
+                commands
+                    .spawn(SpriteSheetBundle {
+                        texture_atlas: texture_atlas.clone(),
+                        sprite: graphics.get_heirloom_icon(heirloom),
+                        transform: Transform::from_translation(Vec3::new(
+                            -ORB_TRACKER_COL_WIDTH * 0.5 + ORB_TRACKER_ICON_SIZE * 0.5 + 2.,
+                            0.,
+                            1.,
+                        )),
+                        ..default()
+                    })
+                    .insert(Sprite {
+                        custom_size: Some(Vec2::splat(ORB_TRACKER_ICON_SIZE)),
+                        ..default()
+                    })
+                    .insert(RenderLayers::from_layers(&[3]))
+                    .set_parent(row_root);
+            } else {
+                commands
+                    .spawn(Text2dBundle {
+                        text: Text::from_section(
+                            source.label(),
+                            gf::HUD_MICRO.text_style(asset_server, WHITE),
+                        )
+                        .with_alignment(TextAlignment::Center),
+                        text_anchor: Anchor::CenterLeft,
+                        transform: Transform::from_translation(Vec3::new(
+                            -ORB_TRACKER_COL_WIDTH * 0.5 + 2.,
+                            0.,
+                            1.,
+                        )),
+                        ..default()
+                    })
+                    .insert(RenderLayers::from_layers(&[3]))
+                    .set_parent(row_root);
+            }
+            let x_offset = if is_icon {
+                0.
+            } else {
+                (source.label().len() - 5) as f32 * 4. + 12.
+            };
+            commands
+                .spawn(Text2dBundle {
+                    text: Text::from_section(
+                        format!("{pct}%"),
+                        gf::HUD_MICRO.text_style(asset_server, WHITE),
+                    )
+                    .with_alignment(TextAlignment::Center),
+                    text_anchor: Anchor::CenterLeft,
+                    transform: Transform::from_translation(Vec3::new(
+                        -ORB_TRACKER_COL_WIDTH * 0.5 + ORB_TRACKER_ICON_SIZE + 6. + x_offset,
+                        0.,
+                        2.,
+                    )),
+                    ..default()
+                })
+                .insert(RenderLayers::from_layers(&[3]))
+                .set_parent(row_root);
+        }
     }
+
+    spawn_orb_tracker_rate_line(
+        commands,
+        asset_server,
+        root,
+        "Gain",
+        tracker.health_gained_per_second(window_elapsed_secs),
+        size.y,
+    );
 
     root
 }
@@ -1791,11 +2013,12 @@ pub fn handle_mana_tracker_hud_tooltip(
     asset_server: Res<AssetServer>,
     cursor_pos: Res<CursorPos>,
     trigger_counts: Res<HeirloomTriggerCounts>,
+    tracker_timer: Res<ManaTrackerResetTimer>,
     hit_detection_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     mut hover_targets: Query<(Entity, &GlobalTransform, &mut Interactable), With<ManaOrbHudHover>>,
     existing_tooltips: Query<Entity, With<ManaTrackerHudTooltip>>,
     mut last_hovered: Local<bool>,
-    mut last_total: Local<u64>,
+    mut last_snapshot: Local<(u64, u64)>,
 ) {
     use Interaction;
 
@@ -1817,12 +2040,15 @@ pub fn handle_mana_tracker_hud_tooltip(
         .iter()
         .any(|(_, _, interactable)| matches!(interactable.current(), Interaction::Hovering));
 
-    let total = trigger_counts.total_mana_consumed();
-    if hovering == *last_hovered && (!hovering || total == *last_total) {
+    let snapshot = (
+        trigger_counts.total_mana_consumed(),
+        trigger_counts.mana_gained,
+    );
+    if hovering == *last_hovered && (!hovering || snapshot == *last_snapshot) {
         return;
     }
     *last_hovered = hovering;
-    *last_total = total;
+    *last_snapshot = snapshot;
 
     for tooltip_e in existing_tooltips.iter() {
         commands.entity(tooltip_e).despawn_recursive();
@@ -1834,12 +2060,80 @@ pub fn handle_mana_tracker_hud_tooltip(
             .find(|(_, _, interactable)| matches!(interactable.current(), Interaction::Hovering))
             .map(|(_, transform, _)| transform.translation())
             .unwrap_or(Vec3::ZERO);
+        let window_elapsed_secs = tracker_timer.0.elapsed().as_secs_f32();
         spawn_mana_tracker_tooltip(
             &mut commands,
             &graphics,
             &asset_server,
             anchor_pos,
             &trigger_counts,
+            window_elapsed_secs,
+        );
+    }
+}
+
+/// Shows a breakdown of health gained by source while hovering the health orb.
+pub fn handle_health_tracker_hud_tooltip(
+    mut commands: Commands,
+    graphics: Res<Graphics>,
+    asset_server: Res<AssetServer>,
+    cursor_pos: Res<CursorPos>,
+    trigger_counts: Res<HeirloomTriggerCounts>,
+    tracker_timer: Res<ManaTrackerResetTimer>,
+    hit_detection_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
+    mut hover_targets: Query<
+        (Entity, &GlobalTransform, &mut Interactable),
+        With<HealthOrbHudHover>,
+    >,
+    existing_tooltips: Query<Entity, With<HealthTrackerHudTooltip>>,
+    mut last_hovered: Local<bool>,
+    mut last_snapshot: Local<u64>,
+) {
+    use Interaction;
+
+    let hit_entity = super::ui_helpers::pointcast_2d(&cursor_pos, &hit_detection_sprites, None);
+
+    for (entity, _, mut interactable) in hover_targets.iter_mut() {
+        let is_hit = hit_entity
+            .as_ref()
+            .map(|(e, _s, _t)| *e == entity)
+            .unwrap_or(false);
+        if is_hit && !matches!(interactable.current(), Interaction::Hovering) {
+            interactable.change(Interaction::Hovering);
+        } else if !is_hit && matches!(interactable.current(), Interaction::Hovering) {
+            interactable.change(Interaction::None);
+        }
+    }
+
+    let hovering = hover_targets
+        .iter()
+        .any(|(_, _, interactable)| matches!(interactable.current(), Interaction::Hovering));
+
+    let snapshot = trigger_counts.total_health_gained();
+    if hovering == *last_hovered && (!hovering || snapshot == *last_snapshot) {
+        return;
+    }
+    *last_hovered = hovering;
+    *last_snapshot = snapshot;
+
+    for tooltip_e in existing_tooltips.iter() {
+        commands.entity(tooltip_e).despawn_recursive();
+    }
+
+    if hovering {
+        let anchor_pos = hover_targets
+            .iter()
+            .find(|(_, _, interactable)| matches!(interactable.current(), Interaction::Hovering))
+            .map(|(_, transform, _)| transform.translation())
+            .unwrap_or(Vec3::ZERO);
+        let window_elapsed_secs = tracker_timer.0.elapsed().as_secs_f32();
+        spawn_health_tracker_tooltip(
+            &mut commands,
+            &graphics,
+            &asset_server,
+            anchor_pos,
+            &trigger_counts,
+            window_elapsed_secs,
         );
     }
 }

@@ -94,17 +94,24 @@ pub struct ModifyManaEvent(pub i32);
 pub fn handle_modify_mana_event(
     mut event: EventReader<ModifyManaEvent>,
     mut query: Query<(&mut CurrentMana, &MaxMana, &GlobalTransform), With<Player>>,
+    mut trigger_counts: ResMut<HeirloomTriggerCounts>,
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     cheat_settings: Option<Res<CheatSettings>>,
 ) {
     for event in event.iter() {
-        let (mut mana, max_mana, player_t) = query.single_mut();
-        if mana.0 == max_mana.0 && event.0 > 0 {
-            return;
+        if event.0 == 0 {
+            continue;
         }
-        mana.0 += event.0;
+        let (mut mana, max_mana, player_t) = query.single_mut();
+
         if event.0 > 0 {
+            trigger_counts.record_mana_gained(event.0);
+            let applied = event.0.min(max_mana.0.saturating_sub(mana.0));
+            if applied <= 0 {
+                continue;
+            }
+            mana.0 += applied;
             if cheat_settings
                 .as_deref()
                 .is_some_and(|s| !s.show_player_damage_numbers)
@@ -116,9 +123,11 @@ pub fn handle_modify_mana_event(
                 &asset_server,
                 player_t.translation() + Vec3::new(0., 15., 0.),
                 BLUE,
-                format!("+{} MP", event.0),
+                format!("+{} MP", applied),
                 floating_text_font_style(cheat_settings.as_deref()),
             );
+        } else {
+            mana.0 += event.0;
         }
     }
 }

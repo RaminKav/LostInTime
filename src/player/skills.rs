@@ -1315,6 +1315,13 @@ impl Heirloom {
             Self::SkillPower | Self::SkillPowerHunt => &[D::SkillPower],
             // Self::ItemPickupRadius | Self::GravityScales => &[D::PickupRange],
             Self::OnHitEcho | Self::HealEcho | Self::SkillEcho | Self::ParryEcho => &[D::Echo],
+            Self::Attack
+            | Self::GoldIntoDamage
+            | Self::CrateBreakDamage
+            | Self::LowHPDamage
+            | Self::StandStill
+            | Self::MaxHPDamage => &[D::Attack],
+            Self::ChaosBoost => &[D::Chaos],
             Self::CoinLightning | Self::KillLightning | Self::ManaRegenLightning => &[D::Lightning],
 
             Self::IceStaffAoE => &[D::IceExplosion],
@@ -1327,7 +1334,7 @@ impl Heirloom {
             | Self::PoisonDuration
             | Self::PoisonStrength => &[D::Poison],
 
-            Self::ChaosStats => &[D::Mana, D::Defence, D::Dodge],
+            Self::ChaosStats => &[D::Attack, D::Chaos, D::Mana, D::Defence, D::Dodge],
             Self::Gigantify | Self::GravityScales => &[D::Size],
             Self::LoadedDice => &[D::Luck],
 
@@ -3026,11 +3033,38 @@ impl PlayerSkills {
 }
 
 /// Tracks how many times each heirloom effect has successfully triggered during a run,
-/// and cumulative mana spent by mana-consuming heirlooms.
+/// plus rolling-window HUD orb stats (mana spent, health gained, mana regened).
 #[derive(Resource, Default, Clone, Debug)]
 pub struct HeirloomTriggerCounts {
     pub counts: HashMap<Heirloom, u32>,
     pub mana_consumed: HashMap<Heirloom, u64>,
+    pub health_gained: HashMap<HealthGainSource, u64>,
+    pub mana_gained: u64,
+}
+
+/// Sources tracked on the health orb HUD tooltip (1-minute rolling window).
+#[derive(Clone, Eq, PartialEq, Hash, Debug)]
+pub enum HealthGainSource {
+    CoinHeal,
+    HealthRegen,
+    Lifesteal,
+}
+
+impl HealthGainSource {
+    pub fn label(&self) -> &'static str {
+        match self {
+            HealthGainSource::CoinHeal => "Coin Heal",
+            HealthGainSource::HealthRegen => "Regen",
+            HealthGainSource::Lifesteal => "Lifesteal",
+        }
+    }
+
+    pub fn heirloom_icon(&self) -> Option<Heirloom> {
+        match self {
+            HealthGainSource::CoinHeal => Some(Heirloom::CoinHeal),
+            HealthGainSource::HealthRegen | HealthGainSource::Lifesteal => None,
+        }
+    }
 }
 
 impl HeirloomTriggerCounts {
@@ -3077,10 +3111,73 @@ impl HeirloomTriggerCounts {
     pub fn reset_mana_consumed(&mut self) {
         self.mana_consumed.clear();
     }
+
+    pub fn record_health_gain(&mut self, source: HealthGainSource, amount: i32) {
+        if amount > 0 {
+            *self.health_gained.entry(source).or_insert(0) += amount as u64;
+        }
+    }
+
+    pub fn record_mana_gained(&mut self, amount: i32) {
+        if amount > 0 {
+            self.mana_gained += amount as u64;
+        }
+    }
+
+    pub fn total_health_gained(&self) -> u64 {
+        self.health_gained.values().sum()
+    }
+
+    pub fn health_gained_percentage(&self, source: &HealthGainSource) -> u32 {
+        let total = self.total_health_gained();
+        if total == 0 {
+            return 0;
+        }
+        let amount = self.health_gained.get(source).copied().unwrap_or(0);
+        ((amount as f64 / total as f64) * 100.0).round() as u32
+    }
+
+    pub fn sorted_health_gain_entries(&self) -> Vec<(HealthGainSource, u64)> {
+        const ORDER: [HealthGainSource; 3] = [
+            HealthGainSource::CoinHeal,
+            HealthGainSource::HealthRegen,
+            HealthGainSource::Lifesteal,
+        ];
+        ORDER
+            .into_iter()
+            .filter_map(|source| {
+                self.health_gained
+                    .get(&source)
+                    .copied()
+                    .filter(|amount| *amount > 0)
+                    .map(|amount| (source, amount))
+            })
+            .collect()
+    }
+
+    pub fn per_second(total: u64, window_elapsed_secs: f32) -> f32 {
+        if window_elapsed_secs <= 0.0 {
+            return 0.0;
+        }
+        total as f32 / window_elapsed_secs
+    }
+
+    pub fn mana_gained_per_second(&self, window_elapsed_secs: f32) -> f32 {
+        Self::per_second(self.mana_gained, window_elapsed_secs)
+    }
+
+    pub fn health_gained_per_second(&self, window_elapsed_secs: f32) -> f32 {
+        Self::per_second(self.total_health_gained(), window_elapsed_secs)
+    }
+
+    pub fn reset_hud_orb_window_stats(&mut self) {
+        self.mana_consumed.clear();
+        self.health_gained.clear();
+        self.mana_gained = 0;
+    }
 }
 
-/// Repeating timer that clears [`HeirloomTriggerCounts::mana_consumed`] every minute so the
-/// HUD mana tracker reflects recent consumption rather than the full run.
+/// Repeating timer that clears HUD orb rolling-window stats every minute.
 #[derive(Resource)]
 pub struct ManaTrackerResetTimer(pub Timer);
 
@@ -3097,6 +3194,6 @@ pub fn tick_mana_tracker_reset(
 ) {
     timer.0.tick(time.delta());
     if timer.0.just_finished() {
-        trigger_counts.reset_mana_consumed();
+        trigger_counts.reset_hud_orb_window_stats();
     }
 }

@@ -27,6 +27,7 @@ use crate::{
     player::{
         levels::PlayerLevel,
         score::{RunScore, RunTimer},
+        skills::PlayerSkills,
         Player, TimeFragmentCurrency,
     },
     proto::proto_param::ProtoParam,
@@ -795,6 +796,7 @@ pub fn handle_game_over_final_stats_tooltip(
             &Lifesteal,
             &PickupRange,
             &AttackSpeed,
+            &PlayerSkills,
         ),
         With<Player>,
     >,
@@ -850,12 +852,13 @@ pub fn handle_game_over_final_stats_tooltip(
                 lifesteal,
                 pickup_range,
                 attack_speed,
+                skills,
             )) = player_stats.get_single()
             else {
                 return;
             };
 
-            let attributes = ItemAttributes {
+            let mut attributes = ItemAttributes {
                 attack: AttributeValue::new(attack.0, AttributeQuality::Low, 0.),
                 health: AttributeValue::new(max_health.0, AttributeQuality::Low, 0.),
                 mana: AttributeValue::new(max_mana.0, AttributeQuality::Low, 0.),
@@ -878,6 +881,7 @@ pub fn handle_game_over_final_stats_tooltip(
                 ..Default::default()
             }
             .get_stats_summary(curr_health.0, curr_mana.0, None, None);
+            attributes.push(skills.poison_chance_stat_summary());
 
             // Hitbox is centered above "Try Again"; place tooltip up and to the left so it stays on-screen.
             let tooltip_pos = Vec3::new(-125., 18., 2.);

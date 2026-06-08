@@ -22,7 +22,10 @@ use crate::player::{handle_move_player, Player};
 use crate::ui::{ChestContainer, FurnaceContainer};
 use crate::world::wall_auto_tile::ChunkWallCache;
 use crate::world::world_helpers::world_pos_to_tile_pos;
-use crate::{item::WorldObject, GameParam, ImageAssets};
+use crate::{
+    item::{projectile::Projectile, WorldObject},
+    GameParam, ImageAssets,
+};
 use crate::{CustomFlush, GameState, TextureCamera};
 use serde::{Deserialize, Serialize};
 
@@ -589,7 +592,10 @@ impl ChunkPlugin {
 
     fn toggle_on_screen_mesh_visibility(
         camera_query: Query<&Transform, With<TextureCamera>>,
-        mut obj_query: Query<(&mut Visibility, &GlobalTransform), With<WorldObject>>,
+        mut obj_query: Query<
+            (&mut Visibility, &GlobalTransform),
+            (With<WorldObject>, Without<Projectile>),
+        >,
     ) {
         for camera_transform in camera_query.iter() {
             for (mut v, ft) in obj_query.iter_mut() {

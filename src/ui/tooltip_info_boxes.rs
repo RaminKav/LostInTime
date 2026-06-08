@@ -43,6 +43,7 @@ pub enum TooltipDefinition {
     PickupRange,
     Size,
     Luck,
+    Chaos,
 }
 
 impl TooltipDefinition {
@@ -56,7 +57,7 @@ impl TooltipDefinition {
             TooltipDefinition::FreezeChance => ["Frozen enemies are slowed", "by 15% per stack"],
             TooltipDefinition::CritChance => ["Crit Chance", "Chance to crit on hit."],
             TooltipDefinition::CritDamage => ["Crit Damage", "Bonus crit hit damage."],
-            TooltipDefinition::Attack => ["Damage", "Increases attack damage."],
+            TooltipDefinition::Attack => ["Damage & Attack scale", "all sources of damage."],
             TooltipDefinition::AttackSpeed => ["Attack Speed scales your", "weapon attack rate"],
             TooltipDefinition::Defence => ["Defence Reduces incoming", "damage."],
             TooltipDefinition::Speed => ["Speed", "Movement speed."],
@@ -72,6 +73,7 @@ impl TooltipDefinition {
                 ["Size makes attacks, skills", "and heirloom effects larger"]
             }
             TooltipDefinition::Luck => ["Luck increases the chance", "of rare heirlooms and gear"],
+            TooltipDefinition::Chaos => ["Chaos gives enemies more", "hp, attack, and score."],
         }
     }
 }

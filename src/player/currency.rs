@@ -130,6 +130,10 @@ pub fn handle_modify_currency(
                             if heal_amount > 0 {
                                 modify_health_event.send(ModifyHealthEvent(heal_amount));
                                 trigger_counts.increment(Heirloom::CoinHeal);
+                                trigger_counts.record_health_gain(
+                                    crate::player::skills::HealthGainSource::CoinHeal,
+                                    heal_amount,
+                                );
                             }
                         }
                     }
