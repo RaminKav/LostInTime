@@ -1,7 +1,7 @@
 use std::f32::consts::PI;
 
 use bevy::prelude::*;
-use bevy_aseprite::{anim::AsepriteAnimation, aseprite};
+use bevy_aseprite::{anim::AsepriteAnimation, aseprite, Aseprite};
 use bevy_rapier2d::prelude::{Collider, KinematicCharacterController};
 
 use crate::{
@@ -29,7 +29,8 @@ use super::{
     ActiveSkillUsedEvent, Heirloom, MovePlayerEvent, Player, PlayerSkills,
 };
 
-aseprite!(pub IceExplosion, "textures/effects/IceExplosion.aseprite");
+aseprite!(pub IceExplosion, "textures/effects/IceExplosion2.aseprite");
+aseprite!(pub SmallExplosion, "textures/effects/SmallExplosion.aseprite");
 aseprite!(pub Electricity, "textures/effects/Electricity.aseprite");
 aseprite!(pub IceFloor, "textures/effects/IceFloor.aseprite");
 /// Brief marker set on the player right after teleporting; removed once the
@@ -250,6 +251,36 @@ pub fn tick_just_teleported(
     }
 }
 
+fn spawn_aseprite_explosion_hitbox(
+    commands: &mut Commands,
+    pos: Vec3,
+    dmg: i32,
+    size_multiplier: f32,
+    handle: Handle<Aseprite>,
+    animation: AsepriteAnimation,
+    duration: f32,
+    base_radius: f32,
+    projectile: Projectile,
+    extra_components: Vec<DeferredComponent>,
+) {
+    let scaled_radius = base_radius * size_multiplier;
+
+    // Queue deferred spawn - actual entity will be created in PreUpdate
+    spawn_deferred_aseprite_collider(
+        commands,
+        Transform::from_translation(pos).with_scale(Vec3::splat(size_multiplier)),
+        duration,
+        dmg,
+        Collider::capsule(Vec2::ZERO, Vec2::ZERO, scaled_radius),
+        handle,
+        animation,
+        false,
+        projectile,
+        extra_components,
+        None,
+    );
+}
+
 pub fn spawn_ice_explosion_hitbox(
     commands: &mut Commands,
     graphics: &Graphics,
@@ -257,26 +288,38 @@ pub fn spawn_ice_explosion_hitbox(
     dmg: i32,
     size_multiplier: f32,
 ) {
-    // Use default animation to ensure it starts at frame 0
-    let anim = AsepriteAnimation::default();
-
-    // Scale the collider radius by the size multiplier
-    let base_radius = 26.0;
-    let scaled_radius = base_radius * size_multiplier;
-
-    // Queue deferred spawn - actual entity will be created in PreUpdate
-    spawn_deferred_aseprite_collider(
+    spawn_aseprite_explosion_hitbox(
         commands,
-        Transform::from_translation(pos).with_scale(Vec3::splat(size_multiplier)),
-        10.5,
+        pos,
         dmg,
-        Collider::capsule(Vec2::ZERO, Vec2::ZERO, scaled_radius),
+        size_multiplier,
         graphics.ice_explosion_ase.as_ref().unwrap().clone(),
-        anim,
-        false,
+        AsepriteAnimation::default(),
+        10.5,
+        26.0,
         Projectile::IceExplosionAOE,
         vec![DeferredComponent::IceExplosionDmg],
-        None, // No parent
     );
     // Sound is now handled by the caller to batch multiple explosions
+}
+
+pub fn spawn_small_explosion_hitbox(
+    commands: &mut Commands,
+    graphics: &Graphics,
+    pos: Vec3,
+    dmg: i32,
+    size_multiplier: f32,
+) {
+    spawn_aseprite_explosion_hitbox(
+        commands,
+        pos,
+        dmg,
+        size_multiplier,
+        graphics.small_explosion_ase.as_ref().unwrap().clone(),
+        AsepriteAnimation::from(SmallExplosion::tags::EXPLOSION),
+        1.0,
+        13.0,
+        Projectile::SmallExplosionAOE,
+        vec![],
+    );
 }

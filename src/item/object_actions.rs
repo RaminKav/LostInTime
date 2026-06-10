@@ -639,12 +639,7 @@ impl ObjectAction {
                 if !*DEBUG {
                     let current_era = game.era.current_era.clone();
                     if current_era == Era::Third {
-                        // In endless mode, entering the portal in era 3 kills the player (no next era)
-                        if item_action_param.infinite_mode.active {
-                            item_action_param
-                                .modify_health_event
-                                .send(ModifyHealthEvent(-9999999));
-                        }
+                        // No next era after era 3; portal does nothing for now.
                         return;
                     }
 

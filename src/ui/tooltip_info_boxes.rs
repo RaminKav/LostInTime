@@ -44,6 +44,8 @@ pub enum TooltipDefinition {
     Size,
     Luck,
     Chaos,
+    Weapons,
+    Skills,
 }
 
 impl TooltipDefinition {
@@ -74,6 +76,8 @@ impl TooltipDefinition {
             }
             TooltipDefinition::Luck => ["Luck increases the chance", "of rare heirlooms and gear"],
             TooltipDefinition::Chaos => ["Chaos gives enemies more", "hp, attack, and score."],
+            TooltipDefinition::Weapons => ["Weapons are equipped and", "attack on their own."],
+            TooltipDefinition::Skills => ["Skills are powerful", "abilities on a cooldown."],
         }
     }
 }

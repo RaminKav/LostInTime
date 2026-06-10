@@ -63,6 +63,7 @@ pub enum Projectile {
     ThrowingStar,
     ThrowingStarLarge,
     IceExplosionAOE,
+    SmallExplosionAOE,
     SlimeGooProjectile,
     Arc,
     FireAttack,
@@ -95,10 +96,12 @@ pub enum Projectile {
     DaggerSlash,
     Bomb,
     BombExplosion,
+    CherryBombExplosion,
     Lightning,
     FuryKunai,
     SpearGravity,
     SpinAttack,
+    SprintLunge,
     IceFloor,
     CrowFeather,
     CactusSlam,
@@ -168,8 +171,18 @@ impl Projectile {
             Projectile::PossessedBlade => true,
             Projectile::ArrowVolleyShot => true,
             Projectile::Recall => true,
+            Projectile::ThrowingStarLarge => true,
+            Projectile::TeleportShock => true,
+            Projectile::SprintLunge => true,
             _ => false,
         }
+    }
+
+    pub fn is_skill_explosion_excluded(&self) -> bool {
+        matches!(
+            self,
+            Projectile::SmallExplosionAOE | Projectile::IceExplosionAOE
+        )
     }
     pub fn animation_category(&self) -> AnimVisualCategory {
         match self {
@@ -179,6 +192,8 @@ impl Projectile {
             | Projectile::Arc
             | Projectile::Echo
             | Projectile::IceExplosionAOE
+            | Projectile::SmallExplosionAOE
+            | Projectile::CherryBombExplosion
             | Projectile::IceFloor
             | Projectile::EnergyBall
             | Projectile::EnergyBallMuzzle => AnimVisualCategory::Heirloom,
@@ -199,6 +214,8 @@ impl Projectile {
             | Projectile::ArrowVolleyShot
             | Projectile::TeleportShock
             | Projectile::Recall
+            | Projectile::ThrowingStarLarge
+            | Projectile::SprintLunge
             | Projectile::PoisonCloud
             | Projectile::HealHearts
             | Projectile::AttackSpeed
@@ -209,6 +226,11 @@ impl Projectile {
 }
 
 pub const ARROW_MAX_WORLD_OBJECT_PIERCES: u8 = 3;
+
+/// Player active-skill projectile (not a weapon attack). Used to distinguish shared
+/// projectile types like [`Projectile::Bullet`] / [`Projectile::ThrowingStar`].
+#[derive(Component, Clone, Copy, Debug, Default)]
+pub struct FromActiveSkill;
 
 #[derive(Component, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum AnimVisualCategory {
@@ -674,6 +696,8 @@ fn handle_spawn_projectiles_after_delay(
                 if let Some(e) = proj.from_entity {
                     if pet_check.get(e).is_ok() {
                         commands.entity(p).insert(PetProjectileMarker);
+                    } else if !proj.from_enemy {
+                        commands.entity(p).insert(FromActiveSkill);
                     }
                 }
 

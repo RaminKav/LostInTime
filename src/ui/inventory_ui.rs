@@ -17,8 +17,10 @@ use crate::colors::{
 use crate::cursor::CursorPos;
 use crate::custom_commands::CommandsExt;
 use crate::night::EraTimer;
+use crate::item::active_skill_shrine::assign_shrine_skill_to_slot;
 use crate::player::skills::{
-    Heirloom, HeirloomChoiceQueue, HeirloomChoiceState, HeirloomRarity, PlayerSkills,
+    ActiveSkill, ActiveSkillChoiceState, Heirloom, HeirloomChoiceQueue, HeirloomChoiceState,
+    HeirloomRarity, PlayerSkills,
 };
 use crate::player::unlocks::RunUnlockState;
 use crate::player::ModifyCurencyEvent;
@@ -27,6 +29,10 @@ use crate::ui::heirloom_browser_grid::{
     despawn_dev_heirloom_picker_grid_layers, grid_backdrop_size, heirloom_choice_from_full_pool,
     sorted_full_pool_grid_entries, spawn_heirloom_grid_overlay, DevHeirloomPickerGridLayer,
     HeirloomGridContext,
+};
+use crate::ui::skill_browser_grid::{
+    despawn_dev_skill_picker_grid_layers, sorted_dev_skill_grid_entries,
+    spawn_skill_grid_overlay, DevSkillPickerGridLayer, DevSkillPickerIcon,
 };
 use crate::ui::time_crystal_progress_ui::CrystalUnlockIcon;
 use crate::ui::{
@@ -141,6 +147,17 @@ pub struct GrantHeirloomDevEvent(pub HeirloomChoiceState);
 #[derive(Resource, Default)]
 pub struct DevHeirloomGridOpen(pub bool);
 
+/// Event to grant an active skill from dev mode (handled in a separate system to avoid query conflicts).
+pub struct GrantSkillDevEvent {
+    pub skill: ActiveSkill,
+    /// Player skill slot index: 1 = 2nd slot, 2 = 3rd slot.
+    pub slot: usize,
+}
+
+/// When true, the dev skill picker grid is shown beside the dev buttons.
+#[derive(Resource, Default)]
+pub struct DevSkillGridOpen(pub bool);
+
 #[derive(Component, Default, Clone)]
 pub struct InventoryUI;
 
@@ -236,6 +253,10 @@ pub enum DevButtonAction {
 /// Dev button that toggles the full-pool heirloom picker grid.
 #[derive(Component)]
 pub struct DevHeirloomPickerToggleButton;
+
+/// Dev button that toggles the full-pool active skill picker grid.
+#[derive(Component)]
+pub struct DevSkillPickerToggleButton;
 #[derive(Component, FromReflect, Reflect, Clone, Debug)]
 pub struct InventorySlotState {
     pub slot_index: usize,
@@ -315,12 +336,22 @@ pub fn cleanup_dev_heirloom_grid_on_inv_close(
     despawn_dev_heirloom_picker_grid_layers(&mut commands, &grid_layers);
 }
 
+pub fn cleanup_dev_skill_grid_on_inv_close(
+    mut grid_open: ResMut<DevSkillGridOpen>,
+    grid_layers: Query<Entity, With<DevSkillPickerGridLayer>>,
+    mut commands: Commands,
+) {
+    grid_open.0 = false;
+    despawn_dev_skill_picker_grid_layers(&mut commands, &grid_layers);
+}
+
 pub fn setup_inv_ui(
     mut commands: Commands,
     graphics: Res<Graphics>,
     mut inv_state: ResMut<InventoryState>,
     cur_inv_state: Res<State<UIState>>,
     mut dev_grid_open: ResMut<DevHeirloomGridOpen>,
+    mut dev_skill_grid_open: ResMut<DevSkillGridOpen>,
     mut stats_event: EventWriter<ShowInvPlayerStatsEvent>,
     resolution: Res<ScreenResolution>,
     asset_server: Res<AssetServer>,
@@ -333,6 +364,7 @@ pub fn setup_inv_ui(
     damage_tracker_menu: Res<DamageTrackerMenuOpen>,
 ) {
     dev_grid_open.0 = false;
+    dev_skill_grid_open.0 = false;
     let (size, texture, pos_offset) = match cur_inv_state.0 {
         UIState::Inventory | UIState::InventoryCrafting => (
             INVENTORY_UI_SIZE,
@@ -785,6 +817,7 @@ pub fn setup_inv_ui(
             (DevButtonAction::AddLoadedDice, "Loaded Dice"),
         ];
         let heirloom_picker_y = start_y - labels.len() as f32 * DEV_BUTTON_SPACING;
+        let skill_picker_y = heirloom_picker_y - DEV_BUTTON_SPACING;
         for (i, (action, label)) in labels.iter().enumerate() {
             let y = start_y - i as f32 * DEV_BUTTON_SPACING;
             let btn = commands
@@ -865,6 +898,45 @@ pub fn setup_inv_ui(
             ))
             .set_parent(picker_btn);
         commands.entity(inv).add_child(picker_btn);
+
+        let skill_picker_btn = commands
+            .spawn(SpriteBundle {
+                texture: graphics.get_ui_element_texture(UIElement::XLKey).clone(),
+                sprite: Sprite {
+                    custom_size: Some(Vec2::new(DEV_BUTTON_WIDTH, DEV_BUTTON_HEIGHT)),
+                    ..Default::default()
+                },
+                transform: Transform::from_xyz(dev_x, skill_picker_y, 10.),
+                ..Default::default()
+            })
+            .insert(RenderLayers::from_layers(&[3]))
+            .insert(UIState::Inventory)
+            .insert(Interactable::default())
+            .insert(DevSkillPickerToggleButton)
+            .insert(Name::new("Dev Skill Picker Toggle"))
+            .id();
+        commands
+            .spawn((
+                Text2dBundle {
+                    text: Text::from_section(
+                        "+skills",
+                        TextStyle {
+                            font: asset_server.load("fonts/4x5.ttf"),
+                            font_size: 5.0,
+                            color: DARK_WOOD_BROWN,
+                        },
+                    )
+                    .with_alignment(TextAlignment::Center),
+                    text_anchor: Anchor::Center,
+                    transform: Transform::from_xyz(0., 0.5, 1.),
+                    ..Default::default()
+                },
+                RenderLayers::from_layers(&[3]),
+                UIState::Inventory,
+                Name::new("Dev Skill Picker Toggle Label"),
+            ))
+            .set_parent(skill_picker_btn);
+        commands.entity(inv).add_child(skill_picker_btn);
     }
 
     stats_event.send(ShowInvPlayerStatsEvent {
@@ -2297,7 +2369,9 @@ pub fn handle_dev_heirloom_picker_toggle(
     asset_server: Res<AssetServer>,
     graphics: Res<Graphics>,
     mut grid_open: ResMut<DevHeirloomGridOpen>,
+    mut skill_grid_open: ResMut<DevSkillGridOpen>,
     grid_layers: Query<Entity, With<DevHeirloomPickerGridLayer>>,
+    skill_grid_layers: Query<Entity, With<DevSkillPickerGridLayer>>,
     inv_ui: Query<Entity, With<InventoryUI>>,
 ) {
     let hit_test = super::ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
@@ -2313,6 +2387,8 @@ pub fn handle_dev_heirloom_picker_toggle(
             if left_mouse_pressed {
                 let show = !grid_open.0;
                 despawn_dev_heirloom_picker_grid_layers(&mut commands, &grid_layers);
+                despawn_dev_skill_picker_grid_layers(&mut commands, &skill_grid_layers);
+                skill_grid_open.0 = false;
                 if show {
                     if let Ok(inv_entity) = inv_ui.get_single() {
                         const DEV_BUTTON_WIDTH: f32 = 38.;
@@ -2381,6 +2457,141 @@ pub fn handle_dev_heirloom_picker_clicks(
             if left_mouse_pressed {
                 let choice = heirloom_choice_from_full_pool(icon.heirloom.clone(), icon.rarity);
                 grant_heirloom_dev.send(GrantHeirloomDevEvent(choice));
+                commands.spawn(crate::audio::SoundSpawner::new(
+                    crate::audio::AudioSoundEffect::ButtonClick,
+                    0.2,
+                ));
+            }
+        } else if matches!(interactable.current(), Interaction::Hovering) {
+            interactable.change(Interaction::None);
+        }
+    }
+}
+
+/// Applies dev-mode active skill grants (separate system to avoid query conflicts).
+pub fn apply_grant_skill_dev(
+    mut grant_events: EventReader<GrantSkillDevEvent>,
+    mut player_query: Query<(Entity, &mut PlayerSkills), With<Player>>,
+    mut commands: Commands,
+    mut att_event: EventWriter<AttributeChangeEvent>,
+) {
+    for GrantSkillDevEvent { skill, slot } in grant_events.iter() {
+        if *slot != 1 && *slot != 2 {
+            continue;
+        }
+        if let Ok((player_entity, mut skills)) = player_query.get_single_mut() {
+            let choice = ActiveSkillChoiceState::new(*skill, HeirloomRarity::Common);
+            assign_shrine_skill_to_slot(&mut skills, *slot, choice);
+            skill.add_skill_components(player_entity, &mut commands);
+            att_event.send(AttributeChangeEvent);
+        }
+    }
+}
+
+/// Toggles the dev skill picker grid to the right of the dev buttons.
+pub fn handle_dev_skill_picker_toggle(
+    cursor_pos: Res<CursorPos>,
+    mouse_input: Res<Input<MouseButton>>,
+    ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
+    mut toggle_buttons: Query<(Entity, &mut Interactable), With<DevSkillPickerToggleButton>>,
+    mut commands: Commands,
+    graphics: Res<Graphics>,
+    mut grid_open: ResMut<DevSkillGridOpen>,
+    mut heirloom_grid_open: ResMut<DevHeirloomGridOpen>,
+    grid_layers: Query<Entity, With<DevSkillPickerGridLayer>>,
+    heirloom_grid_layers: Query<Entity, With<DevHeirloomPickerGridLayer>>,
+    inv_ui: Query<Entity, With<InventoryUI>>,
+) {
+    let hit_test = super::ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
+
+    for (e, mut interactable) in toggle_buttons.iter_mut() {
+        let hit = match &hit_test {
+            Some((hit_ent, _, _)) => *hit_ent == e,
+            None => false,
+        };
+        if hit {
+            interactable.change(Interaction::Hovering);
+            if left_mouse_pressed {
+                let show = !grid_open.0;
+                despawn_dev_skill_picker_grid_layers(&mut commands, &grid_layers);
+                despawn_dev_heirloom_picker_grid_layers(&mut commands, &heirloom_grid_layers);
+                heirloom_grid_open.0 = false;
+                if show {
+                    if let Ok(inv_entity) = inv_ui.get_single() {
+                        const DEV_BUTTON_WIDTH: f32 = 38.;
+                        let dev_x = -INVENTORY_UI_SIZE.x / 2. - DEV_BUTTON_WIDTH / 2.;
+                        let entries = sorted_dev_skill_grid_entries();
+                        let entry_count = entries.len();
+                        let (backdrop_w, _, _) = grid_backdrop_size(entry_count, 400., 320.);
+                        let grid_center_x = dev_x + DEV_BUTTON_WIDTH * 0.5 + 8. + backdrop_w * 0.5;
+                        spawn_skill_grid_overlay(
+                            &mut commands,
+                            &graphics,
+                            Vec2::new(grid_center_x, 0.),
+                            400.,
+                            320.,
+                            entries,
+                            Some(inv_entity),
+                        );
+                    }
+                }
+                grid_open.0 = show;
+                commands.spawn(crate::audio::SoundSpawner::new(
+                    crate::audio::AudioSoundEffect::ButtonClick,
+                    0.2,
+                ));
+            }
+        } else if matches!(interactable.current(), Interaction::Hovering) {
+            interactable.change(Interaction::None);
+        }
+    }
+}
+
+/// Click an icon in the dev skill picker to grant that skill to slot 2 (left) or 3 (right).
+pub fn handle_dev_skill_picker_clicks(
+    grid_open: Res<DevSkillGridOpen>,
+    cursor_pos: Res<CursorPos>,
+    mouse_input: Res<Input<MouseButton>>,
+    ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
+    mut icons: Query<
+        (Entity, &mut Interactable, &DevSkillPickerIcon),
+        With<DevSkillPickerGridLayer>,
+    >,
+    mut grant_skill_dev: EventWriter<GrantSkillDevEvent>,
+    mut commands: Commands,
+) {
+    if !grid_open.0 {
+        return;
+    }
+
+    let hit_test = super::ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
+    let right_mouse_pressed = mouse_input.just_pressed(MouseButton::Right);
+
+    for (entity, mut interactable, icon) in icons.iter_mut() {
+        let hit = match &hit_test {
+            Some((hit_ent, _, _)) => *hit_ent == entity,
+            None => false,
+        };
+        if hit {
+            if !matches!(interactable.current(), Interaction::Hovering) {
+                interactable.change(Interaction::Hovering);
+            }
+            if left_mouse_pressed {
+                grant_skill_dev.send(GrantSkillDevEvent {
+                    skill: icon.active_skill,
+                    slot: 1,
+                });
+                commands.spawn(crate::audio::SoundSpawner::new(
+                    crate::audio::AudioSoundEffect::ButtonClick,
+                    0.2,
+                ));
+            } else if right_mouse_pressed {
+                grant_skill_dev.send(GrantSkillDevEvent {
+                    skill: icon.active_skill,
+                    slot: 2,
+                });
                 commands.spawn(crate::audio::SoundSpawner::new(
                     crate::audio::AudioSoundEffect::ButtonClick,
                     0.2,

@@ -303,6 +303,7 @@ pub fn handle_on_hit_upgrades(
             continue;
         };
         if hit.hit_with_projectile.clone().unwrap_or_default() != Projectile::IceExplosionAOE
+            && hit.hit_with_projectile.clone().unwrap_or_default() != Projectile::SmallExplosionAOE
             && hit.hit_with_projectile.clone().unwrap_or_default() != Projectile::IceFloor
             && skills.has(Heirloom::IceStaffAoE)
             && rng.gen_bool((skills.get_count(Heirloom::IceStaffAoE) as f64 * 0.07).clamp(0., 1.))

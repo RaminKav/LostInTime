@@ -10,14 +10,15 @@ use bevy_rapier2d::{
 };
 use combat_heirlooms::{
     break_crates_with_roll, handle_ant_farm_state, handle_boss_hit_mana_orb_drops,
-    handle_crate_break_damage, handle_death_defiance_freeze, handle_dodge_crit_activation,
-    handle_dodge_crit_next_hit_reset, handle_energy_ball_barrage, handle_mana_charge_damage,
-    handle_mana_charge_damage_reset, handle_mana_orb_attack, handle_mana_orb_drops,
-    handle_mana_regen_lightning, handle_mana_regen_poison, handle_max_hp_hunt,
-    handle_reaper_soul_spawns, handle_skill_mana_regen, handle_skill_power_hunt,
-    handle_summon_ring_state, handle_trigger_summons_on_heal, tick_dodge_crit_buff,
-    tick_stand_still_state, update_ant_farm_ants, update_homing_energy_balls, update_reaper_souls,
-    update_stone_tooth, update_summon_ring, TriggerSummonsEvent,
+    handle_cherry_bomb_on_attack, handle_crate_break_damage, handle_death_defiance_freeze,
+    handle_dodge_crit_activation, handle_dodge_crit_next_hit_reset, handle_energy_ball_barrage,
+    handle_mana_charge_damage, handle_mana_charge_damage_reset, handle_mana_orb_attack,
+    handle_mana_orb_drops, handle_mana_regen_lightning, handle_mana_regen_poison,
+    handle_max_hp_hunt, handle_reaper_soul_spawns, handle_skill_mana_regen,
+    handle_skill_power_hunt, handle_summon_ring_state, handle_trigger_summons_on_heal,
+    tick_dodge_crit_buff, tick_stand_still_state, update_ant_farm_ants, update_cherry_bomb_arcs,
+    update_homing_energy_balls, update_reaper_souls, update_stone_tooth, update_summon_ring,
+    TriggerSummonsEvent,
 };
 use melee_skills::{
     handle_delayed_heirloom_casts, handle_echo_after_heal, handle_parry, handle_parry_success,
@@ -131,7 +132,7 @@ impl Default for PlayerState {
             position: Vec3::ZERO,
             reach_distance: 8.5,
             player_dash_cooldown: Timer::from_seconds(0.75, TimerMode::Once),
-            player_dash_duration: Timer::from_seconds(0.28, TimerMode::Once),
+            player_dash_duration: Timer::from_seconds(0.31, TimerMode::Once),
             next_hit_crit: false,
             ice_slide_direction: None,
             ice_momentum_remaining: 0.0,
@@ -249,7 +250,13 @@ impl Plugin for PlayerPlugin {
                     handle_energy_ball_barrage
                         .run_if(is_not_paused)
                         .after(crate::handle_hits),
+                    handle_cherry_bomb_on_attack.run_if(is_not_paused),
+                    update_cherry_bomb_arcs.run_if(is_not_paused),
                     update_homing_energy_balls.run_if(is_not_paused),
+                    skill_heirlooms::handle_skill_explosion_hits
+                        .run_if(is_not_paused)
+                        .after(handle_hits),
+                    skill_heirlooms::tick_skill_explosion_buff.run_if(is_not_paused),
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
@@ -262,6 +269,10 @@ impl Plugin for PlayerPlugin {
                         .run_if(is_not_paused)
                         .after(crate::inputs::mouse_click_system)
                         .after(handle_sprint_timer),
+                    skill_heirlooms::handle_skill_explosion_cast
+                        .run_if(is_not_paused)
+                        .after(crate::inputs::dispatch_active_skill_events)
+                        .before(skill_heirlooms::handle_active_skill_event),
                     skill_heirlooms::handle_active_skill_event.run_if(is_not_paused),
                     skill_heirlooms::add_rapidfire_speed_to_bonus.run_if(is_not_paused),
                     skill_heirlooms::tick_stealth_and_buffs.run_if(is_not_paused),

@@ -90,6 +90,8 @@ pub struct HitEvent {
     pub ignore_tool: bool,
     /// If Some, this damage came from a specific heirloom effect and should not trigger other heirloom effects
     pub from_heirloom_effect: Option<Heirloom>,
+    /// True when damage came from a player active-skill projectile (see [`crate::item::projectile::FromActiveSkill`]).
+    pub from_active_skill: bool,
 }
 
 /// Brief marker set on a mob at the moment of death so follow-up systems can

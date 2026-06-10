@@ -93,6 +93,8 @@ mod time_crystals_browser_ui;
 pub use time_crystals_browser_ui::*;
 mod heirloom_browser_grid;
 pub use heirloom_browser_grid::*;
+mod skill_browser_grid;
+pub use skill_browser_grid::*;
 mod beastiary_browser_ui;
 pub use beastiary_browser_ui::*;
 mod achievements_ui;
@@ -556,6 +558,7 @@ impl Plugin for UIPlugin {
             .init_resource::<MerchantShopUiDirty>()
             .init_resource::<TimeCrystalsHeirloomGridOpen>()
             .init_resource::<DevHeirloomGridOpen>()
+            .init_resource::<DevSkillGridOpen>()
             .init_resource::<SelectedBeastiaryMob>()
             .add_event::<TooltipTeardownEvent>()
             .add_event::<ShowInvPlayerStatsEvent>()
@@ -565,6 +568,7 @@ impl Plugin for UIPlugin {
             .add_event::<DropInWorldEvent>()
             .add_event::<MenuButtonClickEvent>()
             .add_event::<GrantHeirloomDevEvent>()
+            .add_event::<GrantSkillDevEvent>()
             .add_event::<HeirloomTooltipRequest>()
             .add_plugin(Material2dPlugin::<ScreenEffectMaterial>::default())
             .add_plugin(Material2dPlugin::<ui_helpers::RadialOverlayMaterial>::default())
@@ -673,6 +677,8 @@ impl Plugin for UIPlugin {
                     .before(CustomFlush)
                     .run_if(state_changed::<UIState>().and_then(in_state(UIState::Inventory))),
                 cleanup_dev_heirloom_grid_on_inv_close
+                    .run_if(state_changed::<UIState>().and_then(not(in_state(UIState::Inventory)))),
+                cleanup_dev_skill_grid_on_inv_close
                     .run_if(state_changed::<UIState>().and_then(not(in_state(UIState::Inventory)))),
                 reset_blueprints_pagination_on_open
                     .before(CustomFlush)
@@ -1276,9 +1282,12 @@ impl Plugin for UIPlugin {
                 (
                     handle_dev_heirloom_picker_toggle.run_if(in_state(UIState::Inventory)),
                     handle_dev_heirloom_picker_clicks.run_if(in_state(UIState::Inventory)),
+                    handle_dev_skill_picker_toggle.run_if(in_state(UIState::Inventory)),
+                    handle_dev_skill_picker_clicks.run_if(in_state(UIState::Inventory)),
                     handle_time_crystal_unlock_hover_tooltip
                         .run_if(in_state(UIState::Inventory)),
                     apply_grant_heirloom_dev.run_if(in_state(UIState::Inventory)),
+                    apply_grant_skill_dev.run_if(in_state(UIState::Inventory)),
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )

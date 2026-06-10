@@ -1792,7 +1792,7 @@
             size: (16., 16.),
             anchor: None,
         ),
-        OnHitEcho: WorldObjectData(
+        SkillEcho: WorldObjectData(
             texture_pos: (4., 20.),
             size: (16., 16.),
             anchor: None,
@@ -1947,7 +1947,7 @@
             size: (16., 16.),
             anchor: None,
         ),
-        SkillEcho: WorldObjectData(
+        OnHitEcho: WorldObjectData(
             texture_pos: (9., 21.),
             size: (16., 16.),
             anchor: None,
@@ -2125,6 +2125,16 @@
         ),
         DamageDealtMp: WorldObjectData(
             texture_pos: (11., 23.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        SkillExplosion: WorldObjectData(
+            texture_pos: (14., 23.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        CherryBomb: WorldObjectData(
+            texture_pos: (13., 23.),
             size: (16., 16.),
             anchor: None,
         ),

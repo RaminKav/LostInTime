@@ -1133,6 +1133,7 @@ pub fn mouse_click_system(
                 from_heirloom_effect: None,
                 was_crit,
                 was_overcrit,
+                from_active_skill: false,
             });
         }
     }

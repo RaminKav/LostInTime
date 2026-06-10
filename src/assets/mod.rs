@@ -28,7 +28,7 @@ use crate::item::{
     FurnaceRecipeList, RecipeList, RecipeListProto, Recipes, WorldObject, WorldObjectResource,
 };
 use crate::pets::state::Pet;
-use crate::player::mage_skills::IceExplosion;
+use crate::player::mage_skills::{IceExplosion, SmallExplosion};
 use crate::player::skills::SkillClass;
 use crate::player::skills::{ActiveSkill, Heirloom};
 use crate::player::{
@@ -163,6 +163,9 @@ impl Plugin for GameAssetsPlugin {
                 ui_portal_ase: None,
                 class_pet_data: None,
                 ice_explosion_ase: None,
+                small_explosion_ase: None,
+                cherry_bomb_ase: None,
+                cherry_bomb_explosion_ase: None,
                 stone_pillar_ase: None,
                 pink_flower_ase: None,
                 foliage_textures: None,
@@ -238,6 +241,9 @@ pub struct Graphics {
     pub ui_portal_ase: Option<Handle<Aseprite>>,
     pub class_pet_data: Option<ClassPetData>,
     pub ice_explosion_ase: Option<Handle<Aseprite>>,
+    pub small_explosion_ase: Option<Handle<Aseprite>>,
+    pub cherry_bomb_ase: Option<Handle<Aseprite>>,
+    pub cherry_bomb_explosion_ase: Option<Handle<Aseprite>>,
     pub stone_pillar_ase: Option<Handle<Aseprite>>,
     pub pink_flower_ase: Option<Handle<Aseprite>>,
     /// Foliage (tree) texture handles: normal and fade, keyed by WorldObject. Populated lazily
@@ -608,6 +614,13 @@ impl GameAssetsPlugin {
             active_skill_shrine: Some(asset_server.load(ActiveSkillSprite::PATH)),
             heirloom_shrine_anim: Some(asset_server.load(HeirloomMerchantSprite::PATH)),
             ice_explosion_ase: Some(asset_server.load(IceExplosion::PATH)),
+            small_explosion_ase: Some(asset_server.load(SmallExplosion::PATH)),
+            cherry_bomb_ase: Some(
+                asset_server.load("textures/effects/CherryBomb.aseprite"),
+            ),
+            cherry_bomb_explosion_ase: Some(
+                asset_server.load("textures/effects/CherryBombExplosion.ase"),
+            ),
             portal_ase: Some(asset_server.load(Portal::PATH)),
             ui_portal_ase: Some(asset_server.load(UIPortal::PATH)),
             stone_pillar_ase: Some(asset_server.load("textures/stonegolem/StonePillar.ase")),

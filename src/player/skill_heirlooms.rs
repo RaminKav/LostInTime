@@ -8,10 +8,11 @@ use rand::{seq::SliceRandom, Rng};
 use crate::{
     ai::FollowState,
     animations::{player_sprite::PlayerAnimation, AttackEvent},
+    assets::Graphics,
     attributes::{
         attribute_helpers::skill_power_multiplier, ActiveConsumableBuffs, Attack, AttackSpeed,
         AttributeChangeEvent, BonusAttackSpeed, ConsumableBuffEffect, ConsumableBuffEntry,
-        CurrentHealth, CurrentMana, MaxHealth, SkillPower, Speed,
+        CurrentHealth, CurrentMana, MaxHealth, ProjectileSize, SkillPower, Speed,
     },
     audio::{AudioSoundEffect, SoundSpawner},
     blessings::{Blessing, OwnedBlessings},
@@ -27,6 +28,7 @@ use crate::{
         WorldObject,
     },
     player::{
+        mage_skills::spawn_small_explosion_hitbox,
         melee_skills::{
             spawn_delayed_heirloom_cast, spawn_echo_hitbox, DelayedCastType,
             HeirloomTriggerCooldowns, SpearState, HEIRLOOM_EXTRA_CAST_DELAY,
@@ -2426,6 +2428,116 @@ pub fn handle_bomb_explosion(
                 commands.entity(bomb_entity).despawn_recursive();
             }
         }
+    }
+}
+
+const MAX_SKILL_EXPLOSIONS_PER_FRAME: u8 = 8;
+const SKILL_EXPLOSION_BUFF_SECS: f32 = 4.0;
+
+/// Active after paying mana on skill cast; skill hits spawn small explosions while this timer runs.
+#[derive(Component)]
+pub struct SkillExplosionBuff {
+    pub timer: Timer,
+    pub damage_fraction: f32,
+}
+
+/// Pay mana when a skill is cast to enable explosion-on-hit for that skill window.
+pub fn handle_skill_explosion_cast(
+    mut events: EventReader<ActiveSkillUsedEvent>,
+    mut player: Query<(Entity, &PlayerSkills, &mut CurrentMana), With<Player>>,
+    mut commands: Commands,
+    mut trigger_counts: ResMut<HeirloomTriggerCounts>,
+) {
+    let Ok((player_e, skills, mut current_mana)) = player.get_single_mut() else {
+        return;
+    };
+    let stacks = skills.get_count(Heirloom::SkillExplosion);
+    if stacks <= 0 {
+        return;
+    }
+
+    let mana_cost = Heirloom::skill_explosion_mana_cost(stacks);
+    let damage_fraction = Heirloom::skill_explosion_damage_fraction(stacks);
+
+    for _ in events.iter() {
+        if current_mana.0 < mana_cost {
+            commands.entity(player_e).remove::<SkillExplosionBuff>();
+            continue;
+        }
+        current_mana.0 -= mana_cost;
+        trigger_counts.record_mana(Heirloom::SkillExplosion, mana_cost);
+        trigger_counts.increment(Heirloom::SkillExplosion);
+        commands.entity(player_e).insert(SkillExplosionBuff {
+            timer: Timer::from_seconds(SKILL_EXPLOSION_BUFF_SECS, TimerMode::Once),
+            damage_fraction,
+        });
+    }
+}
+
+pub fn tick_skill_explosion_buff(
+    time: Res<Time>,
+    mut commands: Commands,
+    mut query: Query<(Entity, &mut SkillExplosionBuff), With<Player>>,
+) {
+    for (entity, mut buff) in query.iter_mut() {
+        buff.timer.tick(time.delta());
+        if buff.timer.finished() {
+            commands.entity(entity).remove::<SkillExplosionBuff>();
+        }
+    }
+}
+
+/// Skill hits spawn a small explosion at the target while [`SkillExplosionBuff`] is active.
+pub fn handle_skill_explosion_hits(
+    mut hits: EventReader<HitEvent>,
+    player: Query<(&PlayerSkills, &ProjectileSize, Option<&SkillExplosionBuff>), With<Player>>,
+    mobs: Query<&GlobalTransform, With<Mob>>,
+    mut commands: Commands,
+    graphics: Res<Graphics>,
+    mut throttle: Local<u8>,
+) {
+    *throttle = 0;
+
+    let Ok((skills, projectile_size, explosion_buff)) = player.get_single() else {
+        return;
+    };
+    if skills.get_count(Heirloom::SkillExplosion) <= 0 {
+        return;
+    }
+    let Some(buff) = explosion_buff else {
+        return;
+    };
+
+    for hit in hits.iter() {
+        if hit.from_heirloom_effect.is_some() || hit.hit_by_mob.is_some() {
+            continue;
+        }
+        let Some(proj) = &hit.hit_with_projectile else {
+            continue;
+        };
+        if proj.is_skill_explosion_excluded()
+            || (!hit.from_active_skill && !proj.is_skill_projectile())
+        {
+            continue;
+        }
+        if *throttle >= MAX_SKILL_EXPLOSIONS_PER_FRAME {
+            continue;
+        }
+        let Ok(hit_txfm) = mobs.get(hit.hit_entity) else {
+            continue;
+        };
+
+        *throttle += 1;
+
+        let explosion_dmg =
+            (hit.damage as f32 * buff.damage_fraction).round().max(1.) as i32;
+        spawn_small_explosion_hitbox(
+            &mut commands,
+            &graphics,
+            hit_txfm.translation(),
+            explosion_dmg,
+            projectile_size.get_multiplier(),
+        );
     }
 }
 

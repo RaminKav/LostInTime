@@ -362,6 +362,7 @@ pub fn handle_burning_ticks(
                     hit_by_mob: None,
                     ignore_tool: false,
                     from_heirloom_effect: Some(Heirloom::PoisonStacks),
+                    from_active_skill: false,
                 });
                 burning.tick_timer.reset();
             }

@@ -208,7 +208,7 @@ pub fn spawn_heirloom_tooltip_card(
                 ),
                 text_anchor: Anchor::Center,
                 transform: Transform {
-                    translation: Vec3::new(0., y, 1.),
+                    translation: Vec3::new(2., y, 1.),
                     scale: Vec3::new(1., 1., 1.),
                     ..Default::default()
                 },

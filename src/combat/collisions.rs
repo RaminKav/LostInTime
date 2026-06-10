@@ -22,8 +22,8 @@ use crate::{
         item_actions::ItemActionParam,
         object_actions::TouchTriggerObjectAction,
         projectile::{
-            EnemyProjectile, PetProjectileMarker, Projectile, ProjectileState, RangedAttackEvent,
-            ARROW_MAX_WORLD_OBJECT_PIERCES,
+            EnemyProjectile, FromActiveSkill, PetProjectileMarker, Projectile, ProjectileState,
+            RangedAttackEvent, ARROW_MAX_WORLD_OBJECT_PIERCES,
         },
         Equipment, ItemDrop, MainHand, WorldObject,
     },
@@ -137,6 +137,7 @@ fn check_contact_damage_collisions(
             was_overcrit: false,
             ignore_tool: false,
             from_heirloom_effect: None,
+            from_active_skill: false,
         });
         break;
     }
@@ -211,6 +212,7 @@ fn check_melee_hit_collisions(
                 hit_by_mob: None,
                 ignore_tool: false,
                 from_heirloom_effect: None,
+                from_active_skill: false,
             });
 
             commands.spawn(SoundSpawner::new(AudioSoundEffect::DefaultEnemyHit, 0.2));
@@ -251,6 +253,7 @@ fn check_projectile_hit_mob_collisions(
     mut game: GameParam,
     mut status_event: EventWriter<StatusEffectEvent>,
     pet_check: Query<Entity, With<PetProjectileMarker>>,
+    from_active_skill_q: Query<(), With<FromActiveSkill>>,
     player_skills: Query<&PlayerSkills, With<Player>>,
     mut lifesteal_events: EventWriter<LifestealEvent>,
 ) {
@@ -363,8 +366,10 @@ fn check_projectile_hit_mob_collisions(
             // Check if this projectile is from a heirloom on-kill effect
             let heirloom_source = match proj {
                 Projectile::IceExplosionAOE => Some(Heirloom::FrozenAoE),
+                Projectile::SmallExplosionAOE => Some(Heirloom::SkillExplosion),
                 Projectile::Echo => Some(Heirloom::OnHitEcho),
                 Projectile::EnergyBall => Some(Heirloom::EnergyBallBarrage),
+                Projectile::CherryBombExplosion => Some(Heirloom::CherryBomb),
                 _ => None,
             };
 
@@ -396,6 +401,7 @@ fn check_projectile_hit_mob_collisions(
                 was_crit,
                 was_overcrit,
                 from_heirloom_effect: heirloom_source,
+                from_active_skill: from_active_skill_q.get(proj_entity).is_ok(),
             });
 
             if matches!(*proj, Projectile::Arrow | Projectile::ArrowVolleyShot)
@@ -468,6 +474,7 @@ fn check_multihit_projectile_ongoing_collisions(
     game: GameParam,
     mut status_event: EventWriter<StatusEffectEvent>,
     pet_check: Query<Entity, With<PetProjectileMarker>>,
+    from_active_skill_q: Query<(), With<FromActiveSkill>>,
 ) {
     // Only process multi-hit projectiles (FireRing, LaserBeam)
     for (proj_entity, mut state, proj, att, ice_aoe, spear_att) in projectiles.iter_mut() {
@@ -571,6 +578,8 @@ fn check_multihit_projectile_ongoing_collisions(
 
                     let heirloom_source = match proj {
                         Projectile::IceExplosionAOE => Some(Heirloom::FrozenAoE),
+                        Projectile::SmallExplosionAOE => Some(Heirloom::SkillExplosion),
+                        Projectile::CherryBombExplosion => Some(Heirloom::CherryBomb),
                         _ => None,
                     };
 
@@ -586,6 +595,7 @@ fn check_multihit_projectile_ongoing_collisions(
                         was_crit,
                         was_overcrit,
                         from_heirloom_effect: heirloom_source,
+                        from_active_skill: from_active_skill_q.get(proj_entity).is_ok(),
                     });
 
                     if nearby_mobs.get(target_e).is_ok() {
@@ -748,6 +758,7 @@ fn check_projectile_hit_player_collisions(
                     was_crit: false,
                     was_overcrit: false,
                     from_heirloom_effect: None,
+                    from_active_skill: false,
                 });
             }
             if state.despawn_on_hit {
@@ -1158,6 +1169,7 @@ fn check_mob_to_player_collisions(
                     was_crit: false,
                     was_overcrit: false,
                     from_heirloom_effect: None,
+                    from_active_skill: false,
                 });
             }
             // hit back to attacker if we have Thorns
@@ -1189,6 +1201,7 @@ fn check_mob_to_player_collisions(
                     was_crit: false,
                     was_overcrit: false,
                     from_heirloom_effect: None,
+                    from_active_skill: false,
                 });
             }
 
@@ -1252,6 +1265,7 @@ fn check_boss_to_objects_collisions(
                     was_crit: false,
                     was_overcrit: false,
                     from_heirloom_effect: None,
+                    from_active_skill: false,
                 });
             }
         }

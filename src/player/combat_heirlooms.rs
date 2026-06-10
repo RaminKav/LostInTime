@@ -7,7 +7,7 @@ use bevy_rapier2d::prelude::{Collider, RapierContext, RigidBody, Sensor};
 use rand::{seq::SliceRandom, Rng};
 
 use crate::{
-    animations::DoneAnimation,
+    animations::{AttackEvent, DoneAnimation},
     assets::Graphics,
     attributes::{
         modifiers::ModifyManaEvent, Attack, CurrentHealth, CurrentMana, ManaRegen, MaxHealth,
@@ -15,7 +15,7 @@ use crate::{
     },
     audio::{AudioSoundEffect, SoundSpawner},
     combat::{
-        combat_helpers::DespawnTimer,
+        combat_helpers::{spawn_deferred_aseprite_collider, DespawnTimer},
         status_effects::{Burning, MobStatusEffects, StatusEffect, StatusEffectEvent},
         EnemyDeathEvent, HitEvent, ObjBreakEvent,
     },
@@ -28,11 +28,14 @@ use crate::{
         ItemDrop, WorldObject,
     },
     player::{
-        skills::{ActiveSkillUsedEvent, Heirloom, HeirloomTriggerCounts, PlayerSkills},
+        skills::{
+            active_skill_scaling::{attack_damage_multiplier, BOMB},
+            ActiveSkillUsedEvent, Heirloom, HeirloomTriggerCounts, PlayerSkills,
+        },
         Player,
     },
     proto::proto_param::ProtoParam,
-    world::{world_helpers::world_pos_to_tile_pos, y_sort::YSort, TileMapPosition},
+    world::{world_helpers::world_pos_to_tile_pos, y_sort::YSort, TileMapPosition, TILE_SIZE},
     GameParam,
 };
 
@@ -677,6 +680,7 @@ pub fn update_summon_ring(
                         was_overcrit,
                         ignore_tool: true,
                         from_heirloom_effect: Some(Heirloom::SummonRing),
+                        from_active_skill: false,
                     });
                 }
             }
@@ -728,6 +732,7 @@ pub fn update_summon_ring(
                     was_overcrit,
                     ignore_tool: true,
                     from_heirloom_effect: Some(Heirloom::SummonRing),
+                    from_active_skill: false,
                 });
                 continue;
             }
@@ -867,6 +872,7 @@ pub fn update_ant_farm_ants(
                 was_overcrit,
                 ignore_tool: true,
                 from_heirloom_effect: Some(Heirloom::AntFarm),
+                from_active_skill: false,
             });
             commands.entity(entity).despawn_recursive();
         }
@@ -1000,6 +1006,7 @@ pub fn update_stone_tooth(
                     was_overcrit,
                     ignore_tool: true,
                     from_heirloom_effect: Some(Heirloom::StoneTooth),
+                    from_active_skill: false,
                 });
                 lifetime.hit_entities.insert(snapshot.entity);
             }
@@ -1363,6 +1370,7 @@ pub fn update_reaper_souls(
                 was_overcrit,
                 ignore_tool: true,
                 from_heirloom_effect: Some(Heirloom::Reaper),
+                from_active_skill: false,
             });
             commands.entity(entity).despawn_recursive();
         }
@@ -2544,5 +2552,209 @@ pub fn update_homing_energy_balls(
         // Keep ProjectileState direction in sync so collision knockback is
         // calculated in the right direction.
         proj_state.direction = velocity.normalize_or_zero();
+    }
+}
+
+// ============================================================================
+// CherryBomb - Attacks lob arcing cherry bombs that explode on landing
+// ============================================================================
+
+aseprite!(pub CherryBombSprite, "textures/effects/CherryBomb.aseprite");
+aseprite!(pub CherryBombExplosionSprite, "textures/effects/CherryBombExplosion.ase");
+
+const CHERRY_BOMB_PROC_PCT_PER_STACK: u32 = 25;
+const CHERRY_BOMB_MIN_TILES: f32 = 3.0;
+const CHERRY_BOMB_MAX_TILES: f32 = 10.0;
+const CHERRY_BOMB_FLIGHT_SECS: f32 = 0.72;
+const CHERRY_BOMB_ARC_HEIGHT: f32 = 28.0;
+const CHERRY_BOMB_EXPLOSION_RADIUS: f32 = 20.0;
+const CHERRY_BOMB_EXPLOSION_ANIM_SECS: f32 = 0.45;
+
+#[derive(Component)]
+pub struct CherryBombArc {
+    pub start_pos: Vec2,
+    pub target_pos: Vec2,
+    pub timer: Timer,
+    pub arc_height: f32,
+    pub explosion_damage: i32,
+}
+
+/// Rolls how many times a stacked percentage proc fires.
+/// e.g. 250% => 2 guaranteed + 50% chance for a 3rd.
+pub fn roll_stacked_proc_count(chance_pct: u32, rng: &mut impl Rng) -> u32 {
+    if chance_pct == 0 {
+        return 0;
+    }
+    let guaranteed = chance_pct / 100;
+    let remainder = chance_pct % 100;
+    let extra = if remainder > 0 && rng.gen_ratio(remainder, 100) {
+        1
+    } else {
+        0
+    };
+    guaranteed + extra
+}
+
+fn random_cherry_bomb_target(player_pos: Vec2, rng: &mut impl Rng) -> Vec2 {
+    let min_dist = CHERRY_BOMB_MIN_TILES * TILE_SIZE.x;
+    let max_dist = CHERRY_BOMB_MAX_TILES * TILE_SIZE.x;
+    let angle = rng.gen_range(0.0..TAU);
+    let dist = rng.gen_range(min_dist..max_dist);
+    player_pos + Vec2::new(angle.cos(), angle.sin()) * dist
+}
+
+fn spawn_cherry_bomb_flight(
+    commands: &mut Commands,
+    graphics: &Graphics,
+    start_pos: Vec2,
+    target_pos: Vec2,
+    explosion_damage: i32,
+) {
+    let Some(cherry_bomb_ase) = graphics.cherry_bomb_ase.as_ref() else {
+        return;
+    };
+
+    commands.spawn((
+        AsepriteBundle {
+            aseprite: cherry_bomb_ase.clone(),
+            animation: AsepriteAnimation::from(CherryBombSprite::tags::BOMB),
+            transform: Transform::from_translation(start_pos.extend(11.)),
+            ..default()
+        },
+        CherryBombArc {
+            start_pos,
+            target_pos,
+            timer: Timer::from_seconds(CHERRY_BOMB_FLIGHT_SECS, TimerMode::Once),
+            arc_height: CHERRY_BOMB_ARC_HEIGHT,
+            explosion_damage,
+        },
+        YSort(11.),
+        Name::new("CHERRY_BOMB"),
+    ));
+}
+
+fn spawn_cherry_bomb_explosion(
+    commands: &mut Commands,
+    graphics: &Graphics,
+    pos: Vec2,
+    dmg: i32,
+    size_multiplier: f32,
+) {
+    let Some(explosion_ase) = graphics.cherry_bomb_explosion_ase.as_ref() else {
+        return;
+    };
+
+    spawn_deferred_aseprite_collider(
+        commands,
+        Transform::from_translation(pos.extend(11.)).with_scale(Vec3::splat(size_multiplier)),
+        CHERRY_BOMB_EXPLOSION_ANIM_SECS,
+        dmg,
+        Collider::capsule(
+            Vec2::new(0.0, -2.0),
+            Vec2::new(0.0, -4.0),
+            CHERRY_BOMB_EXPLOSION_RADIUS * size_multiplier,
+        ),
+        explosion_ase.clone(),
+        AsepriteAnimation::from(CherryBombExplosionSprite::tags::EXPLOSION),
+        false,
+        Projectile::CherryBombExplosion,
+        vec![],
+        None,
+    );
+}
+
+pub fn handle_cherry_bomb_on_attack(
+    mut attacks: EventReader<AttackEvent>,
+    mut player: Query<(&PlayerSkills, &Attack, &GlobalTransform, &mut CurrentMana), With<Player>>,
+    graphics: Res<Graphics>,
+    mut commands: Commands,
+    mut trigger_counts: ResMut<HeirloomTriggerCounts>,
+) {
+    let Ok((skills, attack, player_transform, mut current_mana)) = player.get_single_mut() else {
+        return;
+    };
+
+    let stacks = skills.get_count(Heirloom::CherryBomb);
+    if stacks <= 0 {
+        return;
+    }
+
+    let mana_cost_per_bomb = (Heirloom::CherryBomb.get_mana_cost() as f32
+        * if skills.has(Heirloom::DiscountMP) {
+            0.75
+        } else {
+            1.
+        }) as i32;
+    if mana_cost_per_bomb <= 0 {
+        return;
+    }
+
+    let player_pos = player_transform.translation().truncate();
+    let explosion_damage = (attack.0 as f32 * attack_damage_multiplier(100.)).round() as i32;
+
+    for _ in attacks.iter() {
+        let mut rng = rand::thread_rng();
+        let chance_pct = stacks as u32 * CHERRY_BOMB_PROC_PCT_PER_STACK;
+        let proc_count = roll_stacked_proc_count(chance_pct, &mut rng);
+        if proc_count == 0 {
+            continue;
+        }
+
+        let mut bombs_spawned = 0u32;
+        for _ in 0..proc_count {
+            if current_mana.0 < mana_cost_per_bomb {
+                break;
+            }
+            current_mana.0 -= mana_cost_per_bomb;
+            trigger_counts.record_mana(Heirloom::CherryBomb, mana_cost_per_bomb);
+
+            let target_pos = random_cherry_bomb_target(player_pos, &mut rng);
+            spawn_cherry_bomb_flight(
+                &mut commands,
+                &graphics,
+                player_pos,
+                target_pos,
+                explosion_damage,
+            );
+            bombs_spawned += 1;
+        }
+
+        if bombs_spawned > 0 {
+            trigger_counts.increment(Heirloom::CherryBomb);
+        }
+    }
+}
+
+pub fn update_cherry_bomb_arcs(
+    mut commands: Commands,
+    time: Res<Time>,
+    graphics: Res<Graphics>,
+    player_size: Query<&ProjectileSize, With<Player>>,
+    mut bombs: Query<(Entity, &mut CherryBombArc, &mut Transform)>,
+) {
+    let size_multiplier = player_size
+        .get_single()
+        .map(|s| s.get_multiplier())
+        .unwrap_or(1.0);
+
+    for (entity, mut arc, mut transform) in bombs.iter_mut() {
+        arc.timer.tick(time.delta());
+        let duration = arc.timer.duration().as_secs_f32().max(f32::EPSILON);
+        let t = (arc.timer.elapsed_secs() / duration).clamp(0.0, 1.0);
+        let ground = arc.start_pos.lerp(arc.target_pos, t);
+        let height = arc.arc_height * (std::f32::consts::PI * t).sin();
+        transform.translation = Vec3::new(ground.x, ground.y + height, transform.translation.z);
+
+        if arc.timer.just_finished() {
+            spawn_cherry_bomb_explosion(
+                &mut commands,
+                &graphics,
+                arc.target_pos,
+                arc.explosion_damage,
+                size_multiplier,
+            );
+            commands.spawn(SoundSpawner::new(AudioSoundEffect::IceExplosion, 0.25));
+            commands.entity(entity).despawn_recursive();
+        }
     }
 }

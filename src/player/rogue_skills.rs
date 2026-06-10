@@ -295,7 +295,7 @@ pub fn handle_lunge(
                 0.5,
                 (dmg.0 as f32 * skill_power_mult * attack_damage_multiplier(SPRINT_LUNGE)) as i32,
                 Collider::cuboid(9., 1.5 * TILE_SIZE.x),
-                Projectile::None,
+                Projectile::SprintLunge,
             );
             safe_set_parent(&mut commands, lunge_e, e);
 

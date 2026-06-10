@@ -413,7 +413,7 @@ impl ActiveSkill {
     /// Returns the base cooldown in seconds for this skill
     pub fn get_base_cooldown(&self) -> f32 {
         match self {
-            ActiveSkill::Roll => 1.2, // Cooldown matches player_dash_cooldown duration
+            ActiveSkill::Roll => 0.9, // Cooldown matches player_dash_cooldown duration
             ActiveSkill::Parry => 1.2,
             ActiveSkill::ParrySpear => 12.,
             ActiveSkill::Sprint => 8.0,
@@ -1036,6 +1036,7 @@ pub enum Heirloom {
 
     // On-Attack Triggers
     WaveAttack,  // hero sword
+    CherryBomb,  // cherry bomb lob on attack
     FrailStacks, // skull
     SlowStacks,  // sea shell
 
@@ -1106,6 +1107,8 @@ pub enum Heirloom {
     ManaOrbDropMult,
     /// Every 150 player damage dealt fires a homing energy ball (not from energy balls).
     EnergyBallBarrage,
+    /// Skill hits spawn a small explosion at the target when the player has enough mana.
+    SkillExplosion,
 }
 
 pub enum HeirloomTrait {
@@ -1132,6 +1135,7 @@ impl Heirloom {
             Heirloom::HealSummons => 15,
             Heirloom::SkillEcho => 3,
             Heirloom::WaveAttack => 5,
+            Heirloom::CherryBomb => 2,
             Heirloom::AntFarm => 2,
             Heirloom::StoneTooth => 5,
             Heirloom::SummonRing => 5,
@@ -1140,8 +1144,19 @@ impl Heirloom {
             Heirloom::KillLightning => 5,
             Heirloom::ManaRegenLightning => 5,
             Heirloom::ManaOrbAttack => 2,
+            Heirloom::SkillExplosion => 3,
             _ => 0,
         }
+    }
+
+    /// Mana spent when a skill cast activates Impact Rune (3 per copy).
+    pub fn skill_explosion_mana_cost(stacks: i32) -> i32 {
+        stacks.max(1) * Heirloom::SkillExplosion.get_mana_cost()
+    }
+
+    /// Explosion damage as a fraction of the triggering skill hit (0.25 per copy).
+    pub fn skill_explosion_damage_fraction(stacks: i32) -> f32 {
+        stacks.max(1) as f32 * 0.25
     }
     /// Minimum player level required before this heirloom is allowed to appear in any
     /// selection (level-ups, shrines, chests, essence shop, blessings). `0` means no gate.
@@ -1171,6 +1186,7 @@ impl Heirloom {
             Heirloom::Attack => "Anvil ".to_string(),
             Heirloom::DodgeChance => "Leather".to_string(),
             Heirloom::WaveAttack => "Hero Sword".to_string(),
+            Heirloom::CherryBomb => "Cherry Bomb".to_string(),
             Heirloom::FrailStacks => "Skull".to_string(),
             Heirloom::SlowStacks => "Sea Shell".to_string(),
             Heirloom::AntFarm => "Ant Farm".to_string(),
@@ -1251,6 +1267,7 @@ impl Heirloom {
             Heirloom::ManaOrbs => "Mana Dust".to_string(),
             Heirloom::ManaOrbAttack => "Wizard Hat".to_string(),
             Heirloom::EnergyBallBarrage => "Underworld's Hat".to_string(),
+            Heirloom::SkillExplosion => "Impact Rune".to_string(),
             Heirloom::ItemPickupRadius => "Magnet".to_string(),
             Heirloom::GravityScales => "Gravity Scales".to_string(),
             Heirloom::MagnetPull => "Gravitation Tome".to_string(),
@@ -1308,9 +1325,9 @@ impl Heirloom {
             // | Self::CrateBreakDamage
             // | Self::StandStill
             // | Self::MPBarDMG => &[D::Attack],
-            Self::SkillPower | Self::SkillPowerHunt => &[D::SkillPower],
+            Self::SkillPower | Self::SkillPowerHunt => &[D::SkillPower, D::Skills],
             // Self::ItemPickupRadius | Self::GravityScales => &[D::PickupRange],
-            Self::OnHitEcho | Self::HealEcho | Self::SkillEcho | Self::ParryEcho => &[D::Echo],
+            Self::OnHitEcho | Self::HealEcho | Self::ParryEcho => &[D::Echo],
             Self::Attack
             | Self::GoldIntoDamage
             | Self::CrateBreakDamage
@@ -1320,8 +1337,9 @@ impl Heirloom {
             Self::ChaosBoost => &[D::Chaos],
             Self::CoinLightning | Self::KillLightning | Self::ManaRegenLightning => &[D::Lightning],
 
-            Self::IceStaffAoE => &[D::IceExplosion],
+            Self::IceStaffAoE => &[D::IceExplosion, D::Weapons],
             Self::FrozenAoE => &[D::IceExplosion, D::FreezeChance],
+            Self::SkillExplosion => &[D::IceExplosion, D::Skills],
             Self::SlowStacks | Self::FrozenCrit => &[D::FreezeChance],
 
             Self::PoisonStacks
@@ -1333,7 +1351,10 @@ impl Heirloom {
             Self::ChaosStats => &[D::Attack, D::Chaos, D::Mana, D::Defence, D::Dodge],
             Self::Gigantify | Self::GravityScales => &[D::Size],
             Self::LoadedDice => &[D::Luck],
-
+            Self::CherryBomb | Self::WaveAttack => &[D::Weapons],
+            Self::SkillCDReduction | Self::SkillChargeIncrease => &[D::Skills],
+            Self::SkillManaRegen => &[D::Skills, D::Mana],
+            Self::SkillEcho => &[D::Skills, D::Echo],
             _ => &[],
         }
     }
@@ -1410,12 +1431,18 @@ impl Heirloom {
             Heirloom::Gigantify => vec!["+10% Size".to_string()],
 
             Heirloom::WaveAttack => vec![
-                "Your Attacks have".to_string(),
+                "Weapon Attacks have".to_string(),
                 "a chance to send a".to_string(),
                 "sonic wave attack".to_string(),
                 "that travels a".to_string(),
                 "short distance.".to_string(),
                 format!("Costs {} mana", Heirloom::WaveAttack.get_mana_cost()),
+            ],
+            Heirloom::CherryBomb => vec![
+                "Weapon Attacks have".to_string(),
+                "a +25% chance to".to_string(),
+                "lob a cherry bomb.".to_string(),
+                format!("Costs {} mana", Heirloom::CherryBomb.get_mana_cost()),
             ],
             Heirloom::FrailStacks => vec![
                 "Your Attacks have".to_string(),
@@ -1780,6 +1807,15 @@ impl Heirloom {
                 "deal fires a homing".to_string(),
                 "fire ball at a".to_string(),
                 "nearby enemy.".to_string(),
+            ],
+            Heirloom::SkillExplosion => vec![
+                "Skill damage triggers".to_string(),
+                "a small explosion at".to_string(),
+                "the target.".to_string(),
+                format!(
+                    "Costs {} mana per copy",
+                    Heirloom::SkillExplosion.get_mana_cost()
+                ),
             ],
             Heirloom::TomeDoubleUpgrade => vec![
                 "Upgrade Tomes".to_string(),
@@ -2294,13 +2330,14 @@ pub fn time_crystal_heirlooms(idx: usize) -> Vec<(Heirloom, HeirloomRarity)> {
         4 => vec![
             (Heirloom::RegenLifesteal, HeirloomRarity::Uncommon),
             (Heirloom::FrozenMPRegen, HeirloomRarity::Rare),
-            (Heirloom::LowHPDamage, HeirloomRarity::Rare),
+            (Heirloom::SkillExplosion, HeirloomRarity::Uncommon),
         ],
         5 => vec![
             (Heirloom::CoinLightning, HeirloomRarity::Legendary),
             (Heirloom::GoldIntoDamage, HeirloomRarity::Rare),
         ],
         6 => vec![
+            (Heirloom::LowHPDamage, HeirloomRarity::Rare),
             (Heirloom::ThornsLifesteal, HeirloomRarity::Uncommon),
             (Heirloom::ThornsOnDamage, HeirloomRarity::Rare),
         ],
@@ -2363,6 +2400,7 @@ impl HeirloomChoiceQueue {
             HeirloomChoiceState::new(Heirloom::ThornsSpikes, HeirloomRarity::Uncommon),
             HeirloomChoiceState::new(Heirloom::DamageDealtMp, HeirloomRarity::Uncommon),
             HeirloomChoiceState::new(Heirloom::KillLightning, HeirloomRarity::Uncommon),
+            HeirloomChoiceState::new(Heirloom::CherryBomb, HeirloomRarity::Uncommon),
             HeirloomChoiceState::new(Heirloom::OnHitEcho, HeirloomRarity::Rare),
             HeirloomChoiceState::new(Heirloom::PoisonDuration, HeirloomRarity::Rare),
             HeirloomChoiceState::new(Heirloom::PoisonStrength, HeirloomRarity::Rare),
@@ -2384,6 +2422,7 @@ impl HeirloomChoiceQueue {
             HeirloomChoiceState::new(Heirloom::LifestealCoins, HeirloomRarity::Legendary),
             HeirloomChoiceState::new(Heirloom::CrateBreakDamage, HeirloomRarity::Legendary),
             HeirloomChoiceState::new(Heirloom::EnergyBallBarrage, HeirloomRarity::Legendary),
+            HeirloomChoiceState::new(Heirloom::SkillExplosion, HeirloomRarity::Uncommon),
         ]
     }
 

@@ -72,15 +72,18 @@ pub enum DamageSource {
     ArrowVolley,
     PossessedBlade,
     PiercingStar,
+    SprintLunge,
     Recall,
 
     // Heirloom effects
     Echo,
     IceExplosion,
+    SmallExplosion,
     IceFloor,
     TeleportShock,
     Thorns,
     Lightning,
+    CherryBomb,
     ManaOrb,
     Poison,
     AntFarm,
@@ -124,13 +127,16 @@ impl DamageSource {
             | DamageSource::ArrowVolley
             | DamageSource::PossessedBlade
             | DamageSource::PiercingStar
+            | DamageSource::SprintLunge
             | DamageSource::Recall => DamageSourceCategory::Skill,
 
             DamageSource::Echo
             | DamageSource::IceExplosion
+            | DamageSource::SmallExplosion
             | DamageSource::IceFloor
             | DamageSource::Thorns
             | DamageSource::Lightning
+            | DamageSource::CherryBomb
             | DamageSource::ManaOrb
             | DamageSource::Poison
             | DamageSource::AntFarm
@@ -173,13 +179,16 @@ impl DamageSource {
             DamageSource::ArrowVolley => "Arrow Volley",
             DamageSource::PossessedBlade => "Possessed Blade",
             DamageSource::PiercingStar => "Piercing Star",
+            DamageSource::SprintLunge => "Lunge",
             DamageSource::Recall => "Shadow Step",
             DamageSource::Echo => "Echo",
             DamageSource::IceExplosion => "Ice Explosion",
+            DamageSource::SmallExplosion => "Small Explosion",
             DamageSource::IceFloor => "Ice Floor",
             DamageSource::TeleportShock => "Teleport",
             DamageSource::Thorns => "Thorns",
             DamageSource::Lightning => "Lightning",
+            DamageSource::CherryBomb => "Cherry Bomb",
             DamageSource::ManaOrb => "Mana Orb",
             DamageSource::Poison => "Poison",
             DamageSource::AntFarm => "Ant Farm",
@@ -196,6 +205,7 @@ impl DamageSource {
                 Some(DamageSource::Echo)
             }
             Heirloom::FrozenAoE => Some(DamageSource::IceExplosion),
+            Heirloom::SkillExplosion => Some(DamageSource::SmallExplosion),
             Heirloom::IceStaffFloor => Some(DamageSource::IceFloor),
             Heirloom::TeleportShock => Some(DamageSource::TeleportShock),
             Heirloom::Thorns | Heirloom::ThornsSpikes | Heirloom::ThornsOnDamage => {
@@ -215,6 +225,7 @@ impl DamageSource {
             Heirloom::StoneTooth => Some(DamageSource::StoneTooth),
             Heirloom::Reaper => Some(DamageSource::ReaperSoul),
             Heirloom::EnergyBallBarrage => Some(DamageSource::EnergyBall),
+            Heirloom::CherryBomb => Some(DamageSource::CherryBomb),
             _ => None,
         }
     }
@@ -256,6 +267,7 @@ impl DamageSource {
             Projectile::Shout => Some(DamageSource::Shout),
             Projectile::LaserBeam => Some(DamageSource::LaserBeam),
             Projectile::Bomb | Projectile::BombExplosion => Some(DamageSource::Bomb),
+            Projectile::CherryBombExplosion => Some(DamageSource::CherryBomb),
             Projectile::DaggerSlash => Some(DamageSource::DaggerSlash),
             Projectile::DaggerThrow => Some(DamageSource::DaggerThrow),
             Projectile::FuryKunai => Some(DamageSource::FuryKunai),
@@ -266,8 +278,10 @@ impl DamageSource {
 
             Projectile::Echo => Some(DamageSource::Echo),
             Projectile::IceExplosionAOE => Some(DamageSource::IceExplosion),
+            Projectile::SmallExplosionAOE => Some(DamageSource::SmallExplosion),
             Projectile::IceFloor => Some(DamageSource::IceFloor),
             Projectile::TeleportShock => Some(DamageSource::TeleportShock),
+            Projectile::SprintLunge => Some(DamageSource::SprintLunge),
             Projectile::Recall => Some(DamageSource::Recall),
             // Both ThornsProjectile and direct thorns damage merge into Thorns
             Projectile::ThornsProjectile => Some(DamageSource::Thorns),

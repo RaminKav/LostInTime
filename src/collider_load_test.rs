@@ -197,6 +197,7 @@ fn tick_collider_load_test_kill(
                 was_overcrit: false,
                 ignore_tool: false,
                 from_heirloom_effect: Some(Heirloom::PoisonStacks),
+                from_active_skill: false,
             });
             commands
                 .entity(entity)

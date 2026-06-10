@@ -90,6 +90,7 @@ pub fn handle_second_split_attack(
             hit_by_mob: None,
             ignore_tool: false,
             from_heirloom_effect: None,
+            from_active_skill: false,
         });
         commands.entity(e).remove::<SecondHitDelay>();
     }
