@@ -538,7 +538,14 @@ Heirlooms:
 - [Feature] Health and Mana trackers, hover over the health or mana orbs in the HUD to view useful information about health gain sources, health regen/s, or mana draining sources, and mana regen/s. It resets every 60s.
 - [Balance] Buff class passive stat amounts significantly. For example, warrior gives +5 size isntead of +2. Should make the class passives feel very significant, and give them more identity, now that the base skills were removed.
 - [Balance] Fur devils and lizards spawn rate increased from 2.5 -> 2.0s per spawn, this is hand-in-hand with the change last patch that made some enemies slower.
+- [Balance] Buff Fur Devil base hp from 8 -> 10
+- [Balance] Buff roll: cooldonw 1.2s -> 0.9s, distance increased by ~10%
 - [QoL] Add info boxes explaining Size, Luck, Chaos, and Attack stats
 - [QoL] Add % Poison chance stat to the stat viewer in inventory
+- [QoL] Auto Weapon Attack Aim keybind added (Defalt E), attacks will aim to nearest enemy
+- [QoL] Dev mode button to get any skill in the game
 - [QoL] Decreased density of trees and big cactuses in all 3 biomes. Forest (Era 1) especially should feel more open
 - [Art] tweaked visuals for desert dirt patches
+- [Art] New ice explosion animation (experiment, lmk if you like it or hate it)
+- [New Heirloom] Cherry Bomb: Uncommon, cost 2 mana, attacks have +25% chance to lob a cherry bomb.
+- [New Heirloom] Impact Rune: Uncommon, costs 3 mana, skill damage triggers a small explosion, damage and mana cost scale with more copies
