@@ -21,7 +21,7 @@ fn default_interact() -> InputBinding {
     InputBinding::KeyBinding(KeyCode::F)
 }
 fn default_attack_auto_target() -> InputBinding {
-    InputBinding::KeyBinding(KeyCode::T)
+    InputBinding::KeyBinding(KeyCode::E)
 }
 
 /// Hidden fourth skill slot (no HUD / options row while `VISIBLE_CLASS_SKILL_COUNT` is 3).
@@ -43,9 +43,7 @@ pub fn normalize_key_binding(key: KeyCode) -> KeyCode {
 /// Left/right Shift, Ctrl, and Alt are treated as interchangeable.
 pub fn key_binding_just_pressed(bound: KeyCode, keys: &Input<KeyCode>) -> bool {
     match normalize_key_binding(bound) {
-        KeyCode::LShift => {
-            keys.just_pressed(KeyCode::LShift) || keys.just_pressed(KeyCode::RShift)
-        }
+        KeyCode::LShift => keys.just_pressed(KeyCode::LShift) || keys.just_pressed(KeyCode::RShift),
         KeyCode::LControl => {
             keys.just_pressed(KeyCode::LControl) || keys.just_pressed(KeyCode::RControl)
         }
