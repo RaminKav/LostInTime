@@ -80,6 +80,7 @@ pub mod combat_shrine;
 pub mod dungeon_shrine;
 pub mod gamble_shrine;
 pub mod heirloom_shrine;
+pub mod item_drop_outline;
 pub mod microwave_shrine;
 use boss_shrine::*;
 pub mod item_upgrades;
@@ -97,6 +98,7 @@ use serde::{Deserialize, Serialize};
 use strum_macros::{Display, EnumIter, IntoStaticStr};
 
 use self::ammo::tick_reload;
+use self::item_drop_outline::ItemDropOutlinePlugin;
 use self::bridge_placement::{
     handle_bridge_placement_mode, handle_bridge_preview_dragging, BridgePlacementMode,
 };
@@ -1549,6 +1551,7 @@ impl Plugin for ItemsPlugin {
             .add_plugin(CraftingPlugin)
             .add_plugin(RangedAttackPlugin)
             .add_plugin(LootTablePlugin)
+            .add_plugin(ItemDropOutlinePlugin)
             .add_system(
                 handle_break_object
                     .before(CustomFlush)

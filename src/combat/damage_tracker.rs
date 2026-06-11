@@ -183,7 +183,7 @@ impl DamageSource {
             DamageSource::Recall => "Shadow Step",
             DamageSource::Echo => "Echo",
             DamageSource::IceExplosion => "Ice Explosion",
-            DamageSource::SmallExplosion => "Small Explosion",
+            DamageSource::SmallExplosion => "Sml Explosion",
             DamageSource::IceFloor => "Ice Floor",
             DamageSource::TeleportShock => "Teleport",
             DamageSource::Thorns => "Thorns",

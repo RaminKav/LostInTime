@@ -1135,7 +1135,7 @@ impl Heirloom {
             Heirloom::HealSummons => 15,
             Heirloom::SkillEcho => 3,
             Heirloom::WaveAttack => 5,
-            Heirloom::CherryBomb => 2,
+            Heirloom::CherryBomb => 3,
             Heirloom::AntFarm => 2,
             Heirloom::StoneTooth => 5,
             Heirloom::SummonRing => 5,
@@ -1144,7 +1144,7 @@ impl Heirloom {
             Heirloom::KillLightning => 5,
             Heirloom::ManaRegenLightning => 5,
             Heirloom::ManaOrbAttack => 2,
-            Heirloom::SkillExplosion => 3,
+            Heirloom::SkillExplosion => 5,
             _ => 0,
         }
     }
