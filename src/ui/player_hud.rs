@@ -3156,7 +3156,9 @@ pub fn skill_slot_cooldown_progress(
     dash_cooldown: &Timer,
     overlay: Option<&SkillCooldownOverlay>,
 ) -> Option<f32> {
-    if Some(slot_index) == roll_slot {
+    // Roll now lives in the slot charge system (slot_index < 4). Only fall back to the
+    // legacy dash cooldown timer if the slot hasn't been set up with charges yet.
+    if Some(slot_index) == roll_slot && !(slot_index < 4 && slots.0[slot_index].max_charges > 0) {
         if dash_cooldown.finished() {
             return None;
         }
@@ -3348,7 +3350,8 @@ pub fn update_skill_tooltip_cooldown(
         };
         let slot_index = tooltip_skill.0;
 
-        let (remaining, max_cooldown) = if Some(slot_index) == roll_slot {
+        let roll_uses_slot = slot_index < 4 && slots.0[slot_index].max_charges > 0;
+        let (remaining, max_cooldown) = if Some(slot_index) == roll_slot && !roll_uses_slot {
             let dash = &game.player_state.player_dash_cooldown;
             let max = dash.duration().as_secs_f32();
             let remaining = (max - dash.elapsed().as_secs_f32()).max(0.0);

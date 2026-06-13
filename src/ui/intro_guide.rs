@@ -127,9 +127,12 @@ pub fn spawn_intro_guide(
         return;
     }
 
+    // Sit just above the gameplay HUD (active skills at z=4) but below the inventory /
+    // chest full-screen overlays (z=9) so opening the inventory while the guide is still
+    // fading covers it instead of the guide drawing on top. Child offsets stay < 1.
     let root = commands
         .spawn(SpatialBundle::from_transform(Transform::from_translation(
-            Vec3::new(0., 0., 20.),
+            Vec3::new(0., 0., 5.),
         )))
         .insert(IntroGuideRoot { elapsed: 0. })
         .insert(Name::new("Intro Guide"))

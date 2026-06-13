@@ -88,7 +88,7 @@ pub struct EssenceShopCache {
 }
 
 /// Path to the marker icon spawned on top of a right-clicked shop item.
-pub const MERCHANT_MARKER_ICON_PATH: &str = "ui/Icons/MerchantMarker.png";
+pub const MERCHANT_MARKER_ICON_PATH: &str = "ui/icons/MerchantMarker.png";
 pub const MERCHANT_MARKER_ICON_SIZE: Vec2 = Vec2::new(16., 16.);
 /// World-space vertical offset of the tracked-item display above the merchant.
 const MERCHANT_WORLD_MARKER_Y_OFFSET: f32 = 34.;

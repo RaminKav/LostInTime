@@ -344,19 +344,33 @@ pub fn handle_active_skill_event(
                         commands.spawn(SoundSpawner::new(AudioSoundEffect::GainExp, 0.12));
                     }
                     ActiveSkill::Rapidfire => {
-                        if let Some(existing) = rapid_state {
-                            if !existing.duration.finished() {
-                                bonus_attack_speed.remove_multiplier(existing.attack_speed_bonus);
+                        let new_bonus = attack_damage_multiplier(
+                            RAPIDFIRE_ATTACK_SPEED_BONUS_PERCENT,
+                        ) * power_mult;
+                        // Casting Rapidfire again while it's running stacks: the new attack
+                        // speed layer is added on top of the active buff and the duration is
+                        // refreshed. `attack_speed_bonus` stores the *cumulative* amount so it
+                        // is fully removed when the buff finally ends.
+                        let was_active =
+                            rapid_state.map_or(false, |s| !s.duration.finished());
+                        let stored_bonus = if was_active {
+                            bonus_attack_speed.add_multiplier(new_bonus);
+                            attribute_change.send_default();
+                            rapid_state.unwrap().attack_speed_bonus + new_bonus
+                        } else {
+                            // No active buff. If a stale (expired) RapidfireState component is
+                            // still attached, re-inserting won't trigger the `Added` apply
+                            // system, so apply the speed manually; otherwise `Added` handles it.
+                            if rapid_state.is_some() {
+                                bonus_attack_speed.add_multiplier(new_bonus);
                                 attribute_change.send_default();
                             }
-                            commands.entity(player_e).remove::<RapidfireState>();
-                        }
+                            new_bonus
+                        };
                         let dur = Timer::from_seconds(3.0, TimerMode::Once);
                         commands.entity(player_e).insert(RapidfireState {
                             duration: dur,
-                            attack_speed_bonus: attack_damage_multiplier(
-                                RAPIDFIRE_ATTACK_SPEED_BONUS_PERCENT,
-                            ) * power_mult,
+                            attack_speed_bonus: stored_bonus,
                         });
                         start_slot_cooldown_for_cast(
                             &mut class_slots,
@@ -1081,18 +1095,32 @@ pub fn handle_active_skill_event(
                         commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.2));
                     }
                     ActiveSkill::Fury => {
-                        if !should_start_cooldown {
-                            if fury_state.is_some() {
-                                commands.entity(player_e).remove::<FuryState>();
+                        // Casting Fury again while it's running stacks by extending the
+                        // duration: the second cast's worth of kunai folds into the ongoing
+                        // throw stream rather than restarting it. The throw cadence is
+                        // preserved so the stream doesn't hitch mid-flight.
+                        let fury = match fury_state {
+                            Some(existing) if !existing.duration.finished() => {
+                                let remaining = (existing.duration.duration().as_secs_f32()
+                                    - existing.duration.elapsed_secs())
+                                .max(0.0);
+                                FuryState {
+                                    duration: Timer::from_seconds(
+                                        remaining + FURY_DURATION_SECS,
+                                        TimerMode::Once,
+                                    ),
+                                    throw_timer: existing.throw_timer.clone(),
+                                }
                             }
-                        }
-                        commands.entity(player_e).insert(FuryState {
-                            duration: Timer::from_seconds(FURY_DURATION_SECS, TimerMode::Once),
-                            throw_timer: Timer::from_seconds(
-                                FURY_THROW_TIMER_EFFECTIVE_SECS,
-                                TimerMode::Repeating,
-                            ),
-                        });
+                            _ => FuryState {
+                                duration: Timer::from_seconds(FURY_DURATION_SECS, TimerMode::Once),
+                                throw_timer: Timer::from_seconds(
+                                    FURY_THROW_TIMER_EFFECTIVE_SECS,
+                                    TimerMode::Repeating,
+                                ),
+                            },
+                        };
+                        commands.entity(player_e).insert(fury);
                         start_slot_cooldown_for_cast(
                             &mut class_slots,
                             ev.slot,
@@ -1265,6 +1293,17 @@ pub fn handle_active_skill_event(
                             spawn_delay: 0.0,
                         });
                         commands.spawn(SoundSpawner::new(AudioSoundEffect::Claw, 0.3));
+                    }
+                    ActiveSkill::Roll => {
+                        // The dash motion is driven in `inputs.rs`; here we only run the
+                        // shared slot charge/cooldown bookkeeping so Roll participates in
+                        // the charge system (and supports Paintbrush extra charges).
+                        start_slot_cooldown_for_cast(
+                            &mut class_slots,
+                            ev.slot,
+                            skill_cd,
+                            should_start_cooldown,
+                        );
                     }
                     _ => {}
                 }
@@ -1453,11 +1492,20 @@ pub fn tick_class_skill_slots(
     time: Res<Time>,
     player_skills: Query<&PlayerSkills, With<Player>>,
     blessings: Query<&OwnedBlessings, With<Player>>,
-    mut q: Query<(Entity, &mut ClassSkillSlots, Option<&Stealthed>), With<Player>>,
+    mut q: Query<
+        (
+            Entity,
+            &mut ClassSkillSlots,
+            Option<&Stealthed>,
+            Option<&RapidfireState>,
+            Option<&FuryState>,
+        ),
+        With<Player>,
+    >,
 ) {
     let skills_single = player_skills.get_single().ok();
     let blessings_single = blessings.get_single().ok();
-    for (entity, mut slots, stealthed) in q.iter_mut() {
+    for (entity, mut slots, stealthed, rapidfire_state, fury_state) in q.iter_mut() {
         for i in 0..4 {
             let skill = slots.0[i].tracked_skill;
             if skill == ActiveSkill::Stealth && stealthed.is_some() {
@@ -1467,7 +1515,14 @@ pub fn tick_class_skill_slots(
             if !slots.0[i].cooldown_timer.just_finished() {
                 continue;
             }
-            if skill == ActiveSkill::Rapidfire || skill == ActiveSkill::Fury {
+            // While the Rapidfire/Fury buff is *active*, the running cooldown represents
+            // the in-use charge, so don't refund it yet (it's granted back when the buff
+            // ends in `finalize_rapidfire_fury_charges`). Once no buff is active we must
+            // keep regenerating remaining charges here, otherwise skills boosted past 1
+            // max charge (e.g. via Paintbrush) get stuck below max.
+            let buff_active = (skill == ActiveSkill::Rapidfire && rapidfire_state.is_some())
+                || (skill == ActiveSkill::Fury && fury_state.is_some());
+            if buff_active {
                 continue;
             }
             grant_skill_charge_after_cooldown_complete(entity, skill, slots.as_mut());
@@ -1882,6 +1937,8 @@ pub fn tick_pending_dagger_slashes(
 
 pub fn finalize_rapidfire_fury_charges(
     mut commands: Commands,
+    player_skills: Query<&PlayerSkills, With<Player>>,
+    blessings: Query<&OwnedBlessings, With<Player>>,
     mut q: Query<
         (
             Entity,
@@ -1892,6 +1949,8 @@ pub fn finalize_rapidfire_fury_charges(
         With<Player>,
     >,
 ) {
+    let skills_single = player_skills.get_single().ok();
+    let blessings_single = blessings.get_single().ok();
     for (e, mut slots, rapid, fury) in q.iter_mut() {
         if let Some(r) = rapid {
             if r.duration.finished() {
@@ -1907,6 +1966,13 @@ pub fn finalize_rapidfire_fury_charges(
                             slots.as_mut(),
                         );
                         commands.entity(e).remove::<RapidfireState>();
+                        // Keep regenerating toward max once the buff is gone, otherwise
+                        // multi-charge (Paintbrush) Rapidfire stays stuck below max.
+                        restart_charge_regen_if_below_max(
+                            skills_single,
+                            blessings_single,
+                            &mut slots.0[si],
+                        );
                     }
                 }
             }
@@ -1925,6 +1991,11 @@ pub fn finalize_rapidfire_fury_charges(
                             slots.as_mut(),
                         );
                         commands.entity(e).remove::<FuryState>();
+                        restart_charge_regen_if_below_max(
+                            skills_single,
+                            blessings_single,
+                            &mut slots.0[si],
+                        );
                     }
                 }
             }
@@ -2066,10 +2137,6 @@ fn update_one_slot_runtime(
             *slot = empty_roll();
         }
         Some(choice) => {
-            if choice.active_skill == ActiveSkill::Roll {
-                *slot = empty_roll();
-                return;
-            }
             let base_cooldown = choice.active_skill.get_base_cooldown();
             let current_skill = choice.active_skill;
             let skill_changed = slot.tracked_skill != current_skill;

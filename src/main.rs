@@ -609,6 +609,9 @@ impl<'w, 's> GameParam<'w, 's> {
     pub fn get_player_skills(&self) -> PlayerSkills {
         self.player_query.single().1.clone()
     }
+    pub fn get_xp_rate_bonus(&self) -> i32 {
+        self.player_stats.get_single().map(|s| s.13 .0).unwrap_or(0)
+    }
     pub fn player_mut(&mut self) -> &mut PlayerState {
         &mut self.game.player_state
     }

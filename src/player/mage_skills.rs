@@ -263,15 +263,15 @@ fn spawn_aseprite_explosion_hitbox(
     projectile: Projectile,
     extra_components: Vec<DeferredComponent>,
 ) {
-    let scaled_radius = base_radius * size_multiplier;
-
-    // Queue deferred spawn - actual entity will be created in PreUpdate
+    // NOTE: do NOT pre-scale the collider radius by `size_multiplier`. The entity's
+    // Transform scale below is applied to the collider by Rapier, so multiplying the
+    // radius here as well would scale the hitbox twice (it would grow ~size^2).
     spawn_deferred_aseprite_collider(
         commands,
         Transform::from_translation(pos).with_scale(Vec3::splat(size_multiplier)),
         duration,
         dmg,
-        Collider::capsule(Vec2::ZERO, Vec2::ZERO, scaled_radius),
+        Collider::capsule(Vec2::ZERO, Vec2::ZERO, base_radius),
         handle,
         animation,
         false,

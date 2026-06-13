@@ -260,7 +260,12 @@ pub fn spawn_shrine_interact_key_guide(
                         commands.entity(key_text).insert(InteractGuideKeybindText);
                     }
                 }
-                if let Some(icon_stack) = guide.icon_stack.clone() {
+                if let Some(mut icon_stack) = guide.icon_stack.clone() {
+                    // Boss shrine summon cost scales with each summon, so reflect the
+                    // current cost on the coin icon instead of the static initial value.
+                    if world_obj.copied() == Some(WorldObject::BossShrine) {
+                        icon_stack = icon_stack.copy_with_count(summon_cost.max(0) as usize);
+                    }
                     let icon = spawn_item_stack_icon(
                         &mut commands,
                         &game.graphics,

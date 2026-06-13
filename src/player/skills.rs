@@ -1148,7 +1148,7 @@ impl Heirloom {
             Heirloom::AntFarm => 2,
             Heirloom::StoneTooth => 5,
             Heirloom::SummonRing => 5,
-            Heirloom::Reaper => 3,
+            Heirloom::Reaper => 1,
             Heirloom::CoinLightning => 5,
             Heirloom::KillLightning => 5,
             Heirloom::ManaRegenLightning => 5,
@@ -2438,7 +2438,6 @@ impl HeirloomChoiceQueue {
             HeirloomChoiceState::new(Heirloom::LifestealCoins, HeirloomRarity::Legendary),
             HeirloomChoiceState::new(Heirloom::CrateBreakDamage, HeirloomRarity::Legendary),
             HeirloomChoiceState::new(Heirloom::EnergyBallBarrage, HeirloomRarity::Legendary),
-            HeirloomChoiceState::new(Heirloom::SkillExplosion, HeirloomRarity::Uncommon),
             HeirloomChoiceState::new(Heirloom::GoldenTooth, HeirloomRarity::Uncommon),
         ]
     }

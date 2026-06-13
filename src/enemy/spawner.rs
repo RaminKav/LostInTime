@@ -127,7 +127,7 @@ fn spawners_endless() -> Vec<Spawner> {
     vec![Spawner {
         enemy: Mob::VoidCrawler,
         weight: 100.,
-        spawn_timer: Timer::from_seconds(2., TimerMode::Once),
+        spawn_timer: Timer::from_seconds(1.2, TimerMode::Once),
         min_days_to_spawn: 0,
         num_to_spawn: Some(1),
     }]

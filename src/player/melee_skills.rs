@@ -440,9 +440,10 @@ pub fn spawn_echo_hitbox(
     // Use default animation to ensure it starts at frame 0
     let anim = AsepriteAnimation::default();
 
-    // Scale the collider radius by the size multiplier
+    // NOTE: do NOT pre-scale the collider radius by `size_multiplier`. The entity's
+    // Transform scale below is applied to the collider by Rapier, so multiplying the
+    // radius here as well would scale the hitbox twice (it would grow ~size^2).
     let base_radius = 24.0;
-    let scaled_radius = base_radius * size_multiplier;
 
     // Queue deferred spawn with parent - actual entity will be created in PreUpdate and parented
     spawn_deferred_aseprite_collider(
@@ -450,7 +451,7 @@ pub fn spawn_echo_hitbox(
         Transform::from_translation(Vec3::ZERO).with_scale(Vec3::splat(size_multiplier)),
         10.5,
         dmg,
-        Collider::capsule(Vec2::ZERO, Vec2::ZERO, scaled_radius),
+        Collider::capsule(Vec2::ZERO, Vec2::ZERO, base_radius),
         asset_server.load::<Aseprite, _>(Echo::PATH),
         anim,
         false,

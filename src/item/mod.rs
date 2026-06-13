@@ -2013,14 +2013,15 @@ pub fn handle_break_object(
 
         // EXP Reward
         if let Ok(exp) = xp.get(broken.entity) {
-            let player_skills = game.get_player_skills().clone();
+            let xp_rate_bonus = game.get_xp_rate_bonus();
             let mut player_xp = game.get_player_level_mut();
-            let did_level = player_xp.add_xp(exp.0, &player_skills, &mut chaos_tracker);
+            let (did_level, gained_xp) =
+                player_xp.add_xp(exp.0, xp_rate_bonus, &mut chaos_tracker);
             let t = tile_pos_to_world_pos(broken.pos, true);
-            spawn_xp_particles(t, &mut commands, exp.0, did_level);
+            spawn_xp_particles(t, &mut commands, gained_xp, did_level);
             flash_event.send(FlashExpBarEvent {
-                amount: exp.0,
-                did_level: did_level,
+                amount: gained_xp,
+                did_level,
             });
         }
 

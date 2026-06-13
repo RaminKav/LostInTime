@@ -2209,22 +2209,22 @@ pub fn handle_dev_button_clicks(
 
                 match action {
                     DevButtonAction::GrantXp => {
-                        let player_skills = game.get_player_skills();
+                        let xp_rate_bonus = game.get_xp_rate_bonus();
                         let mut player_level = game.get_player_level_mut();
-                        let did_level =
-                            player_level.add_xp(250, &player_skills, &mut chaos_tracker);
+                        let (did_level, gained_xp) =
+                            player_level.add_xp(250, xp_rate_bonus, &mut chaos_tracker);
                         flash_event.send(FlashExpBarEvent {
-                            amount: 250,
+                            amount: gained_xp,
                             did_level,
                         });
                     }
                     DevButtonAction::GrantMoreXp => {
-                        let player_skills = game.get_player_skills();
+                        let xp_rate_bonus = game.get_xp_rate_bonus();
                         let mut player_level = game.get_player_level_mut();
-                        let did_level =
-                            player_level.add_xp(1000, &player_skills, &mut chaos_tracker);
+                        let (did_level, gained_xp) =
+                            player_level.add_xp(1000, xp_rate_bonus, &mut chaos_tracker);
                         flash_event.send(FlashExpBarEvent {
-                            amount: 1000,
+                            amount: gained_xp,
                             did_level,
                         });
                     }

@@ -21,12 +21,12 @@ use super::{
 
 /// Vertical offset from the hovered HUD heirloom icon to the tooltip card center.
 pub const HEIRLOOM_HUD_HOVER_TOOLTIP_Y_OFFSET: f32 = -90.;
-pub const HEIRLOOM_HUD_HOVER_TOOLTIP_Z_OFFSET: f32 = 10.;
+pub const HEIRLOOM_HUD_HOVER_TOOLTIP_Z_OFFSET: f32 = 100.;
 /// Inset from the screen edge when clamping heirloom hover tooltips.
 pub const HEIRLOOM_TOOLTIP_SCREEN_EDGE_PAD: f32 = 8.;
 /// High layer-3 z for the hover card so it (and its child info boxes) render above all other
 /// UI such as shop icons/hitboxes.
-pub const HEIRLOOM_TOOLTIP_CARD_Z: f32 = 110.;
+pub const HEIRLOOM_TOOLTIP_CARD_Z: f32 = 140.;
 
 /// World position for a HUD heirloom hover card, nudged inward when near the left/right edge.
 pub fn heirloom_hud_hover_tooltip_position(
@@ -106,7 +106,7 @@ pub fn spawn_heirloom_tooltip_card(
             transform: Transform {
                 // Force a high z so the card (and its children) render above all other
                 // layer-3 UI like shop icons/hitboxes, regardless of the caller's z.
-                translation: position.truncate().extend(HEIRLOOM_TOOLTIP_CARD_Z),
+                translation: position + Vec3::new(0., 0., HEIRLOOM_TOOLTIP_CARD_Z),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },

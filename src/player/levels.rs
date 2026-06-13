@@ -5,12 +5,22 @@ use serde::{Deserialize, Serialize};
 use crate::{
     chaos::ChaosTracker,
     colors::YELLOW,
-    player::skills::{Heirloom, PlayerSkills},
     ui::{damage_numbers::spawn_floating_text_with_shadow, game_fonts::FLOATING_TEXT, UIState},
     DEBUG,
 };
 
 use super::{stats::SkillPoints, HeirloomChoiceQueue};
+
+/// Applies the player's total XP-rate bonus (equipment + Microchip heirloom stacks).
+pub fn effective_xp_gain(base_xp: u32, xp_rate_bonus: i32) -> u32 {
+    if base_xp == 0 {
+        return 0;
+    }
+    if xp_rate_bonus <= 0 {
+        return base_xp;
+    }
+    (base_xp as f32 * (1. + xp_rate_bonus as f32 / 100.)).round() as u32
+}
 
 #[derive(Component, Clone, Default, Debug, Serialize, Deserialize)]
 pub struct PlayerLevel {
@@ -40,11 +50,12 @@ impl PlayerLevel {
     pub fn add_xp(
         &mut self,
         xp: u32,
-        skills: &PlayerSkills,
+        xp_rate_bonus: i32,
         chaos_tracker: &mut ChaosTracker,
-    ) -> bool {
+    ) -> (bool, u32) {
         let mut did_level_up = false;
-        self.xp += (xp as f32 * (1. + skills.get_count(Heirloom::XPGain) as f32 * 0.07)) as u32;
+        let gained = effective_xp_gain(xp, xp_rate_bonus);
+        self.xp += gained;
 
         if self.xp >= self.next_level_xp {
             self.level += 1;
@@ -62,7 +73,7 @@ impl PlayerLevel {
         if did_level_up {
             chaos_tracker.add_chaos(0.1);
         }
-        did_level_up
+        (did_level_up, gained)
     }
 }
 

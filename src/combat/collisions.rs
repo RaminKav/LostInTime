@@ -873,20 +873,21 @@ pub fn check_item_drop_collisions(
             || obj == WorldObject::XPShardLarge
         {
             let mut xp_amount = match obj {
-                WorldObject::XPShard => 9,
-                WorldObject::XPShardMedium => 32,
+                WorldObject::XPShard => 7,
+                WorldObject::XPShardMedium => 23,
                 WorldObject::XPShardLarge => 500,
                 _ => 0,
             };
             if *NO_XP {
                 xp_amount = 0;
             }
-            let player_skills = game.get_player_skills();
+            let xp_rate_bonus = game.get_xp_rate_bonus();
             let mut player_level = game.get_player_level_mut();
-            let did_level = player_level.add_xp(xp_amount, &player_skills, &mut chaos_tracker);
+            let (did_level, gained_xp) =
+                player_level.add_xp(xp_amount, xp_rate_bonus, &mut chaos_tracker);
 
             flash_event.send(FlashExpBarEvent {
-                amount: xp_amount,
+                amount: gained_xp,
                 did_level,
             });
 

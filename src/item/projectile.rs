@@ -290,7 +290,7 @@ impl Plugin for RangedAttackPlugin {
             (
                 handle_ranged_attack_event,
                 handle_translate_projectiles.run_if(is_not_paused),
-                handle_spawn_projectiles_after_delay,
+                handle_spawn_projectiles_after_delay.run_if(is_not_paused),
             )
                 .in_set(OnUpdate(GameState::Main)),
         );

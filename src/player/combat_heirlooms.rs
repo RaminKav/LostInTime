@@ -2725,10 +2725,13 @@ fn spawn_cherry_bomb_explosion(
         Transform::from_translation(pos.extend(11.)).with_scale(Vec3::splat(size_multiplier)),
         CHERRY_BOMB_EXPLOSION_ANIM_SECS,
         dmg,
+        // NOTE: do NOT pre-scale the collider radius by `size_multiplier`. The entity's
+        // Transform scale above is applied to the collider by Rapier, so multiplying the
+        // radius here as well would scale the hitbox twice (it would grow ~size^2).
         Collider::capsule(
             Vec2::new(0.0, -2.0),
             Vec2::new(0.0, -4.0),
-            CHERRY_BOMB_EXPLOSION_RADIUS * size_multiplier,
+            CHERRY_BOMB_EXPLOSION_RADIUS,
         ),
         explosion_ase.clone(),
         AsepriteAnimation::from(CherryBombExplosionSprite::tags::EXPLOSION),

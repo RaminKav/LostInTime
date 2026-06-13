@@ -104,6 +104,10 @@ impl Plugin for InputsPlugin {
                     dispatch_active_skill_events
                         .run_if(is_not_paused)
                         .after(handle_hotbar_consume_keys),
+                    handle_roll
+                        .run_if(is_not_paused)
+                        .after(dispatch_active_skill_events)
+                        .before(crate::player::skill_heirlooms::handle_active_skill_event),
                     handle_hotbar_consume_keys
                         .run_if(is_not_paused)
                         .before(dispatch_active_skill_events),
@@ -377,10 +381,8 @@ pub fn player_move_inputs(
             &Speed,
             &Hunger,
             &mut RunDustTimer,
-            &PlayerSkills,
             Option<&BounceEffect>,
             &ActiveConsumableBuffs,
-            &OwnedBlessings,
             Option<&HitAnimationTracker>,
             Option<&KinematicCharacterControllerOutput>,
         ),
@@ -393,18 +395,14 @@ pub fn player_move_inputs(
     >,
     time: Res<Time>,
     key_input: Res<Input<KeyCode>>,
-    mouse_input: Res<Input<MouseButton>>,
     mut commands: Commands,
     mut particle: Query<&mut EffectSpawner, With<DustParticles>>,
     asset_server: Res<AssetServer>,
     audio: Res<Audio>,
     audio_volume: Res<AudioVolume>,
     mut audio_timer: Local<Timer>,
-    mut active_skill_event: EventWriter<ActiveSkillUsedEvent>,
     mut ammo_query: Query<&mut Ammo>,
-    keybinds: Res<crate::keybinds::InputMappings>,
     proto_param: ProtoParam,
-    bridge_mode: Res<BridgePlacementMode>,
 ) {
     if audio_timer.duration() == Duration::ZERO {
         *audio_timer = Timer::from_seconds(0.2, TimerMode::Once);
@@ -417,10 +415,8 @@ pub fn player_move_inputs(
         speed,
         hunger,
         mut run_dust_timer,
-        skills,
         bounce_option,
         consumable_buffs,
-        blessings,
         hit_tracker_option,
         kcc_output,
     ) = player_query.single_mut();
@@ -459,34 +455,6 @@ pub fn player_move_inputs(
     if key_input.pressed(KeyCode::S) || key_input.pressed(KeyCode::Down) {
         d_raw.y -= 1.;
         player.is_moving = true;
-    }
-    //TODO: move this tick to animations.rs
-    if !bridge_mode.active {
-        if let Some(roll_slot) = skills.has_active_skill(ActiveSkill::Roll) {
-            if player.player_dash_cooldown.finished()
-                && keybinds.check_skill_input(roll_slot, &key_input, &mouse_input)
-            {
-                player.is_dashing = true;
-                player.ice_slide_direction = None;
-                player.ice_momentum_remaining = 0.0;
-                player.ice_momentum_direction = None;
-                player.ice_slide_speed_factor = 1.0;
-                let effective_cd = skills.effective_skill_cooldown(&ActiveSkill::Roll, blessings);
-                let effective_cd = effective_cd.max(0.0); // avoid negative Duration panic
-                active_skill_event.send(ActiveSkillUsedEvent {
-                    slot: roll_slot,
-                    cooldown: effective_cd,
-                });
-                player
-                    .player_dash_cooldown
-                    .set_duration(Duration::from_secs_f32(effective_cd));
-                player.player_dash_cooldown.reset();
-                commands
-                    .entity(player_e)
-                    .insert(PhasingThroughEnemies::new(0.28));
-                commands.spawn(SoundSpawner::new(AudioSoundEffect::Roll, 0.25));
-            }
-        }
     }
     clear_ice_slide_when_stuck(&mut player, on_ice, d_raw, kcc_output);
 
@@ -636,6 +604,53 @@ pub fn dispatch_active_skill_events(
         }
     }
 }
+/// Triggers the dash motion when the Roll skill is cast. Roll is dispatched like any other
+/// active skill (`dispatch_active_skill_events`), and charge/cooldown bookkeeping lives in
+/// `handle_active_skill_event`. This system only reacts to the event by starting the dash —
+/// `player_move_inputs` then applies the actual movement from `is_dashing`.
+pub fn handle_roll(
+    mut active_skill_events: EventReader<ActiveSkillUsedEvent>,
+    mut commands: Commands,
+    mut game: GameParam,
+    player_q: Query<(Entity, &PlayerSkills), With<Player>>,
+    bridge_mode: Res<BridgePlacementMode>,
+) {
+    if bridge_mode.active {
+        return;
+    }
+    let Ok((player_e, skills)) = player_q.get_single() else {
+        return;
+    };
+    let Some(roll_slot) = skills.has_active_skill(ActiveSkill::Roll) else {
+        active_skill_events.clear();
+        return;
+    };
+    let mut should_dash = false;
+    for ev in active_skill_events.iter() {
+        if ev.slot == roll_slot {
+            should_dash = true;
+        }
+    }
+    if !should_dash {
+        return;
+    }
+
+    let player = game.player_mut();
+    player.is_dashing = true;
+    player.ice_slide_direction = None;
+    player.ice_momentum_remaining = 0.0;
+    player.ice_momentum_direction = None;
+    player.ice_slide_speed_factor = 1.0;
+    // Restart the dash motion so back-to-back rolls (e.g. extra Paintbrush charges) each
+    // get a fresh dash arc instead of resuming a partially-elapsed one.
+    player.player_dash_duration.reset();
+
+    commands
+        .entity(player_e)
+        .insert(PhasingThroughEnemies::new(0.28));
+    commands.spawn(SoundSpawner::new(AudioSoundEffect::Roll, 0.25));
+}
+
 pub fn tick_dash_timer(mut game: GameParam, time: Res<Time>) {
     let player = game.player_mut();
 
@@ -783,13 +798,13 @@ pub fn toggle_inventory(
             });
         }
         if key_input.just_pressed(KeyCode::C) {
-            let skills = game.get_player_skills().clone();
-            let did_level = game
+            let xp_rate_bonus = game.get_xp_rate_bonus();
+            let (did_level, gained_xp) = game
                 .get_player_level_mut()
-                .add_xp(200, &skills, &mut chaos_tracker);
+                .add_xp(200, xp_rate_bonus, &mut chaos_tracker);
 
             flash_event.send(FlashExpBarEvent {
-                amount: 200,
+                amount: gained_xp,
                 did_level,
             });
         }

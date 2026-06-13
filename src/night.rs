@@ -179,7 +179,7 @@ pub const DIFFICULTY_INCREASE_INTERVAL: f32 = 90.0; // 1.5 minutes
 /// Endless chaos: smooth power-law chaos(elapsed) = COEFFICIENT * elapsed_seconds^EXPONENT.
 /// Kept gentle (exponent 1.2) so mob HP scaling (1.4^(late_chaos/10)) doesn't blow up.
 /// Roughly ~8 @ 5min, ~22 @ 10min, ~47 @ 20min raw (before tier mult).
-pub const ENDLESS_CHAOS_COEFFICIENT: f32 = 0.011;
+pub const ENDLESS_CHAOS_COEFFICIENT: f32 = 0.0187;
 pub const ENDLESS_CHAOS_EXPONENT: f32 = 1.5;
 
 /// Era timer - 10 minutes per era. Timer pauses in dungeons.

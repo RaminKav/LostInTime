@@ -694,7 +694,9 @@ impl ItemAttributes {
         ));
         // Defence already calculated above for ThornArmor
         entity.insert(Defence(total_defence));
-        entity.insert(XpRateBonus(self.xp_rate.value));
+        entity.insert(XpRateBonus(
+            self.xp_rate.value + skills.get_count(Heirloom::XPGain) * 7,
+        ));
         entity.insert(LootRateBonus(
             self.loot_rate.value + skills.get_count(Heirloom::LoadedDice) * 7,
         ));
