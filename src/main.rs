@@ -269,6 +269,7 @@ fn main() {
         .insert_resource(Msaa::Off)
         .insert_resource(FixedTime::new_from_secs(TIME_STEP))
         .insert_resource(DisplayScaleSettings::load())
+        .insert_resource(cursor::CursorColorSettings::load())
         .add_plugin(panic_handler::PanicHandler::new().build())
         .add_plugin(AsepritePlugin)
         .add_plugin(FrameTimeDiagnosticsPlugin)

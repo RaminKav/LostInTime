@@ -708,7 +708,12 @@ pub fn tick_game_start_overlay(
                 crate::ui::tutorial_ui::PendingFindBossShrineHint::WaitingForTrigger,
             );
             commands.insert_resource(XpBarFadeIn(Timer::from_seconds(2.0, TimerMode::Once)));
-            commands.insert_resource(crate::ui::tutorial_ui::TutorialReady);
+            commands.insert_resource(crate::ui::tutorial_ui::PendingTutorialReady(
+                Timer::from_seconds(
+                    crate::ui::tutorial_ui::START_TUTORIAL_DELAY_SECS,
+                    TimerMode::Once,
+                ),
+            ));
             commands.entity(e).despawn();
         } else {
             let alpha = f32::max(0., 1. - timer.0.percent());

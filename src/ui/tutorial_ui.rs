@@ -49,6 +49,16 @@ aseprite!(pub TutorialAnims, "ui/TutorialAnims.ase");
 #[derive(Resource)]
 pub struct TutorialReady;
 
+/// Delay (after the run fade-in completes) before the first-run start tutorial is armed.
+/// The 3s game-start fade-in plus this delay lands the popup ~10s into the run, giving the
+/// intro input-tip overlay (0.6s fade in + 8s hold + 0.6s fade out) time to finish first.
+pub const START_TUTORIAL_DELAY_SECS: f32 = 7.0;
+
+/// Inserted when the run fade-in ends; ticks down and then inserts [`TutorialReady`] so the
+/// first-run tutorial popup is delayed rather than shown immediately.
+#[derive(Resource)]
+pub struct PendingTutorialReady(pub Timer);
+
 /// Seconds after the hint is scheduled (tutorial done or skipped) before the message appears.
 const FIND_BOSS_SHRINE_HINT_DELAY_SECS: f32 = 2.3;
 
@@ -278,6 +288,7 @@ impl Plugin for TutorialPlugin {
                     process_pending_inventory_tutorials,
                     handle_tutorial_buttons,
                     tick_pending_find_boss_shrine_hint,
+                    tick_pending_tutorial_ready,
                 )
                     .in_set(OnUpdate(GameState::Main)),
             );
@@ -343,6 +354,21 @@ fn tick_pending_find_boss_shrine_hint(
     if timer.finished() {
         show_find_boss_shrine_hint(&mut global_text_events);
         commands.remove_resource::<PendingFindBossShrineHint>();
+    }
+}
+
+fn tick_pending_tutorial_ready(
+    time: Res<Time>,
+    mut pending: Option<ResMut<PendingTutorialReady>>,
+    mut commands: Commands,
+) {
+    let Some(pending) = pending.as_deref_mut() else {
+        return;
+    };
+    pending.0.tick(time.delta());
+    if pending.0.finished() {
+        commands.insert_resource(TutorialReady);
+        commands.remove_resource::<PendingTutorialReady>();
     }
 }
 

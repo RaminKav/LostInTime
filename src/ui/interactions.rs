@@ -2654,10 +2654,13 @@ pub fn handle_merchant_shop_interactions(
     children: Query<&Children>,
     icons: Query<Entity, With<super::MerchantSlotIcon>>,
     mut purchase_event: EventWriter<SubmitMerchantPurchase>,
+    mut shop: ResMut<EssenceShopChoices>,
+    mut cache: ResMut<super::EssenceShopCache>,
     mut commands: Commands,
 ) {
     let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
+    let right_mouse_pressed = mouse_input.just_pressed(MouseButton::Right);
 
     for (e, mut interactable, slot_index) in shop_slots.iter_mut() {
         match hit_test {
@@ -2671,6 +2674,14 @@ pub fn handle_merchant_shop_interactions(
                         purchase_event.send(SubmitMerchantPurchase {
                             slot_index: slot_index.0,
                         });
+                    } else if right_mouse_pressed && !shop.slots[slot_index.0].purchased {
+                        // Mark this item to track (1 per shop); right-clicking it again clears it.
+                        shop.marked_slot = if shop.marked_slot == Some(slot_index.0) {
+                            None
+                        } else {
+                            Some(slot_index.0)
+                        };
+                        sync_merchant_shop_to_world(&shop, &mut commands, &mut cache);
                     }
                 }
                 _ => (),

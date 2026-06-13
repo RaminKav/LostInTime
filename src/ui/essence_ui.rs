@@ -11,7 +11,7 @@ use crate::{
         attribute_helpers::create_new_random_item_stack_with_attributes, AttributeChangeEvent,
         ItemGlow, ItemRarity, LootRateBonus,
     },
-    colors::{RED, WHITE},
+    colors::{LIGHT_RED, RED, SHRINE_GREEN, WHITE},
     custom_commands::CommandsExt,
     inventory::{Inventory, ItemStack},
     item::WorldObject,
@@ -83,14 +83,24 @@ pub const MERCHANT_CONTAINER_UI_SIZE: Vec2 = Vec2::new(160., 188.);
 #[derive(Resource, Default, Debug, Clone)]
 pub struct EssenceShopCache {
     pub shops: std::collections::HashMap<crate::world::TileMapPosition, [MerchantShopSlot; 7]>,
+    /// The slot index the player has marked to track for each shop (max 1 per shop).
+    pub marked: std::collections::HashMap<crate::world::TileMapPosition, usize>,
 }
+
+/// Path to the marker icon spawned on top of a right-clicked shop item.
+pub const MERCHANT_MARKER_ICON_PATH: &str = "ui/Icons/MerchantMarker.png";
+pub const MERCHANT_MARKER_ICON_SIZE: Vec2 = Vec2::new(16., 16.);
+/// World-space vertical offset of the tracked-item display above the merchant.
+const MERCHANT_WORLD_MARKER_Y_OFFSET: f32 = 34.;
+/// Z used so the world-space tracked-item display renders above all y-sorted world entities.
+const MERCHANT_WORLD_MARKER_Z: f32 = 990.;
 
 use super::{
     heirloom_tooltip::{HeirloomTooltipRequest, HeirloomTooltipShow},
     spawn_item_stack_icon,
     tooltips::{ToolTipUpdateEvent, TooltipTeardownEvent},
     Interactable, UIElement, UIState, CURRENCY_BACKGROUND_SIZE, KEYBIND_BADGE_COLOR,
-    KEYBIND_BADGE_SIZE,
+    TOOLTIP_INFO_BOX_SIZE,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -178,6 +188,8 @@ pub struct EssenceShopChoices {
     pub slots: [MerchantShopSlot; MERCHANT_SLOT_COUNT],
     pub owner_entity: Option<Entity>,
     pub tile_pos: Option<crate::world::TileMapPosition>,
+    /// Slot index the player marked to track (1 per shop). `None` when nothing is tracked.
+    pub marked_slot: Option<usize>,
 }
 
 impl EssenceShopChoices {
@@ -246,6 +258,29 @@ pub struct MerchantCategoryRerollIcon;
 #[derive(Component)]
 pub struct MerchantSlotIcon;
 
+/// The `MerchantMarker.png` overlay shown on top of the marked item icon inside the shop UI.
+#[derive(Component)]
+pub struct MerchantMarkerOverlay {
+    pub slot_index: usize,
+}
+
+/// Root of the world-space tracked-item display shown above a merchant.
+#[derive(Component)]
+pub struct MerchantWorldMarkerDisplay {
+    pub owner: Entity,
+    pub slot_index: usize,
+}
+
+/// World-space coin cost text for the tracked item (turns green when affordable).
+#[derive(Component)]
+pub struct MerchantWorldMarkerPriceText {
+    pub coin_cost: u32,
+}
+
+/// Marks the shop-side info box explaining the right-click-to-track action.
+#[derive(Component)]
+pub struct MerchantTrackInfoBox;
+
 #[derive(Component)]
 pub struct MerchantHeirloomHover {
     pub heirloom: Heirloom,
@@ -305,6 +340,14 @@ pub fn sync_merchant_shop_to_world(
     }
     if let Some(tile_pos) = shop.tile_pos {
         cache.shops.insert(tile_pos, shop.slots.clone());
+        match shop.marked_slot {
+            Some(slot) => {
+                cache.marked.insert(tile_pos, slot);
+            }
+            None => {
+                cache.marked.remove(&tile_pos);
+            }
+        }
     }
 }
 
@@ -451,6 +494,59 @@ fn spawn_price_badge(
         .set_parent(badge);
 
     commands.entity(badge).set_parent(row);
+}
+
+/// Reuses the tooltip info-box art to explain right-click tracking, placed to the right of
+/// the shop beneath the currency counters.
+fn spawn_merchant_track_info_box(
+    commands: &mut Commands,
+    graphics: &Graphics,
+    asset_server: &AssetServer,
+    parent: Entity,
+) {
+    // Sit fully to the right of the merchant container (no overlap) with a small gap.
+    let pos = Vec2::new(
+        MERCHANT_CONTAINER_UI_SIZE.x / 2. + TOOLTIP_INFO_BOX_SIZE.x / 2. + 6.,
+        8.,
+    );
+    let box_e = commands
+        .spawn(SpriteBundle {
+            texture: graphics.get_ui_element_texture(UIElement::TooltipInfoBox),
+            sprite: Sprite {
+                custom_size: Some(TOOLTIP_INFO_BOX_SIZE),
+                ..default()
+            },
+            transform: Transform::from_translation(Vec3::new(pos.x, pos.y, 2.)),
+            ..default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(UIState::Essence)
+        .insert(MerchantTrackInfoBox)
+        .insert(Name::new("Merchant Track Info Box"))
+        .set_parent(parent)
+        .id();
+
+    for (line, y) in [("Right click:", 5.), ("Mark a shop item to track", -6.)] {
+        commands
+            .spawn((
+                Text2dBundle {
+                    text: Text::from_section(
+                        line.to_string(),
+                        TextStyle {
+                            font: asset_server.load("fonts/slkscr.ttf"),
+                            font_size: 8.4,
+                            color: WHITE,
+                        },
+                    )
+                    .with_alignment(TextAlignment::Center),
+                    text_anchor: bevy::sprite::Anchor::Center,
+                    transform: Transform::from_translation(Vec3::new(0., y, 2.)),
+                    ..default()
+                },
+                RenderLayers::from_layers(&[3]),
+            ))
+            .set_parent(box_e);
+    }
 }
 
 fn spawn_section_label(
@@ -660,6 +756,296 @@ pub fn spawn_merchant_slot_ui(
     }
 
     commands.entity(slot_root_e).set_parent(parent);
+}
+
+/// Keeps the in-shop `MerchantMarker.png` overlay attached to the marked slot's icon.
+/// Re-parents/rebuilds it after purchases or rerolls despawn and respawn slot roots.
+pub fn sync_merchant_marker_overlay(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    shop: Res<EssenceShopChoices>,
+    slot_ui: Query<(Entity, &MerchantSlotUi)>,
+    overlays: Query<(Entity, &MerchantMarkerOverlay)>,
+) {
+    let desired = shop
+        .marked_slot
+        .filter(|&slot| slot < MERCHANT_SLOT_COUNT && !shop.slots[slot].purchased);
+
+    // When a slot root is despawned (purchase/reroll) the overlay child dies with it, so a
+    // stale overlay never lingers; we only need to compare the surviving overlay's slot.
+    let existing = overlays.iter().next();
+    if existing.map(|(_, o)| o.slot_index) == desired {
+        return;
+    }
+
+    let desired_root = desired.and_then(|slot| {
+        slot_ui
+            .iter()
+            .find(|(_, ui)| ui.slot_index == slot)
+            .map(|(e, _)| e)
+    });
+
+    for (e, _) in overlays.iter() {
+        commands.entity(e).despawn_recursive();
+    }
+
+    if let (Some(slot), Some(root)) = (desired, desired_root) {
+        commands
+            .spawn((
+                SpriteBundle {
+                    texture: asset_server.load(MERCHANT_MARKER_ICON_PATH),
+                    sprite: Sprite {
+                        custom_size: Some(MERCHANT_MARKER_ICON_SIZE),
+                        ..default()
+                    },
+                    transform: Transform::from_translation(Vec3::new(
+                        0.,
+                        0.,
+                        MERCHANT_ICON_HIT_Z + 1.,
+                    )),
+                    ..default()
+                },
+                RenderLayers::from_layers(&[3]),
+                UIState::Essence,
+                MerchantMarkerOverlay { slot_index: slot },
+                Name::new("Merchant Marker Overlay"),
+            ))
+            .set_parent(root);
+    }
+}
+
+/// World-space (game camera, default render layer) icon for the tracked item.
+fn merchant_world_marker_icon_sprite(
+    graphics: &Graphics,
+    slot: &MerchantShopSlot,
+) -> TextureAtlasSprite {
+    match &slot.kind {
+        MerchantItemKind::Heirloom { heirloom, .. } => graphics.get_heirloom_icon(heirloom.clone()),
+        MerchantItemKind::Equipment(stack) | MerchantItemKind::Material(stack) => graphics
+            .spritesheet_map
+            .as_ref()
+            .unwrap()
+            .get(&stack.obj_type)
+            .cloned()
+            .expect("merchant item icon"),
+    }
+}
+
+fn merchant_world_marker_glow(slot: &MerchantShopSlot) -> Option<ItemGlow> {
+    match &slot.kind {
+        MerchantItemKind::Heirloom { rarity, .. } => rarity.get_item_glow(),
+        MerchantItemKind::Equipment(stack) | MerchantItemKind::Material(stack) => {
+            stack.rarity.get_item_glow()
+        }
+    }
+}
+
+/// Builds the world-space tracked-item display (icon + glow + coin cost) above a merchant.
+/// Mirrors the shop badge layout but renders on the game camera instead of the UI camera.
+fn spawn_merchant_world_marker_display(
+    commands: &mut Commands,
+    graphics: &Graphics,
+    asset_server: &AssetServer,
+    coins: u32,
+    merchant_pos: Vec2,
+    owner: Entity,
+    slot_index: usize,
+    slot: &MerchantShopSlot,
+) {
+    let root = commands
+        .spawn((
+            SpatialBundle::from_transform(Transform::from_translation(Vec3::new(
+                merchant_pos.x,
+                merchant_pos.y + MERCHANT_WORLD_MARKER_Y_OFFSET,
+                MERCHANT_WORLD_MARKER_Z,
+            ))),
+            MerchantWorldMarkerDisplay { owner, slot_index },
+            Name::new("Merchant World Marker Display"),
+        ))
+        .id();
+
+    // Black background behind the icon for contrast against the world.
+    commands
+        .spawn(SpriteBundle {
+            sprite: Sprite {
+                color: KEYBIND_BADGE_COLOR,
+                custom_size: Some(Vec2::new(20., 20.)),
+                ..default()
+            },
+            transform: Transform::from_translation(Vec3::new(0., 0., 0.)),
+            ..default()
+        })
+        .set_parent(root);
+
+    let icon_e = commands
+        .spawn(SpriteSheetBundle {
+            sprite: merchant_world_marker_icon_sprite(graphics, slot),
+            texture_atlas: graphics.texture_atlas.as_ref().unwrap().clone(),
+            transform: Transform::from_translation(Vec3::new(0., 0., 2.)),
+            ..default()
+        })
+        .set_parent(root)
+        .id();
+
+    if let Some(glow) = merchant_world_marker_glow(slot) {
+        commands
+            .spawn(SpriteBundle {
+                texture: graphics.get_item_glow(glow),
+                sprite: Sprite {
+                    custom_size: Some(Vec2::new(20., 20.)),
+                    ..default()
+                },
+                transform: Transform::from_translation(Vec3::new(0., 0., -1.)),
+                ..default()
+            })
+            .set_parent(icon_e);
+    }
+
+    // Coin cost badge: coin icon + black background + number (green when affordable).
+    let count_str = slot.coin_cost.to_string();
+    let badge_width = 12. + (count_str.len().saturating_sub(1) as f32 * 14.);
+    let price_color = if coins >= slot.coin_cost {
+        SHRINE_GREEN
+    } else {
+        LIGHT_RED
+    };
+
+    let row = commands
+        .spawn((
+            SpatialBundle::from_transform(Transform::from_translation(Vec3::new(5., -18., 0.5))),
+            Name::new("Merchant World Marker Price"),
+        ))
+        .set_parent(root)
+        .id();
+
+    let coin_sprite = graphics
+        .icons
+        .as_ref()
+        .unwrap()
+        .get(&WorldObject::Coin)
+        .or_else(|| {
+            graphics
+                .spritesheet_map
+                .as_ref()
+                .unwrap()
+                .get(&WorldObject::Coin)
+        })
+        .cloned()
+        .expect("coin icon");
+    commands
+        .spawn(SpriteSheetBundle {
+            sprite: coin_sprite,
+            texture_atlas: graphics.texture_atlas.as_ref().unwrap().clone(),
+            transform: Transform::from_translation(Vec3::new(-12., 0., 1.)),
+            ..default()
+        })
+        .set_parent(row);
+
+    let badge = commands
+        .spawn(SpriteBundle {
+            sprite: Sprite {
+                color: KEYBIND_BADGE_COLOR,
+                custom_size: Some(Vec2::new(badge_width, 14.)),
+                ..default()
+            },
+            transform: Transform::from_translation(Vec3::new(-5., 0., 1.)),
+            ..default()
+        })
+        .set_parent(row)
+        .id();
+
+    commands
+        .spawn((
+            Text2dBundle {
+                text: Text::from_section(
+                    count_str,
+                    TextStyle {
+                        font: asset_server.load("fonts/slkscr.ttf"),
+                        font_size: 8.4,
+                        color: price_color,
+                    },
+                )
+                .with_alignment(TextAlignment::Center),
+                text_anchor: bevy::sprite::Anchor::Center,
+                transform: Transform::from_translation(Vec3::new(5., 0., 2.)),
+                ..default()
+            },
+            MerchantWorldMarkerPriceText {
+                coin_cost: slot.coin_cost,
+            },
+        ))
+        .set_parent(badge);
+}
+
+/// Keeps the world-space tracked-item display in sync with each merchant's marked slot.
+pub fn sync_merchant_world_marker_displays(
+    mut commands: Commands,
+    graphics: Res<Graphics>,
+    asset_server: Res<AssetServer>,
+    coins: Res<CoinCurrency>,
+    merchants: Query<(Entity, &EssenceShopChoices, &GlobalTransform)>,
+    displays: Query<(Entity, &MerchantWorldMarkerDisplay)>,
+) {
+    // Desired (owner -> slot) tracked items that are still valid.
+    let mut desired: std::collections::HashMap<Entity, usize> = std::collections::HashMap::new();
+    for (entity, shop, _) in merchants.iter() {
+        if let Some(slot) = shop
+            .marked_slot
+            .filter(|&slot| slot < MERCHANT_SLOT_COUNT && !shop.slots[slot].purchased)
+        {
+            desired.insert(entity, slot);
+        }
+    }
+
+    // Despawn displays that no longer match a desired (owner, slot).
+    for (e, display) in displays.iter() {
+        if desired.get(&display.owner) != Some(&display.slot_index) {
+            commands.entity(e).despawn_recursive();
+        }
+    }
+
+    // Spawn displays for merchants that need one but don't have a matching display yet.
+    for (entity, shop, transform) in merchants.iter() {
+        let Some(&slot) = desired.get(&entity) else {
+            continue;
+        };
+        let already = displays
+            .iter()
+            .any(|(_, d)| d.owner == entity && d.slot_index == slot);
+        if already {
+            continue;
+        }
+        spawn_merchant_world_marker_display(
+            &mut commands,
+            &graphics,
+            &asset_server,
+            coins.coins,
+            transform.translation().truncate(),
+            entity,
+            slot,
+            &shop.slots[slot],
+        );
+    }
+}
+
+/// Recolors world-space tracked-item cost text green once the player can afford it.
+pub fn update_merchant_world_marker_price_colors(
+    coins: Res<CoinCurrency>,
+    mut price_texts: Query<(&MerchantWorldMarkerPriceText, &mut Text)>,
+) {
+    if !coins.is_changed() {
+        return;
+    }
+    for (price, mut text) in price_texts.iter_mut() {
+        let color = if coins.coins >= price.coin_cost {
+            SHRINE_GREEN
+        } else {
+            LIGHT_RED
+        };
+        if let Some(section) = text.sections.first_mut() {
+            section.style.color = color;
+        }
+    }
 }
 
 pub fn spawn_merchant_category_reroll_button(
@@ -1079,6 +1465,8 @@ pub fn setup_essence_ui(
         },
     );
 
+    spawn_merchant_track_info_box(&mut commands, &graphics, &asset_server, essence_ui_e);
+
     for category in [
         MerchantCategory::Heirlooms,
         MerchantCategory::Equipment,
@@ -1290,6 +1678,9 @@ pub fn handle_submit_merchant_purchase(
         }
 
         shop.slots[slot_index].purchased = true;
+        if shop.marked_slot == Some(slot_index) {
+            shop.marked_slot = None;
+        }
         purchase_tracker.purchases_made += 1;
 
         sync_merchant_shop_to_world(&shop, &mut commands, &mut cache);
@@ -1705,6 +2096,16 @@ pub fn handle_populate_essence_shop_on_new_spawn(
                 slots[idx] = generate_material_slot(&mut rng, &proto, purchase_multiplier);
             }
             shop.slots = slots;
+        }
+
+        // Restore the tracked-item marker; drop it if that slot is now purchased.
+        shop.marked_slot = shop_cache
+            .marked
+            .get(&tile_pos)
+            .copied()
+            .filter(|&slot| slot < MERCHANT_SLOT_COUNT && !shop.slots[slot].purchased);
+        if shop.marked_slot.is_none() {
+            shop_cache.marked.remove(&tile_pos);
         }
 
         shop_cache.shops.insert(tile_pos, shop.slots.clone());

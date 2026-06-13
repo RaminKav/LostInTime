@@ -34,6 +34,8 @@ pub mod layout_sync;
 pub mod text_pixel_snap;
 pub mod key_input_guide;
 use key_input_guide::*;
+pub mod intro_guide;
+use intro_guide::IntroGuidePlugin;
 pub mod furnace_ui;
 mod heirloom_tooltip;
 pub mod tooltip_info_boxes;
@@ -578,6 +580,7 @@ impl Plugin for UIPlugin {
             .register_type::<InventorySlotState>()
             .add_plugin(MinimapPlugin)
             .add_plugin(TipPlugin)
+            .add_plugin(IntroGuidePlugin)
             .add_plugin(tutorial_ui::TutorialPlugin)
             .add_system(setup_loading_screen.in_schedule(OnEnter(GameState::Initializing)))
             .add_system(
@@ -770,8 +773,7 @@ impl Plugin for UIPlugin {
             ))
             .add_system(
                 handle_add_damage_numbers_after_hit
-                    .after(handle_hits)
-                    .before(crate::item::handle_break_object)
+                    .before(handle_hits)
                     .in_set(OnUpdate(GameState::Main))
                     .run_if(resource_exists::<Game>()),
             )
@@ -1016,6 +1018,8 @@ impl Plugin for UIPlugin {
                         .run_if(in_state(UIState::Options))
                         .before(crate::update_pixel_perfect_viewport),
                     update_scale_text.run_if(in_state(UIState::Options)),
+                    handle_cursor_color_button_click.run_if(in_state(UIState::Options)),
+                    update_cursor_color_preview.run_if(in_state(UIState::Options)),
                     handle_achievement_row_clicks.run_if(in_state(UIState::Achievements)))
                 )
             .add_system(
@@ -1060,7 +1064,15 @@ impl Plugin for UIPlugin {
                     handle_merchant_category_reroll_buttons.run_if(in_state(UIState::Essence)),
                     handle_merchant_category_reroll_event.run_if(in_state(UIState::Essence)),
                     refresh_merchant_shop_ui_dirty.run_if(in_state(UIState::Essence)),
+                    sync_merchant_marker_overlay.run_if(in_state(UIState::Essence)),
                     update_chest_button_label_hover.run_if(in_state(UIState::Essence)),
+                )
+                    .in_set(OnUpdate(GameState::Main)),
+            )
+            .add_systems(
+                (
+                    sync_merchant_world_marker_displays,
+                    update_merchant_world_marker_price_colors,
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )

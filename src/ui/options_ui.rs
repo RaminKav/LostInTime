@@ -202,6 +202,15 @@ pub struct ScaleValueText {
     pub channel: ScaleChannel,
 }
 
+#[derive(Component)]
+pub struct CursorColorButton {
+    pub direction: VolumeDirection,
+}
+
+/// Marker for the sprite that previews the currently selected cursor color.
+#[derive(Component)]
+pub struct CursorColorPreview;
+
 pub fn handle_options_clicks(
     cursor_pos: Res<CursorPos>,
     mouse_input: Res<Input<MouseButton>>,
@@ -414,6 +423,7 @@ pub fn setup_options_ui(
     cheat_settings: Res<CheatSettings>,
     audio_volume: Res<AudioVolume>,
     display_scale: Res<DisplayScaleSettings>,
+    cursor_color: Res<crate::cursor::CursorColorSettings>,
     auto_attack: Res<AutoAttackState>,
     existing_options: Query<Entity, With<OptionsUI>>,
     existing_popup: Query<Entity, With<WipeDataPopup>>,
@@ -794,6 +804,20 @@ pub fn setup_options_ui(
         Vec3::new(
             center_side_x,
             ui_scale_y,
+            ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
+        ),
+    );
+
+    let cursor_color_y = ui_scale_y - 36.;
+    spawn_cursor_color_row(
+        &mut commands,
+        &graphics,
+        &asset_server,
+        "Cursor:",
+        cursor_color.index,
+        Vec3::new(
+            center_side_x,
+            cursor_color_y,
             ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
         ),
     );
@@ -1905,6 +1929,223 @@ fn spawn_scale_row(
             UIState::Options,
         ))
         .set_parent(plus_entity);
+}
+
+/// Cursor color row: `[label]  [<]  [sprite preview]  [>]`, mirroring `spawn_scale_row`
+/// but showing the actual cursor sprite instead of a text value.
+fn spawn_cursor_color_row(
+    commands: &mut Commands,
+    graphics: &Graphics,
+    asset_server: &AssetServer,
+    label: &str,
+    current_index: u8,
+    label_pos: Vec3,
+) {
+    commands.spawn((
+        Text2dBundle {
+            text: Text::from_section(
+                label,
+                TextStyle {
+                    font: asset_server.load("fonts/4x5.ttf"),
+                    font_size: 5.0,
+                    color: crate::colors::WHITE,
+                },
+            )
+            .with_alignment(TextAlignment::Left),
+            text_anchor: bevy::sprite::Anchor::CenterLeft,
+            transform: Transform::from_translation(label_pos),
+            ..Default::default()
+        },
+        RenderLayers::from_layers(&[3]),
+        OptionsUI,
+        UIState::Options,
+        Name::new("Cursor Color Label"),
+    ));
+
+    let controls_x = label_pos.x + 50.;
+
+    let minus_entity = commands
+        .spawn(SpriteBundle {
+            texture: graphics.get_ui_element_texture(UIElement::XLKey).clone(),
+            sprite: Sprite {
+                custom_size: Some(Vec2::new(14., 12.)),
+                ..Default::default()
+            },
+            transform: Transform::from_translation(Vec3::new(
+                controls_x,
+                label_pos.y - 3.5,
+                label_pos.z,
+            )),
+            visibility: Visibility::Visible,
+            ..Default::default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(UIState::Options)
+        .insert(UIElement::XLKey)
+        .insert(OptionsUI)
+        .insert(CursorColorButton {
+            direction: VolumeDirection::Down,
+        })
+        .insert(Interactable::default())
+        .insert(Name::new("Cursor Color Down"))
+        .id();
+
+    commands
+        .spawn((
+            Text2dBundle {
+                text: Text::from_section(
+                    "<",
+                    TextStyle {
+                        font: asset_server.load("fonts/4x5.ttf"),
+                        font_size: 5.0,
+                        color: crate::colors::WHITE,
+                    },
+                )
+                .with_alignment(TextAlignment::Center),
+                text_anchor: bevy::sprite::Anchor::Center,
+                transform: Transform::from_translation(Vec3::new(0., 0.5, 1.)),
+                ..Default::default()
+            },
+            RenderLayers::from_layers(&[3]),
+            UIState::Options,
+        ))
+        .set_parent(minus_entity);
+
+    // Sprite preview of the currently selected cursor color.
+    let mut preview_sprite = graphics
+        .get_cursor_color_sprite(current_index)
+        .unwrap_or_default();
+    preview_sprite.custom_size = Some(Vec2::new(16., 16.));
+    if let Some(atlas) = graphics.texture_atlas.as_ref() {
+        commands.spawn((
+            SpriteSheetBundle {
+                texture_atlas: atlas.clone(),
+                sprite: preview_sprite,
+                transform: Transform::from_translation(Vec3::new(
+                    controls_x + 14.,
+                    label_pos.y,
+                    label_pos.z,
+                )),
+                ..Default::default()
+            },
+            RenderLayers::from_layers(&[3]),
+            OptionsUI,
+            UIState::Options,
+            CursorColorPreview,
+            Name::new("Cursor Color Preview"),
+        ));
+    }
+
+    let plus_entity = commands
+        .spawn(SpriteBundle {
+            texture: graphics.get_ui_element_texture(UIElement::XLKey).clone(),
+            sprite: Sprite {
+                custom_size: Some(Vec2::new(14., 12.)),
+                ..Default::default()
+            },
+            transform: Transform::from_translation(Vec3::new(
+                controls_x + 36.,
+                label_pos.y - 3.5,
+                label_pos.z,
+            )),
+            visibility: Visibility::Visible,
+            ..Default::default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(UIState::Options)
+        .insert(UIElement::XLKey)
+        .insert(OptionsUI)
+        .insert(CursorColorButton {
+            direction: VolumeDirection::Up,
+        })
+        .insert(Interactable::default())
+        .insert(Name::new("Cursor Color Up"))
+        .id();
+
+    commands
+        .spawn((
+            Text2dBundle {
+                text: Text::from_section(
+                    ">",
+                    TextStyle {
+                        font: asset_server.load("fonts/4x5.ttf"),
+                        font_size: 5.0,
+                        color: crate::colors::WHITE,
+                    },
+                )
+                .with_alignment(TextAlignment::Center),
+                text_anchor: bevy::sprite::Anchor::Center,
+                transform: Transform::from_translation(Vec3::new(0., 0.5, 1.)),
+                ..Default::default()
+            },
+            RenderLayers::from_layers(&[3]),
+            UIState::Options,
+        ))
+        .set_parent(plus_entity);
+}
+
+/// Arrow-click handler for the cursor color row. Mirrors `handle_scale_button_click`.
+pub fn handle_cursor_color_button_click(
+    cursor_pos: Res<CursorPos>,
+    mouse_input: Res<Input<MouseButton>>,
+    ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
+    mut buttons: Query<(Entity, &mut Interactable, &CursorColorButton)>,
+    mut cursor_color: ResMut<crate::cursor::CursorColorSettings>,
+    mut commands: Commands,
+    graphics: Res<Graphics>,
+) {
+    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    let left_mouse_released = mouse_input.just_released(MouseButton::Left);
+
+    for (entity, mut interactable, color_button) in buttons.iter_mut() {
+        match hit_test {
+            Some(hit) if hit.0 == entity => match interactable.current() {
+                Interaction::None => {
+                    interactable.change(Interaction::Hovering);
+                    commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonHover, 0.05));
+                    commands
+                        .entity(entity)
+                        .insert(UIElement::XLKeyHover)
+                        .insert(graphics.get_ui_element_texture(UIElement::XLKeyHover));
+                }
+                Interaction::Hovering => {
+                    if left_mouse_released {
+                        cursor_color.nudge(color_button.direction == VolumeDirection::Up);
+                        cursor_color.save();
+                        commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.2));
+                    }
+                }
+                _ => {}
+            },
+            _ => {
+                let Interaction::Hovering = interactable.current() else {
+                    continue;
+                };
+                interactable.change(Interaction::None);
+                commands
+                    .entity(entity)
+                    .insert(UIElement::XLKey)
+                    .insert(graphics.get_ui_element_texture(UIElement::XLKey));
+            }
+        }
+    }
+}
+
+/// Keeps the cursor color preview sprite in sync with the selected color.
+pub fn update_cursor_color_preview(
+    cursor_color: Res<crate::cursor::CursorColorSettings>,
+    graphics: Res<Graphics>,
+    mut previews: Query<&mut TextureAtlasSprite, With<CursorColorPreview>>,
+) {
+    if !cursor_color.is_changed() {
+        return;
+    }
+    let Some(new_sprite) = graphics.get_cursor_color_sprite(cursor_color.index) else {
+        return;
+    };
+    for mut sprite in previews.iter_mut() {
+        sprite.index = new_sprite.index;
+    }
 }
 
 pub fn handle_volume_button_click(

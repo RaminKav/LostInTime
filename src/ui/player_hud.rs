@@ -2221,6 +2221,16 @@ fn get_heirloom_scaling_text(
                 crate::player::combat_heirlooms::ENERGY_BALL_DAMAGE_THRESHOLD
             ))
         }
+        Heirloom::SkillCDReduction => {
+            let stacks = skills.get_count(Heirloom::SkillCDReduction);
+            if stacks > 0 {
+                // Mirror `PlayerSkills::skill_cooldown_multiplier` (0.92 per stack).
+                let reduction_percent = (1.0 - skills.skill_cooldown_multiplier()) * 100.0;
+                Some(format!("(-{:.1}% cooldown)", reduction_percent))
+            } else {
+                None
+            }
+        }
         Heirloom::GravityScales => {
             let stacks = skills.get_count(Heirloom::GravityScales);
             if stacks > 0 {

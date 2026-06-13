@@ -2166,6 +2166,7 @@ pub fn reduce_skill_cooldown_on_crit(
     >,
     blessings: Query<&OwnedBlessings, With<Player>>,
     mut class_slots: Query<&mut ClassSkillSlots, With<Player>>,
+    mut trigger_counts: ResMut<crate::player::skills::HeirloomTriggerCounts>,
 ) {
     for hit in hit_events.iter() {
         if !hit.was_crit || hit.hit_by_mob.is_some() {
@@ -2188,6 +2189,8 @@ pub fn reduce_skill_cooldown_on_crit(
             }
 
             let reduction = (0.1 * heirloom_count as f32).max(0.0);
+
+            trigger_counts.increment(Heirloom::CritSkillCooldownReduction);
 
             if let Ok(mut slots) = class_slots.get_mut(player_e) {
                 let blessings_ref = blessings.get(player_e).ok();

@@ -243,6 +243,8 @@ pub struct GameData {
     #[serde(default)]
     pub display_scale: Option<crate::DisplayScaleSettings>,
     #[serde(default)]
+    pub cursor_color: Option<crate::cursor::CursorColorSettings>,
+    #[serde(default)]
     pub auto_attack: Option<crate::inputs::AutoAttackState>,
     #[serde(default)]
     pub attack_auto_target: Option<crate::inputs::AttackAutoTargetState>,

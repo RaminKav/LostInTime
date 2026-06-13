@@ -1,11 +1,74 @@
+use std::fs::File;
+use std::io::BufReader;
+
 use bevy::prelude::*;
 use bevy::render::view::RenderLayers;
 use bevy::window::PrimaryWindow;
+use serde::{Deserialize, Serialize};
 
 use crate::assets::Graphics;
+use crate::datafiles;
 use crate::inputs::{cursor_pos_in_ui, cursor_pos_in_world};
-use crate::item::WorldObject;
 use crate::{GameState, TextureCamera, UICamera, DEBUG};
+
+/// Number of selectable custom-cursor colors (sheet positions (4,1)..(11,1)).
+pub const NUM_CURSOR_COLORS: u8 = 8;
+
+/// Persisted player choice of custom cursor color, as an index into the cursor color sprites.
+#[derive(Resource, Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct CursorColorSettings {
+    pub index: u8,
+}
+
+impl Default for CursorColorSettings {
+    fn default() -> Self {
+        Self { index: 0 }
+    }
+}
+
+impl CursorColorSettings {
+    pub fn load() -> Self {
+        let path = datafiles::game_data();
+        if let Ok(file) = File::open(&path) {
+            let reader = BufReader::new(file);
+            if let Ok(game_data) = crate::client::GameData::try_from_json_reader(reader) {
+                return game_data.cursor_color.unwrap_or_default().sanitized();
+            }
+        }
+        Self::default()
+    }
+
+    pub fn save(&self) {
+        let path = datafiles::game_data();
+        let mut game_data = if let Ok(file) = File::open(&path) {
+            let reader = BufReader::new(file);
+            crate::client::GameData::try_from_json_reader(reader).unwrap_or_default()
+        } else {
+            crate::client::GameData::default()
+        };
+
+        game_data.cursor_color = Some(self.sanitized());
+
+        if let Ok(file) = File::create(&path) {
+            let _ = serde_json::to_writer_pretty(file, &game_data);
+        }
+    }
+
+    pub fn sanitized(self) -> Self {
+        Self {
+            index: self.index % NUM_CURSOR_COLORS,
+        }
+    }
+
+    /// Cycle to the next/previous color, wrapping around.
+    pub fn nudge(&mut self, forward: bool) {
+        self.index = if forward {
+            (self.index + 1) % NUM_CURSOR_COLORS
+        } else {
+            (self.index + NUM_CURSOR_COLORS - 1) % NUM_CURSOR_COLORS
+        };
+    }
+}
 
 #[derive(Reflect, Resource, Debug)]
 #[reflect(Resource)]
@@ -54,7 +117,9 @@ impl Plugin for CustomCursorPlugin {
                     .in_schedule(OnEnter(GameState::MainMenu)),
             )
             // Update cursor position in all game states (not just Main)
-            .add_system(update_custom_cursor_position.run_if(use_custom_cursor));
+            .add_system(update_custom_cursor_position.run_if(use_custom_cursor))
+            // Re-skin the cursor whenever the chosen color changes
+            .add_system(update_custom_cursor_color.run_if(use_custom_cursor));
     }
 }
 
@@ -67,6 +132,7 @@ fn hide_system_cursor(mut windows: Query<&mut Window, With<PrimaryWindow>>) {
 fn setup_custom_cursor(
     mut commands: Commands,
     graphics: Res<Graphics>,
+    cursor_color: Res<CursorColorSettings>,
     existing_cursors: Query<Entity, With<CustomCursor>>,
 ) {
     // Don't spawn if already exists
@@ -79,14 +145,8 @@ fn setup_custom_cursor(
         return;
     };
 
-    let Some(spritesheet_map) = graphics.spritesheet_map.as_ref() else {
-        warn!("No spritesheet map available for custom cursor");
-        return;
-    };
-
-    // Use Flint as the cursor sprite (placeholder)
-    let Some(cursor_sprite) = spritesheet_map.get(&WorldObject::Flint).cloned() else {
-        warn!("Flint sprite not found for custom cursor");
+    let Some(cursor_sprite) = graphics.get_cursor_color_sprite(cursor_color.index) else {
+        warn!("No cursor color sprite available for custom cursor");
         return;
     };
 
@@ -116,6 +176,23 @@ fn update_custom_cursor_position(
     for mut transform in cursor_query.iter_mut() {
         transform.translation.x = ui_pos.x;
         transform.translation.y = ui_pos.y;
+    }
+}
+
+fn update_custom_cursor_color(
+    cursor_color: Res<CursorColorSettings>,
+    graphics: Res<Graphics>,
+    mut cursor_query: Query<&mut TextureAtlasSprite, With<CustomCursor>>,
+) {
+    if !cursor_color.is_changed() {
+        return;
+    }
+    let Some(new_sprite) = graphics.get_cursor_color_sprite(cursor_color.index) else {
+        return;
+    };
+    for mut sprite in cursor_query.iter_mut() {
+        sprite.index = new_sprite.index;
+        sprite.custom_size = new_sprite.custom_size;
     }
 }
 

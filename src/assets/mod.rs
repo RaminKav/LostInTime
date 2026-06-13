@@ -169,6 +169,7 @@ impl Plugin for GameAssetsPlugin {
                 stone_pillar_ase: None,
                 pink_flower_ase: None,
                 foliage_textures: None,
+                cursor_color_sprites: None,
             })
             .add_system(
                 Self::update_graphics
@@ -249,6 +250,8 @@ pub struct Graphics {
     /// Foliage (tree) texture handles: normal and fade, keyed by WorldObject. Populated lazily
     /// so we load each image path once instead of every frame in animate_foliage_opacity.
     pub foliage_textures: Option<HashMap<WorldObject, (Handle<Image>, Handle<Image>)>>,
+    /// Selectable custom-cursor color sprites, in selection order (sheet positions (4,1)..(11,1)).
+    pub cursor_color_sprites: Option<Vec<TextureAtlasSprite>>,
 }
 impl Graphics {
     pub fn get_ui_element_texture(&self, element: UIElement) -> Handle<Image> {
@@ -282,6 +285,16 @@ impl Graphics {
             .get(&active_skill)
             .unwrap()
             .clone()
+    }
+    /// Cursor color sprite for the given selection index, wrapping if out of range.
+    pub fn get_cursor_color_sprite(&self, index: u8) -> Option<TextureAtlasSprite> {
+        self.cursor_color_sprites.as_ref().and_then(|sprites| {
+            if sprites.is_empty() {
+                None
+            } else {
+                sprites.get(index as usize % sprites.len()).cloned()
+            }
+        })
     }
     pub fn get_item_glow(&self, glow: ItemGlow) -> Handle<Image> {
         self.item_glows
@@ -589,6 +602,21 @@ impl GameAssetsPlugin {
             item_glow_handles.insert(u, handle);
         }
 
+        // Selectable cursor color sprites laid out horizontally on row 1 of the sheet,
+        // starting at column 4 (positions (4,1)..(11,1)).
+        let cursor_color_sprites = (0..crate::cursor::NUM_CURSOR_COLORS)
+            .map(|i| {
+                let rect = WorldObjectData {
+                    texture_pos: Vec2::new(4. + i as f32, 1.),
+                    size: Vec2::new(16., 16.),
+                    anchor: None,
+                };
+                let mut sprite = TextureAtlasSprite::new(atlas.add_texture(rect.to_atlas_rect()));
+                sprite.custom_size = Some(Vec2::new(rect.size.x, rect.size.y));
+                sprite
+            })
+            .collect::<Vec<_>>();
+
         let atlas_handle = texture_assets.add(atlas);
         let wall_atlas_handle = texture_assets.add(wall_atlas);
 
@@ -627,6 +655,7 @@ impl GameAssetsPlugin {
             pink_flower_ase: Some(asset_server.load(PinkFlowerAseprite::PATH)),
             class_pet_data: Some(class_pet_data.clone()),
             foliage_textures: None, // populated lazily in animate_foliage_opacity
+            cursor_color_sprites: Some(cursor_color_sprites),
         };
     }
     /// Keeps the graphics up to date for things that are spawned from proto, or change Obj type
