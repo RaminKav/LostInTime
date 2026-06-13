@@ -414,6 +414,11 @@ pub fn build_ancestor_blessing_offer(
     let pool = ancestor.pool();
     let mut counts: HashMap<AncestorBlessing, u32> = HashMap::new();
     let mut choices = Vec::new();
+    // Track random rolls already shown to the player so repeatable blessings
+    // don't offer the same visible option twice (e.g. two "Chosen Skill"
+    // cards both rolling Heal).
+    let mut used_skills: Vec<ActiveSkill> = Vec::new();
+    let mut used_heirlooms: Vec<Heirloom> = Vec::new();
 
     for _ in 0..3 {
         let available: Vec<AncestorBlessing> = pool
@@ -435,14 +440,23 @@ pub fn build_ancestor_blessing_offer(
 
         let picked = *available.choose(&mut rng).unwrap();
         *counts.entry(picked).or_insert(0) += 1;
-        choices.push(resolve_ancestor_blessing(
+        let resolved = resolve_ancestor_blessing(
             picked,
             &mut rng,
             heirloom_queue,
             player_level,
             player_skills,
             starting_weapon,
-        ));
+            &used_skills,
+            &used_heirlooms,
+        );
+        if let Some(skill) = resolved.resolved_skill {
+            used_skills.push(skill);
+        }
+        if let Some(heirloom) = resolved.resolved_heirloom.as_ref() {
+            used_heirlooms.push(heirloom.heirloom.clone());
+        }
+        choices.push(resolved);
     }
 
     AncestorBlessingOffer { ancestor, choices }
@@ -455,6 +469,8 @@ pub fn resolve_ancestor_blessing(
     player_level: u8,
     player_skills: Option<&PlayerSkills>,
     starting_weapon: WorldObject,
+    used_skills: &[ActiveSkill],
+    used_heirlooms: &[Heirloom],
 ) -> ResolvedAncestorBlessing {
     let mut resolved_heirloom = None;
     let mut resolved_weapon = None;
@@ -586,7 +602,7 @@ pub fn resolve_ancestor_blessing(
                 HeirloomRarity::Uncommon,
                 rng,
                 player_level,
-                &|_| true,
+                &|state| !used_heirlooms.contains(&state.heirloom),
             ) {
                 resolved_heirloom = Some(HeirloomWithRarity {
                     heirloom: picked.heirloom.clone(),
@@ -604,7 +620,7 @@ pub fn resolve_ancestor_blessing(
                 HeirloomRarity::Common,
                 rng,
                 player_level,
-                &|_| true,
+                &|state| !used_heirlooms.contains(&state.heirloom),
             ) {
                 resolved_heirloom = Some(HeirloomWithRarity {
                     heirloom: picked.heirloom.clone(),
@@ -631,8 +647,9 @@ pub fn resolve_ancestor_blessing(
         }
         AncestorBlessing::SpecificSkill => {
             if let Some(skill) = roll_active_skill_shrine_offer_skills(player_skills)
+                .into_iter()
+                .filter(|skill| !used_skills.contains(skill))
                 .choose(rng)
-                .copied()
             {
                 resolved_skill = Some(skill);
                 description = blessing.reward_description_with_name(&skill.get_title());
@@ -640,10 +657,12 @@ pub fn resolve_ancestor_blessing(
             }
         }
         AncestorBlessing::SpecificRareHeirloom => {
-            if let Some(picked) =
-                heirloom_queue
-                    .get_skill_of_rarity(HeirloomRarity::Rare, rng, player_level, &|_| true)
-            {
+            if let Some(picked) = heirloom_queue.get_skill_of_rarity(
+                HeirloomRarity::Rare,
+                rng,
+                player_level,
+                &|state| !used_heirlooms.contains(&state.heirloom),
+            ) {
                 resolved_heirloom = Some(HeirloomWithRarity {
                     heirloom: picked.heirloom.clone(),
                     rarity: picked.rarity.clone(),
