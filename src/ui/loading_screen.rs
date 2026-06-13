@@ -2,6 +2,7 @@ use bevy::prelude::*;
 use bevy::sprite::Anchor;
 
 use crate::{
+    blessings::PendingRunStartBlessing,
     colors::DARK_WOOD_BROWN, enemy::spawner::GlobalSpawners, player::Player,
     ui::ui_helpers,
     world::chunk::DoneCreateChunkEvent, GameState, RenderLayers, ScreenResolution,
@@ -80,6 +81,7 @@ pub fn check_initialization_complete(
     mut init_timer: Local<Option<InitializationTimer>>,
     time: Res<Time>,
     spawners: Option<ResMut<GlobalSpawners>>,
+    pending_run_start_blessing: Option<Res<PendingRunStartBlessing>>,
 ) {
     // Initialize timer on first run
     if init_timer.is_none() {
@@ -152,6 +154,12 @@ pub fn check_initialization_complete(
         }
     }
 
+    let next_game_state = if pending_run_start_blessing.is_some() {
+        GameState::BlessingChoice
+    } else {
+        GameState::Main
+    };
+
     // Force transition if we've been stuck with 0 chunks for too long (safety fallback)
     let force_transition_stuck = waiting_for_chunks_stuck
         && timer
@@ -167,7 +175,7 @@ pub fn check_initialization_complete(
         for entity in loading_screens.iter() {
             commands.entity(entity).despawn_recursive();
         }
-        next_state.set(GameState::Main);
+        next_state.set(next_game_state);
         *init_timer = None;
         if let Some(mut spawners) = spawners {
             spawners.initial_spawn_delay.reset();
@@ -183,16 +191,15 @@ pub fn check_initialization_complete(
         && chunks_created > 0
     {
         info!(
-            "Initialization complete! Player: {}, Chunks: {}, Transitioning to Main",
-            player_exists, chunks_created
+            "Initialization complete! Player: {}, Chunks: {}, Transitioning to {:?}",
+            player_exists, chunks_created, next_game_state
         );
         // Remove loading screen
         for entity in loading_screens.iter() {
             commands.entity(entity).despawn_recursive();
         }
 
-        // Transition to Main state
-        next_state.set(GameState::Main);
+        next_state.set(next_game_state);
         *init_timer = None;
         if let Some(mut spawners) = spawners {
             spawners.initial_spawn_delay.reset();

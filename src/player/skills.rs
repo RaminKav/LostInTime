@@ -238,8 +238,11 @@ pub mod active_skill_scaling {
     pub const FIRE_PILLAR: f32 = 95.0;
     pub const ICE_WALL: f32 = 300.0;
     pub const METEOR_SHOWER: f32 = 85.0;
-    /// Number of meteors the first MeteorShower cast spawns; grows +1 per cast.
+    /// Number of meteors the first MeteorShower cast spawns; grows +1 every
+    /// [`METEOR_SHOWER_CASTS_PER_GROWTH`] casts.
     pub const METEOR_SHOWER_BASE_COUNT: u32 = 3;
+    /// Number of casts required to gain +1 meteor.
+    pub const METEOR_SHOWER_CASTS_PER_GROWTH: u32 = 5;
     /// Radius (tiles) around the player meteors can land within.
     pub const METEOR_SHOWER_RADIUS_TILES: f32 = 12.0;
     /// The first meteor of each cast always lands within this radius (tiles).
@@ -491,13 +494,15 @@ pub struct BuckshotSkillState;
 #[derive(Component, Clone)]
 #[component(storage = "SparseSet")]
 pub struct IceWallSkillState;
-/// Tracks how many meteors the next MeteorShower cast spawns. Grows by 1 each
-/// cast. Stored `SparseSet` because it's only present on the player while the
-/// MeteorShower skill is equipped.
+/// Tracks how many meteors the next MeteorShower cast spawns. Grows by 1 every
+/// [`METEOR_SHOWER_CASTS_PER_GROWTH`] casts. Stored `SparseSet` because it's
+/// only present on the player while the MeteorShower skill is equipped.
 #[derive(Component, Clone)]
 #[component(storage = "SparseSet")]
 pub struct MeteorShowerSkillState {
     pub meteor_count: u32,
+    /// Number of casts accumulated toward the next +1 meteor.
+    pub casts: u32,
 }
 #[derive(Component, Clone)]
 #[component(storage = "SparseSet")]
@@ -745,7 +750,7 @@ impl ActiveSkill {
                         "each dealing {:.1}% damage on impact.",
                         skill_power * METEOR_SHOWER
                     ),
-                    "Gain +1 meteor per cast.".to_string(),
+                    "Gain +1 meteor every 5 casts.".to_string(),
                 ]
             }
             ActiveSkill::Buckshot => vec![
@@ -794,11 +799,12 @@ impl ActiveSkill {
                 ]
             }
             ActiveSkill::LaserBeam => vec![
-                "Channel a powerful laser beam that deals".to_string(),
+                "Channel a powerful laser beam that".to_string(),
                 format!(
-                    "{:.1}% damage rapidly to enemies in front.",
+                    "deals {:.1}% damage rapidly to enemies",
                     skill_power * LASER_BEAM
                 ),
+                "in front.".to_string(),
             ],
             ActiveSkill::ArrowVolley => {
                 let total = arrow_volley_total_arrows();
@@ -914,6 +920,7 @@ impl ActiveSkill {
             ActiveSkill::MeteorShower => {
                 commands.entity(entity).insert(MeteorShowerSkillState {
                     meteor_count: active_skill_scaling::METEOR_SHOWER_BASE_COUNT,
+                    casts: 0,
                 });
             }
             ActiveSkill::DruidTree => {
@@ -2657,6 +2664,32 @@ impl HeirloomChoiceQueue {
             filtered.iter().map(|x| (*x).clone()).collect();
         owned_filtered.as_slice().choose(rng).cloned()
     }
+
+    /// Pick a random heirloom from the run pool that has `tooltip`, respecting banish
+    /// and level gates. Rarity comes from the pool entry (canonical per `skills.rs`).
+    pub fn pick_random_heirloom_with_tooltip(
+        &self,
+        tooltip: TooltipDefinition,
+        rng: &mut rand::rngs::ThreadRng,
+        player_level: u8,
+    ) -> Option<HeirloomWithRarity> {
+        let candidates: Vec<HeirloomWithRarity> = self
+            .pool
+            .iter()
+            .filter(|state| {
+                state.heirloom.tooltip_definitions().contains(&tooltip)
+                    && !self.banned.contains(&state.heirloom)
+                    && state.heirloom.min_player_level() <= player_level
+                    && state.heirloom != Heirloom::default()
+            })
+            .map(|state| HeirloomWithRarity {
+                heirloom: state.heirloom.clone(),
+                rarity: state.rarity.clone(),
+            })
+            .collect();
+        candidates.choose(rng).cloned()
+    }
+
     pub fn gen_rarity(rng: &mut rand::rngs::ThreadRng, loot_bonus: i32) -> HeirloomRarity {
         Self::gen_rarity_with_uncommon_bonus(rng, loot_bonus, 0.0)
     }

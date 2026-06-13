@@ -38,13 +38,11 @@ pub mod furnace_ui;
 mod heirloom_tooltip;
 pub mod tooltip_info_boxes;
 pub use heirloom_tooltip::{
-    process_heirloom_tooltip_requests,  
-    HeirloomTooltipRequest, 
+    process_heirloom_tooltip_requests, HeirloomDynamicTooltip, HeirloomTooltipRequest,
+    HeirloomTooltipShow,
 };
 pub use tooltip_info_boxes::{
-    build_tooltip_info_boxes, spawn_tooltip_info_boxes, spawn_tooltip_info_boxes_with_resolution,
-    HeirloomDescLine, HeirloomDescLineKind, TooltipDefinition, TooltipInfoBox, TooltipInfoBoxAnchor,
-    TooltipInfoBoxKind, TooltipInfoBoxSpec,
+   HeirloomDescLine, HeirloomDescLineKind, TooltipDefinition
 };
 pub use skill_choice_ui::*;
 mod achievement_banner;

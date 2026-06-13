@@ -41,7 +41,8 @@ use crate::{
                 dagger_slash_total_slashes, meteor_shower_spawn_interval_secs, ARROW_VOLLEY, BOMB,
                 BUCKSHOT_PELLET, DAGGER_SLASH, DAGGER_THROW, FIRE_PILLAR, FURY,
                 HEAL_MAX_HEALTH_PERCENT, ICE_WALL, LASER_BEAM, LIGHTNING, METEOR_SHOWER,
-                METEOR_SHOWER_BASE_COUNT, METEOR_SHOWER_FIRST_RADIUS_TILES,
+                METEOR_SHOWER_BASE_COUNT, METEOR_SHOWER_CASTS_PER_GROWTH,
+                METEOR_SHOWER_FIRST_RADIUS_TILES,
                 METEOR_SHOWER_RADIUS_TILES, PIERCING_STAR, POSSESSED_BLADE,
                 RAPIDFIRE_ATTACK_SPEED_BONUS_PERCENT, SHOUT, SPIN_ATTACK, TRIPLE_THROW,
             },
@@ -599,16 +600,26 @@ pub fn handle_active_skill_event(
                         commands.spawn(SoundSpawner::new(AudioSoundEffect::IceExplosion, 0.2));
                     }
                     ActiveSkill::MeteorShower => {
-                        // Read the running meteor count (grows +1 per cast).
+                        // Read the running meteor count (grows +1 every
+                        // METEOR_SHOWER_CASTS_PER_GROWTH casts).
                         let meteor_count = meteorshower_state
                             .map(|s| s.meteor_count)
                             .unwrap_or(METEOR_SHOWER_BASE_COUNT)
                             .max(1);
+                        let prev_casts = meteorshower_state.map(|s| s.casts).unwrap_or(0);
                         if !should_start_cooldown {
                             commands.entity(player_e).remove::<MeteorShowerSkillState>();
                         }
+                        let next_casts = prev_casts + 1;
+                        let (next_count, next_casts) =
+                            if next_casts >= METEOR_SHOWER_CASTS_PER_GROWTH {
+                                (meteor_count + 1, 0)
+                            } else {
+                                (meteor_count, next_casts)
+                            };
                         commands.entity(player_e).insert(MeteorShowerSkillState {
-                            meteor_count: meteor_count + 1,
+                            meteor_count: next_count,
+                            casts: next_casts,
                         });
                         start_slot_cooldown_for_cast(
                             &mut class_slots,

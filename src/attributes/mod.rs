@@ -18,7 +18,7 @@ use crate::{
     animations::{AnimatedTextureMaterial, DoneAnimation},
     assets::Graphics,
     attributes::attribute_helpers::{build_item_stack_with_parsed_attributes, get_rarity_rng},
-    blessings::{Blessing, HeirloomStatsBonuses, OwnedBlessings},
+    blessings::{Blessing, BlessingMaxHpPenalty, HeirloomStatsBonuses, OwnedBlessings},
     client::{is_not_paused, GameOverEvent},
     colors::{
         COMMON_TOOLTIP_TITLE, GREY, LEGENDARY_TOOLTIP_TITLE, LIGHT_GREY, ORANGE,
@@ -517,6 +517,7 @@ impl ItemAttributes {
         old_shield: i32,
         skills: &PlayerSkills,
         blessings: &OwnedBlessings,
+        blessing_max_hp_penalty_pct: f32,
         dodge_crit_buff_active: bool,
         coins: u32,
         max_hp_hunt_bonus: i32,      // Max HP gained from MaxHPHunt heirloom
@@ -554,6 +555,10 @@ impl ItemAttributes {
         } else {
             0
         };
+        if blessing_max_hp_penalty_pct > 0.0 {
+            computed_health.value -=
+                (computed_health.value as f32 * blessing_max_hp_penalty_pct) as i32;
+        }
         let computed_speed = self.speed.value
             + chaos_speed_bonus
             + if dodge_crit_buff_active { 30 } else { 0 } // DodgeCrit speed buff
@@ -1651,6 +1656,7 @@ fn handle_player_item_attribute_change_events(
             Option<&SkillPowerHuntTracker>,
             Option<&BonusAttackSpeed>,
             Option<&FoodAttributeBonuses>,
+            Option<&BlessingMaxHpPenalty>,
         ),
         With<Player>,
     >,
@@ -1677,7 +1683,9 @@ fn handle_player_item_attribute_change_events(
             skill_power_hunt_tracker,
             bonus_attack_speed,
             food_bonuses,
+            blessing_max_hp_penalty,
         ) = player_atts.single();
+        let blessing_max_hp_penalty_pct = blessing_max_hp_penalty.map(|p| p.0).unwrap_or(0.0);
         let mut new_att = att.clone();
         let (player, inv) = player.single();
         let equips: Vec<ItemAttributes> = inv
@@ -1750,6 +1758,7 @@ fn handle_player_item_attribute_change_events(
             old_shield.0,
             skills,
             blessings,
+            blessing_max_hp_penalty_pct,
             dodge_crit_buff_active,
             coins.coins,
             max_hp_hunt_bonus,

@@ -10,7 +10,9 @@ use crate::{
     assets::Graphics,
     attributes::{ItemAttributes, ItemRarity},
     audio::{AudioSoundEffect, SoundSpawner},
+    blessings::PendingRunStartBlessing,
     chaos::ChaosTracker,
+    client::GameData,
     colors::{DARK_WOOD_BROWN, WHITE},
     container::ContainerRegistry,
     cursor::CursorPos,
@@ -2438,6 +2440,7 @@ pub fn handle_portal_animation(
     screen_res: Res<ScreenResolution>,
     time_crystals: Res<TimeCrystals>,
     cheat_settings: Res<CheatSettings>,
+    game_data: Option<Res<GameData>>,
 ) {
     for (_portal_entity, mut anim_state, mut anim) in portal_query.iter_mut() {
         // Check if we have a pending game start resource and are still in Idle state
@@ -2491,6 +2494,18 @@ pub fn handle_portal_animation(
                             &*unlock_upgrades,
                             time_crystals.completed_count() as u32,
                         );
+
+                        // Only offer the run-start blessing once the player has completed at
+                        // least one prior run (i.e. died). `num_runs` is incremented on game
+                        // over, not when exiting to the menu, so the very first run never
+                        // shows the blessing screen.
+                        let has_completed_a_run = game_data
+                            .as_ref()
+                            .map(|data| data.num_runs >= 1)
+                            .unwrap_or(false);
+                        if has_completed_a_run {
+                            commands.insert_resource(PendingRunStartBlessing);
+                        }
 
                         // Start the game with fade-in overlay
                         commands

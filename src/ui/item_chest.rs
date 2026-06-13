@@ -1121,6 +1121,8 @@ pub fn handle_item_chest_final_item_hover(
                                         -CHEST_INVENTORY_UI_SIZE.y / 2. + 40.,
                                     )),
                                     header_text: Some("Currently Equipped".to_string()),
+                                    world_anchor: None,
+                                    ui_state_tag: None,
                                 });
                             }
                         }

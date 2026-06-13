@@ -69,7 +69,7 @@ use crate::{
         InvincibilityCooldown, ItemAttributes, ManaRegen, MaxHealth, MaxMana,
         PlayerAttributeBundle, ShieldRegen,
     },
-    blessings::{HeirloomStatsBonuses, OwnedBlessings},
+    blessings::{HeirloomStatsBonuses, OwnedBlessings, StartingWeaponOverride},
     client::is_not_paused,
     combat::pickup_radius::BASE_PICKUP_RADIUS,
     container::Container,
@@ -591,6 +591,7 @@ fn give_player_starting_items(
     class_ranks: Option<Res<ClassRankSystem>>,
     run_state: ResMut<RunUnlockState>,
     unlock_upgrades: Option<Res<UnlockUpgrades>>,
+    weapon_override: Option<Res<StartingWeaponOverride>>,
 ) {
     // if let Ok(save_file) = File::open(datafiles::save_file()) {
     //     let reader = BufReader::new(save_file);
@@ -606,12 +607,27 @@ fn give_player_starting_items(
         .unwrap_or(SkillClass::None);
 
     // Give class-specific starting weapon with rarity based on class rank
-    let starting_weapon = selected_class.get_starting_wep();
-    let weapon_rarity = if let Some(ranks) = &class_ranks {
+    let default_starting_weapon = selected_class.get_starting_wep();
+    let default_weapon_rarity = if let Some(ranks) = &class_ranks {
         ranks.get_starting_weapon_rarity(&selected_class)
     } else {
         crate::attributes::ItemRarity::Common
     };
+    let (starting_weapon, weapon_rarity, spawn_default_weapon) =
+        if let Some(override_weapon) = weapon_override.as_deref() {
+            let rarity = if override_weapon.upgrade_starting_weapon {
+                default_weapon_rarity.get_next_rarity()
+            } else {
+                override_weapon.rarity.clone()
+            };
+            (
+                override_weapon.weapon,
+                rarity,
+                !override_weapon.replace_starting_weapon,
+            )
+        } else {
+            (default_starting_weapon, default_weapon_rarity, true)
+        };
 
     for pet in player_class
         .as_ref()
@@ -701,18 +717,35 @@ fn give_player_starting_items(
 
     // Spawn the starting weapon and mark it for rarity override
     let player_pos = game.player().position.truncate();
-    if let Some(weapon_entity) = proto_commands.spawn_item_from_proto(
+    if spawn_default_weapon {
+        if let Some(weapon_entity) = proto_commands.spawn_item_from_proto(
+            starting_weapon,
+            &proto,
+            player_pos,
+            1,
+            Some(1), // Use default level, we'll override rarity instead
+        ) {
+            // Mark this weapon as a starting weapon with specific rarity
+            commands.entity(weapon_entity).insert(StartingWeapon {
+                rarity: weapon_rarity,
+            });
+            force_player_autopick(&mut game);
+        }
+    } else if let Some(weapon_entity) = proto_commands.spawn_item_from_proto(
         starting_weapon,
         &proto,
         player_pos,
         1,
-        Some(1), // Use default level, we'll override rarity instead
+        Some(1),
     ) {
-        // Mark this weapon as a starting weapon with specific rarity
         commands.entity(weapon_entity).insert(StartingWeapon {
             rarity: weapon_rarity,
         });
         force_player_autopick(&mut game);
+    }
+
+    if weapon_override.is_some() {
+        commands.remove_resource::<StartingWeaponOverride>();
     }
     // run_state.pending_food = 0;
     // run_state.pending_tomes = 0;

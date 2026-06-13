@@ -1,27 +1,38 @@
 use bevy::prelude::*;
 use strum_macros::{EnumIter, IntoStaticStr};
 
-use crate::{ui::UIState, GameState};
+use crate::{
+    attributes::ItemRarity,
+    item::WorldObject,
+    ui::{handle_spawn_inv_item_tooltip, process_heirloom_tooltip_requests, UIState},
+    GameState,
+};
+
+mod ancestors;
 mod blessing_choice_ui;
 mod blessing_effects;
+
+pub use ancestors::*;
 pub use blessing_choice_ui::*;
 pub use blessing_effects::*;
+
 pub struct BlessingsPlugin;
 
 impl Plugin for BlessingsPlugin {
     fn build(&self, app: &mut App) {
-        app.add_event::<BlessingSelectEvent>()
+        app.add_event::<AncestorBlessingSelectEvent>()
             .init_resource::<BlessingItemRewards>()
             .add_system(
-                handle_blessing_selected.run_if(
-                    in_state(GameState::BlessingChoice)
-                        .or_else(in_state(GameState::Initializing))
-                        .and_then(resource_exists::<BlessingTransitionState>()),
-                ),
+                handle_ancestor_blessing_selected
+                    .after(handle_blessing_choice_card_interactions)
+                    .run_if(
+                        in_state(GameState::BlessingChoice)
+                            .and_then(resource_exists::<BlessingTransitionState>()),
+                    ),
             )
             .add_system(enter_blessing_ui.in_schedule(OnEnter(GameState::BlessingChoice)))
             .add_system(
-                transition_to_next_era_after_blessing
+                transition_to_main_after_blessing
                     .run_if(resource_exists::<BlessingTransitionState>()),
             )
             .add_system(
@@ -35,9 +46,64 @@ impl Plugin for BlessingsPlugin {
                         .and_then(not(resource_exists::<BlessingTransitionState>())),
                 ),
             )
+            .add_system(
+                handle_blessing_choice_icon_tooltips
+                    .after(handle_blessing_choice_card_interactions)
+                    .run_if(
+                        in_state(GameState::BlessingChoice)
+                            .and_then(in_state(UIState::BlessingChoice))
+                            .and_then(not(resource_exists::<BlessingTransitionState>())),
+                    ),
+            )
+            .add_system(
+                process_heirloom_tooltip_requests
+                    .after(handle_blessing_choice_icon_tooltips)
+                    .run_if(
+                        in_state(GameState::BlessingChoice)
+                            .and_then(in_state(UIState::BlessingChoice))
+                            .and_then(not(resource_exists::<BlessingTransitionState>())),
+                    ),
+            )
+            // Reuse the real inventory item-tooltip renderer for blessing item cards. It is
+            // event-driven; the blessing hover system emits `ToolTipUpdateEvent` with a
+            // `world_anchor`, and this dispatcher (normally Main-only) must also run here.
+            .add_system(
+                handle_spawn_inv_item_tooltip
+                    .after(handle_blessing_choice_icon_tooltips)
+                    .run_if(
+                        in_state(GameState::BlessingChoice)
+                            .and_then(in_state(UIState::BlessingChoice))
+                            .and_then(not(resource_exists::<BlessingTransitionState>())),
+                    ),
+            )
             .add_system(spawn_blessing_item_drops.in_schedule(OnEnter(GameState::Main)));
     }
 }
+
+/// Set when a new run begins; consumed when showing the run-start blessing screen.
+#[derive(Resource, Default)]
+pub struct PendingRunStartBlessing;
+
+/// Applied when entering Main after a chaos ancestor pick.
+#[derive(Resource, Clone, Debug, Default)]
+pub struct PendingRunStartChaos {
+    pub amount: f32,
+}
+
+/// Overrides the class starting weapon spawn in `give_player_starting_items`.
+#[derive(Resource, Clone, Debug)]
+pub struct StartingWeaponOverride {
+    pub weapon: WorldObject,
+    pub rarity: ItemRarity,
+    /// When true, skip the default class starting weapon entirely.
+    pub replace_starting_weapon: bool,
+    /// When true, bump the class starting weapon rarity by one tier instead of using `rarity`.
+    pub upgrade_starting_weapon: bool,
+}
+
+/// Percentage max HP penalty from a chaos ancestor blessing (e.g. 0.25 = -25%).
+#[derive(Component, Clone, Debug)]
+pub struct BlessingMaxHpPenalty(pub f32);
 
 #[derive(
     Debug,

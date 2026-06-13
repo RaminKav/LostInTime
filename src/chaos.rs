@@ -1,4 +1,6 @@
 use bevy::prelude::*;
+
+use crate::blessings::PendingRunStartChaos;
 use bevy::utils::HashMap;
 use serde::{Deserialize, Serialize};
 
@@ -83,11 +85,20 @@ impl Plugin for ChaosPlugin {
 
 /// Initialize chaos from the starting era when entering Main game state
 /// Resets chaos to 0 and then adds the base chaos for the current era
-fn initialize_chaos_from_era(mut chaos_tracker: ResMut<ChaosTracker>) {
-    // Reset chaos to 0 at the start of a run, then add era's base chaos
-    // This ensures chaos doesn't carry over from previous runs
+fn initialize_chaos_from_era(
+    mut chaos_tracker: ResMut<ChaosTracker>,
+    pending_run_start_chaos: Option<Res<PendingRunStartChaos>>,
+    mut commands: Commands,
+) {
     info!("Resetting chaos from {} to 0", chaos_tracker.chaos_level);
     chaos_tracker.chaos_level = 0.0;
+
+    if let Some(pending) = pending_run_start_chaos {
+        if pending.amount > 0.0 {
+            chaos_tracker.add_chaos(pending.amount);
+        }
+        commands.remove_resource::<PendingRunStartChaos>();
+    }
 }
 
 fn handle_increase_chaos_event(

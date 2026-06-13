@@ -176,6 +176,10 @@ impl Plugin for DimensionPlugin {
             .add_system(
                 Self::new_dim_with_params
                     .in_base_set(CoreSet::PreUpdate)
+                    // `GameParam` requires `WorldObjectCache`; gate on it so this system never
+                    // runs during run teardown (exit-to-menu sends `CleanUpRunStateEvent`, which
+                    // removes the cache in the same `PreUpdate` frame while still in `Main`).
+                    .run_if(resource_exists::<WorldObjectCache>())
                     .run_if(
                         in_state(GameState::Main)
                             .or_else(in_state(GameState::Initializing))

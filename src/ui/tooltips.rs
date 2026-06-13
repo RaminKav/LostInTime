@@ -151,6 +151,14 @@ pub struct ToolTipUpdateEvent {
     pub header_text: Option<String>,
     /// Optional side glossary / trigger info boxes rendered to the right of the card.
     pub info_boxes: Vec<TooltipInfoBoxSpec>,
+    /// When `Some`, the tooltip card is spawned **unparented** in world space with its panel
+    /// centered at this position (z included), instead of relative to an inventory/essence/chest
+    /// UI root. Used by the run-start blessing choice screen, which has no inventory container.
+    /// Takes precedence over `position_override`.
+    pub world_anchor: Option<Vec3>,
+    /// When `Some`, this `UIState` component is inserted on the spawned tooltip so the standard
+    /// UI-state-exit cleanup (`handle_new_ui_state`) despawns it on leaving that state.
+    pub ui_state_tag: Option<UIState>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -289,7 +297,9 @@ pub fn handle_spawn_inv_item_tooltip(
                 .floor(),
             0.,
         );
-        let parent_offset = if let Some(p) = item.position_override {
+        let parent_offset = if let Some(world) = item.world_anchor {
+            world.truncate()
+        } else if let Some(p) = item.position_override {
             p
         } else {
             match cur_inv_state.0 {
@@ -327,7 +337,9 @@ pub fn handle_spawn_inv_item_tooltip(
 
         let use_absolute_inventory_tooltip =
             cur_inv_state.0 == UIState::Inventory && item.position_override.is_none();
-        let tooltip_z = if use_absolute_inventory_tooltip {
+        let tooltip_z = if let Some(world) = item.world_anchor {
+            world.z
+        } else if use_absolute_inventory_tooltip {
             INVENTORY_CURSOR_TOOLTIP_Z
         } else {
             10.
@@ -998,8 +1010,14 @@ pub fn handle_spawn_inv_item_tooltip(
                 .set_parent(tooltip);
         }
 
+        if let Some(tag) = item.ui_state_tag.clone() {
+            commands.entity(tooltip).insert(tag);
+        }
+
         // add tooltip to inventory, essence, or item chest ui
-        if use_absolute_inventory_tooltip {
+        if item.world_anchor.is_some() {
+            // World-space tooltip (e.g. blessing choice screen); stays unparented.
+        } else if use_absolute_inventory_tooltip {
             // Absolute UI-space position near the cursor; stats panel stays visible.
         } else if let Ok(inv) = inv.get_single() {
             commands.entity(inv).add_child(tooltip);
@@ -1596,6 +1614,14 @@ pub fn spawn_item_tooltip_icon_name_header(
         .set_parent(tooltip);
 }
 
+/// World-space offset from HUD icon anchor to the large item tooltip panel center
+/// (tuned so the card sits above the icon with its bottom clearing the slot).
+pub fn world_item_tooltip_hud_anchor_offset() -> Vec3 {
+    let size = ITEM_TOOLTIP_LARGE_CARD_SIZE;
+    let legacy_panel_h = 120.;
+    Vec3::new(-size.x / 2., 55. + (size.y - legacy_panel_h) / 2., 20.)
+}
+
 /// World-space item card for HUD buff hover (inventory UI closed).
 pub fn spawn_world_item_tooltip_for_stack(
     commands: &mut Commands,
@@ -1609,9 +1635,7 @@ pub fn spawn_world_item_tooltip_for_stack(
     let size = ITEM_TOOLTIP_LARGE_CARD_SIZE;
     let item_actions = proto.get_component::<ItemActions, _>(item_stack.obj_type);
 
-    // Panel center offset was tuned for 130×120; shift up when using the tall card so the bottom clears the icon.
-    let legacy_panel_h = 120.;
-    let panel_center_offset = Vec3::new(-size.x / 2., 55. + (size.y - legacy_panel_h) / 2., 20.);
+    let panel_center_offset = world_item_tooltip_hud_anchor_offset();
 
     let tooltip = commands
         .spawn((

@@ -326,15 +326,11 @@ pub fn change_player_class_visuals(
         let class_data = graphics.get_class_data(class.clone());
         let active_skills = &class_data.active_skills;
 
-        // Slot 0 is the class movement skill; slots 1–2 start empty and are filled
-        // at active skill shrines during the run.
+        // Slot 0 is the class movement skill; slots 1–4 may already hold run-start blessings.
         player_skills.active_skill_slot_0 = Some(ActiveSkillChoiceState::new(
             active_skills[0].clone(),
             HeirloomRarity::Common,
         ));
-        player_skills.active_skill_slot_1 = None;
-        player_skills.active_skill_slot_2 = None;
-        player_skills.active_skill_slot_3 = None;
 
         active_skills[0].add_skill_components(e, &mut commands);
 

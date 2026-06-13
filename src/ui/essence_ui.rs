@@ -896,6 +896,8 @@ pub fn handle_merchant_item_tooltip(
                             -MERCHANT_CONTAINER_UI_SIZE.y / 2. + 40.,
                         )),
                         header_text: Some("Currently Equipped".to_string()),
+                        world_anchor: None,
+                        ui_state_tag: None,
                     });
                 }
             }

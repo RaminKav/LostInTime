@@ -125,8 +125,8 @@ pub enum ShrineAssignAction {
     ShowSlotPicker,
 }
 
-/// After the player picks a shrine skill, decide whether to auto-fill the lone
-/// empty unlocked slot or show the slot picker (slots 1–2 only).
+/// After the player picks a shrine skill, auto-fill the first empty unlocked slot
+/// (slot 1 / LMB before slot 2) or show the slot picker when both are full.
 pub fn shrine_assign_action(
     skills: &PlayerSkills,
     class: &SkillClass,
@@ -140,8 +140,8 @@ pub fn shrine_assign_action(
         .filter(|&slot| skills.get_active_skill_in_slot(slot).is_none())
         .collect();
 
-    if empty_slots.len() == 1 {
-        ShrineAssignAction::AutoFill(empty_slots[0])
+    if let Some(&slot) = empty_slots.first() {
+        ShrineAssignAction::AutoFill(slot)
     } else {
         ShrineAssignAction::ShowSlotPicker
     }
