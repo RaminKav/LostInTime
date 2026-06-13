@@ -1132,7 +1132,7 @@ pub fn cleanup_marked_for_death_entities(
                         let total_casts = guaranteed_casts + bonus;
                         let mana_cost = Heirloom::FrozenAoE.get_mana_cost();
                         let pos = mob_pos.translation();
-                        let dmg = attack.0 / 4;
+                        let dmg = attack.0 / 2;
                         let size_mult = projectile_size.get_multiplier();
 
                         for i in 0..total_casts {

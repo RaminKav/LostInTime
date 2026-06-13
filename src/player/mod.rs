@@ -16,7 +16,7 @@ use combat_heirlooms::{
     handle_mana_orb_drops, handle_mana_regen_lightning, handle_mana_regen_poison,
     handle_max_hp_hunt, handle_reaper_soul_spawns, handle_skill_mana_regen,
     handle_skill_power_hunt, handle_summon_ring_state, handle_trigger_summons_on_heal,
-    tick_dodge_crit_buff, tick_stand_still_state, update_ant_farm_ants, update_cherry_bomb_arcs,
+    tick_dodge_crit_buff, tick_stand_still_state, update_ant_farm_ants, update_lob_arcs,
     update_homing_energy_balls, update_reaper_souls, update_stone_tooth, update_summon_ring,
     TriggerSummonsEvent,
 };
@@ -251,7 +251,7 @@ impl Plugin for PlayerPlugin {
                         .run_if(is_not_paused)
                         .after(crate::handle_hits),
                     handle_cherry_bomb_on_attack.run_if(is_not_paused),
-                    update_cherry_bomb_arcs.run_if(is_not_paused),
+                    update_lob_arcs.run_if(is_not_paused),
                     update_homing_energy_balls.run_if(is_not_paused),
                     skill_heirlooms::handle_skill_explosion_hits
                         .run_if(is_not_paused)
@@ -312,8 +312,6 @@ impl Plugin for PlayerPlugin {
                     skill_heirlooms::tick_arrow_volley.run_if(is_not_paused),
                     skill_heirlooms::tick_pending_dagger_slashes.run_if(is_not_paused),
                     skill_heirlooms::handle_fury_skill.run_if(is_not_paused),
-                    skill_heirlooms::handle_attach_bomb_target.run_if(is_not_paused),
-                    skill_heirlooms::handle_bomb_explosion.run_if(is_not_paused),
                     skill_heirlooms::handle_rapidfire_slow_enemies.run_if(is_not_paused),
                     skill_heirlooms::handle_rapidfire_slow_remove.run_if(is_not_paused),
                     skill_heirlooms::handle_attach_possessed_blade_return.run_if(is_not_paused),
@@ -363,6 +361,7 @@ impl Plugin for PlayerPlugin {
                     handle_echo_after_heal
                         .after(tick_heirloom_trigger_cooldowns)
                         .after(handle_modify_health_event)
+                        .before(crate::attributes::clamp_health)
                         .before(handle_add_damage_numbers_after_hit),
                     handle_trigger_summons_on_heal.after(handle_echo_after_heal),
                     handle_delayed_heirloom_casts,
@@ -415,11 +414,11 @@ pub fn handle_move_player(
     mut move_events: EventReader<MovePlayerEvent>,
 ) {
     for m in move_events.iter() {
-        //TODO: Add world helper to get chunk -> world pos, lots of copy code in item.rs
-
         let world_pos = tile_pos_to_world_pos(m.pos, false);
 
-        let (mut raw_pos, mut pos) = player.single_mut();
+        let Ok((mut raw_pos, mut pos)) = player.get_single_mut() else {
+            continue;
+        };
         raw_pos.0 = world_pos;
         pos.translation = world_pos.extend(0.);
     }

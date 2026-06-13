@@ -39,10 +39,10 @@
         Tumbleweed4: 0.00008,
         DesertCrate: 0.002,
         DesertCrate2: 0.002,
-        DesertSkull1: 0.001,
-        DesertSkull2: 0.001,
-        DesertSkull3: 0.001,
-        DesertSkull4: 0.001,
+        DesertSkull1: 0.0004,
+        DesertSkull2: 0.0004,
+        DesertSkull3: 0.0004,
+        DesertSkull4: 0.0004,
 
         DesertBones1: 0.0002,
         DesertBones2: 0.0002,
@@ -75,12 +75,12 @@
         SmlFruitCactus3: 0.00055,
         SmlFruitCactus4: 0.00055,
 
-        DesertDriftWood1: 0.0004,
-        DesertDriftWood2: 0.0004,
-        DesertDriftWood3: 0.0004,
-        DesertFence1: 0.0004,
-        DesertFence2: 0.0004,
-        DesertFence3: 0.0004,
+        DesertDriftWood1: 0.0007,
+        DesertDriftWood2: 0.0007,
+        DesertDriftWood3: 0.0007,
+        DesertFence1: 0.0007,
+        DesertFence2: 0.0007,
+        DesertFence3: 0.0007,
 
 
         DesertMedBoulder1: 0.002,

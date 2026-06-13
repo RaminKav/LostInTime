@@ -770,7 +770,8 @@ impl Plugin for UIPlugin {
             ))
             .add_system(
                 handle_add_damage_numbers_after_hit
-                    .before(handle_hits)
+                    .after(handle_hits)
+                    .before(crate::item::handle_break_object)
                     .in_set(OnUpdate(GameState::Main))
                     .run_if(resource_exists::<Game>()),
             )

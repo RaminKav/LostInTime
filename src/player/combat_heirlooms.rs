@@ -121,7 +121,12 @@ pub struct OrbitingStone {
     pub active: bool,
     /// Matches player projectile size for hit radius and sprite.
     pub size_multiplier: f32,
+    /// Staggered render depth so overlapping rocks don't z-fight.
+    pub z_slot: u8,
 }
+
+const STONE_TOOTH_Z_DEPTH_LAYERS: u8 = 20;
+const STONE_TOOTH_Z_DEPTH_STEP: f32 = 0.02;
 
 /// Tracks lifetime and which enemies this rock has already hit (pierce: hit each once).
 #[derive(Component)]
@@ -344,6 +349,7 @@ pub fn spawn_stone_tooth_rocks(
     mana_value: &mut Option<&mut i32>,
     mana_cost_per: i32,
     size_multiplier: f32,
+    z_slot_offset: usize,
 ) -> usize {
     let mut spawned = 0;
     for index in 0..count {
@@ -359,6 +365,7 @@ pub fn spawn_stone_tooth_rocks(
         } else {
             0.0
         };
+        let z_slot = ((z_slot_offset + index) % STONE_TOOTH_Z_DEPTH_LAYERS as usize) as u8;
         // Rocks start at player and expand outward (offset applied in update_stone_tooth).
         let offset = Vec2::ZERO;
         if let Some(sprite_sheet) = &graphics.spritesheet_map {
@@ -379,6 +386,7 @@ pub fn spawn_stone_tooth_rocks(
                         base_angle,
                         active: true,
                         size_multiplier,
+                        z_slot,
                     },
                     StoneToothRockLifetime {
                         lifetime: Timer::from_seconds(STONE_TOOTH_ROCK_LIFETIME, TimerMode::Once),
@@ -977,7 +985,7 @@ pub fn update_stone_tooth(
         transform.translation = Vec3::new(
             player_xy.x + offset.x,
             player_xy.y + offset.y,
-            player_pos.z + 0.25,
+            player_pos.z + 0.25 + stone.z_slot as f32 * STONE_TOOTH_Z_DEPTH_STEP,
         );
         let stone_pos = transform.translation.truncate();
         for snapshot in mob_snapshots.iter() {
@@ -1020,6 +1028,15 @@ pub fn update_stone_tooth(
     if !should_spawn_stones {
         return;
     }
+    let active_rock_count = stones
+        .iter()
+        .filter(|(_, stone, _, lifetime_option)| {
+            stone.owner == player_e
+                && lifetime_option
+                    .map(|lifetime| !lifetime.lifetime.finished())
+                    .unwrap_or(false)
+        })
+        .count();
     let mut mana_opt = Some(&mut curr_mana.0);
     let mana_cost_per = Heirloom::StoneTooth.get_mana_cost();
     let spawned = spawn_stone_tooth_rocks(
@@ -1032,6 +1049,7 @@ pub fn update_stone_tooth(
         &mut mana_opt,
         mana_cost_per,
         size_mult,
+        active_rock_count,
     );
     if spawned > 0 {
         game.heirloom_trigger_counts
@@ -1056,6 +1074,7 @@ pub fn handle_trigger_summons_on_heal(
         ),
         With<Player>,
     >,
+    stones: Query<(&OrbitingStone, Option<&StoneToothRockLifetime>)>,
     graphics: Res<Graphics>,
     mut trigger_counts: ResMut<HeirloomTriggerCounts>,
 ) {
@@ -1101,6 +1120,15 @@ pub fn handle_trigger_summons_on_heal(
 
         let stone_stacks = skills.get_count(Heirloom::StoneTooth).max(0) as usize;
         if stone_stacks >= 1 {
+            let active_rock_count = stones
+                .iter()
+                .filter(|(stone, lifetime_option)| {
+                    stone.owner == player_e
+                        && lifetime_option
+                            .map(|lifetime| !lifetime.lifetime.finished())
+                            .unwrap_or(false)
+                })
+                .count();
             let mut mana_opt = Some(&mut curr_mana.0);
             spawn_stone_tooth_rocks(
                 &mut commands,
@@ -1112,6 +1140,7 @@ pub fn handle_trigger_summons_on_heal(
                 &mut mana_opt,
                 0,
                 size_mult,
+                active_rock_count,
             );
             if let Some(ref mut state) = stone_state {
                 state.elapsed = 0.0;
@@ -2556,7 +2585,7 @@ pub fn update_homing_energy_balls(
 }
 
 // ============================================================================
-// CherryBomb - Attacks lob arcing cherry bombs that explode on landing
+// LobArc - shared arcing projectile flight used by Cherry Bomb heirloom and Bomb skill
 // ============================================================================
 
 aseprite!(pub CherryBombSprite, "textures/effects/CherryBomb.aseprite");
@@ -2565,18 +2594,24 @@ aseprite!(pub CherryBombExplosionSprite, "textures/effects/CherryBombExplosion.a
 const CHERRY_BOMB_PROC_PCT_PER_STACK: u32 = 25;
 const CHERRY_BOMB_MIN_TILES: f32 = 3.0;
 const CHERRY_BOMB_MAX_TILES: f32 = 10.0;
-const CHERRY_BOMB_FLIGHT_SECS: f32 = 0.72;
-const CHERRY_BOMB_ARC_HEIGHT: f32 = 28.0;
+const LOB_ARC_FLIGHT_SECS: f32 = 0.72;
+const LOB_ARC_HEIGHT: f32 = 28.0;
 const CHERRY_BOMB_EXPLOSION_RADIUS: f32 = 20.0;
 const CHERRY_BOMB_EXPLOSION_ANIM_SECS: f32 = 0.45;
 
+#[derive(Clone, Copy)]
+pub enum LobArcLanding {
+    CherryBomb { explosion_damage: i32 },
+    SkillBomb { explosion_damage: i32 },
+}
+
 #[derive(Component)]
-pub struct CherryBombArc {
+pub struct LobArc {
     pub start_pos: Vec2,
     pub target_pos: Vec2,
     pub timer: Timer,
     pub arc_height: f32,
-    pub explosion_damage: i32,
+    pub landing: LobArcLanding,
 }
 
 /// Rolls how many times a stacked percentage proc fires.
@@ -2603,7 +2638,7 @@ fn random_cherry_bomb_target(player_pos: Vec2, rng: &mut impl Rng) -> Vec2 {
     player_pos + Vec2::new(angle.cos(), angle.sin()) * dist
 }
 
-fn spawn_cherry_bomb_flight(
+pub fn spawn_cherry_bomb_flight(
     commands: &mut Commands,
     graphics: &Graphics,
     start_pos: Vec2,
@@ -2621,15 +2656,56 @@ fn spawn_cherry_bomb_flight(
             transform: Transform::from_translation(start_pos.extend(11.)),
             ..default()
         },
-        CherryBombArc {
+        LobArc {
             start_pos,
             target_pos,
-            timer: Timer::from_seconds(CHERRY_BOMB_FLIGHT_SECS, TimerMode::Once),
-            arc_height: CHERRY_BOMB_ARC_HEIGHT,
-            explosion_damage,
+            timer: Timer::from_seconds(LOB_ARC_FLIGHT_SECS, TimerMode::Once),
+            arc_height: LOB_ARC_HEIGHT,
+            landing: LobArcLanding::CherryBomb {
+                explosion_damage,
+            },
         },
         YSort(11.),
         Name::new("CHERRY_BOMB"),
+    ));
+}
+
+pub fn spawn_skill_bomb_lob(
+    commands: &mut Commands,
+    graphics: &Graphics,
+    start_pos: Vec2,
+    target_pos: Vec2,
+    explosion_damage: i32,
+) {
+    let Some(texture_atlas) = graphics.texture_atlas.as_ref() else {
+        return;
+    };
+    let Some(sprite) = graphics
+        .spritesheet_map
+        .as_ref()
+        .and_then(|map| map.get(&WorldObject::Bomb).cloned())
+    else {
+        return;
+    };
+
+    commands.spawn((
+        SpriteSheetBundle {
+            texture_atlas: texture_atlas.clone(),
+            sprite,
+            transform: Transform::from_translation(start_pos.extend(11.)),
+            ..default()
+        },
+        LobArc {
+            start_pos,
+            target_pos,
+            timer: Timer::from_seconds(LOB_ARC_FLIGHT_SECS, TimerMode::Once),
+            arc_height: LOB_ARC_HEIGHT,
+            landing: LobArcLanding::SkillBomb {
+                explosion_damage,
+            },
+        },
+        YSort(11.),
+        Name::new("SKILL_BOMB"),
     ));
 }
 
@@ -2725,12 +2801,16 @@ pub fn handle_cherry_bomb_on_attack(
     }
 }
 
-pub fn update_cherry_bomb_arcs(
+pub fn update_lob_arcs(
     mut commands: Commands,
     time: Res<Time>,
     graphics: Res<Graphics>,
     player_size: Query<&ProjectileSize, With<Player>>,
-    mut bombs: Query<(Entity, &mut CherryBombArc, &mut Transform)>,
+    mut bombs: Query<(Entity, &mut LobArc, &mut Transform)>,
+    mut ranged_attack_events: EventWriter<RangedAttackEvent>,
+    enemies: Query<(Entity, &GlobalTransform), With<Mob>>,
+    mut mob_status: Query<&mut MobStatusEffects, With<Mob>>,
+    mut status_event: EventWriter<StatusEffectEvent>,
 ) {
     let size_multiplier = player_size
         .get_single()
@@ -2746,15 +2826,70 @@ pub fn update_cherry_bomb_arcs(
         transform.translation = Vec3::new(ground.x, ground.y + height, transform.translation.z);
 
         if arc.timer.just_finished() {
-            spawn_cherry_bomb_explosion(
-                &mut commands,
-                &graphics,
-                arc.target_pos,
-                arc.explosion_damage,
-                size_multiplier,
-            );
-            commands.spawn(SoundSpawner::new(AudioSoundEffect::IceExplosion, 0.25));
+            match arc.landing {
+                LobArcLanding::CherryBomb {
+                    explosion_damage,
+                } => {
+                    spawn_cherry_bomb_explosion(
+                        &mut commands,
+                        &graphics,
+                        arc.target_pos,
+                        explosion_damage,
+                        size_multiplier,
+                    );
+                    commands.spawn(SoundSpawner::new(AudioSoundEffect::IceExplosion, 0.25));
+                }
+                LobArcLanding::SkillBomb {
+                    explosion_damage,
+                } => {
+                    ranged_attack_events.send(RangedAttackEvent {
+                        projectile: Projectile::BombExplosion,
+                        direction: Vec2::ZERO,
+                        mana_cost: None,
+                        mana_cost_heirloom: None,
+                        from_enemy: false,
+                        from_entity: None,
+                        is_followup_proj: false,
+                        dmg_override: Some(explosion_damage),
+                        pos_override: Some(arc.target_pos),
+                        spawn_delay: 0.0,
+                    });
+                    apply_bomb_frail_at_position(
+                        arc.target_pos,
+                        &enemies,
+                        &mut mob_status,
+                        &mut status_event,
+                    );
+                }
+            }
             commands.entity(entity).despawn_recursive();
         }
+    }
+}
+
+const BOMB_FRAIL_RADIUS: f32 = 50.0;
+
+pub fn apply_bomb_frail_at_position(
+    target_pos: Vec2,
+    enemies: &Query<(Entity, &GlobalTransform), With<Mob>>,
+    mob_status: &mut Query<&mut MobStatusEffects, With<Mob>>,
+    status_event: &mut EventWriter<StatusEffectEvent>,
+) {
+    for (enemy_entity, enemy_transform) in enemies.iter() {
+        let enemy_pos = enemy_transform.translation().truncate();
+        if target_pos.distance(enemy_pos) > BOMB_FRAIL_RADIUS {
+            continue;
+        }
+        if let Ok(mut status) = mob_status.get_mut(enemy_entity) {
+            status.frail = Some(crate::combat::status_effects::Frail {
+                num_stacks: 3,
+                timer: Timer::from_seconds(1.2, TimerMode::Repeating),
+            });
+        }
+        status_event.send(StatusEffectEvent {
+            entity: enemy_entity,
+            effect: StatusEffect::Frail,
+            num_stacks: 3,
+        });
     }
 }

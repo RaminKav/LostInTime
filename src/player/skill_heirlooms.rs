@@ -16,15 +16,12 @@ use crate::{
     },
     audio::{AudioSoundEffect, SoundSpawner},
     blessings::{Blessing, OwnedBlessings},
-    combat::{
-        status_effects::{StatusEffect, StatusEffectEvent},
-        EnemyDeathEvent, HitEvent,
-    },
+    combat::{EnemyDeathEvent, HitEvent},
     cursor::CursorPos,
     custom_commands::CommandsExt,
     enemy::Mob,
     item::{
-        projectile::{BombTarget, Projectile, ProjectileState, RangedAttackEvent},
+        projectile::{Projectile, ProjectileState, RangedAttackEvent},
         WorldObject,
     },
     player::{
@@ -42,9 +39,9 @@ use crate::{
                 BUCKSHOT_PELLET, DAGGER_SLASH, DAGGER_THROW, FIRE_PILLAR, FURY,
                 HEAL_MAX_HEALTH_PERCENT, ICE_WALL, LASER_BEAM, LIGHTNING, METEOR_SHOWER,
                 METEOR_SHOWER_BASE_COUNT, METEOR_SHOWER_CASTS_PER_GROWTH,
-                METEOR_SHOWER_FIRST_RADIUS_TILES,
-                METEOR_SHOWER_RADIUS_TILES, PIERCING_STAR, POSSESSED_BLADE,
-                RAPIDFIRE_ATTACK_SPEED_BONUS_PERCENT, SHOUT, SPIN_ATTACK, TRIPLE_THROW,
+                METEOR_SHOWER_FIRST_RADIUS_TILES, METEOR_SHOWER_RADIUS_TILES, PIERCING_STAR,
+                POSSESSED_BLADE, RAPIDFIRE_ATTACK_SPEED_BONUS_PERCENT, SHOUT, SPIN_ATTACK,
+                TRIPLE_THROW,
             },
             arrow_volley_scaling, effective_player_attack_speed_multiplier,
             fury_throw_speed_multiplier, grant_skill_charge_after_cooldown_complete, ActiveSkill,
@@ -71,7 +68,16 @@ fn start_slot_cooldown_for_cast(
     should_start: bool,
 ) {
     if slot < 4 {
-        slots.0[slot].start_cooldown_seconds(cd_secs, should_start);
+        let s = &mut slots.0[slot];
+        // If a charge-regen cooldown is already ticking (e.g. we had 1 of 2 charges
+        // saved and were partway to regenerating the second), consuming the saved
+        // charge must NOT restart the timer — otherwise the partial progress toward
+        // the next charge is wiped every cast. Leave the in-flight regen alone and
+        // just let the already-consumed charge stand.
+        if should_start && !s.cooldown_timer.finished() {
+            return;
+        }
+        s.start_cooldown_seconds(cd_secs, should_start);
     }
 }
 
@@ -383,7 +389,7 @@ pub fn handle_active_skill_event(
                             }
                         }
                         commands.entity(player_e).insert(FirePillarState {
-                            hit_clear_timer: Timer::from_seconds(1.0, TimerMode::Repeating),
+                            hit_clear_timer: Timer::from_seconds(1.15, TimerMode::Repeating),
                         });
                         start_slot_cooldown_for_cast(
                             &mut class_slots,
@@ -1109,34 +1115,19 @@ pub fn handle_active_skill_event(
                             should_start_cooldown,
                         );
 
-                        // Calculate direction to cursor position
                         let player_pos = player_txfm.translation().truncate();
                         let cursor_pos = cursor.world_coords.truncate();
-                        let direction = (cursor_pos - player_pos).normalize_or_zero();
-
-                        // Spawn bomb projectile toward cursor position
                         let base_dmg: i32 = attack_opt.map(|a| a.0).unwrap_or(10);
                         let dmg =
                             (base_dmg as f32 * power_mult * attack_damage_multiplier(BOMB)) as i32;
 
-                        // Store the target position for later attachment to the bomb projectile
-                        // We'll attach it after the projectile spawns
-                        commands.entity(player_e).insert(BombTarget {
-                            target_pos: cursor_pos,
-                        });
-
-                        ranged_attack_events.send(RangedAttackEvent {
-                            projectile: Projectile::Bomb,
-                            direction,
-                            mana_cost: None,
-                            mana_cost_heirloom: None,
-                            from_enemy: false,
-                            from_entity: Some(player_e),
-                            is_followup_proj: false,
-                            dmg_override: Some(dmg),
-                            pos_override: None,
-                            spawn_delay: 0.0,
-                        });
+                        crate::player::combat_heirlooms::spawn_skill_bomb_lob(
+                            &mut commands,
+                            &proto_param.graphics,
+                            player_pos,
+                            cursor_pos,
+                            dmg,
+                        );
                     }
                     ActiveSkill::SpinAttack => {
                         if !should_start_cooldown {
@@ -2339,109 +2330,6 @@ pub fn handle_fury_skill(
     }
 }
 
-/// Attach BombTarget component to newly spawned Bomb projectiles
-pub fn handle_attach_bomb_target(
-    mut commands: Commands,
-    mut bomb_projectiles: Query<
-        (Entity, &Projectile, &GlobalTransform),
-        (With<Projectile>, Added<Projectile>),
-    >,
-    player_bomb_targets: Query<(Entity, &BombTarget), With<Player>>,
-    transforms: Query<&GlobalTransform>,
-) {
-    for (proj_entity, proj, proj_transform) in bomb_projectiles.iter_mut() {
-        if *proj != Projectile::Bomb {
-            continue;
-        }
-
-        let proj_pos = proj_transform.translation().truncate();
-        for (player_e, bomb_target) in player_bomb_targets.iter() {
-            if let Ok(player_txfm) = transforms.get(player_e) {
-                let player_pos = player_txfm.translation().truncate();
-                let distance = proj_pos.distance(player_pos);
-                if distance < 100.0 {
-                    commands.entity(proj_entity).insert(BombTarget {
-                        target_pos: bomb_target.target_pos,
-                    });
-                    commands.entity(player_e).remove::<BombTarget>();
-                    break;
-                }
-            }
-        }
-    }
-}
-
-/// Handle bomb explosions when bomb reaches target or hits something
-pub fn handle_bomb_explosion(
-    mut commands: Commands,
-    mut bomb_projectiles: Query<(Entity, &GlobalTransform, Option<&BombTarget>), With<Projectile>>,
-    projectiles: Query<&Projectile>,
-    mut ranged_attack_events: EventWriter<RangedAttackEvent>,
-    enemies: Query<(Entity, &GlobalTransform), With<Mob>>,
-    mut mob_status: Query<&mut crate::combat::status_effects::MobStatusEffects, With<Mob>>,
-    player_skills: Query<(&SkillPower, &Attack, &OwnedBlessings, &Attack), With<Player>>,
-    mut status_event: EventWriter<StatusEffectEvent>,
-) {
-    let Ok((skill_power, attack, blessings, _)) = player_skills.get_single() else {
-        return;
-    };
-    let power_mult = skill_power_multiplier(skill_power, blessings.get_skill_power_bonus());
-
-    let base_dmg: i32 = attack.0;
-    let dmg = (base_dmg as f32 * power_mult * attack_damage_multiplier(BOMB)) as i32;
-
-    for (bomb_entity, bomb_txfm, bomb_target_opt) in bomb_projectiles.iter_mut() {
-        if let Ok(proj) = projectiles.get(bomb_entity) {
-            if *proj != Projectile::Bomb {
-                continue;
-            }
-        } else {
-            continue;
-        }
-        if let Some(bomb_target) = bomb_target_opt {
-            let bomb_pos = bomb_txfm.translation().truncate();
-            let distance_to_target = bomb_pos.distance(bomb_target.target_pos);
-
-            if distance_to_target < 5.0 {
-                ranged_attack_events.send(RangedAttackEvent {
-                    projectile: Projectile::BombExplosion,
-                    direction: Vec2::ZERO,
-                    mana_cost: None,
-                    mana_cost_heirloom: None,
-                    from_enemy: false,
-                    from_entity: None,
-                    is_followup_proj: false,
-                    dmg_override: Some(dmg),
-                    pos_override: Some(bomb_target.target_pos),
-                    spawn_delay: 0.0,
-                });
-
-                let explosion_radius = 50.0;
-                for (enemy_entity, enemy_transform) in enemies.iter() {
-                    let enemy_pos = enemy_transform.translation().truncate();
-                    let distance = bomb_target.target_pos.distance(enemy_pos);
-                    if distance <= explosion_radius {
-                        if let Ok(mut status) = mob_status.get_mut(enemy_entity) {
-                            status.frail = Some(Frail {
-                                num_stacks: 3,
-                                timer: Timer::from_seconds(1.2, TimerMode::Repeating),
-                            });
-                        }
-
-                        status_event.send(StatusEffectEvent {
-                            entity: enemy_entity,
-                            effect: StatusEffect::Frail,
-                            num_stacks: 3,
-                        });
-                    }
-                }
-
-                commands.entity(bomb_entity).despawn_recursive();
-            }
-        }
-    }
-}
-
 const MAX_SKILL_EXPLOSIONS_PER_FRAME: u8 = 8;
 const SKILL_EXPLOSION_BUFF_SECS: f32 = 4.0;
 
@@ -2540,8 +2428,7 @@ pub fn handle_skill_explosion_hits(
 
         *throttle += 1;
 
-        let explosion_dmg =
-            (hit.damage as f32 * buff.damage_fraction).round().max(1.) as i32;
+        let explosion_dmg = (hit.damage as f32 * buff.damage_fraction).round().max(1.) as i32;
         spawn_small_explosion_hitbox(
             &mut commands,
             &graphics,

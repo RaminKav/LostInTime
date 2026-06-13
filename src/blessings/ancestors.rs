@@ -271,7 +271,7 @@ impl AncestorBlessing {
                 vec!["Upgrade starting", "weapon one tier."]
             }
             AncestorBlessing::RandomWeapon => vec!["Start with a random", "weapon."],
-            AncestorBlessing::RandomEquipment => vec!["Start with random", "equipment."],
+            AncestorBlessing::RandomEquipment => vec!["Start with a random", "equipment."],
             AncestorBlessing::RandomAccessory => vec!["Start with a random", "accessory."],
             AncestorBlessing::ReplaceWithSpecificWeapon => {
                 vec![
@@ -283,8 +283,8 @@ impl AncestorBlessing {
             AncestorBlessing::RandomWeaponHeirloom => {
                 vec!["Start with a random", "weapon heirloom."]
             }
-            AncestorBlessing::RandomSkill => vec!["Start with a random", "active skill."],
-            AncestorBlessing::SpecificSkill => vec!["Start with a specific", "active skill."],
+            AncestorBlessing::RandomSkill => vec!["Start with a random", "extra skill."],
+            AncestorBlessing::SpecificSkill => vec!["Start with a specific", "extra skill."],
             AncestorBlessing::SkillHeirloom => vec!["Start with a", "skill heirloom."],
             AncestorBlessing::PlasmaWeapon => {
                 vec!["Start with plasma staff.", "Powerful, but costs mana."]

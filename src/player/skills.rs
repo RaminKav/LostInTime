@@ -905,7 +905,7 @@ impl ActiveSkill {
             }
             ActiveSkill::FirePillar => {
                 commands.entity(entity).insert(FirePillarState {
-                    hit_clear_timer: Timer::from_seconds(1., TimerMode::Repeating),
+                    hit_clear_timer: Timer::from_seconds(1.15, TimerMode::Repeating),
                 });
             }
             ActiveSkill::Heal => {
@@ -1141,7 +1141,7 @@ impl Heirloom {
             Heirloom::IceStaffFloor => 5,
             Heirloom::ViralVenum => 5,
             Heirloom::HealEcho => 7,
-            Heirloom::HealSummons => 15,
+            Heirloom::HealSummons => 7,
             Heirloom::SkillEcho => 3,
             Heirloom::WaveAttack => 5,
             Heirloom::CherryBomb => 3,
@@ -1734,7 +1734,7 @@ impl Heirloom {
                 "chance to trigger".to_string(),
                 "all summon heirlooms".to_string(),
                 "once.".to_string(),
-                // format!("Costs {} mana", Heirloom::HealSummons.get_mana_cost()),
+                format!("Costs {} mana", Heirloom::HealSummons.get_mana_cost()),
             ],
             Heirloom::FullStomach => vec![
                 "You get hungry".to_string(),

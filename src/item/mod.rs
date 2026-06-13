@@ -98,12 +98,12 @@ use serde::{Deserialize, Serialize};
 use strum_macros::{Display, EnumIter, IntoStaticStr};
 
 use self::ammo::tick_reload;
-use self::item_drop_outline::ItemDropOutlinePlugin;
 use self::bridge_placement::{
     handle_bridge_placement_mode, handle_bridge_preview_dragging, BridgePlacementMode,
 };
 use self::crafting::CraftingPlugin;
 use self::item_actions::handle_item_action_success;
+use self::item_drop_outline::ItemDropOutlinePlugin;
 use self::item_upgrades::{
     handle_delayed_ranged_attack, handle_on_hit_upgrades, handle_spread_arrows_attack,
 };
@@ -951,6 +951,10 @@ impl WorldObject {
                 | WorldObject::DesertSkull2
                 | WorldObject::DesertSkull3
                 | WorldObject::DesertSkull4
+                | WorldObject::Tumbleweed1
+                | WorldObject::Tumbleweed2
+                | WorldObject::Tumbleweed3
+                | WorldObject::Tumbleweed4
         )
     }
 
@@ -1085,6 +1089,9 @@ impl WorldObject {
             WorldObject::DesertSmlBoulder4 => true,
             WorldObject::DesertSmlBoulder5 => true,
             WorldObject::DesertSmlBoulder6 => true,
+            WorldObject::DesertMedBoulder1 => true,
+            WorldObject::DesertMedBoulder2 => true,
+            WorldObject::DesertMedBoulder3 => true,
             WorldObject::SmlCactus1 => true,
             WorldObject::SmlCactus2 => true,
             WorldObject::SmlCactus3 => true,
@@ -1110,6 +1117,9 @@ impl WorldObject {
             WorldObject::SnowSmlBoulder4 => true,
             WorldObject::SnowSmlBoulder5 => true,
             WorldObject::SnowSmlBoulder6 => true,
+            WorldObject::SnowMedBoulder1 => true,
+            WorldObject::SnowMedBoulder2 => true,
+            WorldObject::SnowMedBoulder3 => true,
             WorldObject::SnowBush1 => true,
             WorldObject::SnowBush2 => true,
             WorldObject::SnowBush3 => true,
@@ -1776,8 +1786,7 @@ pub fn handle_placing_world_object(
                                             GROUND_PATCH_YSORT_KEY_8,
                                             0.,
                                         ))
-                                    } else if place_event.obj.spawns_grass_patch_9_shrine_under()
-                                    {
+                                    } else if place_event.obj.spawns_grass_patch_9_shrine_under() {
                                         Some((
                                             GroundPatch::GrassPatch4,
                                             GroundPatchPlacement::Shrine { anchor },

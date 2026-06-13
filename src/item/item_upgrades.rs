@@ -321,7 +321,7 @@ pub fn handle_on_hit_upgrades(
                         &mut commands,
                         &graphics,
                         hit_entity_txfm.translation(),
-                        hit.damage / 4,
+                        hit.damage / 2,
                         projectile_size.get_multiplier(),
                     );
                     // Only play sound once per frame to avoid audio spam

@@ -13,7 +13,7 @@ use crate::{
 
 use super::{item_actions::ItemActionParam, PlaceItemEvent, WorldObject};
 
-const BRIDGE_MODE_IDLE_EXIT_SECS: f32 = 3.0;
+const BRIDGE_MODE_IDLE_EXIT_SECS: f32 = 1.;
 
 /// Preview icon while placing bridges — not an inventory drag (`DraggedItem`) and has no
 /// [`ItemStack`], so it cannot be world-dropped or picked up as loot.
