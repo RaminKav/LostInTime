@@ -685,9 +685,10 @@ pub fn resolve_ancestor_blessing(
         }
         AncestorBlessing::ThreeCommonHeirlooms
         | AncestorBlessing::OneUncommonHeirloom
-        | AncestorBlessing::TwoRandomRareHeirlooms
-        | AncestorBlessing::ThreeRerolls
-        | AncestorBlessing::TwoBanishes => {}
+        | AncestorBlessing::TwoRandomRareHeirlooms => {
+            display_icon = Some(AncestorBlessingIcon::Mystery);
+        }
+        AncestorBlessing::ThreeRerolls | AncestorBlessing::TwoBanishes => {}
     }
 
     if display_icon.is_none() && !blessing.hides_resolved_reward_from_player() {

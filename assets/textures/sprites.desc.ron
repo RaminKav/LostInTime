@@ -2143,6 +2143,11 @@
             size: (16., 16.),
             anchor: None,
         ),
+        GoldenTooth: WorldObjectData(
+            texture_pos: (15., 23.),
+            size: (16., 16.),
+            anchor: None,
+        ),
     },
     icons : {
         StoneWallBlock: SpriteData(

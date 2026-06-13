@@ -352,6 +352,10 @@ fn handle_enemy_death(
         let is_infinite_mode = infinite_mode.active;
 
         let has_double_gold = blessings.has_double_gold_drops();
+        // Golden Tooth: when an enemy drops a coin, each stack grants a +10% chance to drop an
+        // extra coin. Rolled separately from (and only after) a successful base coin loot roll.
+        let golden_tooth_stacks =
+            player_skills.get_count(crate::player::skills::Heirloom::GoldenTooth);
 
         // drop loot
         if !*NO_DROPS {
@@ -384,11 +388,25 @@ fn handle_enemy_death(
                 })
                 .collect::<Vec<_>>()
                 {
-                    let count = if drop.obj_type == WorldObject::Coin && has_double_gold {
+                    let base_count = if drop.obj_type == WorldObject::Coin && has_double_gold {
                         2
                     } else {
                         1
                     };
+                    let mut golden_tooth_extra = 0;
+                    if drop.obj_type == WorldObject::Coin && golden_tooth_stacks > 0 {
+                        let mut rng = rand::thread_rng();
+                        let extra_chance = golden_tooth_stacks as f32 * 0.10;
+                        // Guaranteed extra coins for each whole 100%, plus a roll on the remainder.
+                        golden_tooth_extra += extra_chance.floor() as i32;
+                        if rng.gen::<f32>() < extra_chance.fract() {
+                            golden_tooth_extra += 1;
+                        }
+                        if golden_tooth_extra > 0 {
+                            trigger_counts.increment(Heirloom::GoldenTooth);
+                        }
+                    }
+                    let count = base_count + golden_tooth_extra;
                     for _ in 0..count {
                         let mut rng = rand::thread_rng();
                         let d = if mob.is_boss() { 30. } else { 10. };

@@ -331,9 +331,9 @@ pub fn fire_ring_duration_seconds(max_mana: i32) -> f32 {
 // gameplay in `melee_skills::handle_spear`) ---
 
 pub mod parry_spear_scaling {
-    pub const BASE_PULL_RADIUS_PX: f32 = 64.0;
+    pub const BASE_PULL_RADIUS_PX: f32 = 80.0;
     /// Extra pull radius per point of Size ([`crate::attributes::ProjectileSize`]).
-    pub const PULL_RADIUS_PER_SIZE_PX: f32 = 0.6;
+    pub const PULL_RADIUS_PER_SIZE_PX: f32 = 0.5;
 }
 
 pub fn parry_spear_pull_radius_px(size: i32) -> f32 {
@@ -1116,6 +1116,8 @@ pub enum Heirloom {
     EnergyBallBarrage,
     /// Skill hits spawn a small explosion at the target when the player has enough mana.
     SkillExplosion,
+    /// When an enemy drops a coin from its loot table, 10% chance per stack to drop an extra coin.
+    GoldenTooth,
 }
 
 pub enum HeirloomTrait {
@@ -1292,6 +1294,7 @@ impl Heirloom {
             Heirloom::SkillManaRegen => "Brown Card".to_string(),
             Heirloom::DamageDealtMp => "Blue Card".to_string(),
             Heirloom::ManaOrbDropMult => "Purple Card".to_string(),
+            Heirloom::GoldenTooth => "Golden Tooth".to_string(),
         }
     }
 
@@ -1936,6 +1939,12 @@ impl Heirloom {
                 "chance from enemies".to_string(),
                 "is doubled.".to_string(),
             ],
+            Heirloom::GoldenTooth => vec![
+                "Mobs that drop a".to_string(),
+                "coin have a +10%".to_string(),
+                "chance to drop an".to_string(),
+                "extra coin.".to_string(),
+            ],
         };
         Self::typed_from_strings(lines)
     }
@@ -2430,6 +2439,7 @@ impl HeirloomChoiceQueue {
             HeirloomChoiceState::new(Heirloom::CrateBreakDamage, HeirloomRarity::Legendary),
             HeirloomChoiceState::new(Heirloom::EnergyBallBarrage, HeirloomRarity::Legendary),
             HeirloomChoiceState::new(Heirloom::SkillExplosion, HeirloomRarity::Uncommon),
+            HeirloomChoiceState::new(Heirloom::GoldenTooth, HeirloomRarity::Uncommon),
         ]
     }
 

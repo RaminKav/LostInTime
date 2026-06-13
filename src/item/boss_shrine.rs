@@ -162,7 +162,7 @@ impl BossSummonIndex {
     }
     pub fn num_poison_bombs(&self) -> usize {
         match self.0 {
-            0 => 1,
+            0 => 2,
             1 => 3,
             2 => 5,
             3 => 8,
