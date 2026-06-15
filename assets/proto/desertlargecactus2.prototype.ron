@@ -3,6 +3,7 @@
   templates: [],
   schematics: {
   "survival_rogue_like::item::WorldObject": DesertLargeCactus2,
+  "survival_rogue_like::animations::FadeOpacity": (),
   "bevy_proto::custom::SpriteBundle": (
       texture: AssetPath("desertcactuslarge2.png")
    ),

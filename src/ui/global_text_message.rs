@@ -3,13 +3,8 @@ use bevy::render::view::RenderLayers;
 use bevy::sprite::Anchor;
 
 use crate::{
-    assets::Graphics,
-    colors::WHITE,
-    inventory::ItemStack,
-    item::WorldObject,
-    night::NightTracker,
-    world::dimension::Era,
-    ScreenResolution,
+    assets::Graphics, colors::WHITE, inventory::ItemStack, item::WorldObject, night::NightTracker,
+    world::dimension::Era, ScreenResolution,
 };
 
 use super::{
@@ -17,7 +12,7 @@ use super::{
     spawn_item_stack_icon,
 };
 
-const MESSAGE_DISPLAY_SECS: f32 = 3.5;
+const MESSAGE_DISPLAY_SECS: f32 = 5.;
 const TOP_MARGIN: f32 = 80.0;
 
 /// Matches tutorial / contextual tip panels in [`super::tutorial_ui`].
@@ -313,10 +308,7 @@ pub fn show_pending_era_announcement(
     if let Some(event) = GlobalTextMessageEvent::era_start_announcement(era) {
         events.send(
             event
-                .with_sub_text(
-                    format!("Day {}", night.display_day()),
-                    WHITE,
-                )
+                .with_sub_text(format!("Day {}", night.display_day()), WHITE)
                 .with_sub_panel_width(80.),
         );
     }

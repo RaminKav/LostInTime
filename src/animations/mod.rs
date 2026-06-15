@@ -8,7 +8,6 @@ pub mod ui_animaitons;
 use bevy::reflect::TypeUuid;
 use bevy::render::render_resource::ShaderRef;
 use bevy::sprite::{Material2d, Material2dPlugin};
-use bevy::utils::HashMap;
 use bevy::{prelude::*, render::render_resource::AsBindGroup};
 use bevy_aseprite::anim::AsepriteAnimation;
 use bevy_proto::prelude::{ReflectSchematic, Schematic};
@@ -456,59 +455,44 @@ fn animate_spritesheet_animations(
 #[reflect(Component, Schematic)]
 pub struct FadeOpacity;
 
-/// Current foliage opacity state so we only update the texture when it changes.
-#[derive(Component, Clone, Copy, PartialEq, Eq, Debug, Default, Reflect, FromReflect)]
-#[reflect(Component)]
-pub enum FoliageOpacityState {
-    #[default]
-    Normal,
-    Faded,
-}
-
+/// Smoothly fades foliage (trees) translucent when the player walks behind them by lerping the
+/// sprite's color alpha toward a target. This keeps sprites batched (no per-tree material/mesh)
+/// and works for every tree without needing pre-baked `_fade.png` textures.
 fn animate_foliage_opacity(
-    mut commands: Commands,
-    tree_query: Query<
-        (
-            Entity,
-            &GlobalTransform,
-            &WorldObject,
-            Option<&FoliageOpacityState>,
-        ),
-        (With<FadeOpacity>, Without<Sapling>),
-    >,
+    time: Res<Time>,
+    mut tree_query: Query<(&GlobalTransform, &mut Sprite), (With<FadeOpacity>, Without<Sapling>)>,
     player: Query<&GlobalTransform, With<Player>>,
-    asset_server: Res<AssetServer>,
-    mut graphics: ResMut<crate::assets::Graphics>,
 ) {
+    const NORMAL_ALPHA: f32 = 1.0;
+    const FADED_ALPHA: f32 = 0.35;
+    /// Seconds for a full opaque <-> faded transition.
+    const FADE_DURATION: f32 = 0.15;
+
     let p_txfm = match player.get_single() {
         Ok(t) => t,
         Err(_) => return,
     };
-    let cache = graphics
-        .foliage_textures
-        .get_or_insert_with(HashMap::default);
-    for (e, txfm, obj, current_state) in tree_query.iter() {
-        let delta_t = p_txfm.translation().truncate() - txfm.translation().truncate();
-        let desired =
+    let player_pos = p_txfm.translation().truncate();
+    let step = ((NORMAL_ALPHA - FADED_ALPHA) / FADE_DURATION) * time.delta_seconds();
+
+    for (txfm, mut sprite) in tree_query.iter_mut() {
+        let delta_t = player_pos - txfm.translation().truncate();
+        let target =
             if delta_t.x <= 65. && delta_t.x >= -65. && delta_t.y <= 80. && delta_t.y >= -26. {
-                FoliageOpacityState::Faded
+                FADED_ALPHA
             } else {
-                FoliageOpacityState::Normal
+                NORMAL_ALPHA
             };
-        if current_state.map_or(true, |s| *s != desired) {
-            let (normal, fade) = cache.entry(*obj).or_insert_with(|| {
-                let stem = obj.to_string().to_lowercase();
-                (
-                    asset_server.load::<Image, _>(format!("{stem}.png")),
-                    asset_server.load::<Image, _>(format!("{stem}_fade.png")),
-                )
-            });
-            let handle = match desired {
-                FoliageOpacityState::Faded => fade.clone(),
-                FoliageOpacityState::Normal => normal.clone(),
-            };
-            commands.entity(e).insert(handle).insert(desired);
+        let current = sprite.color.a();
+        if (current - target).abs() <= f32::EPSILON {
+            continue;
         }
+        let new_alpha = if current < target {
+            (current + step).min(target)
+        } else {
+            (current - step).max(target)
+        };
+        sprite.color.set_a(new_alpha);
     }
 }
 

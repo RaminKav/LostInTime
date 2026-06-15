@@ -6,11 +6,13 @@ use crate::{
         attribute_helpers::skill_power_multiplier, AttackSpeed, BonusAttackSpeed, CritChance,
         MaxHealth, MaxMana, ProjectileSize, SkillPower, Speed,
     },
+    audio::{AudioSoundEffect, SoundSpawner},
     blessings::OwnedBlessings,
-    colors::WHITE,
+    colors::{WHITE, YELLOW_2},
     item::active_skill_shrine::{
-        assign_shrine_skill_to_slot, shrine_assign_action, shrine_assignable_slots,
-        ActiveSkillShrineOverwrite, ActiveSkillShrineSelection, ShrineAssignAction,
+        assign_shrine_skill_to_slot, reroll_active_skill_shrine_offer_skills,
+        shrine_assign_action, shrine_assignable_slots, skill_choices_from_offer_skills, ActiveSkillShrineOverwrite, ActiveSkillShrineSelection,
+        ShrineAssignAction,
     },
     player::{
         skills::{
@@ -18,17 +20,42 @@ use crate::{
             effective_player_attack_speed_multiplier, ActiveSkillChoiceState, PlayerClass,
             PlayerSkills,
         },
-        unlocks::UnlockedSkills,
+        unlocks::{RunUnlockState, UnlockedSkills},
         Player,
     },
-    ui::ui_helpers::spawn_full_screen_ui_overlay_tuned,
-    ScreenResolution,
+    ui::{
+        essence_ui::{MERCHANT_REROLL_ICON_PATH, MERCHANT_REROLL_ICON_SIZE},
+        ui_helpers::spawn_full_screen_ui_overlay_tuned,
+    },
+    GameParam, ScreenResolution,
 };
 
 use super::{
     interactions::Interaction, main_menu::spawn_back_button, options_ui::CheatSettings,
     player_hud::spawn_skill_tooltip_content, Interactable, UIElement, UIState,
+    KEYBIND_BADGE_COLOR, TOOLTIP_INFO_BOX_SIZE,
 };
+
+const SKILL_VIEW2_SIZE: Vec2 = Vec2::new(248.5, 171.5);
+const SHRINE_BANNER_SPACING: f32 = 60.;
+const SHRINE_REROLL_BADGE_SIZE: Vec2 = Vec2::new(14., 12.);
+/// Bottom of `SkillView2`, inset from the panel edge (same band as merchant category rerolls).
+const SHRINE_REROLL_BUTTON_Y: f32 = -SKILL_VIEW2_SIZE.y * 0.5 + 14.;
+
+#[derive(Component)]
+pub struct ActiveSkillShrineRoot;
+
+#[derive(Component)]
+pub struct ActiveSkillShrineChoicesRoot;
+
+#[derive(Component)]
+pub struct ActiveSkillShrineRerollButton;
+
+#[derive(Component)]
+pub struct ActiveSkillShrineRerollIcon;
+
+#[derive(Component)]
+pub struct ActiveSkillShrineRerollsText;
 
 #[derive(Component)]
 pub struct ActiveSkillShrineUI {
@@ -44,11 +71,224 @@ pub struct ActiveSkillSlotChoiceUI {
     pub interaction_lock_timer: Timer,
 }
 
+fn spawn_active_skill_shrine_skill_choices(
+    commands: &mut Commands,
+    graphics: &Graphics,
+    asset_server: &AssetServer,
+    parent: Entity,
+    skill_choices: &[ActiveSkillChoiceState],
+    skill_power: (
+        &SkillPower,
+        &OwnedBlessings,
+        &MaxMana,
+        &MaxHealth,
+        Option<&BonusAttackSpeed>,
+        Option<&AttackSpeed>,
+        &CritChance,
+        &Speed,
+        &ProjectileSize,
+    ),
+) {
+    let start_y = -SHRINE_BANNER_SPACING * 0.5;
+    let (
+        skill_power,
+        blessings,
+        max_mana,
+        max_health,
+        bonus_as,
+        attack_speed,
+        crit,
+        spd,
+        size,
+    ) = skill_power;
+    let bonus_as_mult = effective_player_attack_speed_multiplier(
+        attack_speed.map(|a| a.0).unwrap_or(0),
+        bonus_as.map(|b| b.get_multiplier()).unwrap_or(1.0),
+    );
+
+    for (index, skill_choice) in skill_choices.iter().enumerate() {
+        let banner_x = -70.;
+        let banner_y = start_y + (index as f32 * SHRINE_BANNER_SPACING);
+        let tooltip_pos = Vec3::new(banner_x, banner_y, 15.);
+
+        let container = commands
+            .spawn(RenderLayers::from_layers(&[3]))
+            .insert(SpatialBundle::from_transform(Transform {
+                translation: tooltip_pos,
+                scale: Vec3::new(1., 1., 11.),
+                ..Default::default()
+            }))
+            .set_parent(parent)
+            .id();
+
+        commands
+            .spawn(SpriteBundle {
+                texture: graphics.get_ui_element_texture(UIElement::SkillTooltipBanner),
+                sprite: Sprite {
+                    custom_size: Some(Vec2::new(236., 57.5)),
+                    ..Default::default()
+                },
+                transform: Transform {
+                    translation: Vec3::new(70., -1., 1.),
+                    scale: Vec3::new(1., 1., 1.),
+                    ..Default::default()
+                },
+                ..Default::default()
+            })
+            .insert(ActiveSkillShrineUI {
+                skill_choice: skill_choice.clone(),
+                interaction_lock_timer: Timer::from_seconds(0.75, TimerMode::Once),
+            })
+            .insert(Interactable::default())
+            .insert(RenderLayers::from_layers(&[3]))
+            .insert(UIState::ActiveSkillShrine)
+            .insert(Name::new(format!("SKILL_BANNER_{index}")))
+            .set_parent(container);
+
+        spawn_skill_tooltip_content(
+            commands,
+            graphics,
+            asset_server,
+            skill_choice.active_skill.clone(),
+            None,
+            container,
+            skill_power_multiplier(skill_power, blessings.get_skill_power_bonus()),
+            max_mana.0,
+            max_health.0,
+            bonus_as_mult,
+            crit.0,
+            spd.0,
+            size.0,
+            METEOR_SHOWER_BASE_COUNT,
+        );
+    }
+}
+
+fn spawn_active_skill_shrine_reroll_button(
+    commands: &mut Commands,
+    asset_server: &AssetServer,
+    parent: Entity,
+    enabled: bool,
+) {
+    let color = if enabled {
+        Color::WHITE
+    } else {
+        Color::rgb(0.45, 0.45, 0.45)
+    };
+
+    let mut btn = commands.spawn(SpriteBundle {
+        sprite: Sprite {
+            color: KEYBIND_BADGE_COLOR,
+            custom_size: Some(SHRINE_REROLL_BADGE_SIZE),
+            ..default()
+        },
+        transform: Transform::from_translation(Vec3::new(0., SHRINE_REROLL_BUTTON_Y, 3.)),
+        ..default()
+    });
+    btn.insert(RenderLayers::from_layers(&[3]))
+        .insert(UIState::ActiveSkillShrine)
+        .insert(ActiveSkillShrineRerollButton)
+        .insert(Name::new("Active Skill Shrine Reroll"));
+
+    if enabled {
+        btn.insert(Interactable::default());
+    }
+
+    let btn_e = btn.id();
+
+    commands
+        .spawn(SpriteBundle {
+            texture: asset_server.load(MERCHANT_REROLL_ICON_PATH),
+            sprite: Sprite {
+                custom_size: Some(MERCHANT_REROLL_ICON_SIZE),
+                color,
+                ..default()
+            },
+            transform: Transform::from_translation(Vec3::new(0., 0., 1.)),
+            ..default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(ActiveSkillShrineRerollIcon)
+        .set_parent(btn_e);
+
+    commands.entity(btn_e).set_parent(parent);
+}
+
+fn spawn_active_skill_shrine_reroll_info_box(
+    commands: &mut Commands,
+    graphics: &Graphics,
+    asset_server: &AssetServer,
+    parent: Entity,
+    rerolls_remaining: u32,
+) {
+    let pos = Vec2::new(
+        SKILL_VIEW2_SIZE.x / 2. + TOOLTIP_INFO_BOX_SIZE.x / 2. + 6.,
+        50.,
+    );
+    let box_e = commands
+        .spawn(SpriteBundle {
+            texture: graphics.get_ui_element_texture(UIElement::TooltipInfoBox),
+            sprite: Sprite {
+                custom_size: Some(TOOLTIP_INFO_BOX_SIZE),
+                ..default()
+            },
+            transform: Transform::from_translation(Vec3::new(pos.x, pos.y, 2.)),
+            ..default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(UIState::ActiveSkillShrine)
+        .insert(Name::new("Active Skill Shrine Reroll Info Box"))
+        .set_parent(parent)
+        .id();
+
+    commands
+        .spawn((
+            Text2dBundle {
+                text: Text::from_section(
+                    "Rerolls left:".to_string(),
+                    TextStyle {
+                        font: asset_server.load("fonts/slkscr.ttf"),
+                        font_size: 8.4,
+                        color: WHITE,
+                    },
+                )
+                .with_alignment(TextAlignment::Center),
+                text_anchor: Anchor::Center,
+                transform: Transform::from_translation(Vec3::new(0., 5., 2.)),
+                ..default()
+            },
+            RenderLayers::from_layers(&[3]),
+        ))
+        .set_parent(box_e);
+
+    commands
+        .spawn((
+            Text2dBundle {
+                text: Text::from_section(
+                    rerolls_remaining.to_string(),
+                    TextStyle {
+                        font: asset_server.load("fonts/slkscr.ttf"),
+                        font_size: 8.4,
+                        color: WHITE,
+                    },
+                )
+                .with_alignment(TextAlignment::Center),
+                text_anchor: Anchor::Center,
+                transform: Transform::from_translation(Vec3::new(0., -6., 2.)),
+                ..default()
+            },
+            RenderLayers::from_layers(&[3]),
+            ActiveSkillShrineRerollsText,
+        ))
+        .set_parent(box_e);
+}
+
 pub fn setup_active_skill_shrine_ui(
     mut commands: Commands,
     graphics: Res<Graphics>,
     asset_server: Res<AssetServer>,
     shrine_selection: Res<ActiveSkillShrineSelection>,
+    run_unlocks: Res<RunUnlockState>,
     res: Res<ScreenResolution>,
     skill_power: Query<
         (
@@ -113,12 +353,12 @@ pub fn setup_active_skill_shrine_ui(
             UIState::BlessingChoice,
         ))
         .id();
-    // Spawn SkillView2 background
+
     let view2_bg = commands
         .spawn(SpriteBundle {
             texture: graphics.get_ui_element_texture(UIElement::SkillView2),
             sprite: Sprite {
-                custom_size: Some(Vec2::new(248.5, 171.5)), // Adjust size based on actual asset
+                custom_size: Some(SKILL_VIEW2_SIZE),
                 ..Default::default()
             },
             transform: Transform {
@@ -130,74 +370,47 @@ pub fn setup_active_skill_shrine_ui(
         })
         .insert(RenderLayers::from_layers(&[3]))
         .insert(UIState::ActiveSkillShrine)
+        .insert(ActiveSkillShrineRoot)
         .insert(Name::new("SKILL_VIEW2_BACKGROUND"))
         .id();
 
-    let banner_spacing = 60.;
-    let start_y = -banner_spacing;
+    let choices_root = commands
+        .spawn((
+            SpatialBundle::from_transform(Transform::IDENTITY),
+            RenderLayers::from_layers(&[3]),
+            UIState::ActiveSkillShrine,
+            ActiveSkillShrineChoicesRoot,
+            Name::new("Active Skill Shrine Choices"),
+        ))
+        .set_parent(view2_bg)
+        .id();
 
-    for (index, skill_choice) in shrine_selection.skill_choices.iter().enumerate() {
-        let banner_x = -70.;
-        let banner_y = start_y + (index as f32 * banner_spacing);
-        let tooltip_pos = Vec3::new(banner_x, banner_y, 15.);
+    let Ok(skill_power) = skill_power.get_single() else {
+        return;
+    };
+    spawn_active_skill_shrine_skill_choices(
+        &mut commands,
+        &graphics,
+        &asset_server,
+        choices_root,
+        &shrine_selection.skill_choices,
+        skill_power,
+    );
 
-        let container = commands
-            .spawn(RenderLayers::from_layers(&[3]))
-            .insert(SpatialBundle::from_transform(Transform {
-                translation: tooltip_pos,
-                scale: Vec3::new(1., 1., 11.),
-                ..Default::default()
-            }))
-            .set_parent(view2_bg)
-            .id();
-        // Spawn SkillTooltipBanner
-        let _banner = commands
-            .spawn(SpriteBundle {
-                texture: graphics.get_ui_element_texture(UIElement::SkillTooltipBanner),
-                sprite: Sprite {
-                    custom_size: Some(Vec2::new(236., 57.5)), // Same size as SkillTooltip
-                    ..Default::default()
-                },
-                transform: Transform {
-                    translation: Vec3::new(70., -1., 1.),
-                    scale: Vec3::new(1., 1., 1.),
-                    ..Default::default()
-                },
-                ..Default::default()
-            })
-            .insert(ActiveSkillShrineUI {
-                skill_choice: skill_choice.clone(),
-                interaction_lock_timer: Timer::from_seconds(0.75, TimerMode::Once),
-            })
-            .insert(Interactable::default())
-            .insert(RenderLayers::from_layers(&[3]))
-            .insert(UIState::ActiveSkillShrine)
-            .insert(Name::new(format!("SKILL_BANNER_{}", index)))
-            .set_parent(container)
-            .id();
-        let (skill_power, blessings, max_mana, max_health, bonus_as, attack_speed, crit, spd, size) =
-            skill_power.single();
-        let bonus_as_mult = effective_player_attack_speed_multiplier(
-            attack_speed.map(|a| a.0).unwrap_or(0),
-            bonus_as.map(|b| b.get_multiplier()).unwrap_or(1.0),
-        );
-        spawn_skill_tooltip_content(
-            &mut commands,
-            &graphics,
-            &asset_server,
-            skill_choice.active_skill.clone(),
-            None,
-            container,
-            skill_power_multiplier(skill_power, blessings.get_skill_power_bonus()),
-            max_mana.0,
-            max_health.0,
-            bonus_as_mult,
-            crit.0,
-            spd.0,
-            size.0,
-            METEOR_SHOWER_BASE_COUNT,
-        );
-    }
+    let reroll_enabled = run_unlocks.rerolls_remaining > 0;
+    spawn_active_skill_shrine_reroll_button(
+        &mut commands,
+        &asset_server,
+        view2_bg,
+        reroll_enabled,
+    );
+    spawn_active_skill_shrine_reroll_info_box(
+        &mut commands,
+        &graphics,
+        &asset_server,
+        view2_bg,
+        run_unlocks.rerolls_remaining,
+    );
 
     let back_button = spawn_back_button(
         Vec3::new(res.game_width / 2. - 55., -res.game_height / 2. + 38., 11.),
@@ -334,6 +547,196 @@ pub fn handle_active_skill_shrine_ui_interaction(
                     .insert(ui_element.clone())
                     .insert(graphics.get_ui_element_texture(ui_element));
             }
+        }
+    }
+}
+
+pub fn handle_active_skill_shrine_reroll_button(
+    cursor_pos: Res<crate::cursor::CursorPos>,
+    mouse_input: Res<Input<MouseButton>>,
+    mut sprites: ParamSet<(
+        Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
+        Query<&mut Sprite, With<ActiveSkillShrineRerollIcon>>,
+    )>,
+    mut reroll_buttons: Query<(
+        Entity,
+        &mut Interactable,
+        &ActiveSkillShrineRerollButton,
+        &Children,
+    )>,
+    mut reroll_text: Query<&mut Text, With<ActiveSkillShrineRerollsText>>,
+    mut commands: Commands,
+    mut run_unlocks: ResMut<RunUnlockState>,
+    mut shrine_selection: ResMut<ActiveSkillShrineSelection>,
+    mut game: GameParam,
+    player_skills: Query<&PlayerSkills, With<Player>>,
+    skill_power: Query<
+        (
+            &SkillPower,
+            &OwnedBlessings,
+            &MaxMana,
+            &MaxHealth,
+            Option<&BonusAttackSpeed>,
+            Option<&AttackSpeed>,
+            &CritChance,
+            &Speed,
+            &ProjectileSize,
+        ),
+        With<Player>,
+    >,
+    choices_root: Query<Entity, With<ActiveSkillShrineChoicesRoot>>,
+    shrine_state: Query<&crate::item::active_skill_shrine::ActiveSkillShrineState>,
+    graphics: Res<Graphics>,
+    asset_server: Res<AssetServer>,
+) {
+    let hit_entity = {
+        let ui_sprites = sprites.p0();
+        super::ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None).map(|(e, _, _)| e)
+    };
+    let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
+    let mut any_hovered = false;
+
+    for (e, mut interactable, _btn, btn_children) in reroll_buttons.iter_mut() {
+        let enabled = run_unlocks.rerolls_remaining > 0;
+        let icon_color = if enabled {
+            Color::WHITE
+        } else {
+            Color::rgb(0.45, 0.45, 0.45)
+        };
+
+        match hit_entity {
+            Some(hit_ent) if hit_ent == e => match interactable.current() {
+                Interaction::None if enabled => {
+                    interactable.change(Interaction::Hovering);
+                    for child in btn_children.iter() {
+                        if let Ok(mut sprite) = sprites.p1().get_mut(*child) {
+                            sprite.color = YELLOW_2;
+                        }
+                    }
+                }
+                Interaction::Hovering => {
+                    any_hovered = true;
+                    if left_mouse_pressed && enabled {
+                        run_unlocks.rerolls_remaining =
+                            run_unlocks.rerolls_remaining.saturating_sub(1);
+
+                        let previous_offer: Vec<_> = shrine_selection
+                            .skill_choices
+                            .iter()
+                            .map(|c| c.active_skill)
+                            .collect();
+                        let offer_skills = reroll_active_skill_shrine_offer_skills(
+                            &previous_offer,
+                            player_skills.get_single().ok(),
+                        );
+                        if offer_skills.is_empty() {
+                            return;
+                        }
+
+                        shrine_selection.skill_choices =
+                            skill_choices_from_offer_skills(&offer_skills);
+
+                        if let Ok(shrine) = shrine_state.get(shrine_selection.shrine_entity) {
+                            game.world_obj_cache
+                                .active_skill_shrine_offers
+                                .insert(shrine.tile_pos, offer_skills);
+                        }
+
+                        if let Ok(choices_e) = choices_root.get_single() {
+                            commands.entity(choices_e).despawn_descendants();
+                            if let Ok(stats) = skill_power.get_single() {
+                                spawn_active_skill_shrine_skill_choices(
+                                    &mut commands,
+                                    &graphics,
+                                    &asset_server,
+                                    choices_e,
+                                    &shrine_selection.skill_choices,
+                                    stats,
+                                );
+                            }
+                        }
+
+                        interactable.change(Interaction::None);
+                        commands.spawn(SoundSpawner::new(AudioSoundEffect::UISkillReRoll, 0.4));
+                        for child in btn_children.iter() {
+                            if let Ok(mut sprite) = sprites.p1().get_mut(*child) {
+                                sprite.color = icon_color;
+                            }
+                        }
+                    }
+                }
+                _ => (),
+            },
+            _ => {
+                if matches!(interactable.current(), Interaction::Hovering) {
+                    interactable.change(Interaction::None);
+                    for child in btn_children.iter() {
+                        if let Ok(mut sprite) = sprites.p1().get_mut(*child) {
+                            sprite.color = icon_color;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    for mut text in reroll_text.iter_mut() {
+        if let Some(section) = text.sections.first_mut() {
+            section.value = run_unlocks.rerolls_remaining.to_string();
+            section.style.color = if any_hovered { YELLOW_2 } else { WHITE };
+        }
+    }
+}
+
+pub fn update_active_skill_shrine_reroll_button_state(
+    run_unlocks: Res<RunUnlockState>,
+    mut reroll_buttons: Query<
+        (Entity, &mut Sprite, &Children),
+        (With<ActiveSkillShrineRerollButton>, With<Interactable>),
+    >,
+    mut reroll_icons: Query<&mut Sprite, (With<ActiveSkillShrineRerollIcon>, Without<ActiveSkillShrineRerollButton>)>,
+    mut commands: Commands,
+) {
+    if !run_unlocks.is_changed() {
+        return;
+    }
+
+    let enabled = run_unlocks.rerolls_remaining > 0;
+    let badge_color = if enabled {
+        KEYBIND_BADGE_COLOR
+    } else {
+        Color::rgba(62. / 255., 58. / 255., 58. / 255., 0.45)
+    };
+    let icon_color = if enabled {
+        Color::WHITE
+    } else {
+        Color::rgb(0.45, 0.45, 0.45)
+    };
+
+    for (e, mut sprite, children) in reroll_buttons.iter_mut() {
+        sprite.color = badge_color;
+        if !enabled {
+            commands.entity(e).remove::<Interactable>();
+        }
+        for child in children.iter() {
+            if let Ok(mut icon) = reroll_icons.get_mut(*child) {
+                icon.color = icon_color;
+            }
+        }
+    }
+}
+
+pub fn update_active_skill_shrine_reroll_count_text(
+    run_unlocks: Res<RunUnlockState>,
+    mut reroll_text: Query<&mut Text, With<ActiveSkillShrineRerollsText>>,
+) {
+    if !run_unlocks.is_changed() {
+        return;
+    }
+
+    for mut text in reroll_text.iter_mut() {
+        if let Some(section) = text.sections.first_mut() {
+            section.value = run_unlocks.rerolls_remaining.to_string();
         }
     }
 }

@@ -168,7 +168,6 @@ impl Plugin for GameAssetsPlugin {
                 cherry_bomb_explosion_ase: None,
                 stone_pillar_ase: None,
                 pink_flower_ase: None,
-                foliage_textures: None,
                 cursor_color_sprites: None,
             })
             .add_system(
@@ -247,9 +246,6 @@ pub struct Graphics {
     pub cherry_bomb_explosion_ase: Option<Handle<Aseprite>>,
     pub stone_pillar_ase: Option<Handle<Aseprite>>,
     pub pink_flower_ase: Option<Handle<Aseprite>>,
-    /// Foliage (tree) texture handles: normal and fade, keyed by WorldObject. Populated lazily
-    /// so we load each image path once instead of every frame in animate_foliage_opacity.
-    pub foliage_textures: Option<HashMap<WorldObject, (Handle<Image>, Handle<Image>)>>,
     /// Selectable custom-cursor color sprites, in selection order (sheet positions (4,1)..(11,1)).
     pub cursor_color_sprites: Option<Vec<TextureAtlasSprite>>,
 }
@@ -654,7 +650,6 @@ impl GameAssetsPlugin {
             stone_pillar_ase: Some(asset_server.load("textures/stonegolem/StonePillar.ase")),
             pink_flower_ase: Some(asset_server.load(PinkFlowerAseprite::PATH)),
             class_pet_data: Some(class_pet_data.clone()),
-            foliage_textures: None, // populated lazily in animate_foliage_opacity
             cursor_color_sprites: Some(cursor_color_sprites),
         };
     }

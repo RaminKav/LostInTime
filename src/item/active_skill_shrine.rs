@@ -31,13 +31,21 @@ pub struct ActiveSkillShrineState {
 }
 
 /// Number of distinct skills offered at each active skill shrine.
-pub const ACTIVE_SKILL_SHRINE_OFFER_COUNT: usize = 3;
+pub const ACTIVE_SKILL_SHRINE_OFFER_COUNT: usize = 2;
 
 /// Same filter as the shrine interaction: exclude these and anything the player already has.
 pub fn roll_active_skill_shrine_offer_skills(
     player_skills: Option<&PlayerSkills>,
 ) -> Vec<ActiveSkill> {
     refresh_active_skill_shrine_offer_skills(&[], player_skills)
+}
+
+/// Roll a fresh offer, excluding the previous shrine choices so rerolls swap both skills.
+pub fn reroll_active_skill_shrine_offer_skills(
+    previous_offer: &[ActiveSkill],
+    player_skills: Option<&PlayerSkills>,
+) -> Vec<ActiveSkill> {
+    refresh_active_skill_shrine_offer_skills_impl(&[], player_skills, previous_offer)
 }
 
 /// Re-validate a cached shrine offer against the player's current active skills:
@@ -49,6 +57,14 @@ pub fn roll_active_skill_shrine_offer_skills(
 pub fn refresh_active_skill_shrine_offer_skills(
     cached_offer: &[ActiveSkill],
     player_skills: Option<&PlayerSkills>,
+) -> Vec<ActiveSkill> {
+    refresh_active_skill_shrine_offer_skills_impl(cached_offer, player_skills, &[])
+}
+
+fn refresh_active_skill_shrine_offer_skills_impl(
+    cached_offer: &[ActiveSkill],
+    player_skills: Option<&PlayerSkills>,
+    also_exclude: &[ActiveSkill],
 ) -> Vec<ActiveSkill> {
     let mut rng = rand::thread_rng();
     let player_current_skills = player_skills
@@ -85,6 +101,7 @@ pub fn refresh_active_skill_shrine_offer_skills(
                 && !skill.is_movement_skill()
                 && !player_current_skills.contains(skill)
                 && !chosen_skills.contains(skill)
+                && !also_exclude.contains(skill)
         })
         .collect();
 

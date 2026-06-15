@@ -1201,6 +1201,12 @@ impl Plugin for UIPlugin {
                         .run_if(in_state(UIState::MicrowaveShrine)),
                     handle_active_skill_shrine_ui_interaction
                         .run_if(in_state(UIState::ActiveSkillShrine)),
+                    handle_active_skill_shrine_reroll_button
+                        .run_if(in_state(UIState::ActiveSkillShrine)),
+                    update_active_skill_shrine_reroll_button_state
+                        .run_if(in_state(UIState::ActiveSkillShrine)),
+                    update_active_skill_shrine_reroll_count_text
+                        .run_if(in_state(UIState::ActiveSkillShrine)),
                     active_skill_shrine_ui::tick_active_skill_slot_choice_ui_interaction_lock_timers
                         .run_if(in_state(UIState::ActiveSkills)),
                     handle_active_skill_shrine_overwrite_interaction

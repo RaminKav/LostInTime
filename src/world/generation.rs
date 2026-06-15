@@ -42,12 +42,15 @@ pub struct DoneGeneratingEvent {
     pub chunk_pos: IVec2,
 }
 
-const UNIQUE_OBJECTS_DATA: [(WorldObject, Vec2, i32); 3] = [
+const UNIQUE_OBJECTS_DATA: [(WorldObject, Vec2, i32); 2] = [
     (WorldObject::BossShrine, Vec2::new(8., 8.), 10),
     (WorldObject::DungeonEntrance, Vec2::new(2., 2.), 7),
-    (WorldObject::ActiveSkillShrine, Vec2::new(2., 2.), 7),
     // (WorldObject::TimeGate, Vec2::new(2., 2.), 3),
 ];
+
+/// Tiles cleared of large foliage objects (trees / medium-size props) around every
+/// pre-rolled shrine so the shrine isn't buried in the forest.
+const SHRINE_CLEAR_RADIUS: i8 = 3;
 
 /// Shrines stay inside this radius (world pixels from `(0, 0)`) so they avoid the outer ring
 /// of island chunks where tiles are often water.
@@ -404,6 +407,24 @@ impl GenerationPlugin {
 
             chunk_pool.swap_remove(chunk_idx);
             game.world_obj_cache.shrines.insert(pos, *shrine_obj);
+
+            // Pre-roll and cache the skill offer for active skill shrines so the
+            // selection is stable from world-gen. The offer is still re-validated
+            // and topped up against the player's current skills at interaction time.
+            if *shrine_obj == WorldObject::ActiveSkillShrine {
+                if let Ok((_, player_skills, _)) = game.player_query.get_single() {
+                    let skills =
+                        crate::item::active_skill_shrine::roll_active_skill_shrine_offer_skills(
+                            Some(player_skills),
+                        );
+                    if !skills.is_empty() {
+                        game.world_obj_cache
+                            .active_skill_shrine_offers
+                            .insert(pos, skills);
+                    }
+                }
+            }
+
             placed += 1;
         }
 
@@ -543,19 +564,6 @@ impl GenerationPlugin {
                 }
                 debug!("set up a {obj_to_spawn:?} at {pos:?}");
                 game.world_obj_cache.unique_objs.insert(obj_to_spawn, pos);
-                if obj_to_spawn == WorldObject::ActiveSkillShrine {
-                    if let Ok((_, player_skills, _)) = game.player_query.get_single() {
-                        let skills =
-                            crate::item::active_skill_shrine::roll_active_skill_shrine_offer_skills(
-                                Some(player_skills),
-                            );
-                        if !skills.is_empty() {
-                            game.world_obj_cache
-                                .active_skill_shrine_offers
-                                .insert(pos, skills);
-                        }
-                    }
-                }
             }
         }
 
@@ -874,6 +882,30 @@ impl GenerationPlugin {
                     for (pos, shrine_obj) in game.world_obj_cache.shrines.clone() {
                         if pos.chunk_pos == chunk_pos {
                             objs.insert(pos, shrine_obj);
+                        }
+                        // Clear a radius of large foliage objects (trees / medium props)
+                        // around every shrine so it doesn't spawn buried in the forest.
+                        let clear_tiles = get_radial_tile_positions(pos, SHRINE_CLEAR_RADIUS);
+                        for pos_to_clear in clear_tiles {
+                            if let Some(obj_to_clear) = objs.get(&pos_to_clear) {
+                                if (obj_to_clear.is_tree()
+                                    || obj_to_clear.is_medium_size(&proto_param))
+                                    && !obj_to_clear.is_unique_object()
+                                {
+                                    objs.remove(&pos_to_clear);
+                                    if let Some((entity_to_despawn, obj_to_despawn)) =
+                                        game.get_obj_entity_at_tile(pos_to_clear, &proto_param)
+                                    {
+                                        if (obj_to_despawn.is_tree()
+                                            || obj_to_despawn.is_medium_size(&proto_param))
+                                            && !obj_to_despawn.is_unique_object()
+                                        {
+                                            commands.entity(entity_to_despawn).despawn_recursive();
+                                        }
+                                    }
+                                    game.remove_object_from_chunk_cache(pos_to_clear);
+                                }
+                            }
                         }
                     }
                 }
