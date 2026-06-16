@@ -570,6 +570,7 @@ impl Plugin for UIPlugin {
             .add_event::<DropInWorldEvent>()
             .add_event::<MenuButtonClickEvent>()
             .add_event::<GrantHeirloomDevEvent>()
+            .add_event::<RevokeHeirloomDevEvent>()
             .add_event::<GrantSkillDevEvent>()
             .add_event::<HeirloomTooltipRequest>()
             .add_plugin(Material2dPlugin::<ScreenEffectMaterial>::default())
@@ -1306,6 +1307,7 @@ impl Plugin for UIPlugin {
                     handle_time_crystal_unlock_hover_tooltip
                         .run_if(in_state(UIState::Inventory)),
                     apply_grant_heirloom_dev.run_if(in_state(UIState::Inventory)),
+                    apply_revoke_heirloom_dev.run_if(in_state(UIState::Inventory)),
                     apply_grant_skill_dev.run_if(in_state(UIState::Inventory)),
                 )
                     .in_set(OnUpdate(GameState::Main)),

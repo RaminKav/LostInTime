@@ -143,6 +143,9 @@ impl UIState {
 /// Event to grant an heirloom from dev mode (handled in a separate system to avoid query conflicts).
 pub struct GrantHeirloomDevEvent(pub HeirloomChoiceState);
 
+/// Event to remove one copy of an heirloom from dev mode (handled in a separate system).
+pub struct RevokeHeirloomDevEvent(pub Heirloom);
+
 /// When true, the dev heirloom picker grid is shown beside the dev buttons.
 #[derive(Resource, Default)]
 pub struct DevHeirloomGridOpen(pub bool);
@@ -2359,6 +2362,29 @@ pub fn apply_grant_heirloom_dev(
     }
 }
 
+/// Removes one copy of an heirloom from the player in dev mode.
+pub fn apply_revoke_heirloom_dev(
+    mut revoke_events: EventReader<RevokeHeirloomDevEvent>,
+    mut player_query: Query<(Entity, &mut PlayerSkills), With<Player>>,
+    mut commands: Commands,
+    mut att_event: EventWriter<AttributeChangeEvent>,
+) {
+    for RevokeHeirloomDevEvent(heirloom) in revoke_events.iter() {
+        if let Ok((player_entity, mut skills)) = player_query.get_single_mut() {
+            let Some(idx) = skills
+                .heirlooms
+                .iter()
+                .position(|h| h.heirloom == *heirloom)
+            else {
+                continue;
+            };
+            skills.heirlooms.remove(idx);
+            heirloom.add_heirloom_components(player_entity, &mut commands, skills.clone());
+            att_event.send(AttributeChangeEvent);
+        }
+    }
+}
+
 /// Toggles the dev heirloom picker grid to the right of the dev buttons.
 pub fn handle_dev_heirloom_picker_toggle(
     cursor_pos: Res<CursorPos>,
@@ -2426,6 +2452,7 @@ pub fn handle_dev_heirloom_picker_toggle(
 }
 
 /// Click an icon in the dev heirloom picker to grant that heirloom from the full pool.
+/// Right-click removes one copy if the player already has it.
 pub fn handle_dev_heirloom_picker_clicks(
     grid_open: Res<DevHeirloomGridOpen>,
     cursor_pos: Res<CursorPos>,
@@ -2435,7 +2462,9 @@ pub fn handle_dev_heirloom_picker_clicks(
         (Entity, &mut Interactable, &CrystalUnlockIcon),
         With<DevHeirloomPickerGridLayer>,
     >,
+    player_skills: Query<&PlayerSkills, With<Player>>,
     mut grant_heirloom_dev: EventWriter<GrantHeirloomDevEvent>,
+    mut revoke_heirloom_dev: EventWriter<RevokeHeirloomDevEvent>,
     mut commands: Commands,
 ) {
     if !grid_open.0 {
@@ -2444,6 +2473,8 @@ pub fn handle_dev_heirloom_picker_clicks(
 
     let hit_test = super::ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
+    let right_mouse_pressed = mouse_input.just_pressed(MouseButton::Right);
+    let skills = player_skills.get_single().ok();
 
     for (entity, mut interactable, icon) in icons.iter_mut() {
         let hit = match &hit_test {
@@ -2457,6 +2488,14 @@ pub fn handle_dev_heirloom_picker_clicks(
             if left_mouse_pressed {
                 let choice = heirloom_choice_from_full_pool(icon.heirloom.clone(), icon.rarity);
                 grant_heirloom_dev.send(GrantHeirloomDevEvent(choice));
+                commands.spawn(crate::audio::SoundSpawner::new(
+                    crate::audio::AudioSoundEffect::ButtonClick,
+                    0.2,
+                ));
+            } else if right_mouse_pressed
+                && skills.is_some_and(|s| s.has(icon.heirloom.clone()))
+            {
+                revoke_heirloom_dev.send(RevokeHeirloomDevEvent(icon.heirloom.clone()));
                 commands.spawn(crate::audio::SoundSpawner::new(
                     crate::audio::AudioSoundEffect::ButtonClick,
                     0.2,
