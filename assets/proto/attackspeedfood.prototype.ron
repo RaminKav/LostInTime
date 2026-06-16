@@ -3,13 +3,13 @@
   templates: ["item_drop.prototype.ron"],
   schematics: {
   "survival_rogue_like::item::WorldObject": AttackSpeedFood,
-  "survival_rogue_like::item::item_actions::ItemActions": (actions: [GainStat("attack_speed", 7)]),
+  "survival_rogue_like::item::item_actions::ItemActions": (actions: [GainStat("attack_speed", 5)]),
   "survival_rogue_like::item::item_actions::ConsumableItem": (),
   "survival_rogue_like::inventory::ItemStack": (
         obj_type: AttackSpeedFood,
         metadata: (
             name: "Attack Speed Boost", 
-            desc: ["Drink to permanently ", "gain +7 attack speed.", "Made with ingredients", "from the Forest and", "Tundra."]
+            desc: ["Drink to permanently ", "gain +5 attack speed.", "Made with ingredients", "from the Forest and", "Tundra."]
         ),
         rarity: Legendary,
         count: 1
