@@ -1,0 +1,202 @@
+[
+  {
+    "description_lines": [
+      "Roll to dodge attacks. You are",
+      "invulnerable while rolling."
+    ],
+    "id": "Roll",
+    "is_movement_skill": true,
+    "title": "Roll"
+  },
+  {
+    "description_lines": [
+      "Launch a spear that pulls enemies",
+      "from 5 tiles towards the impact area,",
+      "dealing 95.0% damage.",
+      "Pull distance scales with Size."
+    ],
+    "id": "ParrySpear",
+    "is_movement_skill": false,
+    "title": "Gravitational Spear"
+  },
+  {
+    "description_lines": [
+      "Lunge quickly through enemies in a",
+      "line dealing 85.0% damage. You are",
+      "invulnerable during the attack."
+    ],
+    "id": "SprintLunge",
+    "is_movement_skill": true,
+    "title": "Lunge"
+  },
+  {
+    "description_lines": [
+      "Teleport forwards, dealing 80.0%",
+      "damage to enemies you pass through."
+    ],
+    "id": "Teleport",
+    "is_movement_skill": true,
+    "title": "Teleport"
+  },
+  {
+    "description_lines": [
+      "Concentrate deeply. Enemies around ",
+      "you move 50% slower briefly. Gain",
+      "80.0% attack speed"
+    ],
+    "id": "Rapidfire",
+    "is_movement_skill": false,
+    "title": "Rapidfire"
+  },
+  {
+    "description_lines": [
+      "Scorch the earth at target area,",
+      "dealing 95.0% damage continuously",
+      "for 2.0s (scales with max mana)."
+    ],
+    "id": "FirePillar",
+    "is_movement_skill": false,
+    "title": "Fire Pillar"
+  },
+  {
+    "description_lines": [
+      "Heal yourself for 30.0% of your",
+      "max health."
+    ],
+    "id": "Heal",
+    "is_movement_skill": false,
+    "title": "Heal"
+  },
+  {
+    "description_lines": [
+      "Fire a shotgun round dealing",
+      "5x 100.0% damage spread in a cone.",
+      "Knocks you back a moderate amount."
+    ],
+    "id": "Buckshot",
+    "is_movement_skill": true,
+    "title": "Buckshot"
+  },
+  {
+    "description_lines": [
+      "Summon an ice pillar at target",
+      "area dealing 300.0% damage."
+    ],
+    "id": "IceWall",
+    "is_movement_skill": false,
+    "title": "Ice Wall"
+  },
+  {
+    "description_lines": [
+      "A meteor shower of 3 meteors,",
+      "each dealing 85.0% damage on impact.",
+      "Gain +1 meteor every 5 casts."
+    ],
+    "id": "MeteorShower",
+    "is_movement_skill": false,
+    "title": "Meteor Shower"
+  },
+  {
+    "description_lines": [
+      "Place a target dummy at target area ",
+      "that taunts enemies towards it",
+      "for a short duration."
+    ],
+    "id": "DruidTree",
+    "is_movement_skill": false,
+    "title": "Druid Tree"
+  },
+  {
+    "description_lines": [
+      "SCREAM, releasing a shockwave",
+      "around you, dealing 160.0% damage.",
+      "Knocks back enemies hit."
+    ],
+    "id": "Shout",
+    "is_movement_skill": false,
+    "title": "Shout"
+  },
+  {
+    "description_lines": [
+      "Throw a large, piercing throwing",
+      "star that travels in a line, dealing",
+      "150.0% damage."
+    ],
+    "id": "PiercingStar",
+    "is_movement_skill": false,
+    "title": "Piercing Star"
+  },
+  {
+    "description_lines": [
+      "Channel a powerful laser beam that",
+      "deals 60.0% damage rapidly to enemies",
+      "in front."
+    ],
+    "id": "LaserBeam",
+    "is_movement_skill": false,
+    "title": "Laser Beam"
+  },
+  {
+    "description_lines": [
+      "Rapidly slash 2 times, each",
+      "dealing 60.0% damage. Number",
+      "slashes scales with speed."
+    ],
+    "id": "DaggerSlash",
+    "is_movement_skill": false,
+    "title": "Slash"
+  },
+  {
+    "description_lines": [
+      "Enter fury for a short duration,",
+      "throwing 8 kunai rapidly at enemies",
+      "around you, dealing 125.0% damage.",
+      "Kunai count scales with attack speed."
+    ],
+    "id": "Fury",
+    "is_movement_skill": false,
+    "title": "Fury"
+  },
+  {
+    "description_lines": [
+      "Throw a bomb at target area that",
+      "explodes on impact, dealing 220.0%",
+      "damage and applying frail."
+    ],
+    "id": "Bomb",
+    "is_movement_skill": false,
+    "title": "Bomb"
+  },
+  {
+    "description_lines": [
+      "Gain a burst of speed and dash",
+      "forwards while spinning a sword",
+      "dealing 80.0% damage around you."
+    ],
+    "id": "SpinAttack",
+    "is_movement_skill": true,
+    "title": "Spin Attack"
+  },
+  {
+    "description_lines": [
+      "Send out waves of arrows,",
+      "dealing 9x 75.0% damage. Gains +0%",
+      "bonus crit dmg per arrow, scaling",
+      "with crit chance."
+    ],
+    "id": "ArrowVolley",
+    "is_movement_skill": false,
+    "title": "Arrow Volley"
+  },
+  {
+    "description_lines": [
+      "Retrace your steps from the last",
+      "1.0s, dashing along that path and",
+      "slicing enemies for 160.0% damage.",
+      "Gain stealth briefly afterwards."
+    ],
+    "id": "Recall",
+    "is_movement_skill": false,
+    "title": "Shadow Step"
+  }
+]

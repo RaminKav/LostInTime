@@ -205,6 +205,12 @@ fn main() {
         return;
     }
 
+    // Export active skill hover data for asset pipeline (run with EXPORT_SKILL_HOVERS=1)
+    if std::env::var("EXPORT_SKILL_HOVERS").is_ok() {
+        export_skill_hovers_data();
+        return;
+    }
+
     // migrate old save files
     let old_game_data = std::path::Path::new("game_data.json");
     if old_game_data.is_file() {
@@ -1329,6 +1335,54 @@ pub fn set_start_of_run_action_resource_true(mut res: ResMut<StartOfRunActionsHa
 
 pub fn set_start_of_run_action_resource_false(mut res: ResMut<StartOfRunActionsHappened>) {
     res.0 = false;
+}
+
+/// Exports active skill hover data (id, title, description_lines) to JSON for the
+/// asset pipeline script. Run with: EXPORT_SKILL_HOVERS=1 cargo run
+fn export_skill_hovers_data() {
+    use player::skills::{
+        active_skill_scaling::METEOR_SHOWER_BASE_COUNT, get_disabled_skills, ActiveSkill,
+    };
+    use std::collections::HashSet;
+    use strum::IntoEnumIterator;
+
+    let disabled: HashSet<ActiveSkill> = get_disabled_skills().into_iter().collect();
+
+    let export: Vec<serde_json::Value> = ActiveSkill::iter()
+        .filter(|skill| !disabled.contains(skill))
+        .map(|skill| {
+            serde_json::json!({
+                "id": format!("{:?}", skill),
+                "title": skill.get_title(),
+                "description_lines": skill.get_desc(
+                    1.0,
+                    100,
+                    100,
+                    1.0,
+                    0,
+                    0,
+                    0,
+                    METEOR_SHOWER_BASE_COUNT,
+                ),
+                "is_movement_skill": skill.is_movement_skill(),
+            })
+        })
+        .collect();
+
+    let out_path = std::env::current_dir()
+        .unwrap_or_else(|_| std::path::PathBuf::from("."))
+        .join("assets")
+        .join("skill_hovers_export.json");
+    if let Some(parent) = out_path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    match std::fs::write(
+        &out_path,
+        serde_json::to_string_pretty(&export).expect("serialize"),
+    ) {
+        Ok(()) => println!("Exported {} skill hovers to {:?}", export.len(), out_path),
+        Err(e) => eprintln!("Failed to write skill hover export: {}", e),
+    }
 }
 
 /// Exports heirloom card data (id, title, description_lines, rarity) to JSON for the
