@@ -4,7 +4,7 @@ use crate::client::is_not_paused;
 use crate::combat::LifestealEvent;
 use crate::player::combat_heirlooms::ThornsOnDamageTracker;
 use crate::player::skill_heirlooms::{handle_fire_pillar_hit_clear, handle_laser_beam_hit_clear};
-use crate::player::skills::{Heirloom, PlayerSkills};
+use crate::player::skills::{Heirloom, ManaGainSource, PlayerSkills};
 use crate::NO_XP;
 use crate::{
     animations::{player_sprite::PlayerAnimation, ui_animaitons::UIIconMover},
@@ -22,8 +22,8 @@ use crate::{
         item_actions::ItemActionParam,
         object_actions::TouchTriggerObjectAction,
         projectile::{
-            EnemyProjectile, FromActiveSkill, PetProjectileMarker, Projectile, ProjectileState,
-            RangedAttackEvent, ARROW_MAX_WORLD_OBJECT_PIERCES,
+            AnimVisualCategory, EnemyProjectile, FromActiveSkill, PetProjectileMarker, Projectile,
+            ProjectileState, RangedAttackEvent, ARROW_MAX_WORLD_OBJECT_PIERCES,
         },
         Equipment, ItemDrop, MainHand, WorldObject,
     },
@@ -189,7 +189,7 @@ fn check_melee_hit_collisions(
 
             let frail_stacks = status_option.map(|s| s.frail_stacks()).unwrap_or(0);
             let (mut damage, was_crit, was_overcrit) =
-                game.calculate_player_damage(0, None, 0, None, frail_stacks, 0);
+                game.calculate_player_damage(0, None, 0, None, frail_stacks, 0, true);
 
             let is_status_effected = status_option
                 .map(|s| s.is_burning() || s.is_slowed() || s.frail.is_some())
@@ -325,6 +325,10 @@ fn check_projectile_hit_mob_collisions(
             } else {
                 0
             };
+            // A weapon-fired projectile (not an active-skill or heirloom shot) is
+            // eligible for the Telescope (DodgeCrit) next-weapon-hit 2x bonus.
+            let is_weapon_projectile = proj.animation_category() == AnimVisualCategory::Attack
+                && from_active_skill_q.get(proj_entity).is_err();
             let (mut damage, was_crit, was_overcrit) = game.calculate_player_damage(
                 crit_bonus,
                 None,
@@ -332,6 +336,7 @@ fn check_projectile_hit_mob_collisions(
                 Some(att.0),
                 frail_stacks,
                 bonus_crit_damage,
+                is_weapon_projectile,
             );
             if is_status_effected && game.has_skill(Heirloom::TeleportStatusDMG) {
                 damage = f32::ceil(damage as f32 * 1.2) as u32;
@@ -543,6 +548,8 @@ fn check_multihit_projectile_ongoing_collisions(
                             0
                         };
 
+                    // Multi-hit projectiles handled here are skill effects (FireRing /
+                    // LaserBeam), so they never grant the DodgeCrit weapon-hit bonus.
                     let (mut damage, was_crit, was_overcrit) = game.calculate_player_damage(
                         crit_bonus,
                         None,
@@ -550,6 +557,7 @@ fn check_multihit_projectile_ongoing_collisions(
                         Some(att.0),
                         frail_stacks,
                         0,
+                        false,
                     );
 
                     if is_status_effected && game.has_skill(Heirloom::TeleportStatusDMG) {
@@ -861,7 +869,10 @@ pub fn check_item_drop_collisions(
         } else if obj == WorldObject::ManaOrb {
             let player_skills = game.get_player_skills();
             let mana_from_orb = 10 + player_skills.get_count(Heirloom::ManaOrbs) as i32 * 5;
-            modify_mana_event.send(ModifyManaEvent(mana_from_orb));
+            modify_mana_event.send(ModifyManaEvent::gain(
+                mana_from_orb,
+                ManaGainSource::ManaOrbs,
+            ));
             analytics.send(AnalyticsUpdateEvent {
                 update_type: AnalyticsTrigger::ItemCollected(obj),
             });

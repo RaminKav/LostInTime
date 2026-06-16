@@ -12,10 +12,9 @@ use crate::{
     inventory::{Inventory, ItemStack},
     juice::UseItemEvent,
     night::NightTracker,
-    player::{stats::SkillPoints, ModifyCurencyEvent, MovePlayerEvent},
+    player::{skills::ManaGainSource, stats::SkillPoints, ModifyCurencyEvent, MovePlayerEvent},
     proto::proto_param::ProtoParam,
     ui::{
-        item_chest::ItemChestState,
         minimap::UpdateMiniMapEvent,
         scrapper_ui::ScrapperContainer,
         tips::{SeenTips, TipEvent},
@@ -296,7 +295,7 @@ impl ItemActions {
                 ItemAction::ModifyMana(delta) => {
                     item_action_param
                         .modify_mana_event
-                        .send(ModifyManaEvent(*delta));
+                        .send(ModifyManaEvent::gain(*delta, ManaGainSource::Potion));
                     item_action_param.use_item_event.send(UseItemEvent(obj));
                 }
                 ItemAction::ApplyAttackSpeedBuff(duration, multiplier) => {

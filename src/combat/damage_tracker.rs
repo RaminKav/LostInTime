@@ -101,7 +101,6 @@ impl DamageSource {
             | DamageSource::Dagger
             | DamageSource::Hammer
             | DamageSource::Bow
-            | DamageSource::Gun
             | DamageSource::Blowdart
             | DamageSource::Claw
             | DamageSource::IceStaff
@@ -127,6 +126,7 @@ impl DamageSource {
             | DamageSource::ArrowVolley
             | DamageSource::PossessedBlade
             | DamageSource::PiercingStar
+            | DamageSource::Gun
             | DamageSource::SprintLunge
             | DamageSource::Recall => DamageSourceCategory::Skill,
 
@@ -155,7 +155,7 @@ impl DamageSource {
             DamageSource::Dagger => "Dagger",
             DamageSource::Hammer => "Hammer",
             DamageSource::Bow => "Bow",
-            DamageSource::Gun => "Gun",
+            DamageSource::Gun => "Buckshot",
             DamageSource::Blowdart => "Blowdart",
             DamageSource::Claw => "Claw",
             DamageSource::IceStaff => "Ice Staff",

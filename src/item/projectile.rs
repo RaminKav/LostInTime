@@ -18,8 +18,8 @@ use crate::{
     player::{
         mage_skills::JustTeleported,
         skills::{
-            fire_ring_duration_seconds, Heirloom, HeirloomTriggerCounts, PlayerClass, PlayerSkills,
-            FIRE_RING_BASE_DURATION_SECS,
+            fire_ring_duration_seconds, Heirloom, HeirloomTriggerCounts, ManaGainSource,
+            PlayerClass, PlayerSkills, FIRE_RING_BASE_DURATION_SECS,
         },
         Player,
     },
@@ -460,7 +460,7 @@ fn handle_ranged_attack_event(
                 } else {
                     1.
                 }) as i32;
-            modify_mana_event.send(ModifyManaEvent(-actual_cost));
+            modify_mana_event.send(ModifyManaEvent::new(-actual_cost));
             if let Some(heirloom) = proj_event.mana_cost_heirloom.clone() {
                 trigger_counts.record_mana(heirloom, actual_cost);
             }
@@ -544,8 +544,9 @@ fn handle_ranged_attack_event(
         }
 
         if teleported_option.is_some() {
-            modify_mana_event.send(ModifyManaEvent(
+            modify_mana_event.send(ModifyManaEvent::gain(
                 mana_regen.0 + skills.get_count(Heirloom::MPRegen) * 5,
+                ManaGainSource::ManaRegen,
             ));
         }
     }

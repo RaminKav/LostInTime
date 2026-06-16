@@ -61,7 +61,7 @@ use crate::{
         combat_heirlooms::{HallucinationStatType, HallucinationStats, ThornsOnDamageTracker},
         levels::PlayerLevel,
         mage_skills::{spawn_ice_explosion_hitbox, IceExplosionDmg, IceFloor},
-        skills::{Heirloom, HeirloomTriggerCounts, PlayerSkills},
+        skills::{Heirloom, HeirloomTriggerCounts, ManaGainSource, PlayerSkills},
     },
     proto::proto_param::ProtoParam,
     ui::{
@@ -1167,7 +1167,10 @@ pub fn cleanup_marked_for_death_entities(
                     let rng = &mut rand::thread_rng();
                     let mirror_count = skills.get_count(Heirloom::FrozenMPRegen);
                     if mirror_count > 0 && rng.gen_bool((0.2 * mirror_count as f64).min(1.0)) {
-                        modify_mana_event.send(ModifyManaEvent(mana_regen.0));
+                        modify_mana_event.send(ModifyManaEvent::gain(
+                            mana_regen.0,
+                            ManaGainSource::Heirloom(Heirloom::FrozenMPRegen),
+                        ));
                         trigger_counts.increment(Heirloom::FrozenMPRegen);
                     }
                 }
@@ -1245,7 +1248,10 @@ pub fn handle_lifesteal(
             if stacks > 0 {
                 let chance = (0.04_f64 * stacks as f64).clamp(0.0, 1.0);
                 if rng.gen_bool(chance) {
-                    modify_mana_events.send(ModifyManaEvent(1));
+                    modify_mana_events.send(ModifyManaEvent::gain(
+                        1,
+                        ManaGainSource::Heirloom(Heirloom::DamageDealtMp),
+                    ));
                     trigger_counts.increment(Heirloom::DamageDealtMp);
                 }
             }

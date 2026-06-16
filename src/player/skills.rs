@@ -1349,7 +1349,7 @@ impl Heirloom {
 
             Self::IceStaffAoE => &[D::IceExplosion, D::Weapons],
             Self::FrozenAoE => &[D::IceExplosion, D::FreezeChance],
-            Self::SkillExplosion => &[D::IceExplosion, D::Skills],
+            Self::SkillExplosion => &[D::Skills],
             Self::SlowStacks | Self::FrozenCrit => &[D::FreezeChance],
 
             Self::PoisonStacks
@@ -1699,10 +1699,11 @@ impl Heirloom {
                 "+25% freeze chance.".to_string(),
             ],
             Heirloom::DodgeCrit => vec![
-                "Dodging grants a".to_string(),
-                "burst of atk speed".to_string(),
-                "and speed. The next".to_string(),
-                "hit does 2x damage.".to_string(),
+                "Dodging grants 2x".to_string(),
+                "attack speed and a".to_string(),
+                "speed burst. Next".to_string(),
+                "weapon hit does 2x".to_string(),
+                "damage.".to_string(),
             ],
             Heirloom::PoisonDuration => vec![
                 "Your poison effect".to_string(),
@@ -2496,6 +2497,18 @@ impl HeirloomChoiceQueue {
         current.saturating_add(1).saturating_sub(base)
     }
 
+    /// Whether a specific heirloom offer may be banished (rarity cap + non-placeholder).
+    pub fn banish_allowed_for_heirloom(
+        &self,
+        time_crystals: &TimeCrystals,
+        heirloom: &HeirloomChoiceState,
+    ) -> bool {
+        if heirloom.heirloom == Heirloom::None {
+            return false;
+        }
+        self.allowed_banishes_for_rarity(time_crystals, heirloom.rarity) > 0
+    }
+
     /// Whether the heirloom currently offered in `queue[0][slot]` may be banished (rarity cap + non-placeholder).
     pub fn banish_allowed_for_choice_slot(
         &self,
@@ -2505,11 +2518,7 @@ impl HeirloomChoiceQueue {
         let Some(choices) = self.queue.first() else {
             return false;
         };
-        let c = &choices[slot];
-        if c.heirloom == Heirloom::None {
-            return false;
-        }
-        self.allowed_banishes_for_rarity(time_crystals, c.rarity) > 0
+        self.banish_allowed_for_heirloom(time_crystals, &choices[slot])
     }
 
     /// Build the heirloom pool for a new run, gated on the player's persistent
@@ -3116,7 +3125,7 @@ pub struct HeirloomTriggerCounts {
     pub counts: HashMap<Heirloom, u32>,
     pub mana_consumed: HashMap<Heirloom, u64>,
     pub health_gained: HashMap<HealthGainSource, u64>,
-    pub mana_gained: u64,
+    pub mana_gained: HashMap<ManaGainSource, u64>,
 }
 
 /// Sources tracked on the health orb HUD tooltip (1-minute rolling window).
@@ -3140,6 +3149,51 @@ impl HealthGainSource {
         match self {
             HealthGainSource::CoinHeal => Some(Heirloom::CoinHeal),
             HealthGainSource::HealthRegen | HealthGainSource::Lifesteal => None,
+        }
+    }
+}
+
+/// Sources tracked on the mana orb HUD tooltip gain list (1-minute rolling window).
+///
+/// Heirlooms such as `FrozenMPRegen` and `SkillManaRegen` manually trigger mana regen, so
+/// they are tracked as their own [`ManaGainSource::Heirloom`] entries instead of being lumped
+/// into [`ManaGainSource::ManaRegen`] (the natural regen timer).
+#[derive(Clone, Eq, PartialEq, Hash, Debug)]
+pub enum ManaGainSource {
+    /// Natural mana regen from the mana regen timer.
+    ManaRegen,
+    /// Mana orb pickups.
+    ManaOrbs,
+    /// Mana restored by consumables.
+    Potion,
+    /// A heirloom that grants/triggers mana (e.g. Blue Card, Mirror, Brown Card).
+    Heirloom(Heirloom),
+}
+
+impl ManaGainSource {
+    pub fn label(&self) -> &'static str {
+        match self {
+            ManaGainSource::ManaRegen => "Regen",
+            ManaGainSource::ManaOrbs => "Mana Orbs",
+            ManaGainSource::Potion => "Potion",
+            ManaGainSource::Heirloom(_) => "",
+        }
+    }
+
+    pub fn heirloom_icon(&self) -> Option<Heirloom> {
+        match self {
+            ManaGainSource::Heirloom(heirloom) => Some(heirloom.clone()),
+            _ => None,
+        }
+    }
+
+    /// Lower numbers sort earlier in the gain list.
+    fn display_order(&self) -> u8 {
+        match self {
+            ManaGainSource::ManaRegen => 0,
+            ManaGainSource::ManaOrbs => 1,
+            ManaGainSource::Potion => 2,
+            ManaGainSource::Heirloom(_) => 3,
         }
     }
 }
@@ -3171,6 +3225,10 @@ impl HeirloomTriggerCounts {
         ((amount as f64 / total as f64) * 100.0).round() as u32
     }
 
+    pub fn mana_consumed_per_second(&self, window_elapsed_secs: f32) -> f32 {
+        Self::per_second(self.total_mana_consumed(), window_elapsed_secs)
+    }
+
     pub fn sorted_mana_entries(&self) -> Vec<(Heirloom, u64)> {
         let mut entries: Vec<_> = self
             .mana_consumed
@@ -3195,10 +3253,39 @@ impl HeirloomTriggerCounts {
         }
     }
 
-    pub fn record_mana_gained(&mut self, amount: i32) {
+    pub fn record_mana_gained(&mut self, source: ManaGainSource, amount: i32) {
         if amount > 0 {
-            self.mana_gained += amount as u64;
+            *self.mana_gained.entry(source).or_insert(0) += amount as u64;
         }
+    }
+
+    pub fn total_mana_gained(&self) -> u64 {
+        self.mana_gained.values().sum()
+    }
+
+    pub fn mana_gained_percentage(&self, source: &ManaGainSource) -> u32 {
+        let total = self.total_mana_gained();
+        if total == 0 {
+            return 0;
+        }
+        let amount = self.mana_gained.get(source).copied().unwrap_or(0);
+        ((amount as f64 / total as f64) * 100.0).round() as u32
+    }
+
+    pub fn sorted_mana_gain_entries(&self) -> Vec<(ManaGainSource, u64)> {
+        let mut entries: Vec<_> = self
+            .mana_gained
+            .iter()
+            .filter(|(_, amount)| **amount > 0)
+            .map(|(source, amount)| (source.clone(), *amount))
+            .collect();
+        entries.sort_by(|a, b| {
+            a.0.display_order()
+                .cmp(&b.0.display_order())
+                .then_with(|| b.1.cmp(&a.1))
+                .then_with(|| a.0.label().cmp(b.0.label()))
+        });
+        entries
     }
 
     pub fn total_health_gained(&self) -> u64 {
@@ -3240,7 +3327,7 @@ impl HeirloomTriggerCounts {
     }
 
     pub fn mana_gained_per_second(&self, window_elapsed_secs: f32) -> f32 {
-        Self::per_second(self.mana_gained, window_elapsed_secs)
+        Self::per_second(self.total_mana_gained(), window_elapsed_secs)
     }
 
     pub fn health_gained_per_second(&self, window_elapsed_secs: f32) -> f32 {
@@ -3250,7 +3337,7 @@ impl HeirloomTriggerCounts {
     pub fn reset_hud_orb_window_stats(&mut self) {
         self.mana_consumed.clear();
         self.health_gained.clear();
-        self.mana_gained = 0;
+        self.mana_gained.clear();
     }
 }
 

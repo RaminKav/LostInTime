@@ -245,6 +245,7 @@ pub fn handle_active_skill_event(
                     1,
                     None,
                 );
+                trigger_counts.increment(Heirloom::CreditCard);
             }
 
             // Get legacy skill states from separate queries

@@ -15,12 +15,17 @@ use crate::{
     inventory::{Inventory, ItemStack},
     item::{EquipmentType, WorldObject},
     juice::bounce::BounceOnHit,
-    player::skills::{Heirloom, HeirloomChoiceQueue, HeirloomChoiceState, HeirloomRarity},
+    player::{
+        skills::{Heirloom, HeirloomChoiceQueue, HeirloomChoiceState, HeirloomRarity},
+        time_crystals::TimeCrystals,
+        unlocks::RunUnlockState,
+    },
     proto::proto_param::ProtoParam,
     GameParam, ScreenResolution,
 };
 
 use super::{
+    banish_tracker_ui::spawn_banish_tracker,
     game_fonts as gf,
     heirloom_tooltip::{HeirloomTooltipRequest, HeirloomTooltipShow},
     interactions::Interaction,
@@ -329,6 +334,8 @@ pub fn setup_item_chest_ui(
     asset_server: Res<AssetServer>,
     res: Res<ScreenResolution>,
     item_chest_state: ResMut<ItemChestState>,
+    skill_queue: Res<HeirloomChoiceQueue>,
+    time_crystals: Res<TimeCrystals>,
 ) {
     // // title bar
     // let title_sprite = commands
@@ -428,6 +435,18 @@ pub fn setup_item_chest_ui(
         true,
         UIState::ItemChest,
     );
+
+    if matches!(item_chest_state.chest_type, ChestType::Heirloom) {
+        spawn_banish_tracker(
+            &mut commands,
+            &asset_server,
+            &graphics,
+            skill_queue.as_ref(),
+            time_crystals.as_ref(),
+            &res,
+            UIState::ItemChest,
+        );
+    }
 }
 
 pub fn toggle_item_chest_visibility(
@@ -753,7 +772,8 @@ pub fn handle_anim_events(
     asset_server: Res<AssetServer>,
     player_atts: Query<&crate::attributes::LootRateBonus, With<crate::player::Player>>,
     choices_queue: Res<HeirloomChoiceQueue>,
-    run_unlocks: Res<crate::player::unlocks::RunUnlockState>,
+    run_unlocks: Res<RunUnlockState>,
+    time_crystals: Res<TimeCrystals>,
 ) {
     for event in events.iter() {
         match event.state {
@@ -920,7 +940,18 @@ pub fn handle_anim_events(
                         UIState::ItemChest,
                     );
                     let right_enabled = match right_kind {
-                        ChestButtonKind::Banish => run_unlocks.banishes_remaining > 0,
+                        ChestButtonKind::Banish => {
+                            let picked = item_chest_state.picked_heirloom.as_ref();
+                            run_unlocks.banishes_remaining > 0
+                                && picked
+                                    .map(|h| {
+                                        choices_queue.banish_allowed_for_heirloom(
+                                            time_crystals.as_ref(),
+                                            h,
+                                        )
+                                    })
+                                    .unwrap_or(false)
+                        }
                         _ => true,
                     };
                     spawn_chest_button(

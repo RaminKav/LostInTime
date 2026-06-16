@@ -57,6 +57,8 @@ pub mod hud_bar_fill;
 mod player_hud;
 mod player_movement_cooldown_bar;
 mod skill_choice_ui;
+pub mod banish_tracker_ui;
+pub use banish_tracker_ui::*;
 pub mod stats_ui;
 pub use active_skill_shrine_ui::*;
 mod icon_hover_tooltips;
@@ -1319,8 +1321,10 @@ impl Plugin for UIPlugin {
             )
             .add_systems(
                 (
-                    update_banish_tracker_ui.run_if(in_state(UIState::Skills)),
-                    handle_banish_tracker_tooltip.run_if(in_state(UIState::Skills)),
+                    update_banish_tracker_ui
+                        .run_if(in_state(UIState::Skills).or_else(in_state(UIState::ItemChest))),
+                    handle_banish_tracker_tooltip
+                        .run_if(in_state(UIState::Skills).or_else(in_state(UIState::ItemChest))),
                     handle_skill_choice_info_box_hover
                         .run_if(in_state(UIState::Skills))
                         .after(handle_cursor_skills_buttons),

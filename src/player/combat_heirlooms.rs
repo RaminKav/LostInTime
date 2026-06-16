@@ -10,8 +10,8 @@ use crate::{
     animations::{AttackEvent, DoneAnimation},
     assets::Graphics,
     attributes::{
-        modifiers::ModifyManaEvent, Attack, CurrentHealth, CurrentMana, ManaRegen, MaxHealth,
-        ProjectileSize,
+        modifiers::ModifyManaEvent, Attack, BonusAttackSpeed, CurrentHealth, CurrentMana,
+        ManaRegen, MaxHealth, ProjectileSize,
     },
     audio::{AudioSoundEffect, SoundSpawner},
     combat::{
@@ -30,7 +30,7 @@ use crate::{
     player::{
         skills::{
             active_skill_scaling::{attack_damage_multiplier, BOMB},
-            ActiveSkillUsedEvent, Heirloom, HeirloomTriggerCounts, PlayerSkills,
+            ActiveSkillUsedEvent, Heirloom, HeirloomTriggerCounts, ManaGainSource, PlayerSkills,
         },
         Player,
     },
@@ -270,7 +270,7 @@ fn calculate_summon_damage(
     frail_stacks: u8,
 ) -> (i32, bool, bool) {
     let (damage, was_crit, was_overcrit) =
-        game.calculate_player_damage(0, None, 0, None, frail_stacks, 0);
+        game.calculate_player_damage(0, None, 0, None, frail_stacks, 0, false);
     (i32::max(1, damage as i32), was_crit, was_overcrit)
 }
 
@@ -1709,6 +1709,13 @@ pub fn handle_crate_break_damage(
 // DodgeCrit - Dodging gives speed/attack speed buff and next hit does 2x damage
 // ============================================================================
 
+/// Telescope (DodgeCrit) attack-speed burst while the dodge buff is active.
+/// Applied through [`BonusAttackSpeed`] — the same mechanism used by Rapidfire
+/// and attack-speed potions — where a `+1.0` multiplier means +100% == 2x
+/// attack speed.
+const DODGE_CRIT_ATTACK_SPEED_BONUS: f32 = 1.0;
+const DODGE_CRIT_BUFF_SECS: f32 = 3.0;
+
 /// State for the DodgeCrit heirloom buff. Stored `SparseSet` because it's
 /// only present on the player while the heirloom is equipped.
 #[derive(Component)]
@@ -1723,7 +1730,7 @@ impl Default for DodgeCritState {
     fn default() -> Self {
         Self {
             buff_active: false,
-            buff_timer: Timer::from_seconds(3.0, TimerMode::Once),
+            buff_timer: Timer::from_seconds(DODGE_CRIT_BUFF_SECS, TimerMode::Once),
             next_hit_bonus: false,
         }
     }
@@ -1731,11 +1738,11 @@ impl Default for DodgeCritState {
 
 pub fn handle_dodge_crit_activation(
     mut dodge_events: EventReader<crate::ui::damage_numbers::DodgeEvent>,
-    mut player_query: Query<(&mut DodgeCritState, &PlayerSkills), With<Player>>,
+    mut player_query: Query<(&mut DodgeCritState, &PlayerSkills, &mut BonusAttackSpeed), With<Player>>,
     mut attribute_event: EventWriter<crate::attributes::AttributeChangeEvent>,
     mut trigger_counts: ResMut<HeirloomTriggerCounts>,
 ) {
-    let Ok((mut state, skills)) = player_query.get_single_mut() else {
+    let Ok((mut state, skills, mut bonus_attack_speed)) = player_query.get_single_mut() else {
         return;
     };
 
@@ -1744,7 +1751,11 @@ pub fn handle_dodge_crit_activation(
     }
 
     for _ in dodge_events.iter() {
-        // Activate the buff
+        // Refreshing an already-active buff only resets the timer; the attack-speed
+        // multiplier is added once so repeated dodges don't stack past 2x.
+        if !state.buff_active {
+            bonus_attack_speed.add_multiplier(DODGE_CRIT_ATTACK_SPEED_BONUS);
+        }
         state.buff_active = true;
         state.buff_timer.reset();
         state.next_hit_bonus = true;
@@ -1755,10 +1766,10 @@ pub fn handle_dodge_crit_activation(
 
 pub fn tick_dodge_crit_buff(
     time: Res<Time>,
-    mut player_query: Query<&mut DodgeCritState, With<Player>>,
+    mut player_query: Query<(&mut DodgeCritState, &mut BonusAttackSpeed), With<Player>>,
     mut attribute_event: EventWriter<crate::attributes::AttributeChangeEvent>,
 ) {
-    let Ok(mut state) = player_query.get_single_mut() else {
+    let Ok((mut state, mut bonus_attack_speed)) = player_query.get_single_mut() else {
         return;
     };
 
@@ -1766,31 +1777,42 @@ pub fn tick_dodge_crit_buff(
         state.buff_timer.tick(time.delta());
         if state.buff_timer.just_finished() {
             state.buff_active = false;
-            state.next_hit_bonus = false; // Also clear the next hit bonus
+            state.next_hit_bonus = false; // Also clear the unused next hit bonus
+            bonus_attack_speed.remove_multiplier(DODGE_CRIT_ATTACK_SPEED_BONUS);
             attribute_event.send(crate::attributes::AttributeChangeEvent);
         }
     }
 }
 
-/// Reset DodgeCrit next hit bonus after player deals damage
+/// Consume the DodgeCrit "next hit does 2x damage" bonus once the player lands a
+/// source of *weapon* damage (a melee weapon swing or a weapon projectile). Skill
+/// and heirloom hits are ignored so the bonus is reserved for the next weapon hit,
+/// matching where the 2x is applied in [`GameParam::calculate_player_damage`].
 pub fn handle_dodge_crit_next_hit_reset(
     mut hit_events: EventReader<crate::combat::HitEvent>,
     mut player_query: Query<&mut DodgeCritState, With<Player>>,
 ) {
-    // Only process hits that are from the player (not from mobs hitting player)
     for hit in hit_events.iter() {
-        if hit.hit_by_mob.is_some() {
+        if hit.hit_by_mob.is_some() || !hit_is_weapon_damage(hit) {
             continue;
         }
 
-        // Reset the next hit bonus
         if let Ok(mut state) = player_query.get_single_mut() {
             if state.next_hit_bonus {
                 state.next_hit_bonus = false;
             }
         }
-        break; // Only need to process once per frame
+        break; // Only need to consume once per frame
     }
+}
+
+/// A hit counts as weapon damage when it comes from a melee weapon swing or from a
+/// weapon-fired projectile (i.e. not an active skill and not a heirloom proc).
+pub fn hit_is_weapon_damage(hit: &crate::combat::HitEvent) -> bool {
+    hit.hit_with_melee.is_some()
+        || (hit.hit_with_projectile.is_some()
+            && !hit.from_active_skill
+            && hit.from_heirloom_effect.is_none())
 }
 
 // ============================================================================
@@ -2255,7 +2277,10 @@ pub fn handle_skill_mana_regen(
         let total_chance = (stacks * chance_per_stack).min(100);
         if rng.gen_ratio(total_chance as u32, 100) {
             // Trigger mana regen (same amount as normal regen)
-            modify_mana_event.send(ModifyManaEvent(mana_regen.0));
+            modify_mana_event.send(ModifyManaEvent::gain(
+                mana_regen.0,
+                ManaGainSource::Heirloom(Heirloom::SkillManaRegen),
+            ));
             trigger_counts.increment(Heirloom::SkillManaRegen);
         }
     }
@@ -2665,6 +2690,7 @@ pub fn spawn_cherry_bomb_flight(
                 explosion_damage,
             },
         },
+        AnimVisualCategory::Heirloom,
         YSort(11.),
         Name::new("CHERRY_BOMB"),
     ));

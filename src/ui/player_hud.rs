@@ -56,7 +56,7 @@ use crate::{
             active_skill_scaling::METEOR_SHOWER_BASE_COUNT,
             effective_player_attack_speed_multiplier, ActiveSkill, ActiveSkillChoiceState,
             ActiveSkillUsedEvent, ClassSkillSlots, Heirloom, HeirloomRarity, HeirloomTriggerCounts,
-            ManaTrackerResetTimer, PlayerSkills, VISIBLE_CLASS_SKILL_COUNT,
+            ManaGainSource, ManaTrackerResetTimer, PlayerSkills, VISIBLE_CLASS_SKILL_COUNT,
         },
         CoinCurrency, Player, RunScore, TimeFragmentCurrency,
     },
@@ -1685,6 +1685,21 @@ fn orb_tracker_tooltip_size(entry_count: usize) -> Vec2 {
     )
 }
 
+/// Mana tooltip has two stacked sections (consume + gain), each followed by a rate line.
+fn mana_tracker_tooltip_size(consume_count: usize, gain_count: usize) -> Vec2 {
+    let consume_rows = consume_count.div_ceil(ORB_TRACKER_COLUMNS).max(1) as f32;
+    let gain_rows = gain_count.div_ceil(ORB_TRACKER_COLUMNS).max(1) as f32;
+    Vec2::new(
+        ORB_TRACKER_COL_WIDTH * ORB_TRACKER_COLUMNS as f32 + ORB_TRACKER_PAD * 2.,
+        ORB_TRACKER_TITLE_HEIGHT
+            + consume_rows * ORB_TRACKER_ROW_HEIGHT
+            + ORB_TRACKER_RATE_HEIGHT
+            + gain_rows * ORB_TRACKER_ROW_HEIGHT
+            + ORB_TRACKER_RATE_HEIGHT
+            + ORB_TRACKER_PAD * 2.,
+    )
+}
+
 fn spawn_orb_tracker_rate_line(
     commands: &mut Commands,
     asset_server: &AssetServer,
@@ -1694,6 +1709,18 @@ fn spawn_orb_tracker_rate_line(
     panel_height: f32,
 ) {
     let y = -panel_height * 0.5 + ORB_TRACKER_PAD + ORB_TRACKER_RATE_HEIGHT * 0.5;
+    spawn_orb_tracker_rate_line_at(commands, asset_server, parent, label, rate, y);
+}
+
+/// Spawns a grey `"Label: x.x/s"` rate line centered at the given local `y`.
+fn spawn_orb_tracker_rate_line_at(
+    commands: &mut Commands,
+    asset_server: &AssetServer,
+    parent: Entity,
+    label: &str,
+    rate: f32,
+    y: f32,
+) {
     commands
         .spawn(Text2dBundle {
             text: Text::from_section(
@@ -1709,6 +1736,101 @@ fn spawn_orb_tracker_rate_line(
         .set_parent(parent);
 }
 
+/// Spawns a single mana-gain entry (icon or text label + percentage) at the given local pos.
+fn spawn_mana_gain_entry(
+    commands: &mut Commands,
+    graphics: &Graphics,
+    asset_server: &AssetServer,
+    texture_atlas: &Handle<TextureAtlas>,
+    parent: Entity,
+    x: f32,
+    y: f32,
+    source: &ManaGainSource,
+    pct: u32,
+) {
+    let row_root = commands
+        .spawn(SpatialBundle::from_transform(Transform::from_translation(
+            Vec3::new(x, y, 1.),
+        )))
+        .insert(RenderLayers::from_layers(&[3]))
+        .set_parent(parent)
+        .id();
+
+    // Pick an icon: heirloom sprite, the mana orb sprite, or fall back to a text label.
+    let icon_sprite = source.heirloom_icon().map(|h| graphics.get_heirloom_icon(h)).or_else(|| {
+        if matches!(source, ManaGainSource::ManaOrbs) {
+            graphics
+                .spritesheet_map
+                .as_ref()
+                .and_then(|m| m.get(&WorldObject::ManaOrb).cloned())
+        } else {
+            None
+        }
+    });
+
+    let is_icon = icon_sprite.is_some();
+    if let Some(sprite) = icon_sprite {
+        commands
+            .spawn(SpriteSheetBundle {
+                texture_atlas: texture_atlas.clone(),
+                sprite,
+                transform: Transform::from_translation(Vec3::new(
+                    -ORB_TRACKER_COL_WIDTH * 0.5 + ORB_TRACKER_ICON_SIZE * 0.5 + 2.,
+                    0.,
+                    1.,
+                )),
+                ..default()
+            })
+            .insert(Sprite {
+                custom_size: Some(Vec2::splat(ORB_TRACKER_ICON_SIZE)),
+                ..default()
+            })
+            .insert(RenderLayers::from_layers(&[3]))
+            .set_parent(row_root);
+    } else {
+        commands
+            .spawn(Text2dBundle {
+                text: Text::from_section(
+                    source.label(),
+                    gf::HUD_MICRO.text_style(asset_server, WHITE),
+                )
+                .with_alignment(TextAlignment::Center),
+                text_anchor: Anchor::CenterLeft,
+                transform: Transform::from_translation(Vec3::new(
+                    -ORB_TRACKER_COL_WIDTH * 0.5 + 2.,
+                    0.,
+                    1.,
+                )),
+                ..default()
+            })
+            .insert(RenderLayers::from_layers(&[3]))
+            .set_parent(row_root);
+    }
+
+    let x_offset = if is_icon {
+        0.
+    } else {
+        (source.label().len().saturating_sub(5)) as f32 * 4. + 12.
+    };
+    commands
+        .spawn(Text2dBundle {
+            text: Text::from_section(
+                format!("{pct}%"),
+                gf::HUD_MICRO.text_style(asset_server, WHITE),
+            )
+            .with_alignment(TextAlignment::Center),
+            text_anchor: Anchor::CenterLeft,
+            transform: Transform::from_translation(Vec3::new(
+                -ORB_TRACKER_COL_WIDTH * 0.5 + ORB_TRACKER_ICON_SIZE + 6. + x_offset,
+                0.,
+                2.,
+            )),
+            ..default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .set_parent(row_root);
+}
+
 fn spawn_mana_tracker_tooltip(
     commands: &mut Commands,
     graphics: &Graphics,
@@ -1717,8 +1839,9 @@ fn spawn_mana_tracker_tooltip(
     tracker: &HeirloomTriggerCounts,
     window_elapsed_secs: f32,
 ) -> Entity {
-    let entries = tracker.sorted_mana_entries();
-    let size = orb_tracker_tooltip_size(entries.len());
+    let consume_entries = tracker.sorted_mana_entries();
+    let gain_entries = tracker.sorted_mana_gain_entries();
+    let size = mana_tracker_tooltip_size(consume_entries.len(), gain_entries.len());
     let tooltip_pos = Vec3::new(
         anchor_pos.x,
         anchor_pos.y + HUD_FILL_PIXEL_SIZE.y * 0.5 + size.y * 0.5 + 6.,
@@ -1761,10 +1884,15 @@ fn spawn_mana_tracker_tooltip(
         .insert(RenderLayers::from_layers(&[3]))
         .set_parent(root);
 
-    let grid_top = title_y - ORB_TRACKER_TITLE_HEIGHT * 0.5 - ORB_TRACKER_ROW_HEIGHT * 0.5;
+    let texture_atlas = graphics.texture_atlas.as_ref().unwrap().clone();
     let left_x = -size.x * 0.5 + ORB_TRACKER_PAD + ORB_TRACKER_COL_WIDTH * 0.5;
 
-    if entries.is_empty() {
+    // Running vertical cursor that walks down from just below the title.
+    let mut section_top = title_y - ORB_TRACKER_TITLE_HEIGHT * 0.5;
+
+    // --- Consume section: heirlooms that spent mana ---
+    let consume_grid_top = section_top - ORB_TRACKER_ROW_HEIGHT * 0.5;
+    if consume_entries.is_empty() {
         commands
             .spawn(Text2dBundle {
                 text: Text::from_section(
@@ -1773,18 +1901,17 @@ fn spawn_mana_tracker_tooltip(
                 )
                 .with_alignment(TextAlignment::Center),
                 text_anchor: Anchor::Center,
-                transform: Transform::from_translation(Vec3::new(0., grid_top, 1.)),
+                transform: Transform::from_translation(Vec3::new(0., consume_grid_top, 1.)),
                 ..default()
             })
             .insert(RenderLayers::from_layers(&[3]))
             .set_parent(root);
     } else {
-        let texture_atlas = graphics.texture_atlas.as_ref().unwrap().clone();
-        for (index, (heirloom, _amount)) in entries.iter().enumerate() {
+        for (index, (heirloom, _amount)) in consume_entries.iter().enumerate() {
             let col = index % ORB_TRACKER_COLUMNS;
             let row = index / ORB_TRACKER_COLUMNS;
             let x = left_x + col as f32 * ORB_TRACKER_COL_WIDTH;
-            let y = grid_top - row as f32 * ORB_TRACKER_ROW_HEIGHT;
+            let y = consume_grid_top - row as f32 * ORB_TRACKER_ROW_HEIGHT;
             let pct = tracker.mana_consumed_percentage(heirloom);
 
             let row_root = commands
@@ -1832,14 +1959,67 @@ fn spawn_mana_tracker_tooltip(
                 .set_parent(row_root);
         }
     }
+    let consume_rows = consume_entries.len().div_ceil(ORB_TRACKER_COLUMNS).max(1) as f32;
+    section_top -= consume_rows * ORB_TRACKER_ROW_HEIGHT;
 
-    spawn_orb_tracker_rate_line(
+    // --- Consume rate line ---
+    spawn_orb_tracker_rate_line_at(
         commands,
         asset_server,
         root,
-        "Gained",
+        "Consume",
+        tracker.mana_consumed_per_second(window_elapsed_secs),
+        section_top - ORB_TRACKER_RATE_HEIGHT * 0.5,
+    );
+    section_top -= ORB_TRACKER_RATE_HEIGHT;
+
+    // --- Gain section: where mana came from ---
+    let gain_grid_top = section_top - ORB_TRACKER_ROW_HEIGHT * 0.5;
+    if gain_entries.is_empty() {
+        commands
+            .spawn(Text2dBundle {
+                text: Text::from_section(
+                    "No mana gained yet",
+                    gf::HUD_MICRO.text_style(asset_server, LIGHT_GREY),
+                )
+                .with_alignment(TextAlignment::Center),
+                text_anchor: Anchor::Center,
+                transform: Transform::from_translation(Vec3::new(0., gain_grid_top, 1.)),
+                ..default()
+            })
+            .insert(RenderLayers::from_layers(&[3]))
+            .set_parent(root);
+    } else {
+        for (index, (source, _amount)) in gain_entries.iter().enumerate() {
+            let col = index % ORB_TRACKER_COLUMNS;
+            let row = index / ORB_TRACKER_COLUMNS;
+            let x = left_x + col as f32 * ORB_TRACKER_COL_WIDTH;
+            let y = gain_grid_top - row as f32 * ORB_TRACKER_ROW_HEIGHT;
+            let pct = tracker.mana_gained_percentage(source);
+            spawn_mana_gain_entry(
+                commands,
+                graphics,
+                asset_server,
+                &texture_atlas,
+                root,
+                x,
+                y,
+                source,
+                pct,
+            );
+        }
+    }
+    let gain_rows = gain_entries.len().div_ceil(ORB_TRACKER_COLUMNS).max(1) as f32;
+    section_top -= gain_rows * ORB_TRACKER_ROW_HEIGHT;
+
+    // --- Gain rate line (bottom) ---
+    spawn_orb_tracker_rate_line_at(
+        commands,
+        asset_server,
+        root,
+        "Gain",
         tracker.mana_gained_per_second(window_elapsed_secs),
-        size.y,
+        section_top - ORB_TRACKER_RATE_HEIGHT * 0.5,
     );
 
     root
@@ -2042,7 +2222,7 @@ pub fn handle_mana_tracker_hud_tooltip(
 
     let snapshot = (
         trigger_counts.total_mana_consumed(),
-        trigger_counts.mana_gained,
+        trigger_counts.total_mana_gained(),
     );
     if hovering == *last_hovered && (!hovering || snapshot == *last_snapshot) {
         return;

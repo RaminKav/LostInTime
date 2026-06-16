@@ -169,7 +169,7 @@ pub fn handle_modify_currency(
                                         pos_override: Some(*target_pos + Vec2::new(0., 48.)),
                                         spawn_delay: 0.0,
                                     });
-                                    modify_mana_event.send(ModifyManaEvent(-MANA_COST));
+                                    modify_mana_event.send(ModifyManaEvent::new(-MANA_COST));
                                     commands.spawn(SoundSpawner::new(
                                         AudioSoundEffect::LightningStaffCast,
                                         0.4,

@@ -3,7 +3,7 @@ use std::time::Duration;
 use bevy::prelude::*;
 
 use crate::player::{
-    skills::{Heirloom, HealthGainSource, PlayerSkills},
+    skills::{Heirloom, HealthGainSource, ManaGainSource, PlayerSkills},
     Player,
 };
 
@@ -113,7 +113,10 @@ pub fn handle_mana_regen(
         if hunger.is_starving() {
             return;
         }
-        modify_mana_event.send(ModifyManaEvent(mana_regen.0));
+        modify_mana_event.send(ModifyManaEvent::gain(
+            mana_regen.0,
+            ManaGainSource::ManaRegen,
+        ));
         timer.0.reset();
     }
 }

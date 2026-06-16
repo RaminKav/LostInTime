@@ -5,7 +5,7 @@ use crate::{
             spawn_delayed_heirloom_cast, spawn_echo_hitbox, DelayedCastType,
             HEIRLOOM_EXTRA_CAST_DELAY,
         },
-        skills::{Heirloom, HeirloomTriggerCounts, PlayerSkills},
+        skills::{Heirloom, HeirloomTriggerCounts, ManaGainSource, PlayerSkills},
         Player,
     },
     ui::{
@@ -89,7 +89,22 @@ pub fn handle_modify_health_event(
         }
     }
 }
-pub struct ModifyManaEvent(pub i32);
+/// Modifies the player's current mana. The optional [`ManaGainSource`] attributes positive
+/// changes to the mana orb HUD tooltip gain breakdown. `None` (or negative amounts) are not
+/// tracked as a gain source.
+pub struct ModifyManaEvent(pub i32, pub Option<ManaGainSource>);
+
+impl ModifyManaEvent {
+    /// Mana change with no tracked gain source (e.g. mana costs/consumption).
+    pub fn new(amount: i32) -> Self {
+        Self(amount, None)
+    }
+
+    /// Mana gain attributed to a specific source for the HUD tooltip breakdown.
+    pub fn gain(amount: i32, source: ManaGainSource) -> Self {
+        Self(amount, Some(source))
+    }
+}
 
 pub fn handle_modify_mana_event(
     mut event: EventReader<ModifyManaEvent>,
@@ -106,7 +121,9 @@ pub fn handle_modify_mana_event(
         let (mut mana, max_mana, player_t) = query.single_mut();
 
         if event.0 > 0 {
-            trigger_counts.record_mana_gained(event.0);
+            if let Some(source) = event.1.clone() {
+                trigger_counts.record_mana_gained(source, event.0);
+            }
             let applied = event.0.min(max_mana.0.saturating_sub(mana.0));
             if applied <= 0 {
                 continue;

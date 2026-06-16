@@ -777,6 +777,9 @@ impl<'w, 's> GameParam<'w, 's> {
         attack_override: Option<i32>,
         frail_stacks: u8,
         bonus_crit_damage: i32,
+        // When true, this damage is from a weapon (melee swing / weapon projectile)
+        // and is eligible for the Telescope (DodgeCrit) "next weapon hit does 2x" bonus.
+        is_weapon_attack: bool,
     ) -> (u32, bool, bool) {
         let (attack, max_health, _, crit_chance, crit_dmg, bonus_dmg, combo_option, ..) =
             self.player_stats.single();
@@ -829,16 +832,18 @@ impl<'w, 's> GameParam<'w, 's> {
             }
         }
 
-        // DodgeCrit: Next hit after dodge does 2x damage
+        // DodgeCrit (Telescope): the next source of weapon damage after a dodge does 2x.
+        // Only weapon hits are eligible; the bonus is consumed in
+        // `handle_dodge_crit_next_hit_reset` on the matching weapon HitEvent.
         let dodge_crit_next_hit_bonus = if let Ok(Some(state)) = self.dodge_crit_query.get_single()
         {
             state.next_hit_bonus
         } else {
             false
         };
-        if dodge_crit_next_hit_bonus {
+        if is_weapon_attack && dodge_crit_next_hit_bonus {
             bonus_damage_multiplier *= 2.0;
-            info!("[DodgeCrit] Next hit bonus applied! 2x damage.");
+            info!("[DodgeCrit] Next weapon hit bonus applied! 2x damage.");
         }
 
         // MPBarDMG: Mana regen charges up bonus flat damage

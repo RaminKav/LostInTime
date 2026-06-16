@@ -1934,6 +1934,13 @@ fn equip_item_chest_reward(
     commands.remove_resource::<ItemChestState>();
 }
 
+/// Bundles event writers for [`handle_cursor_heirloom_chest_button`] (Bevy system param limit).
+#[derive(SystemParam)]
+pub struct HeirloomChestEvents<'w> {
+    pub chest_event: EventWriter<'w, ItemChestAnimChangeEvent>,
+    pub att_event: EventWriter<'w, AttributeChangeEvent>,
+}
+
 /// Handles heirloom chest button interactions (for ChestType::Heirloom).
 ///
 /// Mirrors [`handle_cursor_item_chest_button`] but dispatches to the heirloom-specific
@@ -1950,14 +1957,14 @@ pub fn handle_cursor_heirloom_chest_button(
     >,
     mut commands: Commands,
     mut item_chest_state: ResMut<ItemChestState>,
-    mut chest_event: EventWriter<ItemChestAnimChangeEvent>,
+    mut heirloom_chest_events: HeirloomChestEvents,
     mut next_ui_state: ResMut<NextState<UIState>>,
     mut skill_queue: ResMut<HeirloomChoiceQueue>,
     mut run_unlocks: ResMut<RunUnlockState>,
+    time_crystals: Res<TimeCrystals>,
     mut player_query: Query<(Entity, &Transform, &mut PlayerSkills, &PlayerLevel), With<Player>>,
     proto: ProtoParam,
     mut proto_commands: ProtoCommands,
-    mut att_event: EventWriter<AttributeChangeEvent>,
 ) {
     if item_chest_state.chest_type != ChestType::Heirloom {
         return;
@@ -1966,14 +1973,14 @@ pub fn handle_cursor_heirloom_chest_button(
     if keybinds.check_interact_input(&key_input, &mouse_input) {
         advance_heirloom_chest_state(
             &mut item_chest_state,
-            &mut chest_event,
+            &mut heirloom_chest_events.chest_event,
             &mut commands,
             &mut next_ui_state,
             &mut skill_queue,
             &mut player_query,
             &proto,
             &mut proto_commands,
-            &mut att_event,
+            &mut heirloom_chest_events.att_event,
         );
         return;
     }
@@ -1993,14 +2000,14 @@ pub fn handle_cursor_heirloom_chest_button(
                         match kind {
                             ChestButtonKind::Open => advance_heirloom_chest_state(
                                 &mut item_chest_state,
-                                &mut chest_event,
+                                &mut heirloom_chest_events.chest_event,
                                 &mut commands,
                                 &mut next_ui_state,
                                 &mut skill_queue,
                                 &mut player_query,
                                 &proto,
                                 &mut proto_commands,
-                                &mut att_event,
+                                &mut heirloom_chest_events.att_event,
                             ),
                             ChestButtonKind::Take => take_heirloom_chest_reward(
                                 &mut item_chest_state,
@@ -2010,16 +2017,48 @@ pub fn handle_cursor_heirloom_chest_button(
                                 &mut player_query,
                                 &proto,
                                 &mut proto_commands,
-                                &mut att_event,
+                                &mut heirloom_chest_events.att_event,
                             ),
                             ChestButtonKind::Banish => {
-                                if run_unlocks.banishes_remaining > 0 {
+                                let picked = item_chest_state.picked_heirloom.clone();
+                                let no_banishes = run_unlocks.banishes_remaining == 0;
+                                let slot_allowed = picked
+                                    .as_ref()
+                                    .map(|h| {
+                                        skill_queue.banish_allowed_for_heirloom(&time_crystals, h)
+                                    })
+                                    .unwrap_or(false);
+                                let banishes_available = !no_banishes && slot_allowed;
+                                if left_mouse_pressed && !banishes_available {
+                                    let btn_pos = ui_sprites
+                                        .get(e)
+                                        .map(|(_, _, gt)| gt.translation())
+                                        .unwrap_or(Vec3::ZERO);
+                                    let msg = if no_banishes {
+                                        "No Banishes Left".to_string()
+                                    } else {
+                                        "Rarity Banish Cap Reached".to_string()
+                                    };
+                                    let text = spawn_floating_text_with_shadow(
+                                        &mut commands,
+                                        proto.asset_server.as_ref(),
+                                        btn_pos + Vec3::new(0., 12., 10.),
+                                        RED,
+                                        msg,
+                                        FLOATING_TEXT,
+                                    );
+                                    commands
+                                        .entity(text)
+                                        .insert(bevy::render::view::RenderLayers::from_layers(&[3]));
+                                }
+                                if left_mouse_pressed && banishes_available {
                                     banish_heirloom_chest_reward(
                                         &mut item_chest_state,
                                         &mut commands,
                                         &mut next_ui_state,
                                         &mut skill_queue,
                                         &mut run_unlocks,
+                                        time_crystals.as_ref(),
                                     );
                                 }
                             }
@@ -2115,8 +2154,14 @@ fn banish_heirloom_chest_reward(
     next_ui_state: &mut ResMut<NextState<UIState>>,
     skill_queue: &mut ResMut<HeirloomChoiceQueue>,
     run_unlocks: &mut ResMut<RunUnlockState>,
+    time_crystals: &TimeCrystals,
 ) {
     let picked = item_chest_state.picked_heirloom.clone().unwrap();
+    if run_unlocks.banishes_remaining == 0
+        || !skill_queue.banish_allowed_for_heirloom(time_crystals, &picked)
+    {
+        return;
+    }
     skill_queue.banned.insert(picked.heirloom.clone());
     skill_queue.pool.retain(|x| x.heirloom != picked.heirloom);
     skill_queue.banished_heirlooms.push(picked.clone());

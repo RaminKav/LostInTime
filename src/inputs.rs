@@ -1135,7 +1135,7 @@ pub fn mouse_click_system(
                 debug!("OBJ: {hit_obj:?}");
             }
             let (damage, was_crit, was_overcrit) =
-                game.calculate_player_damage(0, None, 0, None, 0, 0);
+                game.calculate_player_damage(0, None, 0, None, 0, 0, true);
             hit_event.send(HitEvent {
                 hit_by_pet: None,
                 hit_entity: hit_obj,

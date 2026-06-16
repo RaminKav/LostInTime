@@ -587,14 +587,12 @@ impl ItemAttributes {
         entity.insert(AttackSpeed(total_attack_speed));
 
         if self.attack_cooldown > 0. {
-            let dodge_crit_attack_speed_mod = if dodge_crit_buff_active { 1.3 } else { 1.0 };
             let bonus_attack_speed_multiplier = bonus_attack_speed
                 .map(|b| b.get_multiplier())
                 .unwrap_or(1.0)
                 + consumable_attack_speed_add;
             let bonus_tiny_attack_speed = if has_tiny_blessing { 1.5 } else { 1.0 };
             let attack_speed_mod = (1.0 + total_attack_speed as f32 / 100.0)
-                / dodge_crit_attack_speed_mod
                 / bonus_tiny_attack_speed
                 * bonus_attack_speed_multiplier;
 
