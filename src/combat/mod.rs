@@ -1249,7 +1249,7 @@ pub fn handle_lifesteal(
                 let chance = (0.04_f64 * stacks as f64).clamp(0.0, 1.0);
                 if rng.gen_bool(chance) {
                     modify_mana_events.send(ModifyManaEvent::gain(
-                        1,
+                        3,
                         ManaGainSource::Heirloom(Heirloom::DamageDealtMp),
                     ));
                     trigger_counts.increment(Heirloom::DamageDealtMp);

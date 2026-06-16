@@ -1738,7 +1738,10 @@ impl Default for DodgeCritState {
 
 pub fn handle_dodge_crit_activation(
     mut dodge_events: EventReader<crate::ui::damage_numbers::DodgeEvent>,
-    mut player_query: Query<(&mut DodgeCritState, &PlayerSkills, &mut BonusAttackSpeed), With<Player>>,
+    mut player_query: Query<
+        (&mut DodgeCritState, &PlayerSkills, &mut BonusAttackSpeed),
+        With<Player>,
+    >,
     mut attribute_event: EventWriter<crate::attributes::AttributeChangeEvent>,
     mut trigger_counts: ResMut<HeirloomTriggerCounts>,
 ) {
@@ -2250,8 +2253,10 @@ pub fn handle_mana_regen_poison(
     }
 }
 
-// SkillManaRegen - Using a skill has a 20% chance to trigger mana regen
+// SkillManaRegen (Brown Card) - Using a skill has a 15% chance per stack to trigger mana regen
 // ============================================================================
+
+const SKILL_MANA_REGEN_PROC_PCT_PER_STACK: u32 = 15;
 
 /// System to trigger mana regen when a skill is used
 pub fn handle_skill_mana_regen(
@@ -2270,13 +2275,15 @@ pub fn handle_skill_mana_regen(
     }
 
     let mut rng = rand::thread_rng();
+    let chance_pct = stacks as u32 * SKILL_MANA_REGEN_PROC_PCT_PER_STACK;
 
     for _event in skill_events.iter() {
-        // 8% chance per stack (capped at 100%)
-        let chance_per_stack = 8;
-        let total_chance = (stacks * chance_per_stack).min(100);
-        if rng.gen_ratio(total_chance as u32, 100) {
-            // Trigger mana regen (same amount as normal regen)
+        let proc_count = roll_stacked_proc_count(chance_pct, &mut rng);
+        if proc_count == 0 {
+            continue;
+        }
+
+        for _ in 0..proc_count {
             modify_mana_event.send(ModifyManaEvent::gain(
                 mana_regen.0,
                 ManaGainSource::Heirloom(Heirloom::SkillManaRegen),
@@ -2686,9 +2693,7 @@ pub fn spawn_cherry_bomb_flight(
             target_pos,
             timer: Timer::from_seconds(LOB_ARC_FLIGHT_SECS, TimerMode::Once),
             arc_height: LOB_ARC_HEIGHT,
-            landing: LobArcLanding::CherryBomb {
-                explosion_damage,
-            },
+            landing: LobArcLanding::CherryBomb { explosion_damage },
         },
         AnimVisualCategory::Heirloom,
         YSort(11.),
@@ -2726,9 +2731,7 @@ pub fn spawn_skill_bomb_lob(
             target_pos,
             timer: Timer::from_seconds(LOB_ARC_FLIGHT_SECS, TimerMode::Once),
             arc_height: LOB_ARC_HEIGHT,
-            landing: LobArcLanding::SkillBomb {
-                explosion_damage,
-            },
+            landing: LobArcLanding::SkillBomb { explosion_damage },
         },
         YSort(11.),
         Name::new("SKILL_BOMB"),
@@ -2856,9 +2859,7 @@ pub fn update_lob_arcs(
 
         if arc.timer.just_finished() {
             match arc.landing {
-                LobArcLanding::CherryBomb {
-                    explosion_damage,
-                } => {
+                LobArcLanding::CherryBomb { explosion_damage } => {
                     spawn_cherry_bomb_explosion(
                         &mut commands,
                         &graphics,
@@ -2868,9 +2869,7 @@ pub fn update_lob_arcs(
                     );
                     commands.spawn(SoundSpawner::new(AudioSoundEffect::IceExplosion, 0.25));
                 }
-                LobArcLanding::SkillBomb {
-                    explosion_damage,
-                } => {
+                LobArcLanding::SkillBomb { explosion_damage } => {
                     ranged_attack_events.send(RangedAttackEvent {
                         projectile: Projectile::BombExplosion,
                         direction: Vec2::ZERO,

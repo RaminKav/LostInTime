@@ -1107,7 +1107,7 @@ pub enum Heirloom {
     KillLightning,      // Killing an enemy has a 1% chance to spawn lightning
     ManaRegenLightning, // Mana regen has a 10% chance per stack to trigger lightning
     ManaRegenPoison,    // Every 100 mana regen applies poison to all enemies
-    SkillManaRegen,     // Using a skill has a 20% chance to trigger mana regen
+    SkillManaRegen,     // Using a skill has a 15% chance to trigger mana regen
     /// Chance on each non-heirloom damage hit to restore 1 MP (1% + 1% per stack).
     DamageDealtMp,
     /// Additive multiplier to base Mana Orb drop chance (1 + stacks: 2x, 3x, ...).
@@ -1926,13 +1926,13 @@ impl Heirloom {
             ],
             Heirloom::SkillManaRegen => vec![
                 "Using a skill has".to_string(),
-                "a 8% chance to".to_string(),
+                "a 15% chance to".to_string(),
                 "trigger mana regen.".to_string(),
             ],
             Heirloom::DamageDealtMp => vec![
                 "Damage from Weapons".to_string(),
                 "or skills has a 4%".to_string(),
-                "chance to restore 1".to_string(),
+                "chance to restore 3".to_string(),
                 "Mana.".to_string(),
             ],
             Heirloom::ManaOrbDropMult => vec![
