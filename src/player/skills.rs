@@ -1153,19 +1153,19 @@ impl Heirloom {
             Heirloom::KillLightning => 5,
             Heirloom::ManaRegenLightning => 5,
             Heirloom::ManaOrbAttack => 2,
-            Heirloom::SkillExplosion => 5,
+            Heirloom::SkillExplosion => 3,
             _ => 0,
         }
     }
 
-    /// Mana spent when a skill cast activates Impact Rune (3 per copy).
-    pub fn skill_explosion_mana_cost(stacks: i32) -> i32 {
-        stacks.max(1) * Heirloom::SkillExplosion.get_mana_cost()
+    /// Mana spent when a skill hit triggers an Impact Rune explosion.
+    pub fn skill_explosion_mana_cost() -> i32 {
+        Heirloom::SkillExplosion.get_mana_cost()
     }
 
-    /// Explosion damage as a fraction of the triggering skill hit (0.25 per copy).
+    /// Explosion damage as a fraction of the triggering skill hit (15% per copy).
     pub fn skill_explosion_damage_fraction(stacks: i32) -> f32 {
-        stacks.max(1) as f32 * 0.25
+        stacks.max(1) as f32 * 0.15
     }
     /// Minimum player level required before this heirloom is allowed to appear in any
     /// selection (level-ups, shrines, chests, essence shop, blessings). `0` means no gate.
@@ -1823,10 +1823,7 @@ impl Heirloom {
                 "Skill damage triggers".to_string(),
                 "a small explosion at".to_string(),
                 "the target.".to_string(),
-                format!(
-                    "Costs {} mana per copy",
-                    Heirloom::SkillExplosion.get_mana_cost()
-                ),
+                format!("Costs {} mana", Heirloom::SkillExplosion.get_mana_cost()),
             ],
             Heirloom::TomeDoubleUpgrade => vec![
                 "Upgrade Tomes".to_string(),

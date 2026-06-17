@@ -88,8 +88,7 @@ impl Plugin for EnemyPlugin {
             )
             .add_systems(
                 (
-                    red_mushking::tick_aoe_attack_timer.run_if(is_not_paused),
-                    red_mushking::tick_leap_attack_timer.run_if(is_not_paused),
+                    red_mushking::tick_attack_rotation.run_if(is_not_paused),
                     red_mushking::handle_aoe_attack.run_if(is_not_paused),
                     stone_golem::tick_spike_attack_timer.run_if(is_not_paused),
                     stone_golem::initialize_spike_attack_state.run_if(is_not_paused),

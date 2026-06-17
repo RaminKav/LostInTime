@@ -370,22 +370,6 @@ fn handle_enemy_death(
                     mob.is_boss(),
                 )
                 .iter()
-                .filter(|d| {
-                    if elite_option.is_some() && d.obj_type == WorldObject::XPShard {
-                        return false;
-                    }
-                    if is_infinite_mode {
-                        return matches!(
-                            d.obj_type,
-                            WorldObject::ChestBlock
-                                | WorldObject::Coin
-                                | WorldObject::XPShard
-                                | WorldObject::XPShardMedium
-                                | WorldObject::XPShardLarge
-                        );
-                    }
-                    true
-                })
                 .collect::<Vec<_>>()
                 {
                     let base_count = if drop.obj_type == WorldObject::Coin && has_double_gold {

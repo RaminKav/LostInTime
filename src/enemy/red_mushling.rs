@@ -106,7 +106,7 @@ pub fn handle_new_red_mushling_state_machine(
                 GasAttackState {
                     hitbox: None,
                     speed_up_anim: true,
-                    cooldown: Timer::from_seconds(0.0, TimerMode::Once),
+                    cooldown: Timer::from_seconds(0.2, TimerMode::Once),
                 },
             );
 

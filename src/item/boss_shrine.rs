@@ -34,8 +34,18 @@ pub struct BossSummonTracker {
 }
 
 impl BossSummonTracker {
+    /// Linear +50 steps through the 4th summon (orange); doubles each time after that.
     pub fn current_cost(&self) -> i32 {
-        BOSS_SUMMON_BASE_COST + (self.summon_count as i32 * BOSS_SUMMON_COST_INCREMENT)
+        const LAST_LINEAR_SUMMON: u32 = 3;
+        let cap_cost =
+            BOSS_SUMMON_BASE_COST + (LAST_LINEAR_SUMMON as i32 * BOSS_SUMMON_COST_INCREMENT);
+
+        if self.summon_count <= LAST_LINEAR_SUMMON {
+            BOSS_SUMMON_BASE_COST + (self.summon_count as i32 * BOSS_SUMMON_COST_INCREMENT)
+        } else {
+            let overflow = self.summon_count - LAST_LINEAR_SUMMON;
+            cap_cost.saturating_mul(1_i32 << overflow.min(30))
+        }
     }
 
     pub fn reset(&mut self) {
@@ -168,6 +178,10 @@ impl BossSummonIndex {
             3 => 8,
             _ => 8,
         }
+    }
+    /// AoE explosion spawn radius multiplier; +25% per subsequent shrine summon.
+    pub fn aoe_radius_scale(&self) -> f32 {
+        1.0 + self.0 as f32 * 0.25
     }
 }
 

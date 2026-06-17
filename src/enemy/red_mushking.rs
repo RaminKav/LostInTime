@@ -57,6 +57,37 @@ aseprite!(pub RedMushking, "textures/redmushking/red_mushking.ase");
 // every so often, use summon attack
 
 const MAX_JUMP_DISTANCE: f32 = 16. * 8.0; // 8 tiles = 128 pixels
+const AOE_SPAWN_RADIUS_MIN: f32 = 12.5; // 10.0 + 25%
+const AOE_SPAWN_RADIUS_MAX: f32 = 87.5; // 70.0 + 25%
+
+/// Fixed delay between boss attacks. The boss cycles jump -> summon -> aoe,
+/// pausing this long between each attack.
+const ATTACK_ROTATION_INTERVAL: f32 = 1.2;
+/// Base summon duration at boss tier 0; grows by 1s per shrine summon tier.
+const SUMMON_BASE_DURATION: f32 = 1.5;
+/// How often a mushling is spawned while the summon is active.
+const SUMMON_SPAWN_INTERVAL: f32 = 0.12;
+
+fn summon_attack_state(boss_summon_index: &BossSummonIndex) -> SummonAttackState {
+    let duration = SUMMON_BASE_DURATION + boss_summon_index.0 as f32;
+    SummonAttackState {
+        duration_timer: Timer::from_seconds(duration, TimerMode::Once),
+        spawn_timer: Timer::from_seconds(SUMMON_SPAWN_INTERVAL, TimerMode::Repeating),
+        anim_phase: 0,
+    }
+}
+
+fn aoe_attack_state(boss_summon_index: &BossSummonIndex) -> AoEAttackState {
+    let summon_scale = boss_summon_index.aoe_radius_scale();
+    AoEAttackState {
+        delay_timer: Timer::from_seconds(0.85, TimerMode::Once),
+        num_bombs: boss_summon_index.num_poison_bombs() * 2,
+        spawn_radius_min: AOE_SPAWN_RADIUS_MIN * summon_scale,
+        spawn_radius_max: AOE_SPAWN_RADIUS_MAX * summon_scale,
+        cloud_positions: Vec::new(),
+        preview_entities: Vec::new(),
+    }
+}
 
 pub fn handle_new_red_mushking_state_machine(
     mut commands: Commands,
@@ -111,30 +142,14 @@ pub fn handle_new_red_mushking_state_machine(
             .insert(DamagesWorldObjects)
             .insert(HealthThreshold(1.))
             .insert(AttackCollider(None))
-            .insert(AoEAttackTimer {
-                random_timer: Timer::from_seconds(0.0, TimerMode::Once), // Will be set randomly in tick_aoe_attack_timer
-            })
-            .insert(LeapAttackTimer {
-                random_timer: Timer::from_seconds(0.0, TimerMode::Once), // Will be set randomly in tick_leap_attack_timer
+            .insert(AttackRotation {
+                timer: Timer::from_seconds(ATTACK_ROTATION_INTERVAL, TimerMode::Once),
+                index: 0,
             });
 
         let state_machine = StateMachine::default()
             .set_trans_logging(false)
             .with_state::<DeathState>()
-            .trans::<FollowState>(
-                HealthTrigger(0.65),
-                SummonAttackState {
-                    num_summons_left: boss_summon_index.num_spawns(),
-                    timer: Timer::from_seconds(0.2, TimerMode::Repeating),
-                },
-            )
-            .trans::<LeapAttackState>(
-                HealthTrigger(0.65),
-                SummonAttackState {
-                    num_summons_left: boss_summon_index.num_spawns(),
-                    timer: Timer::from_seconds(0.2, TimerMode::Repeating),
-                },
-            )
             .trans::<FollowState>(
                 JumpTimer,
                 LeapAttackState {
@@ -153,28 +168,8 @@ pub fn handle_new_red_mushking_state_machine(
                     attack_preview_entity: None,
                 },
             )
-            .trans::<FollowState>(
-                AoEAttackTimerTrigger,
-                AoEAttackState {
-                    delay_timer: Timer::from_seconds(0.85, TimerMode::Once),
-                    num_bombs: boss_summon_index.num_poison_bombs(),
-                    spawn_radius_min: 10.0 * (boss_summon_index.0 as f32 * 0.5).max(1.),
-                    spawn_radius_max: 70.0 * (boss_summon_index.0 as f32 * 0.5).max(1.),
-                    cloud_positions: Vec::new(),
-                    preview_entities: Vec::new(),
-                },
-            )
-            .trans::<LeapAttackState>(
-                AoEAttackTimerTrigger,
-                AoEAttackState {
-                    delay_timer: Timer::from_seconds(0.85, TimerMode::Once),
-                    num_bombs: boss_summon_index.num_poison_bombs(),
-                    spawn_radius_min: 10.0 * (boss_summon_index.0 as f32 * 0.5).max(1.),
-                    spawn_radius_max: 70.0 * (boss_summon_index.0 as f32 * 0.5).max(1.),
-                    cloud_positions: Vec::new(),
-                    preview_entities: Vec::new(),
-                },
-            );
+            .trans::<FollowState>(SummonTrigger, summon_attack_state(boss_summon_index))
+            .trans::<FollowState>(AoEAttackTimerTrigger, aoe_attack_state(boss_summon_index));
         // .trans::<FollowState>(
         //     Trigger::not(ShrineLOS {
         //         range: TILE_SIZE.x * 16.,
@@ -207,28 +202,38 @@ pub struct JumpAttackState;
 #[derive(Clone, Component, Reflect)]
 #[component(storage = "SparseSet")]
 pub struct SummonAttackState {
-    num_summons_left: usize,
-    timer: Timer,
+    /// Total time the boss spends summoning; mushlings spawn for this whole window.
+    /// This effect timer is fully decoupled from the summon animation.
+    duration_timer: Timer,
+    /// Rate at which mushlings spawn during the summon.
+    spawn_timer: Timer,
+    /// Tracks the single play-through of the summon animation (no looping):
+    /// 0 = not started, 1 = START_SUMMON, 2 = SUMMONING, 3 = END_SUMMON, 4 = done.
+    anim_phase: u8,
 }
 
 #[derive(Clone, Component, Reflect)]
 #[component(storage = "SparseSet")]
 pub struct DeathState;
 
-/// Component that tracks the AoE attack timer (always present on boss)
+/// Drives the boss's attack cadence: it cycles jump -> summon -> aoe, waiting
+/// `ATTACK_ROTATION_INTERVAL` between attacks. `index` selects the next attack.
 #[derive(Component)]
-pub struct AoEAttackTimer {
-    pub random_timer: Timer, // Timer for random interval (1-4s)
+pub struct AttackRotation {
+    pub timer: Timer,
+    pub index: usize,
 }
 
-/// Component that tracks the leap attack timer (always present on boss)
-#[derive(Component)]
-pub struct LeapAttackTimer {
-    pub random_timer: Timer, // Timer for random interval (2-5s)
+impl AttackRotation {
+    /// Advance to the next attack in the cycle and restart the inter-attack delay.
+    fn advance(&mut self) {
+        self.index = (self.index + 1) % 3;
+        self.timer = Timer::from_seconds(ATTACK_ROTATION_INTERVAL, TimerMode::Once);
+    }
 }
 
 /// State that is active during the AoE attack.
-/// Supports N poison bombs (scaled by `BossSummonIndex`), doubled when below half health.
+/// Bomb count is doubled from the shrine summon index; doubled again when below half health.
 #[derive(Clone, Component, Reflect)]
 #[component(storage = "SparseSet")]
 pub struct AoEAttackState {
@@ -262,7 +267,7 @@ pub fn new_leap_attack(
         &mut AttackCollider,
     )>,
     mut commands: Commands,
-    mut leap_timers: Query<&mut LeapAttackTimer>,
+    mut rotations: Query<&mut AttackRotation>,
     time: Res<Time>,
     mut game_camera: Query<Entity, With<TextureCamera>>,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -416,11 +421,9 @@ pub fn new_leap_attack(
 
         // PHASE 3: End of leap - cleanup and transition back
 
-        // Reset leap timer for next attack
-        if let Ok(mut leap_timer) = leap_timers.get_mut(entity) {
-            let mut rng = rand::thread_rng();
-            let random_duration = rng.gen_range(0.5..4.);
-            leap_timer.random_timer = Timer::from_seconds(random_duration, TimerMode::Once);
+        // Advance the attack rotation for the next attack
+        if let Ok(mut rotation) = rotations.get_mut(entity) {
+            rotation.advance();
         }
 
         // Reset animation to WALK
@@ -441,9 +444,10 @@ pub fn new_leap_attack(
                 curr_path: None,
                 speed: follow_speed.0,
             })
-            .insert(EnemyAttackCooldown(
-                leap_attack.attack_cooldown_timer.clone(),
-            ))
+            .insert(EnemyAttackCooldown(Timer::from_seconds(
+                ATTACK_ROTATION_INTERVAL,
+                TimerMode::Once,
+            )))
             .remove::<LeapAttackState>()
             .remove::<MobIsAttacking>();
     }
@@ -455,6 +459,7 @@ pub fn summon_attack(
         &mut AsepriteAnimation,
         &GlobalTransform,
         &FollowSpeed,
+        &mut AttackRotation,
     )>,
     mut commands: Commands,
     time: Res<Time>,
@@ -462,52 +467,66 @@ pub fn summon_attack(
     proto: ProtoParam,
     game: GameParam,
 ) {
-    for (entity, mut summon_attack, mut anim_state, txfm, follow_speed) in attacks.iter_mut() {
-        let frame = anim_state.current_frame();
+    for (entity, mut summon_attack, mut anim_state, txfm, follow_speed, mut rotation) in
+        attacks.iter_mut()
+    {
         if anim_state.is_paused() {
             anim_state.play();
         }
-        if !(29..=42).contains(&frame) {
-            *anim_state = AsepriteAnimation::from(RedMushking::tags::START_SUMMON);
-        } else if frame == 33 {
-            *anim_state = AsepriteAnimation::from(RedMushking::tags::SUMMONING);
-        } else if (33..=39).contains(&frame) {
-            // SUMMONING
 
-            if summon_attack.num_summons_left > 0
-                && summon_attack.timer.tick(time.delta()).just_finished()
+        // --- Effect: spawn mushlings for the full duration, decoupled from the animation. ---
+        summon_attack.duration_timer.tick(time.delta());
+        if !summon_attack.duration_timer.finished()
+            && summon_attack.spawn_timer.tick(time.delta()).just_finished()
+        {
+            let mut rng = rand::thread_rng();
+            let my_txfm = txfm.translation().truncate();
+            let summon_range = 110.;
+            let offset_x = rng.gen_range(-summon_range..summon_range);
+            let offset_y = rng.gen_range(-summon_range..summon_range);
+            let mut pos = Vec2::new(my_txfm.x + offset_x, my_txfm.y + offset_y);
+            while !can_spawn_mob_here(pos, &game, &proto, false) {
+                pos = Vec2::new(
+                    my_txfm.x + rng.gen_range(-summon_range..summon_range),
+                    my_txfm.y + rng.gen_range(-summon_range..summon_range),
+                );
+            }
+
+            if let Some(mob) =
+                proto_commands.spawn_from_proto(Mob::RedMushling, &proto.prototypes, pos)
             {
-                let mut rng = rand::thread_rng();
-                let my_txfm = txfm.translation().truncate();
-                let summon_range = 110.;
-                let offset_x = rng.gen_range(-summon_range..summon_range);
-                let offset_y = rng.gen_range(-summon_range..summon_range);
-                let mut pos = Vec2::new(my_txfm.x + offset_x, my_txfm.y + offset_y);
-                while !can_spawn_mob_here(pos, &game, &proto, false) {
-                    pos = Vec2::new(
-                        my_txfm.x + rng.gen_range(-summon_range..summon_range),
-                        my_txfm.y + rng.gen_range(-summon_range..summon_range),
-                    );
-                }
-
-                if let Some(mob) =
-                    proto_commands.spawn_from_proto(Mob::RedMushling, &proto.prototypes, pos)
-                {
-                    proto_commands
-                        .commands()
-                        .entity(mob)
-                        .remove::<LootTable>()
-                        .remove::<ExperienceReward>();
-                }
-
-                summon_attack.num_summons_left -= 1;
+                proto_commands
+                    .commands()
+                    .entity(mob)
+                    .remove::<LootTable>()
+                    .remove::<ExperienceReward>();
             }
         }
-        if summon_attack.num_summons_left == 0 && frame == 39 {
-            *anim_state = AsepriteAnimation::from(RedMushking::tags::END_SUMMON);
+
+        // --- Animation: a single play-through (no loop), chained on just_finished. ---
+        match summon_attack.anim_phase {
+            0 => {
+                *anim_state = AsepriteAnimation::from(RedMushking::tags::START_SUMMON);
+                summon_attack.anim_phase = 1;
+            }
+            1 if anim_state.just_finished() => {
+                *anim_state = AsepriteAnimation::from(RedMushking::tags::SUMMONING);
+                summon_attack.anim_phase = 2;
+            }
+            2 if anim_state.just_finished() => {
+                *anim_state = AsepriteAnimation::from(RedMushking::tags::END_SUMMON);
+                summon_attack.anim_phase = 3;
+            }
+            3 if anim_state.just_finished() => {
+                *anim_state = AsepriteAnimation::from(RedMushking::tags::WALK);
+                summon_attack.anim_phase = 4;
+            }
+            _ => {}
         }
-        // END LEAP ATTACK
-        if frame == 42 {
+
+        // --- The effect timer (not the animation) drives the end of the summon. ---
+        if summon_attack.duration_timer.finished() {
+            rotation.advance();
             commands
                 .entity(entity)
                 .insert(FollowState {
@@ -517,7 +536,7 @@ pub fn summon_attack(
                     speed: follow_speed.0,
                 })
                 .insert(EnemyAttackCooldown(Timer::from_seconds(
-                    0.8,
+                    ATTACK_ROTATION_INTERVAL,
                     TimerMode::Once,
                 )))
                 .remove::<SummonAttackState>();
@@ -629,9 +648,8 @@ impl BoolTrigger for JumpTimer {
             'w,
             's,
             (
-                &'static LeapAttackTimer,
+                &'static AttackRotation,
                 Option<&'static EnemyAttackCooldown>,
-                Option<&'static AoEAttackState>,
             ),
         >,
         Query<'w, 's, &'static Transform>,
@@ -641,28 +659,18 @@ impl BoolTrigger for JumpTimer {
     fn trigger(
         &self,
         entity: Entity,
-        (leap_timer_query, transforms, player_query): Self::Param<'_, '_>,
+        (rotation_query, transforms, player_query): Self::Param<'_, '_>,
     ) -> bool {
-        // Check if timer is finished and no cooldown
-        match leap_timer_query.get(entity) {
-            Ok((leap_timer, attack_cooldown, aoe_state)) => {
-                // Don't trigger if on cooldown
+        match rotation_query.get(entity) {
+            Ok((rotation, attack_cooldown)) => {
+                // Jump is index 0 of the rotation
+                if rotation.index != 0 {
+                    return false;
+                }
                 if attack_cooldown.is_some() {
                     return false;
                 }
-
-                // Don't trigger if already in AoE attack state
-                if aoe_state.is_some() {
-                    return false;
-                }
-
-                // Don't trigger if timer duration is 0 (uninitialized)
-                if leap_timer.random_timer.duration().as_secs_f32() == 0.0 {
-                    return false;
-                }
-
-                // Don't trigger if timer not finished
-                if !leap_timer.random_timer.finished() {
+                if !rotation.timer.finished() {
                     return false;
                 }
 
@@ -690,6 +698,30 @@ impl BoolTrigger for JumpTimer {
 }
 
 #[derive(Clone, Copy, Reflect)]
+pub struct SummonTrigger;
+
+impl BoolTrigger for SummonTrigger {
+    type Param<'w, 's> = Query<
+        'w,
+        's,
+        (
+            &'static AttackRotation,
+            Option<&'static EnemyAttackCooldown>,
+        ),
+    >;
+
+    fn trigger(&self, entity: Entity, query: Self::Param<'_, '_>) -> bool {
+        match query.get(entity) {
+            Ok((rotation, attack_cooldown)) => {
+                // Summon is index 1 of the rotation
+                rotation.index == 1 && attack_cooldown.is_none() && rotation.timer.finished()
+            }
+            Err(_) => false,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Reflect)]
 pub struct AoEAttackTimerTrigger;
 
 impl BoolTrigger for AoEAttackTimerTrigger {
@@ -697,33 +729,18 @@ impl BoolTrigger for AoEAttackTimerTrigger {
         'w,
         's,
         (
-            &'static AoEAttackTimer,
+            &'static AttackRotation,
             Option<&'static EnemyAttackCooldown>,
-            Option<&'static LeapAttackState>,
         ),
     >;
 
     fn trigger(&self, entity: Entity, query: Self::Param<'_, '_>) -> bool {
         match query.get(entity) {
-            Ok((aoe_timer, attack_cooldown, leap_state)) => {
-                // Only trigger if not on cooldown and random timer is finished
-                // Also require timer duration > 0 to avoid triggering on uninitialized timers
-                if attack_cooldown.is_some() {
-                    return false;
-                }
-                // Don't trigger if already in leap attack state
-                if leap_state.is_some() {
-                    return false;
-                }
-                if aoe_timer.random_timer.duration().as_secs_f32() == 0.0 {
-                    return false;
-                }
-                aoe_timer.random_timer.finished()
+            Ok((rotation, attack_cooldown)) => {
+                // AoE is index 2 of the rotation
+                rotation.index == 2 && attack_cooldown.is_none() && rotation.timer.finished()
             }
-            Err(_) => {
-                // This shouldn't happen often, but log it if it does
-                false
-            }
+            Err(_) => false,
         }
     }
 }
@@ -832,70 +849,10 @@ impl Trigger for ShrineLOS {
     }
 }
 
-/// System to tick the AoE attack random timer and initialize the attack
-pub fn tick_aoe_attack_timer(
-    mut aoe_timers: Query<(Entity, &mut AoEAttackTimer), With<Mob>>,
-    boss_health: Query<(&CurrentHealth, &MaxHealth), With<Mob>>,
-    time: Res<Time>,
-) {
-    for (entity, mut aoe_timer) in aoe_timers.iter_mut() {
-        // If random timer hasn't been set yet, set it to a random duration
-        if aoe_timer.random_timer.duration().as_secs_f32() == 0.0 {
-            let mut rng = rand::thread_rng();
-
-            // Check if boss is below half health - if so, use half the timer range (twice as fast)
-            let is_below_half_health = boss_health
-                .get(entity)
-                .map(|(current, max)| (current.0 as f32 / max.0 as f32) < 0.5)
-                .unwrap_or(false);
-
-            let random_duration = if is_below_half_health {
-                // Half the normal range: 0.15..1.25 (twice as fast)
-                rng.gen_range(0.15..1.25)
-            } else {
-                // Normal range: 0.3..2.5
-                rng.gen_range(0.3..2.5)
-            };
-
-            aoe_timer.random_timer = Timer::from_seconds(random_duration, TimerMode::Once);
-        }
-
-        // Tick the random timer
-        let was_finished = aoe_timer.random_timer.finished();
-        aoe_timer.random_timer.tick(time.delta());
-    }
-}
-
-/// System to tick the leap attack random timer
-pub fn tick_leap_attack_timer(
-    mut leap_timers: Query<(Entity, &mut LeapAttackTimer), With<Mob>>,
-    boss_health: Query<(&CurrentHealth, &MaxHealth), With<Mob>>,
-    time: Res<Time>,
-) {
-    for (entity, mut leap_timer) in leap_timers.iter_mut() {
-        // If random timer hasn't been set yet, set it to a random duration
-        if leap_timer.random_timer.duration().as_secs_f32() == 0.0 {
-            let mut rng = rand::thread_rng();
-
-            // Check if boss is below half health - if so, use shorter timer (more frequent)
-            let is_below_half_health = boss_health
-                .get(entity)
-                .map(|(current, max)| (current.0 as f32 / max.0 as f32) < 0.5)
-                .unwrap_or(false);
-
-            let random_duration = if is_below_half_health {
-                // Faster range: 1.5..3.0 seconds
-                rng.gen_range(1.5..3.0)
-            } else {
-                // Normal range: 2.5..5.0 seconds (less frequent than before)
-                rng.gen_range(2.5..5.0)
-            };
-
-            leap_timer.random_timer = Timer::from_seconds(random_duration, TimerMode::Once);
-        }
-
-        // Tick the random timer
-        leap_timer.random_timer.tick(time.delta());
+/// System to tick the boss attack rotation timer (the inter-attack delay).
+pub fn tick_attack_rotation(mut rotations: Query<&mut AttackRotation, With<Mob>>, time: Res<Time>) {
+    for mut rotation in rotations.iter_mut() {
+        rotation.timer.tick(time.delta());
     }
 }
 
@@ -905,7 +862,7 @@ pub fn handle_aoe_attack(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
     mut aoe_attacks: Query<(Entity, &mut AoEAttackState, &Attack, &GlobalTransform), With<Mob>>,
-    mut aoe_timers: Query<&mut AoEAttackTimer>,
+    mut rotations: Query<&mut AttackRotation>,
     boss_health: Query<(&CurrentHealth, &MaxHealth), With<Mob>>,
     player_query: Query<&Transform, With<Player>>,
     time: Res<Time>,
@@ -1001,20 +958,11 @@ pub fn handle_aoe_attack(
                 }
             }
 
+            if let Ok(mut rotation) = rotations.get_mut(boss_entity) {
+                rotation.advance();
+            }
+
             if let Some(mut entity_commands) = commands.get_entity(boss_entity) {
-                let mut rng = rand::thread_rng();
-
-                let is_below_half_health = boss_health
-                    .get(boss_entity)
-                    .map(|(current, max)| (current.0 as f32 / max.0 as f32) < 0.5)
-                    .unwrap_or(false);
-
-                let random_duration = if is_below_half_health {
-                    rng.gen_range(0.15..1.25)
-                } else {
-                    rng.gen_range(0.3..2.5)
-                };
-
                 entity_commands
                     .remove::<AoEAttackState>()
                     .insert(FollowState {
@@ -1024,13 +972,9 @@ pub fn handle_aoe_attack(
                         speed: 1.0,
                     })
                     .insert(EnemyAttackCooldown(Timer::from_seconds(
-                        1.0,
+                        ATTACK_ROTATION_INTERVAL,
                         TimerMode::Once,
                     )));
-
-                if let Ok(mut aoe_timer) = aoe_timers.get_mut(boss_entity) {
-                    aoe_timer.random_timer = Timer::from_seconds(random_duration, TimerMode::Once);
-                }
             }
         }
     }
