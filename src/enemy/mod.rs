@@ -198,7 +198,7 @@ impl Mob {
             Mob::Crow => 100.,
             Mob::RedMushling => 0.,
             Mob::RedMushking => 0.,
-            Mob::StoneGolem => 20.,
+            Mob::StoneGolem => 10.,
             Mob::Hog => 50.,
             Mob::SmallCactus => 60.,
             Mob::BigCactus => 50.,

@@ -322,8 +322,14 @@ fn heirloom_rarity_cost_inc(rarity: &HeirloomRarity) -> f32 {
     }
 }
 
+const MIN_MERCHANT_COIN_COST: u32 = 10;
+
 fn apply_purchase_multiplier(base: f32, multiplier: f32) -> u32 {
-    (base * multiplier).trunc() as u32
+    let cost = (base * multiplier).trunc() as u32;
+    if cost == 0 {
+        return 0;
+    }
+    cost.max(MIN_MERCHANT_COIN_COST)
 }
 
 fn purchase_multiplier_for_level(player_level: u8) -> f32 {
@@ -1813,13 +1819,21 @@ fn generate_material_slot(
         WorldObject::UpgradeTome,
         WorldObject::MagicGem,
         WorldObject::OrbOfTransformation,
+        WorldObject::SmallPotion,
+        WorldObject::LargePotion,
+        WorldObject::AttackSpeedPotion,
+        WorldObject::MovementSpeedPotion,
     ];
     let pick = pool.choose(rng).unwrap();
     let stack = proto.get_item_data(*pick).unwrap().clone();
     let base = match pick {
         WorldObject::UpgradeTome => 6.,
         WorldObject::MagicGem => 8.,
-        WorldObject::OrbOfTransformation => 14.,
+        WorldObject::OrbOfTransformation => 12.,
+        WorldObject::SmallPotion => 3.,
+        WorldObject::LargePotion => 4.,
+        WorldObject::AttackSpeedPotion => 4.,
+        WorldObject::MovementSpeedPotion => 4.,
         _ => 6.,
     };
     let base_coin_cost = base + rng.gen_range(1.0..3.0);

@@ -2482,9 +2482,12 @@ pub fn handle_skill_explosion_hits(
         let Some(proj) = &hit.hit_with_projectile else {
             continue;
         };
-        if proj.is_skill_explosion_excluded()
-            || (!hit.from_active_skill && !proj.is_skill_projectile())
-        {
+        // Only true active-skill projectiles should trigger the explosion. We rely on the
+        // explicit `is_skill_projectile` allowlist instead of the `from_active_skill` marker,
+        // because that marker is attached to every player projectile with a `from_entity`
+        // (including heirloom procs and special weapon shots), which would otherwise let
+        // non-skill projectile damage trigger Impact Rune.
+        if proj.is_skill_explosion_excluded() || !proj.is_skill_projectile() {
             continue;
         }
         if *throttle >= MAX_SKILL_EXPLOSIONS_PER_FRAME {

@@ -152,9 +152,6 @@ impl Projectile {
     }
     pub fn is_skill_projectile(&self) -> bool {
         match self {
-            Projectile::Arc => true,
-            Projectile::Echo => true,
-            Projectile::IceExplosionAOE => true,
             Projectile::FireRing => true,
             Projectile::IceWall => true,
             Projectile::Meteor => true,
@@ -164,7 +161,6 @@ impl Projectile {
             Projectile::Bomb => true,
             Projectile::DaggerSlash => true,
             Projectile::DaggerThrow => true,
-            Projectile::Lightning => true,
             Projectile::FuryKunai => true,
             Projectile::SpinAttack => true,
             Projectile::SpearGravity => true,
@@ -174,10 +170,22 @@ impl Projectile {
             Projectile::ThrowingStarLarge => true,
             Projectile::TeleportShock => true,
             Projectile::SprintLunge => true,
+            Projectile::Bullet => true,
             _ => false,
         }
     }
-
+    pub fn is_heirloom_projectile(&self) -> bool {
+        match self {
+            Projectile::Arc => true,
+            Projectile::Echo => true,
+            Projectile::IceExplosionAOE => true,
+            Projectile::Lightning => true,
+            Projectile::SmallExplosionAOE => true,
+            Projectile::CherryBombExplosion => true,
+            Projectile::ThornsProjectile => true,
+            _ => false,
+        }
+    }
     pub fn is_skill_explosion_excluded(&self) -> bool {
         matches!(
             self,
@@ -420,6 +428,7 @@ fn handle_ranged_attack_event(
             && player_cooldown.is_some()
             && !proj_event.is_followup_proj
             && !proj_event.projectile.is_skill_projectile()
+            && !proj_event.projectile.is_heirloom_projectile()
         {
             continue;
         }
@@ -489,6 +498,7 @@ fn handle_ranged_attack_event(
         let track_player_aim = !proj_event.from_enemy
             && proj_event.from_entity.is_none()
             && !proj_event.projectile.is_skill_projectile()
+            && !proj_event.projectile.is_heirloom_projectile()
             && proj_event.spawn_delay > 0.0;
         let track_player_pos = track_player_aim
             && proj_event.pos_override.is_none()

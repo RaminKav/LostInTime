@@ -15,6 +15,6 @@
   "bevy_proto::custom::SpriteBundle": (
       texture: AssetPath("snowleaflesstree1.png")
    ),
-  "survival_rogue_like::item::loot_table::LootTable": (drops: [(item: Stick, min: 1, max: 2, rate: 0.5)]),
+  "survival_rogue_like::item::loot_table::LootTable": (drops: [(item: Stick, min: 1, max: 2, rate: 0.5), (item: Log, min: 1, max: 4, rate: 1.)]),
   }
 )

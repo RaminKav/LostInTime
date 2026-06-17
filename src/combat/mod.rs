@@ -628,10 +628,9 @@ pub fn handle_hits(
             if let Some(obj) = obj_option {
                 // Skill projectiles (AoE, shouts, explosions, etc.) never satisfy tool gating -
                 // only regular attack projectiles can chop/mine when the player carries the tool.
-                let is_skill_projectile = hit
-                    .hit_with_projectile
-                    .as_ref()
-                    .map_or(false, |p| p.is_skill_projectile());
+                let is_skill_projectile = hit.hit_with_projectile.as_ref().map_or(false, |p| {
+                    p.is_skill_projectile() || p.is_heirloom_projectile()
+                });
 
                 // Does the player carry the required tool anywhere in inventory?
                 let inventory_has_required_tool = hit_req_option
@@ -881,7 +880,7 @@ pub fn handle_hits(
                 let mob_kb = if let Some(mob) = mob_option {
                     mob.get_base_kb()
                         + if game.has_skill(Heirloom::Knockback) {
-                            200.
+                            200. * if mob.is_boss() { 0.15 } else { 1.0 }
                         } else {
                             0.
                         }
