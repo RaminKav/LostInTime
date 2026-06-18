@@ -1438,7 +1438,7 @@ impl Heirloom {
                 "you use a skill.".to_string(),
             ],
             Heirloom::DodgeChance => vec!["+7% Dodge Chance".to_string()],
-            Heirloom::Gigantify => vec!["+10% Size".to_string()],
+            Heirloom::Gigantify => vec!["+8% Size".to_string()],
 
             Heirloom::WaveAttack => vec![
                 "Weapon Attacks have".to_string(),
