@@ -34,6 +34,8 @@ pub const WHITE: Color = Color::rgba(226. / 255., 212. / 255., 177. / 255., 1.);
 pub const PINK: Color = Color::rgba(255. / 255., 136. / 255., 169. / 255., 1.);
 pub const LEVEL_BLUE: Color = Color::rgba(77. / 255., 215. / 255., 225. / 255., 1.);
 pub const LEVEL_DARK_BLUE: Color = Color::rgba(67. / 255., 86. / 255., 122. / 255., 1.);
+/// Dark blue used for the third player map marker (`#0064c8`).
+pub const MAP_MARKER_BLUE: Color = Color::rgba(0. / 255., 100. / 255., 200. / 255., 1.);
 pub const TOOLTIP_BLACK: Color = Color::rgba(39. / 255., 39. / 255., 39. / 255., 1.);
 pub const TOOLTIP_BLACK_2: Color = Color::rgba(68. / 255., 68. / 255., 68. / 255., 1.);
 

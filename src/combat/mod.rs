@@ -1320,8 +1320,7 @@ pub fn handle_thorns_on_damage_tracker(
                     if let Ok(skills) = player_skills.get_single() {
                         let stacks =
                             skills.get_count(crate::player::skills::Heirloom::ThornsOnDamage);
-                        if stacks > 0 {
-                            tracker.thorns_gained += stacks;
+                        if tracker.gain_from_damage(stacks) {
                             attribute_events.send(AttributeChangeEvent);
                             trigger_counts.increment(Heirloom::ThornsOnDamage);
                         }
@@ -1419,9 +1418,8 @@ pub fn handle_thorns_on_self_damage(
         }
 
         let on_damage_stacks = skills.get_count(Heirloom::ThornsOnDamage);
-        if on_damage_stacks > 0 {
-            if let Some(ref mut tracker) = tracker_opt {
-                tracker.thorns_gained += on_damage_stacks;
+        if let Some(ref mut tracker) = tracker_opt {
+            if tracker.gain_from_damage(on_damage_stacks) {
                 attribute_events.send(AttributeChangeEvent);
                 trigger_counts.increment(Heirloom::ThornsOnDamage);
             }

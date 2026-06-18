@@ -44,7 +44,24 @@ pub struct UnlockButtonLabel;
 #[derive(Component)]
 pub struct UnlocksCurrencyText;
 
-const UNLOCK_ROWS: [UnlockUpgradeKind; 7] = [
+/// Vertical offset applied to title, currency, and unlock rows (back button stays put).
+const UNLOCKS_CONTENT_Y_OFFSET: f32 = 30.0;
+const UNLOCK_BUTTON_DISABLED_SPRITE: Color = Color::rgb(0.55, 0.55, 0.55);
+const UNLOCK_BUTTON_DISABLED_LABEL: Color = Color::rgb(0.7, 0.7, 0.7);
+
+fn unlock_purchase_button_enabled(is_maxed: bool, affordable: bool) -> bool {
+    !is_maxed && affordable
+}
+
+fn unlock_purchase_button_label(is_maxed: bool) -> &'static str {
+    if is_maxed {
+        "MAXED"
+    } else {
+        "Purchase"
+    }
+}
+
+const UNLOCK_ROWS: [UnlockUpgradeKind; 8] = [
     UnlockUpgradeKind::Reroll,
     UnlockUpgradeKind::Banish,
     UnlockUpgradeKind::StartSupplies,
@@ -52,6 +69,7 @@ const UNLOCK_ROWS: [UnlockUpgradeKind; 7] = [
     UnlockUpgradeKind::StartTome,
     UnlockUpgradeKind::StartOrb,
     UnlockUpgradeKind::StartingTools,
+    UnlockUpgradeKind::MapMarkers,
 ];
 
 fn unlock_effect_summary(kind: UnlockUpgradeKind, upgrades: &UnlockUpgrades) -> String {
@@ -117,6 +135,16 @@ fn unlock_effect_summary(kind: UnlockUpgradeKind, upgrades: &UnlockUpgrades) -> 
             2 => "Tier 3: Start with Wood Axe and Pickaxe".to_string(),
             _ => format!("Unlocked: Start with Wood Axe and Pickaxe",),
         },
+        UnlockUpgradeKind::MapMarkers => format!(
+            "Tier {}: Place up to {} map marker{}",
+            tier,
+            upgrades.map_marker_count(),
+            if upgrades.map_marker_count() == 1 {
+                ""
+            } else {
+                "s"
+            }
+        ),
     }
 }
 
@@ -208,9 +236,16 @@ pub fn update_unlocks_currency_text(
 }
 
 pub fn refresh_unlock_button_states(
+    mut commands: Commands,
     currency: Res<TimeFragmentCurrency>,
     upgrades: Res<UnlockUpgrades>,
-    mut buttons: Query<(&UnlockPurchaseButton, &mut Sprite, &Children)>,
+    mut buttons: Query<(
+        Entity,
+        &UnlockPurchaseButton,
+        &mut Sprite,
+        &Children,
+        Option<&Interactable>,
+    )>,
     mut text_queries: ParamSet<(
         Query<&mut Text, With<UnlockButtonLabel>>,
         Query<(&UnlockCostText, &mut Text)>,
@@ -221,40 +256,33 @@ pub fn refresh_unlock_button_states(
         return;
     }
 
-    for (button, mut sprite, children) in buttons.iter_mut() {
-        // Hide button if unlock is maxed
+    for (entity, button, mut sprite, children, interactable) in buttons.iter_mut() {
         let is_maxed = upgrades.is_maxed(button.kind);
-        if is_maxed {
-            // Hide the button sprite
-            sprite.color = Color::NONE;
-            // Also hide the button label text
-            {
-                let mut labels = text_queries.p0();
-                for child in children.iter() {
-                    if let Ok(mut text) = labels.get_mut(*child) {
-                        text.sections[0].style.color = Color::NONE;
-                    }
-                }
-            }
-            continue;
-        }
-
         let cost = upgrades.next_cost(button.kind);
         let affordable = currency.time_fragments.max(0) as u32 >= cost;
-        sprite.color = if affordable {
+        let enabled = unlock_purchase_button_enabled(is_maxed, affordable);
+
+        sprite.color = if enabled {
             Color::WHITE
         } else {
-            Color::rgb(0.55, 0.55, 0.55)
+            UNLOCK_BUTTON_DISABLED_SPRITE
         };
+
+        if enabled && interactable.is_none() {
+            commands.entity(entity).insert(Interactable::default());
+        } else if !enabled && interactable.is_some() {
+            commands.entity(entity).remove::<Interactable>();
+        }
 
         {
             let mut labels = text_queries.p0();
             for child in children.iter() {
                 if let Ok(mut text) = labels.get_mut(*child) {
-                    text.sections[0].style.color = if affordable {
+                    text.sections[0].value = unlock_purchase_button_label(is_maxed).to_string();
+                    text.sections[0].style.color = if enabled {
                         crate::colors::WHITE
                     } else {
-                        Color::rgb(0.7, 0.7, 0.7)
+                        UNLOCK_BUTTON_DISABLED_LABEL
                     };
                 }
             }
@@ -319,7 +347,7 @@ pub fn setup_unlocks_ui(
             )
             .with_alignment(TextAlignment::Center),
             text_anchor: bevy::sprite::Anchor::Center,
-            transform: Transform::from_translation(Vec3::new(0., 104., 11.)),
+            transform: Transform::from_translation(Vec3::new(0., 104. + UNLOCKS_CONTENT_Y_OFFSET, 11.)),
             ..Default::default()
         },
         RenderLayers::from_layers(&[3]),
@@ -341,7 +369,7 @@ pub fn setup_unlocks_ui(
                 )
                 .with_alignment(TextAlignment::Left),
                 text_anchor: bevy::sprite::Anchor::CenterLeft,
-                transform: Transform::from_translation(Vec3::new(-160., 104.5, 11.)),
+                transform: Transform::from_translation(Vec3::new(-160., 104.5 + UNLOCKS_CONTENT_Y_OFFSET, 11.)),
                 ..Default::default()
             },
             RenderLayers::from_layers(&[3]),
@@ -361,7 +389,7 @@ pub fn setup_unlocks_ui(
     );
     commands.entity(currency_stack).set_parent(currency_text);
 
-    let start_y = 54.5;
+    let start_y = 54.5 + UNLOCKS_CONTENT_Y_OFFSET;
     let row_spacing = -39.0;
 
     for (index, kind) in UNLOCK_ROWS
@@ -432,7 +460,7 @@ fn spawn_unlock_row(
                 TextStyle {
                     font: asset_server.load("fonts/4x5.ttf"),
                     font_size: 5.,
-                    color: crate::colors::WHITE,
+                    color: crate::colors::YELLOW_2,
                 },
             )
             .with_alignment(TextAlignment::Left),
@@ -470,55 +498,55 @@ fn spawn_unlock_row(
         Name::new(format!("Unlock Row Cost {}", kind.display_name())),
     ));
 
-    // Only show purchase button if unlock is not maxed
+    // Purchase button — grayed out and non-interactive when maxed or unaffordable.
     let is_maxed = upgrades.is_maxed(kind);
     let cost = upgrades.next_cost(kind);
     let affordable = currency.time_fragments.max(0) as u32 >= cost;
-    let button_color = if affordable {
+    let enabled = unlock_purchase_button_enabled(is_maxed, affordable);
+    let button_color = if enabled {
         Color::WHITE
     } else {
-        Color::rgb(0.55, 0.55, 0.55)
+        UNLOCK_BUTTON_DISABLED_SPRITE
     };
-    let label_color = if affordable {
+    let label_color = if enabled {
         crate::colors::WHITE
     } else {
-        Color::rgb(0.7, 0.7, 0.7)
+        UNLOCK_BUTTON_DISABLED_LABEL
     };
-    let button_entity = commands
-        .spawn(SpriteBundle {
-            texture: graphics
-                .get_ui_element_texture(UIElement::BackButton)
-                .clone(),
-            sprite: Sprite {
-                custom_size: Some(Vec2::new(53., 18.)),
-                color: button_color,
-                ..Default::default()
-            },
-            transform: Transform::from_translation(button_pos),
-            visibility: if is_maxed {
-                Visibility::Hidden
-            } else {
-                Visibility::Visible
-            },
+    let mut button_cmd = commands.spawn(SpriteBundle {
+        texture: graphics
+            .get_ui_element_texture(UIElement::BackButton)
+            .clone(),
+        sprite: Sprite {
+            custom_size: Some(Vec2::new(53., 18.)),
+            color: button_color,
             ..Default::default()
-        })
+        },
+        transform: Transform::from_translation(button_pos),
+        ..Default::default()
+    });
+    button_cmd
         .insert(RenderLayers::from_layers(&[3]))
         .insert(UIState::Unlocks)
         .insert(UIElement::BackButton)
         .insert(UnlocksUI)
         .insert(UnlockPurchaseButton { kind })
-        .insert(Interactable::default())
         .insert(Name::new(format!(
             "Unlock Purchase Button {}",
             kind.display_name()
-        )))
-        .id();
+        )));
+
+    if enabled {
+        button_cmd.insert(Interactable::default());
+    }
+
+    let button_entity = button_cmd.id();
 
     commands
         .spawn((
             Text2dBundle {
                 text: Text::from_section(
-                    "Purchase",
+                    unlock_purchase_button_label(is_maxed),
                     TextStyle {
                         font: asset_server.load("fonts/4x5.ttf"),
                         font_size: 5.0,

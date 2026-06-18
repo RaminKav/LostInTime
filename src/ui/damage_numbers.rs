@@ -12,12 +12,12 @@ use crate::{
     item::{EquipmentType, WorldObject},
     ui::CheatSettings,
     world::{world_helpers, TILE_SIZE},
-    Game, TextureCamera, WasHitWithCrit, WasHitWithOvercrit,
+    Game, ScreenResolution, TextureCamera, WasHitWithCrit, WasHitWithOvercrit,
 };
 
 use super::{
     game_fonts::{FontStyle, FLOATING_TEXT, FLOATING_TEXT_SMALL},
-    spawn_item_stack_icon, UIElement,
+    spawn_item_stack_icon, UIElement, UI_SLOT_SIZE,
 };
 
 /// Font used for damage, healing/regen, and item-pickup floating labels.
@@ -334,10 +334,10 @@ pub fn spawn_screen_locked_icon_to_world_pos(
         .insert(Name::new("SCREEN ICON ITEM"));
 
     let mut binding = commands.spawn(SpriteBundle {
-        texture: graphics.get_ui_element_texture(UIElement::ScreenIconSlotLarge),
+        texture: graphics.get_ui_element_texture(UIElement::InventorySlot),
         transform: Transform::default(), // Position will be set in handle_clamp_screen_locked_icons_worldpos
         sprite: Sprite {
-            custom_size: Some(Vec2::new(20., 20.)),
+            custom_size: Some(UI_SLOT_SIZE),
             ..Default::default()
         },
         ..Default::default()
@@ -350,12 +350,20 @@ pub fn spawn_screen_locked_icon_to_world_pos(
     slot_entity.id()
 }
 
+/// Screen-locked beacons stay visible until the player is within this many tiles of the target.
+const SCREEN_LOCKED_ICON_HIDE_RADIUS_TILES: f32 = 4.0;
+
 pub fn handle_clamp_screen_locked_icons_worldpos(
     mut query: Query<(&ScreenLockedTargetWorldPos, &mut Transform, &mut Visibility)>,
     game_camera: Query<&GlobalTransform, With<TextureCamera>>,
+    res: Res<ScreenResolution>,
 ) {
-    let MAX_DIST: Vec2 = Vec2::new(11.5, 7.) * TILE_SIZE.x - Vec2::new(0., 0.);
-    let offset = Vec2::new(6., 5.);
+    // The UI/layer-3 space spans [-game_width/2, game_width/2] x [-game_height/2, game_height/2]
+    // in the same units as the camera-relative world offset, so clamp icons to the real screen
+    // edges (minus the icon half-size so it stays fully visible).
+    let MAX_DIST: Vec2 = Vec2::new(res.game_width / 2., res.game_height / 2.);
+    let offset = Vec2::splat(12.);
+    let hide_radius = SCREEN_LOCKED_ICON_HIDE_RADIUS_TILES * TILE_SIZE.x;
 
     let camera_txfm = match game_camera.get_single() {
         Ok(t) => t,
@@ -365,6 +373,11 @@ pub fn handle_clamp_screen_locked_icons_worldpos(
     let camera_pos = camera_txfm.translation().truncate();
 
     for (target, mut icon_txfm, mut v) in query.iter_mut() {
+        if camera_pos.distance(target.0) <= hide_radius {
+            *v = Visibility::Hidden;
+            continue;
+        }
+
         // Vector from camera (UI origin) to target in UI space
         let ui_vec = world_helpers::world_pos_to_ui_screen_pos(target.0, camera_pos);
 
@@ -372,18 +385,20 @@ pub fn handle_clamp_screen_locked_icons_worldpos(
         let rx = MAX_DIST.x - offset.x;
         let ry = MAX_DIST.y - offset.y;
 
-        // If the target is within the visible region, hide the icon
-        if ui_vec.x.abs() <= rx && ui_vec.y.abs() <= ry {
-            *v = Visibility::Hidden;
-            continue;
-        }
-
         if ui_vec.x == 0. && ui_vec.y == 0. {
             *v = Visibility::Hidden;
             continue;
         }
 
-        // Project to the edge of the rect: scale vector so it hits the border
+        // If the target is actually visible on screen, draw the icon at its real position
+        // instead of clamping it to the screen edge.
+        if ui_vec.x.abs() <= rx && ui_vec.y.abs() <= ry {
+            icon_txfm.translation = ui_vec.extend(20.);
+            *v = Visibility::Visible;
+            continue;
+        }
+
+        // Off-screen: project to the edge of the rect so it points toward the target.
         let tx = rx / ui_vec.x.abs();
         let ty = ry / ui_vec.y.abs();
         let t = tx.min(ty);
@@ -438,8 +453,16 @@ pub fn spawn_floating_text_with_shadow(
     text: String,
     font_style: FontStyle,
 ) -> Entity {
-    spawn_floating_text_with_shadow_inner(commands, asset_server, pos, color, text, font_style, None)
-        .1
+    spawn_floating_text_with_shadow_inner(
+        commands,
+        asset_server,
+        pos,
+        color,
+        text,
+        font_style,
+        None,
+    )
+    .1
 }
 
 /// Same as [`spawn_floating_text_with_shadow`] but also inserts the given

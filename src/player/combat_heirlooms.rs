@@ -1671,6 +1671,25 @@ pub struct ThornsOnDamageTracker {
     pub thorns_gained: i32,
 }
 
+/// Max thorns Spiked Helmet may grant per equipped stack (mirrors MaxHPHunt's
+/// `stacks * 250` cap pattern).
+pub const THORNS_ON_DAMAGE_CAP_PER_STACK: i32 = 300;
+
+impl ThornsOnDamageTracker {
+    /// Gain thorns from taking damage. Returns `true` when any thorns were added.
+    pub fn gain_from_damage(&mut self, stacks: i32) -> bool {
+        if stacks <= 0 {
+            return false;
+        }
+        let cap = stacks * THORNS_ON_DAMAGE_CAP_PER_STACK;
+        if self.thorns_gained >= cap {
+            return false;
+        }
+        self.thorns_gained = (self.thorns_gained + stacks).min(cap);
+        true
+    }
+}
+
 pub fn handle_crate_break_damage(
     mut obj_break_events: EventReader<ObjBreakEvent>,
     mut player_query: Query<(&mut CrateBreakDamageTracker, &PlayerSkills), With<Player>>,
@@ -2377,6 +2396,9 @@ pub fn handle_mana_regen_lightning(
 aseprite!(pub EnergyBallEffect, "textures/effects/EnergyBall.ase");
 
 pub const ENERGY_BALL_DAMAGE_THRESHOLD: i32 = 150;
+/// Maximum homing fire balls Underworld's Hat may spawn per second (end-game damage
+/// can otherwise enqueue unbounded projectiles in a single frame).
+pub const ENERGY_BALL_MAX_SUMMONS_PER_SEC: u32 = 100;
 pub const ENERGY_BALL_INITIAL_SPEED: f32 = 90.0;
 pub const ENERGY_BALL_LOCK_DELAY: f32 = 0.55;
 
@@ -2395,6 +2417,8 @@ const ENERGY_BALL_MUZZLE_OFFSET: f32 = 18.0;
 #[component(storage = "SparseSet")]
 pub struct EnergyBallBarrageTracker {
     pub accumulated: i32,
+    spawns_this_sec: u32,
+    rate_window_elapsed: f32,
 }
 
 fn is_energy_ball_damage_hit(hit: &HitEvent) -> bool {
@@ -2438,6 +2462,7 @@ fn spawn_energy_ball_muzzle(
 /// `RangedAttackEvent` → proto pipeline so it gets proper physics, collision,
 /// and the aseprite swap that happens in `spawn_projectile_from_proto`.
 pub fn handle_energy_ball_barrage(
+    time: Res<Time>,
     mut hit_events: EventReader<HitEvent>,
     in_i_frame: Query<&crate::combat::InvincibilityTimer>,
     mut player_query: Query<
@@ -2460,6 +2485,12 @@ pub fn handle_energy_ball_barrage(
     };
     if skills.get_count(Heirloom::EnergyBallBarrage) <= 0 {
         return;
+    }
+
+    tracker.rate_window_elapsed += time.delta_seconds();
+    if tracker.rate_window_elapsed >= 1.0 {
+        tracker.rate_window_elapsed -= 1.0;
+        tracker.spawns_this_sec = 0;
     }
 
     let player_pos = player_transform.translation();
@@ -2485,9 +2516,22 @@ pub fn handle_energy_ball_barrage(
         tracker.accumulated += dmg;
 
         while tracker.accumulated >= ENERGY_BALL_DAMAGE_THRESHOLD {
+            if tracker.spawns_this_sec >= ENERGY_BALL_MAX_SUMMONS_PER_SEC {
+                tracker.accumulated = 0;
+                break;
+            }
             tracker.accumulated -= ENERGY_BALL_DAMAGE_THRESHOLD;
 
+            let mut spawned_any = false;
+            let mut hit_cap = false;
             for _ in 0..stacks {
+                if tracker.spawns_this_sec >= ENERGY_BALL_MAX_SUMMONS_PER_SEC {
+                    hit_cap = true;
+                    break;
+                }
+                spawned_any = true;
+                tracker.spawns_this_sec += 1;
+
                 // Random initial heading — the homing component steers it toward
                 // the nearest enemy once the lock-on delay elapses.
                 let initial_dir = Vec2::from_angle(rng.gen_range(0.0..TAU));
@@ -2517,10 +2561,17 @@ pub fn handle_energy_ball_barrage(
                 fired += 1;
             }
 
-            commands.spawn(SoundSpawner::new(
-                AudioSoundEffect::LightningStaffCast,
-                0.15,
-            ));
+            if hit_cap {
+                tracker.accumulated = 0;
+                break;
+            }
+
+            if spawned_any {
+                commands.spawn(SoundSpawner::new(
+                    AudioSoundEffect::LightningStaffCast,
+                    0.15,
+                ));
+            }
         }
     }
 

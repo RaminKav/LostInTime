@@ -118,7 +118,7 @@ impl Plugin for MinimapPlugin {
 }
 
 pub const HUD_MINIMAP_RADIUS_TILES: i32 = 26;
-const HUD_MINIMAP_PIXELS_PER_TILE: u32 = 2;
+pub const HUD_MINIMAP_PIXELS_PER_TILE: u32 = 2;
 /// HUD minimap diameter in UI world units (tuned at Large / reference UI scale).
 pub const HUD_MINIMAP_DISPLAY_SIZE: f32 = 90.0;
 const HUD_MINIMAP_ICON_SIZE: f32 = 16.0;
@@ -136,6 +136,22 @@ pub fn hud_minimap_display_size(_res: &ScreenResolution) -> f32 {
 /// Full island map panel size (square) for the current UI camera bucket.
 pub fn island_map_display_size(res: &ScreenResolution) -> f32 {
     f32::min(res.game_height * 0.85, res.game_width * 0.85)
+}
+
+/// Horizontal UI-space shift applied to the whole island map (border, fog, legend, markers).
+pub const ISLAND_MAP_X_OFFSET: f32 = 20.0;
+
+/// Center X of the legend panel to the left of the (shifted) island map.
+pub fn island_map_legend_center_x(res: &ScreenResolution) -> f32 {
+    ISLAND_MAP_X_OFFSET
+        - island_map_display_size(res) * 0.5
+        - MINIMAP_LEGEND_GAP_FROM_MAP
+        - MINIMAP_LEGEND_PANEL_HALF_WIDTH
+}
+
+/// Y of the top edge of the legend icon stack (legend is vertically centered at 0).
+pub fn island_map_legend_top_y() -> f32 {
+    MINIMAP_LEGEND_ROWS.len() as f32 * MINIMAP_LEGEND_ROW_HEIGHT * 0.5
 }
 
 /// World-space x for the LEFT edge of the HUD minimap sprite.
@@ -199,7 +215,7 @@ fn hud_minimap_texture_padding_pixels() -> u32 {
     (HUD_MINIMAP_SHADOW_THICKNESS + 0.5).ceil() as u32
 }
 
-fn hud_minimap_texture_pixels() -> u32 {
+pub fn hud_minimap_texture_pixels() -> u32 {
     hud_minimap_map_diameter_pixels() + 2 * hud_minimap_texture_padding_pixels()
 }
 
@@ -207,7 +223,7 @@ fn hud_minimap_radius_pixels() -> f32 {
     (HUD_MINIMAP_RADIUS_TILES as f32 + 0.5) * HUD_MINIMAP_PIXELS_PER_TILE as f32
 }
 
-fn hud_minimap_max_icon_center_distance(scale: f32) -> f32 {
+pub fn hud_minimap_max_icon_center_distance(scale: f32) -> f32 {
     hud_minimap_radius_pixels() * scale - HUD_MINIMAP_ICON_SIZE / 2.0 - HUD_MINIMAP_ICON_CLIP_INSET
 }
 
@@ -687,7 +703,7 @@ fn setup_island_map(
                 custom_size: Some(Vec2::new(map_display_size + 4., map_display_size + 4.)),
                 ..Default::default()
             },
-            transform: Transform::from_translation(Vec3::new(0., 0., 900.)),
+            transform: Transform::from_translation(Vec3::new(ISLAND_MAP_X_OFFSET, 0., 900.)),
             ..Default::default()
         })
         .insert(RenderLayers::from_layers(&[3]))
@@ -748,8 +764,10 @@ fn spawn_island_map_legend(
 ) {
     let row_count = MINIMAP_LEGEND_ROWS.len() as f32;
     let total_height = row_count * MINIMAP_LEGEND_ROW_HEIGHT;
-    let legend_center_x =
-        -map_display_size * 0.5 - MINIMAP_LEGEND_GAP_FROM_MAP - MINIMAP_LEGEND_PANEL_HALF_WIDTH;
+    let legend_center_x = ISLAND_MAP_X_OFFSET
+        - map_display_size * 0.5
+        - MINIMAP_LEGEND_GAP_FROM_MAP
+        - MINIMAP_LEGEND_PANEL_HALF_WIDTH;
 
     let root = commands
         .spawn((
@@ -1293,7 +1311,7 @@ fn update_fog_overlay_on_map(
                         .into(),
                     )
                     .into(),
-                transform: Transform::from_translation(Vec3::new(0., 0., 903.)),
+                transform: Transform::from_translation(Vec3::new(ISLAND_MAP_X_OFFSET, 0., 903.)),
                 material: mat,
                 ..default()
             },

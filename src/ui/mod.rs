@@ -53,6 +53,7 @@ mod interactions;
 mod inventory_ui;
 pub mod upgrade_drag;
 pub mod minimap;
+pub mod map_markers;
 pub mod hud_bar_fill;
 mod player_hud;
 mod player_movement_cooldown_bar;
@@ -582,6 +583,7 @@ impl Plugin for UIPlugin {
             .add_plugin(hud_bar_fill::HudBarFillPlugin)
             .register_type::<InventorySlotState>()
             .add_plugin(MinimapPlugin)
+            .add_plugin(map_markers::MapMarkerPlugin)
             .add_plugin(TipPlugin)
             .add_plugin(IntroGuidePlugin)
             .add_plugin(tutorial_ui::TutorialPlugin)

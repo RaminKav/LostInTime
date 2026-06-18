@@ -132,6 +132,7 @@ pub enum UnlockUpgradeKind {
     StartTome,
     StartOrb,
     StartingTools,
+    MapMarkers,
 }
 
 impl UnlockUpgradeKind {
@@ -144,6 +145,7 @@ impl UnlockUpgradeKind {
             UnlockUpgradeKind::StartTome => "Start with Tomes",
             UnlockUpgradeKind::StartOrb => "Start with Orbs",
             UnlockUpgradeKind::StartingTools => "Starting Tools",
+            UnlockUpgradeKind::MapMarkers => "Map Markers",
         }
     }
     pub fn is_disabled(&self) -> bool {
@@ -155,6 +157,7 @@ impl UnlockUpgradeKind {
             UnlockUpgradeKind::StartTome => true,
             UnlockUpgradeKind::StartOrb => true,
             UnlockUpgradeKind::StartingTools => false,
+            UnlockUpgradeKind::MapMarkers => false,
         }
     }
 }
@@ -172,6 +175,8 @@ pub struct UnlockUpgrades {
     pub orb_tier: u32,
     pub starting_tools_tier: u32,
     pub second_active_skill_slot_unlocked: bool,
+    /// Each tier unlocks one extra map marker beyond the first (max tier 2 -> 3 markers).
+    pub map_marker_tier: u32,
 }
 
 impl UnlockUpgrades {
@@ -184,6 +189,7 @@ impl UnlockUpgrades {
             UnlockUpgradeKind::StartTome => 25,
             UnlockUpgradeKind::StartOrb => 30,
             UnlockUpgradeKind::StartingTools => 50, // Tier 1: WoodAxe, Tier 2: Pickaxe
+            UnlockUpgradeKind::MapMarkers => 40,
         }
     }
 
@@ -196,7 +202,13 @@ impl UnlockUpgrades {
             UnlockUpgradeKind::StartTome => self.tome_tier,
             UnlockUpgradeKind::StartOrb => self.orb_tier,
             UnlockUpgradeKind::StartingTools => self.starting_tools_tier,
+            UnlockUpgradeKind::MapMarkers => self.map_marker_tier,
         }
+    }
+
+    /// Total number of map markers the player can place (1 base + one per tier, capped at 3).
+    pub fn map_marker_count(&self) -> u32 {
+        (1 + self.map_marker_tier).min(3)
     }
 
     pub fn increment(&mut self, kind: UnlockUpgradeKind) {
@@ -210,8 +222,11 @@ impl UnlockUpgrades {
             UnlockUpgradeKind::StartTome => self.tome_tier = self.tome_tier.saturating_add(1),
             UnlockUpgradeKind::StartOrb => self.orb_tier = self.orb_tier.saturating_add(1),
             UnlockUpgradeKind::StartingTools => {
-                // Cap at tier 3 (SalvageBin)
+                // Cap at tier 2 (Wood Axe, then Pickaxe).
                 self.starting_tools_tier = (self.starting_tools_tier + 1).min(2);
+            }
+            UnlockUpgradeKind::MapMarkers => {
+                self.map_marker_tier = (self.map_marker_tier + 1).min(2);
             }
         }
     }
@@ -238,6 +253,13 @@ impl UnlockUpgrades {
                     0 => 50,  // Tier 1: WoodAxe
                     1 => 100, // Tier 2: Pickaxe (70 more)
                     _ => 0,   // Max tier reached
+                }
+            }
+            UnlockUpgradeKind::MapMarkers => {
+                match tier {
+                    0 => 20, // 2nd marker
+                    1 => 40, // 3rd marker
+                    _ => 0,  // Max tier reached
                 }
             }
             UnlockUpgradeKind::Reroll => {
@@ -322,13 +344,14 @@ impl UnlockUpgrades {
     /// Check if an unlock is maxed out (cannot be purchased further)
     pub fn is_maxed(&self, kind: UnlockUpgradeKind) -> bool {
         match kind {
-            UnlockUpgradeKind::StartingTools => self.starting_tools_tier >= 3,
+            UnlockUpgradeKind::StartingTools => self.starting_tools_tier >= 2,
             UnlockUpgradeKind::Reroll => self.reroll_tier >= 7,
             UnlockUpgradeKind::Banish => self.banish_tier >= 5,
             UnlockUpgradeKind::StartSupplies => self.food_tier >= 6,
             UnlockUpgradeKind::StartStatBoosts => self.stat_boost_tier >= 5,
             UnlockUpgradeKind::StartTome => self.tome_tier >= 5,
             UnlockUpgradeKind::StartOrb => self.orb_tier >= 5,
+            UnlockUpgradeKind::MapMarkers => self.map_marker_tier >= 2,
         }
     }
 }
