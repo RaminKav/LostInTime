@@ -710,7 +710,7 @@ impl ItemAttributes {
             0
         };
         entity.insert(ProjectileSize(
-            self.size.value + skills.get_count(Heirloom::Gigantify) * 10 + gravity_size_bonus,
+            self.size.value + skills.get_count(Heirloom::Gigantify) * 8 + gravity_size_bonus,
         ));
         entity.insert(PickupRange(pickup_range_total));
         entity.insert(SkillPower(

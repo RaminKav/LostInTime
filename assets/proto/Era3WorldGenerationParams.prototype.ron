@@ -46,7 +46,8 @@
         SnowSmlBoulder4: 0.0008,
         SnowSmlBoulder5: 0.0008,
         SnowSmlBoulder6: 0.0008,
-        SnowMetalBoulder: 0.001,
+        SnowMetalBoulder: 0.0003,
+
 
         SnowBush1: 0.0009,
         SnowBush2: 0.0009,
