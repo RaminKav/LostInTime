@@ -680,36 +680,22 @@ fn give_player_starting_items(
     //     None,
     // );
 
-    // Handle pending rewards (food, tomes, orbs)
+    // Handle pending rewards (supplies, stat boosts, tomes, orbs)
     if run_state.pending_rewards {
-        let mut rng = rand::thread_rng();
-        let food_options = [
-            WorldObject::RedMushroomBlock,
-            WorldObject::BrownMushroomBlock,
-            WorldObject::Apple,
-        ];
-
         let player_pos = game.player().position.truncate();
 
-        let mut upgrade_rewards = vec![];
-
-        for _ in 0..run_state.pending_food {
-            upgrade_rewards.push(
-                *food_options
-                    .choose(&mut rng)
-                    .unwrap_or(&WorldObject::RedMushroomBlock),
+        for supply in roll_starting_supplies(run_state.pending_supplies) {
+            spawn_reward_drop(
+                &mut proto_commands,
+                &proto,
+                player_pos,
+                supply.object,
+                supply.count,
             );
         }
-        // for _ in 0..run_state.pending_tomes {
-        //     upgrade_rewards.push(WorldObject::UpgradeTome);
-        // }
-
-        // for _ in 0..run_state.pending_orbs {
-        //     upgrade_rewards.push(WorldObject::OrbOfTransformation);
-        // }
-        upgrade_rewards.iter().for_each(|obj| {
-            spawn_reward_drop(&mut proto_commands, &proto, player_pos, *obj, 1);
-        });
+        for stat_boost in roll_starting_stat_boosts(run_state.pending_stat_boosts) {
+            spawn_reward_drop(&mut proto_commands, &proto, player_pos, stat_boost, 1);
+        }
 
         force_player_autopick(&mut game);
     }

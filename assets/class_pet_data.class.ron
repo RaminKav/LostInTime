@@ -6,7 +6,7 @@
                 "Sword"
             ],
             stat_description: [
-                "Gain +5 size per level" // 5 lvls, +5 would be 2, 50*5 = 150
+                "Gain +3 size per level"
             ],
             class_icon: RedPlayerSelectIcon,
             skill_icon: HealthIcon,
@@ -19,7 +19,7 @@
                 "Fire Staff"
             ],
             stat_description: [
-                "Gain +10 Max Mana per level" // 8 50*10 = 500
+                "Gain +8 Max Mana per level"
             ],
             class_icon: BluePlayerSelectIcon,
             skill_icon: ManaIcon,
@@ -32,7 +32,7 @@
                 "Daggers"
             ],
             stat_description: [
-                "Gain +5 Speed per level" // 10 50*5 = 250
+                "Gain +3 Speed per level"
             ],
             class_icon: RoguePlayerSelectIcon,
             skill_icon: CritChanceIcon,
@@ -45,7 +45,7 @@
                 "Claw"
             ],
             stat_description: [
-                "Gain +5% Attack Speed per level" // 7, but its a rare 250%
+                "Gain +3% Attack Speed per level"
             ],
             class_icon: GreyPlayerSelectIcon,
             skill_icon: AttackSpeedIcon,

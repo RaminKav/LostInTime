@@ -137,7 +137,7 @@ impl TutorialContent {
                 "Place Extra gear in your inventory.\n\nYou will still gain the highlighted\n\nstat, shown here in purple!"
             }
             TutorialContent::ShrinesExplore => {
-                "Explore the island and interact\n\nwith shrines, which offer various\n\nchoices or challenges."
+                "Explore the island and interact\n\nwith shrines, which offer various\n\nchoices or challenges. Find the\n\nBoss Shrine..."
             }
             TutorialContent::PinkFlowers => {
                 "Biomes have different environmental\n\ninteractions, like these bouncing flowers\n\nfound in the forest"
@@ -463,11 +463,7 @@ pub(crate) fn try_spawn_tutorial_overlay(
             return;
         }
         commands.remove_resource::<TutorialReady>();
-        let start_tips = [
-            TutorialContent::Attacking,
-            TutorialContent::Skills,
-            TutorialContent::ShrinesExplore,
-        ];
+        let start_tips = [TutorialContent::Attacking, TutorialContent::ShrinesExplore];
         let any_unseen_start = start_tips
             .iter()
             .any(|content| !seen_chunks.has_seen(content));
@@ -534,6 +530,20 @@ fn check_biome_timer_tutorial(
         &seen_chunks,
         &existing,
         &[TutorialContent::PinkFlowers],
+    );
+}
+
+/// Call when the active skill shrine UI opens.
+pub fn try_active_skill_shrine_tutorial(
+    popup_events: &mut EventWriter<TutorialPopupEvent>,
+    seen_chunks: &SeenTutorialChunks,
+    existing: &Query<(), With<TutorialUI>>,
+) {
+    try_send_contextual_popup(
+        popup_events,
+        seen_chunks,
+        existing,
+        &[TutorialContent::Skills],
     );
 }
 
@@ -664,10 +674,15 @@ fn spawn_tutorial_root(
         ));
     }
 
+    let panel_alpha = if mode == TutorialPopupMode::Contextual {
+        0.98
+    } else {
+        0.95
+    };
     commands.spawn((
         SpriteBundle {
             sprite: Sprite {
-                color: Color::rgba(0.15, 0.12, 0.10, 0.95),
+                color: Color::rgba(0.15, 0.12, 0.10, panel_alpha),
                 custom_size: Some(Vec2::new(panel_width, panel_height)),
                 ..default()
             },

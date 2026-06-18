@@ -1,4 +1,5 @@
 use bevy::{prelude::*, reflect::TypeUuid};
+use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
@@ -9,6 +10,7 @@ use super::{
     currency::TimeFragmentCurrency,
 };
 use crate::datafiles;
+use crate::item::WorldObject;
 use crate::player::skills::SkillClass;
 
 #[derive(Resource, Debug, Clone, Default)]
@@ -125,7 +127,8 @@ const UNLOCK_COST_SCALE: f32 = 1.75;
 pub enum UnlockUpgradeKind {
     Reroll,
     Banish,
-    StartFood,
+    StartSupplies,
+    StartStatBoosts,
     StartTome,
     StartOrb,
     StartingTools,
@@ -136,7 +139,8 @@ impl UnlockUpgradeKind {
         match self {
             UnlockUpgradeKind::Reroll => "Reroll",
             UnlockUpgradeKind::Banish => "Banish",
-            UnlockUpgradeKind::StartFood => "Start with Food",
+            UnlockUpgradeKind::StartSupplies => "Start with Supplies",
+            UnlockUpgradeKind::StartStatBoosts => "Start with Stat Boosts",
             UnlockUpgradeKind::StartTome => "Start with Tomes",
             UnlockUpgradeKind::StartOrb => "Start with Orbs",
             UnlockUpgradeKind::StartingTools => "Starting Tools",
@@ -146,7 +150,8 @@ impl UnlockUpgradeKind {
         match self {
             UnlockUpgradeKind::Reroll => false,
             UnlockUpgradeKind::Banish => false,
-            UnlockUpgradeKind::StartFood => false,
+            UnlockUpgradeKind::StartSupplies => false,
+            UnlockUpgradeKind::StartStatBoosts => false,
             UnlockUpgradeKind::StartTome => true,
             UnlockUpgradeKind::StartOrb => true,
             UnlockUpgradeKind::StartingTools => false,
@@ -154,11 +159,15 @@ impl UnlockUpgradeKind {
     }
 }
 
+/// Persisted in `game_data.json`. `#[serde(default)]` keeps older saves loadable when new
+/// tier fields are added (missing keys deserialize as `0` / `false`).
 #[derive(Resource, Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(default)]
 pub struct UnlockUpgrades {
     pub reroll_tier: u32,
     pub banish_tier: u32,
     pub food_tier: u32,
+    pub stat_boost_tier: u32,
     pub tome_tier: u32,
     pub orb_tier: u32,
     pub starting_tools_tier: u32,
@@ -170,7 +179,8 @@ impl UnlockUpgrades {
         match kind {
             UnlockUpgradeKind::Reroll => 5,
             UnlockUpgradeKind::Banish => 20,
-            UnlockUpgradeKind::StartFood => 8,
+            UnlockUpgradeKind::StartSupplies => 8,
+            UnlockUpgradeKind::StartStatBoosts => 10,
             UnlockUpgradeKind::StartTome => 25,
             UnlockUpgradeKind::StartOrb => 30,
             UnlockUpgradeKind::StartingTools => 50, // Tier 1: WoodAxe, Tier 2: Pickaxe
@@ -181,7 +191,8 @@ impl UnlockUpgrades {
         match kind {
             UnlockUpgradeKind::Reroll => self.reroll_tier,
             UnlockUpgradeKind::Banish => self.banish_tier,
-            UnlockUpgradeKind::StartFood => self.food_tier,
+            UnlockUpgradeKind::StartSupplies => self.food_tier,
+            UnlockUpgradeKind::StartStatBoosts => self.stat_boost_tier,
             UnlockUpgradeKind::StartTome => self.tome_tier,
             UnlockUpgradeKind::StartOrb => self.orb_tier,
             UnlockUpgradeKind::StartingTools => self.starting_tools_tier,
@@ -192,7 +203,10 @@ impl UnlockUpgrades {
         match kind {
             UnlockUpgradeKind::Reroll => self.reroll_tier = self.reroll_tier.saturating_add(1),
             UnlockUpgradeKind::Banish => self.banish_tier = self.banish_tier.saturating_add(1),
-            UnlockUpgradeKind::StartFood => self.food_tier = self.food_tier.saturating_add(1),
+            UnlockUpgradeKind::StartSupplies => self.food_tier = self.food_tier.saturating_add(1),
+            UnlockUpgradeKind::StartStatBoosts => {
+                self.stat_boost_tier = self.stat_boost_tier.saturating_add(1)
+            }
             UnlockUpgradeKind::StartTome => self.tome_tier = self.tome_tier.saturating_add(1),
             UnlockUpgradeKind::StartOrb => self.orb_tier = self.orb_tier.saturating_add(1),
             UnlockUpgradeKind::StartingTools => {
@@ -289,8 +303,12 @@ impl UnlockUpgrades {
         self.banish_tier
     }
 
-    pub fn food_count(&self) -> u32 {
+    pub fn supplies_count(&self) -> u32 {
         self.food_tier
+    }
+
+    pub fn stat_boost_count(&self) -> u32 {
+        self.stat_boost_tier
     }
 
     pub fn tome_count(&self) -> u32 {
@@ -307,7 +325,8 @@ impl UnlockUpgrades {
             UnlockUpgradeKind::StartingTools => self.starting_tools_tier >= 3,
             UnlockUpgradeKind::Reroll => self.reroll_tier >= 7,
             UnlockUpgradeKind::Banish => self.banish_tier >= 5,
-            UnlockUpgradeKind::StartFood => self.food_tier >= 8,
+            UnlockUpgradeKind::StartSupplies => self.food_tier >= 6,
+            UnlockUpgradeKind::StartStatBoosts => self.stat_boost_tier >= 5,
             UnlockUpgradeKind::StartTome => self.tome_tier >= 5,
             UnlockUpgradeKind::StartOrb => self.orb_tier >= 5,
         }
@@ -320,10 +339,88 @@ pub struct RunUnlockState {
     pub rerolls_remaining: u32,
     pub banishes_total: u32,
     pub banishes_remaining: u32,
-    pub pending_food: u32,
+    pub pending_supplies: u32,
+    pub pending_stat_boosts: u32,
     pub pending_tomes: u32,
     pub pending_orbs: u32,
     pub pending_rewards: bool,
+}
+
+#[derive(Clone, Copy)]
+pub struct SupplyDrop {
+    pub object: WorldObject,
+    pub count: usize,
+}
+
+pub const STARTING_SUPPLY_POOL: [SupplyDrop; 6] = [
+    SupplyDrop {
+        object: WorldObject::Apple,
+        count: 3,
+    },
+    SupplyDrop {
+        object: WorldObject::BerryJam,
+        count: 1,
+    },
+    SupplyDrop {
+        object: WorldObject::RedStew,
+        count: 1,
+    },
+    SupplyDrop {
+        object: WorldObject::SmallPotion,
+        count: 1,
+    },
+    SupplyDrop {
+        object: WorldObject::MovementSpeedPotion,
+        count: 1,
+    },
+    SupplyDrop {
+        object: WorldObject::AttackSpeedPotion,
+        count: 1,
+    },
+];
+
+pub const STARTING_STAT_BOOST_POOL: [WorldObject; 12] = [
+    WorldObject::SpeedFood,
+    WorldObject::HealthFood,
+    WorldObject::ManaFood,
+    WorldObject::ThornsFood,
+    WorldObject::CritChanceFood,
+    WorldObject::LifestealFood,
+    WorldObject::SkillPowerFood,
+    WorldObject::ManaRegenFood,
+    WorldObject::DodgeFood,
+    WorldObject::DefenceFood,
+    WorldObject::SizeFood,
+    WorldObject::AttackSpeedFood,
+];
+
+/// Pick `tier` unique supply drops from [`STARTING_SUPPLY_POOL`] (max 6).
+pub fn roll_starting_supplies(tier: u32) -> Vec<SupplyDrop> {
+    let pick_count = tier.min(STARTING_SUPPLY_POOL.len() as u32) as usize;
+    if pick_count == 0 {
+        return Vec::new();
+    }
+    let mut pool: Vec<SupplyDrop> = STARTING_SUPPLY_POOL.to_vec();
+    let mut rng = rand::thread_rng();
+    pool.shuffle(&mut rng);
+    pool.truncate(pick_count);
+    pool
+}
+
+/// Pick `tier` random stat-boost foods from [`STARTING_STAT_BOOST_POOL`] (max 5, duplicates allowed).
+pub fn roll_starting_stat_boosts(tier: u32) -> Vec<WorldObject> {
+    let pick_count = tier.min(5) as usize;
+    if pick_count == 0 {
+        return Vec::new();
+    }
+    let mut rng = rand::thread_rng();
+    (0..pick_count)
+        .map(|_| {
+            *STARTING_STAT_BOOST_POOL
+                .choose(&mut rng)
+                .unwrap_or(&WorldObject::DodgeFood)
+        })
+        .collect()
 }
 
 impl RunUnlockState {
@@ -336,11 +433,14 @@ impl RunUnlockState {
             .banish_total()
             .saturating_add(banishes_from_time_crystals);
         self.banishes_remaining = self.banishes_total;
-        self.pending_food = upgrades.food_count();
+        self.pending_supplies = upgrades.supplies_count();
+        self.pending_stat_boosts = upgrades.stat_boost_count();
         self.pending_tomes = upgrades.tome_count();
         self.pending_orbs = upgrades.orb_count();
-        self.pending_rewards =
-            self.pending_food > 0 || self.pending_tomes > 0 || self.pending_orbs > 0;
+        self.pending_rewards = self.pending_supplies > 0
+            || self.pending_stat_boosts > 0
+            || self.pending_tomes > 0
+            || self.pending_orbs > 0;
     }
 }
 

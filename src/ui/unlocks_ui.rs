@@ -44,10 +44,11 @@ pub struct UnlockButtonLabel;
 #[derive(Component)]
 pub struct UnlocksCurrencyText;
 
-const UNLOCK_ROWS: [UnlockUpgradeKind; 6] = [
+const UNLOCK_ROWS: [UnlockUpgradeKind; 7] = [
     UnlockUpgradeKind::Reroll,
     UnlockUpgradeKind::Banish,
-    UnlockUpgradeKind::StartFood,
+    UnlockUpgradeKind::StartSupplies,
+    UnlockUpgradeKind::StartStatBoosts,
     UnlockUpgradeKind::StartTome,
     UnlockUpgradeKind::StartOrb,
     UnlockUpgradeKind::StartingTools,
@@ -66,12 +67,30 @@ fn unlock_effect_summary(kind: UnlockUpgradeKind, upgrades: &UnlockUpgrades) -> 
             tier,
             upgrades.banish_total()
         ),
-        UnlockUpgradeKind::StartFood => {
-            let count = upgrades.food_count();
+        UnlockUpgradeKind::StartSupplies => {
+            let count = upgrades.supplies_count();
             if count == 0 {
-                format!("Tier {}: No bonus food yet", tier)
+                format!("Tier {}: No bonus supplies yet", tier)
             } else {
-                format!("Tier {}: Start with {} random food items.", tier, count,)
+                format!(
+                    "Tier {}: Start with {} random {}.",
+                    tier,
+                    count,
+                    if count == 1 { "supply" } else { "supplies" }
+                )
+            }
+        }
+        UnlockUpgradeKind::StartStatBoosts => {
+            let count = upgrades.stat_boost_count();
+            if count == 0 {
+                format!("Tier {}: No stat boost foods yet", tier)
+            } else {
+                format!(
+                    "Tier {}: Start with {} random stat boost food{}.",
+                    tier,
+                    count,
+                    if count == 1 { "" } else { "s" }
+                )
             }
         }
         UnlockUpgradeKind::StartTome => {
@@ -342,8 +361,8 @@ pub fn setup_unlocks_ui(
     );
     commands.entity(currency_stack).set_parent(currency_text);
 
-    let start_y = 86.5;
-    let row_spacing = -27.0;
+    let start_y = 54.5;
+    let row_spacing = -39.0;
 
     for (index, kind) in UNLOCK_ROWS
         .iter()
@@ -365,7 +384,7 @@ pub fn setup_unlocks_ui(
 
     // Back Button
     let back_button = spawn_back_button(
-        Vec3::new(0., -108., 11.),
+        Vec3::new(0., -148., 11.),
         &mut commands,
         &graphics,
         &asset_server,
@@ -405,7 +424,7 @@ fn spawn_unlock_row(
         Name::new(title_name),
     ));
 
-    let info_text_pos = Vec3::new(info_pos.x, info_pos.y - 11., info_pos.z);
+    let info_text_pos = Vec3::new(info_pos.x, info_pos.y - 13., info_pos.z);
     commands.spawn((
         Text2dBundle {
             text: Text::from_section(

@@ -290,6 +290,9 @@ pub fn setup_active_skill_shrine_ui(
     shrine_selection: Res<ActiveSkillShrineSelection>,
     run_unlocks: Res<RunUnlockState>,
     res: Res<ScreenResolution>,
+    mut popup_events: EventWriter<crate::ui::tutorial_ui::TutorialPopupEvent>,
+    seen_chunks: Option<Res<crate::ui::tutorial_ui::SeenTutorialChunks>>,
+    tutorial_ui: Query<(), With<crate::ui::tutorial_ui::TutorialUI>>,
     skill_power: Query<
         (
             &SkillPower,
@@ -421,6 +424,14 @@ pub fn setup_active_skill_shrine_ui(
     commands
         .entity(back_button)
         .insert(UIState::ActiveSkillShrine);
+
+    if let Some(seen_chunks) = seen_chunks.as_ref() {
+        crate::ui::tutorial_ui::try_active_skill_shrine_tutorial(
+            &mut popup_events,
+            seen_chunks,
+            &tutorial_ui,
+        );
+    }
 }
 
 pub fn tick_active_skill_shrine_ui_interaction_lock_timers(

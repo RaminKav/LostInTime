@@ -2338,6 +2338,10 @@ pub fn handle_crit_heal(
 
         if heal_amount > 0 {
             trigger_counts.increment(Heirloom::CritHeal);
+            trigger_counts.record_health_gain(
+                crate::player::skills::HealthGainSource::VampiricRing,
+                heal_amount,
+            );
             modify_health_event.send(crate::attributes::modifiers::ModifyHealthEvent(heal_amount));
         }
     }

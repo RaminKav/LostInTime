@@ -43,9 +43,9 @@ pub enum SkillClass {
     #[default]
     None,
 
-    Warrior, // Sword, Spear, Hammer - +5 HP per level
-    Wizard,  // Fire Staff, Ice Staff, Basic Staff - +5 MP per level
-    Rogue,   // Dagger - +3% crit chance per level
+    Warrior, // Sword, Spear, Hammer - +3 size per level
+    Wizard,  // Fire Staff, Ice Staff, Basic Staff - +8 max mana per level
+    Rogue,   // Dagger - +3 speed per level
     Thief,   // Claw - +3% attack speed per level
     Hunter,  // Bow, Gun - +3% crit dmg per level
 }
@@ -119,16 +119,16 @@ impl SkillClass {
 
         match self {
             SkillClass::Warrior => {
-                stats.size = AttributeValue::new(level * 5, quality, 1.);
+                stats.size = AttributeValue::new(level * 3, quality, 1.);
             }
             SkillClass::Wizard => {
-                stats.mana = AttributeValue::new(level * 10, quality, 1.);
+                stats.mana = AttributeValue::new(level * 8, quality, 1.);
             }
             SkillClass::Rogue => {
-                stats.speed = AttributeValue::new(level * 5, quality, 1.);
+                stats.speed = AttributeValue::new(level * 3, quality, 1.);
             }
             SkillClass::Thief => {
-                stats.attack_speed = AttributeValue::new(level * 5, quality, 1.);
+                stats.attack_speed = AttributeValue::new(level * 3, quality, 1.);
             }
             SkillClass::Hunter => {
                 stats.crit_chance = AttributeValue::new(level * 3, quality, 1.);
@@ -1462,7 +1462,7 @@ impl Heirloom {
             ],
             Heirloom::SlowStacks => vec![
                 "Your Attacks have".to_string(),
-                "a +25% chance to".to_string(),
+                "a +15% chance to".to_string(),
                 "apply a Freeze".to_string(),
                 "stack.".to_string(),
             ],
@@ -1662,7 +1662,7 @@ impl Heirloom {
                 "enemy has a 25%".to_string(),
                 "chance to trigger an".to_string(),
                 "ice explosion.".to_string(),
-                "+25% freeze chance.".to_string(),
+                "+15% freeze chance".to_string(),
                 format!("Costs {} mana", Heirloom::FrozenAoE.get_mana_cost()),
             ],
             Heirloom::IceStaffFloor => vec![
@@ -1677,7 +1677,7 @@ impl Heirloom {
                 "enemies gives you".to_string(),
                 "a +15% critical hit".to_string(),
                 "chance.".to_string(),
-                "+25% freeze chance.".to_string(),
+                "+15% freeze chance".to_string(),
             ],
             Heirloom::MPBarDMG => vec![
                 "Mana regeneration".to_string(),
@@ -1696,7 +1696,7 @@ impl Heirloom {
                 "enemy has a 20%".to_string(),
                 "chance to trigger".to_string(),
                 "mana regen.".to_string(),
-                "+25% freeze chance.".to_string(),
+                "+15% freeze chance".to_string(),
             ],
             Heirloom::DodgeCrit => vec![
                 "Dodging grants 2x".to_string(),
@@ -2965,7 +2965,7 @@ impl PlayerSkills {
             Heirloom::SlowStacks,
         ];
         for skill in freeze_skills.iter() {
-            chance += self.get_count(skill.clone()) as f64 * 0.25;
+            chance += self.get_count(skill.clone()) as f64 * 0.15;
         }
         chance
     }
@@ -3131,6 +3131,7 @@ pub enum HealthGainSource {
     CoinHeal,
     HealthRegen,
     Lifesteal,
+    VampiricRing,
 }
 
 impl HealthGainSource {
@@ -3139,12 +3140,14 @@ impl HealthGainSource {
             HealthGainSource::CoinHeal => "Coin Heal",
             HealthGainSource::HealthRegen => "Regen",
             HealthGainSource::Lifesteal => "Lifesteal",
+            HealthGainSource::VampiricRing => "Vampiric Ring",
         }
     }
 
     pub fn heirloom_icon(&self) -> Option<Heirloom> {
         match self {
             HealthGainSource::CoinHeal => Some(Heirloom::CoinHeal),
+            HealthGainSource::VampiricRing => Some(Heirloom::CritHeal),
             HealthGainSource::HealthRegen | HealthGainSource::Lifesteal => None,
         }
     }
@@ -3299,10 +3302,11 @@ impl HeirloomTriggerCounts {
     }
 
     pub fn sorted_health_gain_entries(&self) -> Vec<(HealthGainSource, u64)> {
-        const ORDER: [HealthGainSource; 3] = [
+        const ORDER: [HealthGainSource; 4] = [
             HealthGainSource::CoinHeal,
             HealthGainSource::HealthRegen,
             HealthGainSource::Lifesteal,
+            HealthGainSource::VampiricRing,
         ];
         ORDER
             .into_iter()
