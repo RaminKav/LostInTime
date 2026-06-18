@@ -333,17 +333,14 @@ impl MobStatTracker {
         let mut v: Vec<_> = self
             .per_mob
             .iter()
-            .filter(|(m, s)| **m != Mob::None && (s.kills > 0 || s.damage_taken > 0))
+            .filter(|(m, s)| **m != Mob::None && s.kills > 0)
             .map(|(m, s)| (m.clone(), s))
             .collect();
         v.sort_by(|a, b| {
-            b.1.damage_taken
-                .cmp(&a.1.damage_taken)
-                .then_with(|| b.1.kills.cmp(&a.1.kills))
-                .then_with(|| {
-                    a.0.stat_tracker_display_name()
-                        .cmp(&b.0.stat_tracker_display_name())
-                })
+            b.1.kills.cmp(&a.1.kills).then_with(|| {
+                a.0.stat_tracker_display_name()
+                    .cmp(&b.0.stat_tracker_display_name())
+            })
         });
         v
     }
@@ -834,7 +831,6 @@ pub fn spawn_mob_stat_tracker_ui(
 
     let mut spawned_entities = Vec::new();
     let row_spacing = 8.0;
-    let category_gap = 4.0;
     let mut cursor_y = 0.0;
     let hw = width / 2.0;
 
@@ -849,7 +845,7 @@ pub fn spawn_mob_stat_tracker_ui(
                 ..default()
             },
             RenderLayers::from_layers(&[3]),
-            Name::new("Mob Stat Tracker Panel"),
+            Name::new("Mob Kills Tracker Panel"),
         ))
         .id();
     spawned_entities.push(panel);
@@ -858,7 +854,7 @@ pub fn spawn_mob_stat_tracker_ui(
         .spawn((
             Text2dBundle {
                 text: Text::from_section(
-                    "Mob encounters",
+                    "Mob kills",
                     TextStyle {
                         font: asset_server.load("fonts/4x5.ttf"),
                         font_size: 5.0,
@@ -871,7 +867,7 @@ pub fn spawn_mob_stat_tracker_ui(
                 ..default()
             },
             RenderLayers::from_layers(&[3]),
-            Name::new("Mob Stat Tracker Title"),
+            Name::new("Mob Kills Tracker Title"),
         ))
         .id();
     commands.entity(panel).add_child(title);
@@ -879,34 +875,11 @@ pub fn spawn_mob_stat_tracker_ui(
     cursor_y -= 10.0;
 
     for (mob, stats) in entries {
-        let mob_header = commands
+        let mob_name = commands
             .spawn((
                 Text2dBundle {
                     text: Text::from_section(
-                        mob.stat_tracker_display_name(),
-                        TextStyle {
-                            font: asset_server.load("fonts/4x5.ttf"),
-                            font_size: 5.0,
-                            color: LEVEL_BLUE.with_a(base_alpha),
-                        },
-                    )
-                    .with_alignment(TextAlignment::Left),
-                    text_anchor: Anchor::CenterLeft,
-                    transform: Transform::from_translation(Vec3::new(-hw, cursor_y, 1.)),
-                    ..default()
-                },
-                RenderLayers::from_layers(&[3]),
-            ))
-            .id();
-        commands.entity(panel).add_child(mob_header);
-        spawned_entities.push(mob_header);
-        cursor_y -= row_spacing;
-
-        let kills_label = commands
-            .spawn((
-                Text2dBundle {
-                    text: Text::from_section(
-                        "    Kills:",
+                        format!(" {}", mob.stat_tracker_display_name()),
                         TextStyle {
                             font: asset_server.load("fonts/4x5.ttf"),
                             font_size: 5.0,
@@ -921,8 +894,8 @@ pub fn spawn_mob_stat_tracker_ui(
                 RenderLayers::from_layers(&[3]),
             ))
             .id();
-        commands.entity(panel).add_child(kills_label);
-        spawned_entities.push(kills_label);
+        commands.entity(panel).add_child(mob_name);
+        spawned_entities.push(mob_name);
 
         let kills_val = commands
             .spawn((
@@ -946,53 +919,6 @@ pub fn spawn_mob_stat_tracker_ui(
         commands.entity(panel).add_child(kills_val);
         spawned_entities.push(kills_val);
         cursor_y -= row_spacing;
-
-        let hp_label = commands
-            .spawn((
-                Text2dBundle {
-                    text: Text::from_section(
-                        "    HP Lost:",
-                        TextStyle {
-                            font: asset_server.load("fonts/4x5.ttf"),
-                            font_size: 5.0,
-                            color: WHITE.with_a(base_alpha),
-                        },
-                    )
-                    .with_alignment(TextAlignment::Left),
-                    text_anchor: Anchor::CenterLeft,
-                    transform: Transform::from_translation(Vec3::new(-hw, cursor_y, 1.)),
-                    ..default()
-                },
-                RenderLayers::from_layers(&[3]),
-            ))
-            .id();
-        commands.entity(panel).add_child(hp_label);
-        spawned_entities.push(hp_label);
-
-        let hp_val = commands
-            .spawn((
-                Text2dBundle {
-                    text: Text::from_section(
-                        format_damage(stats.damage_taken),
-                        TextStyle {
-                            font: asset_server.load("fonts/4x5.ttf"),
-                            font_size: 5.0,
-                            color: WHITE.with_a(base_alpha),
-                        },
-                    )
-                    .with_alignment(TextAlignment::Right),
-                    text_anchor: Anchor::CenterRight,
-                    transform: Transform::from_translation(Vec3::new(hw + 10., cursor_y, 1.)),
-                    ..default()
-                },
-                RenderLayers::from_layers(&[3]),
-            ))
-            .id();
-        commands.entity(panel).add_child(hp_val);
-        spawned_entities.push(hp_val);
-        cursor_y -= row_spacing;
-
-        cursor_y -= category_gap;
     }
 
     Some((spawned_entities, cursor_y))

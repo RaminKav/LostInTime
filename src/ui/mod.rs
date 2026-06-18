@@ -558,6 +558,7 @@ impl Plugin for UIPlugin {
             .init_resource::<BeaconGuidanceRegistry>()
             .init_resource::<BlacksmithPurchaseTracker>()
             .init_resource::<EssenceShopCache>()
+            .init_resource::<MerchantPriceRefreshTimer>()
             .init_resource::<MerchantShopUiDirty>()
             .init_resource::<TimeCrystalsHeirloomGridOpen>()
             .init_resource::<DevHeirloomGridOpen>()
@@ -1078,6 +1079,7 @@ impl Plugin for UIPlugin {
                 (
                     sync_merchant_world_marker_displays,
                     update_merchant_world_marker_price_colors,
+                    refresh_merchant_prices_on_timer,
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )

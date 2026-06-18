@@ -336,6 +336,75 @@ fn purchase_multiplier_for_level(player_level: u8) -> f32 {
     1.0 + player_level as f32 * 0.53
 }
 
+/// How often live merchant shops recompute their prices against the player's current level.
+pub const MERCHANT_PRICE_REFRESH_SECS: f32 = 45.0;
+
+/// Drives [`refresh_merchant_prices_on_timer`]; shops only recompute prices on spawn, so without
+/// this the displayed prices never scale while the player stays near the shop and levels up.
+#[derive(Resource)]
+pub struct MerchantPriceRefreshTimer(pub Timer);
+
+impl Default for MerchantPriceRefreshTimer {
+    fn default() -> Self {
+        Self(Timer::from_seconds(
+            MERCHANT_PRICE_REFRESH_SECS,
+            TimerMode::Repeating,
+        ))
+    }
+}
+
+fn recompute_slot_prices(slots: &mut [MerchantShopSlot; MERCHANT_SLOT_COUNT], multiplier: f32) {
+    for slot in slots.iter_mut() {
+        if !slot.purchased && slot.base_coin_cost > 0. {
+            slot.coin_cost = apply_purchase_multiplier(slot.base_coin_cost, multiplier);
+        }
+    }
+}
+
+/// Every 45s, recompute prices for the cached shops, the live merchant entities, and the currently
+/// open shop so they stay scaled to the player's current level without needing a despawn/respawn.
+pub fn refresh_merchant_prices_on_timer(
+    time: Res<Time>,
+    mut timer: ResMut<MerchantPriceRefreshTimer>,
+    player_level: Query<&PlayerLevel, With<Player>>,
+    mut cache: ResMut<EssenceShopCache>,
+    mut merchants: Query<&mut EssenceShopChoices>,
+    open_shop: Option<ResMut<EssenceShopChoices>>,
+    ui_dirty: Option<ResMut<MerchantShopUiDirty>>,
+    mut commands: Commands,
+    world_markers: Query<Entity, With<MerchantWorldMarkerDisplay>>,
+) {
+    if !timer.0.tick(time.delta()).just_finished() {
+        return;
+    }
+
+    let level = player_level.get_single().map(|l| l.level).unwrap_or(1);
+    let multiplier = purchase_multiplier_for_level(level);
+
+    for slots in cache.shops.values_mut() {
+        recompute_slot_prices(slots, multiplier);
+    }
+    for mut shop in merchants.iter_mut() {
+        recompute_slot_prices(&mut shop.slots, multiplier);
+    }
+
+    // World-space tracked-item markers cache their price at spawn; despawn them so
+    // `sync_merchant_world_marker_displays` rebuilds them next frame with the new price.
+    for e in world_markers.iter() {
+        commands.entity(e).despawn_recursive();
+    }
+
+    // Refresh the open shop's badges so the displayed numbers update immediately.
+    if let (Some(mut shop), Some(mut dirty)) = (open_shop, ui_dirty) {
+        recompute_slot_prices(&mut shop.slots, multiplier);
+        for idx in 0..MERCHANT_SLOT_COUNT {
+            if !shop.slots[idx].purchased && !dirty.slots.contains(&idx) {
+                dirty.slots.push(idx);
+            }
+        }
+    }
+}
+
 pub fn sync_merchant_shop_to_world(
     shop: &EssenceShopChoices,
     commands: &mut Commands,

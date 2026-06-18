@@ -201,9 +201,10 @@ fn handle_map_marker_clicks(
         return;
     }
 
+    // At capacity: drop the oldest marker to make room for this new one.
     let capacity = upgrades.map_marker_count() as usize;
-    if markers.markers.len() >= capacity {
-        return;
+    while markers.markers.len() >= capacity && !markers.markers.is_empty() {
+        markers.markers.remove(0);
     }
 
     if let Some(color) = next_free_color(&markers.markers) {

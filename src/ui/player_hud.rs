@@ -1,4 +1,4 @@
-use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
+use bevy::{ecs::system::SystemParam, prelude::*, render::view::RenderLayers, sprite::Anchor};
 use rand::Rng;
 use std::collections::HashMap;
 
@@ -56,12 +56,14 @@ use crate::{
             active_skill_scaling::METEOR_SHOWER_BASE_COUNT,
             effective_player_attack_speed_multiplier, ActiveSkill, ActiveSkillChoiceState,
             ActiveSkillUsedEvent, ClassSkillSlots, Heirloom, HeirloomRarity, HeirloomTriggerCounts,
-            ManaGainSource, ManaTrackerResetTimer, PlayerSkills, VISIBLE_CLASS_SKILL_COUNT,
+            ManaGainSource, ManaTrackerResetTimer, PlayerClass, PlayerSkills, SkillClass,
+            VISIBLE_CLASS_SKILL_COUNT,
         },
+        unlocks::UnlockedSkills,
         CoinCurrency, Player, RunScore, TimeFragmentCurrency,
     },
     proto::proto_param::ProtoParam,
-    ui::{game_fonts as gf, Interactable},
+    ui::{game_fonts as gf, CheatSettings, Interactable},
     GameState, InputMappings, ScreenResolution,
 };
 use bevy::utils::Duration;
@@ -165,6 +167,41 @@ pub struct ActiveSkillIcon {
 #[derive(Component)]
 pub struct ActiveSkillSlotBg {
     pub slot_index: usize,
+}
+
+pub const ACTIVE_SKILL_LOCK_ICON_PATH: &str = "ui/Icons/lock.png";
+pub const ACTIVE_SKILL_LOCK_ICON_SIZE: Vec2 = Vec2::new(16., 16.);
+
+/// Lock overlay on HUD skill slots that have not been unlocked via Time Fragments.
+#[derive(Component)]
+pub struct ActiveSkillLockIcon {
+    pub slot_index: usize,
+}
+
+#[derive(SystemParam)]
+pub struct SkillSlotUnlockState<'w> {
+    unlocked_skills: Res<'w, UnlockedSkills>,
+    player_class: Option<Res<'w, PlayerClass>>,
+    cheat_settings: Option<Res<'w, CheatSettings>>,
+}
+
+impl SkillSlotUnlockState<'_> {
+    pub fn is_slot_locked(&self, slot_index: usize) -> bool {
+        if self
+            .cheat_settings
+            .as_ref()
+            .map(|settings| settings.bypass_class_unlocks)
+            .unwrap_or(false)
+        {
+            return false;
+        }
+        let class = self
+            .player_class
+            .as_ref()
+            .map(|player_class| player_class.class.clone())
+            .unwrap_or(SkillClass::None);
+        !self.unlocked_skills.is_unlocked(&class, slot_index)
+    }
 }
 
 /// Marker for the floating drag preview sprite that follows the cursor while the
@@ -2440,6 +2477,7 @@ pub fn handle_update_player_skills(
     existing_skill_keybinds: Query<Entity, With<ActiveSkillKeyBackground>>,
     keybinds: Res<crate::keybinds::InputMappings>,
     mut prev_active_skills: Local<Vec<Option<ActiveSkill>>>, // Track previous active skills per slot to detect swaps
+    slot_unlock_state: SkillSlotUnlockState,
 ) {
     if !game_over.is_empty() {
         prev_icons_tracker.clear();
@@ -2696,7 +2734,25 @@ pub fn handle_update_player_skills(
             commands
                 .entity(key_text)
                 .insert(ActiveSkillKeybindText { slot: *slot_index });
-            if let Some(active_skill) = active_skill_option.clone() {
+            let slot_locked = slot_unlock_state.is_slot_locked(*slot_index);
+            if slot_locked {
+                commands
+                    .spawn(SpriteBundle {
+                        texture: asset_server.load(ACTIVE_SKILL_LOCK_ICON_PATH),
+                        sprite: Sprite {
+                            custom_size: Some(ACTIVE_SKILL_LOCK_ICON_SIZE),
+                            ..Default::default()
+                        },
+                        transform: Transform::from_translation(Vec3::new(0., 0., 1.)),
+                        ..Default::default()
+                    })
+                    .insert(RenderLayers::from_layers(&[3]))
+                    .insert(ActiveSkillLockIcon {
+                        slot_index: *slot_index,
+                    })
+                    .insert(Name::new("HUD SKILL LOCK"))
+                    .set_parent(icon_bg);
+            } else if let Some(active_skill) = active_skill_option.clone() {
                 commands
                     .spawn(SpriteBundle {
                         texture: graphics.get_active_skill_icon(active_skill.active_skill.clone()),

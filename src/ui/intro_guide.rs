@@ -2,6 +2,7 @@ use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
 
 use crate::{
     client::GameData,
+    colors::BLACK,
     keybinds::{get_key_display_name, InputBinding, InputMappings},
     GameState, ScreenResolution,
 };
@@ -15,7 +16,7 @@ const INTRO_KEY_BADGE_SIZE: Vec2 = Vec2::new(24., 24.);
 const INTRO_FONT_SIZE: f32 = 15.0;
 
 const FADE_IN_SECS: f32 = 0.6;
-const HOLD_SECS: f32 = 8.0;
+const HOLD_SECS: f32 = 12.0;
 const FADE_OUT_SECS: f32 = 0.6;
 
 const TEXT_TARGET_ALPHA: f32 = 1.0;
@@ -92,26 +93,52 @@ fn spawn_caption(
     transform: Transform,
     parent: Entity,
 ) {
+    let render_layers = RenderLayers::from_layers(&[INTRO_GUIDE_RENDER_LAYER]);
+    let font = asset_server.load("fonts/alagard.ttf");
+
+    let caption = commands
+        .spawn(Text2dBundle {
+            text: Text::from_section(
+                text.clone(),
+                TextStyle {
+                    font: font.clone(),
+                    font_size: INTRO_FONT_SIZE,
+                    color: crate::colors::WHITE.with_a(0.),
+                },
+            )
+            .with_alignment(TextAlignment::Center),
+            text_anchor: anchor.clone(),
+            transform,
+            ..default()
+        })
+        .insert(render_layers.clone())
+        .insert(IntroGuideVisual {
+            target_alpha: TEXT_TARGET_ALPHA,
+        })
+        .set_parent(parent)
+        .id();
+
+    // Shadow copy — same pattern as `spawn_floating_text_with_shadow` in damage_numbers.rs.
     commands
         .spawn(Text2dBundle {
             text: Text::from_section(
                 text,
                 TextStyle {
-                    font: asset_server.load("fonts/alagard.ttf"),
+                    font,
                     font_size: INTRO_FONT_SIZE,
-                    color: crate::colors::DARK_BROWN.with_a(0.),
+                    color: BLACK.with_a(0.),
                 },
             )
             .with_alignment(TextAlignment::Center),
-            text_anchor: anchor,
-            transform,
+            text_anchor: anchor.clone(),
+            transform: Transform::from_translation(Vec3::new(1., -1., -1.)),
             ..default()
         })
-        .insert(RenderLayers::from_layers(&[INTRO_GUIDE_RENDER_LAYER]))
+        .insert(render_layers)
         .insert(IntroGuideVisual {
             target_alpha: TEXT_TARGET_ALPHA,
         })
-        .set_parent(parent);
+        .set_parent(caption);
 }
 
 pub fn spawn_intro_guide(
@@ -201,15 +228,20 @@ pub fn spawn_intro_guide(
     ];
     let row_step = key.y + gap * 2.5;
     let total_height = row_step * (rows.len() as f32 - 1.);
-    let badge_x = -key.x * 0.5 - gap;
     let label_x = key.x * 0.5 + gap;
     for (i, (badge_label, caption)) in rows.iter().enumerate() {
         let y = total_height * 0.5 - i as f32 * row_step;
+        let badge_size = if *caption == "Inventory" {
+            Vec2::new(key.x + 8., key.y)
+        } else {
+            key
+        };
+        let badge_x = -badge_size.x * 0.5 - gap;
         spawn_key_badge(
             &mut commands,
             &asset_server,
             badge_label.clone(),
-            key,
+            badge_size,
             Transform::from_translation(Vec3::new(badge_x, y, 0.)),
             right_group,
         );
