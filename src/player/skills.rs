@@ -11,7 +11,7 @@ use strum_macros::{Display, EnumIter};
 
 use crate::{
     animations::player_sprite::{
-        PlayerBlueAseprite, PlayerGreenAseprite, PlayerGreyAseprite, PlayerRedAseprite,
+        PlayerBlueAseprite, PlayerGreyAseprite, PlayerHunterAseprite, PlayerRedAseprite,
         PlayerRogueAseprite, PlayerSpriteHandles, PlayerThiefAseprite,
     },
     attributes::{AttributeQuality, AttributeValue, ItemAttributes, ItemGlow},
@@ -73,7 +73,7 @@ impl SkillClass {
             SkillClass::Wizard => (sprites.blue.clone(), PlayerBlueAseprite::tags::IDLE_FRONT),
             SkillClass::Rogue => (sprites.rogue.clone(), PlayerRogueAseprite::tags::IDLE_FRONT),
             SkillClass::Thief => (sprites.thief.clone(), PlayerThiefAseprite::tags::IDLE_FRONT),
-            SkillClass::Hunter => (sprites.green.clone(), PlayerGreenAseprite::tags::IDLE_FRONT),
+            SkillClass::Hunter => (sprites.hunter.clone(), PlayerHunterAseprite::tags::IDLE_FRONT),
             _ => (sprites.grey.clone(), PlayerGreyAseprite::tags::IDLE_FRONT),
         }
     }

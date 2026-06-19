@@ -348,6 +348,7 @@ pub fn follow(
     mut commands: Commands,
     time: Res<Time>,
     night_tracker: Res<NightTracker>,
+    grid: Res<crate::ai::steering::EnemySpatialGrid>,
 ) {
     for (
         entity,
@@ -399,6 +400,21 @@ pub fn follow(
         //convert follower txfm to AIPos too
         let target_txfm = target_translation.truncate();
         let direct_path_to_target = (target_txfm - follow_translation).normalize_or_zero();
+        // Blend in flank-arc + neighbor separation so enemies fan out instead of
+        // stacking on the exact same point, then smooth against the prior frame.
+        let steered = crate::ai::steering::steer_chase(
+            &grid,
+            entity,
+            follow_translation,
+            direct_path_to_target,
+            distance_from_target,
+        );
+        let direct_path_to_target = match follow.curr_delta {
+            Some(prev) => prev
+                .lerp(steered, crate::ai::steering::STEERING_SMOOTHING)
+                .normalize_or_zero(),
+            None => steered,
+        };
         // let delta_override: Option<Vec2> = if let Some(curr_path) = follow.curr_path {
         //     if curr_path == target_txfm {
         //         Some(

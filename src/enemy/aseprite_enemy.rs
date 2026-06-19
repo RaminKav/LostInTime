@@ -449,6 +449,7 @@ pub fn aseprite_follow(
     mut commands: Commands,
     time: Res<Time>,
     night_tracker: Res<NightTracker>,
+    grid: Res<crate::ai::steering::EnemySpatialGrid>,
 ) {
     for (
         entity,
@@ -477,8 +478,22 @@ pub fn aseprite_follow(
             continue;
         };
         let enemy_translation = transforms.get(entity).unwrap().translation;
-        let delta = (target_translation.translation.truncate() - enemy_translation.truncate())
-            .normalize_or_zero();
+        let to_player = target_translation.translation.truncate() - enemy_translation.truncate();
+        let dist_to_player = to_player.length();
+        let seek_dir = to_player.normalize_or_zero();
+        let steered = crate::ai::steering::steer_chase(
+            &grid,
+            entity,
+            enemy_translation.truncate(),
+            seek_dir,
+            dist_to_player,
+        );
+        let delta = match follow.curr_delta {
+            Some(prev) => prev
+                .lerp(steered, crate::ai::steering::STEERING_SMOOTHING)
+                .normalize_or_zero(),
+            None => steered,
+        };
 
         let mut mover = mover.get_mut(entity).unwrap();
         mover.filter_groups = Some(CollisionGroups::new(Group::NONE, Group::NONE));

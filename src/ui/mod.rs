@@ -1079,7 +1079,7 @@ impl Plugin for UIPlugin {
                 (
                     sync_merchant_world_marker_displays,
                     update_merchant_world_marker_price_colors,
-                    refresh_merchant_prices_on_timer,
+                    refresh_merchant_prices_on_timer.run_if(is_not_paused),
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )

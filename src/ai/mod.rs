@@ -1,5 +1,6 @@
 mod enemy_hostile_basic;
 pub mod pathfinding;
+pub mod steering;
 
 use crate::{
     client::is_not_paused,
@@ -17,18 +18,27 @@ use crate::{
 use bevy::prelude::*;
 pub use enemy_hostile_basic::*;
 use seldom_state::StateMachinePlugin;
+use steering::{build_enemy_spatial_grid, EnemySpatialGrid};
 
 pub struct AIPlugin;
 
 impl Plugin for AIPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<EnemyAICacheMap>()
+            .init_resource::<EnemySpatialGrid>()
             .add_system(
                 update_enemy_ai_cache
                     .in_base_set(CoreSet::PreUpdate)
                     .run_if(in_state(GameState::Main)),
             )
             .add_plugin(StateMachinePlugin)
+            .add_system(
+                build_enemy_spatial_grid
+                    .run_if(is_not_paused)
+                    .before(follow)
+                    .before(aseprite_enemy::aseprite_follow)
+                    .in_set(OnUpdate(GameState::Main)),
+            )
             .add_systems(
                 (
                     follow.run_if(is_not_paused),

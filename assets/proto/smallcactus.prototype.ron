@@ -4,7 +4,7 @@
   schematics: {
     "survival_rogue_like::enemy::Mob": SmallCactus,
     "survival_rogue_like::enemy::CombatAlignment": Hostile,
-    "survival_rogue_like::enemy::FollowSpeed": (0.5),
+    "survival_rogue_like::enemy::FollowSpeed": (0.55),
     "survival_rogue_like::enemy::CircleAttack": (activation_distance: 28., cooldown: 1.5, startup: 0.2, hitbox_offset: 16., hitbox_delay: 0.2, hitbox_radius: 10.),
     "survival_rogue_like::proto::ColliderCapsulProto": (x1: 0., y1: -1., x2: 0., y2: -1.5, r: 6.),
     "survival_rogue_like::attributes::MaxHealth": (11),
