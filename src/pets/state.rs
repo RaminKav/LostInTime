@@ -30,6 +30,7 @@ use crate::{
     Hash,
     Serialize,
     Deserialize,
+    Copy,
 )]
 #[reflect(Component, Schematic)]
 pub enum Pet {

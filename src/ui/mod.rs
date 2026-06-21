@@ -55,7 +55,7 @@ pub mod upgrade_drag;
 pub mod minimap;
 pub mod map_markers;
 pub mod hud_bar_fill;
-mod player_hud;
+pub mod player_hud;
 mod player_movement_cooldown_bar;
 mod skill_choice_ui;
 pub mod banish_tracker_ui;
@@ -80,6 +80,7 @@ pub use player_movement_cooldown_bar::*;
 pub use tooltips::*;
 mod main_menu;
 pub use main_menu::*;
+pub use loading_screen::{cleanup_loading_screen, spawn_loading_overlay};
 mod essence_ui;
 pub use essence_ui::*;
 mod unlocks_ui;
@@ -488,6 +489,7 @@ pub const INV_CRAFTING_PANEL_RESULT_Y: f32 = 41.0;
 /// Amount text offset beneath each ingredient icon (e.g. "2/3").
 pub const INV_CRAFTING_PANEL_INGREDIENT_COUNT_Y_OFFSET: f32 = -11.0;
 
+pub const SKILL_TOOLTIP_SIZE: Vec2 = Vec2::new(242., 94.);
 /// Reset the blueprints panel page to 0 whenever the player (re-)opens the inventory in
 /// `InventoryCrafting` mode so the panel always boots at the first page of recipes.
 pub fn reset_blueprints_pagination_on_open(
@@ -1117,6 +1119,8 @@ impl Plugin for UIPlugin {
                     player_hud::handle_mana_tracker_hud_tooltip,
                     player_hud::handle_health_tracker_hud_tooltip,
                     player_hud::update_skill_tooltip_cooldown.after(player_hud::handle_active_skill_hud_tooltip),
+                    player_hud::update_pet_skill_tooltip_cooldown
+                        .after(player_hud::handle_pet_skill_hud_tooltip),
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
@@ -1356,6 +1360,7 @@ impl Plugin for UIPlugin {
                 handle_slot_deselection.run_if(in_state(UIState::ClassSelection)),
                 update_preview_sprites.run_if(in_state(UIState::ClassSelection)),
                 update_slot_visuals.run_if(in_state(UIState::ClassSelection)),
+                update_locked_class_overlays.run_if(in_state(UIState::ClassSelection)),
                 update_class_option_icons.run_if(in_state(UIState::ClassSelection)),
                 update_info_card.run_if(in_state(UIState::ClassSelection)),
                 update_unlock_currency_text.run_if(in_state(UIState::ClassSelection)),

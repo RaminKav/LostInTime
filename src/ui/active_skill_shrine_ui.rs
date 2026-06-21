@@ -32,7 +32,7 @@ use crate::{
 
 use super::{
     interactions::Interaction, main_menu::spawn_back_button, options_ui::CheatSettings,
-    player_hud::spawn_skill_tooltip_content, Interactable, UIElement, UIState,
+    player_hud::{spawn_skill_tooltip_content, SKILL_TOOLTIP_ICON_SIZE}, Interactable, UIElement, UIState,
     KEYBIND_BADGE_COLOR, TOOLTIP_INFO_BOX_SIZE,
 };
 
@@ -160,6 +160,7 @@ fn spawn_active_skill_shrine_skill_choices(
             spd.0,
             size.0,
             METEOR_SHOWER_BASE_COUNT,
+            SKILL_TOOLTIP_ICON_SIZE,
         );
     }
 }
@@ -968,6 +969,7 @@ pub fn setup_active_skill_shrine_overwrite_ui(
                 spd.0,
                 size.0,
                 METEOR_SHOWER_BASE_COUNT,
+                SKILL_TOOLTIP_ICON_SIZE,
             );
         } else {
             spawn_empty_shrine_slot_row(

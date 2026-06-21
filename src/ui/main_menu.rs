@@ -48,9 +48,10 @@ use crate::{
 use super::{
     essence_ui::EssenceShopCache,
     minimap::{FogOfWarData, MinimapTileCache},
-    options_ui::{spawn_wipe_data_popup, WipeDataPopup},
+    options_ui::{spawn_wipe_data_popup, OptionsUI, WipeDataPopup},
     player_hud::XpBarFadeIn,
     scrapper_ui::ScrapperEvent,
+    spawn_loading_overlay,
     Interactable, UIElement,
 };
 
@@ -88,6 +89,7 @@ pub struct MenuButtonExtras<'w, 's> {
     player_class: Option<Res<'w, PlayerClass>>,
     game_state: Res<'w, State<GameState>>,
     wipe_popup: Query<'w, 's, Entity, With<WipeDataPopup>>,
+    options_ui: Query<'w, 's, Entity, With<OptionsUI>>,
     graphics: Res<'w, Graphics>,
     asset_server: Res<'w, AssetServer>,
 }
@@ -475,6 +477,12 @@ pub fn handle_menu_button_click_events(
                     connect_server(analytics_data.clone());
                 }
                 info!("Despawning everything, Sending to main menu");
+                spawn_loading_overlay(
+                    &mut commands,
+                    &extras.asset_server,
+                    &extras.screen_res,
+                    "Loading...",
+                );
                 for e in extras.world_entities.iter() {
                     if let Some(entity_commands) = commands.get_entity(e) {
                         entity_commands.despawn_recursive();
@@ -508,6 +516,18 @@ pub fn handle_menu_button_click_events(
             }
             MenuButton::OptionsExit => {
                 info!("Options menu: Exiting to main menu");
+                spawn_loading_overlay(
+                    &mut commands,
+                    &extras.asset_server,
+                    &extras.screen_res,
+                    "Loading...",
+                );
+                for entity in extras.options_ui.iter() {
+                    commands.entity(entity).despawn_recursive();
+                }
+                for entity in extras.wipe_popup.iter() {
+                    commands.entity(entity).despawn_recursive();
+                }
                 next_ui_state.set(UIState::Closed);
                 next_state.set(GameState::MainMenu);
                 cleanup_event.send_default();

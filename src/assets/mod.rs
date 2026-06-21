@@ -1,4 +1,5 @@
 pub mod asset_helpers;
+pub mod skill_icons;
 use std::fs::File;
 use std::io::BufReader;
 
@@ -39,6 +40,8 @@ use crate::status_effects::StatusEffect;
 use crate::ui::tips::SeenTips;
 use crate::ui::tutorial_ui::{seen_tutorial_chunks_from_game_data, SeenTutorialChunks};
 use crate::ui::{BlacksmithMerchant, UIElement};
+
+use self::skill_icons::{load_skill_icons, SkillIcon};
 use crate::world::portal::{Portal, UIPortal};
 use crate::{datafiles, GameState, ImageAssets};
 
@@ -81,7 +84,6 @@ pub struct ClassData {
     pub weapon_description: Vec<String>,
     pub stat_description: Vec<String>,
     pub class_icon: UIElement,
-    pub skill_icon: UIElement,
     /// The 4 active skills for this class (displayed in skill slots 0-3)
     pub active_skills: [crate::player::skills::ActiveSkill; 4],
     /// All starting weapons for this class
@@ -97,7 +99,6 @@ pub struct PetData {
     // pub passive_name: String,
     pub passive_description: Vec<String>,
     pub pet_icon: UIElement,
-    pub skill_icon: UIElement,
 }
 
 /// Container for all class and pet data loaded from RON
@@ -224,7 +225,7 @@ pub struct Graphics {
     pub ui_image_handles: Option<HashMap<UIElement, Handle<Image>>>,
     pub mob_spritesheets: Option<HashMap<Mob, Vec<Handle<Image>>>>,
     pub status_effect_icons: Option<HashMap<StatusEffect, Handle<Image>>>,
-    pub skill_icons: Option<HashMap<ActiveSkill, Handle<Image>>>,
+    pub skill_icons: Option<HashMap<SkillIcon, Handle<Image>>>,
     pub heirloom_skill_icons: Option<HashMap<Heirloom, Handle<Image>>>,
     pub heirloom_sprites: Option<HashMap<Heirloom, TextureAtlasSprite>>,
     pub item_glows: Option<HashMap<ItemGlow, Handle<Image>>>,
@@ -274,13 +275,29 @@ impl Graphics {
             .unwrap_or_else(|| panic!("No graphic for object {:?}", heirloom))
             .clone()
     }
-    pub fn get_active_skill_icon(&self, active_skill: ActiveSkill) -> Handle<Image> {
+    pub fn get_skill_icon(&self, icon: SkillIcon) -> Handle<Image> {
         self.skill_icons
             .as_ref()
             .unwrap()
-            .get(&active_skill)
-            .unwrap()
+            .get(&icon)
+            .unwrap_or_else(|| panic!("No skill icon for {:?}", icon))
             .clone()
+    }
+
+    pub fn get_active_skill_icon(&self, active_skill: ActiveSkill) -> Handle<Image> {
+        self.get_skill_icon(SkillIcon::Active(active_skill))
+    }
+
+    pub fn get_class_passive_skill_icon(&self, class: SkillClass) -> Handle<Image> {
+        self.get_skill_icon(SkillIcon::ClassPassive(class))
+    }
+
+    pub fn get_pet_active_skill_icon(&self, pet: Pet) -> Handle<Image> {
+        self.get_skill_icon(SkillIcon::PetActive(pet))
+    }
+
+    pub fn get_pet_passive_skill_icon(&self, pet: Pet) -> Handle<Image> {
+        self.get_skill_icon(SkillIcon::PetPassive(pet))
     }
     /// Cursor color sprite for the given selection index, wrapping if out of range.
     pub fn get_cursor_color_sprite(&self, index: u8) -> Option<TextureAtlasSprite> {
@@ -586,12 +603,8 @@ impl GameAssetsPlugin {
             let handle = asset_server.load(format!("effects/{u}Icon.png"));
             status_effect_handles.insert(u, handle);
         }
-        // load Active Skill Icons
-        let mut active_skill_handles = HashMap::default();
-        for u in crate::player::skills::ActiveSkill::iter() {
-            let handle = asset_server.load(format!("effects/{u}Icon.png"));
-            active_skill_handles.insert(u, handle);
-        }
+        // Active skills, class passives, and pet active/passive icons.
+        let skill_icon_handles = load_skill_icons(&asset_server);
         // load Item Glows
         for u in ItemGlow::iter() {
             let handle = asset_server.load(format!("effects/{u}ItemGlow.png"));
@@ -624,7 +637,7 @@ impl GameAssetsPlugin {
             icons: Some(icon_map),
             mob_spritesheets: Some(mob_spritesheets),
             status_effect_icons: Some(status_effect_handles),
-            skill_icons: Some(active_skill_handles),
+            skill_icons: Some(skill_icon_handles),
             heirloom_skill_icons: Some(skill_handles),
             heirloom_sprites: Some(heirloom_sprites),
             item_glows: Some(item_glow_handles),

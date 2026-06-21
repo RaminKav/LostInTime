@@ -13,7 +13,7 @@ use crate::{
     blessings::PendingRunStartBlessing,
     chaos::ChaosTracker,
     client::GameData,
-    colors::{DARK_WOOD_BROWN, WHITE},
+    colors::{DARK_WOOD_BROWN, WHITE, YELLOW_2},
     container::ContainerRegistry,
     cursor::CursorPos,
     inventory::ItemStack,
@@ -34,9 +34,8 @@ use crate::{
     },
     ui::{
         global_text_message::PendingEraAnnouncement, main_menu::GameStartFadein,
-        options_ui::CheatSettings, spawn_back_button,
-        spawn_back_button_texture_only, ui_helpers::spawn_full_screen_ui_overlay_tuned_colored,
-        MenuButton, UIElement, UIState,
+        options_ui::CheatSettings,
+        ui_helpers::spawn_full_screen_ui_overlay_tuned_colored, MenuButton, UIElement, UIState,
     },
     world::{dimension::EraManager, portal::UIPortal},
     FairyPetSprite, Pet, RenderLayers, ScreenResolution, SlimePetSprite,
@@ -52,6 +51,7 @@ use super::{
 const BODY_FONT: &str = "fonts/slkscr.ttf";
 const TITLE_FONT: &str = "fonts/slkscrbold.ttf";
 const BODY_FONT_SIZE: f32 = 8.4;
+const CLASS_PREVIEW_ICON_SIZE: Vec2 = Vec2::new(22., 22.);
 
 #[derive(Component)]
 pub struct ClassSelectionUI;
@@ -65,6 +65,9 @@ pub struct PetOption;
 pub struct ClassIcon {
     pub class: SkillClass,
 }
+
+#[derive(Component)]
+pub struct LockedClassOverlay;
 
 #[derive(Component)]
 pub struct PlayerSelectSlot {
@@ -251,7 +254,7 @@ pub fn setup_class_selection_ui(
                 )
                 .with_alignment(TextAlignment::Left),
                 text_anchor: Anchor::CenterLeft,
-                transform: Transform::from_translation(Vec3::new(-230., 140., 11.)),
+                transform: Transform::from_translation(Vec3::new(-250., 160., 11.)),
                 ..Default::default()
             },
             RenderLayers::from_layers(&[3]),
@@ -279,7 +282,7 @@ pub fn setup_class_selection_ui(
             aseprite: graphics.ui_portal_ase.as_ref().unwrap().clone(),
             animation: AsepriteAnimation::from(UIPortal::tags::IDLE),
             transform: Transform {
-                translation: Vec3::new(30., -30., 10.),
+                translation: Vec3::new(186., -10., 10.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
@@ -299,8 +302,8 @@ pub fn setup_class_selection_ui(
     spawn_skill_unlock_confirm_ui(&mut commands, &asset_server);
 
     // Title
-    let title_text = commands
-        .spawn(Text2dBundle {
+    commands.spawn((
+        Text2dBundle {
             text: Text::from_section(
                 "Choose Your Class",
                 TextStyle {
@@ -316,14 +319,35 @@ pub fn setup_class_selection_ui(
                 ..Default::default()
             },
             ..default()
-        })
-        .insert(RenderLayers::from_layers(&[3]))
-        .insert(Name::new("CLASS TITLE"))
-        .id();
-    commands
-        .entity(title_text)
-        .insert(UIState::ClassSelection)
-        .insert(ClassSelectionUI);
+        },
+        RenderLayers::from_layers(&[3]),
+        ClassSelectionUI,
+        UIState::ClassSelection,
+        Name::new("CLASS TITLE"),
+    ));
+    commands.spawn((
+        Text2dBundle {
+            text: Text::from_section(
+                "Pets",
+                TextStyle {
+                    font: asset_server.load("fonts/alagard.ttf"),
+                    font_size: 15.0,
+                    color: DARK_WOOD_BROWN,
+                },
+            ),
+            text_anchor: Anchor::Center,
+            transform: Transform {
+                translation: Vec3::new(8., 70., 12.),
+                scale: Vec3::new(1., 1., 1.),
+                ..Default::default()
+            },
+            ..default()
+        },
+        RenderLayers::from_layers(&[3]),
+        ClassSelectionUI,
+        UIState::ClassSelection,
+        Name::new("PET TITLE"),
+    ));
     // Class options from RON data
     let class_options = SkillClass::iter()
         .filter(|class| *class != SkillClass::None)
@@ -350,7 +374,7 @@ pub fn setup_class_selection_ui(
                 .get_ui_element_texture(UIElement::PlayerSelect)
                 .clone(),
             sprite: Sprite {
-                custom_size: Some(Vec2::new(576., 360.)),
+                custom_size: Some(Vec2::new(620., 360.)),
                 ..Default::default()
             },
             transform: Transform {
@@ -367,8 +391,8 @@ pub fn setup_class_selection_ui(
         .id();
 
     for (i, class) in class_options.iter().enumerate() {
-        let x_offset = (i % 6) as f32 * 29.0 - 240.; // Center the options
-        let y_offset = ((i / 6) as f32).trunc() * -29.0; // every 6 options, go to next row
+        let x_offset = (i % 6) as f32 * 60.0 - 260.; // Center the options
+        let y_offset = 0.; // every 6 options, go to next row
 
         let class_unlocked =
             cheat_settings.bypass_class_unlocks || unlocked_classes.contains(class);
@@ -382,7 +406,7 @@ pub fn setup_class_selection_ui(
                         .get_ui_element_texture(UIElement::PlayerSelectSlot)
                         .clone(),
                     sprite: Sprite {
-                        custom_size: Some(Vec2::new(22., 22.)),
+                        custom_size: Some(Vec2::new(44., 60.)),
                         ..Default::default()
                     },
                     transform: Transform {
@@ -407,17 +431,20 @@ pub fn setup_class_selection_ui(
             ))
             .id();
 
-        // Class icon - show actual icon if unlocked, or grey locked version if locked
+        // Class icon - hidden when locked; locked overlay covers the slot instead.
         let class_data = graphics.get_class_data(class.clone());
-        let icon_handle = if class_unlocked {
-            graphics.get_ui_element_texture(class_data.class_icon.clone())
-        } else {
-            graphics.get_ui_element_texture(UIElement::UnknownUnlockIcon)
-        };
+        let icon_handle = graphics
+            .get_ui_element_texture(class_data.class_icon.clone())
+            .clone();
 
         let mut icon_entity_commands = commands.spawn((
             SpriteBundle {
                 texture: icon_handle,
+                visibility: if class_unlocked {
+                    Visibility::Inherited
+                } else {
+                    Visibility::Hidden
+                },
                 sprite: Sprite {
                     custom_size: Some(Vec2::new(22., 22.)),
                     ..Default::default()
@@ -440,6 +467,32 @@ pub fn setup_class_selection_ui(
         ));
 
         icon_entity_commands.set_parent(icon_slot);
+
+        if !class_unlocked {
+            commands
+                .spawn((
+                    SpriteBundle {
+                        texture: graphics
+                            .get_ui_element_texture(UIElement::LockedClass)
+                            .clone(),
+                        sprite: Sprite {
+                            custom_size: Some(Vec2::new(53., 47.)),
+                            ..Default::default()
+                        },
+                        transform: Transform {
+                            translation: Vec3::new(0., 0., 2.),
+                            ..Default::default()
+                        },
+                        ..Default::default()
+                    },
+                    UIState::ClassSelection,
+                    ClassSelectionUI,
+                    LockedClassOverlay,
+                    RenderLayers::from_layers(&[3]),
+                    Name::new("LOCKED CLASS OVERLAY"),
+                ))
+                .set_parent(icon_slot);
+        }
 
         // Spawn warning animation for locked classes that have all achievements met
         if !class_unlocked {
@@ -483,17 +536,20 @@ pub fn setup_class_selection_ui(
         let pet_selected = default_pet.as_ref().is_some_and(|d| *d == pet);
 
         // Pet option background
-        let x_offset = (i as f32 - (pet_count - 1.) * 0.5) * 29.0 + 149.;
+        let row = (i as f32 / 2.).trunc();
+        let col = (i as f32 % 2.).trunc();
+        let x_offset = col * 40.0 - 13.;
+        let y_offset = row * -44.0 + 33.;
         let mut slot_entity_commands = commands.spawn(SpriteBundle {
             texture: graphics
-                .get_ui_element_texture(UIElement::PlayerSelectSlot)
+                .get_ui_element_texture(UIElement::PetSelectSlot)
                 .clone(),
             sprite: Sprite {
-                custom_size: Some(Vec2::new(22., 22.)),
+                custom_size: Some(Vec2::new(36., 40.)),
                 ..Default::default()
             },
             transform: Transform {
-                translation: Vec3::new(x_offset, 81., 11.),
+                translation: Vec3::new(x_offset, y_offset, 11.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
@@ -548,56 +604,53 @@ pub fn setup_class_selection_ui(
         icon_entity_commands.set_parent(icon_slot);
     }
 
-    let button_y = -res.game_height / 2. + 38.;
-    let button_x = res.game_width / 2. - 55.;
-    // Confirm button
-    let confirm_button = spawn_back_button_texture_only(
-        Vec3::new(button_x, button_y, 11.),
-        &mut commands,
-        &graphics,
-    );
+    let button_y = -res.game_height / 2. + 16.;
+    let back_button_x = -res.game_width / 2. + 42.;
 
     commands
-        .entity(confirm_button)
-        .insert(UIState::ClassSelection)
-        .insert(ClassSelectionUI)
-        .insert(MenuButton::Begin)
-        .insert(ConfirmButton);
-
-    // Confirm button text
-    let _confirm_text = commands
-        .spawn(Text2dBundle {
-            text: Text::from_section(
-                "BEGIN",
-                TextStyle {
-                    font: asset_server.load("fonts/alagard.ttf"),
-                    font_size: 15.0,
-                    color: WHITE,
+        .spawn((
+            SpriteBundle {
+                texture: graphics
+                    .get_ui_element_texture(UIElement::StartGameButton)
+                    .clone(),
+                sprite: Sprite {
+                    custom_size: Some(Vec2::new(170., 26.)),
+                    ..Default::default()
                 },
-            ),
-            text_anchor: Anchor::Center,
-            transform: Transform {
-                translation: Vec3::new(0.5, -0.5, 1.),
-                scale: Vec3::new(1., 1., 1.),
+                transform: Transform::from_translation(Vec3::new(0., button_y, 11.)),
                 ..Default::default()
             },
-            ..default()
-        })
-        .insert(RenderLayers::from_layers(&[3]))
-        .set_parent(confirm_button);
-
-    // Back Button (parent sprite + child text)
-    let back_button_e = spawn_back_button(
-        Vec3::new(button_x - 80., button_y, 11.),
-        &mut commands,
-        &graphics,
-        &asset_server,
-    );
+            super::Interactable::default(),
+            UIElement::StartGameButton,
+            MenuButton::Begin,
+            ConfirmButton,
+            UIState::ClassSelection,
+            ClassSelectionUI,
+            RenderLayers::from_layers(&[3]),
+            Name::new("Start Button"),
+        ));
 
     commands
-        .entity(back_button_e)
-        .insert(UIState::ClassSelection)
-        .insert(ClassSelectionUI);
+        .spawn((
+            SpriteBundle {
+                texture: graphics
+                    .get_ui_element_texture(UIElement::BackButton2)
+                    .clone(),
+                sprite: Sprite {
+                    custom_size: Some(Vec2::new(60., 26.)),
+                    ..Default::default()
+                },
+                transform: Transform::from_translation(Vec3::new(back_button_x, button_y, 11.)),
+                ..Default::default()
+            },
+            super::Interactable::default(),
+            UIElement::BackButton2,
+            MenuButton::Back,
+            UIState::ClassSelection,
+            ClassSelectionUI,
+            RenderLayers::from_layers(&[3]),
+            Name::new("Back Button"),
+        ));
 
     // Class preview sprite (shows default selected class)
     let _class_preview = spawn_player_preview(
@@ -815,7 +868,7 @@ fn spawn_empty_skill_slot_preview(
             SpriteBundle {
                 sprite: Sprite {
                     color: Color::rgba(0.08, 0.08, 0.1, 0.55),
-                    custom_size: Some(Vec2::new(20., 20.)),
+                    custom_size: Some(CLASS_PREVIEW_ICON_SIZE),
                     ..Default::default()
                 },
                 transform: Transform::from_translation(Vec3::new(ICONS_X_OFFSET, 0., 2.)),
@@ -929,7 +982,7 @@ fn spawn_locked_skill_content(
             SpriteBundle {
                 sprite: Sprite {
                     color: Color::rgba(0.08, 0.08, 0.1, 0.85),
-                    custom_size: Some(Vec2::new(20., 20.)),
+                    custom_size: Some(CLASS_PREVIEW_ICON_SIZE),
                     ..Default::default()
                 },
                 transform: Transform::from_translation(Vec3::new(ICONS_X_OFFSET, 0., 2.)),
@@ -1125,8 +1178,8 @@ pub fn handle_class_selection(
                     match interactable.current() {
                         Interaction::None => {
                             interactable.change(Interaction::Hovering);
+                            slot.is_hovered = true;
                             if !is_locked {
-                                slot.is_hovered = true;
                                 commands
                                     .spawn(SoundSpawner::new(AudioSoundEffect::ButtonHover, 0.05));
                             }
@@ -1289,7 +1342,7 @@ pub fn update_class_unlock_panel(
 
     if let Ok((mut visibility, mut transform)) = panel_query.get_single_mut() {
         *visibility = Visibility::Visible;
-        let offset = Vec3::new(70., -20.5, 0.);
+        let offset = Vec3::new(86., -20.5, 0.);
         transform.translation = Vec3::new(
             hover_state.slot_position.x + offset.x,
             hover_state.slot_position.y + offset.y,
@@ -1583,7 +1636,7 @@ pub fn update_skill_unlock_confirm_panel(
     let panel_entity = if let Ok((e, mut transform)) = param_set.p0().get_single_mut() {
         if active {
             transform.translation = Vec3::new(
-                confirm_state.anchor_position.x + 80.,
+                confirm_state.anchor_position.x + 96.,
                 confirm_state.anchor_position.y,
                 30.,
             );
@@ -1730,16 +1783,16 @@ fn spawn_player_preview(
 ) -> Entity {
     let ICONS_X_OFFSET = -24.;
     // let SKILL_X_OFFSET = -20.;
-    let ICONS_Y_OFFSET = -20.;
-    let ICON_Y_SPACING = -33.;
-    let TEXT_Y_OFFSET = 12.;
-    let TITLE_Y_OFFSET = 5.;
-    let TITLE_X_OFFSET = 72.;
-    let DESC_TEXT_X = ICONS_X_OFFSET + 12.;
+    let ICONS_Y_OFFSET = -42.;
+    let ICON_Y_SPACING = -147.;
+    let TEXT_Y_OFFSET = 10.;
+    let TITLE_Y_OFFSET = 2.;
+    let TITLE_X_OFFSET = 60.;
+    let DESC_TEXT_X = ICONS_X_OFFSET + 32.;
     let (aseprite_path, animation_tag) = selected_class.get_anim_data(&sprite_handles);
 
     let class_data = graphics.get_class_data(selected_class.clone());
-    let power_icon = graphics.get_ui_element_texture(class_data.skill_icon.clone());
+    let power_icon = graphics.get_class_passive_skill_icon(selected_class.clone());
     let class_name = &class_data.name;
     let weapon_description = class_data.weapon_description.join(" ");
     let stat_description = class_data.stat_description.join(" ");
@@ -1764,7 +1817,7 @@ fn spawn_player_preview(
             Name::new("PLAYER PREVIEW CONTAINER"),
         ))
         .insert(SpatialBundle::from_transform(Transform {
-            translation: Vec3::new(-230., 79., 12.),
+            translation: Vec3::new(-237., 68., 12.),
             scale: Vec3::new(1., 1., 1.),
             ..Default::default()
         }))
@@ -1793,29 +1846,6 @@ fn spawn_player_preview(
         .insert(Name::new("CLASS TITLE"))
         .set_parent(player_container)
         .id();
-    // Spawn class title text above the player
-    let _skill_title_text = commands
-        .spawn(Text2dBundle {
-            text: Text::from_section(
-                "Skills".to_string(),
-                TextStyle {
-                    font: asset_server.load("fonts/alagard.ttf"),
-                    font_size: 15.0,
-                    color: DARK_WOOD_BROWN,
-                },
-            ),
-            text_anchor: Anchor::Center,
-            transform: Transform {
-                translation: Vec3::new(TITLE_X_OFFSET, ICONS_Y_OFFSET + ICON_Y_SPACING - 24., 1.),
-                scale: Vec3::new(1., 1., 1.),
-                ..Default::default()
-            },
-            ..default()
-        })
-        .insert(RenderLayers::from_layers(&[3]))
-        .insert(Name::new("CLASS TITLE"))
-        .set_parent(player_container)
-        .id();
 
     // Spawn rank information
     let _rank_text = commands
@@ -1825,12 +1855,12 @@ fn spawn_player_preview(
                 TextStyle {
                     font: asset_server.load(BODY_FONT),
                     font_size: BODY_FONT_SIZE,
-                    color: DARK_WOOD_BROWN,
+                    color: WHITE,
                 },
             ),
             text_anchor: Anchor::CenterLeft,
             transform: Transform {
-                translation: Vec3::new(-19., TITLE_Y_OFFSET, 1.),
+                translation: Vec3::new(-42., TITLE_Y_OFFSET - 14., 1.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
@@ -1853,12 +1883,12 @@ fn spawn_player_preview(
                 TextStyle {
                     font: asset_server.load(BODY_FONT),
                     font_size: BODY_FONT_SIZE,
-                    color: DARK_WOOD_BROWN,
+                    color: WHITE,
                 },
             ),
             text_anchor: Anchor::CenterLeft,
             transform: Transform {
-                translation: Vec3::new(123., TITLE_Y_OFFSET, 1.),
+                translation: Vec3::new(112., TITLE_Y_OFFSET - 14., 1.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
@@ -1875,7 +1905,7 @@ fn spawn_player_preview(
             aseprite: aseprite_path,
             animation: AsepriteAnimation::from(animation_tag),
             transform: Transform {
-                translation: Vec3::new(268., -97., 1.),
+                translation: Vec3::new(420., -48., 1.),
                 scale: Vec3::new(2., 2., 2.),
                 ..Default::default()
             },
@@ -1919,7 +1949,7 @@ fn spawn_player_preview(
                 .get_ui_element_texture(UIElement::ClassWeaponSlot)
                 .clone(),
             sprite: Sprite {
-                custom_size: Some(Vec2::new(18., 18.)),
+                custom_size: Some(CLASS_PREVIEW_ICON_SIZE),
                 ..Default::default()
             },
             transform: Transform {
@@ -1937,6 +1967,29 @@ fn spawn_player_preview(
     // Set the weapon as a child of the player container
     commands.entity(weapon_sprite).set_parent(player_container);
 
+    let _weapon_title_text = commands
+        .spawn(Text2dBundle {
+            text: Text::from_section(
+                "Starting Weapon",
+                TextStyle {
+                    font: asset_server.load(TITLE_FONT),
+                    font_size: BODY_FONT_SIZE,
+                    color: YELLOW_2,
+                },
+            )
+            .with_alignment(TextAlignment::Left),
+            text_anchor: Anchor::TopLeft,
+            transform: Transform {
+                translation: Vec3::new(DESC_TEXT_X, ICONS_Y_OFFSET + TEXT_Y_OFFSET + 2., 1.),
+                scale: Vec3::new(1., 1., 1.),
+                ..Default::default()
+            },
+            ..default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(Name::new("WEAPON TITLE"))
+        .set_parent(player_container)
+        .id();
     // Spawn weapon description text
     let _weapon_description_text = commands
         .spawn(Text2dBundle {
@@ -1946,7 +1999,7 @@ fn spawn_player_preview(
                     font: asset_server.load(BODY_FONT),
                     font_size: BODY_FONT_SIZE,
                     color: if weapon_rarity == ItemRarity::Common {
-                        DARK_WOOD_BROWN
+                        WHITE
                     } else {
                         weapon_rarity.get_color()
                     },
@@ -1971,11 +2024,11 @@ fn spawn_player_preview(
         .spawn(SpriteBundle {
             texture: power_icon,
             sprite: Sprite {
-                custom_size: Some(Vec2::new(18., 18.)),
+                custom_size: Some(CLASS_PREVIEW_ICON_SIZE),
                 ..Default::default()
             },
             transform: Transform {
-                translation: Vec3::new(ICONS_X_OFFSET, ICONS_Y_OFFSET + ICON_Y_SPACING + 11., 11.),
+                translation: Vec3::new(ICONS_X_OFFSET, ICONS_Y_OFFSET + ICON_Y_SPACING + 7., 11.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
@@ -1986,6 +2039,33 @@ fn spawn_player_preview(
         .set_parent(player_container)
         .id();
 
+    let _power_title_text = commands
+        .spawn(Text2dBundle {
+            text: Text::from_section(
+                "Class Passive",
+                TextStyle {
+                    font: asset_server.load(TITLE_FONT),
+                    font_size: BODY_FONT_SIZE,
+                    color: YELLOW_2,
+                },
+            )
+            .with_alignment(TextAlignment::Left),
+            text_anchor: Anchor::TopLeft,
+            transform: Transform {
+                translation: Vec3::new(
+                    DESC_TEXT_X,
+                    ICONS_Y_OFFSET + ICON_Y_SPACING + TEXT_Y_OFFSET + 11.,
+                    1.,
+                ),
+                scale: Vec3::new(1., 1., 1.),
+                ..Default::default()
+            },
+            ..default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(Name::new("STAT DESCRIPTION"))
+        .set_parent(player_container)
+        .id();
     // Spawn stat description text
     let _power_description_text = commands
         .spawn(Text2dBundle {
@@ -1994,7 +2074,7 @@ fn spawn_player_preview(
                 TextStyle {
                     font: asset_server.load(BODY_FONT),
                     font_size: BODY_FONT_SIZE,
-                    color: DARK_WOOD_BROWN,
+                    color: WHITE,
                 },
             )
             .with_alignment(TextAlignment::Left),
@@ -2002,7 +2082,7 @@ fn spawn_player_preview(
             transform: Transform {
                 translation: Vec3::new(
                     DESC_TEXT_X,
-                    ICONS_Y_OFFSET + ICON_Y_SPACING + TEXT_Y_OFFSET + 4.,
+                    ICONS_Y_OFFSET + ICON_Y_SPACING + TEXT_Y_OFFSET,
                     1.,
                 ),
                 scale: Vec3::new(1., 1., 1.),
@@ -2015,29 +2095,10 @@ fn spawn_player_preview(
         .set_parent(player_container)
         .id();
 
-    // Evenly space skill preview rows between these Y positions inside `player_container`
-    // (more negative = lower on screen).
-    const CLASS_PREVIEW_SKILLS_Y_TOP: f32 = -108.;
-    const CLASS_PREVIEW_SKILLS_Y_BOTTOM: f32 = -202.;
-
-    let skill_row_count = class_data
-        .active_skills
-        .len()
-        .min(VISIBLE_CLASS_SKILL_COUNT)
-        .max(1);
-    let skill_y_span = CLASS_PREVIEW_SKILLS_Y_BOTTOM - CLASS_PREVIEW_SKILLS_Y_TOP;
-
     for skill_index in 0..VISIBLE_CLASS_SKILL_COUNT {
-        let skill_y_offset = if skill_row_count <= 1 {
-            CLASS_PREVIEW_SKILLS_Y_TOP + skill_y_span * 0.5
-        } else {
-            CLASS_PREVIEW_SKILLS_Y_TOP
-                + skill_y_span * (skill_index as f32 / (skill_row_count - 1) as f32)
-        };
-
         let skill_container = commands
             .spawn(SpatialBundle::from_transform(Transform {
-                translation: Vec3::new(0., skill_y_offset, 0.),
+                translation: Vec3::new(0., -112., 0.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             }))
@@ -2047,8 +2108,6 @@ fn spawn_player_preview(
             .set_parent(player_container)
             .id();
 
-        let is_unlocked =
-            bypass_unlocks || unlocked_skills.is_unlocked(selected_class, skill_index);
         if skill_index == 0 {
             spawn_skill_tooltip_content(
                 commands,
@@ -2065,18 +2124,20 @@ fn spawn_player_preview(
                 0,
                 0,
                 METEOR_SHOWER_BASE_COUNT,
-            );
-        } else if is_unlocked {
-            spawn_empty_skill_slot_preview(commands, asset_server, skill_container);
-        } else {
-            spawn_locked_skill_content(
-                commands,
-                asset_server,
-                skill_container,
-                selected_class.clone(),
-                skill_index,
+                CLASS_PREVIEW_ICON_SIZE,
             );
         }
+        // else if is_unlocked {
+        //     spawn_empty_skill_slot_preview(commands, asset_server, skill_container);
+        // } else {
+        //     spawn_locked_skill_content(
+        //         commands,
+        //         asset_server,
+        //         skill_container,
+        //         selected_class.clone(),
+        //         skill_index,
+        //     );
+        // }
     }
 
     player_container
@@ -2095,14 +2156,18 @@ fn spawn_pet_preview(
             (sprite_handles.slime_pet.clone(), SlimePetSprite::tags::IDLE)
         }
     };
-
+    let ICON_X = -16.;
+    let ICON_Y = 5.;
     let pet_data = graphics.get_pet_data(selected_pet.clone());
     let pet_name = &pet_data.name;
-    let power_icon = graphics.get_ui_element_texture(pet_data.skill_icon.clone());
+    let power_icon = graphics.get_pet_active_skill_icon(selected_pet.clone());
+    let passive_icon = graphics.get_pet_passive_skill_icon(selected_pet.clone());
     let pet_skill_desc = pet_data.skill_description.join(" ");
     let pet_skill_name = pet_data.skill_name.clone();
     let pet_passive = pet_data.passive_description.join(" ");
     const Y_OFFSET: f32 = -4.;
+    const TEXT_Y_OFFSET: f32 = 14.;
+    const TEXT_X_OFFSET: f32 = 16.;
     // Spawn the pet preview container
     let pet_container = commands
         .spawn((
@@ -2113,7 +2178,7 @@ fn spawn_pet_preview(
             Name::new("PET PREVIEW CONTAINER"),
         ))
         .insert(SpatialBundle::from_transform(Transform {
-            translation: Vec3::new(120., 20., 12.),
+            translation: Vec3::new(120., -60., 12.),
             scale: Vec3::new(1., 1., 1.),
             ..Default::default()
         }))
@@ -2132,7 +2197,7 @@ fn spawn_pet_preview(
             ),
             text_anchor: Anchor::Center,
             transform: Transform {
-                translation: Vec3::new(62., 10., 1.),
+                translation: Vec3::new(69., 41., 1.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
@@ -2149,7 +2214,7 @@ fn spawn_pet_preview(
             aseprite: aseprite_path,
             animation: AsepriteAnimation::from(animation_tag),
             transform: Transform {
-                translation: Vec3::new(-100., -69., 1.),
+                translation: Vec3::new(30., 90., 1.),
                 scale: Vec3::new(2., 2., 2.),
                 ..Default::default()
             },
@@ -2167,11 +2232,11 @@ fn spawn_pet_preview(
         .spawn(SpriteBundle {
             texture: power_icon,
             sprite: Sprite {
-                custom_size: Some(Vec2::new(18., 18.)),
+                custom_size: Some(CLASS_PREVIEW_ICON_SIZE),
                 ..Default::default()
             },
             transform: Transform {
-                translation: Vec3::new(0., -18. + Y_OFFSET, 11.),
+                translation: Vec3::new(ICON_X, ICON_Y + Y_OFFSET, 11.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
@@ -2190,13 +2255,13 @@ fn spawn_pet_preview(
                 TextStyle {
                     font: asset_server.load(TITLE_FONT),
                     font_size: BODY_FONT_SIZE,
-                    color: DARK_WOOD_BROWN,
+                    color: YELLOW_2,
                 },
             )
             .with_alignment(TextAlignment::Left),
             text_anchor: Anchor::TopLeft,
             transform: Transform {
-                translation: Vec3::new(12., Y_OFFSET, 1.),
+                translation: Vec3::new(TEXT_X_OFFSET, ICON_Y + Y_OFFSET + TEXT_Y_OFFSET, 1.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
@@ -2213,13 +2278,13 @@ fn spawn_pet_preview(
                 TextStyle {
                     font: asset_server.load(BODY_FONT),
                     font_size: BODY_FONT_SIZE,
-                    color: DARK_WOOD_BROWN,
+                    color: WHITE,
                 },
             )
             .with_alignment(TextAlignment::Left),
             text_anchor: Anchor::TopLeft,
             transform: Transform {
-                translation: Vec3::new(12., -9. + Y_OFFSET, 1.),
+                translation: Vec3::new(TEXT_X_OFFSET, -9. + Y_OFFSET + TEXT_Y_OFFSET + ICON_Y, 1.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
@@ -2229,6 +2294,26 @@ fn spawn_pet_preview(
         .insert(Name::new("PET DESCRIPTION"))
         .set_parent(pet_container)
         .id();
+
+    // power icon
+    let _icon_slot = commands
+        .spawn(SpriteBundle {
+            texture: passive_icon,
+            sprite: Sprite {
+                custom_size: Some(CLASS_PREVIEW_ICON_SIZE),
+                ..Default::default()
+            },
+            transform: Transform {
+                translation: Vec3::new(ICON_X, ICON_Y + Y_OFFSET - 61., 11.),
+                scale: Vec3::new(1., 1., 1.),
+                ..Default::default()
+            },
+            ..Default::default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(Name::new("POWER ICON"))
+        .set_parent(pet_container)
+        .id();
     let _passive_title_text = commands
         .spawn(Text2dBundle {
             text: Text::from_section(
@@ -2236,13 +2321,13 @@ fn spawn_pet_preview(
                 TextStyle {
                     font: asset_server.load(TITLE_FONT),
                     font_size: BODY_FONT_SIZE,
-                    color: DARK_WOOD_BROWN,
+                    color: YELLOW_2,
                 },
             )
             .with_alignment(TextAlignment::Left),
             text_anchor: Anchor::TopLeft,
             transform: Transform {
-                translation: Vec3::new(12., -38. + Y_OFFSET, 1.),
+                translation: Vec3::new(TEXT_X_OFFSET, -40. + Y_OFFSET, 1.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
@@ -2259,13 +2344,13 @@ fn spawn_pet_preview(
                 TextStyle {
                     font: asset_server.load(BODY_FONT),
                     font_size: BODY_FONT_SIZE,
-                    color: DARK_WOOD_BROWN,
+                    color: WHITE,
                 },
             )
             .with_alignment(TextAlignment::Left),
             text_anchor: Anchor::TopLeft,
             transform: Transform {
-                translation: Vec3::new(12., -48. + Y_OFFSET, 1.),
+                translation: Vec3::new(TEXT_X_OFFSET, -50. + Y_OFFSET, 1.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
@@ -2342,6 +2427,7 @@ pub fn update_slot_visuals(
             With<ClassOption>,
             Without<PetOption>,
             Without<ConfirmButton>,
+            Without<LockedClassOverlay>,
         ),
     >,
     mut pet_slots: Query<
@@ -2352,16 +2438,19 @@ pub fn update_slot_visuals(
             Without<ConfirmButton>,
         ),
     >,
+    unlocked_classes: Res<UnlockedClasses>,
+    cheat_settings: Res<CheatSettings>,
     graphics: Res<Graphics>,
 ) {
     // Update class slot visuals
     for (mut texture, slot) in class_slots.iter_mut() {
-        if slot.is_selected {
-            // Use selected texture (could be the same as hover for now)
+        let is_locked = !cheat_settings.bypass_class_unlocks
+            && !unlocked_classes.contains(&slot.class);
+        if is_locked {
             *texture = graphics
-                .get_ui_element_texture(UIElement::PlayerSelectSlotHover)
+                .get_ui_element_texture(UIElement::PlayerSelectSlot)
                 .clone();
-        } else if slot.is_hovered {
+        } else if slot.is_selected || slot.is_hovered {
             *texture = graphics
                 .get_ui_element_texture(UIElement::PlayerSelectSlotHover)
                 .clone();
@@ -2377,16 +2466,48 @@ pub fn update_slot_visuals(
         if slot.is_selected {
             // Use selected texture (could be the same as hover for now)
             *texture = graphics
-                .get_ui_element_texture(UIElement::PlayerSelectSlotHover)
+                .get_ui_element_texture(UIElement::PetSelectSlotHover)
                 .clone();
         } else if slot.is_hovered {
             *texture = graphics
-                .get_ui_element_texture(UIElement::PlayerSelectSlotHover)
+                .get_ui_element_texture(UIElement::PetSelectSlotHover)
                 .clone();
         } else {
             *texture = graphics
-                .get_ui_element_texture(UIElement::PlayerSelectSlot)
+                .get_ui_element_texture(UIElement::PetSelectSlot)
                 .clone();
+        }
+    }
+}
+
+pub fn update_locked_class_overlays(
+    slots: Query<&PlayerSelectSlot>,
+    mut overlays: Query<
+        (&Parent, &mut Handle<Image>, &mut Visibility),
+        With<LockedClassOverlay>,
+    >,
+    unlocked_classes: Res<UnlockedClasses>,
+    cheat_settings: Res<CheatSettings>,
+    graphics: Res<Graphics>,
+) {
+    for (parent, mut texture, mut visibility) in overlays.iter_mut() {
+        let Ok(slot) = slots.get(parent.get()) else {
+            continue;
+        };
+
+        let is_locked = !cheat_settings.bypass_class_unlocks
+            && !unlocked_classes.contains(&slot.class);
+        if is_locked {
+            *visibility = Visibility::Inherited;
+            *texture = graphics
+                .get_ui_element_texture(if slot.is_hovered {
+                    UIElement::LockedClassHover
+                } else {
+                    UIElement::LockedClass
+                })
+                .clone();
+        } else {
+            *visibility = Visibility::Hidden;
         }
     }
 }
@@ -2394,23 +2515,22 @@ pub fn update_slot_visuals(
 pub fn update_class_option_icons(
     unlocked_classes: Res<UnlockedClasses>,
     graphics: Res<Graphics>,
-    mut class_icons: Query<(&ClassIcon, &mut Handle<Image>)>,
+    mut class_icons: Query<(&ClassIcon, &mut Handle<Image>, &mut Visibility)>,
     cheat_settings: Res<CheatSettings>,
 ) {
     if !unlocked_classes.is_changed() && !cheat_settings.is_changed() {
         return;
     }
 
-    for (class_icon, mut texture) in class_icons.iter_mut() {
+    for (class_icon, mut texture, mut visibility) in class_icons.iter_mut() {
         let class_data = graphics.get_class_data(class_icon.class.clone());
         if cheat_settings.bypass_class_unlocks || unlocked_classes.contains(&class_icon.class) {
+            *visibility = Visibility::Inherited;
             *texture = graphics
                 .get_ui_element_texture(class_data.class_icon.clone())
                 .clone();
         } else {
-            *texture = graphics
-                .get_ui_element_texture(UIElement::UnknownUnlockIcon)
-                .clone();
+            *visibility = Visibility::Hidden;
         }
     }
 }

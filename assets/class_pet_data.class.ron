@@ -9,7 +9,6 @@
                 "Gain +3 size per level"
             ],
             class_icon: RedPlayerSelectIcon,
-            skill_icon: HealthIcon,
             active_skills: (SpinAttack, Shout, ParrySpear,Heal), // pull radius scales with Size
             starting_weapons: [Sword, Spear, Hammer],
         ),
@@ -22,7 +21,6 @@
                 "Gain +8 Max Mana per level"
             ],
             class_icon: BluePlayerSelectIcon,
-            skill_icon: ManaIcon,
             active_skills: (Teleport, MeteorShower, FirePillar,Lightning), // 
             starting_weapons: [FireStaff, IceStaff, BasicStaff],
         ),
@@ -35,7 +33,6 @@
                 "Gain +3 Speed per level"
             ],
             class_icon: RoguePlayerSelectIcon,
-            skill_icon: CritChanceIcon,
             active_skills: (SprintLunge, Recall, DaggerSlash,PossessedBlade), // one extra slash per 25 speed
             starting_weapons: [Dagger],
         ),
@@ -45,10 +42,9 @@
                 "Claw"
             ],
             stat_description: [
-                "Gain +3% Attack Speed per level"
+                "Gain +3% Attack Speed per\nlevel"
             ],
             class_icon: GreyPlayerSelectIcon,
-            skill_icon: AttackSpeedIcon,
             active_skills: (Roll, PiercingStar, Fury,TripleThrow),
             starting_weapons: [Claw],
         ),
@@ -58,10 +54,9 @@
                 "Bow"
             ],
             stat_description: [
-                "Gain +3% Crit Chance per level" // 7
+                "Gain +3% Crit Chance per\nlevel" // 7
             ],
             class_icon: GreenPlayerSelectIcon,
-            skill_icon: CritDamageIcon,
             active_skills: (Buckshot, Bomb, ArrowVolley, DruidTree), // crit chance is added as crit dmg
             starting_weapons: [WoodBow, Gun],
         ),
@@ -70,12 +65,11 @@
         Slime: (
             name: "Slime",
             skill_description: [
-                "Periodically covers you\nin slime, protecting you\nfrom damage."
+                "Covers you in slime,\nblocking one hit of damage"
             ],
             skill_name: "Slime Shield",
             pet_icon: SlimePetIcon,
             passive_description: ["Gain +1 Defence per\nlevel"], //10
-            skill_icon: SlimeShieldIcon,
 
         ),
         Fairy: (
@@ -86,37 +80,33 @@
             skill_name: "Healing Touch",
             passive_description: ["Gain +1 Health Regen\nper level"], // 5
             pet_icon: FairyPetIcon,
-            skill_icon: HPRegenCooldownIcon,
         ),
         Porkipine: (
             name: "Porkipine",
             skill_description: [
-                "Damages you for 1 HP\nevery 1.5s when above\n30% health."
+                "Damages you a bit every\n1.5s when above 30% health"
             ],
             skill_name: "Spiky Burden",
             passive_description: ["Gain +0.5 Lifesteal\nper level"], // 4
             pet_icon: SlimePetIcon,
-            skill_icon: SlimeShieldIcon,
         ),
         GoldenPig: (
             name: "Golden Pig",
             skill_description: [
-                "Drops coins every 15s.\n $$$"
+                "Drops coins every 15s\n $$$"
             ],
             skill_name: "Coin Drop",
             passive_description: ["Gain +2% Pickup Range\nper level"], 
             pet_icon: SlimePetIcon,
-            skill_icon: SlimeShieldIcon,
         ),
         Goliath: (
             name: "Cyclops",
             skill_description: [
-                "Small chance for each\nweapon or skill to double\nin size."
+                "Attacks, skills, & effects\nsometimes double in size"
             ],
             skill_name: "Giant",
             passive_description: ["Gain +1% Size per\nlevel"],
             pet_icon: SlimePetIcon,
-            skill_icon: SlimeShieldIcon,
         ),
     },
 )

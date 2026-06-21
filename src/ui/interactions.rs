@@ -151,6 +151,10 @@ pub enum UIElement {
     UpgradeButtonHover,
     BackButton,
     BackButtonHover,
+    BackButton2,
+    BackButton2Hover,
+    StartGameButton,
+    StartGameButtonHover,
     ItemChestOpeningCommon,
     ItemChestOpeningUncommon,
     ItemChestOpeningRare,
@@ -169,17 +173,14 @@ pub enum UIElement {
     PlayerSelect,
     PlayerSelectSlot,
     PlayerSelectSlotHover,
+    LockedClass,
+    LockedClassHover,
+    PetSelectSlot,
+    PetSelectSlotHover,
     MeleePowerIcon,
     ClassWeaponSlot,
-    AttackSpeedIcon,
-    CritChanceIcon,
-    CritDamageIcon,
     DefenceIcon,
     DodgeChanceIcon,
-    HealthIcon,
-    ManaIcon,
-    HPRegenCooldownIcon,
-    SlimeShieldIcon,
     HPRegenIcon,
     MPRegenIcon,
     SpeedIcon,
@@ -236,6 +237,8 @@ impl UIElement {
             UIElement::RerollDice => Some(UIElement::RerollDiceHover),
             UIElement::UpgradeButton => Some(UIElement::UpgradeButtonHover),
             UIElement::BackButton => Some(UIElement::BackButtonHover),
+            UIElement::BackButton2 => Some(UIElement::BackButton2Hover),
+            UIElement::StartGameButton => Some(UIElement::StartGameButtonHover),
             UIElement::XLKey => Some(UIElement::XLKeyHover),
             UIElement::MenuButton => Some(UIElement::MenuButtonHover),
             UIElement::AchievementsButton => Some(UIElement::AchievementsButtonHover),
@@ -261,6 +264,8 @@ impl UIElement {
             UIElement::RerollDiceHover => Some(UIElement::RerollDice),
             UIElement::UpgradeButtonHover => Some(UIElement::UpgradeButton),
             UIElement::BackButtonHover => Some(UIElement::BackButton),
+            UIElement::BackButton2Hover => Some(UIElement::BackButton2),
+            UIElement::StartGameButtonHover => Some(UIElement::StartGameButton),
             UIElement::XLKeyHover => Some(UIElement::XLKey),
             UIElement::MenuButtonHover => Some(UIElement::MenuButton),
             UIElement::AchievementsButtonHover => Some(UIElement::AchievementsButton),
@@ -2047,9 +2052,9 @@ pub fn handle_cursor_heirloom_chest_button(
                                         msg,
                                         FLOATING_TEXT,
                                     );
-                                    commands
-                                        .entity(text)
-                                        .insert(bevy::render::view::RenderLayers::from_layers(&[3]));
+                                    commands.entity(text).insert(
+                                        bevy::render::view::RenderLayers::from_layers(&[3]),
+                                    );
                                 }
                                 if left_mouse_pressed && banishes_available {
                                     banish_heirloom_chest_reward(

@@ -30,11 +30,12 @@ use crate::{
         clamp_tooltip_center_x, clamp_tooltip_center_y,
         damage_numbers::spawn_floating_text_with_shadow,
         game_fonts::{self as gf, FLOATING_TEXT, HEIRLOOM_CARD_DESC_LINE_STEP},
+        player_hud::SKILL_TOOLTIP_ICON_SIZE,
         spawn_skill_tooltip_content,
         ui_helpers::{self, spawn_full_screen_ui_overlay},
         HeirloomDynamicTooltip, HeirloomTooltipRequest, HeirloomTooltipShow, Interactable,
         Interaction, ItemOrRecipeTooltip, ToolTipUpdateEvent, UIElement, UIState,
-        ITEM_TOOLTIP_LARGE_CARD_SIZE, SKILLS_CHOICE_UI_SIZE,
+        ITEM_TOOLTIP_LARGE_CARD_SIZE, SKILLS_CHOICE_UI_SIZE, SKILL_TOOLTIP_SIZE,
     },
     GameState, ScreenResolution,
 };
@@ -754,7 +755,7 @@ pub fn handle_blessing_choice_icon_tooltips(
                 .spawn(SpriteBundle {
                     texture: graphics.get_ui_element_texture(UIElement::SkillTooltip),
                     sprite: Sprite {
-                        custom_size: Some(Vec2::new(246., 71.)),
+                        custom_size: Some(SKILL_TOOLTIP_SIZE),
                         ..Default::default()
                     },
                     transform: Transform::from_translation(Vec3::new(72., -3., 1.)),
@@ -801,6 +802,7 @@ pub fn handle_blessing_choice_icon_tooltips(
                     .get_single()
                     .map(|s| s.meteor_count)
                     .unwrap_or(METEOR_SHOWER_BASE_COUNT),
+                SKILL_TOOLTIP_ICON_SIZE,
             );
         }
         Some((choice, BlessingChoiceTooltipTarget::Item(item), icon_pos)) => {

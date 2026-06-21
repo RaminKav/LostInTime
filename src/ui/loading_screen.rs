@@ -11,35 +11,37 @@ use crate::{
 #[derive(Component)]
 pub struct LoadingScreen;
 
-pub fn setup_loading_screen(
-    mut commands: Commands,
-    asset_server: Res<AssetServer>,
-    res: Res<ScreenResolution>,
+const LOADING_SCREEN_BG_Z: f32 = 100.;
+const LOADING_SCREEN_TEXT_Z: f32 = 101.;
+
+/// Full-screen black overlay with centered text. Sits above gameplay and menu UI (z ≈ 100+).
+pub fn spawn_loading_overlay(
+    commands: &mut Commands,
+    asset_server: &AssetServer,
+    res: &ScreenResolution,
+    message: &str,
 ) {
-    // Background overlay
-    let _background = commands
+    commands
         .spawn(SpriteBundle {
             sprite: Sprite {
                 color: Color::rgba(0., 0., 0., 1.0),
-                custom_size: Some(ui_helpers::full_screen_overlay_size(&res)),
+                custom_size: Some(ui_helpers::full_screen_overlay_size(res)),
                 ..default()
             },
             transform: Transform {
-                translation: Vec3::new(0., 0., 100.),
+                translation: Vec3::new(0., 0., LOADING_SCREEN_BG_Z),
                 ..default()
             },
             ..default()
         })
         .insert(LoadingScreen)
         .insert(RenderLayers::from_layers(&[3]))
-        .insert(Name::new("LOADING SCREEN BG"))
-        .id();
+        .insert(Name::new("LOADING SCREEN BG"));
 
-    // Loading text
-    let _loading_text = commands
+    commands
         .spawn(Text2dBundle {
             text: Text::from_section(
-                "Generating World...",
+                message,
                 TextStyle {
                     font: asset_server.load("fonts/alagard.ttf"),
                     font_size: 30.0,
@@ -48,15 +50,38 @@ pub fn setup_loading_screen(
             ),
             text_anchor: Anchor::Center,
             transform: Transform {
-                translation: Vec3::new(0., 0., 101.),
+                translation: Vec3::new(0., 0., LOADING_SCREEN_TEXT_Z),
                 ..default()
             },
             ..default()
         })
         .insert(LoadingScreen)
         .insert(RenderLayers::from_layers(&[3]))
-        .insert(Name::new("LOADING TEXT"))
-        .id();
+        .insert(Name::new("LOADING TEXT"));
+}
+
+pub fn setup_loading_screen(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    res: Res<ScreenResolution>,
+) {
+    spawn_loading_overlay(&mut commands, &asset_server, &res, "Generating World...");
+}
+
+pub fn cleanup_loading_screen(
+    mut commands: Commands,
+    loading_screens: Query<Entity, With<LoadingScreen>>,
+) {
+    despawn_loading_screens(&mut commands, &loading_screens);
+}
+
+fn despawn_loading_screens(
+    commands: &mut Commands,
+    loading_screens: &Query<Entity, With<LoadingScreen>>,
+) {
+    for entity in loading_screens.iter() {
+        commands.entity(entity).despawn_recursive();
+    }
 }
 
 /// Time to wait in Initializing after the main timer finishes before forcing transition if no chunks exist (fallback for stuck state).
@@ -172,9 +197,7 @@ pub fn check_initialization_complete(
             "Initialization stuck with 0 chunks after {:.0}s fallback; forcing transition to Main",
             STUCK_FALLBACK_SECS
         );
-        for entity in loading_screens.iter() {
-            commands.entity(entity).despawn_recursive();
-        }
+        despawn_loading_screens(&mut commands, &loading_screens);
         next_state.set(next_game_state);
         *init_timer = None;
         if let Some(mut spawners) = spawners {
@@ -194,10 +217,7 @@ pub fn check_initialization_complete(
             "Initialization complete! Player: {}, Chunks: {}, Transitioning to {:?}",
             player_exists, chunks_created, next_game_state
         );
-        // Remove loading screen
-        for entity in loading_screens.iter() {
-            commands.entity(entity).despawn_recursive();
-        }
+        despawn_loading_screens(&mut commands, &loading_screens);
 
         next_state.set(next_game_state);
         *init_timer = None;

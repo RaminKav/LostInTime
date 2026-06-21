@@ -37,8 +37,8 @@ use crate::{
     chaos::ChaosTracker,
     client::GameOverEvent,
     colors::{
-        overwrite_alpha, DARK_WOOD_BROWN, LEVEL_BLUE, LEVEL_DARK_BLUE, LIGHT_BLUE, LIGHT_GREY,
-        LIGHT_RED, RED, WHITE, YELLOW,
+        overwrite_alpha, LEVEL_BLUE, LEVEL_DARK_BLUE, LIGHT_BLUE, LIGHT_GREY, LIGHT_RED, RED,
+        WHITE, YELLOW, YELLOW_2,
     },
     cursor::CursorPos,
     inventory::{Inventory, ItemStack},
@@ -63,8 +63,8 @@ use crate::{
         CoinCurrency, Player, RunScore, TimeFragmentCurrency,
     },
     proto::proto_param::ProtoParam,
-    ui::{game_fonts as gf, CheatSettings, Interactable},
-    GameState, InputMappings, ScreenResolution,
+    ui::{game_fonts as gf, CheatSettings, Interactable, SKILL_TOOLTIP_SIZE},
+    GameState, InputMappings, Pet, ScreenResolution,
 };
 use bevy::utils::Duration;
 #[derive(Component)]
@@ -1275,7 +1275,7 @@ pub struct PetSkillIcon;
 
 /// Records which pet the current HUD pet slot was built for so we can rebuild on swap.
 #[derive(Component)]
-pub struct PetSkillSlotFor(pub crate::pets::state::Pet);
+pub struct PetSkillSlotFor(pub Pet);
 
 /// Marker for the cooldown overlay sprite on the pet skill slot.
 #[derive(Component)]
@@ -1293,6 +1293,24 @@ pub struct ActiveSkillHudTooltipSkill(pub usize);
 
 #[derive(Component)]
 pub struct SkillTooltipCooldownText;
+
+/// Tags tooltip cooldown text so the correct HUD updater keeps it in sync.
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+pub enum SkillTooltipCooldownMarker {
+    ActiveSkill,
+    Pet,
+}
+
+/// Icon, title, body lines, and optional cooldown corner for a skill tooltip panel.
+pub struct SkillTooltipContent {
+    pub icon: Handle<Image>,
+    pub title: String,
+    pub description_lines: Vec<String>,
+    pub icon_size: Vec2,
+    pub title_color: Color,
+    pub body_color: Color,
+    pub cooldown_marker: Option<SkillTooltipCooldownMarker>,
+}
 
 /// System to handle tooltips for heirloom icons in the HUD
 pub fn handle_heirloom_hud_tooltip(
@@ -1422,11 +1440,183 @@ pub fn handle_heirloom_hud_tooltip(
     *last_hovered = hovered_heirloom;
 }
 
-/// Helper function to spawn skill tooltip content (icon, title, description)
-/// Extracted from class selection UI for reuse.
-/// Coordinates match [`UIElement::SkillTooltip`] / shrine banners.
-/// If `slot_index` is `Some`, also spawns a cooldown text placeholder (updated by system when in HUD).
-/// Description lines come from [`ActiveSkill::get_desc`](crate::player::skills::ActiveSkill::get_desc); vertical spacing is [`SKILL_TOOLTIP_DESC_LINE_STEP`](crate::ui::game_fonts::SKILL_TOOLTIP_DESC_LINE_STEP).
+/// Default skill tooltip icon size (HUD, shrines, blessing choice).
+pub const SKILL_TOOLTIP_ICON_SIZE: Vec2 = Vec2::new(22., 22.);
+
+const HUD_SKILL_TOOLTIP_OFFSET_X: f32 = -20.;
+const HUD_SKILL_TOOLTIP_OFFSET_Y: f32 = 46.;
+const HUD_SKILL_TOOLTIP_BG_LOCAL: Vec3 = Vec3::new(61., 1., 1.);
+const HUD_SKILL_TOOLTIP_Z_BUMP: f32 = 10.;
+
+fn set_interactable_hover(is_hit: bool, interactable: &mut Interactable) {
+    use crate::ui::interactions::Interaction;
+
+    if is_hit && !matches!(interactable.current(), Interaction::Hovering) {
+        interactable.change(Interaction::Hovering);
+    } else if !is_hit && matches!(interactable.current(), Interaction::Hovering) {
+        interactable.change(Interaction::None);
+    }
+}
+
+/// Pixel-snapped world position for a HUD skill/pet tooltip anchored to a hotbar icon.
+fn hud_skill_tooltip_world_position(icon_pos: Vec3, ui_scale: u32) -> Vec3 {
+    Vec3::new(
+        super::snap_world_to_pixel_grid(icon_pos.x + HUD_SKILL_TOOLTIP_OFFSET_X, ui_scale),
+        super::snap_world_to_pixel_grid(icon_pos.y + HUD_SKILL_TOOLTIP_OFFSET_Y, ui_scale),
+        icon_pos.z + HUD_SKILL_TOOLTIP_Z_BUMP,
+    )
+}
+
+/// Rootless tooltip container + shared [`UIElement::SkillTooltip`] background.
+fn spawn_hud_skill_tooltip_shell(
+    commands: &mut Commands,
+    graphics: &Graphics,
+    tooltip_pos: Vec3,
+    bg_name: &'static str,
+) -> Entity {
+    let container = commands
+        .spawn((
+            RenderLayers::from_layers(&[3]),
+            SpatialBundle::from_transform(Transform::from_translation(tooltip_pos)),
+        ))
+        .id();
+
+    commands
+        .spawn(SpriteBundle {
+            texture: graphics.get_ui_element_texture(UIElement::SkillTooltip),
+            sprite: Sprite {
+                custom_size: Some(SKILL_TOOLTIP_SIZE),
+                ..Default::default()
+            },
+            transform: Transform::from_translation(HUD_SKILL_TOOLTIP_BG_LOCAL),
+            ..Default::default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(Name::new(bg_name))
+        .set_parent(container);
+
+    container
+}
+
+/// Shared layout for skill / pet tooltips. Coordinates match [`UIElement::SkillTooltip`] banners.
+pub fn spawn_skill_tooltip_layout(
+    commands: &mut Commands,
+    asset_server: &AssetServer,
+    parent_entity: Entity,
+    content: &SkillTooltipContent,
+) {
+    const ICONS_X_OFFSET: f32 = -24.;
+    const TEXT_Y_OFFSET: f32 = 14.;
+    const DESC_TEXT_X: f32 = ICONS_X_OFFSET + 32.;
+    const COOLDOWN_TEXT_X: f32 = 158.;
+    const TITLE_Y: f32 = TEXT_Y_OFFSET + 10.;
+
+    let desc_body_style = gf::SKILL_PANEL_BODY.text_style(asset_server, content.body_color);
+
+    commands
+        .spawn(SpriteBundle {
+            texture: content.icon.clone(),
+            sprite: Sprite {
+                custom_size: Some(content.icon_size),
+                ..Default::default()
+            },
+            transform: Transform {
+                translation: Vec3::new(ICONS_X_OFFSET, 0., 2.),
+                scale: Vec3::ONE,
+                ..Default::default()
+            },
+            ..default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(Name::new("SKILL TOOLTIP ICON"))
+        .set_parent(parent_entity);
+
+    commands
+        .spawn(Text2dBundle {
+            text: Text::from_section(
+                content.title.as_str(),
+                TextStyle {
+                    font: gf::SKILL_PANEL_TITLE_BOLD.load_font(asset_server),
+                    font_size: gf::SKILL_PANEL_TITLE_BOLD.size,
+                    color: content.title_color,
+                },
+            )
+            .with_alignment(TextAlignment::Left),
+            text_anchor: Anchor::TopLeft,
+            transform: Transform {
+                translation: Vec3::new(DESC_TEXT_X, TITLE_Y, 2.),
+                ..Default::default()
+            },
+            ..default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(Name::new("SKILL TOOLTIP NAME"))
+        .set_parent(parent_entity);
+
+    if let Some(marker) = content.cooldown_marker {
+        let mut cooldown = commands.spawn((
+            Text2dBundle {
+                text: Text::from_section(
+                    "",
+                    TextStyle {
+                        font: gf::SKILL_PANEL_BODY.load_font(asset_server),
+                        font_size: gf::SKILL_PANEL_BODY.size,
+                        color: LIGHT_GREY,
+                    },
+                )
+                .with_alignment(TextAlignment::Right),
+                text_anchor: Anchor::TopRight,
+                transform: Transform {
+                    translation: Vec3::new(COOLDOWN_TEXT_X, TITLE_Y, 2.),
+                    ..Default::default()
+                },
+                ..default()
+            },
+            RenderLayers::from_layers(&[3]),
+            Name::new("SKILL TOOLTIP COOLDOWN"),
+        ));
+        match marker {
+            SkillTooltipCooldownMarker::ActiveSkill => {
+                cooldown.insert(SkillTooltipCooldownText);
+            }
+            SkillTooltipCooldownMarker::Pet => {
+                cooldown.insert(PetSkillTooltipCooldownText);
+            }
+        }
+        cooldown.set_parent(parent_entity);
+    }
+
+    for (j, line) in content.description_lines.iter().enumerate() {
+        commands
+            .spawn(Text2dBundle {
+                text: Text::from_section(line.as_str(), desc_body_style.clone())
+                    .with_alignment(TextAlignment::Left),
+                text_anchor: Anchor::TopLeft,
+                transform: Transform {
+                    translation: Vec3::new(
+                        DESC_TEXT_X,
+                        (TEXT_Y_OFFSET - 2.) - j as f32 * gf::SKILL_TOOLTIP_DESC_LINE_STEP,
+                        2.,
+                    ),
+                    ..Default::default()
+                },
+                ..default()
+            })
+            .insert(RenderLayers::from_layers(&[3]))
+            .insert(Name::new("SKILL TOOLTIP DESCRIPTION LINE"))
+            .set_parent(parent_entity);
+    }
+}
+
+fn pet_skill_description_lines(pet_data: &crate::assets::PetData) -> Vec<String> {
+    pet_data
+        .skill_description
+        .iter()
+        .flat_map(|entry| entry.split('\n').map(str::to_string))
+        .collect()
+}
+
+/// Spawns tooltip content for an [`ActiveSkill`]. Used by HUD hovers, class selection, shrines, etc.
 pub fn spawn_skill_tooltip_content(
     commands: &mut Commands,
     graphics: &Graphics,
@@ -1442,118 +1632,29 @@ pub fn spawn_skill_tooltip_content(
     speed: i32,
     size: i32,
     meteor_count: u32,
+    icon_size: Vec2,
 ) {
-    const ICONS_X_OFFSET: f32 = -24.;
-    const TEXT_Y_OFFSET: f32 = 12.;
-    const DESC_TEXT_X: f32 = ICONS_X_OFFSET + 12.;
-    const COOLDOWN_TEXT_X: f32 = 181.;
-    const TITLE_Y: f32 = TEXT_Y_OFFSET + 6.;
-
-    let active_skill_icon = graphics.get_active_skill_icon(active_skill.clone());
-    let active_skill_desc_lines = active_skill.get_desc(
-        skill_power,
-        max_mana,
-        max_health,
-        bonus_attack_speed_mult,
-        crit_chance,
-        speed,
-        size,
-        meteor_count,
-    );
-    let active_skill_name = active_skill.get_title();
-    let desc_body_style = gf::SKILL_PANEL_BODY.text_style(asset_server, DARK_WOOD_BROWN);
-
-    let _active_skill_icon = commands
-        .spawn(SpriteBundle {
-            texture: active_skill_icon,
-            sprite: Sprite {
-                custom_size: Some(Vec2::new(18., 18.)),
-                ..Default::default()
-            },
-            transform: Transform {
-                translation: Vec3::new(ICONS_X_OFFSET, 0., 2.),
-                scale: Vec3::ONE,
-                ..Default::default()
-            },
-            ..default()
-        })
-        .insert(RenderLayers::from_layers(&[3]))
-        .insert(Name::new("SKILL TOOLTIP ICON"))
-        .set_parent(parent_entity)
-        .id();
-
-    let _active_skill_name_text = commands
-        .spawn(Text2dBundle {
-            text: Text::from_section(
-                active_skill_name,
-                TextStyle {
-                    font: gf::SKILL_PANEL_TITLE_BOLD.load_font(asset_server),
-                    font_size: gf::SKILL_PANEL_TITLE_BOLD.size,
-                    color: DARK_WOOD_BROWN,
-                },
-            )
-            .with_alignment(TextAlignment::Left),
-            text_anchor: Anchor::TopLeft,
-            transform: Transform {
-                translation: Vec3::new(DESC_TEXT_X, TITLE_Y, 2.),
-                scale: Vec3::new(1., 1., 1.),
-                ..Default::default()
-            },
-            ..default()
-        })
-        .insert(RenderLayers::from_layers(&[3]))
-        .insert(Name::new("SKILL TOOLTIP NAME"))
-        .set_parent(parent_entity)
-        .id();
-
-    if slot_index.is_some() {
-        let _ = commands
-            .spawn(Text2dBundle {
-                text: Text::from_section(
-                    "",
-                    TextStyle {
-                        font: gf::SKILL_PANEL_BODY.load_font(asset_server),
-                        font_size: gf::SKILL_PANEL_BODY.size,
-                        color: LIGHT_GREY,
-                    },
-                )
-                .with_alignment(TextAlignment::Right),
-                text_anchor: Anchor::TopRight,
-                transform: Transform {
-                    translation: Vec3::new(COOLDOWN_TEXT_X, TITLE_Y, 2.),
-                    scale: Vec3::new(1., 1., 1.),
-                    ..Default::default()
-                },
-                ..default()
-            })
-            .insert(RenderLayers::from_layers(&[3]))
-            .insert(SkillTooltipCooldownText)
-            .insert(Name::new("SKILL TOOLTIP COOLDOWN"))
-            .set_parent(parent_entity)
-            .id();
-    }
-
-    for (j, line) in active_skill_desc_lines.iter().enumerate() {
-        commands
-            .spawn(Text2dBundle {
-                text: Text::from_section(line.as_str(), desc_body_style.clone())
-                    .with_alignment(TextAlignment::Left),
-                text_anchor: Anchor::TopLeft,
-                transform: Transform {
-                    translation: Vec3::new(
-                        DESC_TEXT_X,
-                        (TEXT_Y_OFFSET - 2.) - j as f32 * gf::SKILL_TOOLTIP_DESC_LINE_STEP,
-                        2.,
-                    ),
-                    scale: Vec3::new(1., 1., 1.),
-                    ..Default::default()
-                },
-                ..default()
-            })
-            .insert(RenderLayers::from_layers(&[3]))
-            .insert(Name::new("SKILL TOOLTIP DESCRIPTION LINE"))
-            .set_parent(parent_entity);
-    }
+    let content = SkillTooltipContent {
+        icon: graphics.get_active_skill_icon(active_skill.clone()),
+        title: active_skill.get_title(),
+        description_lines: active_skill.get_desc(
+            skill_power,
+            max_mana,
+            max_health,
+            bonus_attack_speed_mult,
+            crit_chance,
+            speed,
+            size,
+            meteor_count,
+        ),
+        icon_size,
+        title_color: YELLOW_2,
+        body_color: WHITE,
+        cooldown_marker: slot_index
+            .is_some()
+            .then_some(SkillTooltipCooldownMarker::ActiveSkill),
+    };
+    spawn_skill_tooltip_layout(commands, asset_server, parent_entity, &content);
 }
 
 /// System to handle tooltips for active skill icons in the HUD
@@ -1589,25 +1690,19 @@ pub fn handle_active_skill_hud_tooltip(
     >,
     meteor_shower_state: Query<&crate::player::skills::MeteorShowerSkillState, With<Player>>,
 ) {
-    use Interaction;
-
     // First, do hit detection and update interactable states
     let hit_entity = super::ui_helpers::pointcast_2d(&cursor_pos, &hit_detection_sprites, None);
 
     // Update all skill icons' interactable state based on cursor position
     for (entity, _, ui_elem, mut interactable, _) in skill_icons.iter_mut() {
-        if *ui_elem == UIElement::HeirloomHudIcon {
-            let is_hit = hit_entity
-                .as_ref()
-                .map(|(e, _sprite, _transform)| *e == entity)
-                .unwrap_or(false);
-
-            if is_hit && !matches!(interactable.current(), Interaction::Hovering) {
-                interactable.change(Interaction::Hovering);
-            } else if !is_hit && matches!(interactable.current(), Interaction::Hovering) {
-                interactable.change(Interaction::None);
-            }
+        if *ui_elem != UIElement::HeirloomHudIcon {
+            continue;
         }
+        let is_hit = hit_entity
+            .as_ref()
+            .map(|(e, _, _)| *e == entity)
+            .unwrap_or(false);
+        set_interactable_hover(is_hit, &mut interactable);
     }
 
     // Now find the currently hovered skill directly from the icon
@@ -1638,40 +1733,18 @@ pub fn handle_active_skill_hud_tooltip(
     // Spawn new tooltip if hovering
     if let Some((skill, slot_index, icon_pos)) = currently_hovered {
         // The container is a rootless `SpatialBundle` (no `Sprite`/`Text`), so it is skipped by
-        // `snap_layer3_visuals_to_pixel_grid`. Its child text inherits the container's world
-        // origin, and `pixel_snap_text_glyphs` can only correct glyph offsets *relative* to an
-        // on-grid origin — a fractional container origin chips the (left/right-anchored) glyphs.
-        // Snap the container onto the physical pixel grid so the text origin lands on-grid.
-        let tooltip_pos = Vec3::new(
-            super::snap_world_to_pixel_grid(icon_pos.x - 30., res.scale),
-            super::snap_world_to_pixel_grid(icon_pos.y + 56., res.scale),
-            icon_pos.z + 10.,
+        // `snap_layer3_visuals_to_pixel_grid`. Snap onto the physical pixel grid so anchored
+        // tooltip text lands on-grid (see `hud_skill_tooltip_world_position`).
+        let container = spawn_hud_skill_tooltip_shell(
+            &mut commands,
+            &graphics,
+            hud_skill_tooltip_world_position(icon_pos, res.scale),
+            "ACTIVE SKILL TOOLTIP",
         );
-        let container = commands
-            .spawn(RenderLayers::from_layers(&[3]))
+        commands
+            .entity(container)
             .insert(ActiveSkillHudTooltip)
-            .insert(ActiveSkillHudTooltipSkill(slot_index))
-            .insert(SpatialBundle::from_transform(Transform {
-                translation: tooltip_pos,
-                scale: Vec3::new(1., 1., 1.),
-                ..Default::default()
-            }))
-            .id();
-
-        let _tooltip_bg = commands
-            .spawn(SpriteBundle {
-                texture: graphics.get_ui_element_texture(UIElement::SkillTooltip),
-                sprite: Sprite {
-                    custom_size: Some(Vec2::new(246., 71.)),
-                    ..Default::default()
-                },
-                transform: Transform::from_translation(Vec3::new(72., -3., 1.)),
-                ..Default::default()
-            })
-            .insert(RenderLayers::from_layers(&[3]))
-            .insert(Name::new("ACTIVE SKILL TOOLTIP"))
-            .set_parent(container)
-            .id();
+            .insert(ActiveSkillHudTooltipSkill(slot_index));
 
         let (skill_power, blessings, max_mana, max_health, bonus_as, attack_speed, crit, spd, size) =
             skill_power.single();
@@ -1697,6 +1770,7 @@ pub fn handle_active_skill_hud_tooltip(
                 .get_single()
                 .map(|s| s.meteor_count)
                 .unwrap_or(METEOR_SHOWER_BASE_COUNT),
+            SKILL_TOOLTIP_ICON_SIZE,
         );
     }
 
@@ -1794,16 +1868,19 @@ fn spawn_mana_gain_entry(
         .id();
 
     // Pick an icon: heirloom sprite, the mana orb sprite, or fall back to a text label.
-    let icon_sprite = source.heirloom_icon().map(|h| graphics.get_heirloom_icon(h)).or_else(|| {
-        if matches!(source, ManaGainSource::ManaOrbs) {
-            graphics
-                .spritesheet_map
-                .as_ref()
-                .and_then(|m| m.get(&WorldObject::ManaOrb).cloned())
-        } else {
-            None
-        }
-    });
+    let icon_sprite = source
+        .heirloom_icon()
+        .map(|h| graphics.get_heirloom_icon(h))
+        .or_else(|| {
+            if matches!(source, ManaGainSource::ManaOrbs) {
+                graphics
+                    .spritesheet_map
+                    .as_ref()
+                    .and_then(|m| m.get(&WorldObject::ManaOrb).cloned())
+            } else {
+                None
+            }
+        });
 
     let is_icon = icon_sprite.is_some();
     if let Some(sprite) = icon_sprite {
@@ -3635,6 +3712,42 @@ pub fn update_skill_tooltip_cooldown(
     }
 }
 
+/// Updates the cooldown corner text on pet skill HUD tooltips.
+pub fn update_pet_skill_tooltip_cooldown(
+    mut cooldown_texts: Query<&mut Text, With<PetSkillTooltipCooldownText>>,
+    tooltips: Query<Entity, With<PetSkillHudTooltip>>,
+    pet_q: Query<&Pet>,
+    slime: Query<&crate::pets::pet_abilities::SlimeShieldTimer, With<Pet>>,
+    fairy: Query<&crate::pets::pet_abilities::FairyHealTimer, With<Pet>>,
+    porkipine: Query<&crate::pets::pet_abilities::PorkipineDamageTimer, With<Pet>>,
+    coin: Query<&crate::pets::pet_abilities::GoldenPigCoinTimer, With<Pet>>,
+) {
+    if tooltips.is_empty() {
+        return;
+    }
+
+    let Some(pet) = pet_q.iter().next() else {
+        return;
+    };
+
+    let label = if let Some((elapsed, duration)) =
+        pet_ability_cooldown(pet, &slime, &fairy, &porkipine, &coin)
+    {
+        let remaining = (duration - elapsed).max(0.0);
+        if remaining > 0.05 {
+            format!("{:.1}s", remaining)
+        } else {
+            String::new()
+        }
+    } else {
+        String::new()
+    };
+
+    for mut text in cooldown_texts.iter_mut() {
+        text.sections[0].value = label.clone();
+    }
+}
+
 pub fn update_active_skill_keybind_text(
     keybinds: Res<crate::keybinds::InputMappings>,
     mut texts: Query<(&ActiveSkillKeybindText, &mut Text)>,
@@ -3928,16 +4041,13 @@ pub struct PetSkillTooltipCooldownText;
 /// Read `(elapsed_secs, duration_secs)` for the given pet's auto-cast timer. Returns
 /// `None` for pets without a timer-based ability (e.g. Goliath).
 fn pet_ability_cooldown(
-    pet: &crate::pets::state::Pet,
-    slime: &Query<&crate::pets::pet_abilities::SlimeShieldTimer, With<crate::pets::state::Pet>>,
-    fairy: &Query<&crate::pets::pet_abilities::FairyHealTimer, With<crate::pets::state::Pet>>,
-    porkipine: &Query<
-        &crate::pets::pet_abilities::PorkipineDamageTimer,
-        With<crate::pets::state::Pet>,
-    >,
-    coin: &Query<&crate::pets::pet_abilities::GoldenPigCoinTimer, With<crate::pets::state::Pet>>,
+    pet: &Pet,
+    slime: &Query<&crate::pets::pet_abilities::SlimeShieldTimer, With<Pet>>,
+    fairy: &Query<&crate::pets::pet_abilities::FairyHealTimer, With<Pet>>,
+    porkipine: &Query<&crate::pets::pet_abilities::PorkipineDamageTimer, With<Pet>>,
+    coin: &Query<&crate::pets::pet_abilities::GoldenPigCoinTimer, With<Pet>>,
 ) -> Option<(f32, f32)> {
-    use crate::pets::state::Pet;
+    use Pet;
     match pet {
         Pet::Slime => slime
             .get_single()
@@ -3961,13 +4071,13 @@ fn pet_ability_cooldown(
 
 /// Spawns / refreshes the pet skill HUD slot. The slot sits at the rightmost position
 /// of the 4-wide skills group (reserved in `handle_update_player_skills` by adding `+1`
-/// to the centering count). Renders the pet's `skill_icon` from
-/// `class_pet_data.class.ron` plus a static "PET" label badge (no keybind).
+/// to the centering count). Renders the pet active skill icon from
+/// `assets/ui/SkillIcons/` plus a static "PET" label badge (no keybind).
 pub fn update_pet_skill_hud_slot(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     graphics: Res<Graphics>,
-    pet_q: Query<&crate::pets::state::Pet>,
+    pet_q: Query<&Pet>,
     existing: Query<(Entity, &PetSkillSlotFor), With<PetSkillSlotBg>>,
     res: Res<ScreenResolution>,
 ) {
@@ -3985,8 +4095,6 @@ pub fn update_pet_skill_hud_slot(
     for (e, _) in existing.iter() {
         commands.entity(e).despawn_recursive();
     }
-
-    let pet_data = graphics.get_pet_data(pet.clone());
 
     // Position matches the formula in `handle_update_player_skills`, with 4 reserved
     // positions and the pet at index 3.
@@ -4023,7 +4131,7 @@ pub fn update_pet_skill_hud_slot(
 
     commands
         .spawn(SpriteBundle {
-            texture: graphics.get_ui_element_texture(pet_data.skill_icon.clone()),
+            texture: graphics.get_pet_active_skill_icon(pet.clone()),
             sprite: Sprite {
                 custom_size: Some(Vec2::new(16., 16.)),
                 ..default()
@@ -4061,14 +4169,11 @@ pub fn update_pet_skill_hud_slot(
 /// invisible.
 pub fn tick_pet_skill_cooldown_overlay(
     mut overlays: Query<&mut Sprite, With<PetSkillCooldownOverlay>>,
-    pet_q: Query<&crate::pets::state::Pet>,
-    slime: Query<&crate::pets::pet_abilities::SlimeShieldTimer, With<crate::pets::state::Pet>>,
-    fairy: Query<&crate::pets::pet_abilities::FairyHealTimer, With<crate::pets::state::Pet>>,
-    porkipine: Query<
-        &crate::pets::pet_abilities::PorkipineDamageTimer,
-        With<crate::pets::state::Pet>,
-    >,
-    coin: Query<&crate::pets::pet_abilities::GoldenPigCoinTimer, With<crate::pets::state::Pet>>,
+    pet_q: Query<&Pet>,
+    slime: Query<&crate::pets::pet_abilities::SlimeShieldTimer, With<Pet>>,
+    fairy: Query<&crate::pets::pet_abilities::FairyHealTimer, With<Pet>>,
+    porkipine: Query<&crate::pets::pet_abilities::PorkipineDamageTimer, With<Pet>>,
+    coin: Query<&crate::pets::pet_abilities::GoldenPigCoinTimer, With<Pet>>,
 ) {
     let progress = pet_q
         .iter()
@@ -4104,37 +4209,25 @@ pub fn handle_pet_skill_hud_tooltip(
     >,
     slot_for: Query<&PetSkillSlotFor>,
     existing_tooltips: Query<Entity, With<PetSkillHudTooltip>>,
-    pet_q: Query<&crate::pets::state::Pet>,
-    slime: Query<&crate::pets::pet_abilities::SlimeShieldTimer, With<crate::pets::state::Pet>>,
-    fairy: Query<&crate::pets::pet_abilities::FairyHealTimer, With<crate::pets::state::Pet>>,
-    porkipine: Query<
-        &crate::pets::pet_abilities::PorkipineDamageTimer,
-        With<crate::pets::state::Pet>,
-    >,
-    coin: Query<&crate::pets::pet_abilities::GoldenPigCoinTimer, With<crate::pets::state::Pet>>,
-    mut last_hovered: Local<Option<crate::pets::state::Pet>>,
-    mut tooltip_cooldown_text: Query<&mut Text, With<PetSkillTooltipCooldownText>>,
+    mut last_hovered: Local<Option<Pet>>,
     res: Res<ScreenResolution>,
 ) {
-    use crate::ui::interactions::Interaction;
-
     let hit_entity = super::ui_helpers::pointcast_2d(&cursor_pos, &hit_detection_sprites, None);
     for (entity, _, mut interactable, _) in pet_icons.iter_mut() {
         let is_hit = hit_entity
             .as_ref()
             .map(|(e, _, _)| *e == entity)
             .unwrap_or(false);
-        if is_hit && !matches!(interactable.current(), Interaction::Hovering) {
-            interactable.change(Interaction::Hovering);
-        } else if !is_hit && matches!(interactable.current(), Interaction::Hovering) {
-            interactable.change(Interaction::None);
-        }
+        set_interactable_hover(is_hit, &mut interactable);
     }
 
     let currently_hovered = pet_icons
         .iter()
         .find_map(|(_, xform, interactable, parent)| {
-            if !matches!(interactable.current(), Interaction::Hovering) {
+            if !matches!(
+                interactable.current(),
+                crate::ui::interactions::Interaction::Hovering
+            ) {
                 return None;
             }
             let pet = slot_for.get(parent.get()).ok()?;
@@ -4142,24 +4235,6 @@ pub fn handle_pet_skill_hud_tooltip(
         });
 
     let hovered_pet = currently_hovered.as_ref().map(|(p, _)| p.clone());
-
-    // Keep the tooltip cooldown text live while hovered.
-    if hovered_pet.is_some() {
-        if let Some(pet) = pet_q.iter().next() {
-            if let Some((elapsed, duration)) =
-                pet_ability_cooldown(pet, &slime, &fairy, &porkipine, &coin)
-            {
-                let remaining = (duration - elapsed).max(0.0);
-                for mut text in tooltip_cooldown_text.iter_mut() {
-                    text.sections[0].value = format!("{:.1}s", remaining);
-                }
-            } else {
-                for mut text in tooltip_cooldown_text.iter_mut() {
-                    text.sections[0].value = String::new();
-                }
-            }
-        }
-    }
 
     if *last_hovered == hovered_pet {
         return;
@@ -4171,40 +4246,19 @@ pub fn handle_pet_skill_hud_tooltip(
 
     if let Some((pet, pos)) = currently_hovered {
         let pet_data = graphics.get_pet_data(pet.clone());
-        // Snap the rootless container onto the physical pixel grid so the child tooltip text
-        // origin lands on-grid (see `handle_active_skill_hud_tooltip` for the rationale).
-        let tooltip_pos = Vec3::new(
-            super::snap_world_to_pixel_grid(pos.x - 30., res.scale),
-            super::snap_world_to_pixel_grid(pos.y + 56., res.scale),
-            pos.z + 10.,
+        let container = spawn_hud_skill_tooltip_shell(
+            &mut commands,
+            &graphics,
+            hud_skill_tooltip_world_position(pos, res.scale),
+            "PET SKILL TOOLTIP",
         );
-
-        let container = commands
-            .spawn(RenderLayers::from_layers(&[3]))
-            .insert(PetSkillHudTooltip)
-            .insert(SpatialBundle::from_transform(Transform::from_translation(
-                tooltip_pos,
-            )))
-            .id();
-
-        commands
-            .spawn(SpriteBundle {
-                texture: graphics.get_ui_element_texture(UIElement::SkillTooltip),
-                sprite: Sprite {
-                    custom_size: Some(Vec2::new(246., 71.)),
-                    ..Default::default()
-                },
-                transform: Transform::from_translation(Vec3::new(72., -3., 1.)),
-                ..Default::default()
-            })
-            .insert(RenderLayers::from_layers(&[3]))
-            .insert(Name::new("PET SKILL TOOLTIP BG"))
-            .set_parent(container);
+        commands.entity(container).insert(PetSkillHudTooltip);
 
         spawn_pet_skill_tooltip_content(
             &mut commands,
             &graphics,
             &asset_server,
+            &pet,
             pet_data,
             container,
         );
@@ -4213,101 +4267,24 @@ pub fn handle_pet_skill_hud_tooltip(
     *last_hovered = hovered_pet;
 }
 
-/// Mirrors [`spawn_skill_tooltip_content`] but reads from a pet's `PetData` so the
-/// tooltip layout (icon + title + body lines + cooldown corner) matches class skills
-/// pixel-for-pixel.
 pub fn spawn_pet_skill_tooltip_content(
     commands: &mut Commands,
     graphics: &Graphics,
     asset_server: &AssetServer,
+    pet: &Pet,
     pet_data: &crate::assets::PetData,
     parent_entity: Entity,
 ) {
-    const ICONS_X_OFFSET: f32 = -24.;
-    const TEXT_Y_OFFSET: f32 = 12.;
-    const DESC_TEXT_X: f32 = ICONS_X_OFFSET + 12.;
-    const COOLDOWN_TEXT_X: f32 = 181.;
-    const TITLE_Y: f32 = TEXT_Y_OFFSET + 6.;
-
-    let icon_handle = graphics.get_ui_element_texture(pet_data.skill_icon.clone());
-    let desc_body_style = gf::SKILL_PANEL_BODY.text_style(asset_server, DARK_WOOD_BROWN);
-
-    commands
-        .spawn(SpriteBundle {
-            texture: icon_handle,
-            sprite: Sprite {
-                custom_size: Some(Vec2::new(18., 18.)),
-                ..Default::default()
-            },
-            transform: Transform::from_translation(Vec3::new(ICONS_X_OFFSET, 0., 2.)),
-            ..default()
-        })
-        .insert(RenderLayers::from_layers(&[3]))
-        .insert(Name::new("PET SKILL TOOLTIP ICON"))
-        .set_parent(parent_entity);
-
-    commands
-        .spawn(Text2dBundle {
-            text: Text::from_section(
-                pet_data.skill_name.clone(),
-                TextStyle {
-                    font: gf::SKILL_PANEL_TITLE_BOLD.load_font(asset_server),
-                    font_size: gf::SKILL_PANEL_TITLE_BOLD.size,
-                    color: DARK_WOOD_BROWN,
-                },
-            )
-            .with_alignment(TextAlignment::Left),
-            text_anchor: Anchor::TopLeft,
-            transform: Transform::from_translation(Vec3::new(DESC_TEXT_X, TITLE_Y, 2.)),
-            ..default()
-        })
-        .insert(RenderLayers::from_layers(&[3]))
-        .insert(Name::new("PET SKILL TOOLTIP NAME"))
-        .set_parent(parent_entity);
-
-    commands
-        .spawn(Text2dBundle {
-            text: Text::from_section(
-                "",
-                TextStyle {
-                    font: gf::SKILL_PANEL_BODY.load_font(asset_server),
-                    font_size: gf::SKILL_PANEL_BODY.size,
-                    color: LIGHT_GREY,
-                },
-            )
-            .with_alignment(TextAlignment::Right),
-            text_anchor: Anchor::TopRight,
-            transform: Transform::from_translation(Vec3::new(COOLDOWN_TEXT_X, TITLE_Y, 2.)),
-            ..default()
-        })
-        .insert(RenderLayers::from_layers(&[3]))
-        .insert(PetSkillTooltipCooldownText)
-        .insert(Name::new("PET SKILL TOOLTIP COOLDOWN"))
-        .set_parent(parent_entity);
-
-    // Description lines: pet's skill_description is a Vec<String> where each entry
-    // can contain explicit '\n' line breaks (see `class_pet_data.class.ron`).
-    let mut line_index = 0usize;
-    for entry in pet_data.skill_description.iter() {
-        for line in entry.split('\n') {
-            commands
-                .spawn(Text2dBundle {
-                    text: Text::from_section(line, desc_body_style.clone())
-                        .with_alignment(TextAlignment::Left),
-                    text_anchor: Anchor::TopLeft,
-                    transform: Transform::from_translation(Vec3::new(
-                        DESC_TEXT_X,
-                        (TEXT_Y_OFFSET - 2.) - line_index as f32 * gf::SKILL_TOOLTIP_DESC_LINE_STEP,
-                        2.,
-                    )),
-                    ..default()
-                })
-                .insert(RenderLayers::from_layers(&[3]))
-                .insert(Name::new("PET SKILL TOOLTIP DESCRIPTION LINE"))
-                .set_parent(parent_entity);
-            line_index += 1;
-        }
-    }
+    let content = SkillTooltipContent {
+        icon: graphics.get_pet_active_skill_icon(pet.clone()),
+        title: pet_data.skill_name.clone(),
+        description_lines: pet_skill_description_lines(pet_data),
+        icon_size: SKILL_TOOLTIP_ICON_SIZE,
+        title_color: YELLOW_2,
+        body_color: WHITE,
+        cooldown_marker: Some(SkillTooltipCooldownMarker::Pet),
+    };
+    spawn_skill_tooltip_layout(commands, asset_server, parent_entity, &content);
 }
 
 /// Keep HUD heirloom icons below modal overlays during play, but above the game-over fade.

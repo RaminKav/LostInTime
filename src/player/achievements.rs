@@ -555,14 +555,11 @@ impl Achievement {
     }
 }
 
-/// Returns which classes are unlocked by default (first two classes)
+/// Returns which classes are unlocked by default (Warrior and Wizard).
 pub fn get_default_unlocked_classes() -> Vec<crate::player::skills::SkillClass> {
     vec![
         crate::player::skills::SkillClass::Warrior,
         crate::player::skills::SkillClass::Wizard,
-        crate::player::skills::SkillClass::Rogue,
-        crate::player::skills::SkillClass::Thief,
-        crate::player::skills::SkillClass::Hunter,
     ]
 }
 
