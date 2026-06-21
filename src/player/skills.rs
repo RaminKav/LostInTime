@@ -807,12 +807,9 @@ impl ActiveSkill {
                 ]
             }
             ActiveSkill::LaserBeam => vec![
-                "Channel a powerful laser beam that".to_string(),
-                format!(
-                    "deals {:.1}% damage rapidly to enemies",
-                    skill_power * LASER_BEAM
-                ),
-                "in front.".to_string(),
+                "Channel a powerful laser".to_string(),
+                format!(" beam that deals {:.1}% damage", skill_power * LASER_BEAM),
+                "rapidly to enemies in front.".to_string(),
             ],
             ActiveSkill::ArrowVolley => {
                 let total = arrow_volley_total_arrows();

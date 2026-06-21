@@ -593,21 +593,33 @@ impl ChunkPlugin {
     fn toggle_on_screen_mesh_visibility(
         camera_query: Query<&Transform, With<TextureCamera>>,
         mut obj_query: Query<
-            (&mut Visibility, &GlobalTransform),
+            (&mut Visibility, &GlobalTransform, &WorldObject),
             (With<WorldObject>, Without<Projectile>),
         >,
     ) {
-        for camera_transform in camera_query.iter() {
-            for (mut v, ft) in obj_query.iter_mut() {
-                let pos = ft.translation().xy();
-                let distance = camera_transform.translation.xy().distance(pos);
-                if (*v == Visibility::Visible || *v == Visibility::Inherited)
-                    && distance > (MAX_VISIBILITY) as f32
-                {
-                    *v = Visibility::Hidden;
-                } else if *v != Visibility::Visible && distance <= (MAX_VISIBILITY) as f32 {
-                    *v = Visibility::Visible;
+        let Some(camera_transform) = camera_query.get_single().ok() else {
+            return;
+        };
+        let camera_pos = camera_transform.translation.xy();
+        let max_dist = MAX_VISIBILITY as f32;
+
+        for (mut v, ft, world_obj) in obj_query.iter_mut() {
+            // Unique landmarks (boss shrine, dungeon entrance, etc.) must stay visible
+            // whenever their chunk is loaded — distance culling left them interactable but invisible.
+            if world_obj.is_unique_object() {
+                if matches!(*v, Visibility::Hidden) {
+                    *v = Visibility::Inherited;
                 }
+                continue;
+            }
+
+            let distance = camera_pos.distance(ft.translation().xy());
+            if distance > max_dist {
+                if matches!(*v, Visibility::Visible | Visibility::Inherited) {
+                    *v = Visibility::Hidden;
+                }
+            } else if matches!(*v, Visibility::Hidden) {
+                *v = Visibility::Inherited;
             }
         }
     }

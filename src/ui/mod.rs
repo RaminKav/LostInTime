@@ -1292,6 +1292,7 @@ impl Plugin for UIPlugin {
                             .or_else(in_state(UIState::InventoryCrafting)),
                     ),
                     update_upgrade_material_prompt_text.run_if(in_state(UIState::Inventory)),
+                    sync_dev_endless_button_label.run_if(in_state(UIState::Inventory)),
                     handle_dev_button_clicks.run_if(in_state(UIState::Inventory)),
                     setup_furnace_slots_ui.run_if(in_state(UIState::Furnace)),
                     handle_blueprint_slot_interaction

@@ -3,8 +3,13 @@ use bevy::render::view::RenderLayers;
 use bevy::sprite::Anchor;
 
 use crate::{
-    assets::Graphics, colors::WHITE, inventory::ItemStack, item::WorldObject, night::NightTracker,
-    world::dimension::Era, ScreenResolution,
+    assets::Graphics,
+    colors::{RED, WHITE},
+    inventory::ItemStack,
+    item::WorldObject,
+    night::NightTracker,
+    world::dimension::Era,
+    ScreenResolution,
 };
 
 use super::{
@@ -102,6 +107,11 @@ impl GlobalTextMessageEvent {
     pub fn era_start_announcement(era: Era) -> Option<Self> {
         let label = era.run_start_announcement_label()?;
         Some(Self::new(label, era.minimap_grass_background_color()))
+    }
+
+    /// Shown when the era 3 boss is defeated and endless mode begins.
+    pub fn final_endless_survive_prompt() -> Self {
+        Self::new("Survive...?", RED)
     }
 }
 

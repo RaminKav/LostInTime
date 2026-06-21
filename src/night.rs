@@ -14,6 +14,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     audio::{BGMPicker, UpdateBGMTrackEvent},
+    chaos::hp_multiplier_for_total_chaos,
     chaos::ChaosTracker,
     client::is_not_paused,
     colors::WHITE,
@@ -176,11 +177,19 @@ pub struct InfiniteMode {
 pub const MAX_DIFFICULTY_LEVEL: u8 = 15;
 /// Seconds between difficulty increases
 pub const DIFFICULTY_INCREASE_INTERVAL: f32 = 90.0; // 1.5 minutes
-/// Endless chaos: smooth power-law chaos(elapsed) = COEFFICIENT * elapsed_seconds^EXPONENT.
-/// Kept gentle (exponent 1.2) so mob HP scaling (1.4^(late_chaos/10)) doesn't blow up.
-/// Roughly ~8 @ 5min, ~22 @ 10min, ~47 @ 20min raw (before tier mult).
-pub const ENDLESS_CHAOS_COEFFICIENT: f32 = 0.0187;
-pub const ENDLESS_CHAOS_EXPONENT: f32 = 1.5;
+/// Endless chaos bonus: +1 chaos per this many seconds of elapsed endless time.
+pub const ENDLESS_CHAOS_SECONDS_PER_POINT: f32 = 15.0;
+/// HUD total chaos when endless typically begins (Era 3 base); excess above this scales mobs harder.
+const ENDLESS_CHAOS_REFERENCE: f32 = 22.0;
+/// Extra HP scaling on chaos above [`ENDLESS_CHAOS_REFERENCE`] (steeper than normal mobs/objects).
+const ENDLESS_HP_EXCESS_EXPONENT: f32 = 1.35;
+const ENDLESS_HP_EXCESS_COEFFICIENT: f32 = 2.2;
+const ENDLESS_ATK_EXCESS_EXPONENT: f32 = 1.1;
+const ENDLESS_ATK_EXCESS_COEFFICIENT: f32 = 0.10;
+/// Slight attack boost on top of the normal chaos attack curve during endless.
+pub const ENDLESS_MOB_ATTACK_BONUS: f32 = 1.10;
+/// Scales only the speed gain above 1x (0.8 = 20% slower ramp than before).
+const ENDLESS_SPEED_GAIN_SCALE: f32 = 0.8;
 
 /// Era timer - 10 minutes per era. Timer pauses in dungeons.
 pub const ERA_TIMER_SECONDS: f32 = 11.0 * 60.0; // 10 minutes
@@ -198,12 +207,50 @@ impl InfiniteMode {
         }
     }
 
-    /// Raw endless chaos from elapsed time (before tier multiplier). Smooth power-law.
+    /// Raw endless chaos from elapsed time (+1 per [`ENDLESS_CHAOS_SECONDS_PER_POINT`]).
+    /// Used for the HUD / chaos tracker display only.
     pub fn chaos_from_elapsed(elapsed_seconds: f32) -> f32 {
         if elapsed_seconds <= 0.0 {
             return 0.0;
         }
-        ENDLESS_CHAOS_COEFFICIENT * elapsed_seconds.powf(ENDLESS_CHAOS_EXPONENT)
+        elapsed_seconds / ENDLESS_CHAOS_SECONDS_PER_POINT
+    }
+
+    /// HP multiplier for void endless mobs from HUD total chaos (`global + endless bonus`).
+    /// Uses the normal curve plus a power-law bonus on chaos above [`ENDLESS_CHAOS_REFERENCE`].
+    pub fn endless_mob_hp_multiplier(total_chaos: f32) -> f32 {
+        let normal = hp_multiplier_for_total_chaos(total_chaos);
+        let excess = (total_chaos - ENDLESS_CHAOS_REFERENCE).max(0.0);
+        if excess <= 0.0 {
+            return normal;
+        }
+        normal + 1.1 * excess.powf(ENDLESS_HP_EXCESS_EXPONENT) * ENDLESS_HP_EXCESS_COEFFICIENT
+    }
+
+    /// Attack multiplier for void endless mobs from HUD total chaos (`global + endless bonus`).
+    pub fn endless_mob_attack_multiplier(total_chaos: f32) -> f32 {
+        let normal = (1.0 + total_chaos).powf(0.56);
+        let excess = (total_chaos - ENDLESS_CHAOS_REFERENCE).max(0.0);
+        if excess <= 0.0 {
+            return normal * ENDLESS_MOB_ATTACK_BONUS;
+        }
+        normal
+            * (1.0 + (excess * ENDLESS_ATK_EXCESS_COEFFICIENT).powf(ENDLESS_ATK_EXCESS_EXPONENT))
+            * ENDLESS_MOB_ATTACK_BONUS
+    }
+
+    /// Adds elapsed endless time and keeps difficulty level in sync (for dev tools).
+    pub fn add_elapsed_seconds(&mut self, seconds: f32) {
+        if !self.active {
+            return;
+        }
+        self.elapsed_seconds += seconds;
+        self.sync_difficulty_from_elapsed();
+    }
+
+    fn sync_difficulty_from_elapsed(&mut self) {
+        let level = (1.0 + self.elapsed_seconds / DIFFICULTY_INCREASE_INTERVAL).floor() as u8;
+        self.difficulty_level = level.clamp(1, MAX_DIFFICULTY_LEVEL);
     }
 
     /// Get the elapsed time formatted as MM:SS
@@ -213,11 +260,10 @@ impl InfiniteMode {
         format!("{:02}:{:02}", minutes, seconds)
     }
 
-    /// Get the chaos bonus for mob scaling (only during infinite mode)
-    /// Tier 1: 1x multiplier, Tier 2: 3x multiplier (triple chaos)
+    /// Bonus chaos from elapsed endless time (linear; added on top of global chaos).
     pub fn get_chaos_bonus(&self) -> f32 {
         if self.active {
-            Self::chaos_from_elapsed(self.elapsed_seconds) * self.get_chaos_multiplier()
+            Self::chaos_from_elapsed(self.elapsed_seconds)
         } else {
             0.0
         }
@@ -234,18 +280,17 @@ impl InfiniteMode {
     }
 
     /// Get the speed multiplier for the current difficulty level
-    /// Tier 1 (1-5): 50% speed per level (1.5x to 3.5x)
-    /// Tier 2 (6-10): 70% speed per level (4.2x to 7.7x)
+    /// Tier 1 (1-5): 50% speed per level (1.5x to 3.5x before gain scaling)
+    /// Tier 2 (6+): +150% per level above tier 1 cap
     pub fn get_speed_multiplier(&self) -> f32 {
-        if self.difficulty_level <= 5 {
-            // Tier 1: 50% per level
+        let raw = if self.difficulty_level <= 5 {
             1. + (self.difficulty_level as f32 * 0.5)
         } else {
-            // Tier 2: 70% per level, starting from tier 1 max (3.5x at level 5)
-            let tier1_max = 1. + (5.0 * 0.5); // 3.5x
+            let tier1_max = 1. + (5.0 * 0.5);
             let tier2_levels = self.difficulty_level - 5;
             tier1_max + (tier2_levels as f32 * 1.5)
-        }
+        };
+        1.0 + (raw - 1.0) * ENDLESS_SPEED_GAIN_SCALE
     }
 
     /// Get the tint alpha for the current difficulty level
@@ -266,30 +311,6 @@ impl InfiniteMode {
         } else {
             // Tier 2: Always 1.0 alpha for red tint
             1.0
-        }
-    }
-
-    /// Get the chaos bonus multiplier for the current tier
-    /// Tier 1: 1x (default), Tier 2: 3x (triple)
-    pub fn get_chaos_multiplier(&self) -> f32 {
-        match self.difficulty_level {
-            0 => 1.,
-            1 => 1.,
-            2 => 1.03,
-            3 => 1.08,
-            4 => 1.13,
-            5 => 1.2, // 7.5min
-            6 => 1.3,
-            7 => 1.42,
-            8 => 1.55,
-            9 => 1.7,
-            10 => 1.87,
-            11 => 2.05,
-            12 => 2.22,
-            13 => 2.4,
-            14 => 2.6,
-            15 => 3.0,
-            _ => 3.0,
         }
     }
 }

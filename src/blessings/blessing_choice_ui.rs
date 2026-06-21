@@ -3,8 +3,8 @@ use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
 use crate::{
     assets::Graphics,
     attributes::{
-        attribute_helpers::skill_power_multiplier, AttackSpeed, BonusAttackSpeed, CritChance,
-        MaxHealth, MaxMana, ProjectileSize, SkillPower, Speed,
+        AttackSpeed, BonusAttackSpeed, CritChance, MaxHealth, MaxMana, ProjectileSize, SkillPower,
+        Speed,
     },
     audio::{AudioSoundEffect, SoundSpawner},
     blessings::{
@@ -19,9 +19,8 @@ use crate::{
         class_rank::ClassRankSystem,
         levels::PlayerLevel,
         skills::{
-            active_skill_scaling::METEOR_SHOWER_BASE_COUNT,
-            effective_player_attack_speed_multiplier, ActiveSkill, Heirloom, HeirloomChoiceQueue,
-            HeirloomRarity, HeirloomWithRarity, PlayerClass, PlayerSkills,
+            ActiveSkill, Heirloom, HeirloomChoiceQueue, HeirloomRarity, HeirloomWithRarity,
+            PlayerClass, PlayerSkills,
         },
         Player,
     },
@@ -30,12 +29,14 @@ use crate::{
         clamp_tooltip_center_x, clamp_tooltip_center_y,
         damage_numbers::spawn_floating_text_with_shadow,
         game_fonts::{self as gf, FLOATING_TEXT, HEIRLOOM_CARD_DESC_LINE_STEP},
-        player_hud::SKILL_TOOLTIP_ICON_SIZE,
-        spawn_skill_tooltip_content,
+        player_hud::{
+            active_skill_tooltip_params_from_player, spawn_skill_tooltip_content,
+            spawn_skill_tooltip_shell, SKILL_TOOLTIP_ICON_SIZE,
+        },
         ui_helpers::{self, spawn_full_screen_ui_overlay},
         HeirloomDynamicTooltip, HeirloomTooltipRequest, HeirloomTooltipShow, Interactable,
         Interaction, ItemOrRecipeTooltip, ToolTipUpdateEvent, UIElement, UIState,
-        ITEM_TOOLTIP_LARGE_CARD_SIZE, SKILLS_CHOICE_UI_SIZE, SKILL_TOOLTIP_SIZE,
+        ITEM_TOOLTIP_LARGE_CARD_SIZE, SKILLS_CHOICE_UI_SIZE,
     },
     GameState, ScreenResolution,
 };
@@ -741,49 +742,19 @@ pub fn handle_blessing_choice_icon_tooltips(
                 crate::ui::snap_world_to_pixel_grid(icon_pos.y + 56., res.scale),
                 icon_pos.z + 10.,
             );
-            let container = commands
-                .spawn(RenderLayers::from_layers(&[3]))
+            let container = spawn_skill_tooltip_shell(
+                &mut commands,
+                &graphics,
+                tooltip_pos,
+                "BLESSING SKILL TOOLTIP",
+            );
+            commands
+                .entity(container)
                 .insert(BlessingChoiceSkillTooltip)
-                .insert(UIState::BlessingChoice)
-                .insert(SpatialBundle::from_transform(Transform {
-                    translation: tooltip_pos,
-                    ..Default::default()
-                }))
-                .id();
+                .insert(UIState::BlessingChoice);
 
-            let _tooltip_bg = commands
-                .spawn(SpriteBundle {
-                    texture: graphics.get_ui_element_texture(UIElement::SkillTooltip),
-                    sprite: Sprite {
-                        custom_size: Some(SKILL_TOOLTIP_SIZE),
-                        ..Default::default()
-                    },
-                    transform: Transform::from_translation(Vec3::new(72., -3., 1.)),
-                    ..Default::default()
-                })
-                .insert(RenderLayers::from_layers(&[3]))
-                .insert(Name::new("BLESSING SKILL TOOLTIP"))
-                .set_parent(container)
-                .id();
-
-            let (skill_power_val, max_mana, max_health, bonus_as, crit, spd, size) = skill_power
-                .get_single()
-                .map(|(sp, b, mm, mh, bas, as_, c, s, sz)| {
-                    (
-                        skill_power_multiplier(sp, b.get_skill_power_bonus()),
-                        mm.0,
-                        mh.0,
-                        effective_player_attack_speed_multiplier(
-                            as_.map(|a| a.0).unwrap_or(0),
-                            bas.map(|b| b.get_multiplier()).unwrap_or(1.0),
-                        ),
-                        c.0,
-                        s.0,
-                        sz.0,
-                    )
-                })
-                .unwrap_or((1., 100, 100, 1.0, 10, 0, 0));
-
+            let params =
+                active_skill_tooltip_params_from_player(&skill_power, &meteor_shower_state);
             spawn_skill_tooltip_content(
                 &mut commands,
                 &graphics,
@@ -791,17 +762,14 @@ pub fn handle_blessing_choice_icon_tooltips(
                 skill.clone(),
                 None,
                 container,
-                skill_power_val,
-                max_mana,
-                max_health,
-                bonus_as,
-                crit,
-                spd,
-                size,
-                meteor_shower_state
-                    .get_single()
-                    .map(|s| s.meteor_count)
-                    .unwrap_or(METEOR_SHOWER_BASE_COUNT),
+                params.skill_power,
+                params.max_mana,
+                params.max_health,
+                params.bonus_attack_speed_mult,
+                params.crit_chance,
+                params.speed,
+                params.size,
+                params.meteor_count,
                 SKILL_TOOLTIP_ICON_SIZE,
             );
         }

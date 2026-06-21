@@ -604,33 +604,40 @@ fn juice_up_spawned_mobs_per_day(
     player_level: Query<&PlayerLevel>,
     mut commands: Commands,
 ) {
-    // Get total chaos from tracker (all sources now increment the tracker)
-    let global_chaos = chaos_tracker.as_ref().map(|c| c.get_chaos()).unwrap_or(0.0);
-    // Get infinite mode chaos bonus (only applies during infinite mode, not carried to next era)
-    let infinite_chaos = infinite_mode.get_chaos_bonus();
-    // let is_infinite_mode = infinite_mode.active;
-    // let infinite_mode_xp_scaling = if is_infinite_mode { 0.25 } else { 1.0 };
-    let total_chaos = global_chaos + infinite_chaos;
-
     for (e, mut hp, mut att, mob) in elites.iter_mut() {
-        // 1. per day, 0.2 per level, 1 per heirloom, 1 per totem,
-        let chaos_factor = 1. + total_chaos;
-
-        let hp_multiplier = hp_multiplier_for_total_chaos(total_chaos);
-
-        let attack_multiplier = chaos_factor.powf(0.56);
+        let global_chaos = chaos_tracker.as_ref().map(|c| c.get_chaos()).unwrap_or(0.0);
+        let (hp_multiplier, attack_multiplier, total_chaos, infinite_chaos) =
+            if infinite_mode.active {
+                let infinite_chaos = infinite_mode.get_chaos_bonus();
+                let total_chaos = global_chaos + infinite_chaos;
+                (
+                    InfiniteMode::endless_mob_hp_multiplier(total_chaos),
+                    InfiniteMode::endless_mob_attack_multiplier(total_chaos),
+                    total_chaos,
+                    infinite_chaos,
+                )
+            } else {
+                let total_chaos = global_chaos;
+                let chaos_factor = 1. + total_chaos;
+                (
+                    hp_multiplier_for_total_chaos(total_chaos),
+                    chaos_factor.powf(0.56),
+                    total_chaos,
+                    0.0,
+                )
+            };
 
         hp.0 = (hp.0 as f32 * hp_multiplier) as i32;
         att.0 = (att.0 as f32 * attack_multiplier) as i32;
-        // exp.0 = (exp.0 as f32 * 1. * infinite_mode_xp_scaling) as u32;
         debug!(
-            "[{}] chaos_factor: {} (days: {}, level: {}, global_chaos: {:.1}, infinite_chaos: {:.1}) |||| {:?} {:?}",
+            "[{}] chaos_factor: {} (days: {}, level: {}, global_chaos: {:.1}, infinite_chaos: {:.1}, endless: {}) |||| {:?} {:?}",
             mob,
-            chaos_factor,
+            1. + total_chaos,
             night_tracker.days,
             player_level.single().level as f32 * 0.2,
             global_chaos,
             infinite_chaos,
+            infinite_mode.active,
             hp.0,
             att.0
         );

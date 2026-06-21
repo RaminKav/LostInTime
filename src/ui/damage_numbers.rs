@@ -10,9 +10,10 @@ use crate::{
     enemy::Mob,
     inventory::ItemStack,
     item::{EquipmentType, WorldObject},
+    player::Player,
     ui::CheatSettings,
     world::{world_helpers, TILE_SIZE},
-    Game, ScreenResolution, TextureCamera, WasHitWithCrit, WasHitWithOvercrit,
+    ScreenResolution, TextureCamera, WasHitWithCrit, WasHitWithOvercrit,
 };
 
 use super::{
@@ -123,12 +124,12 @@ pub fn handle_add_damage_numbers_after_hit(
             Option<&mut WasHitWithOvercrit>,
             Option<&Mob>,
             Option<&WorldObject>,
+            Option<&Player>,
         ),
         Changed<CurrentHealth>,
     >,
     txfms: Query<&GlobalTransform>,
     asset_server: Res<AssetServer>,
-    game: Res<Game>,
     cheat_settings: Option<Res<CheatSettings>>,
 ) {
     for (
@@ -140,6 +141,7 @@ pub fn handle_add_damage_numbers_after_hit(
         mut overcrit_option,
         mob_option,
         obj_option,
+        player_option,
     ) in changed_health.iter_mut()
     {
         let delta = changed_health.0 - prev_health.0;
@@ -153,19 +155,21 @@ pub fn handle_add_damage_numbers_after_hit(
         if delta == 0 || was_over_max {
             continue;
         }
-        let is_player = e == game.player;
-        if !is_player {
-            if let Some(ref settings) = cheat_settings {
-                if !settings.show_enemy_damage_numbers {
-                    continue;
-                }
+        let is_player = player_option.is_some();
+        if is_player {
+            // Player HP loss is always shown; only regen/heal respects the option.
+            if delta > 0
+                && cheat_settings
+                    .as_deref()
+                    .is_some_and(|s| !s.show_player_damage_numbers)
+            {
+                continue;
             }
-        } else if delta > 0 {
-            if let Some(ref settings) = cheat_settings {
-                if !settings.show_player_damage_numbers {
-                    continue;
-                }
-            }
+        } else if cheat_settings
+            .as_deref()
+            .is_some_and(|s| !s.show_enemy_damage_numbers)
+        {
+            continue;
         }
         let mut rng = rand::thread_rng();
         let drop_spread = 16.;

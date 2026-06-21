@@ -212,6 +212,39 @@ pub fn handle_delayed_spawns(
     }
 }
 
+/// Asset path for the standalone boss shrine sprite.
+pub const BOSS_SHRINE_TEXTURE_PATH: &str = "textures/BossShrine.png";
+
+/// Boss shrine uses a standalone PNG (not the shared atlas). Reset visibility/sprite after spawn.
+///
+/// We re-insert the texture handle, sprite, and a full visibility bundle here as a failsafe:
+/// `bevy_proto` applies the `SpriteBundle`/`VisibilityBundle` schematics on its own schedule, and
+/// the order relative to our manual inserts in `spawn_object_from_proto` is not guaranteed. Forcing
+/// all render components here guarantees a consistent, visible result.
+pub fn ensure_boss_shrine_sprite_on_spawn(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    new_shrines: Query<(Entity, &WorldObject), Added<WorldObject>>,
+) {
+    for (entity, obj) in new_shrines.iter() {
+        if obj != &WorldObject::BossShrine {
+            continue;
+        }
+        let texture: Handle<Image> = asset_server.load(BOSS_SHRINE_TEXTURE_PATH);
+        commands.entity(entity).insert((
+            texture,
+            Sprite {
+                custom_size: Some(Vec2::new(128., 128.)),
+                ..default()
+            },
+            VisibilityBundle {
+                visibility: Visibility::Inherited,
+                ..default()
+            },
+        ));
+    }
+}
+
 pub fn update_boss_shrine_guide_cost(
     mut guides: Query<(&WorldObject, &mut InteractionGuideTrigger)>,
     summon_tracker: Res<BossSummonTracker>,

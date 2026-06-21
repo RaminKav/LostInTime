@@ -1,12 +1,12 @@
 use bevy::prelude::*;
 
 use crate::{
-    colors::{DARK_WOOD_BROWN, WHITE},
+    colors::WHITE,
     player::Player,
     ui::global_text_message::GlobalTextMessageEvent,
     world::{
-        dimension::EraManager, portal::BossKillTracker, world_helpers::tile_pos_to_world_pos,
-        TILE_SIZE,
+        dimension::{Era, EraManager}, portal::BossKillTracker,
+        world_helpers::tile_pos_to_world_pos, TILE_SIZE,
     },
     GameParam,
 };
@@ -61,10 +61,12 @@ pub fn handle_goal_state_updates(
             if let Some(tracker) = boss_kill_tracker.as_ref() {
                 if tracker.is_boss_killed(&game.era.current_era) {
                     *goal_state = GoalState::ReturnToPortal;
-                    global_text_events.send(GlobalTextMessageEvent::new(
-                        "Return to the portal...",
-                        WHITE,
-                    ));
+                    let event = if game.era.current_era == Era::Third {
+                        GlobalTextMessageEvent::final_endless_survive_prompt()
+                    } else {
+                        GlobalTextMessageEvent::new("Return to the portal...", WHITE)
+                    };
+                    global_text_events.send(event);
                 }
             }
         }

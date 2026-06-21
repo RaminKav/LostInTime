@@ -639,7 +639,17 @@ impl ObjectAction {
                 if !*DEBUG {
                     let current_era = game.era.current_era.clone();
                     if current_era == Era::Third {
-                        // No next era after era 3; portal does nothing for now.
+                        if item_action_param.infinite_mode.active {
+                            let pos = tile_pos_to_world_pos(obj_pos, true);
+                            spawn_floating_text_with_shadow(
+                                commands,
+                                &item_action_param.asset_server,
+                                pos.extend(game.player().position.z) + Vec3::new(0., 28., 0.),
+                                RED,
+                                "There is no escape...".to_string(),
+                                FLOATING_TEXT,
+                            );
+                        }
                         return;
                     }
 

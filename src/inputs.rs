@@ -799,9 +799,9 @@ pub fn toggle_inventory(
         }
         if key_input.just_pressed(KeyCode::C) {
             let xp_rate_bonus = game.get_xp_rate_bonus();
-            let (did_level, gained_xp) = game
-                .get_player_level_mut()
-                .add_xp(200, xp_rate_bonus, &mut chaos_tracker);
+            let (did_level, gained_xp) =
+                game.get_player_level_mut()
+                    .add_xp(200, xp_rate_bonus, &mut chaos_tracker);
 
             flash_event.send(FlashExpBarEvent {
                 amount: gained_xp,
@@ -828,7 +828,7 @@ pub fn toggle_inventory(
             // proto_commands.spawn_item_from_proto(WorldObject::IceStaff, &proto, pos, 1, Some(5));
             // proto_commands.spawn_item_from_proto(WorldObject::BasicStaff, &proto, pos, 1, Some(5));
             proto_commands.spawn_from_proto(Mob::VoidCrawler, &proto.prototypes, pos);
-            proto_commands.spawn_from_proto(Mob::Lizard, &proto.prototypes, pos);
+            // proto_commands.spawn_from_proto(Mob::Lizard, &proto.prototypes, pos);
             // proto_commands.spawn_from_proto(Mob::StingFly, &proto.prototypes, pos);
             // proto_commands.spawn_from_proto(Mob::FurDevil, &proto.prototypes, pos);
             // proto_commands.spawn_from_proto(Mob::Bushling, &proto.prototypes, pos);

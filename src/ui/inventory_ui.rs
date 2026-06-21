@@ -1,4 +1,4 @@
-use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
+use bevy::{ecs::system::SystemParam, prelude::*, render::view::RenderLayers, sprite::Anchor};
 
 use bevy_aseprite::{anim::AsepriteAnimation, aseprite, Aseprite, AsepriteBundle};
 use bevy_proto::prelude::ProtoCommands;
@@ -16,7 +16,8 @@ use crate::colors::{
 };
 use crate::cursor::CursorPos;
 use crate::custom_commands::CommandsExt;
-use crate::night::EraTimer;
+use crate::night::{InfiniteMode, InfiniteModeStartedEvent};
+use crate::enemy::spawner::MobSpawningPaused;
 use crate::item::active_skill_shrine::assign_shrine_skill_to_slot;
 use crate::player::skills::{
     ActiveSkill, ActiveSkillChoiceState, Heirloom, HeirloomChoiceQueue, HeirloomChoiceState,
@@ -251,6 +252,17 @@ pub enum DevButtonAction {
     DropDungeonKey,
     AddBanishCount,
     AddLoadedDice,
+}
+
+/// Label child of the endless dev button; text switches between "endless" and "+1 min".
+#[derive(Component)]
+pub struct DevEndlessButtonLabel;
+
+#[derive(SystemParam)]
+pub(crate) struct DevEndlessButtonParams<'w> {
+    infinite_mode: ResMut<'w, InfiniteMode>,
+    infinite_mode_event: EventWriter<'w, InfiniteModeStartedEvent>,
+    mob_spawning_paused: Res<'w, MobSpawningPaused>,
 }
 
 /// Dev button that toggles the full-pool heirloom picker grid.
@@ -839,7 +851,7 @@ pub fn setup_inv_ui(
                 .insert(*action)
                 .insert(Name::new(format!("Dev Button {:?}", action)))
                 .id();
-            commands
+            let label_entity = commands
                 .spawn((
                     Text2dBundle {
                         text: Text::from_section(
@@ -859,7 +871,11 @@ pub fn setup_inv_ui(
                     UIState::Inventory,
                     Name::new("Dev Button Label"),
                 ))
-                .set_parent(btn);
+                .set_parent(btn)
+                .id();
+            if matches!(action, DevButtonAction::TriggerEndless) {
+                commands.entity(label_entity).insert(DevEndlessButtonLabel);
+            }
             commands.entity(inv).add_child(btn);
         }
 
@@ -2178,6 +2194,23 @@ pub fn mark_slot_dirty(
     }
 }
 
+/// Updates the endless dev button label when endless mode starts or ends.
+pub fn sync_dev_endless_button_label(
+    infinite_mode: Res<InfiniteMode>,
+    mut labels: Query<&mut Text, With<DevEndlessButtonLabel>>,
+) {
+    let label = if infinite_mode.active {
+        "+1 min"
+    } else {
+        "endless"
+    };
+    for mut text in labels.iter_mut() {
+        if text.sections[0].value != label {
+            text.sections[0].value = label.to_string();
+        }
+    }
+}
+
 /// Handles clicks on dev mode buttons (only runs when inventory is open and dev mode is on).
 pub fn handle_dev_button_clicks(
     cursor_pos: Res<CursorPos>,
@@ -2190,7 +2223,7 @@ pub fn handle_dev_button_clicks(
     mut proto_commands: ProtoCommands,
     proto: ProtoParam,
     mut dimension_spawn: EventWriter<DimensionSpawnEvent>,
-    mut era_timer: ResMut<EraTimer>,
+    mut endless_params: DevEndlessButtonParams,
     mut chaos_tracker: ResMut<ChaosTracker>,
     mut currency_event: EventWriter<ModifyCurencyEvent>,
     mut run_unlock_state: ResMut<RunUnlockState>,
@@ -2280,7 +2313,14 @@ pub fn handle_dev_button_clicks(
                         });
                     }
                     DevButtonAction::TriggerEndless => {
-                        era_timer.remaining_seconds = 5.0;
+                        if endless_params.infinite_mode.active {
+                            endless_params.infinite_mode.add_elapsed_seconds(60.0);
+                        } else {
+                            endless_params.infinite_mode_event.send_default();
+                            if endless_params.mob_spawning_paused.paused {
+                                commands.insert_resource(MobSpawningPaused { paused: false });
+                            }
+                        }
                     }
                     DevButtonAction::AddChaos => {
                         chaos_tracker.add_chaos(1.0);

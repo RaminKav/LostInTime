@@ -29,11 +29,13 @@ pub struct CheatSettings {
     pub color_blind_mode: bool,
     /// When true, dev tools (XP, spawn chest/tome/orb, era teleport, endless) are shown in the inventory
     pub dev_mode: bool,
-    /// When true, damage numbers are shown when enemies take damage
+    /// When true, damage numbers are shown when enemies take damage.
+    /// Player HP loss is always shown regardless of this setting.
     pub show_enemy_damage_numbers: bool,
     /// When true, damage/healing/regen floating text and item pickup labels use compact `4x5` at 5.0
     pub small_damage_text: bool,
-    /// When true, player HP healing/regen and MP gain floating numbers are shown
+    /// When true, player HP healing/regen and MP gain floating numbers are shown.
+    /// Player HP loss is always shown regardless of this setting.
     pub show_player_damage_numbers: bool,
     /// When true, the tile under the cursor is highlighted during gameplay
     pub show_tile_hover: bool,
@@ -911,7 +913,7 @@ pub fn setup_options_ui(
         cheat_settings.dev_mode,
     );
 
-    // Enemy damage numbers checkbox (when off, only player damage numbers show)
+    // Enemy damage numbers checkbox (when off, enemy numbers hide; player HP loss still shows)
     let enemy_damage_checkbox_y = dev_mode_checkbox_y - 16.;
     spawn_options_checkbox(
         &mut commands,

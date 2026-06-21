@@ -326,6 +326,7 @@ impl<'w, 's> CommandsExt<'w, 's> for ProtoCommands<'w, 's> {
         } else {
             // Fix world object graphics immediately - replace proto atlas with shared game atlas
             // This ensures world objects have correct graphics from spawn
+            let mut boss_shrine_standalone = false;
             if let Some(sprite_map) = &proto_param.graphics.spritesheet_map {
                 if let Some(obj_type) = proto_param.get_component::<WorldObject, _>(obj.clone()) {
                     if obj_type != &WorldObject::CombatShrine
@@ -338,11 +339,21 @@ impl<'w, 's> CommandsExt<'w, 's> for ProtoCommands<'w, 's> {
                                     proto_param.graphics.texture_atlas.as_ref().unwrap().clone(),
                                 )
                                 .insert(sprite.clone());
+                        } else if obj_type == &WorldObject::BossShrine {
+                            boss_shrine_standalone = true;
                         }
                     }
                 }
             }
+            if boss_shrine_standalone {
+                spawned_entity_commands.insert(Sprite {
+                    custom_size: Some(Vec2::new(128., 128.)),
+                    ..default()
+                });
+            }
         }
+
+        spawned_entity_commands.insert(Visibility::Inherited);
 
         Some(spawned_entity)
     }

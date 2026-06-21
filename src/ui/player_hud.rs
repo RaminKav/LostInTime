@@ -1468,7 +1468,7 @@ fn hud_skill_tooltip_world_position(icon_pos: Vec3, ui_scale: u32) -> Vec3 {
 }
 
 /// Rootless tooltip container + shared [`UIElement::SkillTooltip`] background.
-fn spawn_hud_skill_tooltip_shell(
+pub fn spawn_skill_tooltip_shell(
     commands: &mut Commands,
     graphics: &Graphics,
     tooltip_pos: Vec3,
@@ -1657,6 +1657,86 @@ pub fn spawn_skill_tooltip_content(
     spawn_skill_tooltip_layout(commands, asset_server, parent_entity, &content);
 }
 
+/// Live player stats passed into [`spawn_skill_tooltip_content`].
+pub struct ActiveSkillTooltipParams {
+    pub skill_power: f32,
+    pub max_mana: i32,
+    pub max_health: i32,
+    pub bonus_attack_speed_mult: f32,
+    pub crit_chance: i32,
+    pub speed: i32,
+    pub size: i32,
+    pub meteor_count: u32,
+}
+
+impl ActiveSkillTooltipParams {
+    pub fn preview() -> Self {
+        Self {
+            skill_power: 1.,
+            max_mana: 100,
+            max_health: 100,
+            bonus_attack_speed_mult: 1.0,
+            crit_chance: 10,
+            speed: 0,
+            size: 0,
+            meteor_count: METEOR_SHOWER_BASE_COUNT,
+        }
+    }
+}
+
+pub fn active_skill_tooltip_params_from_player(
+    skill_power: &Query<
+        (
+            &SkillPower,
+            &OwnedBlessings,
+            &MaxMana,
+            &MaxHealth,
+            Option<&BonusAttackSpeed>,
+            Option<&AttackSpeed>,
+            &CritChance,
+            &Speed,
+            &ProjectileSize,
+        ),
+        With<Player>,
+    >,
+    meteor_shower_state: &Query<
+        &crate::player::skills::MeteorShowerSkillState,
+        With<Player>,
+    >,
+) -> ActiveSkillTooltipParams {
+    let Ok((
+        skill_power,
+        blessings,
+        max_mana,
+        max_health,
+        bonus_as,
+        attack_speed,
+        crit,
+        spd,
+        size,
+    )) = skill_power.get_single()
+    else {
+        return ActiveSkillTooltipParams::preview();
+    };
+
+    ActiveSkillTooltipParams {
+        skill_power: skill_power_multiplier(skill_power, blessings.get_skill_power_bonus()),
+        max_mana: max_mana.0,
+        max_health: max_health.0,
+        bonus_attack_speed_mult: effective_player_attack_speed_multiplier(
+            attack_speed.map(|a| a.0).unwrap_or(0),
+            bonus_as.map(|b| b.get_multiplier()).unwrap_or(1.0),
+        ),
+        crit_chance: crit.0,
+        speed: spd.0,
+        size: size.0,
+        meteor_count: meteor_shower_state
+            .get_single()
+            .map(|s| s.meteor_count)
+            .unwrap_or(METEOR_SHOWER_BASE_COUNT),
+    }
+}
+
 /// System to handle tooltips for active skill icons in the HUD
 pub fn handle_active_skill_hud_tooltip(
     mut commands: Commands,
@@ -1735,7 +1815,7 @@ pub fn handle_active_skill_hud_tooltip(
         // The container is a rootless `SpatialBundle` (no `Sprite`/`Text`), so it is skipped by
         // `snap_layer3_visuals_to_pixel_grid`. Snap onto the physical pixel grid so anchored
         // tooltip text lands on-grid (see `hud_skill_tooltip_world_position`).
-        let container = spawn_hud_skill_tooltip_shell(
+        let container = spawn_skill_tooltip_shell(
             &mut commands,
             &graphics,
             hud_skill_tooltip_world_position(icon_pos, res.scale),
@@ -1746,12 +1826,8 @@ pub fn handle_active_skill_hud_tooltip(
             .insert(ActiveSkillHudTooltip)
             .insert(ActiveSkillHudTooltipSkill(slot_index));
 
-        let (skill_power, blessings, max_mana, max_health, bonus_as, attack_speed, crit, spd, size) =
-            skill_power.single();
-        let bonus_as_mult = effective_player_attack_speed_multiplier(
-            attack_speed.map(|a| a.0).unwrap_or(0),
-            bonus_as.map(|b| b.get_multiplier()).unwrap_or(1.0),
-        );
+        let params =
+            active_skill_tooltip_params_from_player(&skill_power, &meteor_shower_state);
         spawn_skill_tooltip_content(
             &mut commands,
             &graphics,
@@ -1759,17 +1835,14 @@ pub fn handle_active_skill_hud_tooltip(
             skill,
             Some(slot_index),
             container,
-            skill_power_multiplier(skill_power, blessings.get_skill_power_bonus()),
-            max_mana.0,
-            max_health.0,
-            bonus_as_mult,
-            crit.0,
-            spd.0,
-            size.0,
-            meteor_shower_state
-                .get_single()
-                .map(|s| s.meteor_count)
-                .unwrap_or(METEOR_SHOWER_BASE_COUNT),
+            params.skill_power,
+            params.max_mana,
+            params.max_health,
+            params.bonus_attack_speed_mult,
+            params.crit_chance,
+            params.speed,
+            params.size,
+            params.meteor_count,
             SKILL_TOOLTIP_ICON_SIZE,
         );
     }
@@ -4246,7 +4319,7 @@ pub fn handle_pet_skill_hud_tooltip(
 
     if let Some((pet, pos)) = currently_hovered {
         let pet_data = graphics.get_pet_data(pet.clone());
-        let container = spawn_hud_skill_tooltip_shell(
+        let container = spawn_skill_tooltip_shell(
             &mut commands,
             &graphics,
             hud_skill_tooltip_world_position(pos, res.scale),

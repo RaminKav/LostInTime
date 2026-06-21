@@ -1609,6 +1609,7 @@ impl Plugin for ItemsPlugin {
             .add_systems(
                 (
                     update_boss_shrine_guide_cost,
+                    ensure_boss_shrine_sprite_on_spawn,
                     handle_on_hit_upgrades.run_if(is_not_paused),
                     handle_reset_proj_hit_enemies_state.run_if(is_not_paused),
                 )
