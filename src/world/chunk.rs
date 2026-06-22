@@ -439,6 +439,10 @@ impl ChunkPlugin {
         _load_chunk_event: EventWriter<SpawnChunkEvent>,
         dungeon_check: Query<&Dungeon>,
     ) {
+        // Room-asset dungeons have no tile chunks at all.
+        if dungeon_check.get_single().is_ok() {
+            return;
+        }
         // only spawn chunks around camera after initial full world generation
         if !game.is_chunk_generated(IVec2::new(0, 0)) && !dungeon_check.get_single().is_ok() {
             return;

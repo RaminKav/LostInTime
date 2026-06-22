@@ -2,6 +2,13 @@ use bevy::prelude::*;
 
 use crate::{enemy::Mob, item::WorldObject, proto::proto_param::ProtoParam};
 
+/// Default peak scale for generic entities (mobs / UI without overrides).
+pub const DEFAULT_BOUNCE_MAX: f32 = 2.5;
+/// Default ramp multiplier for generic entities (non-boss mobs, UI without overrides).
+pub const DEFAULT_BOUNCE_MODIFIER: f32 = 2.0;
+/// Base bump rate multiplied by modifier each frame during the bounce.
+pub const DEFAULT_BOUNCE_BUMP_RATE: f32 = 2.5;
+
 /// Per-entity bounce-on-hit state.
 ///
 /// Always-present on mobs (see `ensure_mob_components`) to avoid archetype
@@ -13,6 +20,12 @@ use crate::{enemy::Mob, item::WorldObject, proto::proto_param::ProtoParam};
 pub struct BounceOnHit {
     pub is_active: bool,
     timer: Timer,
+    /// When set, skips Mob/WorldObject derivation for peak scale.
+    pub max_bounce: Option<f32>,
+    /// When set, skips Mob/WorldObject derivation for ramp speed.
+    pub modifier: Option<f32>,
+    /// When set, overrides [`DEFAULT_BOUNCE_BUMP_RATE`].
+    pub bump_rate: Option<f32>,
 }
 
 impl BounceOnHit {
@@ -20,6 +33,9 @@ impl BounceOnHit {
         Self {
             is_active: true,
             timer: Timer::from_seconds(0.17, TimerMode::Once),
+            max_bounce: None,
+            modifier: None,
+            bump_rate: None,
         }
     }
 
@@ -28,6 +44,22 @@ impl BounceOnHit {
         self.is_active = true;
         self.timer = Timer::from_seconds(0.17, TimerMode::Once);
     }
+
+    /// Subtle hover bounce for active skill shrine tooltips (~30% of default strength).
+    pub fn shrine_hover() -> Self {
+        Self::with_strength_fraction(0.3)
+    }
+
+    /// Scale default bounce peak, ramp, and bump rate by `fraction` (e.g. `0.3` = 30%).
+    pub fn with_strength_fraction(fraction: f32) -> Self {
+        Self {
+            is_active: false,
+            timer: Timer::from_seconds(0.17, TimerMode::Once),
+            max_bounce: Some(1.0 + (DEFAULT_BOUNCE_MAX - 1.0) * fraction),
+            modifier: Some(DEFAULT_BOUNCE_MODIFIER * fraction),
+            bump_rate: Some(DEFAULT_BOUNCE_BUMP_RATE * fraction),
+        }
+    }
 }
 
 impl Default for BounceOnHit {
@@ -35,8 +67,47 @@ impl Default for BounceOnHit {
         Self {
             is_active: false,
             timer: Timer::from_seconds(0.17, TimerMode::Once),
+            max_bounce: None,
+            modifier: None,
+            bump_rate: None,
         }
     }
+}
+
+fn bounce_strength(
+    bounce_on_hit: &BounceOnHit,
+    mob_option: Option<&Mob>,
+    obj_option: Option<&WorldObject>,
+    proto_param: &ProtoParam,
+) -> (f32, f32, f32) {
+    if bounce_on_hit.max_bounce.is_some()
+        || bounce_on_hit.modifier.is_some()
+        || bounce_on_hit.bump_rate.is_some()
+    {
+        return (
+            bounce_on_hit.max_bounce.unwrap_or(DEFAULT_BOUNCE_MAX),
+            bounce_on_hit.modifier.unwrap_or(DEFAULT_BOUNCE_MODIFIER),
+            bounce_on_hit.bump_rate.unwrap_or(DEFAULT_BOUNCE_BUMP_RATE),
+        );
+    }
+
+    let mut max_bounce = DEFAULT_BOUNCE_MAX;
+    let modifier = if let Some(obj) = obj_option {
+        if obj.is_medium_size(proto_param) {
+            0.5
+        } else if obj.is_tree() {
+            0.25
+        } else {
+            1.
+        }
+    } else if mob_option.is_some() && mob_option.unwrap().is_boss() {
+        max_bounce = 1.35;
+        0.5
+    } else {
+        DEFAULT_BOUNCE_MODIFIER
+    };
+
+    (max_bounce, modifier, DEFAULT_BOUNCE_BUMP_RATE)
 }
 
 pub fn bounce_on_hit(
@@ -53,26 +124,12 @@ pub fn bounce_on_hit(
         if !bounce_on_hit.is_active {
             continue;
         }
-        let mut max_bounce = 2.5;
-        let modifier = if let Some(obj) = obj_option {
-            if obj.is_medium_size(&proto_param) {
-                // large objects
-                0.5
-            } else if obj.is_tree() {
-                // trees are not medium but very large
-                0.25
-            } else {
-                // other small obj, crates, etc
-                1.
-            }
-        } else if mob_option.is_some() && mob_option.unwrap().is_boss() {
-            max_bounce = 1.35;
-            // bosses
-            0.5
-        } else {
-            // other mobs
-            2.
-        };
+        let (max_bounce, modifier, bump_rate) = bounce_strength(
+            &bounce_on_hit,
+            mob_option,
+            obj_option,
+            &proto_param,
+        );
         bounce_on_hit.timer.tick(time.delta());
         // Bounce magnitude only; negative scale.x is used for horizontal flip (e.g. scorpion).
         // Old code used `.clamp(1., max)` on signed scale, which forced left-facing sprites to +1.
@@ -82,7 +139,7 @@ pub fn bounce_on_hit(
         let sign_y = if sign_y == 0. { 1. } else { sign_y };
         let mut mag_x = t.scale.x.abs();
         let mut mag_y = t.scale.y.abs();
-        let bump = 2.5 * time.delta_seconds() * modifier;
+        let bump = bump_rate * time.delta_seconds() * modifier;
         if bounce_on_hit.timer.percent() < 0.5 {
             mag_x += bump;
             mag_y += bump;

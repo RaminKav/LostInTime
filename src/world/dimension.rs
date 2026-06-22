@@ -10,24 +10,17 @@ use crate::{
     colors::{DESERT_TILE, SNOW_TILE},
     enemy::{spawner::MobSpawningPaused, Mob},
     item::{Equipment, ItemDrop, WorldObject},
-    ui::global_text_message::PendingEraAnnouncement,
     night::NightTracker,
     player::{MovePlayerEvent, Player},
-    world::{
-        dungeon::{Dungeon, Dungeontimer},
-        dungeon_generation::{gen_new_room_dungeon, get_player_spawn_tile, DUNGEON_GRID_SIZE},
-        world_helpers::world_pos_to_tile_pos,
-    },
+    ui::global_text_message::PendingEraAnnouncement,
+    world::{dungeon::Dungeon, world_helpers::world_pos_to_tile_pos},
     CustomFlush, GameParam, GameState,
 };
 use bevy::ecs::schedule::NextState;
 
 use super::{
-    chunk::Chunk,
-    dungeon::{CachedPlayerPos, DungeonText},
-    generation::WorldObjectCache,
-    portal::TimePortal,
-    wall_auto_tile::ChunkWallCache,
+    chunk::Chunk, dungeon::CachedPlayerPos, dungeon_room::DungeonRoomEntity,
+    generation::WorldObjectCache, portal::TimePortal, wall_auto_tile::ChunkWallCache,
 };
 
 #[derive(Component, Reflect, Default, Debug, Clone)]
@@ -213,7 +206,6 @@ impl DimensionPlugin {
     pub fn new_dim_with_params(
         mut commands: Commands,
         mut spawn_event: EventReader<DimensionSpawnEvent>,
-        dungeon_text: Query<Entity, With<DungeonText>>,
         mut move_player_event: EventWriter<MovePlayerEvent>,
         player_cache_pos: Query<(Entity, &CachedPlayerPos), With<Player>>,
         mut game: GameParam,
@@ -248,9 +240,6 @@ impl DimensionPlugin {
             if new_dim.swap_to_dim_now {
                 commands.entity(dim_e).insert(SpawnDimension);
             }
-            for e in dungeon_text.iter() {
-                commands.entity(e).despawn();
-            }
 
             //swap era data
             if let Some(new_era) = &new_dim.new_era {
@@ -270,19 +259,12 @@ impl DimensionPlugin {
                         .insert(CachedPlayerPos(world_pos_to_tile_pos(
                             player_pos.truncate(),
                         )));
-                    let grid = gen_new_room_dungeon(DUNGEON_GRID_SIZE as usize);
-                    commands
-                        .entity(dim_e)
-                        .insert(Dungeon { grid: grid.clone() })
-                        .insert(Dungeontimer(Timer::from_seconds(360., TimerMode::Once)));
 
-                    if let Some(pos) = get_player_spawn_tile(grid.clone()) {
-                        info!("MOVING PLAYER TO {:?}", pos);
-                        move_player_event.send(MovePlayerEvent { pos });
-                        sent_dungeon_spawn = true;
-                    } else {
-                        error!("Failed to find valid player spawn position in dungeon! This should not happen.");
-                    }
+                    // Room-asset dungeon: no procedural grid. `spawn_dungeon_room`
+                    // builds the room, colliders, shrine and moves the player to
+                    // the room spawn point.
+                    commands.entity(dim_e).insert(Dungeon);
+                    sent_dungeon_spawn = true;
                 } else {
                     // Check if we're returning from a dungeon vs entering a truly new era
                     let curr_era = &game.era.current_era;
@@ -411,6 +393,7 @@ impl DimensionPlugin {
                     With<TimePortal>,
                     With<ItemDrop>,
                     With<DesertTornado>,
+                    With<DungeonRoomEntity>,
                 )>,
                 Without<Equipment>,
             ),

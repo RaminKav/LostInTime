@@ -1,7 +1,7 @@
 pub mod chunk;
 pub mod dimension;
 pub mod dungeon;
-pub mod dungeon_generation;
+pub mod dungeon_room;
 pub mod generation;
 pub mod grass_patches;
 mod noise_helpers;
@@ -28,7 +28,7 @@ use self::{
     chunk::ChunkPlugin,
     dimension::DimensionPlugin,
     dungeon::DungeonPlugin,
-    dungeon_generation::{Bias, GridSize, NumSteps},
+    dungeon_room::DungeonRoomPlugin,
     generation::GenerationPlugin,
     tile::TilePlugin,
     world_helpers::get_neighbour_tile,
@@ -155,19 +155,11 @@ impl Plugin for WorldPlugin {
             .add_plugin(ChunkPlugin)
             .add_plugin(DimensionPlugin)
             .add_plugin(DungeonPlugin)
+            .add_plugin(DungeonRoomPlugin)
             .add_plugin(TilePlugin)
             .add_plugin(YSortPlugin)
-            // .add_plugin(ResourceInspectorPlugin::<NumSteps>::default())
-            // .add_plugin(ResourceInspectorPlugin::<GridSize>::default())
-            // .add_plugin(ResourceInspectorPlugin::<Bias>::default())
-            .init_resource::<NumSteps>()
-            .init_resource::<GridSize>()
-            .init_resource::<Bias>()
             .init_resource::<portal::BossKillTracker>()
             .add_system(portal::track_boss_kills.in_set(OnUpdate(GameState::Main)))
             .add_system(handle_player_near_portal.in_set(OnUpdate(GameState::Main)));
-        // .register_type::<NumSteps>()
-        // .register_type::<GridSize>()
-        // .register_type::<Bias>();
     }
 }

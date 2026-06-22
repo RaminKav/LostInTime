@@ -22,6 +22,7 @@ use crate::{
     },
     world::{
         dimension::DimensionSpawnEvent,
+        dungeon_room::{DungeonRewardDrop, StartNextDungeonWaveEvent},
         portal::BossKillTracker,
         world_helpers::{can_object_be_placed_here, world_pos_to_tile_pos},
         TileMapPosition,
@@ -268,6 +269,8 @@ pub struct ItemActionParam<'w, 's> {
         &'static mut crate::attributes::FoodAttributeBonuses,
         With<crate::player::Player>,
     >,
+    pub dungeon_wave_event: EventWriter<'w, StartNextDungeonWaveEvent>,
+    pub dungeon_reward_drop: ResMut<'w, DungeonRewardDrop>,
 
     #[system_param(ignore)]
     marker: PhantomData<&'s ()>,

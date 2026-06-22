@@ -22,9 +22,21 @@ use crate::{
     player::Player,
     run_once_per_run,
     ui::global_text_message::GlobalTextMessageEvent,
-    world::dimension::EraManager,
+    world::dimension::{ActiveDimension, EraManager},
+    world::dungeon::Dungeon,
     GameState, ScreenResolution, TextureCamera,
 };
+
+/// Daytime hour forced while inside a dungeon so no night effects (dark overlay,
+/// 2x mob speed, night BGM) apply. Must be outside the night window.
+const DUNGEON_FORCED_DAY_HOUR: f32 = 6.0;
+
+/// Stashes the overworld day/night time while the player is in a dungeon so the
+/// cycle can resume exactly where it left off on exit.
+#[derive(Resource, Default)]
+pub struct DungeonNightStash {
+    saved_time: Option<f32>,
+}
 
 #[derive(Component)]
 pub struct Night(Timer);
@@ -484,6 +496,7 @@ impl Plugin for NightPlugin {
             .add_event::<EraTimerExpiredEvent>()
             .init_resource::<InfiniteMode>()
             .init_resource::<EraTimer>()
+            .init_resource::<DungeonNightStash>()
             // .add_plugin(ResourceInspectorPlugin::<NightTracker>::default().run_if(dim_spawned))
             .add_system(
                 spawn_night
@@ -494,6 +507,7 @@ impl Plugin for NightPlugin {
             .add_system(reset_era_timer_on_new_run.in_schedule(OnEnter(GameState::MainMenu)))
             .add_systems(
                 (
+                    manage_dungeon_night_freeze,
                     sync_night_overlay_on_tracker_change,
                     tick_night_color.run_if(is_not_paused),
                     handle_infinite_mode_started,
@@ -664,6 +678,24 @@ fn sync_night_overlay_on_tracker_change(
     }
 }
 
+/// While in a dungeon, freeze the day/night cycle at a daytime hour (stashing the
+/// real overworld time) so no night effects apply; restore it on exit.
+pub fn manage_dungeon_night_freeze(
+    mut night_tracker: ResMut<NightTracker>,
+    mut stash: ResMut<DungeonNightStash>,
+    dungeon_check: Query<&Dungeon, With<ActiveDimension>>,
+) {
+    let in_dungeon = dungeon_check.get_single().is_ok();
+    if in_dungeon {
+        if stash.saved_time.is_none() {
+            stash.saved_time = Some(night_tracker.time);
+            night_tracker.time = DUNGEON_FORCED_DAY_HOUR;
+        }
+    } else if let Some(saved) = stash.saved_time.take() {
+        night_tracker.time = saved;
+    }
+}
+
 pub fn tick_night_color(
     time: Res<Time>,
     mut query: Query<&mut Night>,
@@ -674,7 +706,13 @@ pub fn tick_night_color(
     mut global_text_events: EventWriter<GlobalTextMessageEvent>,
     infinite_mode: Res<InfiniteMode>,
     mut chaos_tracker: ResMut<ChaosTracker>,
+    dungeon_check: Query<&Dungeon, With<ActiveDimension>>,
 ) {
+    // Day/night cycle is frozen while in a dungeon (see manage_dungeon_night_freeze).
+    if dungeon_check.get_single().is_ok() {
+        return;
+    }
+
     // In infinite mode, keep it always night
     if infinite_mode.active {
         // Always play night music in infinite mode

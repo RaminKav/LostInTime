@@ -742,7 +742,7 @@ pub fn handle_blessing_choice_icon_tooltips(
                 crate::ui::snap_world_to_pixel_grid(icon_pos.y + 56., res.scale),
                 icon_pos.z + 10.,
             );
-            let container = spawn_skill_tooltip_shell(
+            let (container, _) = spawn_skill_tooltip_shell(
                 &mut commands,
                 &graphics,
                 tooltip_pos,

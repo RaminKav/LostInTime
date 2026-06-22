@@ -32,6 +32,7 @@ use crate::ui::minimap::UpdateMiniMapEvent;
 use crate::ui::tips::{Tip, TipEvent};
 use crate::ui::UIState;
 use crate::world::dimension::{DimensionSpawnEvent, Era};
+use crate::world::dungeon_room::StartNextDungeonWaveEvent;
 use crate::world::world_helpers;
 use crate::world::world_helpers::tile_pos_to_world_pos;
 use itertools::Itertools;
@@ -200,6 +201,10 @@ impl ObjectAction {
                     swap_to_dim_now: true,
                     new_era: Some(Era::from_index(current_era)),
                 });
+
+                // Schedule the dungeon reward drop once we're back in the overworld.
+                item_action_param.dungeon_reward_drop.timer =
+                    Some(Timer::from_seconds(0.4, TimerMode::Once));
             }
             ObjectAction::Chest => {
                 let chest_inv = item_action_param.chest_query.get(e).unwrap();
@@ -485,22 +490,11 @@ impl ObjectAction {
                         dir,
                     });
                 }
-                commands
-                    .entity(e)
-                    .insert(DungeonShrine {
-                        shrine_type: DungeonShrineType::Weapon,
-                        num_mobs_left: NUM_DUNGEON_SHRINE_MOBS,
-                        is_cleared: false,
-                        is_activated: false,
-                        tile_pos: obj_pos,
-                    })
-                    .insert(AsepriteAnimation::from(CombatShrineAnim::tags::ACTIVATE))
-                    .remove::<InteractionGuideTrigger>()
-                    .remove::<ObjectAction>();
 
-                // let proto_ref: &ProtoParam =
-                //     unsafe { &*(proto_param as *mut ProtoParam as *const ProtoParam) };
-                mark_other_dungeon_shrines_completed(commands, game, proto_param, e);
+                // The weapon shrine drives the dungeon wave system.
+                item_action_param
+                    .dungeon_wave_event
+                    .send(StartNextDungeonWaveEvent(e));
             }
             ObjectAction::ArmorShrine => {
                 // Screen Shake

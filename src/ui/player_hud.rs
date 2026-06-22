@@ -1445,7 +1445,8 @@ pub const SKILL_TOOLTIP_ICON_SIZE: Vec2 = Vec2::new(22., 22.);
 
 const HUD_SKILL_TOOLTIP_OFFSET_X: f32 = -20.;
 const HUD_SKILL_TOOLTIP_OFFSET_Y: f32 = 46.;
-const HUD_SKILL_TOOLTIP_BG_LOCAL: Vec3 = Vec3::new(61., 1., 1.);
+/// Local offset of the [`UIElement::SkillTooltip`] background inside a tooltip container.
+pub const SKILL_TOOLTIP_BG_LOCAL: Vec3 = Vec3::new(61., 1., 1.);
 const HUD_SKILL_TOOLTIP_Z_BUMP: f32 = 10.;
 
 fn set_interactable_hover(is_hit: bool, interactable: &mut Interactable) {
@@ -1473,7 +1474,7 @@ pub fn spawn_skill_tooltip_shell(
     graphics: &Graphics,
     tooltip_pos: Vec3,
     bg_name: &'static str,
-) -> Entity {
+) -> (Entity, Entity) {
     let container = commands
         .spawn((
             RenderLayers::from_layers(&[3]),
@@ -1481,21 +1482,22 @@ pub fn spawn_skill_tooltip_shell(
         ))
         .id();
 
-    commands
+    let bg = commands
         .spawn(SpriteBundle {
             texture: graphics.get_ui_element_texture(UIElement::SkillTooltip),
             sprite: Sprite {
                 custom_size: Some(SKILL_TOOLTIP_SIZE),
                 ..Default::default()
             },
-            transform: Transform::from_translation(HUD_SKILL_TOOLTIP_BG_LOCAL),
+            transform: Transform::from_translation(SKILL_TOOLTIP_BG_LOCAL),
             ..Default::default()
         })
         .insert(RenderLayers::from_layers(&[3]))
         .insert(Name::new(bg_name))
-        .set_parent(container);
+        .set_parent(container)
+        .id();
 
-    container
+    (container, bg)
 }
 
 /// Shared layout for skill / pet tooltips. Coordinates match [`UIElement::SkillTooltip`] banners.
@@ -1815,7 +1817,7 @@ pub fn handle_active_skill_hud_tooltip(
         // The container is a rootless `SpatialBundle` (no `Sprite`/`Text`), so it is skipped by
         // `snap_layer3_visuals_to_pixel_grid`. Snap onto the physical pixel grid so anchored
         // tooltip text lands on-grid (see `hud_skill_tooltip_world_position`).
-        let container = spawn_skill_tooltip_shell(
+        let (container, _) = spawn_skill_tooltip_shell(
             &mut commands,
             &graphics,
             hud_skill_tooltip_world_position(icon_pos, res.scale),
@@ -4319,7 +4321,7 @@ pub fn handle_pet_skill_hud_tooltip(
 
     if let Some((pet, pos)) = currently_hovered {
         let pet_data = graphics.get_pet_data(pet.clone());
-        let container = spawn_skill_tooltip_shell(
+        let (container, _) = spawn_skill_tooltip_shell(
             &mut commands,
             &graphics,
             hud_skill_tooltip_world_position(pos, res.scale),

@@ -640,7 +640,7 @@ impl GenerationPlugin {
         mut chunk_spawn_event: EventReader<GenerateObjectsEvent>,
         dungeon_check: Query<&Dungeon, With<ActiveDimension>>,
         seed: Res<GenerationSeed>,
-        mut chunk_wall_cache: Query<&mut ChunkWallCache>,
+        _chunk_wall_cache: Query<&mut ChunkWallCache>,
         proto_param: ProtoParam,
         mut done_event: EventWriter<DoneGeneratingEvent>,
         mut place_item_event: EventWriter<PlaceItemEvent>,
@@ -750,37 +750,6 @@ impl GenerationPlugin {
                     .into_iter()
                     .chain(cached_objs.to_owned().into_iter())
                     .collect::<Vec<(TileMapPosition, WorldObject)>>();
-
-                // Gen stone walls for dungeons
-                if let Ok(dungeon) = dungeon_check_result {
-                    let chunk_e = game.get_chunk_entity(chunk_pos).unwrap();
-                    let mut wall_cache = chunk_wall_cache.get_mut(chunk_e).unwrap();
-                    for x in 0..CHUNK_SIZE {
-                        for y in 0..CHUNK_SIZE {
-                            let pos = TileMapPosition::new(chunk_pos, TilePos::new(x, y));
-                            if chunk_pos.x < -3
-                                || chunk_pos.x > 4
-                                || chunk_pos.y < -4
-                                || chunk_pos.y > 3
-                            {
-                                objs_to_spawn.push((pos, WorldObject::StoneWall));
-                                wall_cache.walls.insert(pos, true);
-                                continue;
-                            }
-
-                            if dungeon.grid
-                                [(CHUNK_SIZE as i32 * (4 - chunk_pos.y) - 1 - (y as i32)) as usize]
-                                [(3 * CHUNK_SIZE as i32
-                                    + (chunk_pos.x * CHUNK_SIZE as i32)
-                                    + x as i32) as usize]
-                                == 0
-                            {
-                                objs_to_spawn.push((pos, WorldObject::StoneWall));
-                                wall_cache.walls.insert(pos, true);
-                            }
-                        }
-                    }
-                }
 
                 let mut objs = objs_to_spawn
                     .iter()
