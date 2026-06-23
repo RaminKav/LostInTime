@@ -233,7 +233,7 @@ fn main() {
     let app = app
         .insert_resource(StartOfRunActionsHappened(false))
         .insert_resource(ClearColor(Color::BLACK))
-        .insert_resource(crate::player::score::RunScore::new())
+        .insert_resource(crate::player::score::RunScore::new(false))
         .insert_resource(PlayerHealthPercent::default())
         .init_resource::<crate::player::skills::HeirloomTriggerCounts>()
         .init_resource::<crate::player::skills::ManaTrackerResetTimer>()

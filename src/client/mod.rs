@@ -384,12 +384,14 @@ pub fn handle_append_run_data_after_death(
             );
         }
 
-        // Update high scores
+        // Update high scores (skip dev-mode runs, same as leaderboard submission)
         if let Some(score) = &run_score {
             if let Some(class) = &player_class {
-                game_data
-                    .high_scores
-                    .update_high_score(score.score, &class.class);
+                if !score.dev_mode {
+                    game_data
+                        .high_scores
+                        .update_high_score(score.score, &class.class);
+                }
             }
         }
 

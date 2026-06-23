@@ -50,7 +50,9 @@ use crate::item::projectile::{RangedAttack, RangedAttackEvent};
 use crate::item::{Equipment, WorldObject};
 use crate::proto::proto_param::ProtoParam;
 use crate::ui::{
-    tutorial_ui::PendingInventoryTutorialCheck, EssenceShopChoices, FlashExpBarEvent, UIState,
+    class_selection::{ClassUnlockConfirmState, SkillUnlockConfirmState},
+    tutorial_ui::PendingInventoryTutorialCheck, EssenceShopChoices, FlashExpBarEvent,
+    MenuButton, MenuButtonClickEvent, UIState, WaitingForKeyInput, WipeDataPopup,
 };
 use crate::world::chunk::Chunk;
 
@@ -122,7 +124,9 @@ impl Plugin for InputsPlugin {
             )
             .add_systems((
                 toggle_inventory.run_if(in_state(GameState::Main)),
-                close_container.run_if(in_state(GameState::Main)),
+                close_container.run_if(
+                    in_state(GameState::Main).or_else(in_state(GameState::MainMenu)),
+                ),
             ))
             .add_system(
                 move_camera_with_player
@@ -699,54 +703,46 @@ pub fn manage_ability_phasing(
     }
 }
 
+/// Routes Escape through the same [`MenuButtonClickEvent`] handlers as visible Back buttons
+/// (and related cancel buttons), so cleanup, sound, and guard logic stay in one place.
 pub fn close_container(
-    key_input: ResMut<Input<KeyCode>>,
-    mut next_inv_state: ResMut<NextState<UIState>>,
+    key_input: Res<Input<KeyCode>>,
     curr_state: Res<State<UIState>>,
     game_state: Res<State<GameState>>,
+    waiting_for_key: Query<(), With<WaitingForKeyInput>>,
+    wipe_popup: Query<(), With<WipeDataPopup>>,
+    class_confirm: Res<ClassUnlockConfirmState>,
+    skill_confirm: Res<SkillUnlockConfirmState>,
+    mut menu_button_events: EventWriter<MenuButtonClickEvent>,
+    mut commands: Commands,
 ) {
-    if key_input.just_pressed(KeyCode::Escape) {
-        // During gameplay (GameState::Main), toggle between closed and options
-        if game_state.0 == GameState::Main {
-            match curr_state.0 {
-                UIState::Closed => {
-                    // Open options menu
-                    next_inv_state.set(UIState::Options);
-                }
-                UIState::Options => {
-                    // Close options menu, resume game
-                    next_inv_state.set(UIState::Closed);
-                }
-                // Don't close important selection UIs with ESC
-                UIState::ItemChest | UIState::Skills => {
-                    // Player must make a choice, can't accidentally close
-                }
-                UIState::ActiveSkills | UIState::ActiveSkillShrine => {
-                    // Allow closing active skill selection with ESC
-                    next_inv_state.set(UIState::Closed);
-                }
-                _ => {
-                    // Close any other UI
-                    next_inv_state.set(UIState::Closed);
-                }
-            }
-        } else {
-            // In main menu or other game states, just close UI
-            // But still don't close important selection UIs
-            match curr_state.0 {
-                UIState::ItemChest | UIState::Skills => {
-                    // Don't close
-                }
-                UIState::ActiveSkills | UIState::ActiveSkillShrine => {
-                    // Allow closing active skill selection with ESC
-                    next_inv_state.set(UIState::Closed);
-                }
-                _ => {
-                    next_inv_state.set(UIState::Closed);
-                }
-            }
-        }
+    if !key_input.just_pressed(KeyCode::Escape) {
+        return;
     }
+
+    // Options key-rebind capture handles Escape itself.
+    if !waiting_for_key.is_empty() {
+        return;
+    }
+
+    let button = if game_state.0 == GameState::Main && curr_state.0 == UIState::Closed {
+        MenuButton::Options
+    } else if curr_state.0 == UIState::Closed {
+        return;
+    } else if matches!(curr_state.0, UIState::ItemChest | UIState::Skills) {
+        return;
+    } else if !wipe_popup.is_empty() {
+        MenuButton::WipeDataCancel
+    } else if class_confirm.active {
+        MenuButton::ClassUnlockNo
+    } else if skill_confirm.active {
+        MenuButton::SkillUnlockNo
+    } else {
+        MenuButton::Back
+    };
+
+    menu_button_events.send(MenuButtonClickEvent { button });
+    commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.2));
 }
 pub fn toggle_inventory(
     mut commands: Commands,

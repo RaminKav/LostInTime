@@ -14,6 +14,9 @@ pub struct RunScore {
     pub score: u32,
     pub mobs_killed: u32,
     pub objs_destroyed: u32,
+    /// Snapshot of dev mode at run start; dev runs must not update saved high scores.
+    #[serde(default)]
+    pub dev_mode: bool,
 }
 
 /// Tracks the total elapsed seconds the player has spent in the current run.
@@ -25,11 +28,12 @@ pub struct RunTimer {
 }
 
 impl RunScore {
-    pub fn new() -> Self {
+    pub fn new(dev_mode: bool) -> Self {
         Self {
             score: 0,
             mobs_killed: 0,
             objs_destroyed: 0,
+            dev_mode,
         }
     }
 
@@ -71,9 +75,9 @@ pub struct StartingWeapon {
 }
 
 /// System to reset the run score when starting a new run
-pub fn reset_run_score(mut run_score: ResMut<RunScore>) {
+pub fn reset_run_score(mut run_score: ResMut<RunScore>, cheat_settings: Res<crate::ui::CheatSettings>) {
     info!("Resetting run score from {} to 0", run_score.score);
-    *run_score = RunScore::new();
+    *run_score = RunScore::new(cheat_settings.dev_mode);
 }
 
 /// System to reset the run timer when starting a new run

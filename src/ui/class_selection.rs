@@ -34,8 +34,8 @@ use crate::{
     },
     ui::{
         global_text_message::PendingEraAnnouncement, main_menu::GameStartFadein,
-        options_ui::CheatSettings,
-        ui_helpers::spawn_full_screen_ui_overlay_tuned_colored, MenuButton, UIElement, UIState,
+        options_ui::CheatSettings, ui_helpers::spawn_full_screen_ui_overlay_tuned_colored,
+        MenuButton, UIElement, UIState,
     },
     world::{dimension::EraManager, portal::UIPortal},
     FairyPetSprite, Pet, RenderLayers, ScreenResolution, SlimePetSprite,
@@ -52,6 +52,7 @@ const BODY_FONT: &str = "fonts/slkscr.ttf";
 const TITLE_FONT: &str = "fonts/slkscrbold.ttf";
 const BODY_FONT_SIZE: f32 = 8.4;
 const CLASS_PREVIEW_ICON_SIZE: Vec2 = Vec2::new(22., 22.);
+const CLASS_SELECTION_PANEL_Y: f32 = 16.;
 
 #[derive(Component)]
 pub struct ClassSelectionUI;
@@ -254,7 +255,7 @@ pub fn setup_class_selection_ui(
                 )
                 .with_alignment(TextAlignment::Left),
                 text_anchor: Anchor::CenterLeft,
-                transform: Transform::from_translation(Vec3::new(-250., 160., 11.)),
+                transform: Transform::from_translation(Vec3::new(-250., 176., 11.)),
                 ..Default::default()
             },
             RenderLayers::from_layers(&[3]),
@@ -282,7 +283,7 @@ pub fn setup_class_selection_ui(
             aseprite: graphics.ui_portal_ase.as_ref().unwrap().clone(),
             animation: AsepriteAnimation::from(UIPortal::tags::IDLE),
             transform: Transform {
-                translation: Vec3::new(186., -10., 10.),
+                translation: Vec3::new(186., -10. + CLASS_SELECTION_PANEL_Y, 10.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
@@ -305,7 +306,7 @@ pub fn setup_class_selection_ui(
     commands.spawn((
         Text2dBundle {
             text: Text::from_section(
-                "Choose Your Class",
+                "",
                 TextStyle {
                     font: asset_server.load("fonts/alagard.ttf"),
                     font_size: 30.0,
@@ -314,7 +315,7 @@ pub fn setup_class_selection_ui(
             ),
             text_anchor: Anchor::Center,
             transform: Transform {
-                translation: Vec3::new(0., res.game_height / 2. - 24., 10.),
+                translation: Vec3::new(0., res.game_height / 2. - 20., 10.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
@@ -337,7 +338,7 @@ pub fn setup_class_selection_ui(
             ),
             text_anchor: Anchor::Center,
             transform: Transform {
-                translation: Vec3::new(8., 70., 12.),
+                translation: Vec3::new(8., 70. + CLASS_SELECTION_PANEL_Y, 12.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
@@ -410,7 +411,11 @@ pub fn setup_class_selection_ui(
                         ..Default::default()
                     },
                     transform: Transform {
-                        translation: Vec3::new(x_offset, 116. + y_offset, 11.),
+                        translation: Vec3::new(
+                            x_offset,
+                            118. + y_offset + CLASS_SELECTION_PANEL_Y,
+                            11.,
+                        ),
                         scale: Vec3::new(1., 1., 1.),
                         ..Default::default()
                     },
@@ -506,7 +511,7 @@ pub fn setup_class_selection_ui(
                         .all(|req| achievements_res.has(*req));
                     if requirements_met {
                         // Spawn warning animation above and center of the slot
-                        let warning_y = 50. + y_offset + 11.; // 15 pixels above the slot center
+                        let warning_y = 50. + y_offset + 11. + CLASS_SELECTION_PANEL_Y; // 15 pixels above the slot center
                         let warning_pos = Vec3::new(x_offset, warning_y, 20.5);
                         let warning_entity = spawn_attack_warning_aseprite(
                             &mut commands,
@@ -549,7 +554,7 @@ pub fn setup_class_selection_ui(
                 ..Default::default()
             },
             transform: Transform {
-                translation: Vec3::new(x_offset, y_offset, 11.),
+                translation: Vec3::new(x_offset, y_offset + CLASS_SELECTION_PANEL_Y, 11.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
@@ -607,50 +612,48 @@ pub fn setup_class_selection_ui(
     let button_y = -res.game_height / 2. + 16.;
     let back_button_x = -res.game_width / 2. + 42.;
 
-    commands
-        .spawn((
-            SpriteBundle {
-                texture: graphics
-                    .get_ui_element_texture(UIElement::StartGameButton)
-                    .clone(),
-                sprite: Sprite {
-                    custom_size: Some(Vec2::new(170., 26.)),
-                    ..Default::default()
-                },
-                transform: Transform::from_translation(Vec3::new(0., button_y, 11.)),
+    commands.spawn((
+        SpriteBundle {
+            texture: graphics
+                .get_ui_element_texture(UIElement::StartGameButton)
+                .clone(),
+            sprite: Sprite {
+                custom_size: Some(Vec2::new(170., 26.)),
                 ..Default::default()
             },
-            super::Interactable::default(),
-            UIElement::StartGameButton,
-            MenuButton::Begin,
-            ConfirmButton,
-            UIState::ClassSelection,
-            ClassSelectionUI,
-            RenderLayers::from_layers(&[3]),
-            Name::new("Start Button"),
-        ));
+            transform: Transform::from_translation(Vec3::new(0., button_y, 11.)),
+            ..Default::default()
+        },
+        super::Interactable::default(),
+        UIElement::StartGameButton,
+        MenuButton::Begin,
+        ConfirmButton,
+        UIState::ClassSelection,
+        ClassSelectionUI,
+        RenderLayers::from_layers(&[3]),
+        Name::new("Start Button"),
+    ));
 
-    commands
-        .spawn((
-            SpriteBundle {
-                texture: graphics
-                    .get_ui_element_texture(UIElement::BackButton2)
-                    .clone(),
-                sprite: Sprite {
-                    custom_size: Some(Vec2::new(60., 26.)),
-                    ..Default::default()
-                },
-                transform: Transform::from_translation(Vec3::new(back_button_x, button_y, 11.)),
+    commands.spawn((
+        SpriteBundle {
+            texture: graphics
+                .get_ui_element_texture(UIElement::BackButton2)
+                .clone(),
+            sprite: Sprite {
+                custom_size: Some(Vec2::new(60., 26.)),
                 ..Default::default()
             },
-            super::Interactable::default(),
-            UIElement::BackButton2,
-            MenuButton::Back,
-            UIState::ClassSelection,
-            ClassSelectionUI,
-            RenderLayers::from_layers(&[3]),
-            Name::new("Back Button"),
-        ));
+            transform: Transform::from_translation(Vec3::new(back_button_x, button_y, 11.)),
+            ..Default::default()
+        },
+        super::Interactable::default(),
+        UIElement::BackButton2,
+        MenuButton::Back,
+        UIState::ClassSelection,
+        ClassSelectionUI,
+        RenderLayers::from_layers(&[3]),
+        Name::new("Back Button"),
+    ));
 
     // Class preview sprite (shows default selected class)
     let _class_preview = spawn_player_preview(
@@ -1817,7 +1820,7 @@ fn spawn_player_preview(
             Name::new("PLAYER PREVIEW CONTAINER"),
         ))
         .insert(SpatialBundle::from_transform(Transform {
-            translation: Vec3::new(-237., 68., 12.),
+            translation: Vec3::new(-237., 68. + CLASS_SELECTION_PANEL_Y, 12.),
             scale: Vec3::new(1., 1., 1.),
             ..Default::default()
         }))
@@ -2178,7 +2181,7 @@ fn spawn_pet_preview(
             Name::new("PET PREVIEW CONTAINER"),
         ))
         .insert(SpatialBundle::from_transform(Transform {
-            translation: Vec3::new(120., -60., 12.),
+            translation: Vec3::new(120., -60. + CLASS_SELECTION_PANEL_Y, 12.),
             scale: Vec3::new(1., 1., 1.),
             ..Default::default()
         }))
@@ -2444,8 +2447,8 @@ pub fn update_slot_visuals(
 ) {
     // Update class slot visuals
     for (mut texture, slot) in class_slots.iter_mut() {
-        let is_locked = !cheat_settings.bypass_class_unlocks
-            && !unlocked_classes.contains(&slot.class);
+        let is_locked =
+            !cheat_settings.bypass_class_unlocks && !unlocked_classes.contains(&slot.class);
         if is_locked {
             *texture = graphics
                 .get_ui_element_texture(UIElement::PlayerSelectSlot)
@@ -2482,10 +2485,7 @@ pub fn update_slot_visuals(
 
 pub fn update_locked_class_overlays(
     slots: Query<&PlayerSelectSlot>,
-    mut overlays: Query<
-        (&Parent, &mut Handle<Image>, &mut Visibility),
-        With<LockedClassOverlay>,
-    >,
+    mut overlays: Query<(&Parent, &mut Handle<Image>, &mut Visibility), With<LockedClassOverlay>>,
     unlocked_classes: Res<UnlockedClasses>,
     cheat_settings: Res<CheatSettings>,
     graphics: Res<Graphics>,
@@ -2495,8 +2495,8 @@ pub fn update_locked_class_overlays(
             continue;
         };
 
-        let is_locked = !cheat_settings.bypass_class_unlocks
-            && !unlocked_classes.contains(&slot.class);
+        let is_locked =
+            !cheat_settings.bypass_class_unlocks && !unlocked_classes.contains(&slot.class);
         if is_locked {
             *visibility = Visibility::Inherited;
             *texture = graphics
