@@ -451,7 +451,7 @@ pub fn setup_class_selection_ui(
                     Visibility::Hidden
                 },
                 sprite: Sprite {
-                    custom_size: Some(Vec2::new(22., 22.)),
+                    custom_size: Some(Vec2::new(44., 60.)),
                     ..Default::default()
                 },
                 transform: Transform {
@@ -1908,7 +1908,7 @@ fn spawn_player_preview(
             aseprite: aseprite_path,
             animation: AsepriteAnimation::from(animation_tag),
             transform: Transform {
-                translation: Vec3::new(420., -48., 1.),
+                translation: Vec3::new(434., -48., 1.),
                 scale: Vec3::new(2., 2., 2.),
                 ..Default::default()
             },
@@ -2217,7 +2217,7 @@ fn spawn_pet_preview(
             aseprite: aseprite_path,
             animation: AsepriteAnimation::from(animation_tag),
             transform: Transform {
-                translation: Vec3::new(30., 90., 1.),
+                translation: Vec3::new(36., 90., 1.),
                 scale: Vec3::new(2., 2., 2.),
                 ..Default::default()
             },

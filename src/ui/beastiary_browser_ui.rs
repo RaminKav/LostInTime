@@ -3,7 +3,7 @@ use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
 use crate::{
     assets::Graphics,
     audio::{AudioSoundEffect, SoundSpawner},
-    colors::WHITE,
+    colors::{DARK_WOOD_BROWN, GREY, RED, WHITE, YELLOW_2},
     cursor::CursorPos,
     enemy::Mob,
     item::WorldObject,
@@ -28,10 +28,24 @@ pub struct BeastiaryBrowserUI;
 #[derive(Component)]
 pub struct BeastiaryBrowserDoneButton;
 
-/// One clickable card cell in the 4x4 grid.
+/// One clickable card cell in the 3x3 grid.
 #[derive(Component, Clone, Copy)]
 pub struct BeastiaryCardCell {
     pub mob_index: usize,
+}
+
+/// Prev-page control on the left side of the bestiary book.
+#[derive(Component)]
+pub struct BeastiaryBrowserPrevButton;
+
+/// Next-page control on the left side of the bestiary book.
+#[derive(Component)]
+pub struct BeastiaryBrowserNextButton;
+
+/// Current page of the 3x3 card grid (9 mobs per page).
+#[derive(Resource, Default, Debug)]
+pub struct BeastiaryPagination {
+    pub page: usize,
 }
 
 /// Marker for entities composing the right-side detail panel. Cleared and
@@ -48,18 +62,34 @@ const OVERLAY_Z: f32 = 95.;
 const PANEL_Z: f32 = 96.;
 const CONTENT_Z: f32 = 97.;
 
-const GRID_COLS: usize = 4;
-const GRID_ROWS: usize = 4;
-/// Card sprite native dimensions in pixels (matches `sprites.desc.ron` entry size).
-const CARD_BASE_W: f32 = 16.;
-const CARD_BASE_H: f32 = 24.;
-/// Scale-up factor for the bestiary grid view.
-const CARD_DISPLAY_SCALE: f32 = 3.;
-const CARD_DISPLAY_W: f32 = CARD_BASE_W * CARD_DISPLAY_SCALE;
-const CARD_DISPLAY_H: f32 = CARD_BASE_H * CARD_DISPLAY_SCALE;
-/// Spacing between cards on the grid (sum of card-display dim and gap).
-const GRID_CELL_W: f32 = CARD_DISPLAY_W + 18.;
-const GRID_CELL_H: f32 = CARD_DISPLAY_H + 12.;
+const PANEL_W: f32 = 454.;
+const PANEL_H: f32 = 318.;
+const GRID_COLS: usize = 3;
+const CARDS_PER_PAGE: usize = GRID_COLS * GRID_COLS;
+/// Card slot background native size (`BestiaryCardBackground.png`).
+const CARD_W: f32 = 46.;
+const CARD_H: f32 = 66.;
+/// Mob card sprite drawn inside the slot background (2:3 aspect).
+const CARD_SPRITE_W: f32 = 38.;
+const CARD_SPRITE_H: f32 = 57.;
+/// Spacing between cards on the grid (sum of card dim and gap).
+const GRID_CELL_W: f32 = CARD_W + 18.;
+const GRID_CELL_H: f32 = CARD_H + 12.;
+const NAV_BTN_W: f32 = 47.;
+const NAV_BTN_H: f32 = 27.;
+/// Layout offsets tuned to `Bestiary.png` art (panel centered at origin).
+const GRID_CENTER_X: f32 = -112.;
+const GRID_TOP_Y: f32 = 74.;
+const NAV_BTNS_Y: f32 = -164.;
+const NAV_BTN_GAP: f32 = 24.;
+const DETAIL_CENTER_X: f32 = 110.;
+const DETAIL_TOP_Y: f32 = 0.;
+const DETAIL_WIDTH: f32 = 170.;
+const CARD_BOUNCE_STRENGTH: f32 = 0.5;
+
+fn beastiary_total_pages() -> usize {
+    BEASTIARY_MOBS.len().div_ceil(CARDS_PER_PAGE)
+}
 
 pub fn setup_beastiary_browser_ui(
     mut commands: Commands,
@@ -68,13 +98,12 @@ pub fn setup_beastiary_browser_ui(
     resolution: Res<ScreenResolution>,
     beastiary: Res<Beastiary>,
     mut selected: ResMut<SelectedBeastiaryMob>,
+    mut pagination: ResMut<BeastiaryPagination>,
     proto: ProtoParam,
     mut texture_atlases: ResMut<Assets<TextureAtlas>>,
 ) {
     selected.0 = None;
-
-    let inner_w = (resolution.game_width * 0.92).min(560.);
-    let inner_h = (resolution.game_height - 28.).max(260.).min(360.);
+    pagination.page = 0;
 
     commands.spawn((
         SpriteBundle {
@@ -94,9 +123,9 @@ pub fn setup_beastiary_browser_ui(
 
     commands.spawn((
         SpriteBundle {
+            texture: graphics.get_ui_element_texture(UIElement::Bestiary),
             sprite: Sprite {
-                color: Color::rgba(0.02, 0.02, 0.04, 0.98),
-                custom_size: Some(Vec2::new(inner_w, inner_h)),
+                custom_size: Some(Vec2::new(PANEL_W, PANEL_H)),
                 ..Default::default()
             },
             transform: Transform::from_translation(Vec3::new(0., 0., PANEL_Z)),
@@ -108,64 +137,53 @@ pub fn setup_beastiary_browser_ui(
         Name::new("Beastiary Browser Panel"),
     ));
 
-    let half_h = inner_h * 0.5;
-    let half_w = inner_w * 0.5;
+    // Grid cells are spawned by `refresh_beastiary_grid_on_pagination_change` so we
+    // never double-spawn in the same frame as setup (deferred commands).
+
+    let nav_center_x = GRID_CENTER_X;
+    let prev_x = nav_center_x - NAV_BTN_W * 0.5 - NAV_BTN_GAP * 0.5;
+    let next_x = nav_center_x + NAV_BTN_W * 0.5 + NAV_BTN_GAP * 0.5;
 
     commands.spawn((
-        Text2dBundle {
-            text: Text::from_section(
-                "Bestiary",
-                TextStyle {
-                    font: asset_server.load("fonts/alagard.ttf"),
-                    font_size: 15.0,
-                    color: WHITE,
-                },
-            )
-            .with_alignment(TextAlignment::Center),
-            text_anchor: Anchor::Center,
-            transform: Transform::from_translation(Vec3::new(0., half_h - 18., CONTENT_Z)),
+        SpriteBundle {
+            texture: graphics.get_ui_element_texture(UIElement::BestiaryPrevButton),
+            sprite: Sprite {
+                custom_size: Some(Vec2::new(NAV_BTN_W, NAV_BTN_H)),
+                ..Default::default()
+            },
+            transform: Transform::from_translation(Vec3::new(prev_x, NAV_BTNS_Y, CONTENT_Z)),
             ..Default::default()
         },
         RenderLayers::from_layers(&[3]),
+        UIElement::BestiaryPrevButton,
+        Interactable::default(),
+        BeastiaryBrowserPrevButton,
         BeastiaryBrowserUI,
         UIState::BeastiaryBrowser,
-        Name::new("Beastiary Browser Title"),
+        Name::new("Beastiary Browser Prev"),
     ));
 
-    // Left 2/3 of the panel hosts the 4x4 grid; right 1/3 hosts the details.
-    let split_x = -half_w + inner_w * (2. / 3.);
-    let grid_center_x = (-half_w + split_x) * 0.5;
-    let grid_h = GRID_ROWS as f32 * GRID_CELL_H;
-    let grid_top = (half_h - 40.) - (GRID_CELL_H * 0.5);
-    let grid_w = GRID_COLS as f32 * GRID_CELL_W;
-    let grid_left = grid_center_x - grid_w * 0.5 + GRID_CELL_W * 0.5;
+    commands.spawn((
+        SpriteBundle {
+            texture: graphics.get_ui_element_texture(UIElement::BestiaryNextButton),
+            sprite: Sprite {
+                custom_size: Some(Vec2::new(NAV_BTN_W, NAV_BTN_H)),
+                ..Default::default()
+            },
+            transform: Transform::from_translation(Vec3::new(next_x, NAV_BTNS_Y, CONTENT_Z)),
+            ..Default::default()
+        },
+        RenderLayers::from_layers(&[3]),
+        UIElement::BestiaryNextButton,
+        Interactable::default(),
+        BeastiaryBrowserNextButton,
+        BeastiaryBrowserUI,
+        UIState::BeastiaryBrowser,
+        Name::new("Beastiary Browser Next"),
+    ));
 
-    // Suppress unused warning when grid height isn't otherwise referenced.
-    let _ = grid_h;
-
-    for (i, (card_obj, mob)) in BEASTIARY_MOBS.iter().enumerate() {
-        let col = i % GRID_COLS;
-        let row = i / GRID_COLS;
-        if row >= GRID_ROWS {
-            break;
-        }
-        let x = grid_left + col as f32 * GRID_CELL_W;
-        let y = grid_top - row as f32 * GRID_CELL_H;
-        let entry = beastiary.get(mob);
-        spawn_grid_cell(
-            &mut commands,
-            &asset_server,
-            &graphics,
-            x,
-            y,
-            i,
-            *card_obj,
-            entry.cards_collected,
-        );
-    }
-
-    // Done button along the bottom.
-    let button_y = -half_h + 20.;
+    // Done button below the book panel.
+    let button_y = -PANEL_H * 0.5 - 24.;
     let done_entity = commands
         .spawn((
             SpriteBundle {
@@ -207,7 +225,6 @@ pub fn setup_beastiary_browser_ui(
         .set_parent(done_entity);
 
     // Detail panel placeholder (no selection yet).
-    let detail_center_x = (split_x + half_w) * 0.5;
     spawn_detail_panel(
         &mut commands,
         &asset_server,
@@ -215,11 +232,47 @@ pub fn setup_beastiary_browser_ui(
         &beastiary,
         &proto,
         &mut texture_atlases,
-        detail_center_x,
-        half_h - 50.,
-        inner_w / 3. - 12.,
+        DETAIL_CENTER_X,
+        DETAIL_TOP_Y,
+        DETAIL_WIDTH,
         None,
     );
+}
+
+fn spawn_beastiary_grid(
+    commands: &mut Commands,
+    asset_server: &AssetServer,
+    graphics: &Graphics,
+    beastiary: &Beastiary,
+    page: usize,
+) {
+    let start = page * CARDS_PER_PAGE;
+    let grid_w = GRID_COLS as f32 * GRID_CELL_W;
+    let grid_left = GRID_CENTER_X - grid_w * 0.5 + GRID_CELL_W * 0.5;
+
+    for (local_i, (card_obj, mob)) in BEASTIARY_MOBS
+        .iter()
+        .skip(start)
+        .take(CARDS_PER_PAGE)
+        .enumerate()
+    {
+        let mob_index = start + local_i;
+        let col = local_i % GRID_COLS;
+        let row = local_i / GRID_COLS;
+        let x = grid_left + col as f32 * GRID_CELL_W;
+        let y = GRID_TOP_Y - row as f32 * GRID_CELL_H;
+        let entry = beastiary.get(mob);
+        spawn_grid_cell(
+            commands,
+            asset_server,
+            graphics,
+            x,
+            y,
+            mob_index,
+            *card_obj,
+            entry.cards_collected,
+        );
+    }
 }
 
 fn spawn_grid_cell(
@@ -232,14 +285,14 @@ fn spawn_grid_cell(
     card_obj: WorldObject,
     cards_collected: u32,
 ) {
+    let card_bg = graphics.get_ui_element_texture(UIElement::BestiaryCardBackground);
     if cards_collected == 0 {
-        // Locked placeholder: grey square + alagard 30 "?".
         let cell = commands
             .spawn((
                 SpriteBundle {
+                    texture: card_bg,
                     sprite: Sprite {
-                        color: Color::rgba(0.18, 0.18, 0.2, 0.85),
-                        custom_size: Some(Vec2::new(CARD_DISPLAY_W, CARD_DISPLAY_H)),
+                        custom_size: Some(Vec2::new(CARD_W, CARD_H)),
                         ..Default::default()
                     },
                     transform: Transform::from_translation(Vec3::new(x, y, CONTENT_Z)),
@@ -247,7 +300,7 @@ fn spawn_grid_cell(
                 },
                 RenderLayers::from_layers(&[3]),
                 Interactable::default(),
-                BounceOnHit::default(),
+                BounceOnHit::with_strength_fraction(CARD_BOUNCE_STRENGTH),
                 BeastiaryBrowserUI,
                 UIState::BeastiaryBrowser,
                 BeastiaryCardCell { mob_index },
@@ -272,17 +325,34 @@ fn spawn_grid_cell(
             .insert(UIState::BeastiaryBrowser)
             .set_parent(cell);
     } else {
-        // Owned: render the card sprite at full scale + bottom-right "x{N}" overlay.
-        // `pointcast_2d` reads `Sprite::custom_size` for the hit-test rectangle,
-        // so an invisible `Sprite` component is added alongside the
-        // `TextureAtlasSprite` rendered by `SpriteSheetBundle`.
+        // Owned: card slot background + mob card sprite + bottom-right "x{N}" overlay.
         let mut atlas_sprite = graphics
             .spritesheet_map
             .as_ref()
             .and_then(|map| map.get(&card_obj).cloned())
             .unwrap_or_else(TextureAtlasSprite::default);
-        atlas_sprite.custom_size = Some(Vec2::new(CARD_DISPLAY_W, CARD_DISPLAY_H));
+        atlas_sprite.custom_size = Some(Vec2::new(CARD_SPRITE_W, CARD_SPRITE_H));
         let cell = commands
+            .spawn((
+                SpriteBundle {
+                    texture: card_bg,
+                    sprite: Sprite {
+                        custom_size: Some(Vec2::new(CARD_W, CARD_H)),
+                        ..Default::default()
+                    },
+                    transform: Transform::from_translation(Vec3::new(x, y, CONTENT_Z)),
+                    ..Default::default()
+                },
+                RenderLayers::from_layers(&[3]),
+                Interactable::default(),
+                BounceOnHit::with_strength_fraction(CARD_BOUNCE_STRENGTH),
+                BeastiaryBrowserUI,
+                UIState::BeastiaryBrowser,
+                BeastiaryCardCell { mob_index },
+                Name::new("Beastiary owned card cell"),
+            ))
+            .id();
+        commands
             .spawn((
                 SpriteSheetBundle {
                     sprite: atlas_sprite,
@@ -291,25 +361,13 @@ fn spawn_grid_cell(
                         .as_ref()
                         .expect("texture atlas loaded")
                         .clone(),
-                    transform: Transform::from_translation(Vec3::new(x, y, CONTENT_Z)),
-                    ..Default::default()
-                },
-                // Invisible hit-test Sprite — `pointcast_2d` iterates `Sprite`
-                // components only, not `TextureAtlasSprite`.
-                Sprite {
-                    color: Color::NONE,
-                    custom_size: Some(Vec2::new(CARD_DISPLAY_W, CARD_DISPLAY_H)),
+                    transform: Transform::from_translation(Vec3::new(0., 0., 1.)),
                     ..Default::default()
                 },
                 RenderLayers::from_layers(&[3]),
-                Interactable::default(),
-                BounceOnHit::default(),
-                BeastiaryBrowserUI,
                 UIState::BeastiaryBrowser,
-                BeastiaryCardCell { mob_index },
-                Name::new("Beastiary owned card cell"),
             ))
-            .id();
+            .set_parent(cell);
         commands
             .spawn(Text2dBundle {
                 text: Text::from_section(
@@ -322,9 +380,9 @@ fn spawn_grid_cell(
                 ),
                 text_anchor: Anchor::Center,
                 transform: Transform::from_translation(Vec3::new(
-                    CARD_DISPLAY_W * 0.5 - 4.,
-                    -CARD_DISPLAY_H * 0.5 - 2.,
-                    1.,
+                    CARD_W * 0.5 - 4.,
+                    -CARD_H * 0.5 - 2.,
+                    2.,
                 )),
                 ..Default::default()
             })
@@ -338,7 +396,7 @@ fn spawn_grid_cell(
 /// Extra space between the mob preview and the first detail line (large sprites).
 fn detail_text_offset_below_preview(mob: &Mob) -> f32 {
     match mob {
-        Mob::StoneGolem => 40.,
+        Mob::StoneGolem => 0.,
         _ => 0.,
     }
 }
@@ -430,7 +488,7 @@ fn spawn_detail_panel(
     }
 
     // copies >= 1 reveals: top-center mob preview + name.
-    let preview_y = top_y - 28.;
+    let preview_y = top_y + 62.;
     spawn_mob_preview(
         commands,
         asset_server,
@@ -441,7 +499,7 @@ fn spawn_detail_panel(
         preview_y,
     );
 
-    let mut y = preview_y - 32. - detail_text_offset_below_preview(mob);
+    let mut y = preview_y - 72. - detail_text_offset_below_preview(mob);
     commands.spawn((
         Text2dBundle {
             text: Text::from_section(
@@ -449,12 +507,12 @@ fn spawn_detail_panel(
                 TextStyle {
                     font: asset_server.load("fonts/alagard.ttf"),
                     font_size: 15.0,
-                    color: WHITE,
+                    color: DARK_WOOD_BROWN,
                 },
             )
             .with_alignment(TextAlignment::Center),
             text_anchor: Anchor::Center,
-            transform: Transform::from_translation(Vec3::new(center_x, y, CONTENT_Z)),
+            transform: Transform::from_translation(Vec3::new(center_x, 140., CONTENT_Z)),
             ..Default::default()
         },
         RenderLayers::from_layers(&[3]),
@@ -474,7 +532,7 @@ fn spawn_detail_panel(
                         TextStyle {
                             font: asset_server.load("fonts/4x5.ttf"),
                             font_size: 5.0,
-                            color: WHITE,
+                            color: RED,
                         },
                     )
                     .with_alignment(TextAlignment::Center),
@@ -515,7 +573,7 @@ fn spawn_locked_line(
                 TextStyle {
                     font: asset_server.load("fonts/4x5.ttf"),
                     font_size: 5.0,
-                    color: Color::rgba(0.5, 0.5, 0.55, 1.),
+                    color: GREY,
                 },
             )
             .with_alignment(TextAlignment::Center),
@@ -552,7 +610,7 @@ fn spawn_run_stats(
                     TextStyle {
                         font: asset_server.load("fonts/4x5.ttf"),
                         font_size: 5.0,
-                        color: WHITE,
+                        color: DARK_WOOD_BROWN,
                     },
                 )
                 .with_alignment(TextAlignment::Center),
@@ -779,7 +837,6 @@ pub fn handle_beastiary_card_click(
     graphics: Res<Graphics>,
     beastiary: Res<Beastiary>,
     proto: ProtoParam,
-    resolution: Res<ScreenResolution>,
     mut texture_atlases: ResMut<Assets<TextureAtlas>>,
 ) {
     let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
@@ -815,12 +872,6 @@ pub fn handle_beastiary_card_click(
             commands.entity(entity).despawn_recursive();
         }
         commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.2));
-        let inner_w = (resolution.game_width * 0.92).min(560.);
-        let inner_h = (resolution.game_height - 28.).max(260.).min(360.);
-        let half_w = inner_w * 0.5;
-        let half_h = inner_h * 0.5;
-        let split_x = -half_w + inner_w * (2. / 3.);
-        let detail_center_x = (split_x + half_w) * 0.5;
         spawn_detail_panel(
             &mut commands,
             &asset_server,
@@ -828,15 +879,149 @@ pub fn handle_beastiary_card_click(
             &beastiary,
             &proto,
             &mut texture_atlases,
-            detail_center_x,
-            half_h - 50.,
-            inner_w / 3. - 12.,
+            DETAIL_CENTER_X,
+            DETAIL_TOP_Y,
+            DETAIL_WIDTH,
             Some(&mob),
         );
         // Quiet usage to discourage tree-shaking warnings on `card_for_mob`,
         // which is provided as part of the public API for symmetry with
         // `mob_for_card`.
         let _ = card_for_mob(&mob);
+    }
+}
+
+pub fn refresh_beastiary_grid_on_pagination_change(
+    mut commands: Commands,
+    pagination: Res<BeastiaryPagination>,
+    beastiary: Res<Beastiary>,
+    asset_server: Res<AssetServer>,
+    graphics: Res<Graphics>,
+    existing_cells: Query<Entity, With<BeastiaryCardCell>>,
+) {
+    if !pagination.is_changed() {
+        return;
+    }
+    for entity in existing_cells.iter() {
+        commands.entity(entity).despawn_recursive();
+    }
+    spawn_beastiary_grid(
+        &mut commands,
+        &asset_server,
+        &graphics,
+        &beastiary,
+        pagination.page,
+    );
+}
+
+fn beastiary_prev_normal_sprite(commands: &mut Commands, graphics: &Graphics, entity: Entity) {
+    commands
+        .entity(entity)
+        .insert(UIElement::BestiaryPrevButton)
+        .insert(graphics.get_ui_element_texture(UIElement::BestiaryPrevButton));
+}
+
+fn beastiary_next_normal_sprite(commands: &mut Commands, graphics: &Graphics, entity: Entity) {
+    commands
+        .entity(entity)
+        .insert(UIElement::BestiaryNextButton)
+        .insert(graphics.get_ui_element_texture(UIElement::BestiaryNextButton));
+}
+
+pub fn handle_beastiary_pagination_clicks(
+    cursor_pos: Res<CursorPos>,
+    mouse_input: Res<Input<MouseButton>>,
+    ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
+    mut prev_buttons: Query<
+        (Entity, &mut Interactable),
+        (
+            With<BeastiaryBrowserPrevButton>,
+            Without<BeastiaryBrowserNextButton>,
+        ),
+    >,
+    mut next_buttons: Query<
+        (Entity, &mut Interactable),
+        (
+            With<BeastiaryBrowserNextButton>,
+            Without<BeastiaryBrowserPrevButton>,
+        ),
+    >,
+    mut pagination: ResMut<BeastiaryPagination>,
+    mut commands: Commands,
+    graphics: Res<Graphics>,
+) {
+    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    let left_mouse_released = mouse_input.just_released(MouseButton::Left);
+    let total_pages = beastiary_total_pages();
+
+    let Some(hit) = hit_test else {
+        for (entity, mut interactable) in prev_buttons.iter_mut() {
+            if matches!(interactable.current(), Interaction::Hovering) {
+                interactable.change(Interaction::None);
+                beastiary_prev_normal_sprite(&mut commands, &graphics, entity);
+            }
+        }
+        for (entity, mut interactable) in next_buttons.iter_mut() {
+            if matches!(interactable.current(), Interaction::Hovering) {
+                interactable.change(Interaction::None);
+                beastiary_next_normal_sprite(&mut commands, &graphics, entity);
+            }
+        }
+        return;
+    };
+
+    for (entity, mut interactable) in prev_buttons.iter_mut() {
+        if hit.0 == entity {
+            match interactable.current() {
+                Interaction::None => {
+                    interactable.change(Interaction::Hovering);
+                    commands
+                        .entity(entity)
+                        .insert(UIElement::BestiaryPrevButtonHover)
+                        .insert(
+                            graphics.get_ui_element_texture(UIElement::BestiaryPrevButtonHover),
+                        );
+                    commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonHover, 0.05));
+                }
+                Interaction::Hovering => {
+                    if left_mouse_released && pagination.page > 0 {
+                        pagination.page -= 1;
+                        commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.2));
+                    }
+                }
+                _ => {}
+            }
+        } else if matches!(interactable.current(), Interaction::Hovering) {
+            interactable.change(Interaction::None);
+            beastiary_prev_normal_sprite(&mut commands, &graphics, entity);
+        }
+    }
+
+    for (entity, mut interactable) in next_buttons.iter_mut() {
+        if hit.0 == entity {
+            match interactable.current() {
+                Interaction::None => {
+                    interactable.change(Interaction::Hovering);
+                    commands
+                        .entity(entity)
+                        .insert(UIElement::BestiaryNextButtonHover)
+                        .insert(
+                            graphics.get_ui_element_texture(UIElement::BestiaryNextButtonHover),
+                        );
+                    commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonHover, 0.05));
+                }
+                Interaction::Hovering => {
+                    if left_mouse_released && pagination.page + 1 < total_pages {
+                        pagination.page += 1;
+                        commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.2));
+                    }
+                }
+                _ => {}
+            }
+        } else if matches!(interactable.current(), Interaction::Hovering) {
+            interactable.change(Interaction::None);
+            beastiary_next_normal_sprite(&mut commands, &graphics, entity);
+        }
     }
 }
 
@@ -877,9 +1062,11 @@ pub fn cleanup_beastiary_browser_ui(
     mut commands: Commands,
     query: Query<Entity, With<BeastiaryBrowserUI>>,
     mut selected: ResMut<SelectedBeastiaryMob>,
+    mut pagination: ResMut<BeastiaryPagination>,
 ) {
     for entity in query.iter() {
         commands.entity(entity).despawn_recursive();
     }
     selected.0 = None;
+    pagination.page = 0;
 }

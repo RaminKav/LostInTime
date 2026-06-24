@@ -34,6 +34,7 @@ aseprite!(pub PlayerGreyAseprite, "textures/player/player_grey.aseprite");
 aseprite!(pub PlayerGreenAseprite, "textures/player/player_green.aseprite");
 aseprite!(pub PlayerRogueAseprite, "textures/player/player_rogue.aseprite");
 aseprite!(pub PlayerThiefAseprite, "textures/player/player_thief.aseprite");
+aseprite!(pub PlayerWizardAseprite, "textures/player/player_wizard.aseprite");
 aseprite!(pub PlayerHunterAseprite, "textures/player/player_hunter.aseprite");
 
 #[derive(Resource)]
@@ -44,6 +45,7 @@ pub struct PlayerSpriteHandles {
     pub blue: Handle<Aseprite>,
     pub rogue: Handle<Aseprite>,
     pub thief: Handle<Aseprite>,
+    pub wizard: Handle<Aseprite>,
     pub hunter: Handle<Aseprite>,
 
     pub slime_pet: Handle<Aseprite>,
@@ -172,12 +174,23 @@ impl PlayerAnimation {
 #[derive(Component)]
 pub struct PlayerAnimationState {
     pub prev_dir: FacingDirection,
+    /// Previous aseprite frame index, used to detect when a one-time tag loops.
+    prev_aseprite_frame: usize,
+    /// Set once the animation advances past its first frame.
+    seen_aseprite_progress: bool,
 }
 impl PlayerAnimationState {
     pub fn new() -> Self {
         Self {
             prev_dir: FacingDirection::Down,
+            prev_aseprite_frame: 0,
+            seen_aseprite_progress: false,
         }
+    }
+
+    fn reset_aseprite_frame_tracker(&mut self) {
+        self.prev_aseprite_frame = 0;
+        self.seen_aseprite_progress = false;
     }
 }
 
@@ -235,6 +248,9 @@ pub fn handle_anim_change_when_player_dir_changes(
         }
 
         prev_dir.prev_dir = new_dir.clone();
+        if curr_anim.is_one_time_anim() {
+            prev_dir.reset_aseprite_frame_tracker();
+        }
     }
 }
 
@@ -249,9 +265,10 @@ pub fn handle_player_animation_change(
         Changed<PlayerAnimation>,
     >,
 ) {
-    for (curr_anim, mut aseprite_anim, mut prev_dir, dir) in query.iter_mut() {
+    for (curr_anim, mut aseprite_anim, mut anim_state, dir) in query.iter_mut() {
         *aseprite_anim = AsepriteAnimation::from(curr_anim.get_str(dir.clone()));
-        prev_dir.prev_dir = dir.clone();
+        anim_state.prev_dir = dir.clone();
+        anim_state.reset_aseprite_frame_tracker();
     }
 }
 
@@ -259,17 +276,40 @@ pub fn cleanup_one_time_animations(
     mut query: Query<(
         Entity,
         &PlayerAnimation,
-        &AsepriteAnimation,
+        &mut AsepriteAnimation,
+        &mut PlayerAnimationState,
         Option<&crate::attributes::AttackCooldown>,
         Option<&mut AttackAnimationTimer>,
     )>,
     mut commands: Commands,
     time: Res<Time>,
 ) {
-    for (e, curr_anim, anim_state, attack_cooldown_option, attack_timer_option) in query.iter_mut()
+    for (
+        e,
+        curr_anim,
+        mut aseprite_anim,
+        mut anim_state,
+        attack_cooldown_option,
+        attack_timer_option,
+    ) in query.iter_mut()
     {
         if curr_anim.is_one_time_anim() {
-            let mut animation_finished = anim_state.just_finished();
+            let current_frame = aseprite_anim.current_frame();
+            // bevy_aseprite always loops Forward tags back to the first frame.
+            // `just_finished()` is only true for one frame when entering the last
+            // frame, and is cleared at the start of the next `update_animations`
+            // tick. If the last frame duration is shorter than one game tick
+            // (e.g. 10ms at 60fps ≈ 16.7ms delta), the next tick can consume
+            // the last frame and loop back to frame 0 before cleanup runs — leaving
+            // Teleport stuck replaying its opening frames.
+            let looped = anim_state.seen_aseprite_progress
+                && current_frame < anim_state.prev_aseprite_frame;
+            if current_frame > 0 {
+                anim_state.seen_aseprite_progress = true;
+            }
+            anim_state.prev_aseprite_frame = current_frame;
+
+            let mut animation_finished = aseprite_anim.just_finished() || looped;
 
             // Allow attack animations to be interrupted early if attack cooldown is very low
             // This prevents animation duration from being the bottleneck for attack speed
@@ -287,6 +327,7 @@ pub fn cleanup_one_time_animations(
             }
 
             if animation_finished {
+                aseprite_anim.pause();
                 commands.entity(e).insert(PlayerAnimation::Idle);
                 commands.entity(e).remove::<AttackAnimationTimer>();
             }
@@ -301,6 +342,7 @@ pub fn preload_player_sprites(mut commands: Commands, asset_server: Res<AssetSer
         green: asset_server.load(PlayerGreenAseprite::PATH),
         rogue: asset_server.load(PlayerRogueAseprite::PATH),
         thief: asset_server.load(PlayerThiefAseprite::PATH),
+        wizard: asset_server.load(PlayerWizardAseprite::PATH),
         hunter: asset_server.load(PlayerHunterAseprite::PATH),
         blue: asset_server.load(PlayerBlueAseprite::PATH),
         slime_pet: asset_server.load(SlimePetSprite::PATH),

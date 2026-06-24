@@ -165,11 +165,11 @@ pub enum UIElement {
     HeirloomChestOpeningLegendary,
     FairyPetIcon,
     SlimePetIcon,
-    GreenPlayerSelectIcon,
-    RoguePlayerSelectIcon,
-    RedPlayerSelectIcon,
-    BluePlayerSelectIcon,
-    GreyPlayerSelectIcon,
+    WarriorPortrait,
+    WizardPortrait,
+    RoguePortrait,
+    ThiefPortrait,
+    HunterPortrait,
     PlayerSelect,
     PlayerSelectSlot,
     PlayerSelectSlotHover,
@@ -224,6 +224,12 @@ pub enum UIElement {
     MerchantContainer,
     ChestButton,
     ChestButtonBanish,
+    Bestiary,
+    BestiaryCardBackground,
+    BestiaryPrevButton,
+    BestiaryPrevButtonHover,
+    BestiaryNextButton,
+    BestiaryNextButtonHover,
 }
 impl UIElement {
     pub fn get_hover_state(&self) -> Option<UIElement> {
@@ -250,6 +256,8 @@ impl UIElement {
             UIElement::BlueprintSlot => Some(UIElement::BlueprintSlotHover),
             UIElement::ButtonPageUp => Some(UIElement::ButtonPageUpHover),
             UIElement::ButtonPageDown => Some(UIElement::ButtonPageDownHover),
+            UIElement::BestiaryPrevButton => Some(UIElement::BestiaryPrevButtonHover),
+            UIElement::BestiaryNextButton => Some(UIElement::BestiaryNextButtonHover),
             _ => None,
         }
     }
@@ -277,6 +285,8 @@ impl UIElement {
             UIElement::BlueprintSlotHover => Some(UIElement::BlueprintSlot),
             UIElement::ButtonPageUpHover => Some(UIElement::ButtonPageUp),
             UIElement::ButtonPageDownHover => Some(UIElement::ButtonPageDown),
+            UIElement::BestiaryPrevButtonHover => Some(UIElement::BestiaryPrevButton),
+            UIElement::BestiaryNextButtonHover => Some(UIElement::BestiaryNextButton),
             _ => None,
         }
     }

@@ -566,6 +566,7 @@ impl Plugin for UIPlugin {
             .init_resource::<DevHeirloomGridOpen>()
             .init_resource::<DevSkillGridOpen>()
             .init_resource::<SelectedBeastiaryMob>()
+            .init_resource::<BeastiaryPagination>()
             .add_event::<TooltipTeardownEvent>()
             .add_event::<ShowInvPlayerStatsEvent>()
             .add_event::<DamageTrackerRefreshEvent>()
@@ -991,11 +992,17 @@ impl Plugin for UIPlugin {
             .add_systems(
                 (
                     setup_beastiary_browser_ui
+                        .before(refresh_beastiary_grid_on_pagination_change)
                         .before(CustomFlush)
                         .run_if(state_changed::<UIState>().and_then(in_state(UIState::BeastiaryBrowser))),
                     cleanup_beastiary_browser_ui
                         .run_if(state_changed::<UIState>().and_then(not(in_state(UIState::BeastiaryBrowser)))),
                     handle_beastiary_browser_done_button
+                        .run_if(in_state(UIState::BeastiaryBrowser)),
+                    handle_beastiary_pagination_clicks
+                        .before(refresh_beastiary_grid_on_pagination_change)
+                        .run_if(in_state(UIState::BeastiaryBrowser)),
+                    refresh_beastiary_grid_on_pagination_change
                         .run_if(in_state(UIState::BeastiaryBrowser)),
                     handle_beastiary_card_click
                         .run_if(in_state(UIState::BeastiaryBrowser)),
