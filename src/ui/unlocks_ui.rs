@@ -45,7 +45,7 @@ pub struct UnlockButtonLabel;
 pub struct UnlocksCurrencyText;
 
 /// Vertical offset applied to title, currency, and unlock rows (back button stays put).
-const UNLOCKS_CONTENT_Y_OFFSET: f32 = 30.0;
+const UNLOCKS_CONTENT_Y_OFFSET: f32 = 62.0;
 const UNLOCK_BUTTON_DISABLED_SPRITE: Color = Color::rgb(0.55, 0.55, 0.55);
 const UNLOCK_BUTTON_DISABLED_LABEL: Color = Color::rgb(0.7, 0.7, 0.7);
 
@@ -61,7 +61,7 @@ fn unlock_purchase_button_label(is_maxed: bool) -> &'static str {
     }
 }
 
-const UNLOCK_ROWS: [UnlockUpgradeKind; 8] = [
+const UNLOCK_ROWS: [UnlockUpgradeKind; 9] = [
     UnlockUpgradeKind::Reroll,
     UnlockUpgradeKind::Banish,
     UnlockUpgradeKind::StartSupplies,
@@ -70,6 +70,7 @@ const UNLOCK_ROWS: [UnlockUpgradeKind; 8] = [
     UnlockUpgradeKind::StartOrb,
     UnlockUpgradeKind::StartingTools,
     UnlockUpgradeKind::MapMarkers,
+    UnlockUpgradeKind::ThirdSkillSlot,
 ];
 
 fn unlock_effect_summary(kind: UnlockUpgradeKind, upgrades: &UnlockUpgrades) -> String {
@@ -145,6 +146,13 @@ fn unlock_effect_summary(kind: UnlockUpgradeKind, upgrades: &UnlockUpgrades) -> 
                 "s"
             }
         ),
+        UnlockUpgradeKind::ThirdSkillSlot => {
+            if upgrades.third_skill_slot_unlocked {
+                "Unlocked: 3rd skill slot for all classes".to_string()
+            } else {
+                "Unlock the 3rd skill slot for all classes".to_string()
+            }
+        }
     }
 }
 
@@ -412,7 +420,7 @@ pub fn setup_unlocks_ui(
 
     // Back Button
     let back_button = spawn_back_button(
-        Vec3::new(0., -148., 11.),
+        Vec3::new(0., -158., 11.),
         &mut commands,
         &graphics,
         &asset_server,

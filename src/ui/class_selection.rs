@@ -221,7 +221,6 @@ pub fn setup_class_selection_ui(
     high_scores: Option<Res<HighScores>>,
     achievements: Option<Res<Achievements>>,
     unlocked_classes: Res<UnlockedClasses>,
-    unlocked_skills: Res<UnlockedSkills>,
     unlock_currency: Option<Res<TimeFragmentCurrency>>,
     _class_unlocks: Option<Res<ClassUnlockData>>,
     cheat_settings: Res<CheatSettings>,
@@ -536,7 +535,6 @@ pub fn setup_class_selection_ui(
         }
     }
 
-    let pet_count = Pet::iter().count() as f32;
     for (i, pet) in Pet::iter().enumerate() {
         let pet_selected = default_pet.as_ref().is_some_and(|d| *d == pet);
 
@@ -664,8 +662,6 @@ pub fn setup_class_selection_ui(
         &graphics,
         &class_ranks,
         high_scores.as_ref(),
-        &unlocked_skills,
-        cheat_settings.bypass_class_unlocks,
     );
 
     // No pet preview by default - wait for player selection
@@ -856,226 +852,6 @@ fn spawn_class_unlock_confirm_ui(commands: &mut Commands, asset_server: &AssetSe
 }
 
 /// Renders an unlocked-but-empty skill slot in the class preview.
-fn spawn_empty_skill_slot_preview(
-    commands: &mut Commands,
-    asset_server: &AssetServer,
-    parent: Entity,
-) {
-    const ICONS_X_OFFSET: f32 = -24.;
-    const TITLE_Y: f32 = 20.;
-    const DESC_TEXT_X: f32 = ICONS_X_OFFSET + 12.;
-    const TEXT_Y_OFFSET: f32 = 10.;
-
-    commands
-        .spawn((
-            SpriteBundle {
-                sprite: Sprite {
-                    color: Color::rgba(0.08, 0.08, 0.1, 0.55),
-                    custom_size: Some(CLASS_PREVIEW_ICON_SIZE),
-                    ..Default::default()
-                },
-                transform: Transform::from_translation(Vec3::new(ICONS_X_OFFSET, 0., 2.)),
-                ..Default::default()
-            },
-            RenderLayers::from_layers(&[3]),
-            ClassPreviewSkillEntry,
-            Name::new("EMPTY SKILL ICON"),
-        ))
-        .set_parent(parent);
-
-    commands
-        .spawn((
-            Text2dBundle {
-                text: Text::from_section(
-                    "—",
-                    TextStyle {
-                        font: asset_server.load("fonts/alagard.ttf"),
-                        font_size: 15.0,
-                        color: WHITE,
-                    },
-                ),
-                text_anchor: Anchor::TopLeft,
-                transform: Transform::from_translation(Vec3::new(DESC_TEXT_X, TITLE_Y, 2.)),
-                ..Default::default()
-            },
-            RenderLayers::from_layers(&[3]),
-            ClassPreviewSkillEntry,
-            Name::new("EMPTY SKILL TITLE"),
-        ))
-        .set_parent(parent);
-
-    commands
-        .spawn((
-            Text2dBundle {
-                text: Text::from_section(
-                    "Obtain more skills during the run!",
-                    TextStyle {
-                        font: asset_server.load(BODY_FONT),
-                        font_size: BODY_FONT_SIZE,
-                        color: DARK_WOOD_BROWN,
-                    },
-                )
-                .with_alignment(TextAlignment::Left),
-                text_anchor: Anchor::TopLeft,
-                transform: Transform::from_translation(Vec3::new(
-                    DESC_TEXT_X,
-                    TEXT_Y_OFFSET - 2.,
-                    2.,
-                )),
-                ..Default::default()
-            },
-            RenderLayers::from_layers(&[3]),
-            ClassPreviewSkillEntry,
-            Name::new("EMPTY SKILL DESC"),
-        ))
-        .set_parent(parent);
-}
-
-/// Renders a locked-skill placeholder inside the given `parent` skill container
-/// of the class preview. Mimics the `time_crystals_browser_ui` lock styling: a
-fn spawn_locked_skill_content(
-    commands: &mut Commands,
-    asset_server: &AssetServer,
-    parent: Entity,
-    class: SkillClass,
-    slot_index: usize,
-) {
-    const ICONS_X_OFFSET: f32 = -24.;
-    const TITLE_Y: f32 = 20.;
-    const DESC_TEXT_X: f32 = ICONS_X_OFFSET + 12.;
-    const TEXT_Y_OFFSET: f32 = 10.;
-    /// Matches [`UIElement::SkillTooltipBanner`] width used with skill tooltips.
-    const ROW_HIT_W: f32 = 236.;
-    const ROW_HIT_H: f32 = 56.;
-    /// Centers the hit rect over icon + title + body (aligned with shrine skill rows).
-    const ROW_HIT_POS: Vec3 = Vec3::new(70., -4., -12.);
-
-    let cost = UnlockedSkills::cost_for_slot(slot_index);
-    let ordinal = match slot_index {
-        2 => "3rd",
-        3 => "4th",
-        n => return_ordinal(n),
-    };
-
-    commands
-        .spawn((
-            SpriteBundle {
-                sprite: Sprite {
-                    color: Color::rgba(0., 0., 0., 0.),
-                    custom_size: Some(Vec2::new(ROW_HIT_W, ROW_HIT_H)),
-                    ..Default::default()
-                },
-                transform: Transform::from_translation(ROW_HIT_POS),
-                ..Default::default()
-            },
-            RenderLayers::from_layers(&[3]),
-            Interactable::default(),
-            LockedSkillSlot {
-                class: class.clone(),
-                slot_index,
-                cost,
-            },
-            ClassPreviewSkillEntry,
-            Name::new("LOCKED SKILL ROW HIT"),
-        ))
-        .set_parent(parent);
-
-    let icon_bg = commands
-        .spawn((
-            SpriteBundle {
-                sprite: Sprite {
-                    color: Color::rgba(0.08, 0.08, 0.1, 0.85),
-                    custom_size: Some(CLASS_PREVIEW_ICON_SIZE),
-                    ..Default::default()
-                },
-                transform: Transform::from_translation(Vec3::new(ICONS_X_OFFSET, 0., 2.)),
-                ..Default::default()
-            },
-            RenderLayers::from_layers(&[3]),
-            ClassPreviewSkillEntry,
-            Name::new("LOCKED SKILL ICON"),
-        ))
-        .set_parent(parent)
-        .id();
-
-    commands
-        .spawn((
-            Text2dBundle {
-                text: Text::from_section(
-                    "?",
-                    TextStyle {
-                        font: asset_server.load("fonts/alagard.ttf"),
-                        font_size: 15.0,
-                        color: WHITE,
-                    },
-                ),
-                text_anchor: Anchor::Center,
-                transform: Transform::from_translation(Vec3::new(1., 0., 1.)),
-                ..Default::default()
-            },
-            RenderLayers::from_layers(&[3]),
-            ClassPreviewSkillEntry,
-            Name::new("LOCKED SKILL ICON ?"),
-        ))
-        .set_parent(icon_bg);
-
-    commands
-        .spawn((
-            Text2dBundle {
-                text: Text::from_section(
-                    "???",
-                    TextStyle {
-                        font: asset_server.load("fonts/slkscrbold.ttf"),
-                        font_size: 8.5,
-                        color: DARK_WOOD_BROWN,
-                    },
-                )
-                .with_alignment(TextAlignment::Left),
-                text_anchor: Anchor::TopLeft,
-                transform: Transform::from_translation(Vec3::new(DESC_TEXT_X, TITLE_Y, 2.)),
-                ..Default::default()
-            },
-            RenderLayers::from_layers(&[3]),
-            ClassPreviewSkillEntry,
-            Name::new("LOCKED SKILL TITLE"),
-        ))
-        .set_parent(parent);
-
-    commands
-        .spawn((
-            Text2dBundle {
-                text: Text::from_section(
-                    format!("Unlock {} Skill for {} Time\nFragments", ordinal, cost),
-                    TextStyle {
-                        font: asset_server.load(BODY_FONT),
-                        font_size: BODY_FONT_SIZE,
-                        color: DARK_WOOD_BROWN,
-                    },
-                )
-                .with_alignment(TextAlignment::Left),
-                text_anchor: Anchor::TopLeft,
-                transform: Transform::from_translation(Vec3::new(
-                    DESC_TEXT_X,
-                    TEXT_Y_OFFSET - 2.,
-                    2.,
-                )),
-                ..Default::default()
-            },
-            RenderLayers::from_layers(&[3]),
-            ClassPreviewSkillEntry,
-            Name::new("LOCKED SKILL DESC"),
-        ))
-        .set_parent(parent);
-}
-
-fn return_ordinal(n: usize) -> &'static str {
-    // Fallback, not expected to be hit since only slots 2/3 are lockable.
-    match n {
-        0 => "1st",
-        1 => "2nd",
-        _ => "Nth",
-    }
-}
 
 fn spawn_skill_unlock_confirm_ui(commands: &mut Commands, asset_server: &AssetServer) {
     let panel_entity = commands
@@ -1781,8 +1557,6 @@ fn spawn_player_preview(
     graphics: &Res<Graphics>,
     class_ranks: &Res<ClassRankSystem>,
     high_scores: Option<&Res<HighScores>>,
-    unlocked_skills: &UnlockedSkills,
-    bypass_unlocks: bool,
 ) -> Entity {
     let ICONS_X_OFFSET = -24.;
     // let SKILL_X_OFFSET = -20.;
@@ -2130,17 +1904,6 @@ fn spawn_player_preview(
                 CLASS_PREVIEW_ICON_SIZE,
             );
         }
-        // else if is_unlocked {
-        //     spawn_empty_skill_slot_preview(commands, asset_server, skill_container);
-        // } else {
-        //     spawn_locked_skill_content(
-        //         commands,
-        //         asset_server,
-        //         skill_container,
-        //         selected_class.clone(),
-        //         skill_index,
-        //     );
-        // }
     }
 
     player_container
@@ -2378,7 +2141,6 @@ pub fn update_preview_sprites(
     class_ranks: Res<ClassRankSystem>,
     high_scores: Option<Res<HighScores>>,
     unlocked_skills: Res<UnlockedSkills>,
-    cheat_settings: Res<CheatSettings>,
 ) {
     if !selection_state.is_changed() && !unlocked_skills.is_changed() {
         return;
@@ -2405,8 +2167,6 @@ pub fn update_preview_sprites(
             &graphics,
             &class_ranks,
             high_scores.as_ref(),
-            &unlocked_skills,
-            cheat_settings.bypass_class_unlocks,
         );
     }
 

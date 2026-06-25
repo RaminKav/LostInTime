@@ -21,7 +21,7 @@ use crate::{
             effective_player_attack_speed_multiplier, ActiveSkillChoiceState, PlayerClass,
             PlayerSkills,
         },
-        unlocks::{RunUnlockState, UnlockedSkills},
+        unlocks::{RunUnlockState, UnlockUpgrades, UnlockedSkills},
         Player,
     },
     ui::{
@@ -686,6 +686,7 @@ pub fn handle_active_skill_shrine_ui_interaction(
     mut commands: Commands,
     mut player_skills: Query<(Entity, &mut PlayerSkills, &PlayerClass), With<Player>>,
     unlocked_skills: Res<UnlockedSkills>,
+    unlock_upgrades: Res<UnlockUpgrades>,
     cheat_settings: Res<CheatSettings>,
     mut att_event: EventWriter<crate::attributes::AttributeChangeEvent>,
     mut shrine_query: Query<&mut crate::item::active_skill_shrine::ActiveSkillShrineState>,
@@ -721,6 +722,7 @@ pub fn handle_active_skill_shrine_ui_interaction(
                             &skills,
                             &player_class.class,
                             &unlocked_skills,
+                            &unlock_upgrades,
                             cheat_settings.bypass_class_unlocks,
                         ) {
                             ShrineAssignAction::AutoFill(slot) => {
@@ -997,6 +999,7 @@ pub fn setup_active_skill_shrine_overwrite_ui(
         With<Player>,
     >,
     unlocked_skills: Res<UnlockedSkills>,
+    unlock_upgrades: Res<UnlockUpgrades>,
     cheat_settings: Res<CheatSettings>,
 ) {
     let overwrite_overlay = spawn_full_screen_ui_overlay_tuned(&mut commands, &res, 0.0, 0.95, 9.);
@@ -1019,6 +1022,7 @@ pub fn setup_active_skill_shrine_overwrite_ui(
     let assignable_slots = shrine_assignable_slots(
         &player_class.class,
         &unlocked_skills,
+        &unlock_upgrades,
         cheat_settings.bypass_class_unlocks,
     );
     let has_empty_target = assignable_slots

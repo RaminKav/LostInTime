@@ -49,17 +49,15 @@ impl UnlockedClasses {
 }
 
 /// Per-class unlocked active skill slots beyond the default (0, 1). Persists
-/// purchases of the 3rd/4th class skills using Time Fragments. Slots 0 and 1
-/// are always considered unlocked and are not tracked here.
+/// legacy per-class purchases of the 4th class skill (slot 3) using Time
+/// Fragments. Slot 2 is unlocked globally via [`UnlockUpgrades::third_skill_slot_unlocked`].
+/// Slots 0 and 1 are always considered unlocked and are not tracked here.
 #[derive(Resource, Debug, Clone, Default, Serialize, Deserialize)]
 pub struct UnlockedSkills {
     /// Set of `(class, slot_index)` pairs that have been purchased. Only slot
     /// indices 2 and 3 are ever inserted; 0 and 1 are free.
     pub entries: HashSet<(SkillClass, usize)>,
 }
-
-/// Time Fragment costs for unlocking a given class skill slot.
-pub const SKILL_UNLOCK_COSTS: [u32; 4] = [0, 0, 15, 30];
 
 impl UnlockedSkills {
     pub fn new<I: IntoIterator<Item = (SkillClass, usize)>>(entries: I) -> Self {
@@ -69,12 +67,23 @@ impl UnlockedSkills {
     }
 
     /// Returns true if the given class skill slot is available to the player.
-    /// Slots 0 and 1 are always unlocked. Slots 2 and 3 require purchase. Any
-    /// other slot index is considered unlocked (e.g. blessing-granted slot 4).
-    pub fn is_unlocked(&self, class: &SkillClass, slot: usize) -> bool {
+    /// Slots 0 and 1 are always unlocked. Slot 2 requires the global
+    /// [`UnlockUpgrades::third_skill_slot_unlocked`] shop purchase (or a legacy
+    /// per-class entry). Slot 3 still requires a per-class purchase. Any other
+    /// slot index is considered unlocked (e.g. blessing-granted slot 4).
+    pub fn is_unlocked(
+        &self,
+        class: &SkillClass,
+        slot: usize,
+        unlock_upgrades: &UnlockUpgrades,
+    ) -> bool {
         match slot {
             0 | 1 => true,
-            2 | 3 => self.entries.contains(&(class.clone(), slot)),
+            2 => {
+                unlock_upgrades.third_skill_slot_unlocked
+                    || self.entries.contains(&(class.clone(), slot))
+            }
+            3 => self.entries.contains(&(class.clone(), slot)),
             _ => true,
         }
     }
@@ -85,10 +94,6 @@ impl UnlockedSkills {
 
     pub fn to_vec(&self) -> Vec<(SkillClass, usize)> {
         self.entries.iter().cloned().collect()
-    }
-
-    pub fn cost_for_slot(slot: usize) -> u32 {
-        SKILL_UNLOCK_COSTS.get(slot).copied().unwrap_or(0)
     }
 }
 
@@ -133,6 +138,7 @@ pub enum UnlockUpgradeKind {
     StartOrb,
     StartingTools,
     MapMarkers,
+    ThirdSkillSlot,
 }
 
 impl UnlockUpgradeKind {
@@ -146,6 +152,7 @@ impl UnlockUpgradeKind {
             UnlockUpgradeKind::StartOrb => "Start with Orbs",
             UnlockUpgradeKind::StartingTools => "Starting Tools",
             UnlockUpgradeKind::MapMarkers => "Map Markers",
+            UnlockUpgradeKind::ThirdSkillSlot => "3rd Skill Slot",
         }
     }
     pub fn is_disabled(&self) -> bool {
@@ -158,6 +165,7 @@ impl UnlockUpgradeKind {
             UnlockUpgradeKind::StartOrb => true,
             UnlockUpgradeKind::StartingTools => false,
             UnlockUpgradeKind::MapMarkers => false,
+            UnlockUpgradeKind::ThirdSkillSlot => false,
         }
     }
 }
@@ -174,7 +182,8 @@ pub struct UnlockUpgrades {
     pub tome_tier: u32,
     pub orb_tier: u32,
     pub starting_tools_tier: u32,
-    pub second_active_skill_slot_unlocked: bool,
+    #[serde(alias = "second_active_skill_slot_unlocked")]
+    pub third_skill_slot_unlocked: bool,
     /// Each tier unlocks one extra map marker beyond the first (max tier 2 -> 3 markers).
     pub map_marker_tier: u32,
 }
@@ -190,6 +199,7 @@ impl UnlockUpgrades {
             UnlockUpgradeKind::StartOrb => 30,
             UnlockUpgradeKind::StartingTools => 50, // Tier 1: WoodAxe, Tier 2: Pickaxe
             UnlockUpgradeKind::MapMarkers => 40,
+            UnlockUpgradeKind::ThirdSkillSlot => 100,
         }
     }
 
@@ -203,6 +213,7 @@ impl UnlockUpgrades {
             UnlockUpgradeKind::StartOrb => self.orb_tier,
             UnlockUpgradeKind::StartingTools => self.starting_tools_tier,
             UnlockUpgradeKind::MapMarkers => self.map_marker_tier,
+            UnlockUpgradeKind::ThirdSkillSlot => u32::from(self.third_skill_slot_unlocked),
         }
     }
 
@@ -228,11 +239,13 @@ impl UnlockUpgrades {
             UnlockUpgradeKind::MapMarkers => {
                 self.map_marker_tier = (self.map_marker_tier + 1).min(2);
             }
+            UnlockUpgradeKind::ThirdSkillSlot => self.third_skill_slot_unlocked = true,
         }
     }
 
     pub fn is_unlocked(&self, kind: UnlockUpgradeKind) -> bool {
         match kind {
+            UnlockUpgradeKind::ThirdSkillSlot => self.third_skill_slot_unlocked,
             _ => self.tier(kind) > 0,
         }
     }
@@ -260,6 +273,13 @@ impl UnlockUpgrades {
                     0 => 20, // 2nd marker
                     1 => 40, // 3rd marker
                     _ => 0,  // Max tier reached
+                }
+            }
+            UnlockUpgradeKind::ThirdSkillSlot => {
+                if self.third_skill_slot_unlocked {
+                    0
+                } else {
+                    100
                 }
             }
             UnlockUpgradeKind::Reroll => {
@@ -352,6 +372,7 @@ impl UnlockUpgrades {
             UnlockUpgradeKind::StartTome => self.tome_tier >= 5,
             UnlockUpgradeKind::StartOrb => self.orb_tier >= 5,
             UnlockUpgradeKind::MapMarkers => self.map_marker_tier >= 2,
+            UnlockUpgradeKind::ThirdSkillSlot => self.third_skill_slot_unlocked,
         }
     }
 }

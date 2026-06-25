@@ -59,7 +59,7 @@ use crate::{
             ManaGainSource, ManaTrackerResetTimer, PlayerClass, PlayerSkills, SkillClass,
             VISIBLE_CLASS_SKILL_COUNT,
         },
-        unlocks::UnlockedSkills,
+        unlocks::{UnlockUpgrades, UnlockedSkills},
         CoinCurrency, Player, RunScore, TimeFragmentCurrency,
     },
     proto::proto_param::ProtoParam,
@@ -181,6 +181,7 @@ pub struct ActiveSkillLockIcon {
 #[derive(SystemParam)]
 pub struct SkillSlotUnlockState<'w> {
     unlocked_skills: Res<'w, UnlockedSkills>,
+    unlock_upgrades: Res<'w, UnlockUpgrades>,
     player_class: Option<Res<'w, PlayerClass>>,
     cheat_settings: Option<Res<'w, CheatSettings>>,
 }
@@ -200,7 +201,9 @@ impl SkillSlotUnlockState<'_> {
             .as_ref()
             .map(|player_class| player_class.class.clone())
             .unwrap_or(SkillClass::None);
-        !self.unlocked_skills.is_unlocked(&class, slot_index)
+        !self
+            .unlocked_skills
+            .is_unlocked(&class, slot_index, &self.unlock_upgrades)
     }
 }
 

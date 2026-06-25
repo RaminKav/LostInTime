@@ -9,7 +9,7 @@ use crate::{
             get_disabled_skills, ActiveSkill, ActiveSkillChoiceState, HeirloomRarity, PlayerSkills,
             SkillClass,
         },
-        unlocks::UnlockedSkills,
+        unlocks::{UnlockUpgrades, UnlockedSkills},
     },
     ui::{key_input_guide::InteractionGuideTrigger, minimap::UpdateMiniMapEvent, UIState},
     world::TileMapPosition,
@@ -128,10 +128,11 @@ pub fn skill_choices_from_offer_skills(skills: &[ActiveSkill]) -> Vec<ActiveSkil
 pub fn shrine_assignable_slots(
     class: &SkillClass,
     unlocked: &UnlockedSkills,
+    unlock_upgrades: &UnlockUpgrades,
     bypass_unlocks: bool,
 ) -> Vec<usize> {
     let mut slots = vec![1];
-    if bypass_unlocks || unlocked.is_unlocked(class, 2) {
+    if bypass_unlocks || unlocked.is_unlocked(class, 2, unlock_upgrades) {
         slots.push(2);
     }
     slots
@@ -148,9 +149,10 @@ pub fn shrine_assign_action(
     skills: &PlayerSkills,
     class: &SkillClass,
     unlocked: &UnlockedSkills,
+    unlock_upgrades: &UnlockUpgrades,
     bypass_unlocks: bool,
 ) -> ShrineAssignAction {
-    let assignable = shrine_assignable_slots(class, unlocked, bypass_unlocks);
+    let assignable = shrine_assignable_slots(class, unlocked, unlock_upgrades, bypass_unlocks);
     let empty_slots: Vec<usize> = assignable
         .iter()
         .copied()
