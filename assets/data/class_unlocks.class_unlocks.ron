@@ -13,11 +13,11 @@
             cost: 20,
         ),
         Thief: (
-            achievements: [Bouncy, FindClaw],
+            achievements: [Bouncy, Act2, FindClaw],
             cost: 20,
         ),
         Hunter: (
-            achievements: [Act3, FindBow, FindGun],
+            achievements: [Act3, FindBow],
             cost: 25,
         ),
     },
