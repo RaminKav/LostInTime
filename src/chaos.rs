@@ -51,14 +51,15 @@ impl ChaosTracker {
 
 /// Max HP multiplier from total chaos (global chaos tracker + infinite mode bonus),
 /// matching `juice_up_spawned_mobs_per_day` in `crate::enemy`.
+///
+/// Smooth blend: slightly above old soft scaling early, crosses old hard scaling
+/// around chaos 19–20, then continues above hard linear beyond that.
 pub fn hp_multiplier_for_total_chaos(total_chaos: f32) -> f32 {
     let chaos_factor = 1. + total_chaos;
-    let early_cutoff = 20.0_f32;
-    if chaos_factor <= early_cutoff {
-        chaos_factor.powf(0.7)
-    } else {
-        1.1 * chaos_factor
-    }
+    let blend = (total_chaos / 18.).clamp(0., 1.);
+    let early = chaos_factor.powf(0.74);
+    let late = 1.08 * chaos_factor.powf(1.02);
+    (1. - blend) * early + blend * late
 }
 
 pub struct IncreaseChaosEvent {

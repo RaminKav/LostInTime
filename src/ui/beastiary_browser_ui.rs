@@ -62,8 +62,8 @@ const OVERLAY_Z: f32 = 95.;
 const PANEL_Z: f32 = 96.;
 const CONTENT_Z: f32 = 97.;
 
-const PANEL_W: f32 = 454.;
-const PANEL_H: f32 = 318.;
+const PANEL_W: f32 = 482.;
+const PANEL_H: f32 = 344.;
 const GRID_COLS: usize = 3;
 const CARDS_PER_PAGE: usize = GRID_COLS * GRID_COLS;
 /// Card slot background native size (`BestiaryCardBackground.png`).
@@ -82,6 +82,11 @@ const GRID_CENTER_X: f32 = -112.;
 const GRID_TOP_Y: f32 = 74.;
 const NAV_BTNS_Y: f32 = -164.;
 const NAV_BTN_GAP: f32 = 24.;
+const DONE_BTN_W: f32 = 60.;
+const DONE_BTN_H: f32 = 18.;
+/// Bottom-right inset on the book panel art (`Bestiary.png`).
+const DONE_BTN_OFFSET_X: f32 = 56.;
+const DONE_BTN_INSET_Y: f32 = 8.;
 const DETAIL_CENTER_X: f32 = 110.;
 const DETAIL_TOP_Y: f32 = 0.;
 const DETAIL_WIDTH: f32 = 170.;
@@ -182,17 +187,22 @@ pub fn setup_beastiary_browser_ui(
         Name::new("Beastiary Browser Next"),
     ));
 
-    // Done button below the book panel.
-    let button_y = -PANEL_H * 0.5 - 24.;
+    // Done button — bottom-right on the book panel, above the panel art layer.
+    let button_x = PANEL_W * 0.5 - DONE_BTN_W * 0.5 + DONE_BTN_OFFSET_X;
+    let button_y = -PANEL_H * 0.5 + DONE_BTN_H * 0.5 + DONE_BTN_INSET_Y;
     let done_entity = commands
         .spawn((
             SpriteBundle {
                 texture: graphics.get_ui_element_texture(UIElement::MenuButton),
                 sprite: Sprite {
-                    custom_size: Some(Vec2::new(72., 18.)),
+                    custom_size: Some(Vec2::new(DONE_BTN_W, DONE_BTN_H)),
                     ..Default::default()
                 },
-                transform: Transform::from_translation(Vec3::new(0., button_y, CONTENT_Z)),
+                transform: Transform::from_translation(Vec3::new(
+                    button_x,
+                    button_y,
+                    CONTENT_Z + 1.,
+                )),
                 ..Default::default()
             },
             RenderLayers::from_layers(&[3]),

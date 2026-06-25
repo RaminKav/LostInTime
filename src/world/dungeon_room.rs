@@ -659,7 +659,7 @@ fn update_exit_reward_preview(
         return;
     }
 
-    const CELL_W: f32 = 26.;
+    const CELL_W: f32 = 38.;
     const PANEL_PAD: f32 = 8.;
     const PANEL_H: f32 = 30.;
     let panel_w = entries.len() as f32 * CELL_W + PANEL_PAD * 2.;

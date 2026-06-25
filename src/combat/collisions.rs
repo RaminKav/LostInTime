@@ -1137,57 +1137,55 @@ fn check_mob_to_player_collisions(
                 }
             }
             let mut rng = rand::thread_rng();
-            if rng.gen_ratio(dodge.0.try_into().unwrap_or(0), 100) && !in_i_frame.contains(e1) {
+            let already_iframed = in_i_frame.contains(e1);
+            let dodged = !already_iframed
+                && rng.gen_ratio(dodge.0.try_into().unwrap_or(0), 100);
+            if dodged {
                 dodge_event.send(DodgeEvent { entity: e1 });
-                commands
-                    .entity(e1)
-                    .insert(InvincibilityTimer(Timer::from_seconds(
-                        i_frames.0,
-                        TimerMode::Once,
-                    )));
-                continue;
-            }
-            let mut hit_successful = true;
-            if let Some(ref mut parry) = parry_option {
-                if parry.active && !parry.success {
-                    parry_events.send(ParrySuccessEvent(e2));
-                    hit_successful = false;
-                    parry.success = true;
+            } else {
+                let mut hit_successful = true;
+                if let Some(ref mut parry) = parry_option {
+                    if parry.active && !parry.success {
+                        parry_events.send(ParrySuccessEvent(e2));
+                        hit_successful = false;
+                        parry.success = true;
 
-                    commands
-                        .entity(e1)
-                        .insert(InvincibilityTimer(Timer::from_seconds(
-                            i_frames.0,
-                            TimerMode::Once,
-                        )))
-                        .insert(PlayerAnimation::ParryHit);
+                        commands
+                            .entity(e1)
+                            .insert(InvincibilityTimer(Timer::from_seconds(
+                                i_frames.0,
+                                TimerMode::Once,
+                            )))
+                            .insert(PlayerAnimation::ParryHit);
 
-                    commands.entity(e2).insert(Parried {
-                        timer: Timer::from_seconds(0.75, TimerMode::Once),
-                        kb_applied: false,
+                        commands.entity(e2).insert(Parried {
+                            timer: Timer::from_seconds(0.75, TimerMode::Once),
+                            kb_applied: false,
+                        });
+                    }
+                }
+                if hit_successful {
+                    hit_event.send(HitEvent {
+                        hit_by_pet: None,
+                        hit_entity: e1,
+                        damage: defence.apply_to_damage(attack.0),
+                        dir: delta.normalize_or_zero().truncate(),
+                        hit_with_melee: None,
+                        hit_with_projectile: None,
+                        ignore_tool: false,
+                        hit_by_mob: Some(is_attacking.unwrap().0.clone()),
+                        was_crit: false,
+                        was_overcrit: false,
+                        from_heirloom_effect: None,
+                        from_active_skill: false,
                     });
                 }
-            }
-            if hit_successful {
-                hit_event.send(HitEvent {
-                    hit_by_pet: None,
-                    hit_entity: e1,
-                    damage: defence.apply_to_damage(attack.0),
-                    dir: delta.normalize_or_zero().truncate(),
-                    hit_with_melee: None,
-                    hit_with_projectile: None,
-                    ignore_tool: false,
-                    hit_by_mob: Some(is_attacking.unwrap().0.clone()),
-                    was_crit: false,
-                    was_overcrit: false,
-                    from_heirloom_effect: None,
-                    from_active_skill: false,
-                });
             }
             // hit back to attacker if we have Thorns
             // Thorns deals a percentage of PLAYER's damage back to the attacker
             // e.g., 100 thorns = 100% of player damage reflected
-            if thorns.0 > 0 && in_i_frame.get(e1).is_err() {
+            // Still procs on a successful dodge (before i-frames are applied below).
+            if thorns.0 > 0 && !already_iframed {
                 let thorns_damage =
                     f32::ceil(player_attack.0 as f32 * thorns.0 as f32 / 100.) as i32;
 
@@ -1220,7 +1218,7 @@ fn check_mob_to_player_collisions(
             // ThornsSpikes heirloom: spawn radial spikes around the player.
             // Shared with the self-damage path (negative regen, Porkipine pet, etc.)
             // via `combat::trigger_thorns_spikes` so the spawn logic lives in one place.
-            if in_i_frame.get(e1).is_err() {
+            if !already_iframed {
                 crate::combat::trigger_thorns_spikes(
                     player_e,
                     player_skills,
@@ -1229,6 +1227,16 @@ fn check_mob_to_player_collisions(
                     &mut ranged_attack_event,
                     &mut trigger_counts,
                 );
+            }
+
+            if dodged {
+                commands
+                    .entity(e1)
+                    .insert(InvincibilityTimer(Timer::from_seconds(
+                        i_frames.0,
+                        TimerMode::Once,
+                    )));
+                continue;
             }
         }
     }

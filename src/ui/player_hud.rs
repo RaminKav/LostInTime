@@ -18,6 +18,7 @@ use super::{
     ui_helpers::{
         spawn_hud_label_badge, spawn_keybind_badge, Z_DEPTH_HUD_ACTIVE_SKILLS,
         Z_DEPTH_HUD_HEIRLOOM_ICONS, Z_DEPTH_HUD_HEIRLOOM_ICONS_FOREGROUND,
+        Z_DEPTH_HUD_ORB_TRACKERS_FOREGROUND,
     },
     InventorySlotState, InventorySlotType, InventoryState, InventoryUI, UIElement, UIState,
     CURRENCY_BACKGROUND_SIZE, HUD_ACTION_ROW_Y_FROM_BOTTOM, HUD_ERA_TIMER_ENDLESS_WIDTH,
@@ -356,10 +357,12 @@ pub fn setup_bars_ui(
                 custom_size: Some(HUD_FRAME_SIZE),
                 ..Default::default()
             },
-            // Z below `Z_DEPTH_HUD_ACTIVE_SKILLS` (4.0) so the hotbar / skill slot
-            // backgrounds and their icons render on top of the frame. The HP/mana fill
-            // children below add small local Z offsets to stack on top of the frame.
-            transform: Transform::from_translation(Vec3::new(0., row_y, 1.)),
+            // Above heirloom pick overlays (z ≈ 52–58) so orb tracker tooltips stay usable.
+            transform: Transform::from_translation(Vec3::new(
+                0.,
+                row_y,
+                Z_DEPTH_HUD_ORB_TRACKERS_FOREGROUND,
+            )),
             ..Default::default()
         })
         .insert(Name::new("HUD FRAME"))
@@ -2037,7 +2040,7 @@ fn spawn_mana_tracker_tooltip(
     let tooltip_pos = Vec3::new(
         anchor_pos.x,
         anchor_pos.y + HUD_FILL_PIXEL_SIZE.y * 0.5 + size.y * 0.5 + 6.,
-        anchor_pos.z + 10.,
+        Z_DEPTH_HUD_ORB_TRACKERS_FOREGROUND,
     );
 
     let root = commands
@@ -2230,7 +2233,7 @@ fn spawn_health_tracker_tooltip(
     let tooltip_pos = Vec3::new(
         anchor_pos.x,
         anchor_pos.y + HUD_FILL_PIXEL_SIZE.y * 0.5 + size.y * 0.5 + 6.,
-        anchor_pos.z + 10.,
+        Z_DEPTH_HUD_ORB_TRACKERS_FOREGROUND,
     );
 
     let root = commands
