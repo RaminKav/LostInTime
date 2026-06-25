@@ -68,6 +68,7 @@ pub enum Projectile {
     Arc,
     FireAttack,
     TeleportShock,
+    TeleportLightning,
     Recall,
     Echo,
     SwordProjectile,
@@ -168,7 +169,7 @@ impl Projectile {
             Projectile::ArrowVolleyShot => true,
             Projectile::Recall => true,
             Projectile::ThrowingStarLarge => true,
-            Projectile::TeleportShock => true,
+            Projectile::TeleportShock | Projectile::TeleportLightning => true,
             Projectile::SprintLunge => true,
             Projectile::Bullet => true,
             _ => false,
@@ -221,6 +222,7 @@ impl Projectile {
             | Projectile::PossessedBlade
             | Projectile::ArrowVolleyShot
             | Projectile::TeleportShock
+            | Projectile::TeleportLightning
             | Projectile::Recall
             | Projectile::ThrowingStarLarge
             | Projectile::SprintLunge

@@ -176,7 +176,7 @@
             anchor: Some((0.2,0.0)),
         ),
         ArrowVolleyShot: WorldObjectData(
-            texture_pos: (9., 5.),
+            texture_pos: (9., 6.),
             size: (16., 16.),
             anchor: Some((0.2,0.0)),
         ),

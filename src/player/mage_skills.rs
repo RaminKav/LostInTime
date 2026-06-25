@@ -1,8 +1,7 @@
-use std::f32::consts::PI;
-
 use bevy::prelude::*;
 use bevy_aseprite::{anim::AsepriteAnimation, aseprite, Aseprite};
-use bevy_rapier2d::prelude::{Collider, KinematicCharacterController};
+use bevy_proto::prelude::ProtoCommands;
+use bevy_rapier2d::{geometry::Collider, prelude::KinematicCharacterController};
 
 use crate::{
     animations::player_sprite::PlayerAnimation,
@@ -10,9 +9,13 @@ use crate::{
     attributes::{attribute_helpers::skill_power_multiplier, Attack, SkillPower},
     audio::{AudioSoundEffect, SoundSpawner},
     blessings::OwnedBlessings,
-    combat_helpers::{spawn_deferred_aseprite_collider, spawn_temp_collider, DeferredComponent},
+    combat_helpers::{spawn_deferred_aseprite_collider, DeferredComponent},
+    custom_commands::CommandsExt,
     inputs::MovementVector,
-    item::{projectile::Projectile, WorldObject},
+    item::{
+        projectile::{AnimVisualCategory, FromActiveSkill, Projectile},
+        WorldObject,
+    },
     proto::proto_param::ProtoParam,
     world::{
         world_helpers::{get_neighbour_tile, tile_pos_to_world_pos, world_pos_to_tile_pos},
@@ -49,9 +52,6 @@ pub struct TeleportState {
     pub just_teleported_timer: Timer,
     pub timer: Timer,
 }
-
-#[derive(Component)]
-pub struct TeleportShockDmg;
 
 #[derive(Component)]
 pub struct IceExplosionDmg;
@@ -116,6 +116,21 @@ pub(crate) fn resolve_teleport_destination_tile(
         .find(|&t| !teleport_tile_blocked_by_collider(t, game, proto_param))
 }
 
+/// Snap movement to the nearest cardinals/diagonal so teleport VFX stay aligned with input.
+fn cardinalize_teleport_direction(dir: Vec2) -> Vec2 {
+    if dir.length_squared() < f32::EPSILON {
+        return Vec2::ZERO;
+    }
+    let dir = dir.normalize();
+    if dir.x.abs() > dir.y.abs() {
+        Vec2::new(dir.x.signum(), 0.)
+    } else if dir.y.abs() > dir.x.abs() {
+        Vec2::new(0., dir.y.signum())
+    } else {
+        dir
+    }
+}
+
 pub fn handle_teleport(
     mut active_skill_events: EventReader<ActiveSkillUsedEvent>,
     mut move_player: EventWriter<MovePlayerEvent>,
@@ -136,6 +151,7 @@ pub fn handle_teleport(
     >,
     game: GameParam,
     proto_param: ProtoParam,
+    mut proto_commands: ProtoCommands,
     mut commands: Commands,
     time: Res<Time>,
 ) {
@@ -181,7 +197,10 @@ pub fn handle_teleport(
     let player_pos = player_pos.translation();
     if move_direction.0.length() != 0. && teleport_state.timer.just_finished() {
         teleport_state.timer.reset();
-        let direction = move_direction.0.normalize();
+        let direction = cardinalize_teleport_direction(move_direction.0);
+        if direction == Vec2::ZERO {
+            return;
+        }
         let power_mult = skill_power_multiplier(skill_power, blessings.get_skill_power_bonus());
         let base_distance = 4.5 * TILE_SIZE.x;
         let distance = direction * base_distance;
@@ -199,24 +218,31 @@ pub fn handle_teleport(
             + Vec2::new(TILE_SIZE.x * 0.5, TILE_SIZE.y * 0.5);
         let from_2d = player_pos.truncate();
         let to_dest = dest_center - from_2d;
-        let angle = f32::atan2(to_dest.y, to_dest.x) - PI / 2.;
         let shock_dmg =
             (dmg.0 as f32 * power_mult * attack_damage_multiplier(TELEPORT_SHOCK_ATTACK_PERCENT))
                 as i32;
-        let shock_e = spawn_temp_collider(
-            &mut commands,
-            Transform::from_translation(Vec3::new(
-                player_pos.x + to_dest.x * 0.5,
-                player_pos.y + to_dest.y * 0.5,
-                0.,
-            ))
-            .with_rotation(Quat::from_rotation_z(angle)),
-            0.5,
-            shock_dmg,
-            Collider::cuboid(8., 1.5 * TILE_SIZE.x),
-            Projectile::TeleportShock,
-        );
-        commands.entity(shock_e).insert(TeleportShockDmg);
+        let shock_midpoint = from_2d + to_dest * 0.5;
+        if let Some(shock_e) = proto_commands.spawn_projectile_from_proto(
+            Projectile::TeleportLightning,
+            &proto_param,
+            shock_midpoint,
+            direction,
+            false,
+            &proto_param.asset_server,
+            1.0,
+        ) {
+            commands.entity(shock_e).insert((
+                Transform {
+                    translation: shock_midpoint.extend(0.),
+                    rotation: Quat::from_rotation_z(direction.y.atan2(direction.x)),
+                    scale: Vec3::ONE,
+                    ..default()
+                },
+                Attack(shock_dmg),
+                AnimVisualCategory::Skill,
+                FromActiveSkill,
+            ));
+        }
         commands.spawn(SoundSpawner::new(AudioSoundEffect::TeleportShock, 0.2));
 
         if skills.has(Heirloom::TeleportManaRegen) {

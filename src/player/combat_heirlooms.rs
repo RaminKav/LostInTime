@@ -2673,6 +2673,7 @@ pub fn update_homing_energy_balls(
 
 aseprite!(pub CherryBombSprite, "textures/effects/CherryBomb.aseprite");
 aseprite!(pub CherryBombExplosionSprite, "textures/effects/CherryBombExplosion.ase");
+aseprite!(pub BombSprite, "textures/effects/Bomb.ase");
 
 const CHERRY_BOMB_PROC_PCT_PER_STACK: u32 = 25;
 const CHERRY_BOMB_MIN_TILES: f32 = 3.0;
@@ -2759,21 +2760,14 @@ pub fn spawn_skill_bomb_lob(
     target_pos: Vec2,
     explosion_damage: i32,
 ) {
-    let Some(texture_atlas) = graphics.texture_atlas.as_ref() else {
-        return;
-    };
-    let Some(sprite) = graphics
-        .spritesheet_map
-        .as_ref()
-        .and_then(|map| map.get(&WorldObject::Bomb).cloned())
-    else {
+    let Some(bomb_ase) = graphics.bomb_ase.as_ref() else {
         return;
     };
 
     commands.spawn((
-        SpriteSheetBundle {
-            texture_atlas: texture_atlas.clone(),
-            sprite,
+        AsepriteBundle {
+            aseprite: bomb_ase.clone(),
+            animation: AsepriteAnimation::from(BombSprite::tags::BOMB),
             transform: Transform::from_translation(start_pos.extend(11.)),
             ..default()
         },
@@ -2784,6 +2778,7 @@ pub fn spawn_skill_bomb_lob(
             arc_height: LOB_ARC_HEIGHT,
             landing: LobArcLanding::SkillBomb { explosion_damage },
         },
+        AnimVisualCategory::Skill,
         YSort(11.),
         Name::new("SKILL_BOMB"),
     ));

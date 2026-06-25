@@ -239,6 +239,13 @@ impl<'w, 's> CommandsExt<'w, 's> for ProtoCommands<'w, 's> {
                         .remove::<TextureAtlasSprite>()
                         .remove::<Handle<TextureAtlas>>()
                         .remove::<AnimationTimer>();
+                } else if proj == &Projectile::Bomb {
+                    spawned_entity_commands
+                        .insert(AsepriteAnimation::from("Bomb"))
+                        .insert(asset_server.load::<Aseprite, _>("textures/effects/Bomb.ase"))
+                        .remove::<TextureAtlasSprite>()
+                        .remove::<Handle<TextureAtlas>>()
+                        .remove::<AnimationTimer>();
                 }
             }
 

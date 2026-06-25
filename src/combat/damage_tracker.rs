@@ -280,7 +280,9 @@ impl DamageSource {
             Projectile::IceExplosionAOE => Some(DamageSource::IceExplosion),
             Projectile::SmallExplosionAOE => Some(DamageSource::SmallExplosion),
             Projectile::IceFloor => Some(DamageSource::IceFloor),
-            Projectile::TeleportShock => Some(DamageSource::TeleportShock),
+            Projectile::TeleportShock | Projectile::TeleportLightning => {
+                Some(DamageSource::TeleportShock)
+            }
             Projectile::SprintLunge => Some(DamageSource::SprintLunge),
             Projectile::Recall => Some(DamageSource::Recall),
             // Both ThornsProjectile and direct thorns damage merge into Thorns

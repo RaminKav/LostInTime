@@ -167,6 +167,7 @@ impl Plugin for GameAssetsPlugin {
                 small_explosion_ase: None,
                 cherry_bomb_ase: None,
                 cherry_bomb_explosion_ase: None,
+                bomb_ase: None,
                 stone_pillar_ase: None,
                 pink_flower_ase: None,
                 cursor_color_sprites: None,
@@ -245,6 +246,7 @@ pub struct Graphics {
     pub small_explosion_ase: Option<Handle<Aseprite>>,
     pub cherry_bomb_ase: Option<Handle<Aseprite>>,
     pub cherry_bomb_explosion_ase: Option<Handle<Aseprite>>,
+    pub bomb_ase: Option<Handle<Aseprite>>,
     pub stone_pillar_ase: Option<Handle<Aseprite>>,
     pub pink_flower_ase: Option<Handle<Aseprite>>,
     /// Selectable custom-cursor color sprites, in selection order (sheet positions (4,1)..(11,1)).
@@ -658,6 +660,7 @@ impl GameAssetsPlugin {
             cherry_bomb_explosion_ase: Some(
                 asset_server.load("textures/effects/CherryBombExplosion.ase"),
             ),
+            bomb_ase: Some(asset_server.load("textures/effects/Bomb.ase")),
             portal_ase: Some(asset_server.load(Portal::PATH)),
             ui_portal_ase: Some(asset_server.load(UIPortal::PATH)),
             stone_pillar_ase: Some(asset_server.load("textures/stonegolem/StonePillar.ase")),
