@@ -3,9 +3,9 @@ use bevy::prelude::*;
 use crate::{enemy::Mob, item::WorldObject, proto::proto_param::ProtoParam};
 
 /// Default peak scale for generic entities (mobs / UI without overrides).
-pub const DEFAULT_BOUNCE_MAX: f32 = 2.5;
+pub const DEFAULT_BOUNCE_MAX: f32 = 1.35;
 /// Default ramp multiplier for generic entities (non-boss mobs, UI without overrides).
-pub const DEFAULT_BOUNCE_MODIFIER: f32 = 2.0;
+pub const DEFAULT_BOUNCE_MODIFIER: f32 = 1.5;
 /// Base bump rate multiplied by modifier each frame during the bounce.
 pub const DEFAULT_BOUNCE_BUMP_RATE: f32 = 2.5;
 
@@ -101,7 +101,7 @@ fn bounce_strength(
             1.
         }
     } else if mob_option.is_some() && mob_option.unwrap().is_boss() {
-        max_bounce = 1.35;
+        max_bounce = 1.25;
         0.5
     } else {
         DEFAULT_BOUNCE_MODIFIER
@@ -124,12 +124,8 @@ pub fn bounce_on_hit(
         if !bounce_on_hit.is_active {
             continue;
         }
-        let (max_bounce, modifier, bump_rate) = bounce_strength(
-            &bounce_on_hit,
-            mob_option,
-            obj_option,
-            &proto_param,
-        );
+        let (max_bounce, modifier, bump_rate) =
+            bounce_strength(&bounce_on_hit, mob_option, obj_option, &proto_param);
         bounce_on_hit.timer.tick(time.delta());
         // Bounce magnitude only; negative scale.x is used for horizontal flip (e.g. scorpion).
         // Old code used `.clamp(1., max)` on signed scale, which forced left-facing sprites to +1.

@@ -357,12 +357,9 @@ pub fn setup_bars_ui(
                 custom_size: Some(HUD_FRAME_SIZE),
                 ..Default::default()
             },
-            // Above heirloom pick overlays (z ≈ 52–58) so orb tracker tooltips stay usable.
-            transform: Transform::from_translation(Vec3::new(
-                0.,
-                row_y,
-                Z_DEPTH_HUD_ORB_TRACKERS_FOREGROUND,
-            )),
+            // Z below `Z_DEPTH_HUD_ACTIVE_SKILLS` (4.0) so the hotbar / skill slot
+            // backgrounds and their icons render on top of the frame.
+            transform: Transform::from_translation(Vec3::new(0., row_y, 1.)),
             ..Default::default()
         })
         .insert(Name::new("HUD FRAME"))

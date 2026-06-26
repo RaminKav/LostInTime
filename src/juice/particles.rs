@@ -4,22 +4,46 @@ use bevy_hanabi::prelude::*;
 
 use crate::{
     assets::SpriteAnchor,
-    ecs_helpers::SafeHierarchyExt,
     colors::YELLOW,
     combat::{EnemyDeathEvent, HitEvent, ObjBreakEvent},
+    ecs_helpers::SafeHierarchyExt,
     enemy::Mob,
     inputs::MovementVector,
     item::WorldObject,
     night::InfiniteMode,
     player::Player,
     proto::proto_param::ProtoParam,
-    world::{world_helpers::tile_pos_to_world_pos, y_sort::YSort},
+    world::{
+        world_helpers::tile_pos_to_world_pos,
+        y_sort::{y_sort_depth, YSort},
+    },
     Game, GameParam,
 };
 
 use super::{CpuParticleGenerator, CpuParticleType};
 
 const DUST_OFFSET: Vec2 = Vec2::new(3., 4.);
+
+/// Slightly above mob feet (`YSort(0)`) so hit/death bursts sit on the body, not
+/// under the sprite. Hanabi ignores `Transform::z` and only sorts via `z_layer_2d`,
+/// so [`sync_hanabi_z_layer_from_y_sort`] copies the Y-sorted depth each frame.
+const COMBAT_PARTICLE_Y_SORT: f32 = 0.05;
+
+#[derive(Component)]
+pub struct SyncHanabiZLayer;
+
+fn combat_particle_depth(world_pos: Vec2) -> f32 {
+    y_sort_depth(COMBAT_PARTICLE_Y_SORT, world_pos.y, world_pos.x, 0.)
+}
+
+/// Hanabi 2D particles sort by `ParticleEffect::z_layer_2d`, not `Transform::z`.
+pub fn sync_hanabi_z_layer_from_y_sort(
+    mut q: Query<(&Transform, &mut ParticleEffect), With<SyncHanabiZLayer>>,
+) {
+    for (tf, mut effect) in q.iter_mut() {
+        effect.z_layer_2d = Some(tf.translation.z);
+    }
+}
 
 #[derive(Component)]
 pub struct RunDustTimer(pub Timer);
@@ -364,6 +388,9 @@ pub fn spawn_obj_hit_particles(
             continue;
         };
 
+        let world_pos = hit_pos.truncate() + anchor * -1. + Vec2::new(0., 4.);
+        let depth = combat_particle_depth(world_pos);
+
         commands.spawn((
             Name::new("emit:burst"),
             ParticleEffectBundle {
@@ -372,19 +399,17 @@ pub fn spawn_obj_hit_particles(
                         "my_color".to_string(),
                         graph::Value::Uint(color.as_linear_rgba_u32()),
                     )])
-                    .with_z_layer_2d(Some(999.)),
-                transform: Transform::from_translation(
-                    Vec3::new(hit_pos.x, hit_pos.y + 4., 2.) + (anchor.extend(0.) * -1.),
-                ),
+                    .with_z_layer_2d(Some(depth)),
+                transform: Transform::from_translation(world_pos.extend(depth)),
                 ..Default::default()
             },
-            YSort(1.),
+            YSort(COMBAT_PARTICLE_Y_SORT),
+            SyncHanabiZLayer,
             ObjectHitParticles {
                 despawn_timer: Timer::from_seconds(0.23, TimerMode::Once),
                 velocity: Vec3::new(0., 8000., 0.),
             },
         ));
-
     }
 }
 pub fn spawn_use_item_particles(
@@ -398,15 +423,19 @@ pub fn spawn_use_item_particles(
     for _event in use_item_events.iter() {
         let hit_pos = transforms.get(game.player).unwrap().translation();
 
+        let world_pos = hit_pos.truncate() + Vec2::new(0., 5.);
+        let depth = combat_particle_depth(world_pos);
+
         commands.spawn((
             Name::new("emit:burst"),
             ParticleEffectBundle {
                 effect: ParticleEffect::new(particles.use_item_particle.clone())
-                    .with_z_layer_2d(Some(999.)),
-                transform: Transform::from_translation(Vec3::new(hit_pos.x, hit_pos.y + 5., 2.)),
+                    .with_z_layer_2d(Some(depth)),
+                transform: Transform::from_translation(world_pos.extend(depth)),
                 ..Default::default()
             },
-            YSort(1.),
+            YSort(COMBAT_PARTICLE_Y_SORT),
+            SyncHanabiZLayer,
             ObjectHitParticles {
                 despawn_timer: Timer::from_seconds(1., TimerMode::Once),
                 velocity: Vec3::new(0., 10000., 0.),
@@ -422,15 +451,19 @@ pub fn spawn_enemy_death_particles(
     for death_event in death_events.iter() {
         let t = death_event.enemy_pos;
 
+        let world_pos = t + Vec2::new(0., 4.);
+        let depth = combat_particle_depth(world_pos);
+
         commands.spawn((
             Name::new("spawn_enemy_death_particles"),
             ParticleEffectBundle {
                 effect: ParticleEffect::new(particles.enemy_death_particle.clone())
-                    .with_z_layer_2d(Some(999.)),
-                transform: Transform::from_translation(Vec3::new(t.x, t.y + 4., 2.)),
+                    .with_z_layer_2d(Some(depth)),
+                transform: Transform::from_translation(world_pos.extend(depth)),
                 ..Default::default()
             },
-            YSort(1.),
+            YSort(COMBAT_PARTICLE_Y_SORT),
+            SyncHanabiZLayer,
             ObjectHitParticles {
                 despawn_timer: Timer::from_seconds(1.1, TimerMode::Once),
                 velocity: Vec3::new(0., 8000., 0.),
@@ -454,15 +487,19 @@ pub fn spawn_obj_death_particles(
             return;
         }
 
+        let world_pos = Vec2::new(t.x as f32, t.y + 4.);
+        let depth = combat_particle_depth(world_pos);
+
         commands.spawn((
             Name::new("spawn_obj_death_particles"),
             ParticleEffectBundle {
                 effect: ParticleEffect::new(particles.enemy_death_particle.clone())
-                    .with_z_layer_2d(Some(999.)),
-                transform: Transform::from_translation(Vec3::new(t.x as f32, t.y + 4., 2.)),
+                    .with_z_layer_2d(Some(depth)),
+                transform: Transform::from_translation(world_pos.extend(depth)),
                 ..Default::default()
             },
-            YSort(1.),
+            YSort(COMBAT_PARTICLE_Y_SORT),
+            SyncHanabiZLayer,
             ObjectHitParticles {
                 despawn_timer: Timer::from_seconds(1.1, TimerMode::Once),
                 velocity: Vec3::new(0., 8000., 0.),

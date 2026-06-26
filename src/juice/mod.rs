@@ -45,6 +45,11 @@ impl Plugin for JuicePlugin {
                     .in_set(OnUpdate(GameState::Main)),
             )
             .add_system(
+                sync_hanabi_z_layer_from_y_sort
+                    .in_base_set(CoreSet::PostUpdate)
+                    .run_if(in_state(GameState::Main)),
+            )
+            .add_system(
                 shake_effect
                     .after(move_camera_with_player)
                     .before(TransformSystem::TransformPropagate)

@@ -15,6 +15,14 @@ impl Plugin for YSortPlugin {
 #[reflect(Component, Schematic)]
 pub struct YSort(pub f32);
 
+/// Depth used by [`Transparent2d`] for Y-sorted world sprites and Hanabi FX.
+pub fn y_sort_depth(bias: f32, world_y: f32, world_x: f32, anchor_offset_y: f32) -> f32 {
+    bias + 900.
+        - (900.0f32
+            / (1.0f32 + (2.0f32.powf(-0.00001 * (world_y - anchor_offset_y)))))
+        - 0.00001 * world_x
+}
+
 impl YSortPlugin {
     pub fn y_sort(
         mut q: Query<(
@@ -25,12 +33,9 @@ impl YSortPlugin {
         )>,
     ) {
         for (mut tf, gtf, anchor_option, y_sort) in q.iter_mut() {
-            // tf.translation.z = 1. - 1.0f32 / (1.0f32 + (2.0f32.powf(-0.01 * tf.translation.y)));
             let anchor_offset = anchor_option.map(|a| a.0.y).unwrap_or(0.);
-            tf.translation.z = y_sort.0 + 900.
-                - (900.0f32
-                    / (1.0f32 + (2.0f32.powf(-0.00001 * (gtf.translation().y - anchor_offset)))))
-                - 0.00001 * gtf.translation().x;
+            let pos = gtf.translation();
+            tf.translation.z = y_sort_depth(y_sort.0, pos.y, pos.x, anchor_offset);
         }
     }
 }
