@@ -81,6 +81,22 @@ pub struct Slow {
     pub timer: Timer,
 }
 
+/// Shared blue tint for freeze-style status effects (Freeze blessing, Death Defiance, Rapidfire).
+pub const STATUS_EFFECT_BLUE_TINT: Color = Color::rgba(0.5, 0.7, 1.0, 1.0);
+
+/// Stores the mob's pre-tint color while Rapidfire is slowing all enemies.
+#[derive(Component)]
+#[component(storage = "SparseSet")]
+pub struct RapidfireSlowTint {
+    pub original_color: Color,
+}
+
+pub fn apply_status_blue_tint(sprite: &mut TextureAtlasSprite) -> Color {
+    let original = sprite.color;
+    sprite.color = STATUS_EFFECT_BLUE_TINT;
+    original
+}
+
 /// Frozen status effect from Freeze blessing - mob is completely frozen when at 3 stacks
 #[derive(Debug, Clone)]
 pub struct Frozen {
@@ -536,7 +552,7 @@ pub fn check_freeze_on_slow_stacks(
             original_color,
         });
         // Apply blue tint directly to the sprite
-        sprite.color = Color::rgba(0.5, 0.7, 1.0, 1.0);
+        sprite.color = STATUS_EFFECT_BLUE_TINT;
         status_event.send(StatusEffectEvent {
             entity,
             effect: StatusEffect::Frozen,

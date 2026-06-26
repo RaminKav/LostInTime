@@ -407,6 +407,15 @@ pub const HUD_HEIRLOOM_LEFT_PADDING: f32 = 4.0;
 /// Nudge the heirloom row upward from its default position below the progress bar.
 pub const HUD_HEIRLOOM_ROW_Y_NUDGE: f32 = 9.0;
 
+/// On the game-over screen, shift the heirloom icon row upward (other HUD chrome is hidden).
+pub const HUD_HEIRLOOM_GAME_OVER_Y_OFFSET: f32 = 32.0;
+
+/// How long the heirloom row takes to slide up on the game-over screen.
+pub const HUD_HEIRLOOM_GAME_OVER_SLIDE_SECS: f32 = 1.0;
+
+/// Left-side stat panels on the game-over screen sit this many pixels higher than the default anchor.
+pub const HUD_GAME_OVER_LEFT_PANEL_Y_OFFSET: f32 = 32.0;
+
 /// World-space Y for the heirloom icon row (below the progress / currency HUD row).
 pub fn hud_heirloom_row_y(game_height: f32) -> f32 {
     hud_row_below_xp_y(game_height)

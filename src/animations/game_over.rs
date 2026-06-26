@@ -38,7 +38,10 @@ use crate::{
         key_input_guide::InteractGuide,
         spawn_item_stack_icon, spawn_stats_tooltip_at,
         ui_helpers::{self, Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND},
-        CurrencyText, Interactable, Interaction, MenuButton, TimeFragmentIcon, UIElement, UIState,
+        CurrencyText, Interactable, Interaction, MenuButton, TimeFragmentIcon, UIElement,
+        UIState, HUD_GAME_OVER_LEFT_PANEL_Y_OFFSET, HUD_HEIRLOOM_GAME_OVER_SLIDE_SECS,
+        HUD_HEIRLOOM_GAME_OVER_Y_OFFSET,
+        player_hud::{HudGameOverHeirloomSlide, SkillHudIcon},
     },
     world::{
         dimension::{Era, EraManager},
@@ -51,6 +54,12 @@ use super::ui_animaitons::{MoveUIAnimation, UIIconMover};
 
 #[derive(Component)]
 pub struct GameOverFadeout(Timer);
+
+impl GameOverFadeout {
+    pub fn progress(&self) -> f32 {
+        self.0.percent()
+    }
+}
 
 /// Era reached as display number (1, 2, or 3; dungeon counts as its associated era).
 fn era_display_number(era: &Era) -> u8 {
@@ -232,7 +241,7 @@ pub fn handle_game_over_fadeout(
             Name::new("Score Text"),
         ));
         // DAMAGE BREAKDOWN + mob stats — left side list with category headers
-        let start_y = resolution.game_height / 2. - 60.;
+        let start_y = resolution.game_height / 2. - 60. + HUD_GAME_OVER_LEFT_PANEL_Y_OFFSET;
         let stats_width = 84.0;
         let mut next_y = start_y;
 
@@ -550,14 +559,39 @@ pub fn tick_game_over_overlay(
     asset_server: Res<AssetServer>,
     mut game_over_text: Query<&mut Text, With<GameOverText>>,
     mut game_over_sprites: Query<&mut Sprite, (With<GameOverText>, Without<GameOverFadeout>)>,
+    mut heirloom_icons: Query<
+        (&mut Transform, &mut HudGameOverHeirloomSlide),
+        With<SkillHudIcon>,
+    >,
+    mut heirloom_untagged: Query<
+        (Entity, &Transform),
+        (With<SkillHudIcon>, Without<HudGameOverHeirloomSlide>),
+    >,
     mut tip_check: Local<bool>,
     graphics: Res<Graphics>,
     res: Res<ScreenResolution>,
     time_fragments: Res<TimeFragmentCurrency>,
 ) {
-    if query.iter().count() == 0 {
+    let overlay_active = query.iter().next().is_some();
+    if !overlay_active {
         *tip_check = false;
     }
+
+    if overlay_active {
+        for (entity, transform) in heirloom_untagged.iter() {
+            commands.entity(entity).insert(HudGameOverHeirloomSlide {
+                start_y: transform.translation.y,
+                timer: Timer::from_seconds(HUD_HEIRLOOM_GAME_OVER_SLIDE_SECS, TimerMode::Once),
+            });
+        }
+    }
+
+    for (mut transform, mut slide) in heirloom_icons.iter_mut() {
+        slide.timer.tick(time.delta());
+        let t = slide.timer.percent().clamp(0., 1.);
+        transform.translation.y = slide.start_y + HUD_HEIRLOOM_GAME_OVER_Y_OFFSET * t;
+    }
+
     for (_e, mut timer, mut sprite) in query.iter_mut() {
         if timer.0.percent() >= 0.25 && !*tip_check {
             *tip_check = true;

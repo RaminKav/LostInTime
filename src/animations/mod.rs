@@ -1,5 +1,5 @@
 pub mod enemy_sprites;
-mod game_over;
+pub mod game_over;
 
 use std::cmp::max;
 use std::f32::consts::PI;

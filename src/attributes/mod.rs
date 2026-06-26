@@ -1443,6 +1443,7 @@ pub fn clamp_health(
                     h.0 = max_h.0 / 2;
 
                     // Freeze all mobs for 3 seconds with blue tint
+                    use crate::combat::status_effects::STATUS_EFFECT_BLUE_TINT;
                     for (mob_entity, sprite) in mobs.iter() {
                         commands.entity(mob_entity).insert(
                             crate::player::combat_heirlooms::DeathDefianceFrozen {
@@ -1452,7 +1453,7 @@ pub fn clamp_health(
                         );
                         // Apply blue tint
                         commands.entity(mob_entity).insert(TextureAtlasSprite {
-                            color: Color::rgba(0.5, 0.7, 1.0, 1.0),
+                            color: STATUS_EFFECT_BLUE_TINT,
                             ..sprite.clone()
                         });
                     }

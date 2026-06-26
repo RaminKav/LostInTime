@@ -22,7 +22,8 @@ use super::{
     },
     InventorySlotState, InventorySlotType, InventoryState, InventoryUI, UIElement, UIState,
     CURRENCY_BACKGROUND_SIZE, HUD_ACTION_ROW_Y_FROM_BOTTOM, HUD_ERA_TIMER_ENDLESS_WIDTH,
-    HUD_FRAME_Y_FROM_BOTTOM, HUD_HEIRLOOM_ICON_SPACING, HUD_HOTBAR_SLOTS, HUD_SKILLS_CENTER_X,
+    HUD_FRAME_Y_FROM_BOTTOM, HUD_HEIRLOOM_ICON_SPACING,
+    HUD_HOTBAR_SLOTS, HUD_SKILLS_CENTER_X,
     HUD_SKILL_SLOT_HIT_SIZE, HUD_SKILL_SPACING_X, HUD_TIMELINE_ARROWS_SIZE, HUD_TIMELINE_SIZE,
     KEYBIND_BADGE_BOTTOM_INSET, KEYBIND_BADGE_SIZE, PROGRESS_BACKGROUND_SIZE,
 };
@@ -4380,6 +4381,13 @@ pub fn sync_heirloom_hud_depth(
             transform.translation.z = target_z;
         }
     }
+}
+
+/// Captures the pre-slide Y position for a HUD heirloom icon on game over.
+#[derive(Component)]
+pub struct HudGameOverHeirloomSlide {
+    pub start_y: f32,
+    pub timer: Timer,
 }
 
 /// Re-anchor HUD elements when [`ScreenResolution::game_width`] / [`game_height`] change (UI

@@ -16,7 +16,13 @@ use crate::{
     },
     audio::{AudioSoundEffect, SoundSpawner},
     blessings::{Blessing, OwnedBlessings},
-    combat::{EnemyDeathEvent, HitEvent},
+    combat::{
+        status_effects::{
+            apply_status_blue_tint, Frail, MobStatusEffects, RapidfireSlowTint,
+            STATUS_EFFECT_BLUE_TINT,
+        },
+        EnemyDeathEvent, HitEvent,
+    },
     cursor::CursorPos,
     custom_commands::CommandsExt,
     enemy::Mob,
@@ -56,7 +62,6 @@ use crate::{
         Player,
     },
     proto::proto_param::ProtoParam,
-    status_effects::Frail,
     world::TILE_SIZE,
     GameParam,
 };
@@ -1381,16 +1386,43 @@ pub fn tick_stealth_and_buffs(
 /// Apply RapidfireSlow to all enemies when RapidFire is active
 pub fn handle_rapidfire_slow_enemies(
     rapidfire_states: Query<&RapidfireState, With<Player>>,
-    mut enemies: Query<&mut crate::combat::status_effects::MobStatusEffects, With<Mob>>,
+    mut enemies: Query<
+        (
+            Entity,
+            &mut MobStatusEffects,
+            Option<&RapidfireSlowTint>,
+            Option<&crate::player::combat_heirlooms::DeathDefianceFrozen>,
+            Option<&mut TextureAtlasSprite>,
+        ),
+        With<Mob>,
+    >,
+    mut commands: Commands,
 ) {
-    // Check if RapidFire is active
-    if let Ok(state) = rapidfire_states.get_single() {
-        if !state.duration.finished() && state.duration.percent() > 0. {
-            for mut status in enemies.iter_mut() {
-                if !status.rapidfire_slow {
-                    status.rapidfire_slow = true;
-                }
+    let Some(state) = rapidfire_states.get_single().ok() else {
+        return;
+    };
+    if state.duration.finished() || state.duration.percent() <= 0. {
+        return;
+    }
+
+    for (entity, mut status, tint, defiance_frozen, sprite) in enemies.iter_mut() {
+        if !status.rapidfire_slow {
+            status.rapidfire_slow = true;
+        }
+        if defiance_frozen.is_some() || status.is_frozen() {
+            continue;
+        }
+        if tint.is_some() {
+            if let Some(mut sprite) = sprite {
+                sprite.color = STATUS_EFFECT_BLUE_TINT;
             }
+            continue;
+        }
+        if let Some(mut sprite) = sprite {
+            let original_color = apply_status_blue_tint(&mut sprite);
+            commands
+                .entity(entity)
+                .insert(RapidfireSlowTint { original_color });
         }
     }
 }
@@ -1398,16 +1430,35 @@ pub fn handle_rapidfire_slow_enemies(
 /// Remove RapidfireSlow from all enemies when RapidFire ends
 pub fn handle_rapidfire_slow_remove(
     rapidfire_states: Query<&RapidfireState, With<Player>>,
-    mut enemies: Query<&mut crate::combat::status_effects::MobStatusEffects, With<Mob>>,
+    mut enemies: Query<
+        (
+            Entity,
+            &mut MobStatusEffects,
+            Option<&RapidfireSlowTint>,
+            Option<&mut TextureAtlasSprite>,
+        ),
+        With<Mob>,
+    >,
+    mut commands: Commands,
 ) {
-    // Check if RapidFire is no longer active
-    if let Ok(state) = rapidfire_states.get_single() {
-        if state.duration.finished() {
-            for mut status in enemies.iter_mut() {
-                if status.rapidfire_slow {
-                    status.rapidfire_slow = false;
-                }
+    let rapidfire_active = rapidfire_states
+        .get_single()
+        .map(|state| !state.duration.finished() && state.duration.percent() > 0.)
+        .unwrap_or(false);
+    if rapidfire_active {
+        return;
+    }
+
+    for (entity, mut status, tint, sprite) in enemies.iter_mut() {
+        if !status.rapidfire_slow && tint.is_none() {
+            continue;
+        }
+        status.rapidfire_slow = false;
+        if let Some(tint) = tint {
+            if let Some(mut sprite) = sprite {
+                sprite.color = tint.original_color;
             }
+            commands.entity(entity).remove::<RapidfireSlowTint>();
         }
     }
 }
