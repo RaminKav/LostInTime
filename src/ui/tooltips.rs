@@ -533,6 +533,34 @@ pub fn handle_spawn_inv_item_tooltip(
                 ))
                 .set_parent(tooltip)
                 .id();
+            // instructions text
+            let consume_text = vec!["Place in Hotbar or", "Right-Click to", "Consume Now!"];
+            for (i, text) in consume_text.iter().enumerate() {
+                let _instructions_to_consume = commands
+                    .spawn((
+                        Text2dBundle {
+                            text: Text::from_section(
+                                text.to_string(),
+                                TextStyle {
+                                    font: gf::TOOLTIP_CARD_SUBHEAD_BOLD.load_font(asset_server),
+                                    font_size: gf::TOOLTIP_CARD_SUBHEAD_BOLD.size,
+                                    color: YELLOW_2,
+                                },
+                            ),
+                            text_anchor: Anchor::CenterLeft,
+                            transform: Transform {
+                                translation: Vec3::new(-58., 16. - (i as f32 * 10.), 1.),
+                                scale: Vec3::new(1., 1., 1.),
+                                ..Default::default()
+                            },
+                            ..default()
+                        },
+                        Name::new("TOOLTIP Rarity TEXT"),
+                        RenderLayers::from_layers(&[3]),
+                    ))
+                    .set_parent(tooltip)
+                    .id();
+            }
         }
         // ======== rarity ========
         let _rarity_text = commands

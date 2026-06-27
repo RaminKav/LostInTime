@@ -61,6 +61,14 @@ fn unlock_purchase_button_label(is_maxed: bool) -> &'static str {
     }
 }
 
+fn unlock_cost_label(kind: UnlockUpgradeKind, upgrades: &UnlockUpgrades) -> String {
+    if upgrades.is_maxed(kind) {
+        String::new()
+    } else {
+        format!("Cost: {}", upgrades.next_cost(kind))
+    }
+}
+
 const UNLOCK_ROWS: [UnlockUpgradeKind; 9] = [
     UnlockUpgradeKind::Reroll,
     UnlockUpgradeKind::Banish,
@@ -300,12 +308,7 @@ pub fn refresh_unlock_button_states(
     {
         let mut cost_texts = text_queries.p1();
         for (cost, mut text) in cost_texts.iter_mut() {
-            let is_maxed = upgrades.is_maxed(cost.kind);
-            if is_maxed {
-                text.sections[0].value.clear();
-            } else {
-                text.sections[0].value = format!("Cost: {}", upgrades.next_cost(cost.kind));
-            }
+            text.sections[0].value = unlock_cost_label(cost.kind, &upgrades);
         }
     }
 
@@ -487,7 +490,7 @@ fn spawn_unlock_row(
     commands.spawn((
         Text2dBundle {
             text: Text::from_section(
-                format!("Cost: {}", upgrades.next_cost(kind)),
+                unlock_cost_label(kind, upgrades),
                 TextStyle {
                     font: asset_server.load("fonts/4x5.ttf"),
                     font_size: 5.0,

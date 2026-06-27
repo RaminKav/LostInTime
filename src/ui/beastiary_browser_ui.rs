@@ -391,7 +391,7 @@ fn spawn_grid_cell(
                 text_anchor: Anchor::Center,
                 transform: Transform::from_translation(Vec3::new(
                     CARD_W * 0.5 - 4.,
-                    -CARD_H * 0.5 - 2.,
+                    -CARD_H * 0.5,
                     2.,
                 )),
                 ..Default::default()
