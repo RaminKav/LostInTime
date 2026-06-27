@@ -4,13 +4,13 @@ use bevy_proto::prelude::ProtoCommands;
 use rand::{seq::IteratorRandom, Rng};
 
 use crate::{
-    assets::{Graphics, SpriteAnchor},
+    assets::Graphics,
     custom_commands::CommandsExt,
-    enemy::{spawn_helpers::can_spawn_mob_here, CombatAlignment, EliteMob, Mob},
+    enemy::{CombatAlignment, EliteMob, FollowSpeed, Mob, PendingTint},
     item::{object_actions::ObjectAction, LootTable},
     proto::proto_param::ProtoParam,
     ui::minimap::UpdateMiniMapEvent,
-    world::{world_helpers::world_pos_to_tile_pos, TileMapPosition, TILE_SIZE},
+    world::{TileMapPosition, TILE_SIZE},
     GameParam,
 };
 
@@ -56,10 +56,7 @@ pub fn handle_combat_shrine_activate_animation(
                     spawn_pos,
                 ) {
                     num_to_spawn -= 1;
-                    //last mob is elite
-                    if num_to_spawn <= 2 {
-                        commands.entity(mob).insert(EliteMob);
-                    }
+                    commands.entity(mob).insert(EliteMob);
                     proto_param
                         .proto_commands
                         .commands()
@@ -87,6 +84,30 @@ pub fn handle_combat_shrine_activate_animation(
         }
     }
 }
+
+/// Combat shrine mobs are always elite, move 25% faster, and use the red endless-mode tint.
+pub fn enhance_combat_shrine_mobs(
+    mut mobs: Query<
+        (Entity, &mut FollowSpeed, Option<&mut TextureAtlasSprite>),
+        Added<CombatShrineMob>,
+    >,
+    mut commands: Commands,
+) {
+    const COMBAT_SHRINE_SPEED_MULTIPLIER: f32 = 1.25;
+    const COMBAT_SHRINE_TINT: Color = Color::rgba(1.0, 0.5, 0.5, 1.0);
+
+    for (entity, mut follow_speed, maybe_sprite) in mobs.iter_mut() {
+        follow_speed.0 *= COMBAT_SHRINE_SPEED_MULTIPLIER;
+        if let Some(mut sprite) = maybe_sprite {
+            sprite.color = COMBAT_SHRINE_TINT;
+        } else {
+            commands
+                .entity(entity)
+                .insert(PendingTint(COMBAT_SHRINE_TINT));
+        }
+    }
+}
+
 pub fn handle_shrine_rewards(
     mut shrine_mob_event: EventReader<CombatShrineMobDeathEvent>,
     mut shrines: Query<(

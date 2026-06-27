@@ -1,11 +1,7 @@
 use crate::{
     colors::BLUE,
     player::{
-        melee_skills::{
-            spawn_delayed_heirloom_cast, spawn_echo_hitbox, DelayedCastType,
-            HEIRLOOM_EXTRA_CAST_DELAY,
-        },
-        skills::{Heirloom, HeirloomTriggerCounts, ManaGainSource, PlayerSkills},
+        skills::{HeirloomTriggerCounts, ManaGainSource, PlayerSkills},
         Player,
     },
     ui::{
@@ -14,7 +10,7 @@ use crate::{
     },
 };
 
-use super::{Attack, CurrentHealth, CurrentMana, Healing, MaxMana, ProjectileSize};
+use super::{CurrentHealth, CurrentMana, Healing, MaxMana};
 
 use bevy::prelude::*;
 
@@ -22,32 +18,10 @@ pub struct ModifyHealthEvent(pub i32);
 
 pub fn handle_modify_health_event(
     mut event: EventReader<ModifyHealthEvent>,
-    mut query: Query<
-        (
-            Entity,
-            &mut CurrentHealth,
-            &Healing,
-            &PlayerSkills,
-            &Attack,
-            &ProjectileSize,
-            &mut CurrentMana,
-        ),
-        With<Player>,
-    >,
-    mut commands: Commands,
-    asset_server: Res<AssetServer>,
-    mut trigger_counts: ResMut<HeirloomTriggerCounts>,
+    mut query: Query<(&mut CurrentHealth, &Healing), With<Player>>,
 ) {
     for event in event.iter() {
-        let (
-            player_entity,
-            mut health,
-            bonus_healing_rate,
-            skills,
-            attack,
-            projectile_size,
-            mut current_mana,
-        ) = query.single_mut();
+        let (mut health, bonus_healing_rate) = query.single_mut();
 
         // Apply healing bonus only to positive health changes
         let final_delta = if event.0 > 0 {
@@ -57,36 +31,6 @@ pub fn handle_modify_health_event(
         };
 
         health.0 += final_delta;
-
-        if final_delta < 0 {
-            let echo_count = skills.get_count(Heirloom::OnHitEcho);
-            let mana_cost = Heirloom::OnHitEcho.get_mana_cost();
-            let dmg = attack.0;
-            let size_mult = projectile_size.get_multiplier();
-
-            for i in 0..echo_count {
-                if current_mana.0 < mana_cost {
-                    break;
-                }
-                current_mana.0 -= mana_cost;
-                trigger_counts.record_mana(Heirloom::OnHitEcho, mana_cost);
-                trigger_counts.increment(Heirloom::OnHitEcho);
-
-                if i == 0 {
-                    spawn_echo_hitbox(&mut commands, &asset_server, player_entity, dmg, size_mult);
-                } else {
-                    spawn_delayed_heirloom_cast(
-                        &mut commands,
-                        HEIRLOOM_EXTRA_CAST_DELAY * i as f32,
-                        DelayedCastType::Echo {
-                            player: player_entity,
-                            dmg,
-                            size_multiplier: size_mult,
-                        },
-                    );
-                }
-            }
-        }
     }
 }
 /// Modifies the player's current mana. The optional [`ManaGainSource`] attributes positive

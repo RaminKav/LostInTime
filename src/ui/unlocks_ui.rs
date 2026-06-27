@@ -302,7 +302,7 @@ pub fn refresh_unlock_button_states(
         for (cost, mut text) in cost_texts.iter_mut() {
             let is_maxed = upgrades.is_maxed(cost.kind);
             if is_maxed {
-                text.sections[0].value = "Maxed".to_string();
+                text.sections[0].value.clear();
             } else {
                 text.sections[0].value = format!("Cost: {}", upgrades.next_cost(cost.kind));
             }

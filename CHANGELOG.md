@@ -549,3 +549,64 @@ Heirlooms:
 - [Art] New ice explosion animation (experiment, lmk if you like it or hate it)
 - [New Heirloom] Cherry Bomb: Uncommon, cost 2 mana, attacks have +25% chance to lob a cherry bomb.
 - [New Heirloom] Impact Rune: Uncommon, costs 3 mana, skill damage triggers a small explosion, damage and mana cost scale with more copies
+
+## 0.24.0
+
+## Features
+
+- Unlock **3rd Skill Slot** in the Unlocks shop (100 Time Fragments — unlocks slot 3 for all classes)
+- Reworked dungeons: Challenge the dungeon, and fight off waves of enemies. keep pushing for the next wave for better rewards, or cash out at any time and exit. Currently has 3 waves.
+- Reworked Unlocks options and progression
+- Improved enemy pathing / steering so mobs chase more cleanly. Mob movement feels MUCH better.
+- Added minimap markers. Mark any spot in the big map ui, and a marker in-game will guide you there
+-
+
+## Art
+
+- New Dungeon! (and reworked dungeon system, explained above)
+- New class selection screen art overhaul
+- New Bestiary book ui
+- New skill icons across the board
+- New Hunter and Wizard player sprites
+- Updated animations for many skills to better match their icons
+
+## Balance
+
+- Buff Mushking attack patterns
+- Nerf [Impact Rune]: costs mana each instance of spawning the explosion now
+- Boss re-summon cost doubles each time you summon past the last color tier
+- Nerf dungeon key drop rate
+- Nerf potion drop rate
+- Potions added to the merchant shop
+- Reduced boss knockback significantly
+- Nerf class passives per level: Warrior +3 size (was +5), Wizard +8 max mana (was +10), Rogue +3 speed (was +5), Hunter +3% attack speed (was +5%)
+- Nerf [Sappling]: +8 size per stack (was +10)
+- Nerf magic gem boulder spawn rate
+- Heirlooms that grant freeze chance nerfed to +15% chance (was +25%)
+- Cap [Spiked Helmet] gain to 300 thorns per stack
+- Cap [Underworld's Hat] to 150 fireball spawns per second
+- Smoothed out chaos HP scaling on mobs, mostly relevant for <20 chaos
+- Tweaked endless mode scaling
+- Sped up several desert enemies (Lizard, Void Crawler, cacti, etc.)
+
+## Quality of Life
+
+- Locked skill slot icon in the HUD when a slot isn't unlocked yet
+- Simplified mob stats tracker on game over / in inventory
+- Merchant shop prices refresh every 45 seconds
+- Enemies get a blue tint while Rapidfire is active
+- Improved keybind tutorial / intro guide
+- Cleaner skill swap UI at the active skill shrine
+- Smoother loading when exiting a run back to menu
+- Player health loss numbers always show (regardless of the damage-number setting)
+- Tweaked tutorial tips
+- ESC closes open menus
+- Game over screen: cleaned up left-side layout; heirloom row slides up on death
+- Improved projectile / combat particle layering for readability
+
+## Bug Fixes
+
+- Fixed endless mode objective text prompts
+- Fixed invisible boss shrine
+- Merchant no longer refreshes its prices while the game is paused
+- Dodging enemies now triggers thorns (and thorns spikes) like a normal hit

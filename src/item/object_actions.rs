@@ -22,8 +22,8 @@ use crate::player::ModifyCurencyEvent;
 use crate::proto::proto_param::ProtoParam;
 use crate::ui::crafting_ui::{CraftingContainer, CraftingContainerType};
 use crate::ui::damage_numbers::{
-    spawn_floating_text_with_shadow, spawn_screen_locked_icon_to_world_pos, BeaconGuidance,
-    BeaconTarget,
+    spawn_floating_text_with_shadow_anim, spawn_screen_locked_icon_to_world_pos, BeaconGuidance,
+    BeaconTarget, FloatingTextAnim,
 };
 use crate::ui::game_fonts::FLOATING_TEXT;
 use crate::ui::item_chest::ItemChestState;
@@ -46,7 +46,15 @@ use crate::{BounceEvent, GameParam, DEBUG};
 use bevy::prelude::*;
 use bevy_aseprite::anim::AsepriteAnimation;
 use bevy_proto::prelude::{ReflectSchematic, Schematic};
+use rand::seq::SliceRandom;
 use rand::Rng;
+
+const CHAOS_SHRINE_FLAVOR_TEXTS: [&str; 4] = [
+    "You feel the island become tense...",
+    "Chaos consumes you",
+    "This gift bears a cost!",
+    "Something feels off about this shrine...",
+];
 
 #[derive(Component, Reflect, FromReflect, Schematic, Clone, Default)]
 #[reflect(Component, Schematic)]
@@ -620,13 +628,28 @@ impl ObjectAction {
                     None,
                 );
 
-                spawn_floating_text_with_shadow(
+                spawn_floating_text_with_shadow_anim(
                     commands,
                     &item_action_param.asset_server,
                     pos.extend(game.player().position.z) + Vec3::new(0., 20., 0.),
                     RED,
                     format!("+{} Chaos", amount),
                     FLOATING_TEXT,
+                    FloatingTextAnim::message(),
+                );
+
+                let flavor = CHAOS_SHRINE_FLAVOR_TEXTS
+                    .choose(&mut rand::thread_rng())
+                    .copied()
+                    .unwrap_or(CHAOS_SHRINE_FLAVOR_TEXTS[0]);
+                spawn_floating_text_with_shadow_anim(
+                    commands,
+                    &item_action_param.asset_server,
+                    pos.extend(game.player().position.z) + Vec3::new(40., 52., 0.),
+                    WHITE,
+                    flavor.to_string(),
+                    FLOATING_TEXT,
+                    FloatingTextAnim::message(),
                 );
             }
             ObjectAction::TimePortal => {
@@ -635,13 +658,14 @@ impl ObjectAction {
                     if current_era == Era::Third {
                         if item_action_param.infinite_mode.active {
                             let pos = tile_pos_to_world_pos(obj_pos, true);
-                            spawn_floating_text_with_shadow(
+                            spawn_floating_text_with_shadow_anim(
                                 commands,
                                 &item_action_param.asset_server,
                                 pos.extend(game.player().position.z) + Vec3::new(0., 28., 0.),
                                 RED,
                                 "There is no escape...".to_string(),
                                 FLOATING_TEXT,
+                                FloatingTextAnim::message(),
                             );
                         }
                         return;
@@ -650,25 +674,27 @@ impl ObjectAction {
                     if let Some(boss_kill_tracker) = item_action_param.boss_kill_tracker.as_ref() {
                         if !boss_kill_tracker.is_boss_killed(&current_era) {
                             let pos = tile_pos_to_world_pos(obj_pos, true);
-                            spawn_floating_text_with_shadow(
+                            spawn_floating_text_with_shadow_anim(
                                 commands,
                                 &item_action_param.asset_server,
-                                pos.extend(game.player().position.z) + Vec3::new(0., 28., 0.),
+                                pos.extend(game.player().position.z) + Vec3::new(100., 38., 0.),
                                 WHITE,
                                 "A strong force prevents you...".to_string(),
                                 FLOATING_TEXT,
+                                FloatingTextAnim::message(),
                             );
                             return;
                         }
                     } else {
                         let pos = tile_pos_to_world_pos(obj_pos, true);
-                        spawn_floating_text_with_shadow(
+                        spawn_floating_text_with_shadow_anim(
                             commands,
                             &item_action_param.asset_server,
-                            pos.extend(game.player().position.z) + Vec3::new(0., 28., 0.),
+                            pos.extend(game.player().position.z) + Vec3::new(100., 38., 0.),
                             WHITE,
                             "A strong force prevents you...".to_string(),
                             FLOATING_TEXT,
+                            FloatingTextAnim::message(),
                         );
                         return;
                     }

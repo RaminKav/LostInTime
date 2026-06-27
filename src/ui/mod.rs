@@ -803,6 +803,10 @@ impl Plugin for UIPlugin {
                     update_dragged_item_stack_count_text,
                     handle_drop_on_slot_events.after(handle_item_drop_clicks),
                     handle_drop_in_world_events.after(handle_item_drop_clicks),
+                    crate::ui::interactions::handle_inventory_consumable_right_click
+                        .before(handle_interaction_clicks)
+                        .before(crate::item::item_actions::handle_item_action_success)
+                        .run_if(not(in_state(UIState::Closed))),
                     handle_interaction_clicks
                         .before(handle_item_drop_clicks)
                         .run_if(not(in_state(UIState::Closed))),

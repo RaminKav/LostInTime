@@ -31,13 +31,63 @@ pub fn floating_text_font_style(settings: Option<&CheatSettings>) -> FontStyle {
     }
 }
 
+#[derive(Component, Clone, Copy)]
+pub struct FloatingTextAnim {
+    pub lifetime: f32,
+    /// Fraction of lifetime (0–1) before upward float is applied.
+    pub float_start: f32,
+    pub float_accel: f32,
+    /// Fraction of lifetime (0–1) before alpha fade begins.
+    pub fade_start: f32,
+}
+
+impl FloatingTextAnim {
+    /// Fast pop for damage, healing, and dodge numbers.
+    pub fn damage() -> Self {
+        Self {
+            lifetime: 0.85,
+            float_start: 0.3,
+            float_accel: 0.4,
+            fade_start: 0.65,
+        }
+    }
+
+    /// Longer-lived labels for shrine messages, portal warnings, etc.
+    pub fn message() -> Self {
+        Self {
+            lifetime: 2.5,
+            float_start: 0.15,
+            float_accel: 0.7,
+            fade_start: 0.65,
+        }
+    }
+
+    /// Float accel scaled down for longer lifetimes so drift distance stays similar.
+    pub fn scaled_float_accel(&self) -> f32 {
+        let reference = Self::damage();
+        let lifetime_scale = reference.lifetime / self.lifetime;
+        self.float_accel * lifetime_scale * lifetime_scale
+    }
+}
+
+impl Default for FloatingTextAnim {
+    fn default() -> Self {
+        Self::damage()
+    }
+}
+
 #[derive(Component)]
 pub struct DamageNumber {
     pub timer: Timer,
     pub velocity: f32,
     pub target_y: f32,
     pub move_velocity: f32,
+    pub anim: FloatingTextAnim,
 }
+
+/// Black offset copy parented under [`DamageNumber`] text; faded in sync with the parent.
+#[derive(Component)]
+pub(crate) struct FloatingTextShadow;
 
 #[derive(Component, Clone)]
 pub struct QueueFloatingText {
@@ -252,34 +302,45 @@ pub fn handle_add_dodge_text(
 pub fn tick_damage_numbers(
     mut commands: Commands,
     time: Res<Time>,
-    mut query: Query<(Entity, &mut Text, &mut DamageNumber, &mut Transform)>,
+    mut texts: ParamSet<(
+        Query<(
+            Entity,
+            &mut Text,
+            &mut DamageNumber,
+            &mut Transform,
+            &Children,
+        )>,
+        Query<(Entity, &mut Text), With<FloatingTextShadow>>,
+    )>,
 ) {
     const MOVE_ACCELERATION: f32 = 50.0;
     const MAX_MOVE_VELOCITY: f32 = 200.0;
 
-    for (entity, mut text, mut damage_number, mut t) in query.iter_mut() {
+    let mut shadow_fades: Vec<(Entity, f32)> = Vec::new();
+
+    for (entity, mut text, mut damage_number, mut t, children) in texts.p0().iter_mut() {
         damage_number.timer.tick(time.delta());
 
         // Calculate upward float offset (part of the damage number animation)
-        let float_offset = if damage_number.timer.percent() > 0.3 {
-            damage_number.velocity += 0.7;
-            damage_number.velocity * time.delta_seconds()
+        let float_start = damage_number.anim.float_start;
+        let float_accel = damage_number.anim.scaled_float_accel();
+        let fade_start = damage_number.anim.fade_start;
+        let percent = damage_number.timer.percent();
+
+        // Upward float drift — applied directly to the transform.
+        if percent > float_start {
+            damage_number.velocity += float_accel;
+            t.translation.y += damage_number.velocity * time.delta_seconds();
         } else {
-            damage_number.velocity += 0.7;
-            0.0
-        };
+            damage_number.velocity += float_accel;
+        }
 
-        // Update target_y to account for upward float movement
-        // This keeps the target position in sync with the float animation
-        damage_number.target_y += float_offset;
-
-        // Smoothly move toward target_y position (for making room for new items)
+        // Smooth catch-up when another system bumped target_y (item pickup stacking).
         let current_y = t.translation.y;
         let target_y = damage_number.target_y;
         let distance_to_target = target_y - current_y;
 
-        if distance_to_target.abs() > 0.1 {
-            // Accelerate toward target
+        if distance_to_target > 0.1 {
             let direction = if distance_to_target > 0.0 { 1.0 } else { -1.0 };
             damage_number.move_velocity += MOVE_ACCELERATION * time.delta_seconds() * direction;
             damage_number.move_velocity = damage_number
@@ -289,7 +350,6 @@ pub fn tick_damage_numbers(
             let move_delta = damage_number.move_velocity * time.delta_seconds();
             let new_y = current_y + move_delta;
 
-            // Clamp to target if we overshoot
             if (new_y - target_y).abs() < distance_to_target.abs() {
                 t.translation.y = new_y;
             } else {
@@ -297,22 +357,31 @@ pub fn tick_damage_numbers(
                 damage_number.move_velocity = 0.0;
             }
         } else {
-            // Close enough to target, stop moving
-            t.translation.y = target_y;
             damage_number.move_velocity = 0.0;
+            damage_number.target_y = t.translation.y;
         }
 
-        // Apply fade effect
-        if damage_number.timer.percent() > 0.3 {
+        // Apply fade effect — alpha 1.0 at fade_start, 0.0 at end of lifetime.
+        if percent > fade_start {
+            let fade_t = (percent - fade_start) / (1.0 - fade_start);
+            let alpha = 1.0 - fade_t;
             for section in text.sections.iter_mut() {
-                section
-                    .style
-                    .color
-                    .set_a(1. - damage_number.timer.percent() + 0.3);
+                section.style.color.set_a(alpha);
+            }
+            for child in children.iter() {
+                shadow_fades.push((*child, alpha));
             }
         }
         if damage_number.timer.finished() {
             commands.entity(entity).despawn_recursive();
+        }
+    }
+
+    for (shadow_entity, alpha) in shadow_fades {
+        if let Ok((_, mut shadow)) = texts.p1().get_mut(shadow_entity) {
+            for section in shadow.sections.iter_mut() {
+                section.style.color.set_a(alpha);
+            }
         }
     }
 }
@@ -457,6 +526,26 @@ pub fn spawn_floating_text_with_shadow(
     text: String,
     font_style: FontStyle,
 ) -> Entity {
+    spawn_floating_text_with_shadow_anim(
+        commands,
+        asset_server,
+        pos,
+        color,
+        text,
+        font_style,
+        FloatingTextAnim::default(),
+    )
+}
+
+pub fn spawn_floating_text_with_shadow_anim(
+    commands: &mut Commands,
+    asset_server: &AssetServer,
+    pos: Vec3,
+    color: Color,
+    text: String,
+    font_style: FontStyle,
+    anim: FloatingTextAnim,
+) -> Entity {
     spawn_floating_text_with_shadow_inner(
         commands,
         asset_server,
@@ -465,6 +554,7 @@ pub fn spawn_floating_text_with_shadow(
         text,
         font_style,
         None,
+        anim,
     )
     .1
 }
@@ -488,6 +578,28 @@ pub fn spawn_floating_text_with_shadow_on_layer(
     font_style: FontStyle,
     render_layers: RenderLayers,
 ) -> Entity {
+    spawn_floating_text_with_shadow_on_layer_anim(
+        commands,
+        asset_server,
+        pos,
+        color,
+        text,
+        font_style,
+        render_layers,
+        FloatingTextAnim::default(),
+    )
+}
+
+pub fn spawn_floating_text_with_shadow_on_layer_anim(
+    commands: &mut Commands,
+    asset_server: &AssetServer,
+    pos: Vec3,
+    color: Color,
+    text: String,
+    font_style: FontStyle,
+    render_layers: RenderLayers,
+    anim: FloatingTextAnim,
+) -> Entity {
     spawn_floating_text_with_shadow_inner(
         commands,
         asset_server,
@@ -496,6 +608,7 @@ pub fn spawn_floating_text_with_shadow_on_layer(
         text,
         font_style,
         Some(render_layers),
+        anim,
     )
     .0
 }
@@ -508,6 +621,7 @@ fn spawn_floating_text_with_shadow_inner(
     text: String,
     font_style: FontStyle,
     render_layers: Option<RenderLayers>,
+    anim: FloatingTextAnim,
 ) -> (Entity, Entity) {
     let mut shadow_e = Entity::from_raw(0);
     let mut parent_e = Entity::from_raw(0);
@@ -531,14 +645,16 @@ fn spawn_floating_text_with_shadow_inner(
         }
         if i == 0 {
             shadow_e = entity;
+            commands.entity(entity).insert(FloatingTextShadow);
         } else {
             commands
                 .entity(entity)
                 .insert(DamageNumber {
-                    timer: Timer::from_seconds(0.85, TimerMode::Once),
+                    timer: Timer::from_seconds(anim.lifetime, TimerMode::Once),
                     velocity: 0.,
                     target_y: pos.y,
                     move_velocity: 0.0,
+                    anim,
                 })
                 .add_child(shadow_e);
             parent_e = entity;

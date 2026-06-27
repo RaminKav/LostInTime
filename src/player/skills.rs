@@ -81,7 +81,10 @@ impl SkillClass {
     pub fn get_anim_data(&self, sprites: &PlayerSpriteHandles) -> (Handle<Aseprite>, &str) {
         match self {
             SkillClass::Warrior => (sprites.red.clone(), PlayerRedAseprite::tags::IDLE_FRONT),
-            SkillClass::Wizard => (sprites.wizard.clone(), PlayerWizardAseprite::tags::IDLE_FRONT),
+            SkillClass::Wizard => (
+                sprites.wizard.clone(),
+                PlayerWizardAseprite::tags::IDLE_FRONT,
+            ),
             SkillClass::Rogue => (sprites.rogue.clone(), PlayerRogueAseprite::tags::IDLE_FRONT),
             SkillClass::Thief => (sprites.thief.clone(), PlayerThiefAseprite::tags::IDLE_FRONT),
             SkillClass::Hunter => (
@@ -1459,13 +1462,13 @@ impl Heirloom {
                 format!("Costs {} mana", Heirloom::CherryBomb.get_mana_cost()),
             ],
             Heirloom::FrailStacks => vec![
-                "Your Attacks have".to_string(),
+                "Damage you deal has".to_string(),
                 "a +25% chance to".to_string(),
                 "apply a Frail".to_string(),
                 "stack.".to_string(),
             ],
             Heirloom::SlowStacks => vec![
-                "Your Attacks have".to_string(),
+                "Damage you deal has".to_string(),
                 "a +15% chance to".to_string(),
                 "apply a Freeze".to_string(),
                 "stack.".to_string(),
@@ -1505,7 +1508,7 @@ impl Heirloom {
                 ]
             }
             Heirloom::PoisonStacks => vec![
-                "Your Attacks have".to_string(),
+                "Damage you deal has".to_string(),
                 "a +25% chance to".to_string(),
                 "apply a Poison".to_string(),
                 "stack.".to_string(),
@@ -1641,7 +1644,7 @@ impl Heirloom {
             ],
 
             Heirloom::Knockback => vec![
-                "Your attacks".to_string(),
+                "Damage you deal will".to_string(),
                 "knockback enemies".to_string(),
                 "further. ".to_string(),
             ],
@@ -1716,7 +1719,8 @@ impl Heirloom {
             ],
             Heirloom::PoisonStrength => vec![
                 "Your poison effect".to_string(),
-                "does more damage.".to_string(),
+                "does +100% more".to_string(),
+                "damage.".to_string(),
                 "+25% poison chance.".to_string(),
             ],
             Heirloom::ViralVenum => vec![

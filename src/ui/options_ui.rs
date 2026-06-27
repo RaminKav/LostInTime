@@ -162,10 +162,13 @@ pub struct KeyBindText {
 #[derive(Component)]
 pub struct WaitingForKeyInput {
     pub bind_type: KeyBindType,
+    /// Ignore mouse presses briefly so the click that opened rebind is not captured.
+    pub ignore_mouse_frames: u8,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum VolumeChannel {
+    Global,
     Music,
     Sfx,
 }
@@ -240,6 +243,7 @@ pub fn handle_options_clicks(
                         // Start waiting for key input
                         commands.entity(entity).insert(WaitingForKeyInput {
                             bind_type: button.bind_type,
+                            ignore_mouse_frames: 2,
                         });
                         commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.2));
                     }
@@ -265,7 +269,7 @@ pub fn handle_key_rebind_input(
     mut key_input: ResMut<Input<KeyCode>>,
     mut mouse_input: ResMut<Input<MouseButton>>,
     mut keybinds: ResMut<InputMappings>,
-    waiting: Query<(Entity, &WaitingForKeyInput)>,
+    mut waiting: Query<(Entity, &mut WaitingForKeyInput)>,
     graphics: Res<Graphics>,
 ) {
     if waiting.is_empty() {
@@ -275,6 +279,13 @@ pub fn handle_key_rebind_input(
     // Collect keys to avoid borrow checker issues
     let just_pressed_key: Vec<KeyCode> = key_input.get_just_pressed().copied().collect();
     let just_pressed_mouse: Vec<MouseButton> = mouse_input.get_just_pressed().copied().collect();
+
+    // Tick mouse-ignore grace period on active rebind prompts.
+    for (_, mut waiting_for) in waiting.iter_mut() {
+        if waiting_for.ignore_mouse_frames > 0 {
+            waiting_for.ignore_mouse_frames -= 1;
+        }
+    }
 
     // Check for any key press
     for key in just_pressed_key {
@@ -324,6 +335,9 @@ pub fn handle_key_rebind_input(
     // Check for any mouse press
     for mouse_button in just_pressed_mouse {
         for (entity, waiting_for) in waiting.iter() {
+            if waiting_for.ignore_mouse_frames > 0 {
+                continue;
+            }
             match waiting_for.bind_type {
                 KeyBindType::ActiveSkill(slot) => {
                     let binding = InputBinding::MouseBinding(mouse_button);
@@ -729,9 +743,9 @@ pub fn setup_options_ui(
         &mut commands,
         &graphics,
         &asset_server,
-        "Music:",
-        VolumeChannel::Music,
-        audio_volume.music,
+        "Global:",
+        VolumeChannel::Global,
+        audio_volume.global,
         Vec3::new(
             center_side_x,
             music_vol_y,
@@ -739,7 +753,22 @@ pub fn setup_options_ui(
         ),
     );
 
-    let sfx_vol_y = music_vol_y - 18.;
+    let sfx_channel_vol_y = music_vol_y - 18.;
+    spawn_volume_row(
+        &mut commands,
+        &graphics,
+        &asset_server,
+        "Music:",
+        VolumeChannel::Music,
+        audio_volume.music,
+        Vec3::new(
+            center_side_x,
+            sfx_channel_vol_y,
+            ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
+        ),
+    );
+
+    let sfx_vol_y = sfx_channel_vol_y - 18.;
     spawn_volume_row(
         &mut commands,
         &graphics,
@@ -2176,6 +2205,7 @@ pub fn handle_volume_button_click(
                 Interaction::Hovering => {
                     if left_mouse_released {
                         let val = match vol_button.channel {
+                            VolumeChannel::Global => &mut audio_volume.global,
                             VolumeChannel::Music => &mut audio_volume.music,
                             VolumeChannel::Sfx => &mut audio_volume.sfx,
                         };
@@ -2454,6 +2484,7 @@ pub fn update_volume_text(
     }
     for (vol_text, mut text) in texts.iter_mut() {
         let val = match vol_text.channel {
+            VolumeChannel::Global => audio_volume.global,
             VolumeChannel::Music => audio_volume.music,
             VolumeChannel::Sfx => audio_volume.sfx,
         };

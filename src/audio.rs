@@ -31,23 +31,37 @@ const SFX_CLEANUP_DELAY_SECS: f32 = 5.0;
 /// Values range from 0 (muted) to 10 (full volume).
 #[derive(Resource, Debug, Clone, Serialize, Deserialize)]
 pub struct AudioVolume {
+    #[serde(default = "default_volume_level")]
+    pub global: u8,
     pub music: u8,
     pub sfx: u8,
 }
 
+fn default_volume_level() -> u8 {
+    10
+}
+
 impl Default for AudioVolume {
     fn default() -> Self {
-        Self { music: 7, sfx: 7 }
+        Self {
+            global: 10,
+            music: 7,
+            sfx: 7,
+        }
     }
 }
 
 impl AudioVolume {
+    pub fn global_fraction(&self) -> f32 {
+        self.global as f32 / 10.0
+    }
+
     pub fn music_fraction(&self) -> f32 {
-        self.music as f32 / 10.0
+        self.music as f32 / 10.0 * self.global_fraction()
     }
 
     pub fn sfx_fraction(&self) -> f32 {
-        self.sfx as f32 / 10.0
+        self.sfx as f32 / 10.0 * self.global_fraction()
     }
 
     pub fn load() -> Self {

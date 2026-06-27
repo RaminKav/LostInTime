@@ -39,7 +39,7 @@ use crate::{
         MaterialDropsToggleButton, ShiftQuickEquipResult, SortInventoryButton,
         BREAK_DROP_FILTER_ITEMS,
     },
-    item::{heirloom_shrine::HeirloomShrineState, CraftedItemEvent, EquipmentType, WorldObject},
+    item::{heirloom_shrine::HeirloomShrineState, item_actions::{ItemActionParam, ItemActions}, CraftedItemEvent, EquipmentType, WorldObject},
     pets::state::Pet,
     player::{
         combat_heirlooms::HallucinationStatType,
@@ -893,6 +893,110 @@ pub fn handle_drop_dragged_items_on_inv_close(
             stack_empty: true,
         });
     }
+}
+
+/// Right-click a consumable in the inventory or hotbar to use it (same as the hotbar keybind).
+pub fn handle_inventory_consumable_right_click(
+    cursor_pos: Res<CursorPos>,
+    mut mouse_input: ResMut<Input<MouseButton>>,
+    key_input: Res<Input<KeyCode>>,
+    ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
+    mut params: ParamSet<(
+        GameParam,
+        Query<(Entity, &mut Interactable, &InventorySlotState)>,
+    )>,
+    inv: Query<&Inventory>,
+    inv_item_icons: Query<&ItemStack>,
+    dragging_query: Query<&DraggedItem>,
+    ui_state: Res<State<UIState>>,
+    proto: ProtoParam,
+    mut item_action_param: ItemActionParam,
+    mut commands: Commands,
+) {
+    if !ui_state.0.is_inv_open() {
+        return;
+    }
+    if !mouse_input.just_pressed(MouseButton::Right) {
+        return;
+    }
+    if key_input.pressed(KeyCode::LShift) || dragging_query.iter().next().is_some() {
+        return;
+    }
+
+    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    let Some((hit_entity, _, _)) = hit_test else {
+        return;
+    };
+
+    let consume_target = {
+        let inv_slots = params.p1();
+        let mut target = None;
+        for (entity, _, state) in inv_slots.iter() {
+            if entity != hit_entity {
+                continue;
+            }
+            if !(state.r#type.is_inventory() || state.r#type.is_hotbar()) {
+                return;
+            }
+            let Some(item_entity) = state.item else {
+                return;
+            };
+            let Ok(item_stack) = inv_item_icons.get(item_entity) else {
+                return;
+            };
+            let Some(inv_item) = inv
+                .single()
+                .get_items_from_slot_type(state.r#type)
+                .items
+                .get(state.slot_index)
+                .and_then(|slot| slot.clone())
+            else {
+                return;
+            };
+            if inv_item.item_stack.obj_type != item_stack.obj_type {
+                return;
+            }
+            let Some(item_actions) =
+                proto.get_component::<ItemActions, _>(inv_item.item_stack.obj_type)
+            else {
+                return;
+            };
+            if !item_actions.allows_hotbar_band_placement() {
+                return;
+            }
+            target = Some((
+                inv_item.item_stack.obj_type,
+                inv_item.slot,
+                inv_item.item_stack.clone(),
+            ));
+            break;
+        }
+        target
+    };
+
+    let Some((obj, slot, stack)) = consume_target else {
+        return;
+    };
+
+    let Some(item_actions) = proto.get_component::<ItemActions, _>(obj) else {
+        return;
+    };
+    item_actions.run_action(
+        obj,
+        slot,
+        Some(&stack),
+        &mut item_action_param,
+        &mut params.p0(),
+        &proto,
+        &mut commands,
+    );
+
+    if let Ok((_, mut interactable, _)) = params.p1().get_mut(hit_entity) {
+        if !matches!(interactable.current(), Interaction::Hovering) {
+            interactable.change(Interaction::Hovering);
+        }
+    }
+    mouse_input.clear_just_pressed(MouseButton::Right);
 }
 
 pub fn handle_interaction_clicks(

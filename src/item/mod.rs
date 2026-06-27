@@ -50,8 +50,8 @@ use bevy::reflect::TypeUuid;
 use bevy::utils::HashMap;
 use bevy_proto::prelude::{ProtoCommands, Prototypes, ReflectSchematic, Schematic};
 use combat_shrine::{
-    add_shrine_visuals_on_spawn, handle_combat_shrine_activate_animation, handle_shrine_rewards,
-    CombatShrineMobDeathEvent,
+    add_shrine_visuals_on_spawn, enhance_combat_shrine_mobs, handle_combat_shrine_activate_animation,
+    handle_shrine_rewards, CombatShrineMobDeathEvent,
 };
 use dungeon_shrine::{
     add_dungeon_shrine_visuals_on_spawn, handle_dungeon_shrine_activation,
@@ -1575,7 +1575,7 @@ impl Plugin for ItemsPlugin {
                 (
                     handle_pay_shrine_cost,
                     handle_delayed_spawns.run_if(resource_exists::<DelayedSpawn>()),
-                    handle_item_action_success.run_if(is_not_paused),
+                    handle_item_action_success,
                     handle_delayed_ranged_attack.run_if(is_not_paused),
                     handle_spread_arrows_attack
                         .after(CustomFlush)
@@ -1592,6 +1592,9 @@ impl Plugin for ItemsPlugin {
                     handle_combat_shrine_activate_animation,
                 )
                     .in_set(OnUpdate(GameState::Main)),
+            )
+            .add_system(
+                enhance_combat_shrine_mobs.in_set(OnUpdate(GameState::Main)),
             )
             .add_system(
                 handle_bridge_placement_mode

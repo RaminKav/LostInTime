@@ -3009,6 +3009,7 @@ pub fn handle_crafting_result_slot_click(
     mut commands: Commands,
     cursor_pos: Res<CursorPos>,
     mut mouse_input: ResMut<Input<MouseButton>>,
+    key_input: Res<Input<KeyCode>>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     mut result_slots: Query<(Entity, &mut Interactable), With<CraftingResultSlot>>,
     cur_ui_state: Res<State<UIState>>,
@@ -3027,6 +3028,7 @@ pub fn handle_crafting_result_slot_click(
     }
     let hit_test = super::ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
+    let shift_key_pressed = key_input.pressed(KeyCode::LShift);
 
     for (result_entity, mut interactable) in result_slots.iter_mut() {
         // 1. Hover-enter / hover-exit bookkeeping.
@@ -3064,17 +3066,48 @@ pub fn handle_crafting_result_slot_click(
         }
 
         let stack_count = recipe.2.max(1);
+        let max_batches = recipe
+            .0
+            .iter()
+            .map(|ing| inv.items.get_item_count_in_container(ing.item) / ing.count)
+            .min()
+            .unwrap_or(0);
+        if max_batches == 0 {
+            continue;
+        }
 
-        // 3. Either start a new dragged stack or extend the one we already hold. On each
-        //    craft we despawn-and-respawn the icon so the stack-count text refreshes, and we
-        //    drive `Interaction::Dragging` on the result slot so that subsequent clicks on
-        //    other inventory slots route through the standard drop pipeline.
         let existing_drag = dragging_query.iter().next();
+        let current_drag_count = existing_drag
+            .map(|(_, stack)| stack.count)
+            .unwrap_or(0);
+        if existing_drag.is_some()
+            && existing_drag.map(|(_, s)| s.obj_type) != Some(recipe_obj)
+        {
+            continue;
+        }
+
+        let space_for_batches = if current_drag_count >= crate::inventory::MAX_STACK_SIZE {
+            0
+        } else {
+            (crate::inventory::MAX_STACK_SIZE - current_drag_count) / stack_count
+        };
+        let craft_batches = if shift_key_pressed {
+            max_batches.min(space_for_batches.max(1))
+        } else {
+            1
+        };
+        if craft_batches == 0 {
+            continue;
+        }
+        let total_output = craft_batches * stack_count;
+
+        // Either start a new dragged stack or extend the one we already hold. On each
+        // craft we despawn-and-respawn the icon so the stack-count text refreshes, and we
+        // drive `Interaction::Dragging` on the result slot so that subsequent clicks on
+        // other inventory slots route through the standard drop pipeline.
         let (new_stack, old_drag_entity) = if let Some((drag_e, drag_stack)) = existing_drag {
-            if drag_stack.obj_type != recipe_obj {
-                continue;
-            }
-            let new_count = (drag_stack.count + stack_count).min(crate::inventory::MAX_STACK_SIZE);
+            let new_count =
+                (drag_stack.count + total_output).min(crate::inventory::MAX_STACK_SIZE);
             if new_count == drag_stack.count {
                 continue;
             }
@@ -3085,7 +3118,7 @@ pub fn handle_crafting_result_slot_click(
             };
             let loot_bonus = player_atts.get_single().map(|a| a.0).unwrap_or(0);
             let rolled = create_new_random_item_stack_with_attributes(
-                &base_stack.copy_with_count(stack_count),
+                &base_stack.copy_with_count(total_output),
                 &proto,
                 &mut commands,
                 loot_bonus,
@@ -3093,6 +3126,10 @@ pub fn handle_crafting_result_slot_click(
             );
             (rolled, None)
         };
+
+        for _ in 0..craft_batches {
+            crafted_event.send(CraftedItemEvent { obj: recipe_obj });
+        }
 
         if let Some(old) = old_drag_entity {
             commands.entity(old).despawn_recursive();
@@ -3119,7 +3156,6 @@ pub fn handle_crafting_result_slot_click(
             origin_slot: crate::ui::VIRTUAL_DRAG_ORIGIN_SLOT,
         });
 
-        crafted_event.send(CraftedItemEvent { obj: recipe_obj });
         mouse_input.clear();
     }
 }

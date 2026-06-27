@@ -826,46 +826,20 @@ pub fn handle_hits(
                             }
                         }
 
-                        let echo_count = game.skill_count(Heirloom::OnHitEcho);
-                        if echo_count > 0 {
-                            if let Ok((_, mut current_mana, _)) =
-                                player_blessing_mana_query.get_single_mut()
-                            {
-                                let mana_cost = Heirloom::OnHitEcho.get_mana_cost();
-                                let dmg = attack.unwrap_or(&Attack(0)).0;
-                                let size_mult =
-                                    proj_size.unwrap_or(&ProjectileSize(0)).get_multiplier();
-
-                                for i in 0..echo_count {
-                                    if current_mana.0 < mana_cost {
-                                        break;
-                                    }
-                                    current_mana.0 -= mana_cost;
-                                    game.heirloom_trigger_counts
-                                        .record_mana(Heirloom::OnHitEcho, mana_cost);
-                                    game.heirloom_trigger_counts.increment(Heirloom::OnHitEcho);
-
-                                    if i == 0 {
-                                        spawn_echo_hitbox(
-                                            &mut commands,
-                                            &asset_server,
-                                            e,
-                                            dmg,
-                                            size_mult,
-                                        );
-                                    } else {
-                                        spawn_delayed_heirloom_cast(
-                                            &mut commands,
-                                            HEIRLOOM_EXTRA_CAST_DELAY * i as f32,
-                                            DelayedCastType::Echo {
-                                                player: e,
-                                                dmg,
-                                                size_multiplier: size_mult,
-                                            },
-                                        );
-                                    }
-                                }
-                            };
+                        if let Ok((_, mut current_mana, _)) =
+                            player_blessing_mana_query.get_single_mut()
+                        {
+                            let skills = game.get_player_skills();
+                            trigger_on_hit_echo(
+                                e,
+                                &skills,
+                                attack.unwrap_or(&Attack(0)).0,
+                                proj_size.unwrap_or(&ProjectileSize(0)).get_multiplier(),
+                                &mut current_mana,
+                                &mut commands,
+                                &asset_server,
+                                &mut game.heirloom_trigger_counts,
+                            );
                         }
                     }
                     if *DEBUG {
@@ -1157,24 +1131,28 @@ pub fn cleanup_marked_for_death_entities(
                         trigger_counts.increment(Heirloom::FrozenMPRegen);
                     }
                 }
-                if let Some(p) = status_option.and_then(|s| s.burning.as_ref()) {
-                    if skills.has(Heirloom::ViralVenum) {
-                        let mana_cost = Heirloom::ViralVenum.get_mana_cost();
-                        if current_mana.0 >= mana_cost {
-                            current_mana.0 -= mana_cost;
-                            trigger_counts.record_mana(Heirloom::ViralVenum, mana_cost);
-                            trigger_counts.increment(Heirloom::ViralVenum);
-                            // Defer nearby-mob status mutation out of this loop
-                            // so we don't take overlapping borrows of `neaby_mobs`.
-                            nearby_venom_targets.push((
-                                e,
-                                mob_pos.translation().truncate(),
-                                p.clone(),
-                            ));
-                        }
+            }
+
+            // ViralVenum is exempt from the heirloom-kill gate so poison DoT kills
+            // can still spread stacks to nearby enemies.
+            if let Some(p) = status_option.and_then(|s| s.burning.as_ref()) {
+                if skills.has(Heirloom::ViralVenum) {
+                    let mana_cost = Heirloom::ViralVenum.get_mana_cost();
+                    if current_mana.0 >= mana_cost {
+                        current_mana.0 -= mana_cost;
+                        trigger_counts.record_mana(Heirloom::ViralVenum, mana_cost);
+                        trigger_counts.increment(Heirloom::ViralVenum);
+                        // Defer nearby-mob status mutation out of this loop
+                        // so we don't take overlapping borrows of `neaby_mobs`.
+                        nearby_venom_targets.push((
+                            e,
+                            mob_pos.translation().truncate(),
+                            p.clone(),
+                        ));
                     }
                 }
             }
+
             commands.entity(e).despawn_recursive();
         }
         analytics.send(AnalyticsUpdateEvent {
@@ -1188,18 +1166,25 @@ pub fn cleanup_marked_for_death_entities(
         for (_source_e, source_pos, source_burning) in nearby_venom_targets.into_iter() {
             for (mob_e, txfm, mut status) in neaby_mobs.iter_mut() {
                 if source_pos.distance(txfm.translation().truncate()) < 3. * TILE_SIZE.x {
-                    status.burning = Some(crate::combat::status_effects::Burning {
-                        stacks: source_burning.stacks,
-                        duration_timer: Timer::from_seconds(
-                            source_burning.duration_timer.duration().as_secs_f32(),
-                            TimerMode::Once,
-                        ),
-                        tick_timer: source_burning.tick_timer.clone(),
-                    });
+                    let stacks_to_add = source_burning.stacks;
+                    if let Some(existing) = status.burning.as_mut() {
+                        existing.stacks = existing.stacks.saturating_add(stacks_to_add);
+                        existing.duration_timer.reset();
+                    } else {
+                        status.burning = Some(crate::combat::status_effects::Burning {
+                            stacks: stacks_to_add,
+                            duration_timer: Timer::from_seconds(
+                                source_burning.duration_timer.duration().as_secs_f32(),
+                                TimerMode::Once,
+                            ),
+                            tick_timer: source_burning.tick_timer.clone(),
+                        });
+                    }
+                    let total_stacks = status.burning.as_ref().unwrap().stacks as i32;
                     status_event.send(StatusEffectEvent {
                         entity: mob_e,
                         effect: StatusEffect::Poison,
-                        num_stacks: source_burning.stacks as i32,
+                        num_stacks: total_stacks,
                     });
                 }
             }
@@ -1331,6 +1316,48 @@ pub fn handle_thorns_on_damage_tracker(
     }
 }
 
+/// Dragon Eye ([`Heirloom::OnHitEcho`]) echo volley after the player takes damage.
+/// Shared by hit resolution, mob collision, and self-damage ([`ModifyHealthEvent`]) paths.
+pub fn trigger_on_hit_echo(
+    player_e: Entity,
+    skills: &PlayerSkills,
+    attack: i32,
+    size_mult: f32,
+    current_mana: &mut CurrentMana,
+    commands: &mut Commands,
+    asset_server: &AssetServer,
+    trigger_counts: &mut HeirloomTriggerCounts,
+) {
+    let echo_count = skills.get_count(Heirloom::OnHitEcho);
+    if echo_count <= 0 {
+        return;
+    }
+    let mana_cost = Heirloom::OnHitEcho.get_mana_cost();
+
+    for i in 0..echo_count {
+        if current_mana.0 < mana_cost {
+            break;
+        }
+        current_mana.0 -= mana_cost;
+        trigger_counts.record_mana(Heirloom::OnHitEcho, mana_cost);
+        trigger_counts.increment(Heirloom::OnHitEcho);
+
+        if i == 0 {
+            spawn_echo_hitbox(commands, asset_server, player_e, attack, size_mult);
+        } else {
+            spawn_delayed_heirloom_cast(
+                commands,
+                HEIRLOOM_EXTRA_CAST_DELAY * i as f32,
+                DelayedCastType::Echo {
+                    player: player_e,
+                    dmg: attack,
+                    size_multiplier: size_mult,
+                },
+            );
+        }
+    }
+}
+
 /// Spawn the ThornsSpikes radial spike volley around the player. Shared by the
 /// mob-collision path ([`collisions::check_mob_to_player_collisions`]) and the
 /// self-damage path ([`handle_thorns_on_self_damage`]) so the spawn logic stays
@@ -1389,6 +1416,8 @@ pub fn handle_thorns_on_self_damage(
             &Thorns,
             &Attack,
             &PlayerSkills,
+            &ProjectileSize,
+            &mut CurrentMana,
             Option<&mut ThornsOnDamageTracker>,
         ),
         With<Player>,
@@ -1396,8 +1425,12 @@ pub fn handle_thorns_on_self_damage(
     mut ranged_attack_event: EventWriter<RangedAttackEvent>,
     mut trigger_counts: ResMut<HeirloomTriggerCounts>,
     mut attribute_events: EventWriter<AttributeChangeEvent>,
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
 ) {
-    let Ok((player_e, thorns, attack, skills, mut tracker_opt)) = player.get_single_mut() else {
+    let Ok((player_e, thorns, attack, skills, projectile_size, mut current_mana, mut tracker_opt)) =
+        player.get_single_mut()
+    else {
         return;
     };
 
@@ -1405,6 +1438,17 @@ pub fn handle_thorns_on_self_damage(
         if event.0 >= 0 {
             continue;
         }
+
+        trigger_on_hit_echo(
+            player_e,
+            skills,
+            attack.0,
+            projectile_size.get_multiplier(),
+            &mut current_mana,
+            &mut commands,
+            &asset_server,
+            &mut trigger_counts,
+        );
 
         if thorns.0 > 0 {
             trigger_thorns_spikes(

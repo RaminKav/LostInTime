@@ -36,12 +36,12 @@ use crate::{
         damage_numbers::spawn_text,
         game_fonts::FLOATING_TEXT,
         key_input_guide::InteractGuide,
+        player_hud::{HudGameOverHeirloomSlide, SkillHudIcon},
         spawn_item_stack_icon, spawn_stats_tooltip_at,
         ui_helpers::{self, Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND},
-        CurrencyText, Interactable, Interaction, MenuButton, TimeFragmentIcon, UIElement,
-        UIState, HUD_GAME_OVER_LEFT_PANEL_Y_OFFSET, HUD_HEIRLOOM_GAME_OVER_SLIDE_SECS,
+        CurrencyText, Interactable, Interaction, MenuButton, TimeFragmentIcon, UIElement, UIState,
+        HUD_GAME_OVER_LEFT_PANEL_Y_OFFSET, HUD_HEIRLOOM_GAME_OVER_SLIDE_SECS,
         HUD_HEIRLOOM_GAME_OVER_Y_OFFSET,
-        player_hud::{HudGameOverHeirloomSlide, SkillHudIcon},
     },
     world::{
         dimension::{Era, EraManager},
@@ -559,10 +559,7 @@ pub fn tick_game_over_overlay(
     asset_server: Res<AssetServer>,
     mut game_over_text: Query<&mut Text, With<GameOverText>>,
     mut game_over_sprites: Query<&mut Sprite, (With<GameOverText>, Without<GameOverFadeout>)>,
-    mut heirloom_icons: Query<
-        (&mut Transform, &mut HudGameOverHeirloomSlide),
-        With<SkillHudIcon>,
-    >,
+    mut heirloom_icons: Query<(&mut Transform, &mut HudGameOverHeirloomSlide), With<SkillHudIcon>>,
     mut heirloom_untagged: Query<
         (Entity, &Transform),
         (With<SkillHudIcon>, Without<HudGameOverHeirloomSlide>),
@@ -918,7 +915,7 @@ pub fn handle_game_over_final_stats_tooltip(
             attributes.push(skills.poison_chance_stat_summary());
 
             // Hitbox is centered above "Try Again"; place tooltip up and to the left so it stays on-screen.
-            let tooltip_pos = Vec3::new(-125., 18., 2.);
+            let tooltip_pos = Vec3::new(-155., 46., 2.);
             let tooltip_e = spawn_stats_tooltip_at(
                 &mut commands,
                 &graphics,

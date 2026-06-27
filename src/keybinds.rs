@@ -318,6 +318,7 @@ pub fn get_key_display_name(key: InputBinding) -> String {
         InputBinding::MouseBinding(MouseButton::Left) => "LMB".to_string(),
         InputBinding::MouseBinding(MouseButton::Right) => "RMB".to_string(),
         InputBinding::MouseBinding(MouseButton::Middle) => "MMB".to_string(),
+        InputBinding::MouseBinding(MouseButton::Other(i)) => format!("MB{}", i),
 
         // Default: use Debug format but capitalize first letter
         _ => match key {

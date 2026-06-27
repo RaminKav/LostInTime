@@ -518,7 +518,15 @@ pub fn handle_item_action_success(
             .is_some()
         {
             let mut item_action_item = inv.single().items.items[e.item_slot].clone().unwrap();
-            inv.single_mut().items.items[e.item_slot] = item_action_item.modify_count(-1);
+            let consumed_from_slot = item_action_item.slot;
+            inv.single_mut().items.items[consumed_from_slot] = item_action_item.modify_count(-1);
+            for mut state in inv_slots.iter_mut() {
+                if state.slot_index == consumed_from_slot
+                    && (state.r#type == InventorySlotType::Normal || state.r#type.is_hotbar())
+                {
+                    state.dirty = true;
+                }
+            }
             analytics_event.send(AnalyticsUpdateEvent {
                 update_type: AnalyticsTrigger::ItemConsumed(e.obj),
             });
