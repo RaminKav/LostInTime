@@ -8,13 +8,16 @@ use rand::Rng;
 use crate::{
     assets::Graphics,
     colors::RED,
+    combat::MarkedForDeath,
     custom_commands::CommandsExt,
     enemy::red_mushling::{MushlingWakeupState, SproutingState, WaitingToSproutState},
-    enemy::{CombatAlignment, Mob},
+    enemy::{CombatAlignment, EliteMob, Mob},
     inputs::FacingDirection,
     inventory::ItemStack,
     item::{
-        dungeon_shrine::{DungeonShrineMob, DungeonShrineMobDeathEvent},
+        dungeon_shrine::{
+            roll_dungeon_elite, DungeonShrineMob, DungeonShrineMobDeathEvent,
+        },
         Loot, LootTable, WorldObject,
     },
     player::Player,
@@ -117,6 +120,12 @@ pub struct DungeonWaveState {
     pub clock: f32,
     /// Number of mobs from the current wave still alive.
     pub mobs_alive: i32,
+    /// All three initial mini-waves have been spawned for this wave.
+    pub mini_waves_initial_done: bool,
+    /// Mini-wave index used when cycling spawns while golems remain (0..=2).
+    pub cycle_mini_wave: u8,
+    /// Wave clock time when the last cycle mini-wave was spawned.
+    pub last_cycle_spawn_clock: f32,
 }
 
 impl DungeonWaveState {
@@ -346,11 +355,15 @@ fn handle_start_dungeon_wave(
         wave_state.mini_wave = 0;
         wave_state.clock = 0.;
         wave_state.mobs_alive = 0;
+        wave_state.mini_waves_initial_done = false;
+        wave_state.cycle_mini_wave = 0;
+        wave_state.last_cycle_spawn_clock = 0.;
 
         let count = spawn_mini_wave(
             wave_state.wave,
             0,
             event.0,
+            false,
             &mut proto_commands,
             &proto,
             &mut commands,
@@ -376,6 +389,7 @@ fn tick_dungeon_waves(
     game: GameParam,
     mut rewards: ResMut<DungeonRewards>,
     mut guides: Query<&mut InteractionGuideTrigger>,
+    wave_mobs: Query<(&Mob, &DungeonShrineMob), Without<MarkedForDeath>>,
 ) {
     if wave_state.phase != WavePhase::InProgress {
         return;
@@ -386,22 +400,55 @@ fn tick_dungeon_waves(
         return;
     };
 
-    if wave_state.mini_wave < 2 {
-        // Mini-wave 2 spawns at 20s, mini-wave 3 at 40s (from wave start), or
-        // early once the previous mini-wave is nearly cleared.
-        let threshold = if wave_state.mini_wave == 0 { 20. } else { 40. };
-        if wave_state.clock >= threshold || wave_state.mobs_alive <= 1 {
-            wave_state.mini_wave += 1;
+    if !wave_state.mini_waves_initial_done {
+        if wave_state.mini_wave < 2 {
+            // Mini-wave 2 spawns at 20s, mini-wave 3 at 40s (from wave start), or
+            // early once the previous mini-wave is nearly cleared.
+            let threshold = if wave_state.mini_wave == 0 { 20. } else { 40. };
+            if wave_state.clock >= threshold || wave_state.mobs_alive <= 1 {
+                wave_state.mini_wave += 1;
+                let count = spawn_mini_wave(
+                    wave_state.wave,
+                    wave_state.mini_wave,
+                    shrine_e,
+                    false,
+                    &mut proto_commands,
+                    &proto,
+                    &mut commands,
+                    &game,
+                );
+                wave_state.mobs_alive += count as i32;
+                if wave_state.mini_wave == 2 {
+                    wave_state.mini_waves_initial_done = true;
+                    wave_state.cycle_mini_wave = 0;
+                    wave_state.last_cycle_spawn_clock = wave_state.clock;
+                }
+            }
+        }
+        return;
+    }
+
+    let golems_alive = count_wave_golems_alive(shrine_e, &wave_mobs);
+    if wave_state.wave >= 2 && golems_alive > 0 {
+        const CYCLE_INTERVAL: f32 = 20.;
+        const CYCLE_EARLY_INTERVAL: f32 = 5.;
+        let since_last = wave_state.clock - wave_state.last_cycle_spawn_clock;
+        if since_last >= CYCLE_INTERVAL
+            || (wave_state.mobs_alive <= 1 && since_last >= CYCLE_EARLY_INTERVAL)
+        {
             let count = spawn_mini_wave(
                 wave_state.wave,
-                wave_state.mini_wave,
+                wave_state.cycle_mini_wave,
                 shrine_e,
+                true,
                 &mut proto_commands,
                 &proto,
                 &mut commands,
                 &game,
             );
             wave_state.mobs_alive += count as i32;
+            wave_state.cycle_mini_wave = (wave_state.cycle_mini_wave + 1) % 3;
+            wave_state.last_cycle_spawn_clock = wave_state.clock;
         }
     } else if wave_state.mobs_alive <= 0 {
         // All mini-waves spawned and cleared: grant rewards and advance state.
@@ -456,10 +503,21 @@ fn wake_dungeon_wave_mushlings(
     }
 }
 
+fn count_wave_golems_alive(
+    shrine_e: Entity,
+    wave_mobs: &Query<(&Mob, &DungeonShrineMob), Without<MarkedForDeath>>,
+) -> usize {
+    wave_mobs
+        .iter()
+        .filter(|(mob, shrine_mob)| shrine_mob.parent_shrine == shrine_e && **mob == Mob::StoneGolem)
+        .count()
+}
+
 fn spawn_mini_wave(
     wave: u8,
     mini_wave: u8,
     shrine_e: Entity,
+    skip_golem: bool,
     proto_commands: &mut ProtoCommands,
     proto: &ProtoParam,
     commands: &mut Commands,
@@ -472,12 +530,18 @@ fn spawn_mini_wave(
     let mut rng = rand::thread_rng();
     let mut total = 0;
     for (mob, count) in composition.iter() {
+        if skip_golem && *mob == Mob::StoneGolem {
+            continue;
+        }
         for _ in 0..*count {
             let offset = Vec2::new(rng.gen_range(-170. ..=170.), rng.gen_range(-140. ..=110.));
             let spawn_pos = offset;
             if let Some(mob_e) =
                 proto_commands.spawn_from_proto(mob.clone(), &proto.prototypes, spawn_pos)
             {
+                if roll_dungeon_elite(mob, proto, &mut rng) {
+                    commands.entity(mob_e).insert(EliteMob);
+                }
                 commands
                     .entity(mob_e)
                     .insert(CombatAlignment::Hostile)

@@ -656,14 +656,20 @@ fn juice_up_spawned_mobs_per_day(
     chaos_tracker: Option<Res<ChaosTracker>>,
     infinite_mode: Res<InfiniteMode>,
     player_level: Query<&PlayerLevel>,
+    in_dungeon: Query<&Dungeon, With<crate::world::dimension::ActiveDimension>>,
     mut commands: Commands,
 ) {
+    let dungeon_chaos_multiplier = if in_dungeon.get_single().is_ok() {
+        2.
+    } else {
+        1.
+    };
     for (e, mut hp, mut att, mob) in elites.iter_mut() {
         let global_chaos = chaos_tracker.as_ref().map(|c| c.get_chaos()).unwrap_or(0.0);
         let (hp_multiplier, attack_multiplier, total_chaos, infinite_chaos) =
             if infinite_mode.active {
                 let infinite_chaos = infinite_mode.get_chaos_bonus();
-                let total_chaos = global_chaos + infinite_chaos;
+                let total_chaos = (global_chaos + infinite_chaos) * dungeon_chaos_multiplier;
                 (
                     InfiniteMode::endless_mob_hp_multiplier(total_chaos),
                     InfiniteMode::endless_mob_attack_multiplier(total_chaos),
@@ -671,7 +677,7 @@ fn juice_up_spawned_mobs_per_day(
                     infinite_chaos,
                 )
             } else {
-                let total_chaos = global_chaos;
+                let total_chaos = global_chaos * dungeon_chaos_multiplier;
                 let chaos_factor = 1. + total_chaos;
                 (
                     hp_multiplier_for_total_chaos(total_chaos),

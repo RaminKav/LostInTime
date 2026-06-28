@@ -35,7 +35,7 @@
         spawn_distance: 32.,
     ),
     "survival_rogue_like::proto::ColliderCapsulProto": (x1: -6., y1: -10., x2: 6., y2: -10., r: 18.),
-    "survival_rogue_like::attributes::MaxHealth": (1900),
+    "survival_rogue_like::attributes::MaxHealth": (3700),
     "survival_rogue_like::attributes::Attack": (15),
     "survival_rogue_like::enemy::MobLevel": (1),
     "survival_rogue_like::item::loot_table::LootTable": (

@@ -54,7 +54,7 @@
                 "Bow"
             ],
             stat_description: [
-                "Gain +3% Crit Chance per\nlevel" // 7
+                "Gain +2% Crit Chance per\nlevel" // 7
             ],
             class_icon: HunterPortrait,
             active_skills: (Buckshot, Bomb, ArrowVolley, DruidTree), // crit chance is added as crit dmg

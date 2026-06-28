@@ -148,7 +148,7 @@ impl SkillClass {
                 stats.attack_speed = AttributeValue::new(level * 3, quality, 1.);
             }
             SkillClass::Hunter => {
-                stats.crit_chance = AttributeValue::new(level * 3, quality, 1.);
+                stats.crit_chance = AttributeValue::new(level * 2, quality, 1.);
             }
             _ => (),
         }
@@ -3274,7 +3274,10 @@ impl HeirloomTriggerCounts {
             .filter(|(_, amount)| **amount > 0)
             .map(|(weapon, amount)| (*weapon, *amount))
             .collect();
-        entries.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| format!("{:?}", a.0).cmp(&format!("{:?}", b.0))));
+        entries.sort_by(|a, b| {
+            b.1.cmp(&a.1)
+                .then_with(|| format!("{:?}", a.0).cmp(&format!("{:?}", b.0)))
+        });
         entries
     }
 

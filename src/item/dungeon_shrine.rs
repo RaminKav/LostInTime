@@ -46,6 +46,18 @@ aseprite!(pub WeaponShrineAnim, "textures/dungeon_shrines/dungeon_weapon_shrine.
 aseprite!(pub ArmorShrineAnim, "textures/dungeon_shrines/dungeon_armor_shrine.ase");
 aseprite!(pub AccessoryShrineAnim, "textures/dungeon_shrines/dungeon_accessory_shrine.ase");
 pub const NUM_DUNGEON_SHRINE_MOBS: usize = 15;
+pub const DUNGEON_ELITE_SPAWN_RATE: f32 = 0.30;
+
+pub fn roll_dungeon_elite(mob: &Mob, proto: &ProtoParam, rng: &mut impl Rng) -> bool {
+    if *mob == Mob::StoneGolem {
+        return false;
+    }
+    let can_be_elite = proto
+        .get_component::<CombatAlignment, _>(mob.clone())
+        .map(|a| a != &CombatAlignment::Passive)
+        .unwrap_or(false);
+    can_be_elite && rng.gen::<f32>() < DUNGEON_ELITE_SPAWN_RATE
+}
 
 pub fn handle_dungeon_shrine_activation(
     mut shrines: Query<(
@@ -68,7 +80,6 @@ pub fn handle_dungeon_shrine_activation(
             let possible_spawns = [Mob::FurDevil, Mob::Bushling, Mob::StingFly, Mob::SpikeSlime];
             let mut fallback_count = 0;
             let mut rng = rand::thread_rng();
-            let mut elite_count = 0;
 
             while num_to_spawn > 0 {
                 let offset = Vec2::new(rng.gen_range(-16. ..=16.), rng.gen_range(-20. ..=2.))
@@ -77,19 +88,18 @@ pub fn handle_dungeon_shrine_activation(
                 let choice_mob = rng.gen_range(0..possible_spawns.len());
 
                 if can_spawn_mob_here(spawn_pos, &game, &proto_param, fallback_count >= 10) {
-                    if let Some(mob) = proto_param.proto_commands.spawn_from_proto(
-                        if num_to_spawn == 1 {
-                            Mob::StoneGolem
-                        } else {
-                            possible_spawns[choice_mob].clone()
-                        },
+                    let spawned_mob = if num_to_spawn == 1 {
+                        Mob::StoneGolem
+                    } else {
+                        possible_spawns[choice_mob].clone()
+                    };
+                    if let Some(mob_e) = proto_param.proto_commands.spawn_from_proto(
+                        spawned_mob.clone(),
                         &proto_param.prototypes,
                         spawn_pos,
                     ) {
-                        // Make 5 of them elite
-                        if elite_count < 7 && num_to_spawn != 1 {
-                            commands.entity(mob).insert(EliteMob);
-                            elite_count += 1;
+                        if roll_dungeon_elite(&spawned_mob, &proto_param, &mut rng) {
+                            commands.entity(mob_e).insert(EliteMob);
                         }
                         fallback_count = 0;
                         num_to_spawn -= 1;
@@ -97,7 +107,7 @@ pub fn handle_dungeon_shrine_activation(
                         proto_param
                             .proto_commands
                             .commands()
-                            .entity(mob)
+                            .entity(mob_e)
                             .insert(CombatAlignment::Hostile)
                             .insert(LootTable {
                                 drops: vec![

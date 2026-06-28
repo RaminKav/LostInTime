@@ -184,7 +184,11 @@ impl Plugin for SpawnerPlugin {
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
-            .add_system(reset_stone_golem_timer_on_era_change)
+            .add_system(
+                reset_stone_golem_timer_on_era_change
+                    .in_base_set(CoreSet::PreUpdate)
+                    .before(crate::world::dimension::DimensionPlugin::new_dim_with_params),
+            )
             .add_system(
                 add_spawners_to_new_chunks
                     .run_if(run_once_per_run())
