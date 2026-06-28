@@ -40,7 +40,7 @@
                 item: VoidWormCard,
                 min: 1,
                 max: 1,
-                rate: 1.
+                rate: 0.0001
             ),
             ]
         ),

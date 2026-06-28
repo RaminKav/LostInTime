@@ -828,6 +828,7 @@ pub fn toggle_inventory(
             // proto_commands.spawn_from_proto(Mob::StingFly, &proto.prototypes, pos);
             // proto_commands.spawn_from_proto(Mob::FurDevil, &proto.prototypes, pos);
             proto_commands.spawn_from_proto(Mob::VoidWorm, &proto.prototypes, pos);
+            proto_commands.spawn_from_proto(Mob::StoneGolem, &proto.prototypes, pos);
             // proto_commands.spawn_from_proto(Mob::FurDevil, &proto.prototypes, pos);
             // proto_commands.spawn_from_proto(Mob::BigCactus, &proto.prototypes, pos);
             // proto_commands.spawn_from_proto(Mob::SmallCactus, &proto.prototypes, pos);
