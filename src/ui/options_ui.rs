@@ -9,6 +9,7 @@ use crate::{
     assets::Graphics,
     audio::{AudioSoundEffect, AudioVolume, SoundSpawner},
     client::GameData,
+    cursor::CursorColorSettings,
     cursor::CursorPos,
     datafiles,
     inputs::AutoAttackState,
@@ -111,6 +112,7 @@ pub enum OptionsCheckboxType {
     HideAttackAnims,
     HideSkillAnims,
     HideHeirloomAnims,
+    DoubleCursorSize,
     AutoAttack,
 }
 
@@ -439,7 +441,7 @@ pub fn setup_options_ui(
     cheat_settings: Res<CheatSettings>,
     audio_volume: Res<AudioVolume>,
     display_scale: Res<DisplayScaleSettings>,
-    cursor_color: Res<crate::cursor::CursorColorSettings>,
+    cursor_color: Res<CursorColorSettings>,
     auto_attack: Res<AutoAttackState>,
     existing_options: Query<Entity, With<OptionsUI>>,
     existing_popup: Query<Entity, With<WipeDataPopup>>,
@@ -881,6 +883,7 @@ pub fn setup_options_ui(
 
     // Unlock all classes checkbox
     let checkbox_y = 70.;
+    let checkbox_x_offset = 108.;
     spawn_options_checkbox(
         &mut commands,
         &graphics,
@@ -892,7 +895,7 @@ pub fn setup_options_ui(
             ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
         ),
         Vec3::new(
-            right_side_x + 104.,
+            right_side_x + checkbox_x_offset,
             checkbox_y,
             ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
         ),
@@ -913,8 +916,8 @@ pub fn setup_options_ui(
             ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
         ),
         Vec3::new(
-            right_side_x + 100.5,
-            color_blind_checkbox_y + 0.5,
+            right_side_x + checkbox_x_offset,
+            color_blind_checkbox_y,
             ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
         ),
         OptionsCheckboxType::ColorBlindMode,
@@ -934,8 +937,8 @@ pub fn setup_options_ui(
             ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
         ),
         Vec3::new(
-            right_side_x + 100.5,
-            dev_mode_checkbox_y + 0.5,
+            right_side_x + checkbox_x_offset,
+            dev_mode_checkbox_y,
             ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
         ),
         OptionsCheckboxType::DevMode,
@@ -955,8 +958,8 @@ pub fn setup_options_ui(
             ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
         ),
         Vec3::new(
-            right_side_x + 100.5,
-            enemy_damage_checkbox_y + 0.5,
+            right_side_x + checkbox_x_offset,
+            enemy_damage_checkbox_y,
             ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
         ),
         OptionsCheckboxType::ShowEnemyDamageNumbers,
@@ -975,8 +978,8 @@ pub fn setup_options_ui(
             ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
         ),
         Vec3::new(
-            right_side_x + 100.5,
-            small_damage_checkbox_y + 0.5,
+            right_side_x + checkbox_x_offset,
+            small_damage_checkbox_y,
             ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
         ),
         OptionsCheckboxType::SmallDamageText,
@@ -995,8 +998,8 @@ pub fn setup_options_ui(
             ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
         ),
         Vec3::new(
-            right_side_x + 100.5,
-            player_numbers_checkbox_y + 0.5,
+            right_side_x + checkbox_x_offset,
+            player_numbers_checkbox_y,
             ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
         ),
         OptionsCheckboxType::ShowPlayerDamageNumbers,
@@ -1015,8 +1018,8 @@ pub fn setup_options_ui(
             ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
         ),
         Vec3::new(
-            right_side_x + 100.5,
-            tile_hover_checkbox_y + 0.5,
+            right_side_x + checkbox_x_offset,
+            tile_hover_checkbox_y,
             ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
         ),
         OptionsCheckboxType::ShowTileHover,
@@ -1035,8 +1038,8 @@ pub fn setup_options_ui(
             ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
         ),
         Vec3::new(
-            right_side_x + 100.5,
-            hide_attack_y + 0.5,
+            right_side_x + checkbox_x_offset,
+            hide_attack_y,
             ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
         ),
         OptionsCheckboxType::HideAttackAnims,
@@ -1055,8 +1058,8 @@ pub fn setup_options_ui(
             ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
         ),
         Vec3::new(
-            right_side_x + 100.5,
-            hide_skill_y + 0.5,
+            right_side_x + checkbox_x_offset,
+            hide_skill_y,
             ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
         ),
         OptionsCheckboxType::HideSkillAnims,
@@ -1075,8 +1078,8 @@ pub fn setup_options_ui(
             ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
         ),
         Vec3::new(
-            right_side_x + 100.5,
-            hide_heirloom_y + 0.5,
+            right_side_x + checkbox_x_offset,
+            hide_heirloom_y,
             ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
         ),
         OptionsCheckboxType::HideHeirloomAnims,
@@ -1095,12 +1098,32 @@ pub fn setup_options_ui(
             ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
         ),
         Vec3::new(
-            right_side_x + 100.5,
-            bypass_time_crystal_y + 0.5,
+            right_side_x + checkbox_x_offset,
+            bypass_time_crystal_y,
             ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
         ),
         OptionsCheckboxType::BypassTimeCrystalPool,
         cheat_settings.bypass_time_crystal_pool,
+    );
+
+    let double_cursor_y = bypass_time_crystal_y - 16.;
+    spawn_options_checkbox(
+        &mut commands,
+        &graphics,
+        &asset_server,
+        "Double Cursor Size:",
+        Vec3::new(
+            right_side_x,
+            double_cursor_y,
+            ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
+        ),
+        Vec3::new(
+            right_side_x + checkbox_x_offset,
+            double_cursor_y,
+            ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
+        ),
+        OptionsCheckboxType::DoubleCursorSize,
+        cursor_color.double_size,
     );
 
     //TODO: fix restart button
@@ -1371,6 +1394,7 @@ pub fn handle_cheat_checkbox_click(
     >,
     mut cheat_settings: ResMut<CheatSettings>,
     mut auto_attack: ResMut<AutoAttackState>,
+    mut cursor_color: ResMut<CursorColorSettings>,
     mut commands: Commands,
     graphics: Res<Graphics>,
 ) {
@@ -1517,6 +1541,18 @@ pub fn handle_cheat_checkbox_click(
                                     },
                                 )
                             }
+                            OptionsCheckboxType::DoubleCursorSize => {
+                                cursor_color.double_size = !cursor_color.double_size;
+                                cursor_color.save();
+                                (
+                                    cursor_color.double_size,
+                                    if cursor_color.double_size {
+                                        UIElement::CheckBoxSelected
+                                    } else {
+                                        UIElement::CheckBox
+                                    },
+                                )
+                            }
                             OptionsCheckboxType::AutoAttack => {
                                 auto_attack.0 = !auto_attack.0;
                                 auto_attack.save();
@@ -1550,10 +1586,11 @@ pub fn handle_cheat_checkbox_click(
 pub fn update_cheat_checkbox_visual(
     cheat_settings: Res<CheatSettings>,
     auto_attack: Res<AutoAttackState>,
+    cursor_color: Res<CursorColorSettings>,
     mut checkboxes: Query<(&OptionsCheckbox, &mut Handle<Image>)>,
     graphics: Res<Graphics>,
 ) {
-    if !cheat_settings.is_changed() && !auto_attack.is_changed() {
+    if !cheat_settings.is_changed() && !auto_attack.is_changed() && !cursor_color.is_changed() {
         return;
     }
 
@@ -1631,6 +1668,13 @@ pub fn update_cheat_checkbox_visual(
             }
             OptionsCheckboxType::HideHeirloomAnims => {
                 if cheat_settings.hide_heirloom_anims {
+                    UIElement::CheckBoxSelected
+                } else {
+                    UIElement::CheckBox
+                }
+            }
+            OptionsCheckboxType::DoubleCursorSize => {
+                if cursor_color.double_size {
                     UIElement::CheckBoxSelected
                 } else {
                     UIElement::CheckBox
@@ -2121,7 +2165,7 @@ pub fn handle_cursor_color_button_click(
     mouse_input: Res<Input<MouseButton>>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     mut buttons: Query<(Entity, &mut Interactable, &CursorColorButton)>,
-    mut cursor_color: ResMut<crate::cursor::CursorColorSettings>,
+    mut cursor_color: ResMut<CursorColorSettings>,
     mut commands: Commands,
     graphics: Res<Graphics>,
 ) {
@@ -2164,7 +2208,7 @@ pub fn handle_cursor_color_button_click(
 
 /// Keeps the cursor color preview sprite in sync with the selected color.
 pub fn update_cursor_color_preview(
-    cursor_color: Res<crate::cursor::CursorColorSettings>,
+    cursor_color: Res<CursorColorSettings>,
     graphics: Res<Graphics>,
     mut previews: Query<&mut TextureAtlasSprite, With<CursorColorPreview>>,
 ) {

@@ -18,11 +18,17 @@ pub const NUM_CURSOR_COLORS: u8 = 8;
 #[derive(Resource, Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct CursorColorSettings {
     pub index: u8,
+    /// When true, the in-game custom cursor renders at 2× its normal size.
+    #[serde(default)]
+    pub double_size: bool,
 }
 
 impl Default for CursorColorSettings {
     fn default() -> Self {
-        Self { index: 0 }
+        Self {
+            index: 0,
+            double_size: false,
+        }
     }
 }
 
@@ -57,7 +63,19 @@ impl CursorColorSettings {
     pub fn sanitized(self) -> Self {
         Self {
             index: self.index % NUM_CURSOR_COLORS,
+            double_size: self.double_size,
         }
+    }
+
+    fn apply_sprite_settings(sprite: &mut TextureAtlasSprite, base: &TextureAtlasSprite, double_size: bool) {
+        sprite.index = base.index;
+        sprite.custom_size = base.custom_size.map(|size| {
+            if double_size {
+                size * 2.0
+            } else {
+                size
+            }
+        });
     }
 
     /// Cycle to the next/previous color, wrapping around.
@@ -118,8 +136,8 @@ impl Plugin for CustomCursorPlugin {
             )
             // Update cursor position in all game states (not just Main)
             .add_system(update_custom_cursor_position.run_if(use_custom_cursor))
-            // Re-skin the cursor whenever the chosen color changes
-            .add_system(update_custom_cursor_color.run_if(use_custom_cursor));
+            // Re-skin the cursor whenever the chosen color or size changes
+            .add_system(update_custom_cursor_appearance.run_if(use_custom_cursor));
     }
 }
 
@@ -145,10 +163,16 @@ fn setup_custom_cursor(
         return;
     };
 
-    let Some(cursor_sprite) = graphics.get_cursor_color_sprite(cursor_color.index) else {
+    let Some(base_sprite) = graphics.get_cursor_color_sprite(cursor_color.index) else {
         warn!("No cursor color sprite available for custom cursor");
         return;
     };
+    let mut cursor_sprite = base_sprite.clone();
+    CursorColorSettings::apply_sprite_settings(
+        &mut cursor_sprite,
+        &base_sprite,
+        cursor_color.double_size,
+    );
 
     // Spawn the custom cursor sprite on UI layer (render layer 3)
     // Uses ui_coords so it follows the cursor correctly regardless of camera position
@@ -179,7 +203,7 @@ fn update_custom_cursor_position(
     }
 }
 
-fn update_custom_cursor_color(
+fn update_custom_cursor_appearance(
     cursor_color: Res<CursorColorSettings>,
     graphics: Res<Graphics>,
     mut cursor_query: Query<&mut TextureAtlasSprite, With<CustomCursor>>,
@@ -187,12 +211,15 @@ fn update_custom_cursor_color(
     if !cursor_color.is_changed() {
         return;
     }
-    let Some(new_sprite) = graphics.get_cursor_color_sprite(cursor_color.index) else {
+    let Some(base_sprite) = graphics.get_cursor_color_sprite(cursor_color.index) else {
         return;
     };
     for mut sprite in cursor_query.iter_mut() {
-        sprite.index = new_sprite.index;
-        sprite.custom_size = new_sprite.custom_size;
+        CursorColorSettings::apply_sprite_settings(
+            &mut sprite,
+            &base_sprite,
+            cursor_color.double_size,
+        );
     }
 }
 
