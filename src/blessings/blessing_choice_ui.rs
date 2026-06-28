@@ -14,7 +14,7 @@ use crate::{
     colors::{LIGHT_RED, SHIELD_BLUE, WHITE, YELLOW_2},
     cursor::CursorPos,
     inventory::ItemStack,
-    item::WorldObject,
+    item::{item_drop_outline::HeirloomIconOutline, WorldObject},
     player::{
         class_rank::ClassRankSystem,
         levels::PlayerLevel,
@@ -359,6 +359,7 @@ fn spawn_blessing_card_icon(
                         ..Default::default()
                     },
                     RenderLayers::from_layers(&[3]),
+                    HeirloomIconOutline::new(*rarity, Default::default()),
                     Name::new("BLESSING HEIRLOOM ICON"),
                 ))
                 .id();
@@ -867,6 +868,10 @@ pub fn transition_blessing_ui_after_choice(
                         ..Default::default()
                     })
                     .insert(RenderLayers::from_layers(&[3]))
+                    .insert(HeirloomIconOutline::new(
+                        heirloom.rarity,
+                        Default::default(),
+                    ))
                     .insert(Name::new("HEIRLOOM ICON"))
                     .id();
                 commands.entity(icon).set_parent(floating_text);

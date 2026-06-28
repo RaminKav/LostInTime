@@ -163,8 +163,8 @@ impl AncestorBlessing {
 
     pub fn max_hp_penalty_pct(&self) -> f32 {
         match self {
-            AncestorBlessing::PlasmaWeapon | AncestorBlessing::LaserBeam => 0.50,
-            AncestorBlessing::RandomRareEquipment => 0.35,
+            AncestorBlessing::PlasmaWeapon | AncestorBlessing::LaserBeam => 0.40,
+            AncestorBlessing::RandomRareEquipment => 0.20,
             AncestorBlessing::TwoRandomRareHeirlooms | AncestorBlessing::ThreeOfRandomUncommon => {
                 0.30
             }

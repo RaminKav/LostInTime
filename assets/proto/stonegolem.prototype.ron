@@ -6,7 +6,7 @@
     "survival_rogue_like::proto::KCC": (),
     "survival_rogue_like::combat::status_effects::StatusEffectTracker": (effects: []),
     "survival_rogue_like::proto::SensorProto": (),
-    "survival_rogue_like::world::y_sort::YSort": (1.),
+    "survival_rogue_like::world::y_sort::YSort": (0.001),
     "survival_rogue_like::enemy::CombatAlignment": Hostile,
     "survival_rogue_like::enemy::FollowSpeed": (0.5),
     "survival_rogue_like::proto::ColliderCapsulProto": (x1: -14., y1: -14., x2: 14., y2: -14., r: 14.),

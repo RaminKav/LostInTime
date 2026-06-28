@@ -45,6 +45,7 @@ use crate::{
     cursor::CursorPos,
     inventory::{Inventory, ItemStack},
     item::WorldObject,
+    item::item_drop_outline::{HeirloomIconOutline, HeirloomIconOutlineStyle},
     juice::bounce::BounceOnHit,
     keybinds::InputBinding,
     night::{EraTimer, InfiniteMode, ERA_TIMER_SECONDS},
@@ -2032,9 +2033,11 @@ fn spawn_mana_tracker_tooltip(
     tracker: &HeirloomTriggerCounts,
     window_elapsed_secs: f32,
 ) -> Entity {
-    let consume_entries = tracker.sorted_mana_entries();
+    let consume_heirlooms = tracker.sorted_mana_entries();
+    let consume_weapons = tracker.sorted_weapon_mana_entries();
+    let consume_count = consume_heirlooms.len() + consume_weapons.len();
     let gain_entries = tracker.sorted_mana_gain_entries();
-    let size = mana_tracker_tooltip_size(consume_entries.len(), gain_entries.len());
+    let size = mana_tracker_tooltip_size(consume_count, gain_entries.len());
     let tooltip_pos = Vec3::new(
         anchor_pos.x,
         anchor_pos.y + HUD_FILL_PIXEL_SIZE.y * 0.5 + size.y * 0.5 + 6.,
@@ -2083,9 +2086,9 @@ fn spawn_mana_tracker_tooltip(
     // Running vertical cursor that walks down from just below the title.
     let mut section_top = title_y - ORB_TRACKER_TITLE_HEIGHT * 0.5;
 
-    // --- Consume section: heirlooms that spent mana ---
+    // --- Consume section: heirlooms and weapons that spent mana ---
     let consume_grid_top = section_top - ORB_TRACKER_ROW_HEIGHT * 0.5;
-    if consume_entries.is_empty() {
+    if consume_count == 0 {
         commands
             .spawn(Text2dBundle {
                 text: Text::from_section(
@@ -2100,9 +2103,10 @@ fn spawn_mana_tracker_tooltip(
             .insert(RenderLayers::from_layers(&[3]))
             .set_parent(root);
     } else {
-        for (index, (heirloom, _amount)) in consume_entries.iter().enumerate() {
-            let col = index % ORB_TRACKER_COLUMNS;
-            let row = index / ORB_TRACKER_COLUMNS;
+        let mut consume_index = 0usize;
+        for (heirloom, _amount) in &consume_heirlooms {
+            let col = consume_index % ORB_TRACKER_COLUMNS;
+            let row = consume_index / ORB_TRACKER_COLUMNS;
             let x = left_x + col as f32 * ORB_TRACKER_COL_WIDTH;
             let y = consume_grid_top - row as f32 * ORB_TRACKER_ROW_HEIGHT;
             let pct = tracker.mana_consumed_percentage(heirloom);
@@ -2150,9 +2154,68 @@ fn spawn_mana_tracker_tooltip(
                 })
                 .insert(RenderLayers::from_layers(&[3]))
                 .set_parent(row_root);
+            consume_index += 1;
+        }
+        for (weapon, _amount) in &consume_weapons {
+            let col = consume_index % ORB_TRACKER_COLUMNS;
+            let row = consume_index / ORB_TRACKER_COLUMNS;
+            let x = left_x + col as f32 * ORB_TRACKER_COL_WIDTH;
+            let y = consume_grid_top - row as f32 * ORB_TRACKER_ROW_HEIGHT;
+            let pct = tracker.weapon_mana_consumed_percentage(weapon);
+
+            let row_root = commands
+                .spawn(SpatialBundle::from_transform(Transform::from_translation(
+                    Vec3::new(x, y, 1.),
+                )))
+                .insert(RenderLayers::from_layers(&[3]))
+                .set_parent(root)
+                .id();
+
+            if let Some(sprite) = graphics
+                .spritesheet_map
+                .as_ref()
+                .and_then(|m| m.get(weapon).cloned())
+            {
+                commands
+                    .spawn(SpriteSheetBundle {
+                        texture_atlas: texture_atlas.clone(),
+                        sprite,
+                        transform: Transform::from_translation(Vec3::new(
+                            -ORB_TRACKER_COL_WIDTH * 0.5 + ORB_TRACKER_ICON_SIZE * 0.5 + 2.,
+                            0.,
+                            1.,
+                        )),
+                        ..default()
+                    })
+                    .insert(Sprite {
+                        custom_size: Some(Vec2::splat(ORB_TRACKER_ICON_SIZE)),
+                        ..default()
+                    })
+                    .insert(RenderLayers::from_layers(&[3]))
+                    .set_parent(row_root);
+            }
+
+            commands
+                .spawn(Text2dBundle {
+                    text: Text::from_section(
+                        format!("{pct}%"),
+                        gf::HUD_MICRO.text_style(asset_server, WHITE),
+                    )
+                    .with_alignment(TextAlignment::Center),
+                    text_anchor: Anchor::CenterLeft,
+                    transform: Transform::from_translation(Vec3::new(
+                        -ORB_TRACKER_COL_WIDTH * 0.5 + ORB_TRACKER_ICON_SIZE + 6.,
+                        0.,
+                        2.,
+                    )),
+                    ..default()
+                })
+                .insert(RenderLayers::from_layers(&[3]))
+                .set_parent(row_root);
+            consume_index += 1;
         }
     }
-    let consume_rows = consume_entries.len().div_ceil(ORB_TRACKER_COLUMNS).max(1) as f32;
+    let consume_rows = consume_count.div_ceil(ORB_TRACKER_COLUMNS).max(1) as f32;
     section_top -= consume_rows * ORB_TRACKER_ROW_HEIGHT;
 
     // --- Consume rate line ---
@@ -2714,6 +2777,11 @@ pub fn handle_update_player_skills(
                     heirloom_row_y - row as f32 * ROW_SPACING,
                 );
 
+                let rarity = heirloom_counts
+                    .get(heirloom)
+                    .map(|(_, rarity)| *rarity)
+                    .unwrap_or(HeirloomRarity::Common);
+
                 // Create the main icon with interactability directly attached
                 let icon = commands
                     .spawn(SpriteSheetBundle {
@@ -2732,6 +2800,10 @@ pub fn handle_update_player_skills(
                     })
                     .insert(RenderLayers::from_layers(&[3]))
                     .insert(SkillHudIcon(heirloom.clone()))
+                    .insert(HeirloomIconOutline::new(
+                        rarity,
+                        HeirloomIconOutlineStyle::Hud,
+                    ))
                     .insert(super::interactions::Interactable::default())
                     .insert(UIElement::HeirloomHudIcon)
                     .insert(Name::new("HUD ICON!!"))

@@ -226,6 +226,7 @@ pub struct ScorpionAttackTimers {
 #[derive(Component)]
 pub struct ScorpionTornadoTimer {
     pub timer: Timer,
+    pub spawns_per_tick: u32,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -379,12 +380,19 @@ pub fn handle_new_scorpion_state_machine(
         tail_cfg,
         tornado_cfg,
         mut mover,
-        _summon_idx,
+        boss_summon_index,
     ) in spawn_events.iter_mut()
     {
         if mob != &Mob::Scorpion {
             continue;
         }
+        let summon_index = boss_summon_index.copied().unwrap_or(BossSummonIndex(0));
+        let tail_waves = tail_cfg
+            .num_waves
+            .saturating_add(summon_index.scorpion_extra_tail_waves());
+        let tornado_interval =
+            tornado_cfg.interval / summon_index.scorpion_tornado_frequency_scale();
+        let tornado_spawns_per_tick = summon_index.scorpion_tornado_spawns_per_tick();
         let mut animation = AsepriteAnimation::from(WALK_SOUTH);
         animation.play();
         mover.filter_groups = Some(CollisionGroups::new(Group::NONE, Group::NONE));
@@ -412,7 +420,8 @@ pub fn handle_new_scorpion_state_machine(
                 attack_cooldown: Timer::from_seconds(1., TimerMode::Once),
             })
             .insert(ScorpionTornadoTimer {
-                timer: Timer::from_seconds(tornado_cfg.interval, TimerMode::Repeating),
+                timer: Timer::from_seconds(tornado_interval, TimerMode::Repeating),
+                spawns_per_tick: tornado_spawns_per_tick,
             })
             .insert(ClawAttackCollider::default());
 
@@ -441,7 +450,7 @@ pub fn handle_new_scorpion_state_machine(
                     phase: TailPhase::Prep,
                     phase_timer: Timer::from_seconds(tail_cfg.prep_duration, TimerMode::Once),
                     cooldown_timer: Timer::from_seconds(tail_cfg.cooldown, TimerMode::Once),
-                    waves_left: tail_cfg.num_waves,
+                    waves_left: tail_waves,
                     projectiles_per_wave: tail_cfg.projectiles_per_wave,
                     cone_half_angle: tail_cfg.cone_half_angle,
                     wave_duration: tail_cfg.wave_duration,
@@ -741,6 +750,7 @@ pub fn handle_claw_attack(
             &mut ScorpionFacingDir,
             &mut ScorpionAttackTimers,
             &mut ClawAttackCollider,
+            Option<&BossSummonIndex>,
             Option<&HitAnimationTracker>,
         ),
         Without<crate::combat::MarkedForDeath>,
@@ -762,12 +772,18 @@ pub fn handle_claw_attack(
         mut facing_dir,
         mut timers,
         mut claw_collider,
+        boss_summon_index,
         hit_tracker,
     ) in attacks.iter_mut()
     {
         if mob != &Mob::Scorpion {
             continue;
         }
+        let lunge_scale = boss_summon_index
+            .map(|idx| idx.scorpion_lunge_scale())
+            .unwrap_or(1.0);
+        let lunge_speed = claw_cfg.lunge_speed * lunge_scale;
+        let hitbox_offset = claw_cfg.hitbox_offset * lunge_scale;
         let my_pos = global_transforms.get(entity).unwrap().translation();
         let player_pos = global_transforms
             .get(game.game.player)
@@ -832,8 +848,8 @@ pub fn handle_claw_attack(
             ClawPhase::Attack => {
                 if claw_collider.0.is_none() {
                     let offset = Vec3::new(
-                        state.lunge_dir.x * claw_cfg.hitbox_offset,
-                        state.lunge_dir.y * claw_cfg.hitbox_offset,
+                        state.lunge_dir.x * hitbox_offset,
+                        state.lunge_dir.y * hitbox_offset,
                         1.,
                     );
                     let hitbox = commands
@@ -858,8 +874,7 @@ pub fn handle_claw_attack(
 
                 state.lunge_timer.tick(time.delta());
                 if !state.lunge_timer.finished() {
-                    kcc.translation =
-                        Some(state.lunge_dir * claw_cfg.lunge_speed * time.delta_seconds());
+                    kcc.translation = Some(state.lunge_dir * lunge_speed * time.delta_seconds());
                 }
 
                 state.hitbox_timer.tick(time.delta());
@@ -1085,14 +1100,23 @@ pub fn tick_tornado_timer(
         let to_player = (player_pos - my_pos).normalize_or_zero();
         let spawn_pos = my_pos + to_player * cfg.spawn_distance;
         let dir = to_player;
-        spawn_desert_tornado(
-            &mut commands,
-            &asset_server,
-            spawn_pos,
-            dir,
-            cfg.tornado_speed,
-            cfg.tornado_duration,
-        );
+        let spawns = t.spawns_per_tick.max(1);
+        for i in 0..spawns {
+            let spread = if spawns > 1 {
+                (i as f32 - (spawns as f32 - 1.) / 2.) * 0.35
+            } else {
+                0.
+            };
+            let spread_dir = Vec2::from_angle(dir.y.atan2(dir.x) + spread);
+            spawn_desert_tornado(
+                &mut commands,
+                &asset_server,
+                spawn_pos,
+                spread_dir,
+                cfg.tornado_speed,
+                cfg.tornado_duration,
+            );
+        }
     }
 }
 

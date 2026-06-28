@@ -436,7 +436,7 @@ fn handle_enemy_death(
             player_skills.get_count(crate::player::skills::Heirloom::KillLightning);
         if kill_lightning_stacks > 0 {
             let mut rng = rand::thread_rng();
-            let chance_pct = (kill_lightning_stacks as u32 * 15).min(200); // cap at 200% (1 guaranteed + 100% second)
+            let chance_pct = (kill_lightning_stacks as u32 * 10).min(200); // cap at 200% (1 guaranteed + 100% second)
             let death_pos = death_event.enemy_pos;
             let nearby_enemies: Vec<(Entity, Vec2)> = enemies
                 .iter()
@@ -869,6 +869,9 @@ pub fn handle_hits(
                     0.
                 };
 
+                let is_poison_dot =
+                    hit.from_heirloom_effect == Some(Heirloom::PoisonStacks);
+
                 commands.entity(hit.hit_entity).insert(HitAnimationTracker {
                     is_active: true,
                     timer: Timer::from_seconds(
@@ -876,14 +879,12 @@ pub fn handle_hits(
                         0.2,
                         TimerMode::Once,
                     ),
-                    knockback: if shielded_hit {
+                    knockback: if shielded_hit || is_poison_dot {
                         0.
+                    } else if is_player {
+                        200.
                     } else {
-                        if is_player {
-                            200.
-                        } else {
-                            mob_kb + shout_knockback_bonus
-                        }
+                        mob_kb + shout_knockback_bonus
                     },
                     dir: hit.dir,
                 });
@@ -1145,11 +1146,7 @@ pub fn cleanup_marked_for_death_entities(
                         trigger_counts.increment(Heirloom::ViralVenum);
                         // Defer nearby-mob status mutation out of this loop
                         // so we don't take overlapping borrows of `neaby_mobs`.
-                        nearby_venom_targets.push((
-                            e,
-                            mob_pos.translation().truncate(),
-                            p.clone(),
-                        ));
+                        nearby_venom_targets.push((e, mob_pos.translation().truncate(), p.clone()));
                     }
                 }
             }

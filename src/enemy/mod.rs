@@ -741,8 +741,8 @@ fn scale_boss_summon_stats(
         if idx == 0 {
             continue;
         }
-        let hp_scale = tracker.get_health_scale();
-        let att_scale = tracker.get_damage_scale();
+        let hp_scale = summon_idx.health_scale();
+        let att_scale = summon_idx.damage_scale();
         hp.0 = (hp.0 as f32 * hp_scale) as i32;
         att.0 = (att.0 as f32 * att_scale) as i32;
         commands

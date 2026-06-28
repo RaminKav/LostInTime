@@ -1908,7 +1908,7 @@ impl Heirloom {
             ],
             Heirloom::KillLightning => vec![
                 "Killing an enemy".to_string(),
-                "has a 15% chance".to_string(),
+                "has a 10% chance".to_string(),
                 "to spawn a lightning".to_string(),
                 "strike.".to_string(),
                 format!("Costs {} mana", Heirloom::KillLightning.get_mana_cost()),
@@ -3129,6 +3129,7 @@ impl PlayerSkills {
 pub struct HeirloomTriggerCounts {
     pub counts: HashMap<Heirloom, u32>,
     pub mana_consumed: HashMap<Heirloom, u64>,
+    pub weapon_mana_consumed: HashMap<WorldObject, u64>,
     pub health_gained: HashMap<HealthGainSource, u64>,
     pub mana_gained: HashMap<ManaGainSource, u64>,
 }
@@ -3220,8 +3221,14 @@ impl HeirloomTriggerCounts {
         }
     }
 
+    pub fn record_weapon_mana(&mut self, weapon: WorldObject, amount: i32) {
+        if amount > 0 {
+            *self.weapon_mana_consumed.entry(weapon).or_insert(0) += amount as u64;
+        }
+    }
+
     pub fn total_mana_consumed(&self) -> u64 {
-        self.mana_consumed.values().sum()
+        self.mana_consumed.values().sum::<u64>() + self.weapon_mana_consumed.values().sum::<u64>()
     }
 
     pub fn mana_consumed_percentage(&self, heirloom: &Heirloom) -> u32 {
@@ -3230,6 +3237,15 @@ impl HeirloomTriggerCounts {
             return 0;
         }
         let amount = self.mana_consumed.get(heirloom).copied().unwrap_or(0);
+        ((amount as f64 / total as f64) * 100.0).round() as u32
+    }
+
+    pub fn weapon_mana_consumed_percentage(&self, weapon: &WorldObject) -> u32 {
+        let total = self.total_mana_consumed();
+        if total == 0 {
+            return 0;
+        }
+        let amount = self.weapon_mana_consumed.get(weapon).copied().unwrap_or(0);
         ((amount as f64 / total as f64) * 100.0).round() as u32
     }
 
@@ -3251,8 +3267,20 @@ impl HeirloomTriggerCounts {
         entries
     }
 
+    pub fn sorted_weapon_mana_entries(&self) -> Vec<(WorldObject, u64)> {
+        let mut entries: Vec<_> = self
+            .weapon_mana_consumed
+            .iter()
+            .filter(|(_, amount)| **amount > 0)
+            .map(|(weapon, amount)| (*weapon, *amount))
+            .collect();
+        entries.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| format!("{:?}", a.0).cmp(&format!("{:?}", b.0))));
+        entries
+    }
+
     pub fn reset_mana_consumed(&mut self) {
         self.mana_consumed.clear();
+        self.weapon_mana_consumed.clear();
     }
 
     pub fn record_health_gain(&mut self, source: HealthGainSource, amount: i32) {
@@ -3345,6 +3373,7 @@ impl HeirloomTriggerCounts {
 
     pub fn reset_hud_orb_window_stats(&mut self) {
         self.mana_consumed.clear();
+        self.weapon_mana_consumed.clear();
         self.health_gained.clear();
         self.mana_gained.clear();
     }

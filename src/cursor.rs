@@ -67,7 +67,7 @@ impl CursorColorSettings {
         }
     }
 
-    fn apply_sprite_settings(sprite: &mut TextureAtlasSprite, base: &TextureAtlasSprite, double_size: bool) {
+    pub fn apply_sprite_settings(sprite: &mut TextureAtlasSprite, base: &TextureAtlasSprite, double_size: bool) {
         sprite.index = base.index;
         sprite.custom_size = base.custom_size.map(|size| {
             if double_size {

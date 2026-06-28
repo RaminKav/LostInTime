@@ -26,7 +26,6 @@ fn boss_for_era(era: &Era) -> Mob {
 use super::WorldObject;
 
 pub const BOSS_SUMMON_BASE_COST: i32 = 50;
-pub const BOSS_SUMMON_COST_INCREMENT: i32 = 50;
 
 #[derive(Resource, Default)]
 pub struct BossSummonTracker {
@@ -34,18 +33,9 @@ pub struct BossSummonTracker {
 }
 
 impl BossSummonTracker {
-    /// Linear +50 steps through the 4th summon (orange); doubles each time after that.
+    /// Doubles each summon: 50, 100, 200, 400, ...
     pub fn current_cost(&self) -> i32 {
-        const LAST_LINEAR_SUMMON: u32 = 3;
-        let cap_cost =
-            BOSS_SUMMON_BASE_COST + (LAST_LINEAR_SUMMON as i32 * BOSS_SUMMON_COST_INCREMENT);
-
-        if self.summon_count <= LAST_LINEAR_SUMMON {
-            BOSS_SUMMON_BASE_COST + (self.summon_count as i32 * BOSS_SUMMON_COST_INCREMENT)
-        } else {
-            let overflow = self.summon_count - LAST_LINEAR_SUMMON;
-            cap_cost.saturating_mul(1_i32 << overflow.min(30))
-        }
+        BOSS_SUMMON_BASE_COST.saturating_mul(1_i32 << self.summon_count.min(30))
     }
 
     pub fn reset(&mut self) {
@@ -58,24 +48,6 @@ impl BossSummonTracker {
             2 => Color::rgba(0.8, 0.4, 1.0, 1.0), // purple
             3 => Color::rgba(1.0, 0.4, 0.0, 1.0), // orange
             _ => Color::rgba(1.0, 0.0, 0.0, 1.0),
-        }
-    }
-    pub fn get_health_scale(&self) -> f32 {
-        match self.summon_count {
-            0 => 1.0,
-            1 => 2.0,
-            2 => 4.0,
-            3 => 10.0,
-            _ => 10.0,
-        }
-    }
-    pub fn get_damage_scale(&self) -> f32 {
-        match self.summon_count {
-            0 => 1.0,
-            1 => 1.5,
-            2 => 2.0,
-            3 => 4.0,
-            _ => 4.0,
         }
     }
 }
@@ -158,7 +130,7 @@ pub fn handle_pay_shrine_cost(
     }
 }
 /// Marker component for boss summon scaling, attached to bosses spawned from the shrine.
-#[derive(Component)]
+#[derive(Component, Clone, Copy)]
 pub struct BossSummonIndex(pub u32);
 impl BossSummonIndex {
     pub fn num_spawns(&self) -> usize {
@@ -181,6 +153,48 @@ impl BossSummonIndex {
     }
     /// AoE explosion spawn radius multiplier; +25% per subsequent shrine summon.
     pub fn aoe_radius_scale(&self) -> f32 {
+        1.0 + self.0 as f32 * 0.25
+    }
+
+    /// HP multiplier keyed to this boss's shrine summon tier (not the live tracker count).
+    pub fn health_scale(&self) -> f32 {
+        match self.0 {
+            0 => 1.0,
+            1 => 1.5,
+            2 => 3.0,
+            3 => 7.5,
+            _ => 7.5,
+        }
+    }
+
+    /// Attack multiplier keyed to this boss's shrine summon tier.
+    pub fn damage_scale(&self) -> f32 {
+        match self.0 {
+            0 => 1.0,
+            1 => 1.5,
+            2 => 2.0,
+            3 => 4.0,
+            _ => 4.0,
+        }
+    }
+
+    /// Extra tail-attack projectile waves per subsequent shrine summon (2 per tier).
+    pub fn scorpion_extra_tail_waves(&self) -> u8 {
+        self.0.saturating_mul(2) as u8
+    }
+
+    /// Tornado spawn-rate multiplier (+20% per tier); shorter interval = more frequent spawns.
+    pub fn scorpion_tornado_frequency_scale(&self) -> f32 {
+        1.0 + self.0 as f32 * 0.20
+    }
+
+    /// Tornado count per spawn tick (+20% per tier, rounded up).
+    pub fn scorpion_tornado_spawns_per_tick(&self) -> u32 {
+        (1.0 + self.0 as f32 * 0.20).ceil() as u32
+    }
+
+    /// Lunge reach multiplier for the scorpion claw attack (+25% per tier).
+    pub fn scorpion_lunge_scale(&self) -> f32 {
         1.0 + self.0 as f32 * 0.25
     }
 }

@@ -1079,7 +1079,11 @@ impl Plugin for UIPlugin {
                         .run_if(in_state(UIState::ItemChest)),
                     setup_essence_ui
                         .before(CustomFlush)
-                        .run_if(resource_added::<EssenceShopChoices>()),
+                        .run_if(
+                            in_state(UIState::Essence)
+                                .and_then(resource_exists::<EssenceShopChoices>()),
+                        ),
+                    tick_merchant_shop_open_lock.in_set(OnUpdate(GameState::Main)),
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )

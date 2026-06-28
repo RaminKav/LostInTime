@@ -27,7 +27,7 @@ use crate::{
     Game, GameParam, GameState, Pet,
 };
 
-use super::item_upgrades::ArrowSpeedUpgrade;
+use super::{item_upgrades::ArrowSpeedUpgrade, WorldObject};
 
 #[derive(Component, Reflect, Schematic, FromReflect, Default, Clone)]
 #[reflect(Component, Schematic)]
@@ -476,6 +476,8 @@ fn handle_ranged_attack_event(
             modify_mana_event.send(ModifyManaEvent::new(-actual_cost));
             if let Some(heirloom) = proj_event.mana_cost_heirloom.clone() {
                 trigger_counts.record_mana(heirloom, actual_cost);
+            } else if proj_event.projectile == Projectile::PlasmaBall {
+                trigger_counts.record_weapon_mana(WorldObject::PlasmaStaff, actual_cost);
             }
         }
 

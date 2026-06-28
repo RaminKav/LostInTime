@@ -1,5 +1,5 @@
-// 1px outline for item drops. Samples neighboring atlas texels; when the
-// current pixel is transparent but a neighbor is opaque, draws #cdceee.
+// 1px outline for atlas sprites. Samples neighboring atlas texels; when the
+// current pixel is transparent but a neighbor is opaque, draws `outline_color`.
 // Neighbor samples are clamped to the sprite's own sub-rect (uv_bounds) so
 // adjacent sprites in the sheet never bleed into the outline.
 // All texture samples happen before branching (required by Naga uniformity rules).
@@ -10,6 +10,8 @@ var<uniform> uv_bounds: vec4<f32>; // (min_u, min_v, max_u, max_v)
 var source_color_texture: texture_2d<f32>;
 @group(1) @binding(2)
 var source_texture_sampler: sampler;
+@group(1) @binding(3)
+var<uniform> outline_color: vec4<f32>;
 
 fn sample_alpha_in_bounds(p: vec2<f32>) -> f32 {
     let a = textureSample(source_color_texture, source_texture_sampler, p).a;
@@ -38,10 +40,8 @@ fn fragment(
         && uv.y >= uv_bounds.y && uv.y <= uv_bounds.w;
     let is_opaque = color.a > 0.01 && center_inside;
     let has_outline = left > 0.01 || right > 0.01 || up > 0.01 || down > 0.01;
-    // #cdceee
-    let outline = vec4<f32>(0.804, 0.808, 0.933, 0.22);
     let transparent = vec4<f32>(0.0, 0.0, 0.0, 0.0);
 
-    let outlined = select(transparent, outline, has_outline);
+    let outlined = select(transparent, outline_color, has_outline);
     return select(outlined, color, is_opaque);
 }

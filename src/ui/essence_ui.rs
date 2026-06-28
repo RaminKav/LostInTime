@@ -78,6 +78,25 @@ const MERCHANT_ICON_HIT_Z: f32 = 16.;
 const MERCHANT_DONE_BUTTON_Y: f32 = -84.;
 pub const MERCHANT_CONTAINER_UI_SIZE: Vec2 = Vec2::new(160., 188.);
 
+/// Prevents rapid interact spam from re-requesting `UIState::Essence` while the shop is
+/// already open (which would toggle it closed via `handle_new_ui_state`).
+#[derive(Resource)]
+pub struct MerchantShopOpenLock(pub Timer);
+
+/// Ticks [`MerchantShopOpenLock`] after the merchant UI opens.
+pub fn tick_merchant_shop_open_lock(
+    time: Res<Time>,
+    mut lock: Option<ResMut<MerchantShopOpenLock>>,
+    mut commands: Commands,
+) {
+    let Some(mut lock) = lock else {
+        return;
+    };
+    if lock.0.tick(time.delta()).finished() {
+        commands.remove_resource::<MerchantShopOpenLock>();
+    }
+}
+
 /// Caches shop contents by tile position so they persist across chunk load/unload.
 /// Cleared between runs and between non-dungeon era transitions.
 #[derive(Resource, Default, Debug, Clone)]
@@ -1456,7 +1475,12 @@ pub fn setup_essence_ui(
     coins: Res<CoinCurrency>,
     run_unlocks: Res<RunUnlockState>,
     orphan_reroll_flashes: Query<Entity, (With<MerchantCategoryReroll>, Without<UIState>)>,
+    existing_ui: Query<Entity, With<EssenceUI>>,
 ) {
+    if !existing_ui.is_empty() {
+        return;
+    }
+
     for e in orphan_reroll_flashes.iter() {
         commands.entity(e).despawn_recursive();
     }

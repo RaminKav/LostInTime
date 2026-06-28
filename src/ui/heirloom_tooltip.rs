@@ -5,7 +5,8 @@ use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
 
 use crate::{
     assets::Graphics,
-    colors::{BLUE, LIGHT_BLUE, LIGHT_GREY, SHIELD_BLUE, WHITE, YELLOW_2},
+    colors::{LIGHT_GREY, SHIELD_BLUE, WHITE, YELLOW_2},
+    item::item_drop_outline::{HeirloomIconOutline, HeirloomIconOutlineStyle},
     player::skills::{Heirloom, HeirloomRarity},
     ScreenResolution,
 };
@@ -129,6 +130,10 @@ pub fn spawn_heirloom_tooltip_card(
             ..Default::default()
         })
         .insert(RenderLayers::from_layers(&[3]))
+        .insert(HeirloomIconOutline::new(
+            rarity,
+            HeirloomIconOutlineStyle::TooltipCard,
+        ))
         .insert(Name::new("HEIRLOOM ICON"))
         .set_parent(card_e)
         .id();

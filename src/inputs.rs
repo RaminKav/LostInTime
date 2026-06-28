@@ -827,7 +827,7 @@ pub fn toggle_inventory(
             // proto_commands.spawn_from_proto(Mob::Lizard, &proto.prototypes, pos);
             // proto_commands.spawn_from_proto(Mob::StingFly, &proto.prototypes, pos);
             // proto_commands.spawn_from_proto(Mob::FurDevil, &proto.prototypes, pos);
-            proto_commands.spawn_from_proto(Mob::VoidWorm, &proto.prototypes, pos);
+            // proto_commands.spawn_from_proto(Mob::VoidWorm, &proto.prototypes, pos);
             proto_commands.spawn_from_proto(Mob::StoneGolem, &proto.prototypes, pos);
             // proto_commands.spawn_from_proto(Mob::FurDevil, &proto.prototypes, pos);
             // proto_commands.spawn_from_proto(Mob::BigCactus, &proto.prototypes, pos);
@@ -1200,14 +1200,25 @@ pub fn handle_open_essence_ui(
     player_query: Query<&GlobalTransform, With<Player>>,
     nearby_merchant_query: Query<(&GlobalTransform, &EssenceShopChoices)>,
     mut next_inv_state: ResMut<NextState<UIState>>,
+    curr_ui_state: Res<State<UIState>>,
+    open_lock: Option<Res<crate::ui::MerchantShopOpenLock>>,
 ) {
     if !keybinds.check_interact_input(&key_input, &mouse_input) {
+        return;
+    }
+    // Re-pressing interact while the shop is open toggles `Essence` closed in
+    // `handle_new_ui_state`; ignore repeat presses until the player closes via Done.
+    if curr_ui_state.0 == UIState::Essence || open_lock.is_some() {
         return;
     }
     let player_t = player_query.single().translation().truncate();
     for (transform, choices) in nearby_merchant_query.iter() {
         if player_t.distance(transform.translation().truncate()) < 32. {
             commands.insert_resource(choices.clone());
+            commands.insert_resource(crate::ui::MerchantShopOpenLock(Timer::from_seconds(
+                0.45,
+                TimerMode::Once,
+            )));
             next_inv_state.set(UIState::Essence);
         }
     }

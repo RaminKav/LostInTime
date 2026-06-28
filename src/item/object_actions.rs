@@ -645,7 +645,7 @@ impl ObjectAction {
                 spawn_floating_text_with_shadow_anim(
                     commands,
                     &item_action_param.asset_server,
-                    pos.extend(game.player().position.z) + Vec3::new(125., 52., 0.),
+                    pos.extend(game.player().position.z) + Vec3::new(105., 52., 0.),
                     WHITE,
                     flavor.to_string(),
                     FLOATING_TEXT,

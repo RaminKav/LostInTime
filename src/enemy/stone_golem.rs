@@ -7,6 +7,7 @@ use crate::{
     player::Player,
     status_effects::MobStatusEffects,
     ui::{boss_warning_indicator_color, CheatSettings},
+    world::y_sort::YSort,
     GameParam, PLAYER_MOVE_SPEED,
 };
 use bevy::prelude::*;
@@ -273,6 +274,7 @@ pub fn handle_new_stone_golem_state_machine(
                 transform: *transform,
                 ..Default::default()
             })
+            .insert(YSort(0.001))
             .insert(GolemCurrentTag(StoneGolem::tags::WALK_FRONT.to_string()))
             .insert(CollisionGroups::new(Group::GROUP_1, Group::GROUP_1))
             .insert(FollowState {
