@@ -39,7 +39,11 @@ use crate::{
         MaterialDropsToggleButton, ShiftQuickEquipResult, SortInventoryButton,
         BREAK_DROP_FILTER_ITEMS,
     },
-    item::{heirloom_shrine::HeirloomShrineState, item_actions::{ItemActionParam, ItemActions}, CraftedItemEvent, EquipmentType, WorldObject},
+    item::{
+        heirloom_shrine::HeirloomShrineState,
+        item_actions::{ItemActionParam, ItemActions},
+        CraftedItemEvent, EquipmentType,
+    },
     pets::state::Pet,
     player::{
         combat_heirlooms::HallucinationStatType,
@@ -185,7 +189,13 @@ pub enum UIElement {
     MPRegenIcon,
     SpeedIcon,
     UnknownUnlockIcon,
-    Achievements,
+    AchievementsContainer,
+    AchievementsRow1,
+    AchievementsRow2,
+    AchievementsRowWithCounter1,
+    AchievementsRowWithCounter2,
+    AchievementButton,
+    AchievementButtonHover,
     CheckBox,
     CheckBoxSelected,
     AchievementCrossOut,
@@ -258,6 +268,7 @@ impl UIElement {
             UIElement::ButtonPageDown => Some(UIElement::ButtonPageDownHover),
             UIElement::BestiaryPrevButton => Some(UIElement::BestiaryPrevButtonHover),
             UIElement::BestiaryNextButton => Some(UIElement::BestiaryNextButtonHover),
+            UIElement::AchievementButton => Some(UIElement::AchievementButtonHover),
             _ => None,
         }
     }
@@ -287,6 +298,7 @@ impl UIElement {
             UIElement::ButtonPageDownHover => Some(UIElement::ButtonPageDown),
             UIElement::BestiaryPrevButtonHover => Some(UIElement::BestiaryPrevButton),
             UIElement::BestiaryNextButtonHover => Some(UIElement::BestiaryNextButton),
+            UIElement::AchievementButtonHover => Some(UIElement::AchievementButton),
             _ => None,
         }
     }
@@ -2331,6 +2343,8 @@ pub fn handle_cursor_main_menu_buttons(
         Without<InventorySlotState>,
     >,
     mut text: Query<&mut Text, With<MenuButton>>,
+    children: Query<&Children>,
+    mut button_label_text: Query<&mut Text, (Without<MenuButton>, Without<InventorySlotState>)>,
     mut send_menu_button_event: EventWriter<MenuButtonClickEvent>,
     mut commands: Commands,
     graphics: Res<Graphics>,
@@ -2346,6 +2360,18 @@ pub fn handle_cursor_main_menu_buttons(
         || curr_ui_state.0 == UIState::BeastiaryBrowser;
     let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
     let left_mouse_pressed = mouse_input.just_released(MouseButton::Left);
+
+    let mut set_achievement_button_label_color = |button_entity: Entity, color: Color| {
+        if let Ok(button_children) = children.get(button_entity) {
+            for child in button_children.iter() {
+                if let Ok(mut label) = button_label_text.get_mut(*child) {
+                    if let Some(section) = label.sections.first_mut() {
+                        section.style.color = color;
+                    }
+                }
+            }
+        }
+    };
 
     for (e, mut interactable, menu_button, ui_element) in menu_buttons.iter_mut() {
         if !info_check.is_empty() && menu_button != &MenuButton::InfoOK {
@@ -2403,6 +2429,12 @@ pub fn handle_cursor_main_menu_buttons(
                             .entity(e)
                             .insert(ui_element_hover.clone())
                             .insert(graphics.get_ui_element_texture(ui_element_hover));
+                        if matches!(
+                            ui_element,
+                            UIElement::AchievementButton | UIElement::AchievementButtonHover
+                        ) {
+                            set_achievement_button_label_color(e, YELLOW_2);
+                        }
                     } else {
                         let color = if menu_button == &MenuButton::GameOverOK
                             || menu_button == &MenuButton::InfoOK
@@ -2441,6 +2473,12 @@ pub fn handle_cursor_main_menu_buttons(
                         .insert(graphics.get_ui_element_texture(
                             ui_element.clone().get_normal_state().unwrap(),
                         ));
+                    if matches!(
+                        ui_element,
+                        UIElement::AchievementButton | UIElement::AchievementButtonHover
+                    ) {
+                        set_achievement_button_label_color(e, WHITE);
+                    }
                 } else {
                     if let Ok(mut text_comp) = text.get_mut(e) {
                         text_comp.sections[0].style.color = Color::WHITE;

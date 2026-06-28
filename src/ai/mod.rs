@@ -17,7 +17,7 @@ use crate::{
 
 use bevy::prelude::*;
 pub use enemy_hostile_basic::*;
-use seldom_state::StateMachinePlugin;
+use seldom_state::{set::StateSet, StateMachinePlugin};
 use steering::{build_enemy_spatial_grid, EnemySpatialGrid};
 
 pub struct AIPlugin;
@@ -29,6 +29,16 @@ impl Plugin for AIPlugin {
             .add_system(
                 update_enemy_ai_cache
                     .in_base_set(CoreSet::PreUpdate)
+                    .run_if(in_state(GameState::Main)),
+            )
+            // Attack cooldowns are often inserted during Update (e.g. void worm laser
+            // ending). Refresh the cache once more before state transitions so
+            // CachedAttackDistance sees the new cooldown and doesn't immediately
+            // re-enter attack.
+            .add_system(
+                update_enemy_ai_cache
+                    .in_base_set(CoreSet::PostUpdate)
+                    .before(StateSet::Transition)
                     .run_if(in_state(GameState::Main)),
             )
             .add_plugin(StateMachinePlugin)

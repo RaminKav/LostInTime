@@ -45,7 +45,7 @@ use crate::{
     enemy::{
         red_mushking::{AoEAttackState, DeathState, ReturnToShrineState, SummonAttackState},
         scorpion::{ClawAttackCollider, ClawAttackState, ScorpionQueuedAttack, TailAttackState},
-        stone_golem::{SpikeAttackState, SpikeWarning},
+        stone_golem::{SpikeAttackState, SpikeWarning, WaveAttackState},
         Mob, MobLevel,
     },
     inventory::Inventory,
@@ -1059,6 +1059,7 @@ pub fn cleanup_marked_for_death_entities(
                 .remove::<ReturnToShrineState>()
                 .remove::<AoEAttackState>() // Remove RedMushking's AoE attack state
                 .remove::<SpikeAttackState>() // Remove StoneGolem's attack state
+                .remove::<WaveAttackState>()
                 .remove::<ClawAttackState>() // Remove Scorpion's claw attack state
                 .remove::<TailAttackState>() // Remove Scorpion's tail attack state
                 .remove::<ScorpionQueuedAttack>()

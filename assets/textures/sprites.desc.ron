@@ -1619,6 +1619,11 @@
             size: (16., 24.),
             anchor: None,
         ),
+        VoidWormCard: WorldObjectData(
+           texture_pos: (11., 38.),
+            size: (16., 24.),
+            anchor: None,
+        ),
 
     },
     heirlooms: {

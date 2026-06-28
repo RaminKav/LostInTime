@@ -121,16 +121,27 @@ fn spawners_era_third() -> Vec<Spawner> {
     spawners_era_main()
 }
 
-/// Endless mode mob pool. The endless rework replaces all normal era enemies
-/// with Void Crawlers — only these spawn while [`InfiniteMode::active`].
+/// Seconds of [`InfiniteMode::elapsed_seconds`] before Void Worms can spawn in endless.
+const VOID_WORM_ENDLESS_GATE_SECS: f32 = 240.0;
+
+/// Endless mode mob pool. Replaces normal era enemies while [`InfiniteMode::active`].
 fn spawners_endless() -> Vec<Spawner> {
-    vec![Spawner {
-        enemy: Mob::VoidCrawler,
-        weight: 100.,
-        spawn_timer: Timer::from_seconds(1.2, TimerMode::Once),
-        min_days_to_spawn: 0,
-        num_to_spawn: Some(1),
-    }]
+    vec![
+        Spawner {
+            enemy: Mob::VoidCrawler,
+            weight: 100.,
+            spawn_timer: Timer::from_seconds(1.2, TimerMode::Once),
+            min_days_to_spawn: 0,
+            num_to_spawn: Some(1),
+        },
+        Spawner {
+            enemy: Mob::VoidWorm,
+            weight: 100.,
+            spawn_timer: Timer::from_seconds(15., TimerMode::Once),
+            min_days_to_spawn: 0,
+            num_to_spawn: Some(3),
+        },
+    ]
 }
 
 /// Resource to track if mob spawning should be paused (e.g., after boss defeat with time remaining)
@@ -664,6 +675,24 @@ fn tick_spawner_timers(
 
         // Check if this mob is unlocked in the current era transition
         if !transition_state.is_mob_unlocked(&spawner.enemy) {
+            continue;
+        }
+
+        // Void Worms share the normal spawn pipeline but gate on endless elapsed
+        // time and use their configured timer as-is (no endless spawn-rate boost).
+        if spawner.enemy == Mob::VoidWorm {
+            if !infinite_mode.active || infinite_mode.elapsed_seconds < VOID_WORM_ENDLESS_GATE_SECS
+            {
+                continue;
+            }
+            spawner.spawn_timer.tick(time.delta());
+            if spawner.spawn_timer.finished() {
+                spawner.spawn_timer.reset();
+                spawn_event.send(MobSpawnEvent {
+                    mob: Mob::VoidWorm,
+                    bypass_timers: false,
+                });
+            }
             continue;
         }
 

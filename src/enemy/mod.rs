@@ -7,7 +7,10 @@ use bevy::{
 };
 use bevy_proto::prelude::{ReflectSchematic, Schematic};
 use bevy_rapier2d::prelude::{Collider, CollisionGroups, Group};
-use seldom_state::prelude::{StateMachine, Trigger};
+use seldom_state::{
+    prelude::{StateMachine, Trigger},
+    set::StateSet,
+};
 use serde::Deserialize;
 use serde::Serialize;
 use strum_macros::{Display, EnumIter, IntoStaticStr};
@@ -47,6 +50,7 @@ pub mod scorpion;
 pub mod spawn_helpers;
 pub mod spawner;
 pub mod stone_golem;
+pub mod void_worm;
 use self::spawner::SpawnerPlugin;
 use aseprite_enemy::*;
 use fairy::*;
@@ -90,19 +94,37 @@ impl Plugin for EnemyPlugin {
                 (
                     red_mushking::tick_attack_rotation.run_if(is_not_paused),
                     red_mushking::handle_aoe_attack.run_if(is_not_paused),
-                    stone_golem::tick_spike_attack_timer.run_if(is_not_paused),
+                    stone_golem::tick_spike_attack_timer
+                        .run_if(is_not_paused)
+                        .before(StateSet::Transition),
                     stone_golem::initialize_spike_attack_state.run_if(is_not_paused),
                     stone_golem::handle_spike_attack.run_if(is_not_paused),
+                    stone_golem::initialize_wave_attack_state.run_if(is_not_paused),
+                    stone_golem::spawn_delayed_wave_warnings.run_if(is_not_paused),
+                    stone_golem::maintain_wave_attack.run_if(is_not_paused),
                     stone_golem::handle_spike_warnings
                         .run_if(is_not_paused)
-                        .after(stone_golem::handle_spike_attack),
+                        .after(stone_golem::handle_spike_attack)
+                        .after(stone_golem::initialize_wave_attack_state),
                     stone_golem::check_spike_attack_completion
                         .run_if(is_not_paused)
                         .after(stone_golem::handle_spike_warnings),
-                    stone_golem::stone_golem_follow.run_if(is_not_paused),
+                    stone_golem::check_wave_attack_completion
+                        .run_if(is_not_paused)
+                        .after(stone_golem::handle_spike_warnings),
+                    stone_golem::stone_golem_follow
+                        .run_if(is_not_paused)
+                        .after(stone_golem::maintain_wave_attack),
                     stone_golem::update_stone_golem_walk_animation.run_if(is_not_paused),
                     stone_golem::handle_stone_golem_death.run_if(is_not_paused),
                     red_mushling::handle_mushling_wakeup_timers.run_if(is_not_paused),
+                )
+                    .in_set(OnUpdate(GameState::Main)),
+            )
+            .add_systems(
+                (
+                    void_worm::void_worm_laser_attack.run_if(is_not_paused),
+                    void_worm::cleanup_orphan_void_lasers.run_if(is_not_paused),
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
@@ -161,6 +183,7 @@ pub enum Mob {
     Scorpion,
     Lizard,
     VoidCrawler,
+    VoidWorm,
 }
 
 impl Mob {
@@ -184,6 +207,7 @@ impl Mob {
             Mob::Scorpion => LIGHT_BROWN,
             Mob::Lizard => DARK_GREEN,
             Mob::VoidCrawler => PINK,
+            Mob::VoidWorm => PINK,
         }
     }
     pub fn get_base_kb(&self) -> f32 {
@@ -206,6 +230,7 @@ impl Mob {
             Mob::Scorpion => 0.,
             Mob::Lizard => 100.,
             Mob::VoidCrawler => 70.,
+            Mob::VoidWorm => 0.,
         }
     }
     pub fn is_boss(&self) -> bool {
@@ -362,6 +387,35 @@ impl Default for ProjectileAttack {
             projectile: Projectile::default(),
             attack_startup: 0.3,
             projectile_delay: 0.,
+        }
+    }
+}
+
+/// Void Worm laser attack config. The worm walks toward the player, then stops at
+/// a random point between `min_stop_distance` and `max_stop_distance` and fires a
+/// stationary laser (a separate aseprite) in a random cardinal direction for
+/// `laser_duration` seconds, then walks for `walk_duration` seconds before
+/// repeating. See [`crate::enemy::void_worm`].
+#[derive(FromReflect, Debug, Reflect, Clone, Component, Schematic)]
+#[reflect(Component, Schematic, Default)]
+pub struct LaserAttack {
+    /// Closest the worm will stop before firing.
+    pub min_stop_distance: f32,
+    /// Farthest the worm will stop before firing (also the follow->laser trigger range).
+    pub max_stop_distance: f32,
+    /// How long the laser stays active each cycle (seconds).
+    pub laser_duration: f32,
+    /// How long the worm walks between laser cycles (seconds).
+    pub walk_duration: f32,
+}
+
+impl Default for LaserAttack {
+    fn default() -> Self {
+        Self {
+            min_stop_distance: 100.,
+            max_stop_distance: 200.,
+            laser_duration: 4.,
+            walk_duration: 3.,
         }
     }
 }

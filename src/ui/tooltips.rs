@@ -922,32 +922,38 @@ pub fn handle_spawn_inv_item_tooltip(
                     let box_x = 0.0;
                     let box_y = size.y / 2. - 126. - (i as f32 * 9.) - props.offset;
                     let box_pos = Vec3::new(box_x, box_y, 1.);
-                    let (path, idle_tag) = match item.item_stack.rarity {
+                    // Use the retained handles from Graphics so the asset + atlas
+                    // stay resident; loading on demand lets it unload between
+                    // tooltips, which randomly makes the highlight fail to appear.
+                    let (handle, idle_tag) = match item.item_stack.rarity {
                         ItemRarity::Common => (
-                            InventoryStatHighlightCommon::PATH,
+                            graphics.inv_stat_highlight_common_ase.clone(),
                             InventoryStatHighlightCommon::tags::IDLE,
                         ),
                         ItemRarity::Uncommon => (
-                            InventoryStatHighlightUncommon::PATH,
+                            graphics.inv_stat_highlight_uncommon_ase.clone(),
                             InventoryStatHighlightUncommon::tags::IDLE,
                         ),
                         ItemRarity::Rare => (
-                            InventoryStatHighlightRare::PATH,
+                            graphics.inv_stat_highlight_rare_ase.clone(),
                             InventoryStatHighlightRare::tags::IDLE,
                         ),
                         ItemRarity::Legendary => (
-                            InventoryStatHighlightLegendary::PATH,
+                            graphics.inv_stat_highlight_legendary_ase.clone(),
                             InventoryStatHighlightLegendary::tags::IDLE,
                         ),
                     };
-                    let anim = AsepriteAnimation::from(idle_tag);
+                    let mut anim = AsepriteAnimation::from(idle_tag);
+                    anim.current_frame = 0;
+                    anim.play();
                     commands
                         .spawn(AsepriteBundle {
-                            aseprite: asset_server.load(path),
+                            aseprite: handle.unwrap_or_default(),
                             animation: anim,
                             transform: Transform::from_translation(box_pos),
                             ..Default::default()
                         })
+                        .insert(VisibilityBundle::default())
                         .insert(RenderLayers::from_layers(&[3]))
                         .set_parent(tooltip);
                 }

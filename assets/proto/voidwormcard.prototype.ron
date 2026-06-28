@@ -1,0 +1,16 @@
+(
+  name: "VoidWormCard",
+  templates: ["item_drop.prototype.ron"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": VoidWormCard,
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: VoidWormCard,
+        metadata: (
+            name: "Void Worm Card",
+            desc: [""]
+        ),
+        rarity: Uncommon,
+        count: 1
+  ),
+  }
+)

@@ -690,7 +690,7 @@ fn preview_sheet_data(mob: &Mob) -> Option<(Vec2, usize, usize, usize, usize)> {
 /// so no local animator system is needed for them.
 fn preview_aseprite_data(mob: &Mob) -> Option<(&'static str, &'static str)> {
     use crate::enemy::aseprite_enemy::{
-        BigCactusAse, BullAse, LizardAse, SmallCactusAse, VoidCrawlerAse,
+        BigCactusAse, BullAse, LizardAse, SmallCactusAse, VoidCrawlerAse, VoidWormAse,
     };
     use crate::enemy::red_mushling::RedMushling;
     use crate::enemy::stone_golem::StoneGolem;
@@ -700,6 +700,7 @@ fn preview_aseprite_data(mob: &Mob) -> Option<(&'static str, &'static str)> {
         Mob::SmallCactus => Some((SmallCactusAse::PATH, "WalkDown")),
         Mob::Lizard => Some((LizardAse::PATH, "WalkDown")),
         Mob::VoidCrawler => Some((VoidCrawlerAse::PATH, "WalkDown")),
+        Mob::VoidWorm => Some((VoidWormAse::PATH, "WalkDown")),
         Mob::StoneGolem => Some((StoneGolem::PATH, "WalkFront")),
         Mob::RedMushling => Some((RedMushling::PATH, "IDLE_FRONT")),
         _ => None,

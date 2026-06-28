@@ -725,6 +725,7 @@ pub enum WorldObject {
     LargeCactusCard,
     BullCard,
     VoidCrawlerCard,
+    VoidWormCard,
     StoneGolemCard,
 }
 

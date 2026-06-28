@@ -51,8 +51,9 @@ use crate::item::{Equipment, WorldObject};
 use crate::proto::proto_param::ProtoParam;
 use crate::ui::{
     class_selection::{ClassUnlockConfirmState, SkillUnlockConfirmState},
-    tutorial_ui::PendingInventoryTutorialCheck, EssenceShopChoices, FlashExpBarEvent,
-    MenuButton, MenuButtonClickEvent, UIState, WaitingForKeyInput, WipeDataPopup,
+    tutorial_ui::PendingInventoryTutorialCheck,
+    EssenceShopChoices, FlashExpBarEvent, MenuButton, MenuButtonClickEvent, UIState,
+    WaitingForKeyInput, WipeDataPopup,
 };
 use crate::world::chunk::Chunk;
 
@@ -124,9 +125,8 @@ impl Plugin for InputsPlugin {
             )
             .add_systems((
                 toggle_inventory.run_if(in_state(GameState::Main)),
-                close_container.run_if(
-                    in_state(GameState::Main).or_else(in_state(GameState::MainMenu)),
-                ),
+                close_container
+                    .run_if(in_state(GameState::Main).or_else(in_state(GameState::MainMenu))),
             ))
             .add_system(
                 move_camera_with_player
@@ -823,11 +823,11 @@ pub fn toggle_inventory(
             // proto_commands.spawn_item_from_proto(WorldObject::Claw, &proto, pos, 1, Some(5));
             // proto_commands.spawn_item_from_proto(WorldObject::IceStaff, &proto, pos, 1, Some(5));
             // proto_commands.spawn_item_from_proto(WorldObject::BasicStaff, &proto, pos, 1, Some(5));
-            proto_commands.spawn_from_proto(Mob::VoidCrawler, &proto.prototypes, pos);
+            // proto_commands.spawn_from_proto(Mob::VoidCrawler, &proto.prototypes, pos);
             // proto_commands.spawn_from_proto(Mob::Lizard, &proto.prototypes, pos);
             // proto_commands.spawn_from_proto(Mob::StingFly, &proto.prototypes, pos);
             // proto_commands.spawn_from_proto(Mob::FurDevil, &proto.prototypes, pos);
-            // proto_commands.spawn_from_proto(Mob::Bushling, &proto.prototypes, pos);
+            proto_commands.spawn_from_proto(Mob::VoidWorm, &proto.prototypes, pos);
             // proto_commands.spawn_from_proto(Mob::FurDevil, &proto.prototypes, pos);
             // proto_commands.spawn_from_proto(Mob::BigCactus, &proto.prototypes, pos);
             // proto_commands.spawn_from_proto(Mob::SmallCactus, &proto.prototypes, pos);

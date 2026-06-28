@@ -14,8 +14,8 @@ use crate::{
     attributes::Attack,
     combat::{combat_helpers::spawn_temp_collider, status_effects::MobStatusEffects},
     enemy::{
-        BullChargeAttack, CircleAttack, CombatAlignment, FollowSpeed, LeapAttack, Mob,
-        MobIsAttacking, MultiLeapAttack, ProjectileAttack,
+        void_worm::VoidWormLaserState, BullChargeAttack, CircleAttack, CombatAlignment, FollowSpeed,
+        LaserAttack, LeapAttack, Mob, MobIsAttacking, MultiLeapAttack, ProjectileAttack,
     },
     inputs::FacingDirection,
     item::projectile::{EnemyProjectile, Projectile, RangedAttackEvent},
@@ -35,6 +35,7 @@ aseprite!(pub BigCactusAse, "textures/cactus_large/cactus_large.ase");
 aseprite!(pub BullAse, "textures/bull/bull.ase");
 aseprite!(pub LizardAse, "textures/lizard/lizard.ase");
 aseprite!(pub VoidCrawlerAse, "textures/VoidCrawler/voidcrawler.ase");
+aseprite!(pub VoidWormAse, "textures/VoidWorm/VoidWorm.ase");
 
 /// Fixed animation tag names for the shared aseprite basic enemy behavior.
 /// Aseprite files must use these exact tag names: WalkUp, WalkDown, WalkSide, AttackUp, AttackDown, AttackSide.
@@ -71,6 +72,7 @@ fn get_aseprite_basic_config(mob: &Mob) -> Option<(&'static str, &'static str)> 
         Mob::Bull => Some((BullAse::PATH, WALK_DOWN)),
         Mob::Lizard => Some((LizardAse::PATH, WALK_DOWN)),
         Mob::VoidCrawler => Some((VoidCrawlerAse::PATH, WALK_DOWN)),
+        Mob::VoidWorm => Some((VoidWormAse::PATH, WALK_DOWN)),
         _ => None,
     }
 }
@@ -159,6 +161,7 @@ pub fn handle_new_aseprite_enemy_state_machine(
             Option<&CircleAttack>,
             Option<&MultiLeapAttack>,
             Option<&BullChargeAttack>,
+            Option<&LaserAttack>,
         ),
         Added<AsepriteBasicEnemy>,
     >,
@@ -173,6 +176,7 @@ pub fn handle_new_aseprite_enemy_state_machine(
         circle_attack_option,
         multi_leap_option,
         bull_charge_option,
+        laser_attack_option,
     ) in spawn_events.iter()
     {
         let mut alignment = alignment.clone();
@@ -411,6 +415,28 @@ pub fn handle_new_aseprite_enemy_state_machine(
                     phase: BullChargePhase::WindUp,
                 },
             );
+        }
+
+        if let Some(laser_attack) = laser_attack_option {
+            // Pick a fixed random stop distance for this worm's lifetime, between
+            // min and max. The worm walks until within this distance, then fires.
+            let stop_distance = {
+                use rand::Rng;
+                rand::thread_rng()
+                    .gen_range(laser_attack.min_stop_distance..=laser_attack.max_stop_distance)
+            };
+            state_machine = state_machine.trans::<FollowState>(
+                CachedAttackDistance {
+                    range_sq: stop_distance * stop_distance,
+                },
+                VoidWormLaserState::new(
+                    game.game.player,
+                    laser_attack.laser_duration,
+                    laser_attack.walk_duration,
+                ),
+            );
+            // Note: the laser->follow transition is handled imperatively in
+            // `void_worm::void_worm_laser_attack` (insert FollowState + cooldown).
         }
 
         if alignment != CombatAlignment::Passive {

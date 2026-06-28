@@ -113,6 +113,8 @@ pub enum Projectile {
     EnergyBall,
     /// Voltaic Core muzzle flash (stationary, no damage).
     EnergyBallMuzzle,
+    /// Void Worm stationary laser beam hitbox (enemy attack).
+    VoidWormLaser,
 }
 
 impl Projectile {

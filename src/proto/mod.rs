@@ -31,8 +31,8 @@ use crate::{
     },
     enemy::{
         scorpion::{ScorpionClawAttack, ScorpionTailAttack, ScorpionTornadoAttack},
-        BullChargeAttack, CircleAttack, CombatAlignment, EnemyMaterial, FollowSpeed, LeapAttack,
-        Mob, MobLevel, MultiLeapAttack, ProjectileAttack,
+        BullChargeAttack, CircleAttack, CombatAlignment, EnemyMaterial, FollowSpeed, LaserAttack,
+        LeapAttack, Mob, MobLevel, MultiLeapAttack, ProjectileAttack,
     },
     inputs::FacingDirection,
     inventory::ItemStack,
@@ -152,6 +152,7 @@ impl Plugin for ProtoPlugin {
             .register_type::<CircleAttack>()
             .register_type::<MultiLeapAttack>()
             .register_type::<BullChargeAttack>()
+            .register_type::<LaserAttack>()
             .register_type::<ScorpionClawAttack>()
             .register_type::<ScorpionTailAttack>()
             .register_type::<ScorpionTornadoAttack>()

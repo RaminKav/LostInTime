@@ -705,7 +705,7 @@ pub fn setup_options_ui(
         ),
         Vec3::new(
             left_side_x + 100.,
-            auto_attack_y + 0.5,
+            auto_attack_y + 0.,
             ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
         ),
         OptionsCheckboxType::AutoAttack,
@@ -892,8 +892,8 @@ pub fn setup_options_ui(
             ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
         ),
         Vec3::new(
-            right_side_x + 100.5,
-            checkbox_y + 0.5,
+            right_side_x + 104.,
+            checkbox_y,
             ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
         ),
         OptionsCheckboxType::UnlockAllClasses,
@@ -1341,7 +1341,7 @@ fn spawn_options_checkbox(
         .spawn(SpriteBundle {
             texture: graphics.get_ui_element_texture(ui_checkbox).clone(),
             sprite: Sprite {
-                custom_size: Some(Vec2::new(9., 9.)),
+                custom_size: Some(Vec2::new(16., 16.)),
                 ..Default::default()
             },
             transform: Transform::from_translation(checkbox_pos),

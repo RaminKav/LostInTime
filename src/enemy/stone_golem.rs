@@ -14,10 +14,7 @@ use bevy::sprite::{ColorMaterial, MaterialMesh2dBundle};
 use bevy_aseprite::{anim::AsepriteAnimation, aseprite, Aseprite, AsepriteBundle};
 use bevy_rapier2d::prelude::{Collider, CollisionGroups, Group, KinematicCharacterController};
 use rand::Rng;
-use seldom_state::{
-    prelude::StateMachine,
-    trigger::{BoolTrigger, Trigger},
-};
+use seldom_state::{prelude::StateMachine, trigger::BoolTrigger};
 
 use super::{
     red_mushking::{BossAttackPreview, DeathState},
@@ -27,19 +24,142 @@ use super::{
 aseprite!(pub StoneGolem, "textures/stonegolem/StoneGolem.ase");
 aseprite!(pub StonePillar, "textures/stonegolem/StonePillar.ase");
 
+// Animation tags are generated at compile time from StoneGolem.ase — see StoneGolem::tags.
+
 // Constants
 const SPIKE_ATTACK_COUNT_MAX: usize = 7;
 const SPIKE_ATTACK_COUNT_MIN: usize = 4;
 const SPIKE_ATTACK_INTERVAL_MAX: f32 = 1.;
 const SPIKE_ATTACK_INTERVAL_MIN: f32 = 0.1;
 const SPIKE_WARNING_DELAY: f32 = 0.65; // Time between warning and damage
+/// How long after the wave attack starts before warning circles appear.
+const WAVE_WARNING_START_DELAY: f32 = 0.35;
+/// How long warning circles show before wave pillars emerge.
+const WAVE_PILLAR_SPAWN_DELAY: f32 = 0.85;
+/// Extra delay before each subsequent pillar in a row (col 0 unchanged, col 1 +this, col 2 +2×this).
+const WAVE_PILLAR_COLUMN_STAGGER: f32 = 0.35;
+/// How long the golem stays in wave attack (attack anim + stationary) before returning to follow.
+/// Kept just under the full attack animation length (~2.37s).
+const WAVE_ATTACK_DURATION: f32 = 1.97;
 const SPIKE_DAMAGE: i32 = 20;
 const SPIKE_DURATION: f32 = 10.0; // How long the spike hitbox lasts
 const SPIKE_DISTANCE_OFFSET_MAX: f32 = 40.0; // Maximum random distance offset from player
 
+const WAVE_ATTACK_DISTANCE: f32 = 120.0;
+/// When within wave range, chance to use the wave attack vs the random spike attack.
+const WAVE_ATTACK_CHANCE: f32 = 0.5;
+const WAVE_ROW_COUNT: usize = 3;
+const WAVE_PILLARS_PER_ROW: usize = 3;
+
+/// Minimum delay between any two golem attacks (spike or wave).
+const ATTACK_COOLDOWN: f32 = 1.3;
+const WAVE_PILLAR_SPACING: f32 = 40.0;
+const WAVE_ROW_ANGLE_OFFSET: f32 = 0.45; // ~26° between rows
+/// Distance from golem to the first pillar in each row (center pillar was previously here).
+const WAVE_FIRST_PILLAR_DISTANCE: f32 = 40.0;
+
+const PILLAR_MAX_Z: f32 = 999.0;
+const PILLAR_BASE_Z: f32 = 990.0;
+const PILLAR_Z_STAGGER: f32 = 0.6; // 15 wave pillars max out at 998.4
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Reflect)]
+enum GolemFacing {
+    Front,
+    Back,
+    Side,
+}
+
+impl GolemFacing {
+    fn from_delta(delta: Vec2) -> Self {
+        let abs_x = delta.x.abs();
+        let abs_y = delta.y.abs();
+        if abs_x > abs_y * 1.1 {
+            Self::Side
+        } else if delta.y > 0. {
+            Self::Back
+        } else {
+            Self::Front
+        }
+    }
+
+    fn attack_tag(self) -> &'static str {
+        match self {
+            Self::Front => StoneGolem::tags::ATTACK_FRONT,
+            Self::Back => StoneGolem::tags::ATTACK_BACK,
+            Self::Side => StoneGolem::tags::ATTACK_SIDE,
+        }
+    }
+}
+
+fn apply_golem_sprite_flip(transform: &mut Transform, delta: Vec2) {
+    let abs_x = delta.x.abs();
+    let abs_y = delta.y.abs();
+    if abs_x > abs_y * 1.1 && abs_x > f32::EPSILON {
+        if delta.x < 0. && transform.scale.x > 0. {
+            transform.scale.x = -1.0;
+        } else if delta.x > 0. && transform.scale.x < 0. {
+            transform.scale.x = 1.0;
+        }
+    }
+}
+
+fn compute_wave_pillar_positions(golem_pos: Vec2, player_pos: Vec2) -> Vec<Vec2> {
+    let to_player = player_pos - golem_pos;
+    let base_angle = to_player.y.atan2(to_player.x);
+    let row_center = (WAVE_ROW_COUNT as f32 - 1.0) / 2.0;
+    let half_span = (WAVE_PILLARS_PER_ROW as f32 - 1.0) / 2.0 * WAVE_PILLAR_SPACING;
+    let mut positions = Vec::with_capacity(WAVE_ROW_COUNT * WAVE_PILLARS_PER_ROW);
+
+    for row in 0..WAVE_ROW_COUNT {
+        let row_angle = base_angle + (row as f32 - row_center) * WAVE_ROW_ANGLE_OFFSET;
+        let row_dir = Vec2::from_angle(row_angle);
+        // Offset row origin so column 0 sits at WAVE_FIRST_PILLAR_DISTANCE, not behind the golem.
+        let row_origin = golem_pos + row_dir * (WAVE_FIRST_PILLAR_DISTANCE + half_span);
+
+        for col in 0..WAVE_PILLARS_PER_ROW {
+            let along = col as f32 * WAVE_PILLAR_SPACING - half_span;
+            positions.push(row_origin + row_dir * along);
+        }
+    }
+
+    positions
+}
+
+/// Tracks the active aseprite tag so walk animations aren't reset every frame.
+#[derive(Component, Default)]
+pub struct GolemCurrentTag(pub String);
+
+fn set_golem_anim(anim: &mut AsepriteAnimation, current: &mut GolemCurrentTag, tag: &str) {
+    if current.0 != tag {
+        *anim = AsepriteAnimation::from(tag);
+        anim.play();
+        current.0 = tag.to_string();
+    }
+}
+
+/// Always restarts the animation from the first frame, even if the tag is unchanged.
+/// Used when entering an attack so it replays instead of staying frozen on the last frame
+/// of a previous (identical) attack tag.
+fn play_golem_anim_force(anim: &mut AsepriteAnimation, current: &mut GolemCurrentTag, tag: &str) {
+    *anim = AsepriteAnimation::from(tag);
+    anim.play();
+    current.0 = tag.to_string();
+}
+
+fn is_golem_walk_tag(tag: &str) -> bool {
+    matches!(
+        tag,
+        StoneGolem::tags::WALK_FRONT | StoneGolem::tags::WALK_BACK | StoneGolem::tags::WALK_SIDE
+    )
+}
+
 #[derive(Component)]
 pub struct SpikeAttackTimer {
     pub random_timer: Timer,
+    /// Enforces a minimum gap between attacks; reset when any attack starts.
+    pub cooldown_timer: Timer,
+    /// Rolled once per attack window: `true` = wave, `false` = spike when within wave range.
+    pub attack_choice: Option<bool>,
 }
 
 /// Component for individual spike warnings that track their own timer
@@ -48,6 +168,8 @@ pub struct SpikeWarning {
     pub timer: Timer,
     pub target_pos: Vec2,
     pub golem_entity: Entity,
+    /// Per-pillar Z stagger so wave pillars don't z-fight.
+    pub z_offset: f32,
 }
 
 #[derive(Clone, Component, Reflect)]
@@ -56,22 +178,74 @@ pub struct SpikeAttackState {
     pub num_spikes_left: usize,
     pub attack_timer: Timer, // Controls interval between spikes
     pub initialized: bool, // Track if we've initialized the spike count (for randomization on state entry)
+    pub spikes_spawned: usize,
+}
+
+#[derive(Clone, Component, Reflect)]
+#[component(storage = "SparseSet")]
+pub struct WaveAttackState {
+    pub initialized: bool,
+    pub facing: GolemFacing,
+    pub finish_timer: Timer,
+    pub warnings_spawned: bool,
+    pub warning_spawn_timer: Timer,
+    pub pillar_positions: Vec<Vec2>,
 }
 
 #[derive(Clone, Copy, Reflect)]
-pub struct SpikeAttackTimerTrigger;
+pub struct GolemSpikeAttackTrigger;
 
-impl BoolTrigger for SpikeAttackTimerTrigger {
-    type Param<'w, 's> = Query<'w, 's, &'static SpikeAttackTimer>;
+impl BoolTrigger for GolemSpikeAttackTrigger {
+    type Param<'w, 's> = (
+        Query<'w, 's, (&'static SpikeAttackTimer, &'static Transform)>,
+        Query<'w, 's, &'static Transform, With<Player>>,
+    );
 
-    fn trigger(&self, entity: Entity, query: Self::Param<'_, '_>) -> bool {
-        if let Ok(timer) = query.get(entity) {
-            if timer.random_timer.finished() {
-                // info!("SpikeAttackTimerTrigger triggered for entity {:?}", entity);
-                return true;
-            }
+    fn trigger(&self, entity: Entity, (golems, player): Self::Param<'_, '_>) -> bool {
+        let Ok((timer, golem_tf)) = golems.get(entity) else {
+            return false;
+        };
+        if !timer.random_timer.finished() || !timer.cooldown_timer.finished() {
+            return false;
         }
-        false
+        let Ok(player_tf) = player.get_single() else {
+            return false;
+        };
+        let dist = golem_tf
+            .translation
+            .truncate()
+            .distance(player_tf.translation.truncate());
+        if dist <= WAVE_ATTACK_DISTANCE {
+            return timer.attack_choice == Some(false);
+        }
+        true
+    }
+}
+
+#[derive(Clone, Copy, Reflect)]
+pub struct GolemWaveAttackTrigger;
+
+impl BoolTrigger for GolemWaveAttackTrigger {
+    type Param<'w, 's> = (
+        Query<'w, 's, (&'static SpikeAttackTimer, &'static Transform)>,
+        Query<'w, 's, &'static Transform, With<Player>>,
+    );
+
+    fn trigger(&self, entity: Entity, (golems, player): Self::Param<'_, '_>) -> bool {
+        let Ok((timer, golem_tf)) = golems.get(entity) else {
+            return false;
+        };
+        if !timer.random_timer.finished() || !timer.cooldown_timer.finished() {
+            return false;
+        }
+        let Ok(player_tf) = player.get_single() else {
+            return false;
+        };
+        let dist = golem_tf
+            .translation
+            .truncate()
+            .distance(player_tf.translation.truncate());
+        dist <= WAVE_ATTACK_DISTANCE && timer.attack_choice == Some(true)
     }
 }
 
@@ -87,13 +261,11 @@ pub fn handle_new_stone_golem_state_machine(
         }
         let mut e_cmds = commands.entity(e);
 
-        // Initial animation - assume WalkFront is default or use IDLE if available
-        let mut animation = AsepriteAnimation::from("WalkFront");
+        let mut animation = AsepriteAnimation::from(StoneGolem::tags::WALK_FRONT);
         animation.play();
 
         let mut rng = rand::thread_rng();
         let initial_timer = rng.gen_range(3.0..5.0);
-        info!("NEW STONE GOLEM @@@@@@@");
         e_cmds
             .insert(AsepriteBundle {
                 aseprite: asset_server.load(StoneGolem::PATH),
@@ -101,6 +273,7 @@ pub fn handle_new_stone_golem_state_machine(
                 transform: *transform,
                 ..Default::default()
             })
+            .insert(GolemCurrentTag(StoneGolem::tags::WALK_FRONT.to_string()))
             .insert(CollisionGroups::new(Group::GROUP_1, Group::GROUP_1))
             .insert(FollowState {
                 target: game.game.player,
@@ -111,32 +284,48 @@ pub fn handle_new_stone_golem_state_machine(
             .insert(DamagesWorldObjects)
             .insert(SpikeAttackTimer {
                 random_timer: Timer::from_seconds(initial_timer, TimerMode::Once),
+                cooldown_timer: {
+                    // Start finished so the first attack isn't gated by the cooldown.
+                    let mut t = Timer::from_seconds(ATTACK_COOLDOWN, TimerMode::Once);
+                    t.tick(std::time::Duration::from_secs_f32(ATTACK_COOLDOWN));
+                    t
+                },
+                attack_choice: None,
             });
 
         let state_machine = StateMachine::default()
             .set_trans_logging(false)
             .with_state::<DeathState>() // Add DeathState so state machine is always valid
             .trans::<FollowState>(
-                SpikeAttackTimerTrigger,
+                GolemWaveAttackTrigger,
+                WaveAttackState {
+                    initialized: false,
+                    facing: GolemFacing::Front,
+                    finish_timer: Timer::from_seconds(WAVE_ATTACK_DURATION, TimerMode::Once),
+                    warnings_spawned: false,
+                    warning_spawn_timer: Timer::from_seconds(
+                        WAVE_WARNING_START_DELAY,
+                        TimerMode::Once,
+                    ),
+                    pillar_positions: Vec::new(),
+                },
+            )
+            .trans::<FollowState>(
+                GolemSpikeAttackTrigger,
                 SpikeAttackState {
                     num_spikes_left: 0,
                     attack_timer: Timer::from_seconds(0.0, TimerMode::Once),
                     initialized: false,
-                },
-            )
-            .trans::<SpikeAttackState>(
-                Trigger::not(SpikeAttackTimerTrigger), // Placeholder, logic handles return
-                FollowState {
-                    target: game.game.player,
-                    curr_delta: None,
-                    curr_path: None,
-                    speed: follow_speed.0,
+                    spikes_spawned: 0,
                 },
             );
 
-        // Note: We handle transition back to FollowState manually in handle_spike_attack
-        // The above transition is just to satisfy type checking if needed,
-        // but actually we will remove SpikeAttackState and insert FollowState manually.
+        // NOTE: No automatic back-transitions to FollowState. They would use
+        // `Trigger::not(GolemSpikeAttackTrigger/GolemWaveAttackTrigger)`, which fire the instant we
+        // enter an attack (the cooldown reset makes the forward trigger false → `not` true), kicking
+        // the golem out of the attack before the animation can play. Instead,
+        // `check_spike_attack_completion` / `check_wave_attack_completion` manually remove the attack
+        // state and re-insert FollowState once the attack finishes (same pattern as the scorpion boss).
 
         e_cmds.insert(state_machine);
     }
@@ -146,8 +335,17 @@ pub fn tick_spike_attack_timer(
     mut timers: Query<&mut SpikeAttackTimer, Without<crate::combat::MarkedForDeath>>,
     time: Res<Time>,
 ) {
+    let mut rng = rand::thread_rng();
     for mut timer in timers.iter_mut() {
         timer.random_timer.tick(time.delta());
+        timer.cooldown_timer.tick(time.delta());
+
+        if timer.random_timer.finished()
+            && timer.cooldown_timer.finished()
+            && timer.attack_choice.is_none()
+        {
+            timer.attack_choice = Some(rng.gen_bool(WAVE_ATTACK_CHANCE as f64));
+        }
     }
 }
 
@@ -158,12 +356,14 @@ pub fn spawn_golem_spike_hitbox(
     pos: Vec3,
     dmg: i32,
     golem_entity: Entity,
+    z_offset: f32,
 ) {
     // Create default animation
     let anim = AsepriteAnimation::default();
 
     // Spawn at a higher Z to ensure visibility
-    let transform = Transform::from_translation(pos + Vec3::new(0., 32., 995.0));
+    let z = (PILLAR_BASE_Z + z_offset).min(PILLAR_MAX_Z);
+    let transform = Transform::from_translation(pos + Vec3::new(0., 32., z));
 
     // Queue deferred spawn - actual entity will be created in PreUpdate
     spawn_deferred_aseprite_collider(
@@ -186,8 +386,16 @@ pub fn spawn_golem_spike_hitbox(
 
 /// Initialize spike attack state with random spike count when first entered
 pub fn initialize_spike_attack_state(
+    mut commands: Commands,
     mut attacks: Query<
-        (Entity, &mut SpikeAttackState),
+        (
+            Entity,
+            &mut SpikeAttackState,
+            &mut AsepriteAnimation,
+            &mut GolemCurrentTag,
+            &mut KinematicCharacterController,
+            &mut SpikeAttackTimer,
+        ),
         (
             Added<SpikeAttackState>,
             Without<crate::combat::MarkedForDeath>,
@@ -195,11 +403,18 @@ pub fn initialize_spike_attack_state(
     >,
 ) {
     let mut rng = rand::thread_rng();
-    for (_entity, mut state) in attacks.iter_mut() {
+    for (entity, mut state, mut anim, mut current_tag, mut kcc, mut timer) in attacks.iter_mut() {
+        commands.entity(entity).remove::<FollowState>();
+        kcc.translation = None;
+        timer.cooldown_timer = Timer::from_seconds(ATTACK_COOLDOWN, TimerMode::Once);
+        timer.attack_choice = None;
+
         if !state.initialized {
             state.num_spikes_left = rng.gen_range(SPIKE_ATTACK_COUNT_MIN..=SPIKE_ATTACK_COUNT_MAX);
+            state.spikes_spawned = 0;
             state.initialized = true;
         }
+        play_golem_anim_force(&mut anim, &mut current_tag, StoneGolem::tags::ATTACK_FRONT);
     }
 }
 
@@ -207,7 +422,11 @@ pub fn initialize_spike_attack_state(
 pub fn handle_spike_attack(
     mut commands: Commands,
     mut attacks: Query<
-        (Entity, &mut SpikeAttackState, &mut AsepriteAnimation),
+        (
+            Entity,
+            &mut SpikeAttackState,
+            &mut KinematicCharacterController,
+        ),
         Without<crate::combat::MarkedForDeath>,
     >,
     player_query: Query<&Transform, With<Player>>,
@@ -216,18 +435,8 @@ pub fn handle_spike_attack(
     time: Res<Time>,
     cheat_settings: Res<CheatSettings>,
 ) {
-    for (entity, mut state, mut anim) in attacks.iter_mut() {
-        // Set animation to Attack
-        let frame = anim.current_frame();
-        // Assuming Attack frames are 30-44.
-        let is_attacking = (30..=44).contains(&frame);
-        if !is_attacking {
-            *anim = AsepriteAnimation::from("Attack");
-            if anim.is_paused() {
-                anim.play();
-            }
-        }
-
+    for (entity, mut state, mut kcc) in attacks.iter_mut() {
+        kcc.translation = None;
         state.attack_timer.tick(time.delta());
 
         // Spawn new warning when timer finishes and we still have spikes left
@@ -240,6 +449,7 @@ pub fn handle_spike_attack(
                 let offset = Vec2::from_angle(offset_angle) * offset_distance;
 
                 let target_pos = player_txfm.translation.truncate() + offset;
+                let z_offset = state.spikes_spawned as f32 * PILLAR_Z_STAGGER;
 
                 commands.spawn((
                     MaterialMesh2dBundle {
@@ -260,9 +470,11 @@ pub fn handle_spike_attack(
                         timer: Timer::from_seconds(SPIKE_WARNING_DELAY, TimerMode::Once),
                         target_pos,
                         golem_entity: entity,
+                        z_offset,
                     },
                 ));
 
+                state.spikes_spawned += 1;
                 state.num_spikes_left -= 1;
 
                 if state.num_spikes_left > 0 {
@@ -272,6 +484,191 @@ pub fn handle_spike_attack(
                     );
                 }
             }
+        }
+    }
+}
+
+/// Enter wave attack: stop following, face the player, play the attack anim.
+pub fn initialize_wave_attack_state(
+    mut commands: Commands,
+    game: GameParam,
+    global_transforms: Query<&GlobalTransform>,
+    mut attacks: Query<
+        (
+            Entity,
+            &mut WaveAttackState,
+            &mut AsepriteAnimation,
+            &mut Transform,
+            &mut GolemCurrentTag,
+            &mut KinematicCharacterController,
+            &mut SpikeAttackTimer,
+        ),
+        (
+            Added<WaveAttackState>,
+            Without<crate::combat::MarkedForDeath>,
+        ),
+    >,
+) {
+    let Ok(player_global) = global_transforms.get(game.game.player) else {
+        return;
+    };
+    let player_pos = player_global.translation().truncate();
+
+    for (entity, mut state, mut anim, mut transform, mut current_tag, mut kcc, mut timer) in
+        attacks.iter_mut()
+    {
+        commands.entity(entity).remove::<FollowState>();
+        kcc.translation = None;
+        timer.cooldown_timer = Timer::from_seconds(ATTACK_COOLDOWN, TimerMode::Once);
+        timer.attack_choice = None;
+
+        let golem_pos = transform.translation.truncate();
+        let delta = player_pos - golem_pos;
+        let facing = GolemFacing::from_delta(delta);
+        state.facing = facing;
+
+        play_golem_anim_force(&mut anim, &mut current_tag, facing.attack_tag());
+        apply_golem_sprite_flip(&mut transform, delta);
+
+        state.pillar_positions = compute_wave_pillar_positions(golem_pos, player_pos);
+        state.warnings_spawned = false;
+        state.warning_spawn_timer = Timer::from_seconds(WAVE_WARNING_START_DELAY, TimerMode::Once);
+        state.finish_timer = Timer::from_seconds(WAVE_ATTACK_DURATION, TimerMode::Once);
+        state.initialized = true;
+    }
+}
+
+fn spawn_wave_warning_entities(
+    commands: &mut Commands,
+    golem_entity: Entity,
+    positions: &[Vec2],
+    meshes: &mut Assets<Mesh>,
+    materials: &mut Assets<ColorMaterial>,
+    cheat_settings: &CheatSettings,
+) {
+    for (idx, target_pos) in positions.iter().copied().enumerate() {
+        let col = idx % WAVE_PILLARS_PER_ROW;
+        let pillar_delay = WAVE_PILLAR_SPAWN_DELAY + col as f32 * WAVE_PILLAR_COLUMN_STAGGER;
+
+        commands.spawn((
+            MaterialMesh2dBundle {
+                mesh: meshes
+                    .add(bevy::prelude::shape::Circle::new(16.).into())
+                    .into(),
+                material: materials.add(ColorMaterial::from(boss_warning_indicator_color(
+                    cheat_settings,
+                ))),
+                transform: Transform {
+                    translation: target_pos.extend(990.0),
+                    ..default()
+                },
+                ..default()
+            },
+            BossAttackPreview,
+            SpikeWarning {
+                timer: Timer::from_seconds(pillar_delay, TimerMode::Once),
+                target_pos,
+                golem_entity,
+                z_offset: idx as f32 * PILLAR_Z_STAGGER,
+            },
+        ));
+    }
+}
+
+/// Spawn wave warning circles once the start delay has elapsed.
+pub fn spawn_delayed_wave_warnings(
+    mut commands: Commands,
+    time: Res<Time>,
+    mut attacks: Query<(Entity, &mut WaveAttackState), Without<crate::combat::MarkedForDeath>>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<ColorMaterial>>,
+    cheat_settings: Res<CheatSettings>,
+) {
+    for (entity, mut state) in attacks.iter_mut() {
+        if !state.initialized || state.warnings_spawned {
+            continue;
+        }
+
+        state.warning_spawn_timer.tick(time.delta());
+        if !state.warning_spawn_timer.finished() {
+            continue;
+        }
+
+        spawn_wave_warning_entities(
+            &mut commands,
+            entity,
+            &state.pillar_positions,
+            &mut meshes,
+            &mut materials,
+            &cheat_settings,
+        );
+        state.warnings_spawned = true;
+    }
+}
+
+/// Keep the golem stationary and on its attack animation for the whole wave attack.
+pub fn maintain_wave_attack(
+    mut attacks: Query<
+        (
+            &WaveAttackState,
+            &mut AsepriteAnimation,
+            &mut GolemCurrentTag,
+            &mut KinematicCharacterController,
+        ),
+        (
+            With<WaveAttackState>,
+            Without<crate::combat::MarkedForDeath>,
+        ),
+    >,
+) {
+    for (state, mut anim, mut current_tag, mut kcc) in attacks.iter_mut() {
+        kcc.translation = None;
+        if state.initialized {
+            set_golem_anim(&mut anim, &mut current_tag, state.facing.attack_tag());
+        }
+    }
+}
+
+/// Check if wave attack is complete and transition back to FollowState
+pub fn check_wave_attack_completion(
+    mut commands: Commands,
+    time: Res<Time>,
+    mut attacks: Query<(Entity, &mut WaveAttackState), Without<crate::combat::MarkedForDeath>>,
+    mut timers: Query<&mut SpikeAttackTimer>,
+    mut anims: Query<(&mut AsepriteAnimation, &mut GolemCurrentTag)>,
+    game: GameParam,
+    follow_speed_query: Query<&FollowSpeed>,
+) {
+    for (entity, mut state) in attacks.iter_mut() {
+        if !state.initialized {
+            continue;
+        }
+
+        state.finish_timer.tick(time.delta());
+        if !state.finish_timer.finished() {
+            continue;
+        }
+
+        let follow_speed = follow_speed_query.get(entity).map(|f| f.0).unwrap_or(0.65);
+
+        if let Some(mut entity_commands) = commands.get_entity(entity) {
+            entity_commands
+                .remove::<WaveAttackState>()
+                .insert(FollowState {
+                    target: game.game.player,
+                    curr_delta: None,
+                    curr_path: None,
+                    speed: follow_speed,
+                });
+        }
+
+        if let Ok(mut timer) = timers.get_mut(entity) {
+            let mut rng = rand::thread_rng();
+            timer.random_timer = Timer::from_seconds(rng.gen_range(3.0..5.0), TimerMode::Once);
+        }
+
+        if let Ok((mut anim, mut current_tag)) = anims.get_mut(entity) {
+            set_golem_anim(&mut anim, &mut current_tag, StoneGolem::tags::WALK_FRONT);
         }
     }
 }
@@ -293,6 +690,7 @@ pub fn handle_spike_warnings(
                 warning.target_pos.extend(0.0),
                 SPIKE_DAMAGE,
                 warning.golem_entity,
+                warning.z_offset,
             );
 
             commands.entity(warning_entity).despawn_recursive();
@@ -306,7 +704,7 @@ pub fn check_spike_attack_completion(
     attacks: Query<(Entity, &SpikeAttackState), Without<crate::combat::MarkedForDeath>>,
     warnings: Query<&SpikeWarning>,
     mut timers: Query<&mut SpikeAttackTimer>,
-    mut anims: Query<&mut AsepriteAnimation>,
+    mut anims: Query<(&mut AsepriteAnimation, &mut GolemCurrentTag)>,
     game: GameParam,
     follow_speed_query: Query<&FollowSpeed>,
 ) {
@@ -334,8 +732,8 @@ pub fn check_spike_attack_completion(
                         Timer::from_seconds(rng.gen_range(3.0..5.0), TimerMode::Once);
                 }
 
-                if let Ok(mut anim) = anims.get_mut(entity) {
-                    *anim = AsepriteAnimation::from("WalkFront");
+                if let Ok((mut anim, mut current_tag)) = anims.get_mut(entity) {
+                    set_golem_anim(&mut anim, &mut current_tag, StoneGolem::tags::WALK_FRONT);
                 }
             }
         }
@@ -344,7 +742,13 @@ pub fn check_spike_attack_completion(
 
 pub fn update_stone_golem_walk_animation(
     mut query: Query<
-        (Entity, &mut Transform, &mut AsepriteAnimation, &Mob),
+        (
+            Entity,
+            &mut Transform,
+            &mut AsepriteAnimation,
+            &mut GolemCurrentTag,
+            &Mob,
+        ),
         (With<FollowState>, Without<crate::combat::MarkedForDeath>),
     >,
     player_query: Query<&Transform, (With<Player>, Without<FollowState>)>,
@@ -352,7 +756,7 @@ pub fn update_stone_golem_walk_animation(
     if let Ok(player_transform) = player_query.get_single() {
         let player_pos = player_transform.translation.truncate();
 
-        for (_entity, mut transform, mut anim, mob) in query.iter_mut() {
+        for (_entity, mut transform, mut anim, mut current_tag, mob) in query.iter_mut() {
             if mob != &Mob::StoneGolem {
                 continue;
             }
@@ -368,55 +772,35 @@ pub fn update_stone_golem_walk_animation(
             let abs_x = delta.x.abs();
             let abs_y = delta.y.abs();
 
-            // Determine desired animation based on direction with hysteresis
-            let current_frame = anim.current_frame();
-            let is_walk_front = (10..=29).contains(&current_frame);
-            let is_walk_back = (45..=61).contains(&current_frame);
-            let is_walk_side = (62..=77).contains(&current_frame);
+            let keep_current = if abs_x <= abs_y * 1.1
+                && abs_y <= abs_x * 1.1
+                && is_golem_walk_tag(&current_tag.0)
+            {
+                Some(current_tag.0.clone())
+            } else {
+                None
+            };
 
             // 10% buffer to prevent rapid switching between Side and Vertical
             let desired_anim = if abs_x > abs_y * 1.1 {
-                "WalkSide"
+                StoneGolem::tags::WALK_SIDE
             } else if abs_y > abs_x * 1.1 {
                 if delta.y > 0. {
-                    "WalkBack"
+                    StoneGolem::tags::WALK_BACK
                 } else {
-                    "WalkFront"
+                    StoneGolem::tags::WALK_FRONT
                 }
+            } else if let Some(tag) = keep_current.as_deref() {
+                tag
+            } else if abs_x > abs_y {
+                StoneGolem::tags::WALK_SIDE
+            } else if delta.y > 0. {
+                StoneGolem::tags::WALK_BACK
             } else {
-                // In the buffer zone, prefer keeping current valid animation
-                if is_walk_side {
-                    "WalkSide"
-                } else if is_walk_back {
-                    "WalkBack"
-                } else if is_walk_front {
-                    "WalkFront"
-                } else {
-                    // Fallback if current animation is not a walk (e.g. just finished attack)
-                    if abs_x > abs_y {
-                        "WalkSide"
-                    } else if delta.y > 0. {
-                        "WalkBack"
-                    } else {
-                        "WalkFront"
-                    }
-                }
+                StoneGolem::tags::WALK_FRONT
             };
 
-            // Apply change if needed
-            let needs_change = match desired_anim {
-                "WalkFront" => !is_walk_front,
-                "WalkBack" => !is_walk_back,
-                "WalkSide" => !is_walk_side,
-                _ => false,
-            };
-
-            if needs_change {
-                *anim = AsepriteAnimation::from(desired_anim);
-                if anim.is_paused() {
-                    anim.play();
-                }
-            }
+            set_golem_anim(&mut anim, &mut current_tag, desired_anim);
 
             // Handle Flipping for Side Walk with threshold
             if abs_x > 1.0 {
@@ -456,11 +840,15 @@ pub fn handle_stone_golem_death(
 /// Move stone golem towards player when in FollowState
 /// This is separate from the regular follow system because stone golem uses Aseprite animations
 pub fn stone_golem_follow(
-    mut transforms: Query<&mut Transform>,
+    transforms: Query<&mut Transform>,
     mut mover: Query<&mut KinematicCharacterController>,
     mut follows: Query<
         (Entity, &FollowState, &Mob, Option<&MobStatusEffects>),
-        Without<crate::combat::MarkedForDeath>,
+        (
+            Without<crate::combat::MarkedForDeath>,
+            Without<WaveAttackState>,
+            Without<SpikeAttackState>,
+        ),
     >,
     time: Res<Time>,
 ) {

@@ -15,13 +15,14 @@ if [ ! -f "$log" ]; then
   exit 2
 fi
 
-# Match the B0002 error and the human-readable "conflicts with a previous" line.
-if grep -nE 'B0002|conflicts with a previous .* access' "$log"; then
+# Match B0001/B0002 and the human-readable "conflicts with a previous" line.
+if grep -nE 'B000[12]|conflicts with a previous' "$log"; then
   echo "---"
-  echo "B0002 system-param conflict detected (see lines above)."
-  echo "Open the named system and remove the duplicate access (route it through the composite param)."
+  echo "Bevy system-param conflict detected (see lines above)."
+  echo "B0001: merge conflicting Queries into ParamSet or add Without<> filters."
+  echo "B0002: remove duplicate resource access (route through composite SystemParam)."
   exit 1
 fi
 
-echo "No B0002 system-param conflicts found in $log"
+echo "No B0001/B0002 system-param conflicts found in $log"
 exit 0

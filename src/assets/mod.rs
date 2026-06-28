@@ -170,6 +170,11 @@ impl Plugin for GameAssetsPlugin {
                 bomb_ase: None,
                 stone_pillar_ase: None,
                 pink_flower_ase: None,
+                void_laser_ase: None,
+                inv_stat_highlight_common_ase: None,
+                inv_stat_highlight_uncommon_ase: None,
+                inv_stat_highlight_rare_ase: None,
+                inv_stat_highlight_legendary_ase: None,
                 cursor_color_sprites: None,
             })
             .add_system(
@@ -249,6 +254,16 @@ pub struct Graphics {
     pub bomb_ase: Option<Handle<Aseprite>>,
     pub stone_pillar_ase: Option<Handle<Aseprite>>,
     pub pink_flower_ase: Option<Handle<Aseprite>>,
+    /// Void Worm laser beam aseprite. Retained here so the asset + its built atlas
+    /// stay resident; loading it on demand lets it unload between spawns, which
+    /// causes the beam to randomly not render or freeze on a single frame.
+    pub void_laser_ase: Option<Handle<Aseprite>>,
+    /// Inventory tooltip stat-highlight aseprites (per rarity). Retained for the
+    /// same reason as `void_laser_ase` (on-demand loads randomly fail to appear).
+    pub inv_stat_highlight_common_ase: Option<Handle<Aseprite>>,
+    pub inv_stat_highlight_uncommon_ase: Option<Handle<Aseprite>>,
+    pub inv_stat_highlight_rare_ase: Option<Handle<Aseprite>>,
+    pub inv_stat_highlight_legendary_ase: Option<Handle<Aseprite>>,
     /// Selectable custom-cursor color sprites, in selection order (sheet positions (4,1)..(11,1)).
     pub cursor_color_sprites: Option<Vec<TextureAtlasSprite>>,
 }
@@ -665,6 +680,19 @@ impl GameAssetsPlugin {
             ui_portal_ase: Some(asset_server.load(UIPortal::PATH)),
             stone_pillar_ase: Some(asset_server.load("textures/stonegolem/StonePillar.ase")),
             pink_flower_ase: Some(asset_server.load(PinkFlowerAseprite::PATH)),
+            void_laser_ase: Some(asset_server.load("textures/VoidWorm/VoidLaser.ase")),
+            inv_stat_highlight_common_ase: Some(
+                asset_server.load("textures/effects/InventoryStatHighlightCommon.ase"),
+            ),
+            inv_stat_highlight_uncommon_ase: Some(
+                asset_server.load("textures/effects/InventoryStatHighlightUncommon.ase"),
+            ),
+            inv_stat_highlight_rare_ase: Some(
+                asset_server.load("textures/effects/InventoryStatHighlightRare.ase"),
+            ),
+            inv_stat_highlight_legendary_ase: Some(
+                asset_server.load("textures/effects/InventoryStatHighlightLegendary.ase"),
+            ),
             class_pet_data: Some(class_pet_data.clone()),
             cursor_color_sprites: Some(cursor_color_sprites),
         };

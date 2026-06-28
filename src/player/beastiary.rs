@@ -71,6 +71,7 @@ pub const BEASTIARY_MOBS: &[(WorldObject, Mob)] = &[
     (WorldObject::LargeCactusCard, Mob::BigCactus),
     (WorldObject::BullCard, Mob::Bull),
     (WorldObject::VoidCrawlerCard, Mob::VoidCrawler),
+    (WorldObject::VoidWormCard, Mob::VoidWorm),
     (WorldObject::StoneGolemCard, Mob::StoneGolem),
 ];
 
@@ -124,6 +125,7 @@ pub fn mob_display_name(mob: &Mob) -> &'static str {
         Mob::Scorpion => "Desert Scorpion",
         Mob::Lizard => "Lizard",
         Mob::VoidCrawler => "Void Crawler",
+        Mob::VoidWorm => "Void Worm",
         Mob::None => "Unknown",
     }
 }
