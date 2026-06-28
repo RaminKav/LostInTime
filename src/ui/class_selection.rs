@@ -254,7 +254,7 @@ pub fn setup_class_selection_ui(
                 )
                 .with_alignment(TextAlignment::Left),
                 text_anchor: Anchor::CenterLeft,
-                transform: Transform::from_translation(Vec3::new(-250., 176., 11.)),
+                transform: Transform::from_translation(Vec3::new(270., 166., 11.)),
                 ..Default::default()
             },
             RenderLayers::from_layers(&[3]),

@@ -92,7 +92,7 @@ fn crystal_entry_height(time_crystals: &TimeCrystals, idx: usize) -> f32 {
     let nh = time_crystal_heirlooms(idx).len();
     let header = 12f32;
     let body = if complete && nh > 0 {
-        ICON_SIZE + 12.
+        ICON_SIZE + 9.
     } else if complete && nh == 0 {
         12.
     } else {
@@ -347,7 +347,7 @@ pub fn setup_time_crystals_browser_ui(
         y_row_header -= row_heights[row];
     }
 
-    let button_y = -half_h + 20.;
+    let button_y = -half_h + 16.;
     let done_entity = commands
         .spawn((
             SpriteBundle {
@@ -394,7 +394,7 @@ pub fn setup_time_crystals_browser_ui(
             SpriteBundle {
                 texture: graphics.get_ui_element_texture(UIElement::MenuButton),
                 sprite: Sprite {
-                    custom_size: Some(Vec2::new(118., 18.)),
+                    custom_size: Some(Vec2::new(96., 18.)),
                     ..Default::default()
                 },
                 transform: Transform::from_translation(Vec3::new(58., button_y, CONTENT_Z)),
