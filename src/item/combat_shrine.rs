@@ -1,4 +1,4 @@
-use bevy::prelude::*;
+use bevy::{prelude::*, utils::HashMap};
 use bevy_aseprite::{anim::AsepriteAnimation, aseprite, AsepriteBundle};
 use bevy_proto::prelude::ProtoCommands;
 use rand::{seq::IteratorRandom, Rng};
@@ -19,6 +19,7 @@ use super::{Loot, WorldObject};
 #[derive(Component)]
 pub struct CombatShrineMob {
     pub parent_shrine: Entity,
+    pub shrine_tile_pos: TileMapPosition,
 }
 
 #[derive(Component)]
@@ -27,61 +28,88 @@ pub struct CombatShrine {
     pub tile_pos: TileMapPosition,
 }
 
-pub struct CombatShrineMobDeathEvent(pub Entity);
+/// Tracks live combat-shrine mob counts by tile so completion still works after the shrine
+/// entity is despawned with its chunk (mobs are not chunk children and can outlive it).
+#[derive(Resource, Default)]
+pub struct CombatShrineMobCounts {
+    pub remaining: HashMap<TileMapPosition, usize>,
+}
+
+pub struct CombatShrineMobDeathEvent {
+    pub shrine: Entity,
+    pub tile_pos: TileMapPosition,
+}
+
 pub fn handle_combat_shrine_activate_animation(
-    mut shrines: Query<(
-        Entity,
-        &GlobalTransform,
-        &mut CombatShrine,
-        &mut AsepriteAnimation,
-    )>,
+    mut shrines: Query<
+        (
+            Entity,
+            &GlobalTransform,
+            &mut CombatShrine,
+            &mut AsepriteAnimation,
+        ),
+    >,
     mut proto_param: ProtoParam,
     mut commands: Commands,
-    game: GameParam,
+    mut mob_counts: ResMut<CombatShrineMobCounts>,
 ) {
-    for (e, t, shrine, mut anim) in shrines.iter_mut() {
-        if anim.current_frame() == 55 {
-            *anim = AsepriteAnimation::from(CombatShrineAnim::tags::DONE);
-            let mut num_to_spawn = shrine.num_mobs_left;
-            let possible_spawns = [Mob::Bushling, Mob::StingFly, Mob::SpikeSlime];
-            let mut rng = rand::thread_rng();
-            while num_to_spawn > 0 {
-                let offset = Vec2::new(rng.gen_range(-3. ..=3.), rng.gen_range(-3. ..=3.))
-                    * Vec2::splat(TILE_SIZE.x);
-                let spawn_pos = t.translation().truncate() + offset;
-                let choice_mob = rng.gen_range(0..possible_spawns.len());
-                if let Some(mob) = proto_param.proto_commands.spawn_from_proto(
-                    possible_spawns[choice_mob].clone(),
-                    &proto_param.prototypes,
-                    spawn_pos,
-                ) {
-                    num_to_spawn -= 1;
-                    commands.entity(mob).insert(EliteMob);
-                    proto_param
-                        .proto_commands
-                        .commands()
-                        .entity(mob)
-                        .insert(CombatAlignment::Hostile)
-                        .insert(LootTable {
-                            drops: vec![
-                                Loot {
-                                    item: WorldObject::Coin,
-                                    min: 1,
-                                    max: 1,
-                                    rate: 0.2,
-                                },
-                                Loot {
-                                    item: WorldObject::TimeFragment,
-                                    min: 1,
-                                    max: 1,
-                                    rate: 0.02,
-                                },
-                            ],
-                        })
-                        .insert(CombatShrineMob { parent_shrine: e });
-                }
+    for (e, t, mut shrine, mut anim) in shrines.iter_mut() {
+        if anim.current_frame() != 55 {
+            continue;
+        }
+        *anim = AsepriteAnimation::from(CombatShrineAnim::tags::DONE);
+
+        let target = shrine.num_mobs_left;
+        let possible_spawns = [Mob::Bushling, Mob::StingFly, Mob::SpikeSlime];
+        let mut rng = rand::thread_rng();
+        let mut spawned = 0usize;
+        let mut attempts = 0usize;
+        let max_attempts = target.saturating_mul(12).max(12);
+
+        while spawned < target && attempts < max_attempts {
+            attempts += 1;
+            let offset = Vec2::new(rng.gen_range(-3. ..=3.), rng.gen_range(-3. ..=3.))
+                * Vec2::splat(TILE_SIZE.x);
+            let spawn_pos = t.translation().truncate() + offset;
+            let choice_mob = rng.gen_range(0..possible_spawns.len());
+            if let Some(mob) = proto_param.proto_commands.spawn_from_proto(
+                possible_spawns[choice_mob].clone(),
+                &proto_param.prototypes,
+                spawn_pos,
+            ) {
+                spawned += 1;
+                commands.entity(mob).insert(EliteMob);
+                proto_param
+                    .proto_commands
+                    .commands()
+                    .entity(mob)
+                    .insert(CombatAlignment::Hostile)
+                    .insert(LootTable {
+                        drops: vec![
+                            Loot {
+                                item: WorldObject::Coin,
+                                min: 1,
+                                max: 1,
+                                rate: 0.2,
+                            },
+                            Loot {
+                                item: WorldObject::TimeFragment,
+                                min: 1,
+                                max: 1,
+                                rate: 0.02,
+                            },
+                        ],
+                    })
+                    .insert(CombatShrineMob {
+                        parent_shrine: e,
+                        shrine_tile_pos: shrine.tile_pos,
+                    });
             }
         }
+        shrine.num_mobs_left = spawned;
+        mob_counts
+            .remaining
+            .insert(shrine.tile_pos, spawned);
     }
 }
 
@@ -108,58 +136,110 @@ pub fn enhance_combat_shrine_mobs(
     }
 }
 
+fn complete_combat_shrine(
+    tile_pos: TileMapPosition,
+    shrine_entity: Option<Entity>,
+    shrines: &mut Query<
+        (
+            Entity,
+            &GlobalTransform,
+            &mut CombatShrine,
+            &mut AsepriteAnimation,
+        ),
+    >,
+    proto_commands: &mut ProtoCommands,
+    proto: &ProtoParam,
+    commands: &mut Commands,
+    game: &mut GameParam,
+    minimap_event: &mut EventWriter<UpdateMiniMapEvent>,
+) {
+    let drop_list = [
+        WorldObject::ChestBlock,
+        WorldObject::HeirloomChest,
+        WorldObject::Coin,
+    ];
+    let mut rng = rand::thread_rng();
+    let picked_drop = *drop_list.iter().choose(&mut rng).unwrap();
+    let count = match picked_drop {
+        WorldObject::Coin => rng.gen_range(34..53),
+        _ => 1,
+    };
+
+    let reward_pos = if let Some(shrine_e) = shrine_entity {
+        if let Ok((_, t, _, _)) = shrines.get(shrine_e) {
+            t.translation().truncate() + Vec2::new(0., -26.)
+        } else {
+            crate::world::world_helpers::tile_pos_to_world_pos(tile_pos, false)
+                + Vec2::new(0., -26.)
+        }
+    } else {
+        crate::world::world_helpers::tile_pos_to_world_pos(tile_pos, false)
+            + Vec2::new(0., -26.)
+    };
+
+    proto_commands.spawn_item_from_proto(
+        picked_drop,
+        proto,
+        reward_pos,
+        count,
+        Some(game.get_player_level()),
+    );
+
+    if let Some(shrine_e) = shrine_entity {
+        if let Ok((_, _, _, mut anim)) = shrines.get_mut(shrine_e) {
+            commands
+                .entity(shrine_e)
+                .insert(WorldObject::CombatShrineDone)
+                .remove::<ObjectAction>();
+            *anim = AsepriteAnimation::from(CombatShrineAnim::tags::DONE);
+        }
+    }
+
+    game.add_object_to_chunk_cache(tile_pos, WorldObject::CombatShrineDone);
+    minimap_event.send(UpdateMiniMapEvent {
+        pos: Some(tile_pos),
+        new_tile: Some(WorldObject::CombatShrineDone),
+    });
+}
+
 pub fn handle_shrine_rewards(
     mut shrine_mob_event: EventReader<CombatShrineMobDeathEvent>,
-    mut shrines: Query<(
-        Entity,
-        &GlobalTransform,
-        &mut CombatShrine,
-        &mut AsepriteAnimation,
-    )>,
+    mut shrines: Query<
+        (
+            Entity,
+            &GlobalTransform,
+            &mut CombatShrine,
+            &mut AsepriteAnimation,
+        ),
+    >,
     mut proto_commands: ProtoCommands,
     proto: ProtoParam,
     mut commands: Commands,
     mut game: GameParam,
     mut minimap_event: EventWriter<UpdateMiniMapEvent>,
+    mut mob_counts: ResMut<CombatShrineMobCounts>,
 ) {
     for event in shrine_mob_event.iter() {
-        if let Ok((e, t, mut shrine, mut anim)) = shrines.get_mut(event.0) {
-            shrine.num_mobs_left -= 1;
-            let drop_list = [
-                WorldObject::ChestBlock,
-                WorldObject::HeirloomChest,
-                WorldObject::Coin,
-            ];
-            if shrine.num_mobs_left == 0 {
-                // give rewards
-                let mut rng = rand::thread_rng();
-                let picked_drop = *drop_list.iter().choose(&mut rng).unwrap();
-                let count = match picked_drop {
-                    WorldObject::Coin => rng.gen_range(34..53),
-                    _ => 1,
-                };
-                proto_commands.spawn_item_from_proto(
-                    picked_drop,
-                    &proto,
-                    t.translation().truncate() + Vec2::new(0., -26.), // offset so it doesn't spawn on the shrine
-                    count,
-                    Some(game.get_player_level()),
-                );
-                commands
-                    .entity(e)
-                    .insert(WorldObject::CombatShrineDone)
-                    .remove::<ObjectAction>();
-                *anim = AsepriteAnimation::from(CombatShrineAnim::tags::DONE);
-                // Use the stored tile position instead of recalculating
-                game.add_object_to_chunk_cache(shrine.tile_pos, WorldObject::CombatShrineDone);
-
-                // Update minimap to reflect the shrine is now "Done"
-                minimap_event.send(UpdateMiniMapEvent {
-                    pos: Some(shrine.tile_pos),
-                    new_tile: Some(WorldObject::CombatShrineDone),
-                });
-            }
+        let Some(remaining) = mob_counts.remaining.get_mut(&event.tile_pos) else {
+            continue;
+        };
+        *remaining = remaining.saturating_sub(1);
+        if *remaining > 0 {
+            continue;
         }
+        mob_counts.remaining.remove(&event.tile_pos);
+
+        let shrine_entity = shrines.get(event.shrine).ok().map(|(e, _, _, _)| e);
+        complete_combat_shrine(
+            event.tile_pos,
+            shrine_entity,
+            &mut shrines,
+            &mut proto_commands,
+            &proto,
+            &mut commands,
+            &mut game,
+            &mut minimap_event,
+        );
     }
 }
 
@@ -171,7 +251,6 @@ pub fn add_shrine_visuals_on_spawn(
     graphics: Res<Graphics>,
 ) {
     for (e, obj, t) in new_shrines.iter() {
-        // Safety check: ensure entity still exists before inserting components
         let Some(mut entity_commands) = commands.get_entity(e) else {
             continue;
         };

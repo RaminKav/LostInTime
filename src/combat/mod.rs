@@ -911,7 +911,10 @@ pub fn handle_hits(
                     if let Some(parent_shrine) = shrine_option {
                         hit_outcome
                             .combat_shrine_mob_death
-                            .send(CombatShrineMobDeathEvent(parent_shrine.parent_shrine));
+                            .send(CombatShrineMobDeathEvent {
+                                shrine: parent_shrine.parent_shrine,
+                                tile_pos: parent_shrine.shrine_tile_pos,
+                            });
                     }
 
                     if let Some(parent_shrine) = dungeon_shrine_option {

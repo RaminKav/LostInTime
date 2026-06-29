@@ -631,6 +631,11 @@ impl BreakDropFilter {
             self.0.remove(&obj);
         }
     }
+
+    /// When the filter list is non-empty, blocked materials should not be picked up from the ground.
+    pub fn blocks_ground_pickup(&self, obj: WorldObject) -> bool {
+        !self.0.is_empty() && self.is_blocked(obj)
+    }
 }
 
 /// Whether the drop-filter side panel (right of inventory) is visible.

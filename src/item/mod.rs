@@ -51,7 +51,7 @@ use bevy::utils::HashMap;
 use bevy_proto::prelude::{ProtoCommands, Prototypes, ReflectSchematic, Schematic};
 use combat_shrine::{
     add_shrine_visuals_on_spawn, enhance_combat_shrine_mobs, handle_combat_shrine_activate_animation,
-    handle_shrine_rewards, CombatShrineMobDeathEvent,
+    handle_shrine_rewards, CombatShrineMobCounts, CombatShrineMobDeathEvent,
 };
 use dungeon_shrine::{
     add_dungeon_shrine_visuals_on_spawn, handle_dungeon_shrine_activation,
@@ -1550,6 +1550,7 @@ impl Plugin for ItemsPlugin {
         app.insert_resource(WorldObjectResource::new())
             .init_resource::<BossSummonTracker>()
             .init_resource::<BreakDropFilter>()
+            .init_resource::<CombatShrineMobCounts>()
             .insert_resource(AmmoMemory::default())
             .init_resource::<BridgePlacementMode>()
             .add_event::<PlaceItemEvent>()

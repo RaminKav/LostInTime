@@ -16,7 +16,8 @@ use crate::{
     client::analytics::{AnalyticsTrigger, AnalyticsUpdateEvent},
     enemy::{Mob, MobIsAttacking},
     inventory::{
-        can_auto_equip_weapon_on_pickup, try_auto_equip_weapon_on_pickup, Inventory, ItemStack,
+        can_auto_equip_weapon_on_pickup, try_auto_equip_weapon_on_pickup, BreakDropFilter,
+        Inventory, ItemStack,
     },
     item::{
         item_actions::ItemActionParam,
@@ -802,6 +803,7 @@ pub fn check_item_drop_collisions(
     mut global_text_events: EventWriter<GlobalTextMessageEvent>,
     proto: ProtoParam,
     mut beastiary: ResMut<crate::player::beastiary::Beastiary>,
+    break_drop_filter: Res<BreakDropFilter>,
 ) {
     let player_txfm = player.single();
     let player_pos = player_txfm.translation.truncate();
@@ -813,6 +815,10 @@ pub fn check_item_drop_collisions(
         }
         let item_stack = item_stack.clone();
         let obj = item_stack.obj_type;
+        if break_drop_filter.blocks_ground_pickup(obj) {
+            commands.entity(e2).despawn_recursive();
+            continue;
+        }
         // Bestiary mob cards: never enter inventory, just bump the persistent
         // bestiary count (live + on disk) and despawn. No fly-to-HUD.
         if let Some(mob) = crate::player::beastiary::mob_for_card(obj) {

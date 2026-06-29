@@ -2,7 +2,7 @@ use bevy::prelude::*;
 
 use crate::{
     attributes::PickupRange,
-    inventory::{player_can_accept_ground_item_pickup, Inventory, ItemStack},
+    inventory::{player_can_accept_ground_item_pickup, BreakDropFilter, Inventory, ItemStack},
     item::{object_actions::TouchTriggerObjectAction, ItemDrop},
     pets::state::Pet,
     player::{skills::PlayerSkills, Player},
@@ -72,6 +72,7 @@ pub fn mark_items_in_pickup_range(
     inv: Query<&Inventory, With<Player>>,
     pets: Query<(), With<Pet>>,
     proto: ProtoParam,
+    break_drop_filter: Res<BreakDropFilter>,
 ) {
     let Ok((player_transform, pickup_radius)) = player_query.get_single() else {
         return;
@@ -85,6 +86,13 @@ pub fn mark_items_in_pickup_range(
     let pickup_range = pickup_radius.0;
 
     for (item_entity, item_transform, item_stack) in item_query.iter() {
+        if break_drop_filter.blocks_ground_pickup(item_stack.obj_type) {
+            let item_pos = item_transform.translation.truncate();
+            if player_pos.distance(item_pos) <= pickup_range {
+                commands.entity(item_entity).despawn_recursive();
+            }
+            continue;
+        }
         if !player_can_accept_ground_item_pickup(item_stack, inv, player_has_pet, &proto) {
             continue;
         }
@@ -110,6 +118,7 @@ pub fn handle_item_pickup_radius(
     mut commands: Commands,
     time: Res<Time>,
     proto: ProtoParam,
+    break_drop_filter: Res<BreakDropFilter>,
 ) {
     let Ok(player_transform) = player_query.get_single() else {
         return;
@@ -122,6 +131,10 @@ pub fn handle_item_pickup_radius(
     let player_pos = player_transform.translation.truncate();
 
     for (item_entity, mut item_transform, mut pull_state, item_stack) in item_query.iter_mut() {
+        if break_drop_filter.blocks_ground_pickup(item_stack.obj_type) {
+            commands.entity(item_entity).despawn_recursive();
+            continue;
+        }
         if !player_can_accept_ground_item_pickup(item_stack, inv, player_has_pet, &proto) {
             commands.entity(item_entity).remove::<BeingPulledToPlayer>();
             continue;
@@ -200,6 +213,7 @@ pub fn handle_magnet_pull(
     mut commands: Commands,
     time: Res<Time>,
     proto: ProtoParam,
+    break_drop_filter: Res<BreakDropFilter>,
 ) {
     let Ok((mut magnet_timer, player_skills)) = magnet_timer_query.get_single_mut() else {
         return;
@@ -222,6 +236,9 @@ pub fn handle_magnet_pull(
         magnet_timer.duration_timer.reset();
 
         for (item_entity, item_stack) in item_query.iter() {
+            if break_drop_filter.blocks_ground_pickup(item_stack.obj_type) {
+                continue;
+            }
             if !player_can_accept_ground_item_pickup(item_stack, inv, player_has_pet, &proto) {
                 continue;
             }

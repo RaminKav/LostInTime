@@ -84,8 +84,8 @@ pub const Z_DEPTH_HEIRLOOM_SKILL_CHOICE_OVERLAY: f32 = 52.0;
 pub const Z_DEPTH_HEIRLOOM_SKILL_CHOICE_CONTENT: f32 = 54.0;
 /// Reroll/banish count labels (slightly in front of sibling UI on the same screen).
 pub const Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND: f32 = 58.0;
-/// HP/mana orb HUD + tracker tooltips (above skill-choice overlays and options menu, below world markers).
-pub const Z_DEPTH_HUD_ORB_TRACKERS_FOREGROUND: f32 = 95.0;
+/// HP/mana orb HUD + tracker tooltips (above skill-choice heirloom cards at ~194, below world markers).
+pub const Z_DEPTH_HUD_ORB_TRACKERS_FOREGROUND: f32 = 200.0;
 /// HUD heirloom icons during normal play: above the XP/currency row, below inventory/shrine overlays (z ≈ 9+).
 pub const Z_DEPTH_HUD_HEIRLOOM_ICONS: f32 = 8.0;
 /// HUD heirloom icons when they must render above full-screen overlays (e.g. game over at z ≈ 58).
