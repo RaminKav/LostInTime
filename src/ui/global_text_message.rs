@@ -18,7 +18,7 @@ use super::{
 };
 
 const MESSAGE_DISPLAY_SECS: f32 = 5.;
-const TOP_MARGIN: f32 = 80.0;
+const TOP_MARGIN: f32 = 140.0;
 
 /// Matches tutorial / contextual tip panels in [`super::tutorial_ui`].
 const MESSAGE_PANEL_COLOR: Color = Color::rgba(0.15, 0.12, 0.10, 0.75);

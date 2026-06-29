@@ -550,6 +550,51 @@ Heirlooms:
 - [New Heirloom] Cherry Bomb: Uncommon, cost 2 mana, attacks have +25% chance to lob a cherry bomb.
 - [New Heirloom] Impact Rune: Uncommon, costs 3 mana, skill damage triggers a small explosion, damage and mana cost scale with more copies
 
+## 0.25.0
+
+## Features
+
+- New Enemy: **Void Worm**: Spawns in endless mode after a few minutes, slow but menacing. Shoots a laser beam. Goodluck.
+- Rarity-colored **outlines** on the in-game cursor and heirloom icons (HUD, tooltips, choice cards)
+
+## Art
+
+- Achievements UI upgrade!
+- New Time Crystal (meta currency) icon
+- Stone Golem visual refresh + new **wave pillar** attack pattern
+- Slight art color tweaks for some skills
+
+## Balance
+
+- Buff boss base HP: Mush king, Scorpion, and Blake Boulder
+- Nerf Hunter class passive: +2% crit chance per level (was +3%)
+- **Dungeon buffs:** 30% elite spawn rate, 2× chaos mob scaling inside the dungeon, and bonus mini-waves keep cycling while Stone Golems are still alive
+- **Combat shrines** are harder: spawned mobs are always elite, move 25% faster, and use the red endless-mode tint
+- Nerf [Lightning Ring]: +10% on-kill lightning chance per stack (was +15%)
+- Reduced max-HP penalties on several ancestor blessings (Plasma Weapon / Laser Beam, Random Rare Equipment, etc.)
+- Boss shrine re-summon scaling for Scorpion: Added Scorpion-specific mechanics (extra projectile waves, faster tornadoe spawns, longer lunges)
+
+## Quality of Life
+
+- Separate **Global / Music / SFX volume** sliders in Options
+- **Shift + click** a crafting recipe input to craft the maximum amount in one action
+- Click an item in inventory to **consume** it (when consumable)
+- **Double cursor size** option in Settings
+- Small decorative world objects (flowers, mushrooms, dead saplings, etc.) now **break when hit** by weapons and projectiles
+- Clearer chaos-ancestor blessing descriptions on the totem
+- Small UI polish across tooltips, unlocks, bestiary browser, class selection, and time-crystal browser
+- Moved Global text messages like "Find the Boss Shrine" much lower on the screen
+
+## Bug Fixes
+
+- Fixed combat shrine rewards / minimap not updating when the shrine entity despawned with its chunk
+- Fixed filtered materials still being pickable off the ground
+- Fixed [Poison Sceptor] firing on non-damage triggers
+- Fixed [Dragon Eye] echo not triggering with some self-dmg sources
+- Poison damage no longer applies knockback
+- Fixed Blake Boulder y-sort / z-depth layering
+- Fixed merchant shop soft-lock when spamming interact (F)
+
 ## 0.24.0
 
 ## Features
