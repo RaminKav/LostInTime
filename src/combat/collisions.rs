@@ -220,18 +220,29 @@ fn check_melee_hit_collisions(
         }
     }
 }
+fn is_touch_trigger_chest(action: &TouchTriggerObjectAction) -> bool {
+    matches!(
+        action,
+        TouchTriggerObjectAction::ItemChest | TouchTriggerObjectAction::HeirloomChest
+    )
+}
+
 fn check_projectile_hit_mob_collisions(
     mut commands: Commands,
     player_attack: Query<(Entity, &Children), With<Player>>,
     allowed_targets: Query<
-        (Entity, &GlobalTransform, Option<&WorldObject>),
+        (
+            Entity,
+            &GlobalTransform,
+            Option<&WorldObject>,
+            Option<&TouchTriggerObjectAction>,
+        ),
         (
             Without<ItemStack>,
             Without<MainHand>,
             Without<Projectile>,
-            Without<Pet>,                      // Don't hit pets
-            Without<TouchTriggerObjectAction>, // Don't hit bounce flowers etc.
-            Without<WaterCollider>,            // Don't hit water tile colliders
+            Without<Pet>, // Don't hit pets
+            Without<WaterCollider>, // Don't hit water tile colliders
         ),
     >,
     mut hit_event: EventWriter<HitEvent>,
@@ -293,6 +304,12 @@ fn check_projectile_hit_mob_collisions(
             if player_e == *e2 || children.contains(e2) || !allowed_targets.contains(*e2) {
                 continue;
             }
+            let Ok((_, _, _, hit_touch_trigger)) = allowed_targets.get(*e2) else {
+                continue;
+            };
+            if hit_touch_trigger.is_some_and(is_touch_trigger_chest) {
+                continue;
+            }
             if state.hit_entities.contains(e2) {
                 continue;
             }
@@ -342,7 +359,7 @@ fn check_projectile_hit_mob_collisions(
             if is_status_effected && game.has_skill(Heirloom::TeleportStatusDMG) {
                 damage = f32::ceil(damage as f32 * 1.2) as u32;
             }
-            let (_e, hit_txfm, hit_world_obj) = allowed_targets.get(*e2).unwrap();
+            let (_e, hit_txfm, hit_world_obj, _) = allowed_targets.get(*e2).unwrap();
             let enemy_pos = hit_txfm.translation().truncate();
             // Note: SpearAttack gravity pull is now handled proactively in handle_spear_pull_delay
             // The SpearAttack component is still used to identify the damage source
@@ -450,13 +467,12 @@ fn check_multihit_projectile_ongoing_collisions(
     mut commands: Commands,
     player_attack: Query<(Entity, &Children), With<Player>>,
     allowed_targets: Query<
-        (Entity, &GlobalTransform),
+        (Entity, &GlobalTransform, Option<&TouchTriggerObjectAction>),
         (
             Without<ItemStack>,
             Without<MainHand>,
             Without<Projectile>,
             Without<Pet>,
-            Without<TouchTriggerObjectAction>,
             Without<WaterCollider>, // Don't hit water tile colliders
         ),
     >,
@@ -519,6 +535,12 @@ fn check_multihit_projectile_ongoing_collisions(
                     {
                         continue;
                     }
+                    let Ok((_, _, hit_touch_trigger)) = allowed_targets.get(target_e) else {
+                        continue;
+                    };
+                    if hit_touch_trigger.is_some_and(is_touch_trigger_chest) {
+                        continue;
+                    }
 
                     // Only process if not already in hit_entities (to avoid duplicate hits in same frame)
                     if state.hit_entities.contains(&target_e) {
@@ -565,7 +587,7 @@ fn check_multihit_projectile_ongoing_collisions(
                         damage = f32::ceil(damage as f32 * 1.2) as u32;
                     }
 
-                    let (_e, hit_txfm) = allowed_targets.get(target_e).unwrap();
+                    let (_e, hit_txfm, _) = allowed_targets.get(target_e).unwrap();
                     let enemy_pos = hit_txfm.translation().truncate();
 
                     // Note: SpearAttack gravity pull is now handled proactively in handle_spear_pull_delay
@@ -955,12 +977,6 @@ pub fn check_item_drop_collisions(
         });
         commands.spawn(SoundSpawner::new(AudioSoundEffect::ItemPickup, 0.15));
     }
-}
-fn is_touch_trigger_chest(action: &TouchTriggerObjectAction) -> bool {
-    matches!(
-        action,
-        TouchTriggerObjectAction::ItemChest | TouchTriggerObjectAction::HeirloomChest
-    )
 }
 
 pub fn check_object_trigger_collisions(

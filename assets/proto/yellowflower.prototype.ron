@@ -3,6 +3,8 @@
   templates: ["world_object.prototype.ron"],
   schematics: {
   "survival_rogue_like::item::WorldObject": YellowFlower,
+  "survival_rogue_like::proto::ColliderProto": (x: 4.5, y: 4.5),
+  "survival_rogue_like::proto::SensorProto": (),
   "survival_rogue_like::attributes::MaxHealth": (1),
   "survival_rogue_like::player::levels::ExperienceReward": (5),
   "survival_rogue_like::world::y_sort::YSort": (-0.01),
