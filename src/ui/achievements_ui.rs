@@ -4,7 +4,10 @@ use bevy::render::view::RenderLayers;
 use bevy::sprite::Anchor;
 use strum::IntoEnumIterator;
 
-use super::{ui_helpers, Interactable, Interaction, MenuButton, UIElement, UIState};
+use super::{
+    main_menu::spawn_exit_icon_button,
+    ui_helpers, Interactable, Interaction, MenuButton, UIElement, UIState,
+};
 
 use crate::{
     animations::enemy_sprites::spawn_attack_warning_aseprite,
@@ -180,7 +183,12 @@ pub fn setup_achievements_ui(
 ) {
     pagination.page = 0;
 
-    let overlay = ui_helpers::spawn_full_screen_ui_overlay(&mut commands, &resolution, 0.9, 0.);
+    let overlay = ui_helpers::spawn_full_screen_ui_overlay(
+        &mut commands,
+        &resolution,
+        0.95,
+        ui_helpers::Z_DEPTH_MAIN_MENU_MODAL_OVERLAY,
+    );
     commands.entity(overlay).insert(AchievementsUI);
 
     commands.spawn((
@@ -603,21 +611,19 @@ pub fn setup_achievements_ui(
         .set_parent(achievements_bg);
     spawn_achievement_button_label(&mut commands, &asset_server, next_button, "Next");
 
-    let back_button = spawn_achievement_button(
+    let exit_button = spawn_exit_icon_button(
         Vec3::new(0., ACHIEVEMENT_BUTTON_Y, BUTTON_Z),
         &mut commands,
         &graphics,
     );
     commands
-        .entity(back_button)
+        .entity(exit_button)
         .insert((
             AchievementsUI,
             UIState::Achievements,
-            MenuButton::Back,
-            Name::new("Achievements Back Button"),
+            Name::new("Achievements Exit Button"),
         ))
         .set_parent(achievements_bg);
-    spawn_achievement_button_label(&mut commands, &asset_server, back_button, "BACK");
 }
 
 pub fn cleanup_achievements_ui(

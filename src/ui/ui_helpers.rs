@@ -78,6 +78,12 @@ impl Material2d for RadialOverlayMaterial {
 /// Typical full-screen UI overlays (inventory, shrines, class select, etc.) use z ≈ 9–15.
 /// Active skill hotbar: above those modals, below the heirloom pick screen.
 pub const Z_DEPTH_HUD_ACTIVE_SKILLS: f32 = 4.0;
+/// Bottom icon/text row on the main menu — must stay below [`Z_DEPTH_MAIN_MENU_MODAL_OVERLAY`].
+pub const Z_DEPTH_MAIN_MENU_BUTTONS: f32 = 1.0;
+/// Full-screen dim behind sub-menus opened from the main menu (achievements, archives, etc.).
+pub const Z_DEPTH_MAIN_MENU_MODAL_OVERLAY: f32 = 8.0;
+/// Panel/content root for those sub-menus (above the dim, below options/name-entry layers).
+pub const Z_DEPTH_MAIN_MENU_MODAL_CONTENT: f32 = 10.0;
 /// “Choose an Heirloom” screen only: backdrop above active skills, below HUD heirloom row.
 pub const Z_DEPTH_HEIRLOOM_SKILL_CHOICE_OVERLAY: f32 = 52.0;
 /// Root depth for title bar, cards, reroll/banish buttons on that screen.

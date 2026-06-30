@@ -33,8 +33,10 @@ use crate::{
         ClassUnlockData, UnlockedClasses,
     },
     ui::{
-        global_text_message::PendingEraAnnouncement, main_menu::GameStartFadein,
-        options_ui::CheatSettings, ui_helpers::spawn_full_screen_ui_overlay_tuned_colored,
+        global_text_message::PendingEraAnnouncement,
+        main_menu::GameStartFadein,
+        options_ui::CheatSettings,
+        ui_helpers::{spawn_full_screen_ui_overlay_tuned_colored, RADIAL_OVERLAY_DEFAULT_COLOR},
         MenuButton, UIElement, UIState,
     },
     world::{dimension::EraManager, portal::UIPortal},
@@ -228,10 +230,11 @@ pub fn setup_class_selection_ui(
     let overlay = spawn_full_screen_ui_overlay_tuned_colored(
         &mut commands,
         &res,
-        0.7,
+        0.95,
         0.99,
         9.,
-        Color::rgba(3. / 255., 6. / 255., 6. / 255., 1.),
+        // Color::rgba(3. / 255., 6. / 255., 6. / 255., 1.),
+        RADIAL_OVERLAY_DEFAULT_COLOR,
         0.45,
     );
 

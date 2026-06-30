@@ -14,8 +14,8 @@ use crate::{
         unlocks::{persist_unlock_data, UnlockUpgradeKind, UnlockUpgrades, UnlockedClasses},
     },
     ui::{
-        interactions::Interaction, spawn_back_button, spawn_item_stack_icon, ui_helpers,
-        Interactable, UIElement, UIState,
+        interactions::Interaction, main_menu::spawn_exit_icon_button, spawn_item_stack_icon,
+        ui_helpers, Interactable, UIElement, UIState,
     },
     ScreenResolution,
 };
@@ -334,12 +334,7 @@ pub fn setup_unlocks_ui(
     currency: Res<TimeFragmentCurrency>,
     upgrades: Res<UnlockUpgrades>,
 ) {
-    let overlay = ui_helpers::spawn_full_screen_ui_overlay(
-        &mut commands,
-        &resolution,
-        1.,
-        10.,
-    );
+    let overlay = ui_helpers::spawn_full_screen_ui_overlay(&mut commands, &resolution, 1., 10.);
     commands
         .entity(overlay)
         .insert(UnlocksUI)
@@ -358,7 +353,11 @@ pub fn setup_unlocks_ui(
             )
             .with_alignment(TextAlignment::Center),
             text_anchor: bevy::sprite::Anchor::Center,
-            transform: Transform::from_translation(Vec3::new(0., 104. + UNLOCKS_CONTENT_Y_OFFSET, 11.)),
+            transform: Transform::from_translation(Vec3::new(
+                0.,
+                104. + UNLOCKS_CONTENT_Y_OFFSET,
+                11.,
+            )),
             ..Default::default()
         },
         RenderLayers::from_layers(&[3]),
@@ -380,7 +379,11 @@ pub fn setup_unlocks_ui(
                 )
                 .with_alignment(TextAlignment::Left),
                 text_anchor: bevy::sprite::Anchor::CenterLeft,
-                transform: Transform::from_translation(Vec3::new(-160., 104.5 + UNLOCKS_CONTENT_Y_OFFSET, 11.)),
+                transform: Transform::from_translation(Vec3::new(
+                    -160.,
+                    104.5 + UNLOCKS_CONTENT_Y_OFFSET,
+                    11.,
+                )),
                 ..Default::default()
             },
             RenderLayers::from_layers(&[3]),
@@ -421,14 +424,9 @@ pub fn setup_unlocks_ui(
         );
     }
 
-    // Back Button
-    let back_button = spawn_back_button(
-        Vec3::new(0., -158., 11.),
-        &mut commands,
-        &graphics,
-        &asset_server,
-    );
-    commands.entity(back_button).insert(UnlocksUI);
+    // Exit button
+    let exit_button = spawn_exit_icon_button(Vec3::new(0., -158., 11.), &mut commands, &graphics);
+    commands.entity(exit_button).insert(UnlocksUI);
 }
 
 fn spawn_unlock_row(

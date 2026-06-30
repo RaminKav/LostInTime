@@ -2,7 +2,10 @@ use bevy::prelude::*;
 use bevy::render::view::RenderLayers;
 
 use crate::{
-    client::leaderboard::LeaderboardCache, colors::*, ui::inventory_ui::UIState, ScreenResolution,
+    client::leaderboard::LeaderboardCache,
+    colors::*,
+    ui::{inventory_ui::UIState, main_menu::MainMenuLeaderboardVisible},
+    ScreenResolution,
 };
 
 fn format_score(score: i32) -> String {
@@ -25,15 +28,23 @@ pub fn setup_leaderboard_ui(
     asset_server: Res<AssetServer>,
     resolution: Res<ScreenResolution>,
     cache: Res<LeaderboardCache>,
+    visible: Res<MainMenuLeaderboardVisible>,
     existing_query: Query<(), With<LeaderboardUI>>,
 ) {
-    info!("=== SETUP_LEADERBOARD_UI CALLED ===");
-
-    // Don't setup if UI already exists
-    if !existing_query.is_empty() {
-        info!("Leaderboard UI already exists, skipping setup");
+    if !visible.0 || !existing_query.is_empty() {
         return;
     }
+
+    spawn_leaderboard_panel(&mut commands, &asset_server, &resolution, &cache);
+}
+
+fn spawn_leaderboard_panel(
+    commands: &mut Commands,
+    asset_server: &AssetServer,
+    resolution: &ScreenResolution,
+    cache: &LeaderboardCache,
+) {
+    info!("=== SETUP_LEADERBOARD_UI CALLED ===");
 
     info!(
         "Cache state - is_loading: {}, entries: {}, has_error: {}",
@@ -90,11 +101,10 @@ pub fn setup_leaderboard_ui(
         Name::new("Leaderboard Title"),
     ));
 
-    // Spawn entry text entities (will be updated by update system)
     spawn_leaderboard_entries(
-        &mut commands,
-        &asset_server,
-        &cache,
+        commands,
+        asset_server,
+        cache,
         panel_x,
         panel_y,
         LEADERBOARD_PANEL_WIDTH,
@@ -389,5 +399,30 @@ pub fn cleanup_leaderboard_ui(mut commands: Commands, query: Query<Entity, With<
     }
     for entity in query.iter() {
         commands.entity(entity).despawn_recursive();
+    }
+}
+
+/// Show or hide the main-menu leaderboard panel according to [`MainMenuLeaderboardVisible`].
+pub fn sync_main_menu_leaderboard_ui(
+    mut commands: Commands,
+    visible: Res<MainMenuLeaderboardVisible>,
+    ui_state: Res<State<UIState>>,
+    existing: Query<Entity, With<LeaderboardUI>>,
+    asset_server: Res<AssetServer>,
+    resolution: Res<ScreenResolution>,
+    cache: Res<LeaderboardCache>,
+) {
+    if ui_state.0 != UIState::Closed {
+        return;
+    }
+
+    if visible.0 {
+        if existing.is_empty() {
+            spawn_leaderboard_panel(&mut commands, &asset_server, &resolution, &cache);
+        }
+    } else {
+        for entity in existing.iter() {
+            commands.entity(entity).despawn_recursive();
+        }
     }
 }

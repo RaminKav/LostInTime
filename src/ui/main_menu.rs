@@ -1,5 +1,6 @@
 use std::{
-    fs::{self, create_dir_all, File},
+    fs::{self, create_dir_all, File, OpenOptions},
+    io::{BufReader, BufWriter},
     process::exit,
 };
 
@@ -13,6 +14,7 @@ use crate::{
     assets::Graphics,
     audio::UpdateBGMTrackEvent,
     client::analytics::{connect_server, AnalyticsData},
+    client::GameData,
     colors::{overwrite_alpha, WHITE},
     combat::damage_tracker::{DamageTracker, MobStatTracker, PetAbilityStats},
     container::ContainerRegistry,
@@ -47,12 +49,12 @@ use crate::{
 
 use super::{
     essence_ui::EssenceShopCache,
+    game_fonts as gf,
     minimap::{FogOfWarData, MinimapTileCache},
     options_ui::{spawn_wipe_data_popup, OptionsUI, WipeDataPopup},
     player_hud::XpBarFadeIn,
     scrapper_ui::ScrapperEvent,
-    spawn_loading_overlay,
-    Interactable, UIElement,
+    spawn_loading_overlay, ui_helpers, Interactable, UIElement, KEYBIND_BADGE_COLOR,
 };
 
 #[derive(SystemParam)]
@@ -92,6 +94,8 @@ pub struct MenuButtonExtras<'w, 's> {
     options_ui: Query<'w, 's, Entity, With<OptionsUI>>,
     graphics: Res<'w, Graphics>,
     asset_server: Res<'w, AssetServer>,
+    leaderboard_visible: Option<ResMut<'w, MainMenuLeaderboardVisible>>,
+    game_data: Option<ResMut<'w, GameData>>,
 }
 
 #[derive(Component, Clone, Eq, Display, Debug, PartialEq)]
@@ -120,6 +124,8 @@ pub enum MenuButton {
     WipeGameData,
     WipeDataConfirm,
     WipeDataCancel,
+    Archive,
+    LeaderboardToggle,
 }
 #[derive(Component)]
 pub struct InfoModal;
@@ -140,27 +146,70 @@ pub struct AchievementsNotificationIcon;
 #[derive(Component)]
 pub struct GameStartFadein(pub Timer);
 
+/// Short hover label for 28×28 main-menu icon buttons (Archives, Achievements, etc.).
+#[derive(Component, Clone, Copy)]
+pub struct MainMenuIconTooltipText(pub &'static str);
+
+#[derive(Component)]
+pub struct MainMenuIconTooltip;
+
+#[derive(Component)]
+pub struct ArchivesUI;
+
+pub const MAIN_MENU_BG_SIZE: Vec2 = Vec2::new(714., 400.);
+pub const MAIN_MENU_ICON_BUTTON_SIZE: Vec2 = Vec2::new(28., 28.);
+const MAIN_MENU_WIDE_BUTTON_SIZE: Vec2 = Vec2::new(126., 22.);
+/// Distance from the bottom screen edge to the bottom of the icon button row.
+const MAIN_MENU_BOTTOM_INSET: f32 = 12.;
+const MAIN_MENU_EDGE_PADDING: f32 = 22.;
+const MAIN_MENU_ICON_GAP: f32 = 6.;
+
+/// Background container art size (`assets/ui/BackgroundContainer.png`).
+pub const ARCHIVES_CONTAINER_UI_SIZE: Vec2 = Vec2::new(162., 164.);
+
+const ARCHIVES_BUTTON_SPACING_Y: f32 = 30.;
+const ARCHIVES_EXIT_GAP_Y: f32 = 14.;
+
+/// Whether the compact leaderboard panel is visible on the main menu.
+#[derive(Resource, Clone, Copy, Debug, Default)]
+pub struct MainMenuLeaderboardVisible(pub bool);
+
+fn main_menu_button_row_y(game_height: f32) -> f32 {
+    -game_height * 0.5 + MAIN_MENU_BOTTOM_INSET + MAIN_MENU_ICON_BUTTON_SIZE.y * 0.5
+}
+
+fn main_menu_left_icon_x(game_width: f32, index: u32) -> f32 {
+    let first_center =
+        -game_width * 0.5 + MAIN_MENU_EDGE_PADDING + MAIN_MENU_ICON_BUTTON_SIZE.x * 0.5;
+    first_center + index as f32 * (MAIN_MENU_ICON_BUTTON_SIZE.x + MAIN_MENU_ICON_GAP)
+}
+
+fn main_menu_right_icon_x(game_width: f32, index_from_right: u32) -> f32 {
+    let quit_center =
+        game_width * 0.5 - MAIN_MENU_EDGE_PADDING - MAIN_MENU_ICON_BUTTON_SIZE.x * 0.5;
+    quit_center - index_from_right as f32 * (MAIN_MENU_ICON_BUTTON_SIZE.x + MAIN_MENU_ICON_GAP)
+}
+
 pub fn display_main_menu(
     mut commands: Commands,
     graphics: Res<Graphics>,
     mut bgm_track_event: EventWriter<UpdateBGMTrackEvent>,
-    res: Res<ScreenResolution>,
 ) {
     let mut menu = commands.spawn(SpriteBundle {
-        texture: graphics.get_ui_element_texture(UIElement::MainMenu),
+        texture: graphics.get_ui_element_texture(UIElement::MainMenuNew),
 
         transform: Transform {
-            translation: Vec3::new(0., 0., 0.),
+            translation: Vec3::new(16., 0., 0.),
             scale: Vec3::new(1., 1., 1.),
             ..Default::default()
         },
         sprite: Sprite {
-            custom_size: Some(Vec2::new(res.game_width, res.game_height)),
+            custom_size: Some(MAIN_MENU_BG_SIZE),
             ..Default::default()
         },
         ..Default::default()
     });
-    menu.insert(UIElement::MainMenu)
+    menu.insert(UIElement::MainMenuNew)
         .insert(MainMenu)
         .insert(RenderLayers::from_layers(&[3]))
         .insert(Name::new("Main Menu"));
@@ -236,6 +285,24 @@ pub fn handle_menu_button_click_events(
                 }
                 next_ui_state.set(UIState::Achievements);
                 extras.pagination_state.page = 0;
+            }
+            MenuButton::Archive => {
+                if info_modal_open {
+                    continue;
+                }
+                next_ui_state.set(UIState::Archives);
+            }
+            MenuButton::LeaderboardToggle => {
+                if info_modal_open {
+                    continue;
+                }
+                if let Some(mut visible) = extras.leaderboard_visible.as_mut() {
+                    visible.0 = !visible.0;
+                    persist_main_menu_leaderboard_visible(visible.0);
+                    if let Some(mut game_data) = extras.game_data.as_mut() {
+                        game_data.show_main_menu_leaderboard = Some(visible.0);
+                    }
+                }
             }
             MenuButton::TimeCrystals => {
                 if info_modal_open {
@@ -618,101 +685,433 @@ pub fn spawn_menu_button(
     button_e
 }
 
+pub fn spawn_main_menu_icon_button(
+    button_pos: Vec3,
+    button_type: MenuButton,
+    ui_element: UIElement,
+    tooltip: Option<&'static str>,
+    commands: &mut Commands,
+    graphics: &Graphics,
+) -> Entity {
+    let button_name = format!("Main Menu Icon Button: {:?}", button_type);
+    let mut button = commands.spawn((
+        SpriteBundle {
+            texture: graphics.get_ui_element_texture(ui_element.clone()),
+            sprite: Sprite {
+                custom_size: Some(MAIN_MENU_ICON_BUTTON_SIZE),
+                ..Default::default()
+            },
+            transform: Transform::from_translation(button_pos),
+            ..Default::default()
+        },
+        Interactable::default(),
+        ui_element,
+        button_type,
+        RenderLayers::from_layers(&[3]),
+        Name::new(button_name),
+    ));
+    if let Some(label) = tooltip {
+        button.insert(MainMenuIconTooltipText(label));
+    }
+    button.id()
+}
+
+/// Shared 28×28 exit icon used on main menu sub-screens (achievements, unlocks, bestiary, archives).
+pub fn spawn_exit_icon_button(
+    button_pos: Vec3,
+    commands: &mut Commands,
+    graphics: &Graphics,
+) -> Entity {
+    spawn_main_menu_icon_button(
+        button_pos,
+        MenuButton::Back,
+        UIElement::ExitButton,
+        None,
+        commands,
+        graphics,
+    )
+}
+
+pub fn init_main_menu_leaderboard_visibility(
+    mut visible: ResMut<MainMenuLeaderboardVisible>,
+    game_data: Option<Res<GameData>>,
+) {
+    visible.0 = game_data
+        .as_ref()
+        .and_then(|data| data.show_main_menu_leaderboard)
+        .unwrap_or(false);
+}
+
+pub fn persist_main_menu_leaderboard_visible(show: bool) {
+    let path = datafiles::game_data();
+    let mut game_data = if let Ok(file) = File::open(&path) {
+        let reader = BufReader::new(file);
+        GameData::try_from_json_reader(reader).unwrap_or_default()
+    } else {
+        GameData::default()
+    };
+    game_data.show_main_menu_leaderboard = Some(show);
+    if let Ok(file) = OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open(&path)
+    {
+        let writer = BufWriter::new(file);
+        if let Err(err) = serde_json::to_writer_pretty(writer, &game_data) {
+            error!("Failed to persist main-menu leaderboard visibility: {err:?}");
+        }
+    }
+}
+
+pub fn spawn_main_menu_wide_button(
+    button_pos: Vec3,
+    text: &str,
+    button_type: MenuButton,
+    ui_element: UIElement,
+    commands: &mut Commands,
+    graphics: &Graphics,
+    asset_server: &AssetServer,
+) -> Entity {
+    let button_e = commands
+        .spawn((
+            SpriteBundle {
+                texture: graphics.get_ui_element_texture(ui_element.clone()),
+                sprite: Sprite {
+                    custom_size: Some(MAIN_MENU_WIDE_BUTTON_SIZE),
+                    ..Default::default()
+                },
+                transform: Transform::from_translation(button_pos),
+                ..Default::default()
+            },
+            Interactable::default(),
+            ui_element,
+            button_type,
+            RenderLayers::from_layers(&[3]),
+            Name::new(format!("Main Menu Button: {}", text)),
+        ))
+        .id();
+
+    commands
+        .spawn(Text2dBundle {
+            text: Text::from_section(
+                text,
+                TextStyle {
+                    font: asset_server.load("fonts/alagard.ttf"),
+                    font_size: 15.0,
+                    color: WHITE,
+                },
+            )
+            .with_alignment(TextAlignment::Center),
+            text_anchor: Anchor::Center,
+            transform: Transform {
+                translation: Vec3::new(0., -1., 1.),
+                ..Default::default()
+            },
+            ..default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .set_parent(button_e);
+
+    button_e
+}
+
+fn main_menu_tooltip_backdrop_size(label: &str) -> Vec2 {
+    const TOOLTIP_PAD_X: f32 = 10.;
+    const TOOLTIP_PAD_Y: f32 = 5.;
+    const TOOLTIP_LINE_HEIGHT: f32 = 10.0;
+    const TOOLTIP_CHAR_WIDTH: f32 = 4.6;
+    let text_w = label.chars().count() as f32 * TOOLTIP_CHAR_WIDTH;
+    Vec2::new(
+        (text_w + TOOLTIP_PAD_X * 2.).max(28.),
+        TOOLTIP_LINE_HEIGHT + TOOLTIP_PAD_Y * 2.,
+    )
+}
+
+fn main_menu_tooltip_world_pos(icon_center: Vec3, size: Vec2) -> Vec3 {
+    Vec3::new(
+        icon_center.x,
+        icon_center.y + MAIN_MENU_ICON_BUTTON_SIZE.y * 0.5 + 4. + size.y * 0.5,
+        30.,
+    )
+}
+
+pub fn spawn_main_menu_icon_tooltip(
+    commands: &mut Commands,
+    asset_server: &AssetServer,
+    label: &str,
+    icon_center: Vec3,
+) -> Entity {
+    let size = main_menu_tooltip_backdrop_size(label);
+    let pos = main_menu_tooltip_world_pos(icon_center, size);
+
+    let root = commands
+        .spawn((
+            SpatialBundle::from_transform(Transform::from_translation(pos)),
+            RenderLayers::from_layers(&[3]),
+            MainMenuIconTooltip,
+            Name::new("Main Menu Icon Tooltip"),
+        ))
+        .id();
+
+    commands
+        .spawn(SpriteBundle {
+            sprite: Sprite {
+                color: KEYBIND_BADGE_COLOR,
+                custom_size: Some(size),
+                ..default()
+            },
+            ..default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .set_parent(root);
+
+    commands
+        .spawn(Text2dBundle {
+            text: Text::from_section(
+                label,
+                gf::ICON_HOVER_TOOLTIP.text_style(asset_server, WHITE),
+            )
+            .with_alignment(TextAlignment::Center),
+            text_anchor: Anchor::Center,
+            transform: Transform::from_translation(Vec3::new(0., 0., 1.)),
+            ..default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .set_parent(root);
+
+    root
+}
+
+pub fn handle_main_menu_icon_tooltips(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    cursor_pos: Res<crate::cursor::CursorPos>,
+    game_state: Res<State<GameState>>,
+    ui_state: Res<State<UIState>>,
+    ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
+    tooltip_targets: Query<(&GlobalTransform, &MainMenuIconTooltipText)>,
+    existing: Query<Entity, With<MainMenuIconTooltip>>,
+    mut last_hovered: Local<Option<Entity>>,
+) {
+    if game_state.0 != GameState::MainMenu || ui_state.0 != UIState::Closed {
+        for tooltip_e in existing.iter() {
+            commands.entity(tooltip_e).despawn_recursive();
+        }
+        *last_hovered = None;
+        return;
+    }
+
+    let hovered =
+        ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None).and_then(|(entity, _, _)| {
+            tooltip_targets
+                .get(entity)
+                .ok()
+                .map(|(transform, text)| (entity, transform.translation(), text.0))
+        });
+
+    let Some((entity, icon_center, label)) = hovered else {
+        for tooltip_e in existing.iter() {
+            commands.entity(tooltip_e).despawn_recursive();
+        }
+        *last_hovered = None;
+        return;
+    };
+
+    if *last_hovered == Some(entity) {
+        return;
+    }
+
+    for tooltip_e in existing.iter() {
+        commands.entity(tooltip_e).despawn_recursive();
+    }
+
+    spawn_main_menu_icon_tooltip(&mut commands, &asset_server, label, icon_center);
+
+    *last_hovered = Some(entity);
+}
+
+pub fn setup_archives_ui(
+    mut commands: Commands,
+    graphics: Res<Graphics>,
+    asset_server: Res<AssetServer>,
+    resolution: Res<ScreenResolution>,
+) {
+    let overlay = ui_helpers::spawn_full_screen_ui_overlay(
+        &mut commands,
+        &resolution,
+        0.95,
+        ui_helpers::Z_DEPTH_MAIN_MENU_MODAL_OVERLAY,
+    );
+    commands.entity(overlay).insert(ArchivesUI);
+
+    let archives_root = commands
+        .spawn((
+            SpatialBundle {
+                transform: Transform::from_translation(Vec3::new(
+                    0.,
+                    0.,
+                    ui_helpers::Z_DEPTH_MAIN_MENU_MODAL_CONTENT,
+                )),
+                ..Default::default()
+            },
+            ArchivesUI,
+            UIState::Archives,
+            RenderLayers::from_layers(&[3]),
+            Name::new("Archives UI"),
+        ))
+        .id();
+
+    commands
+        .spawn(SpriteBundle {
+            texture: graphics.get_ui_element_texture(UIElement::BackgroundContainer),
+            sprite: Sprite {
+                custom_size: Some(ARCHIVES_CONTAINER_UI_SIZE),
+                ..Default::default()
+            },
+            transform: Transform::from_translation(Vec3::new(0., 0., 1.)),
+            ..Default::default()
+        })
+        .insert(ArchivesUI)
+        .insert(UIState::Archives)
+        .insert(RenderLayers::from_layers(&[3]))
+        .set_parent(archives_root);
+
+    let button_entries: [(&str, MenuButton); 3] = [
+        ("Bestiary", MenuButton::Beastiary),
+        ("Time Crystals", MenuButton::TimeCrystals),
+        ("Unlocks", MenuButton::Unlocks),
+    ];
+    let top_y = ARCHIVES_BUTTON_SPACING_Y;
+    for (i, (label, button_type)) in button_entries.iter().enumerate() {
+        let y = top_y - i as f32 * ARCHIVES_BUTTON_SPACING_Y;
+        let button = spawn_main_menu_wide_button(
+            Vec3::new(0., y, 2.),
+            label,
+            button_type.clone(),
+            UIElement::MainMenuStartButton,
+            &mut commands,
+            &graphics,
+            &asset_server,
+        );
+        commands
+            .entity(button)
+            .insert(ArchivesUI)
+            .insert(UIState::Archives)
+            .set_parent(archives_root);
+    }
+
+    let exit_y = top_y
+        - 2. * ARCHIVES_BUTTON_SPACING_Y
+        - ARCHIVES_EXIT_GAP_Y
+        - MAIN_MENU_ICON_BUTTON_SIZE.y * 0.5
+        - MAIN_MENU_WIDE_BUTTON_SIZE.y * 0.5;
+    let exit_button = spawn_main_menu_icon_button(
+        Vec3::new(0., exit_y, 2.),
+        MenuButton::Back,
+        UIElement::ExitButton,
+        None,
+        &mut commands,
+        &graphics,
+    );
+    commands
+        .entity(exit_button)
+        .insert(ArchivesUI)
+        .insert(UIState::Archives)
+        .set_parent(archives_root);
+}
+
+pub fn cleanup_archives_ui(mut commands: Commands, archives_ui: Query<Entity, With<ArchivesUI>>) {
+    for entity in archives_ui.iter() {
+        commands.entity(entity).despawn_recursive();
+    }
+}
+
 pub fn spawn_menu_text_buttons(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     graphics: Res<Graphics>,
+    resolution: Res<ScreenResolution>,
 ) {
-    // Start Button
-    spawn_menu_button(
-        Vec3::new(22., -38., 1.),
-        Vec3::new(-19., -1., 1.),
-        "Start ",
-        MenuButton::Start,
-        Vec2::new(60., 18.),
+    let row_y = main_menu_button_row_y(resolution.game_height);
+    let button_z = ui_helpers::Z_DEPTH_MAIN_MENU_BUTTONS;
+
+    spawn_main_menu_icon_button(
+        Vec3::new(
+            main_menu_left_icon_x(resolution.game_width, 0),
+            row_y,
+            button_z,
+        ),
+        MenuButton::Archive,
+        UIElement::MainMenuArchiveButton,
+        Some("Archives"),
         &mut commands,
         &graphics,
-        &asset_server,
-        UIElement::MenuButton,
     );
 
-    // Unlocks Button
-    spawn_menu_button(
-        Vec3::new(-14., -62.5, 1.),
-        Vec3::new(-29., -0.5, 1.),
-        "Unlocks",
-        MenuButton::Unlocks,
-        Vec2::new(84., 18.),
-        &mut commands,
-        &graphics,
-        &asset_server,
-        UIElement::UnlocksButton,
-    );
-
-    // Achievements Button
-    let achievements_button = spawn_menu_button(
-        Vec3::new(-22., -86., 1.),
-        Vec3::new(-50., -0., 1.),
-        "Achievements",
+    let achievements_button = spawn_main_menu_icon_button(
+        Vec3::new(
+            main_menu_left_icon_x(resolution.game_width, 1),
+            row_y,
+            button_z,
+        ),
         MenuButton::Achievements,
-        Vec2::new(118., 18.),
+        UIElement::MainMenuAchievementsButton,
+        Some("Achievements"),
         &mut commands,
         &graphics,
-        &asset_server,
-        UIElement::AchievementsButton,
     );
     commands
         .entity(achievements_button)
         .insert(AchievementsButton);
 
-    spawn_menu_button(
-        Vec3::new(-34., -112., 1.),
-        Vec3::new(-50., -0., 1.),
-        "Time Crystals",
-        MenuButton::TimeCrystals,
-        Vec2::new(118., 18.),
+    spawn_main_menu_icon_button(
+        Vec3::new(
+            main_menu_left_icon_x(resolution.game_width, 2),
+            row_y,
+            button_z,
+        ),
+        MenuButton::LeaderboardToggle,
+        UIElement::LeaderboardButton,
+        Some("Leaderboard"),
+        &mut commands,
+        &graphics,
+    );
+
+    spawn_main_menu_wide_button(
+        Vec3::new(0., row_y, button_z),
+        "Enter",
+        MenuButton::Start,
+        UIElement::MainMenuStartButton,
         &mut commands,
         &graphics,
         &asset_server,
-        UIElement::AchievementsButton,
     );
 
-    spawn_menu_button(
-        Vec3::new(-44., -138., 1.),
-        Vec3::new(-30., -0., 1.),
-        "Bestiary",
-        MenuButton::Beastiary,
-        Vec2::new(118., 18.),
-        &mut commands,
-        &graphics,
-        &asset_server,
-        UIElement::AchievementsButton,
-    );
-
-    // Options Button
-    spawn_menu_button(
-        Vec3::new(130., -159., 1.),
-        Vec3::new(-27., 0.0, 1.),
-        "Options",
-        MenuButton::Options,
-        Vec2::new(60., 18.),
-        &mut commands,
-        &graphics,
-        &asset_server,
-        UIElement::MenuButton,
-    );
-
-    // Quit Button
-    spawn_menu_button(
-        Vec3::new(-82., -159., 1.),
-        Vec3::new(-14., -0., 1.),
-        "Quit",
+    spawn_main_menu_icon_button(
+        Vec3::new(
+            main_menu_right_icon_x(resolution.game_width, 0),
+            row_y,
+            button_z,
+        ),
         MenuButton::Quit,
-        Vec2::new(60., 18.),
+        UIElement::ExitButton,
+        Some("Quit"),
         &mut commands,
         &graphics,
-        &asset_server,
-        UIElement::MenuButton,
+    );
+
+    spawn_main_menu_icon_button(
+        Vec3::new(
+            main_menu_right_icon_x(resolution.game_width, 1),
+            row_y,
+            button_z,
+        ),
+        MenuButton::Options,
+        UIElement::MainMenuOptionsButton,
+        Some("Options"),
+        &mut commands,
+        &graphics,
     );
 }
 
@@ -827,7 +1226,7 @@ pub fn update_achievements_notification_icon(
         let icon = spawn_attack_warning_aseprite(
             &mut commands,
             &asset_server,
-            Vec3::new(55., -1., 1.), // Position relative to button
+            Vec3::new(10., 8., 1.), // Position relative to button
             button_entity,
             999999.0, // Very long duration
         );

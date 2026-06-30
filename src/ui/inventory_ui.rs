@@ -124,6 +124,8 @@ pub enum UIState {
     TimeCrystalsBrowser,
     /// Main-menu bestiary browser: 3x3 grid of mob cards plus a detail panel.
     BeastiaryBrowser,
+    /// Main-menu archive modal: bestiary / time crystals / unlocks shortcuts.
+    Archives,
 }
 impl UIState {
     pub fn is_inv_open(&self) -> bool {

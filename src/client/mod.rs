@@ -267,6 +267,9 @@ pub struct GameData {
     >,
     #[serde(default)]
     pub beastiary: Beastiary,
+    /// Whether the main-menu leaderboard panel is shown (persisted).
+    #[serde(default)]
+    pub show_main_menu_leaderboard: Option<bool>,
 }
 
 impl GameData {

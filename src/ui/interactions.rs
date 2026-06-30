@@ -122,6 +122,20 @@ pub enum UIElement {
     UnlocksButtonHover,
     OptionsButtonHover,
     MainMenu,
+    MainMenuNew,
+    MainMenuArchiveButton,
+    MainMenuArchiveButtonHover,
+    MainMenuAchievementsButton,
+    MainMenuAchievementsButtonHover,
+    MainMenuStartButton,
+    MainMenuStartButtonHover,
+    ExitButton,
+    ExitButtonHover,
+    MainMenuOptionsButton,
+    MainMenuOptionsButtonHover,
+    LeaderboardButton,
+    LeaderboardButtonHover,
+    BackgroundContainer,
     Essence,
     EssenceButton,
     EssenceButtonHover,
@@ -260,6 +274,12 @@ impl UIElement {
             UIElement::AchievementsButton => Some(UIElement::AchievementsButtonHover),
             UIElement::UnlocksButton => Some(UIElement::UnlocksButtonHover),
             UIElement::OptionsButton => Some(UIElement::OptionsButtonHover),
+            UIElement::MainMenuArchiveButton => Some(UIElement::MainMenuArchiveButtonHover),
+            UIElement::MainMenuAchievementsButton => Some(UIElement::MainMenuAchievementsButtonHover),
+            UIElement::MainMenuStartButton => Some(UIElement::MainMenuStartButtonHover),
+            UIElement::ExitButton => Some(UIElement::ExitButtonHover),
+            UIElement::MainMenuOptionsButton => Some(UIElement::MainMenuOptionsButtonHover),
+            UIElement::LeaderboardButton => Some(UIElement::LeaderboardButtonHover),
             UIElement::UpgradeSlot => Some(UIElement::UpgradeSlotHover),
             UIElement::CraftingSlot => Some(UIElement::CraftingSlotHover),
             UIElement::CraftButton => Some(UIElement::CraftButtonHover),
@@ -290,6 +310,12 @@ impl UIElement {
             UIElement::AchievementsButtonHover => Some(UIElement::AchievementsButton),
             UIElement::UnlocksButtonHover => Some(UIElement::UnlocksButton),
             UIElement::OptionsButtonHover => Some(UIElement::OptionsButton),
+            UIElement::MainMenuArchiveButtonHover => Some(UIElement::MainMenuArchiveButton),
+            UIElement::MainMenuAchievementsButtonHover => Some(UIElement::MainMenuAchievementsButton),
+            UIElement::MainMenuStartButtonHover => Some(UIElement::MainMenuStartButton),
+            UIElement::ExitButtonHover => Some(UIElement::ExitButton),
+            UIElement::MainMenuOptionsButtonHover => Some(UIElement::MainMenuOptionsButton),
+            UIElement::LeaderboardButtonHover => Some(UIElement::LeaderboardButton),
             UIElement::UpgradeSlotHover => Some(UIElement::UpgradeSlot),
             UIElement::CraftingSlotHover => Some(UIElement::CraftingSlot),
             UIElement::CraftButtonHover => Some(UIElement::CraftButton),
@@ -2357,7 +2383,8 @@ pub fn handle_cursor_main_menu_buttons(
         || curr_ui_state.0 == UIState::Achievements
         || curr_ui_state.0 == UIState::TimeCrystalProgress
         || curr_ui_state.0 == UIState::TimeCrystalsBrowser
-        || curr_ui_state.0 == UIState::BeastiaryBrowser;
+        || curr_ui_state.0 == UIState::BeastiaryBrowser
+        || curr_ui_state.0 == UIState::Archives;
     let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
     let left_mouse_pressed = mouse_input.just_released(MouseButton::Left);
 
@@ -2381,11 +2408,10 @@ pub fn handle_cursor_main_menu_buttons(
             && matches!(
                 menu_button,
                 MenuButton::Start
+                    | MenuButton::Archive
                     | MenuButton::Achievements
-                    | MenuButton::Unlocks
+                    | MenuButton::LeaderboardToggle
                     | MenuButton::Options
-                    | MenuButton::TimeCrystals
-                    | MenuButton::Beastiary
                     | MenuButton::Quit
             )
         {
@@ -2394,6 +2420,8 @@ pub fn handle_cursor_main_menu_buttons(
         let uses_sprite = matches!(
             menu_button,
             MenuButton::Start
+                | MenuButton::Archive
+                | MenuButton::LeaderboardToggle
                 | MenuButton::Unlocks
                 | MenuButton::Options
                 | MenuButton::Achievements

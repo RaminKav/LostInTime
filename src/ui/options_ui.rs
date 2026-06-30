@@ -135,6 +135,9 @@ pub struct OptionsUI;
 #[derive(Resource, Default, Debug, Clone, Copy)]
 pub struct OptionsUiLayoutRevision(pub u32);
 
+/// Shifts keybind/volume/cheat body content up; title and bottom button row stay put.
+const OPTIONS_BODY_Y_OFFSET: f32 = 20.;
+
 /// Marker for the "Wipe Game Data" confirmation popup (overlay + panel + buttons).
 #[derive(Component)]
 pub struct WipeDataPopup;
@@ -512,7 +515,7 @@ pub fn setup_options_ui(
             text_anchor: bevy::sprite::Anchor::CenterLeft,
             transform: Transform::from_translation(Vec3::new(
                 left_side_x,
-                90.,
+                90. + OPTIONS_BODY_Y_OFFSET,
                 ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
             )),
             ..Default::default()
@@ -522,7 +525,7 @@ pub fn setup_options_ui(
         Name::new("Keybind Section Title"),
     ));
 
-    let start_y = 66.5;
+    let start_y = 66.5 + OPTIONS_BODY_Y_OFFSET;
     let row_spacing = -16.0;
 
     // Skill slot keybinds (roll + class skills; matches HUD / `VISIBLE_CLASS_SKILL_COUNT`)
@@ -715,7 +718,7 @@ pub fn setup_options_ui(
     );
 
     // Volume section (center column)
-    let volume_section_y = 90.;
+    let volume_section_y = 90. + OPTIONS_BODY_Y_OFFSET;
     commands.spawn((
         Text2dBundle {
             text: Text::from_section(
@@ -856,7 +859,7 @@ pub fn setup_options_ui(
     );
 
     // Cheats section
-    let cheats_section_y = 90.;
+    let cheats_section_y = 90. + OPTIONS_BODY_Y_OFFSET;
     commands.spawn((
         Text2dBundle {
             text: Text::from_section(
@@ -882,7 +885,7 @@ pub fn setup_options_ui(
     ));
 
     // Unlock all classes checkbox
-    let checkbox_y = 70.;
+    let checkbox_y = 70. + OPTIONS_BODY_Y_OFFSET;
     let checkbox_x_offset = 108.;
     spawn_options_checkbox(
         &mut commands,

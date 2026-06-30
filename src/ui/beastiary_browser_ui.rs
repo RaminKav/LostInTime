@@ -15,6 +15,7 @@ use crate::{
     ui::{
         interactions::{Interactable, Interaction},
         inventory_ui::UIState,
+        main_menu::spawn_exit_icon_button,
         ui_helpers, UIElement,
     },
     ScreenResolution,
@@ -23,10 +24,6 @@ use crate::{
 /// Marker for every entity belonging to the bestiary browser overlay.
 #[derive(Component)]
 pub struct BeastiaryBrowserUI;
-
-/// Done button on the bestiary browser.
-#[derive(Component)]
-pub struct BeastiaryBrowserDoneButton;
 
 /// One clickable card cell in the 3x3 grid.
 #[derive(Component, Clone, Copy)]
@@ -82,11 +79,8 @@ const GRID_CENTER_X: f32 = -112.;
 const GRID_TOP_Y: f32 = 74.;
 const NAV_BTNS_Y: f32 = -164.;
 const NAV_BTN_GAP: f32 = 24.;
-const DONE_BTN_W: f32 = 60.;
-const DONE_BTN_H: f32 = 18.;
-/// Bottom-right inset on the book panel art (`Bestiary.png`).
-const DONE_BTN_OFFSET_X: f32 = 56.;
-const DONE_BTN_INSET_Y: f32 = 8.;
+const EXIT_BTN_OFFSET_X: f32 = 40.;
+const EXIT_BTN_INSET_Y: f32 = 8.;
 const DETAIL_CENTER_X: f32 = 110.;
 const DETAIL_TOP_Y: f32 = 0.;
 const DETAIL_WIDTH: f32 = 170.;
@@ -187,52 +181,22 @@ pub fn setup_beastiary_browser_ui(
         Name::new("Beastiary Browser Next"),
     ));
 
-    // Done button — bottom-right on the book panel, above the panel art layer.
-    let button_x = PANEL_W * 0.5 - DONE_BTN_W * 0.5 + DONE_BTN_OFFSET_X;
-    let button_y = -PANEL_H * 0.5 + DONE_BTN_H * 0.5 + DONE_BTN_INSET_Y;
-    let done_entity = commands
-        .spawn((
-            SpriteBundle {
-                texture: graphics.get_ui_element_texture(UIElement::MenuButton),
-                sprite: Sprite {
-                    custom_size: Some(Vec2::new(DONE_BTN_W, DONE_BTN_H)),
-                    ..Default::default()
-                },
-                transform: Transform::from_translation(Vec3::new(
-                    button_x,
-                    button_y,
-                    CONTENT_Z + 1.,
-                )),
-                ..Default::default()
-            },
-            RenderLayers::from_layers(&[3]),
-            UIElement::MenuButton,
-            Interactable::default(),
-            BeastiaryBrowserDoneButton,
-            BeastiaryBrowserUI,
-            UIState::BeastiaryBrowser,
-            Name::new("Beastiary Browser Done"),
-        ))
-        .id();
-    commands
-        .spawn(Text2dBundle {
-            text: Text::from_section(
-                "Done",
-                TextStyle {
-                    font: asset_server.load("fonts/4x5.ttf"),
-                    font_size: 5.0,
-                    color: crate::colors::WHITE,
-                },
-            )
-            .with_alignment(TextAlignment::Center),
-            text_anchor: Anchor::Center,
-            transform: Transform::from_translation(Vec3::new(0., 0.5, 1.)),
-            ..Default::default()
-        })
-        .insert(RenderLayers::from_layers(&[3]))
-        .insert(UIState::BeastiaryBrowser)
-        .insert(Name::new("Beastiary Browser Done Text"))
-        .set_parent(done_entity);
+    // Exit button — bottom-right on the book panel, above the panel art layer.
+    let button_x = PANEL_W * 0.5 - crate::ui::main_menu::MAIN_MENU_ICON_BUTTON_SIZE.x * 0.5
+        + EXIT_BTN_OFFSET_X;
+    let button_y = -PANEL_H * 0.5
+        + crate::ui::main_menu::MAIN_MENU_ICON_BUTTON_SIZE.y * 0.5
+        + EXIT_BTN_INSET_Y;
+    let exit_button = spawn_exit_icon_button(
+        Vec3::new(button_x, button_y, CONTENT_Z + 1.),
+        &mut commands,
+        &graphics,
+    );
+    commands.entity(exit_button).insert((
+        BeastiaryBrowserUI,
+        UIState::BeastiaryBrowser,
+        Name::new("Beastiary Browser Exit"),
+    ));
 
     // Detail panel placeholder (no selection yet).
     spawn_detail_panel(
@@ -1032,39 +996,6 @@ pub fn handle_beastiary_pagination_clicks(
         } else if matches!(interactable.current(), Interaction::Hovering) {
             interactable.change(Interaction::None);
             beastiary_next_normal_sprite(&mut commands, &graphics, entity);
-        }
-    }
-}
-
-pub fn handle_beastiary_browser_done_button(
-    cursor_pos: Res<CursorPos>,
-    mouse_input: Res<Input<MouseButton>>,
-    ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
-    mut buttons: Query<(Entity, &mut Interactable), With<BeastiaryBrowserDoneButton>>,
-    mut next_ui_state: ResMut<NextState<UIState>>,
-    mut commands: Commands,
-) {
-    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
-    let left_mouse_released = mouse_input.just_released(MouseButton::Left);
-
-    for (entity, mut interactable) in buttons.iter_mut() {
-        match hit_test {
-            Some(hit) if hit.0 == entity => match interactable.current() {
-                Interaction::None => {
-                    interactable.change(Interaction::Hovering);
-                    commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonHover, 0.05));
-                }
-                Interaction::Hovering => {
-                    if left_mouse_released {
-                        next_ui_state.set(UIState::Closed);
-                        commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.2));
-                    }
-                }
-                _ => {}
-            },
-            _ => {
-                interactable.change(Interaction::None);
-            }
         }
     }
 }

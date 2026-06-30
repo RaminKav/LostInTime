@@ -126,7 +126,7 @@ use loading_screen::*;
 
 use crate::{
     attributes::clamp_health,
-    client::{is_not_paused, leaderboard::auto_fetch_leaderboard_on_menu, load_state, ClientState},
+    client::{is_not_paused, leaderboard::auto_fetch_leaderboard_on_menu, load_game_data_for_ui, load_state, ClientState},
     combat::InvincibilityTimer,
     handle_hits,
     inventory::{try_auto_equip_from_upgrade_slot, Inventory},
@@ -576,6 +576,7 @@ impl Plugin for UIPlugin {
             .init_resource::<DevSkillGridOpen>()
             .init_resource::<SelectedBeastiaryMob>()
             .init_resource::<BeastiaryPagination>()
+            .init_resource::<MainMenuLeaderboardVisible>()
             .add_event::<TooltipTeardownEvent>()
             .add_event::<ShowInvPlayerStatsEvent>()
             .add_event::<DamageTrackerRefreshEvent>()
@@ -661,9 +662,15 @@ impl Plugin for UIPlugin {
                     .after(bevy::text::update_text2d_layout),
             )
             .add_system(
-                setup_leaderboard_ui
+                init_main_menu_leaderboard_visibility
                     .in_schedule(OnEnter(GameState::MainMenu))
-                    .after(auto_fetch_leaderboard_on_menu)  // Ensure fetch happens first
+                    .after(load_game_data_for_ui),
+            )
+            .add_system(
+                sync_main_menu_leaderboard_ui
+                    .in_schedule(OnEnter(GameState::MainMenu))
+                    .after(init_main_menu_leaderboard_visibility)
+                    .after(auto_fetch_leaderboard_on_menu),
             )
             .add_system(cleanup_leaderboard_ui.in_schedule(OnExit(GameState::MainMenu)))
             .add_system(reset_blacksmith_tracker.in_schedule(OnEnter(GameState::MainMenu)))
@@ -677,19 +684,30 @@ impl Plugin for UIPlugin {
                         .and_then(state_changed::<UIState>())
                         .and_then(not(in_state(UIState::Closed)))),
                 // Recreate leaderboard when returning to main menu view (but not on initial entry)
-                setup_leaderboard_ui
+                sync_main_menu_leaderboard_ui
                     .after(cleanup_leaderboard_ui)
                     .run_if(in_state(GameState::MainMenu)
                         .and_then(state_changed::<UIState>())
                         .and_then(in_state(UIState::Closed))),
             ))
+            .add_system(
+                sync_main_menu_leaderboard_ui
+                    .run_if(in_state(GameState::MainMenu))
+                    .run_if(in_state(UIState::Closed))
+                    .run_if(resource_exists::<MainMenuLeaderboardVisible>())
+                    .run_if(resource_changed::<MainMenuLeaderboardVisible>()),
+            )
             .add_systems((
                 update_leaderboard_display
                     .run_if(in_state(GameState::MainMenu))
-                    .run_if(in_state(UIState::Closed)),
+                    .run_if(in_state(UIState::Closed))
+                    .run_if(resource_exists::<MainMenuLeaderboardVisible>())
+                    .run_if(|visible: Res<MainMenuLeaderboardVisible>| visible.0),
                 ensure_leaderboard_entries
                     .run_if(in_state(GameState::MainMenu))
-                    .run_if(in_state(UIState::Closed)),
+                    .run_if(in_state(UIState::Closed))
+                    .run_if(resource_exists::<MainMenuLeaderboardVisible>())
+                    .run_if(|visible: Res<MainMenuLeaderboardVisible>| visible.0),
             ))
             .add_systems((
                 setup_inv_ui
@@ -884,6 +902,11 @@ impl Plugin for UIPlugin {
                         )),
                     update_achievements_navigation_buttons
                         .run_if(in_state(UIState::Achievements)),
+                    setup_archives_ui
+                        .before(CustomFlush)
+                        .run_if(state_changed::<UIState>().and_then(in_state(UIState::Archives))),
+                    cleanup_archives_ui
+                        .run_if(state_changed::<UIState>().and_then(not(in_state(UIState::Archives)))),
                 )
                     .in_set(OnUpdate(GameState::MainMenu)),
             )
@@ -1010,8 +1033,6 @@ impl Plugin for UIPlugin {
                         .run_if(state_changed::<UIState>().and_then(in_state(UIState::BeastiaryBrowser))),
                     cleanup_beastiary_browser_ui
                         .run_if(state_changed::<UIState>().and_then(not(in_state(UIState::BeastiaryBrowser)))),
-                    handle_beastiary_browser_done_button
-                        .run_if(in_state(UIState::BeastiaryBrowser)),
                     handle_beastiary_pagination_clicks
                         .before(refresh_beastiary_grid_on_pagination_change)
                         .run_if(in_state(UIState::BeastiaryBrowser)),
@@ -1452,6 +1473,9 @@ impl Plugin for UIPlugin {
             )
             .add_system(handle_hovering.run_if(ui_hover_interactions_condition).after(crate::ui::inventory_ui::update_inventory_ui))
             .add_system(handle_cursor_main_menu_buttons)
+            .add_system(
+                handle_main_menu_icon_tooltips.run_if(in_state(GameState::MainMenu)),
+            )
             .add_system(update_achievements_notification_icon.run_if(in_state(GameState::MainMenu)));
 
         app.add_systems(
