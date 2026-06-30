@@ -127,6 +127,8 @@ pub enum UIElement {
     MainMenuArchiveButtonHover,
     MainMenuAchievementsButton,
     MainMenuAchievementsButtonHover,
+    MainMenuUnlocksButton,
+    MainMenuUnlocksButtonHover,
     MainMenuStartButton,
     MainMenuStartButtonHover,
     ExitButton,
@@ -276,6 +278,7 @@ impl UIElement {
             UIElement::OptionsButton => Some(UIElement::OptionsButtonHover),
             UIElement::MainMenuArchiveButton => Some(UIElement::MainMenuArchiveButtonHover),
             UIElement::MainMenuAchievementsButton => Some(UIElement::MainMenuAchievementsButtonHover),
+            UIElement::MainMenuUnlocksButton => Some(UIElement::MainMenuUnlocksButtonHover),
             UIElement::MainMenuStartButton => Some(UIElement::MainMenuStartButtonHover),
             UIElement::ExitButton => Some(UIElement::ExitButtonHover),
             UIElement::MainMenuOptionsButton => Some(UIElement::MainMenuOptionsButtonHover),
@@ -312,6 +315,7 @@ impl UIElement {
             UIElement::OptionsButtonHover => Some(UIElement::OptionsButton),
             UIElement::MainMenuArchiveButtonHover => Some(UIElement::MainMenuArchiveButton),
             UIElement::MainMenuAchievementsButtonHover => Some(UIElement::MainMenuAchievementsButton),
+            UIElement::MainMenuUnlocksButtonHover => Some(UIElement::MainMenuUnlocksButton),
             UIElement::MainMenuStartButtonHover => Some(UIElement::MainMenuStartButton),
             UIElement::ExitButtonHover => Some(UIElement::ExitButton),
             UIElement::MainMenuOptionsButtonHover => Some(UIElement::MainMenuOptionsButton),
@@ -2410,6 +2414,7 @@ pub fn handle_cursor_main_menu_buttons(
                 MenuButton::Start
                     | MenuButton::Archive
                     | MenuButton::Achievements
+                    | MenuButton::Unlocks
                     | MenuButton::LeaderboardToggle
                     | MenuButton::Options
                     | MenuButton::Quit

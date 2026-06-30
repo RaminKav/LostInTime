@@ -977,10 +977,9 @@ pub fn setup_archives_ui(
         .insert(RenderLayers::from_layers(&[3]))
         .set_parent(archives_root);
 
-    let button_entries: [(&str, MenuButton); 3] = [
+    let button_entries: [(&str, MenuButton); 2] = [
         ("Bestiary", MenuButton::Beastiary),
         ("Time Crystals", MenuButton::TimeCrystals),
-        ("Unlocks", MenuButton::Unlocks),
     ];
     let top_y = ARCHIVES_BUTTON_SPACING_Y;
     for (i, (label, button_type)) in button_entries.iter().enumerate() {
@@ -1002,7 +1001,7 @@ pub fn setup_archives_ui(
     }
 
     let exit_y = top_y
-        - 2. * ARCHIVES_BUTTON_SPACING_Y
+        - ARCHIVES_BUTTON_SPACING_Y
         - ARCHIVES_EXIT_GAP_Y
         - MAIN_MENU_ICON_BUTTON_SIZE.y * 0.5
         - MAIN_MENU_WIDE_BUTTON_SIZE.y * 0.5;
@@ -1071,9 +1070,9 @@ pub fn spawn_menu_text_buttons(
             row_y,
             button_z,
         ),
-        MenuButton::LeaderboardToggle,
-        UIElement::LeaderboardButton,
-        Some("Leaderboard"),
+        MenuButton::Unlocks,
+        UIElement::MainMenuUnlocksButton,
+        Some("Unlocks"),
         &mut commands,
         &graphics,
     );
@@ -1110,6 +1109,19 @@ pub fn spawn_menu_text_buttons(
         MenuButton::Options,
         UIElement::MainMenuOptionsButton,
         Some("Options"),
+        &mut commands,
+        &graphics,
+    );
+
+    spawn_main_menu_icon_button(
+        Vec3::new(
+            main_menu_right_icon_x(resolution.game_width, 2),
+            row_y,
+            button_z,
+        ),
+        MenuButton::LeaderboardToggle,
+        UIElement::LeaderboardButton,
+        Some("Leaderboard"),
         &mut commands,
         &graphics,
     );

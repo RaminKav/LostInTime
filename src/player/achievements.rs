@@ -31,12 +31,20 @@ pub enum Achievement {
     BushlingSlayer1,
     StingflySlayer,
     MushlingSlayer,
+    VoidCrawlerSlayer1,
+    VoidCrawlerSlayer2,
+    VoidCrawlerSlayer3,
+    VoidWormSlayer1,
+    SmallCactusSlayer1,
+    BigCactusSlayer1,
+    BullSlayer1,
+    ScorpionSlayer1,
+    LizardSlayer1,
     Chaotic,
     DungeonCrawler,
     FindHammer,
     FindSpear,
     FindClaw,
-    FindGun,
     FindIceStaff,
     FindBasicStaff,
     FindMagicWhip,
@@ -87,12 +95,20 @@ impl Achievement {
             Achievement::BushlingSlayer1 => "Bushling Slayer".to_string(),
             Achievement::StingflySlayer => "Stingfly Slayer".to_string(),
             Achievement::MushlingSlayer => "Mushling Slayer".to_string(),
+            Achievement::VoidCrawlerSlayer1 => "Void Crawler Slayer".to_string(),
+            Achievement::VoidCrawlerSlayer2 => "Void Crawler Slayer II".to_string(),
+            Achievement::VoidCrawlerSlayer3 => "Void Crawler Slayer III".to_string(),
+            Achievement::VoidWormSlayer1 => "Void Worm Slayer".to_string(),
+            Achievement::SmallCactusSlayer1 => "Small Cactus Slayer".to_string(),
+            Achievement::BigCactusSlayer1 => "Large Cactus Slayer".to_string(),
+            Achievement::BullSlayer1 => "Bull Slayer".to_string(),
+            Achievement::ScorpionSlayer1 => "Desert Scorpion Slayer".to_string(),
+            Achievement::LizardSlayer1 => "Lizard Slayer".to_string(),
             Achievement::Chaotic => "Chaotic".to_string(),
             Achievement::DungeonCrawler => "Dungeon Crawler".to_string(),
             Achievement::FindSpear => "Find Spear".to_string(),
             Achievement::FindHammer => "Find Hammer".to_string(),
             Achievement::FindClaw => "Find Claw".to_string(),
-            Achievement::FindGun => "Find Gun".to_string(),
             Achievement::FindIceStaff => "Find Ice Staff".to_string(),
             Achievement::FindBasicStaff => "Find Basic Staff".to_string(),
             Achievement::FindMagicWhip => "Find Magic Whip".to_string(),
@@ -104,7 +120,7 @@ impl Achievement {
     pub fn get_desc(&self) -> String {
         match self {
             Achievement::FirstRunComplete => "Complete your first run.".to_string(),
-            Achievement::Kill100FurDevils => "Defeat 1000 Fur Devils.".to_string(),
+            Achievement::Kill100FurDevils => "Defeat 5000 Fur Devils.".to_string(),
             Achievement::SlimePet => "Find the Slime in Act 1.".to_string(),
             Achievement::FairyPet => "Find the Fairy in Act 2.".to_string(),
             Achievement::PorkipinePet => "Find the Porkipine.".to_string(),
@@ -114,15 +130,23 @@ impl Achievement {
             Achievement::Act1 => "Defeat the Act 1 boss.".to_string(),
             Achievement::Act2 => "Defeat the Act 2 boss.".to_string(),
             Achievement::Act3 => "Defeat the Act 3 boss.".to_string(),
-            Achievement::BushlingSlayer1 => "Eliminate 1000 Bushlings.".to_string(),
-            Achievement::StingflySlayer => "Eliminate 1000 Stingflies.".to_string(),
-            Achievement::MushlingSlayer => "Eliminate 1000 Red Mushlings.".to_string(),
+            Achievement::BushlingSlayer1 => "Defeat 5000 Bushlings.".to_string(),
+            Achievement::StingflySlayer => "Defeat 5000 Stingflies.".to_string(),
+            Achievement::MushlingSlayer => "Defeat 5000 Red Mushlings.".to_string(),
+            Achievement::VoidCrawlerSlayer1 => "Defeat 5000 Void Crawlers.".to_string(),
+            Achievement::VoidCrawlerSlayer2 => "Defeat 50000 Void Crawlers.".to_string(),
+            Achievement::VoidCrawlerSlayer3 => "Defeat 500000 Void Crawlers.".to_string(),
+            Achievement::VoidWormSlayer1 => "Defeat 1000 Void Worms.".to_string(),
+            Achievement::SmallCactusSlayer1 => "Defeat 5000 Small Cacti.".to_string(),
+            Achievement::BigCactusSlayer1 => "Defeat 5000 Large Cacti.".to_string(),
+            Achievement::BullSlayer1 => "Defeat 5000 Bulls.".to_string(),
+            Achievement::ScorpionSlayer1 => "Defeat 5000 Desert Scorpions.".to_string(),
+            Achievement::LizardSlayer1 => "Defeat 5000 Lizards.".to_string(),
             Achievement::Chaotic => "Reach 20 total Chaos.".to_string(),
             Achievement::DungeonCrawler => "Find the key & clear the dungeon.".to_string(),
             Achievement::FindSpear => "Find a Spear.".to_string(),
             Achievement::FindHammer => "Find a Hammer.".to_string(),
             Achievement::FindClaw => "Find a Claw.".to_string(),
-            Achievement::FindGun => "Find a Gun.".to_string(),
             Achievement::FindIceStaff => "Find an Ice Staff.".to_string(),
             Achievement::FindBasicStaff => "Find a Basic Staff.".to_string(),
             Achievement::FindMagicWhip => "Find a Magic Whip.".to_string(),
@@ -149,11 +173,19 @@ impl Achievement {
             Achievement::BushlingSlayer1 => 7,
             Achievement::StingflySlayer => 10,
             Achievement::MushlingSlayer => 10,
+            Achievement::VoidCrawlerSlayer1 => 7,
+            Achievement::VoidCrawlerSlayer2 => 15,
+            Achievement::VoidCrawlerSlayer3 => 30,
+            Achievement::VoidWormSlayer1 => 7,
+            Achievement::SmallCactusSlayer1 => 7,
+            Achievement::BigCactusSlayer1 => 7,
+            Achievement::BullSlayer1 => 7,
+            Achievement::ScorpionSlayer1 => 7,
+            Achievement::LizardSlayer1 => 7,
             Achievement::Chaotic => 25,
             Achievement::FindSpear
             | Achievement::FindClaw
             | Achievement::FindHammer
-            | Achievement::FindGun
             | Achievement::FindIceStaff
             | Achievement::FindBasicStaff
             | Achievement::FindMagicWhip
@@ -189,10 +221,19 @@ impl Achievement {
 
         match self {
             // Achievements that need analytics
-            Achievement::Kill100FurDevils => Some((get_mob_kills(&Mob::FurDevil), 1000)),
-            Achievement::BushlingSlayer1 => Some((get_mob_kills(&Mob::Bushling), 1000)),
-            Achievement::StingflySlayer => Some((get_mob_kills(&Mob::StingFly), 1000)),
-            Achievement::MushlingSlayer => Some((get_mob_kills(&Mob::RedMushling), 1000)),
+            Achievement::Kill100FurDevils => Some((get_mob_kills(&Mob::FurDevil), 5000)),
+            Achievement::BushlingSlayer1 => Some((get_mob_kills(&Mob::Bushling), 5000)),
+            Achievement::StingflySlayer => Some((get_mob_kills(&Mob::StingFly), 5000)),
+            Achievement::MushlingSlayer => Some((get_mob_kills(&Mob::RedMushling), 5000)),
+            Achievement::VoidCrawlerSlayer1 => Some((get_mob_kills(&Mob::VoidCrawler), 5000)),
+            Achievement::VoidCrawlerSlayer2 => Some((get_mob_kills(&Mob::VoidCrawler), 50000)),
+            Achievement::VoidCrawlerSlayer3 => Some((get_mob_kills(&Mob::VoidCrawler), 500000)),
+            Achievement::VoidWormSlayer1 => Some((get_mob_kills(&Mob::VoidWorm), 5000)),
+            Achievement::SmallCactusSlayer1 => Some((get_mob_kills(&Mob::SmallCactus), 5000)),
+            Achievement::BigCactusSlayer1 => Some((get_mob_kills(&Mob::BigCactus), 5000)),
+            Achievement::BullSlayer1 => Some((get_mob_kills(&Mob::Bull), 5000)),
+            Achievement::ScorpionSlayer1 => Some((get_mob_kills(&Mob::Scorpion), 5000)),
+            Achievement::LizardSlayer1 => Some((get_mob_kills(&Mob::Lizard), 5000)),
             // Achievements that don't need analytics
             Achievement::Bouncy => {
                 if let Some(bounce) = bounce_tracker {
@@ -373,10 +414,19 @@ pub fn check_achievements(
         }
     };
 
-    check_mob_kill(Mob::FurDevil, 1000, Achievement::Kill100FurDevils);
-    check_mob_kill(Mob::Bushling, 1000, Achievement::BushlingSlayer1);
-    check_mob_kill(Mob::StingFly, 1000, Achievement::StingflySlayer);
-    check_mob_kill(Mob::RedMushling, 1000, Achievement::MushlingSlayer);
+    check_mob_kill(Mob::FurDevil, 5000, Achievement::Kill100FurDevils);
+    check_mob_kill(Mob::Bushling, 5000, Achievement::BushlingSlayer1);
+    check_mob_kill(Mob::StingFly, 5000, Achievement::StingflySlayer);
+    check_mob_kill(Mob::RedMushling, 5000, Achievement::MushlingSlayer);
+    check_mob_kill(Mob::VoidCrawler, 5000, Achievement::VoidCrawlerSlayer1);
+    check_mob_kill(Mob::VoidCrawler, 50000, Achievement::VoidCrawlerSlayer2);
+    check_mob_kill(Mob::VoidCrawler, 500000, Achievement::VoidCrawlerSlayer3);
+    check_mob_kill(Mob::VoidWorm, 1000, Achievement::VoidWormSlayer1);
+    check_mob_kill(Mob::SmallCactus, 5000, Achievement::SmallCactusSlayer1);
+    check_mob_kill(Mob::BigCactus, 5000, Achievement::BigCactusSlayer1);
+    check_mob_kill(Mob::Bull, 5000, Achievement::BullSlayer1);
+    check_mob_kill(Mob::Scorpion, 5000, Achievement::ScorpionSlayer1);
+    check_mob_kill(Mob::Lizard, 5000, Achievement::LizardSlayer1);
 
     // Check item collected achievements
     let mut check_item_collected = |object: WorldObject, achievement: Achievement| {
@@ -387,7 +437,6 @@ pub fn check_achievements(
 
     check_item_collected(WorldObject::Spear, Achievement::FindSpear);
     check_item_collected(WorldObject::Claw, Achievement::FindClaw);
-    check_item_collected(WorldObject::Gun, Achievement::FindGun);
     check_item_collected(WorldObject::IceStaff, Achievement::FindIceStaff);
     check_item_collected(WorldObject::BasicStaff, Achievement::FindBasicStaff);
     check_item_collected(WorldObject::MagicWhip, Achievement::FindMagicWhip);
@@ -593,8 +642,10 @@ pub fn is_pet_unlocked(pet: &crate::pets::state::Pet, achievements: &Achievement
     }
 
     // Porkipine and GoldenPig are available to anyone who has completed Act 2
-    if matches!(pet, crate::pets::state::Pet::Porkipine | crate::pets::state::Pet::GoldenPig)
-        && achievements.has(Achievement::Act2)
+    if matches!(
+        pet,
+        crate::pets::state::Pet::Porkipine | crate::pets::state::Pet::GoldenPig
+    ) && achievements.has(Achievement::Act2)
     {
         return true;
     }

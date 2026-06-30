@@ -9,7 +9,7 @@
             cost: 0,
         ),
         Rogue: (
-            achievements: [BushlingSlayer1, FindDagger],
+            achievements: [Kill100FurDevils, FindDagger],
             cost: 20,
         ),
         Thief: (
@@ -17,7 +17,7 @@
             cost: 20,
         ),
         Hunter: (
-            achievements: [Act3, FindBow],
+            achievements: [StingflySlayer, FindBow],
             cost: 25,
         ),
     },
