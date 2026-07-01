@@ -23,7 +23,7 @@ use crate::{
     },
     cursor::CursorPos,
     inventory::{Inventory, ItemStack},
-    item::{item_actions::ItemActions, EquipmentType, WorldObject},
+    item::{item_actions::ItemActions, item_drop_outline::UiShadow, EquipmentType, WorldObject},
     player::{
         skills::{Heirloom, PlayerSkills},
         stats::StatType,
@@ -388,6 +388,7 @@ pub fn handle_spawn_inv_item_tooltip(
                 item_rarity.get_tooltip_ui_element(),
                 Name::new("TOOLTIP"),
                 ItemOrRecipeTooltip,
+                UiShadow::tooltip_card(),
             ))
             .id();
 
@@ -1364,6 +1365,7 @@ pub fn spawn_stats_tooltip_at(
             UIElement::StatTooltip,
             PlayerStatsTooltip,
             Name::new("TOOLTIP"),
+            UiShadow::container(),
         ))
         .id();
 
@@ -1687,6 +1689,7 @@ pub fn spawn_world_item_tooltip_for_stack(
             item_rarity.get_tooltip_ui_element(),
             Name::new("HUD_ITEM_TOOLTIP"),
             ConsumableBuffHudTooltip,
+            UiShadow::tooltip_card(),
         ))
         .id();
 

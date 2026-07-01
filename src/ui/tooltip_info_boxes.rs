@@ -5,6 +5,7 @@ use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
 use crate::{
     assets::Graphics,
     colors::{WHITE, YELLOW_2},
+    item::item_drop_outline::UiShadow,
     player::skills::Heirloom,
 };
 
@@ -251,6 +252,7 @@ pub fn spawn_tooltip_info_boxes(
                 ..default()
             })
             .insert(RenderLayers::from_layers(&[3]))
+            .insert(UiShadow::container())
             .set_parent(root)
             .id();
 

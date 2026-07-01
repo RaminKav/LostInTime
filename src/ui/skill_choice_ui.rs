@@ -6,6 +6,7 @@ use crate::{
     assets::Graphics,
     attributes::LootRateBonus,
     colors::WHITE,
+    item::item_drop_outline::UiShadow,
     player::{
         levels::PlayerLevel,
         skills::{HeirloomChoiceQueue, HeirloomChoiceState},
@@ -207,6 +208,7 @@ pub fn setup_skill_choice_ui(
             .insert(UIElement::RerollDice)
             .insert(UIState::Skills)
             .insert(RerollDice(slot_index))
+            .insert(UiShadow::container())
             .insert(Name::new(format!("REROLL BUTTON {slot_index}")));
         if enabled {
             reroll_entity.insert(Interactable::default());
@@ -249,6 +251,7 @@ pub fn setup_skill_choice_ui(
             .insert(UIElement::BackButton)
             .insert(BanishButton(slot_index))
             .insert(Interactable::default())
+            .insert(UiShadow::container())
             .insert(Name::new(format!("BANISH BUTTON {slot_index}")));
 
         commands
@@ -379,6 +382,7 @@ pub fn spawn_skill_choice_entities(
             None,
             0,
             false,
+            UiShadow::container(),
         );
         commands
             .entity(card_e)

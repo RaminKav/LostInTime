@@ -617,6 +617,7 @@ fn spawn_merchant_track_info_box(
         .insert(UIState::Essence)
         .insert(MerchantTrackInfoBox)
         .insert(Name::new("Merchant Track Info Box"))
+        .insert(crate::item::item_drop_outline::UiShadow::container())
         .set_parent(parent)
         .id();
 
@@ -1505,6 +1506,7 @@ pub fn setup_essence_ui(
         .insert(Name::new("SHOP UI"))
         .insert(UIState::Essence)
         .insert(RenderLayers::from_layers(&[3]))
+        .insert(crate::item::item_drop_outline::UiShadow::container())
         .id();
 
     commands

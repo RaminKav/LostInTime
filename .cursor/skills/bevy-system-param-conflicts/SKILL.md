@@ -68,6 +68,12 @@ fn update_ui(
 
 Real example in this repo: `src/ui/achievements_ui.rs` → `update_achievements_page_display`.
 
+**UiShadow + recursive fade:** when fading UI hierarchies that include `UiShadowChild`
+entities (mesh shadow rings) alongside `Text` nodes, both need `&mut Visibility` in the
+same recursive helper. Put both queries in one `ParamSet` and borrow each with `{ ... }`
+per entity visit — see `src/blessings/blessing_choice_ui.rs` →
+`fade_blessing_card_descendants` / `transition_blessing_ui_after_choice`.
+
 Rules:
 - Any system with **2+ queries** that fetch `&mut` on the same component → use `ParamSet`.
 - `With<MarkerA>` alone is NOT enough if Bevy still sees overlapping access — prefer

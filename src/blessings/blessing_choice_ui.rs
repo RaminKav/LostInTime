@@ -14,7 +14,7 @@ use crate::{
     colors::{LIGHT_RED, SHIELD_BLUE, WHITE, YELLOW_2},
     cursor::CursorPos,
     inventory::ItemStack,
-    item::{item_drop_outline::HeirloomIconOutline, WorldObject},
+    item::{item_drop_outline::{HeirloomIconOutline, UiShadowChild}, WorldObject},
     player::{
         class_rank::ClassRankSystem,
         levels::PlayerLevel,
@@ -142,7 +142,10 @@ fn fade_blessing_card_descendants(
     children: &Query<&Children>,
     sprites: &mut Query<&mut Sprite>,
     atlas_sprites: &mut Query<&mut TextureAtlasSprite>,
-    texts: &mut Query<&mut Visibility, With<Text>>,
+    visibility_set: &mut ParamSet<(
+        Query<'_, '_, &mut Visibility, With<Text>>,
+        Query<'_, '_, &mut Visibility, With<UiShadowChild>>,
+    )>,
 ) {
     if let Ok(mut sprite) = sprites.get_mut(entity) {
         sprite.color.set_a(alpha);
@@ -150,12 +153,33 @@ fn fade_blessing_card_descendants(
     if let Ok(mut atlas) = atlas_sprites.get_mut(entity) {
         atlas.color.set_a(alpha);
     }
-    if let Ok(mut visibility) = texts.get_mut(entity) {
-        *visibility = Visibility::Hidden;
+    {
+        let mut texts = visibility_set.p0();
+        if let Ok(mut visibility) = texts.get_mut(entity) {
+            *visibility = Visibility::Hidden;
+        }
+    }
+    // Shadow children use a mesh material, not Sprite — hide them as soon as the card fades.
+    {
+        let mut shadow_visibilities = visibility_set.p1();
+        if let Ok(mut visibility) = shadow_visibilities.get_mut(entity) {
+            *visibility = if alpha < 1.0 {
+                Visibility::Hidden
+            } else {
+                Visibility::Inherited
+            };
+        }
     }
     if let Ok(kids) = children.get(entity) {
         for child in kids.iter() {
-            fade_blessing_card_descendants(*child, alpha, children, sprites, atlas_sprites, texts);
+            fade_blessing_card_descendants(
+                *child,
+                alpha,
+                children,
+                sprites,
+                atlas_sprites,
+                visibility_set,
+            );
         }
     }
 }
@@ -211,6 +235,7 @@ fn spawn_ancestor_blessing_card(
         .insert(ui_element)
         .insert(Name::new("BLESSING CHOICE UI"))
         .insert(RenderLayers::from_layers(&[3]))
+        .insert(crate::item::item_drop_outline::UiShadow::container())
         .id();
 
     if let Some(icon) = &choice.display_icon {
@@ -828,7 +853,10 @@ pub fn transition_blessing_ui_after_choice(
     mut blessing_cards: Query<(Entity, &BlessingChoiceUI, &GlobalTransform)>,
     mut sprites: Query<&mut Sprite>,
     mut atlas_sprites: Query<&mut TextureAtlasSprite>,
-    mut texts: Query<&mut Visibility, With<Text>>,
+    mut visibility_set: ParamSet<(
+        Query<'_, '_, &mut Visibility, With<Text>>,
+        Query<'_, '_, &mut Visibility, With<UiShadowChild>>,
+    )>,
     child_hierarchy: Query<&Children>,
     graphics: Res<Graphics>,
     mut commands: Commands,
@@ -904,7 +932,7 @@ pub fn transition_blessing_ui_after_choice(
                 &child_hierarchy,
                 &mut sprites,
                 &mut atlas_sprites,
-                &mut texts,
+                &mut visibility_set,
             );
         }
     }

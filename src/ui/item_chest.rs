@@ -396,6 +396,7 @@ pub fn setup_item_chest_ui(
         .insert(ItemChestUI)
         .insert(Name::new("ITEM CHEST"))
         .insert(RenderLayers::from_layers(&[3]))
+        .insert(crate::item::item_drop_outline::UiShadow::container())
         .id();
 
     // closed chest icon (replaced when the open animation starts)

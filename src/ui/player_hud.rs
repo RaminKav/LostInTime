@@ -45,7 +45,7 @@ use crate::{
     cursor::CursorPos,
     inventory::{Inventory, ItemStack},
     item::WorldObject,
-    item::item_drop_outline::{HeirloomIconOutline, HeirloomIconOutlineStyle},
+    item::item_drop_outline::{HeirloomIconOutline, HeirloomIconOutlineStyle, UiShadow},
     juice::bounce::BounceOnHit,
     keybinds::InputBinding,
     night::{EraTimer, InfiniteMode, ERA_TIMER_SECONDS},
@@ -367,6 +367,7 @@ pub fn setup_bars_ui(
         .insert(Name::new("HUD FRAME"))
         .insert(HudFrame)
         .insert(RenderLayers::from_layers(&[3]))
+        .insert(UiShadow::hud())
         .id();
 
     // Shader-driven HP/mana fills sitting inside the two semicircular caps.
@@ -601,6 +602,7 @@ pub fn setup_currency_ui(
             .insert(RenderLayers::from_layers(&[3]))
             .insert(CurrencyHudBackground)
             .insert(CurrencyHudSlotIndex(0))
+            .insert(UiShadow::hud())
             .insert(Name::new("TIME FRAGMENT CURRENCY BG"))
             .id();
 
@@ -653,6 +655,7 @@ pub fn setup_currency_ui(
             .insert(RenderLayers::from_layers(&[3]))
             .insert(CurrencyHudBackground)
             .insert(CurrencyHudSlotIndex(1))
+            .insert(UiShadow::hud())
             .insert(Name::new("COIN CURRENCY BG"))
             .id();
 
@@ -700,6 +703,7 @@ pub fn setup_currency_ui(
         })
         .insert(RenderLayers::from_layers(&[3]))
         .insert(ProgressHudBar)
+        .insert(UiShadow::hud())
         .insert(Name::new("PROGRESS HUD BAR"))
         .id();
 
@@ -1499,6 +1503,7 @@ pub fn spawn_skill_tooltip_shell(
         })
         .insert(RenderLayers::from_layers(&[3]))
         .insert(Name::new(bg_name))
+        .insert(UiShadow::hud())
         .set_parent(container)
         .id();
 
@@ -3413,6 +3418,7 @@ pub fn setup_timeline_hud(
         })
         .insert(RenderLayers::from_layers(&[3]))
         .insert(TimelineHUD)
+        .insert(UiShadow::hud())
         .insert(Name::new("TIMELINE HUD"))
         .id();
 

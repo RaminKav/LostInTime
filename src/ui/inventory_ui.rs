@@ -63,7 +63,9 @@ use crate::{
         MaterialDropFilterMenuOpen, MaterialDropFilterNoneButton, MaterialDropFilterPanel,
         MaterialDropsToggleButton, SortInventoryButton, BREAK_DROP_FILTER_ITEMS,
     },
-    item::{CraftedItemEvent, Recipes, WorldObject},
+    item::{
+        item_drop_outline::UiShadow, CraftedItemEvent, Recipes, WorldObject,
+    },
     ui::{FurnaceState, CHEST_INVENTORY_UI_SIZE, INVENTORY_UI_SIZE},
     ScreenResolution,
 };
@@ -434,6 +436,7 @@ pub fn setup_inv_ui(
         .insert(cur_inv_state.0.clone())
         .insert(Name::new("INVENTORY"))
         .insert(RenderLayers::from_layers(&[3]))
+        .insert(UiShadow::container())
         .id();
     let _inv_text = commands
         .spawn(Text2dBundle {
@@ -511,6 +514,7 @@ pub fn setup_inv_ui(
         .insert(Name::new("CRAFTING PANEL"))
         .insert(side_panel_element)
         .insert(RenderLayers::from_layers(&[3]))
+        .insert(UiShadow::container())
         .id();
     commands.entity(inv).add_child(upgrade_panel);
     if is_crafting_mode {
@@ -559,6 +563,7 @@ pub fn setup_inv_ui(
             .insert(cur_inv_state.0.clone())
             .insert(Name::new("EQUIPMENTS"))
             .insert(RenderLayers::from_layers(&[3]))
+            .insert(UiShadow::container())
             .id();
         commands.entity(inv).add_child(equip_panel);
         let _eqp_text = commands
@@ -614,6 +619,7 @@ pub fn setup_inv_ui(
             .insert(Name::new("BLUEPRINTS"))
             .insert(UIElement::BlueprintsPanel)
             .insert(RenderLayers::from_layers(&[3]))
+            .insert(UiShadow::container())
             .id();
         let _bp_text = commands
             .spawn(Text2dBundle {

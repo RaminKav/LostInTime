@@ -390,6 +390,7 @@ pub fn setup_class_selection_ui(
         .insert(UIState::ClassSelection)
         .insert(ClassSelectionUI)
         .insert(RenderLayers::from_layers(&[3]))
+        .insert(crate::item::item_drop_outline::UiShadow::container())
         .insert(Name::new("CLASS UI"))
         .id();
 

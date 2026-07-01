@@ -975,6 +975,7 @@ pub fn setup_archives_ui(
         .insert(ArchivesUI)
         .insert(UIState::Archives)
         .insert(RenderLayers::from_layers(&[3]))
+        .insert(crate::item::item_drop_outline::UiShadow::container())
         .set_parent(archives_root);
 
     let button_entries: [(&str, MenuButton); 2] = [

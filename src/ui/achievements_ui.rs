@@ -27,7 +27,7 @@ const ROW_HEIGHT: f32 = 36.0;
 const ROW_GAP: f32 = 4.0;
 const ROW_SPACING: f32 = ROW_HEIGHT + ROW_GAP;
 const LIST_START_Y: f32 = 120.0;
-const ACHIEVEMENT_BUTTON_Y: f32 = -168.0;
+const ACHIEVEMENT_BUTTON_Y: f32 = -166.0;
 const ACHIEVEMENT_BUTTON_SIZE: Vec2 = Vec2::new(92., 24.);
 const ACHIEVEMENT_BUTTON_GAP: f32 = 12.0;
 const ACHIEVEMENT_BUTTON_STEP: f32 = ACHIEVEMENT_BUTTON_SIZE.x + ACHIEVEMENT_BUTTON_GAP;
@@ -627,7 +627,7 @@ pub fn setup_achievements_ui(
     spawn_achievement_button_label(&mut commands, &asset_server, next_button, "Next");
 
     let exit_button = spawn_exit_icon_button(
-        Vec3::new(0., ACHIEVEMENT_BUTTON_Y, BUTTON_Z),
+        Vec3::new(0., ACHIEVEMENT_BUTTON_Y + 2., BUTTON_Z),
         &mut commands,
         &graphics,
     );

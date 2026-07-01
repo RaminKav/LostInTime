@@ -6,7 +6,7 @@ use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
 use crate::{
     assets::Graphics,
     colors::{LIGHT_GREY, SHIELD_BLUE, WHITE, YELLOW_2},
-    item::item_drop_outline::{HeirloomIconOutline, HeirloomIconOutlineStyle},
+    item::item_drop_outline::{HeirloomIconOutline, HeirloomIconOutlineStyle, UiShadow},
     player::skills::{Heirloom, HeirloomRarity},
     ScreenResolution,
 };
@@ -95,6 +95,7 @@ pub fn spawn_heirloom_tooltip_card(
     scaling_text: Option<String>,
     trigger_count: u32,
     show_info_boxes: bool,
+    shadow: UiShadow,
 ) -> Entity {
     let (ui_element, size) = heirloom.get_ui_element(rarity);
     let card_e = commands
@@ -116,6 +117,7 @@ pub fn spawn_heirloom_tooltip_card(
         .insert(ui_element)
         .insert(Name::new("HEIRLOOM TOOLTIP CARD"))
         .insert(RenderLayers::from_layers(&[3]))
+        .insert(shadow)
         .id();
 
     let skill_icon = commands
@@ -287,30 +289,35 @@ pub fn process_heirloom_tooltip_requests(
     resolution: Res<ScreenResolution>,
     existing: Query<Entity, With<HeirloomDynamicTooltip>>,
 ) {
-    for ev in events.iter() {
-        let to_despawn: Vec<Entity> = existing.iter().collect();
-        for e in to_despawn {
-            commands.entity(e).despawn_recursive();
-        }
+    let batch: Vec<HeirloomTooltipRequest> = events.iter().cloned().collect();
+    if batch.is_empty() {
+        return;
+    }
 
-        if let HeirloomTooltipRequest::Show(spec) = ev {
-            let card = spawn_heirloom_tooltip_card(
-                &graphics,
-                &mut commands,
-                &asset_server,
-                &resolution,
-                spec.heirloom.clone(),
-                spec.rarity,
-                spec.position,
-                spec.scaling_text.clone(),
-                spec.trigger_count,
-                true,
-            );
-            let mut ec = commands.entity(card);
-            ec.insert(HeirloomDynamicTooltip);
-            if let Some(st) = spec.ui_state.clone() {
-                ec.insert(st);
-            }
-        }
+    for e in existing.iter() {
+        commands.entity(e).despawn_recursive();
+    }
+
+    let Some(HeirloomTooltipRequest::Show(spec)) = batch.last() else {
+        return;
+    };
+
+    let card = spawn_heirloom_tooltip_card(
+        &graphics,
+        &mut commands,
+        &asset_server,
+        &resolution,
+        spec.heirloom.clone(),
+        spec.rarity,
+        spec.position,
+        spec.scaling_text.clone(),
+        spec.trigger_count,
+        true,
+        UiShadow::hud(),
+    );
+    let mut ec = commands.entity(card);
+    ec.insert(HeirloomDynamicTooltip);
+    if let Some(st) = spec.ui_state.clone() {
+        ec.insert(st);
     }
 }

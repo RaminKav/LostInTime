@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 use bevy::reflect::TypeUuid;
 use bevy::render::render_resource::{AsBindGroup, ShaderRef};
+use bevy::render::view::RenderLayers;
 use bevy::sprite::{Material2d, Material2dPlugin, Mesh2dHandle};
 use bevy::utils::{HashMap, HashSet};
 use bevy_aseprite::anim::AsepriteAnimation;
@@ -8,7 +9,8 @@ use bevy_aseprite::anim::AsepriteAnimation;
 use crate::assets::Graphics;
 use crate::blessings::BlessingChoiceUI;
 use crate::colors::overwrite_alpha;
-use crate::cursor::{CustomCursor, CursorColorSettings};
+use crate::cursor::{CursorColorSettings, CustomCursor};
+use crate::ecs_helpers::safe_add_child;
 use crate::item::ItemDrop;
 use crate::player::skills::{Heirloom, HeirloomChoiceQueue, HeirloomRarity, PlayerSkills};
 use crate::ui::item_chest::{ItemChestFinalHeirloom, ItemChestState};
@@ -27,8 +29,20 @@ pub const HUD_HEIRLOOM_OUTLINE_ALPHA: f32 = 0.42;
 pub const TOOLTIP_CARD_HEIRLOOM_OUTLINE_ALPHA: f32 = 0.12;
 
 /// Default outline for floor item drops and the in-game cursor (#cdceee).
-pub const DEFAULT_OUTLINE_COLOR: Color =
-    Color::rgba(0.804, 0.808, 0.933, DEFAULT_OUTLINE_ALPHA);
+pub const DEFAULT_OUTLINE_COLOR: Color = Color::rgba(0.804, 0.808, 0.933, DEFAULT_OUTLINE_ALPHA);
+
+/// Near-black shadow tint for UI container / tooltip outlines.
+pub const UI_SHADOW_OUTLINE_COLOR_RGB: (f32, f32, f32) = (0.0, 0.0, 0.0);
+/// Inner-ring alpha for container panel shadows.
+pub const UI_CONTAINER_SHADOW_ALPHA: f32 = 0.88;
+/// Inner-ring alpha for tooltip card shadows (a touch softer than containers).
+pub const UI_TOOLTIP_SHADOW_ALPHA: f32 = 0.98;
+/// Each successive shadow ring draws at this fraction of the previous ring's alpha
+/// (0.5 => 100%, 50%, 25%, ...).
+pub const UI_SHADOW_RING_FALLOFF: f32 = 0.65;
+/// Ring counts: containers get 2, tooltip hovers get 3.
+pub const UI_CONTAINER_SHADOW_RINGS: u32 = 3;
+pub const UI_TOOLTIP_SHADOW_RINGS: u32 = 7;
 
 /// Controls outline strength for heirloom icons in different UI contexts.
 #[derive(Component, Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -62,7 +76,10 @@ impl HeirloomIconOutline {
     }
 
     pub fn outline_color(&self) -> Color {
-        overwrite_alpha(heirloom_rarity_outline_base(self.rarity), self.style.alpha())
+        overwrite_alpha(
+            heirloom_rarity_outline_base(self.rarity),
+            self.style.alpha(),
+        )
     }
 }
 
@@ -77,10 +94,68 @@ fn heirloom_rarity_outline_base(rarity: HeirloomRarity) -> Color {
     }
 }
 
+/// Attach to any textured UI sprite (`Sprite` + `Handle<Image>`) to give it a soft
+/// drop-shadow outline. This is **non-destructive**: a separate child mesh entity is
+/// spawned *behind* the sprite that renders only the shadow rings, so the original
+/// sprite keeps its `Sprite`/`Handle<Image>` (hover tinting, texture swaps, and
+/// interaction hit-detection all keep working).
+#[derive(Component, Clone, Copy, Debug)]
+pub struct UiShadow {
+    pub color: Color,
+    /// Number of shadow rings (1..=4).
+    pub ring_count: u32,
+    /// Per-ring alpha multiplier.
+    pub falloff: f32,
+}
+
+impl UiShadow {
+    /// Standard 2-ring shadow for panels / buttons / cards.
+    pub fn container() -> Self {
+        let (r, g, b) = UI_SHADOW_OUTLINE_COLOR_RGB;
+        Self {
+            color: Color::rgba(r, g, b, UI_CONTAINER_SHADOW_ALPHA),
+            ring_count: UI_CONTAINER_SHADOW_RINGS,
+            falloff: UI_SHADOW_RING_FALLOFF,
+        }
+    }
+    pub fn hud() -> Self {
+        let (r, g, b) = UI_SHADOW_OUTLINE_COLOR_RGB;
+        Self {
+            color: Color::rgba(r, g, b, UI_CONTAINER_SHADOW_ALPHA),
+            ring_count: UI_CONTAINER_SHADOW_RINGS,
+            falloff: UI_SHADOW_RING_FALLOFF - 0.2,
+        }
+    }
+
+    /// Softer 3-ring shadow for tooltip / hover cards.
+    pub fn tooltip_card() -> Self {
+        let (r, g, b) = UI_SHADOW_OUTLINE_COLOR_RGB;
+        Self {
+            color: Color::rgba(r, g, b, UI_TOOLTIP_SHADOW_ALPHA),
+            ring_count: UI_TOOLTIP_SHADOW_RINGS,
+            falloff: UI_SHADOW_RING_FALLOFF,
+        }
+    }
+}
+
+/// Marks a sprite whose child shadow has already been spawned (so we don't duplicate it).
+#[derive(Component)]
+pub struct UiShadowApplied;
+
+/// Marks the spawned child shadow mesh entity.
+#[derive(Component)]
+pub struct UiShadowChild;
+
 /// Caches outline materials per atlas sprite index + outline color.
 #[derive(Resource, Default)]
 pub struct AtlasSpriteOutlineState {
     pub materials: HashMap<(usize, u32), Handle<AtlasSpriteOutlineMaterial>>,
+}
+
+/// Caches shadow materials per (image, color, ring_count) so identical panels share one.
+#[derive(Resource, Default)]
+pub struct UiShadowState {
+    pub materials: HashMap<(Handle<Image>, u32, u32), Handle<AtlasSpriteOutlineMaterial>>,
 }
 
 /// Maps atlas sprite indices back to heirlooms for auto-tagging icon sprites.
@@ -99,6 +174,9 @@ pub struct AtlasSpriteOutlineMaterial {
     pub uv_bounds: Vec4,
     #[uniform(3)]
     pub outline_color: Vec4,
+    /// `(ring_count, falloff, shadow_only, _)` — see the shader header.
+    #[uniform(4)]
+    pub ring_params: Vec4,
     #[texture(1)]
     #[sampler(2)]
     pub source_texture: Option<Handle<Image>>,
@@ -115,12 +193,16 @@ pub struct ItemDropOutlinePlugin;
 impl Plugin for ItemDropOutlinePlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<AtlasSpriteOutlineState>()
+            .init_resource::<UiShadowState>()
             .init_resource::<HeirloomIconAtlasLookup>()
             .add_plugin(Material2dPlugin::<AtlasSpriteOutlineMaterial>::default())
             .add_system(init_heirloom_icon_atlas_lookup)
             .add_system(tag_heirloom_icon_outlines.before(apply_atlas_sprite_outlines))
-            .add_system(refresh_outlined_cursor_on_settings_change.before(apply_atlas_sprite_outlines))
-            .add_system(apply_atlas_sprite_outlines);
+            .add_system(
+                refresh_outlined_cursor_on_settings_change.before(apply_atlas_sprite_outlines),
+            )
+            .add_system(apply_atlas_sprite_outlines)
+            .add_system(spawn_ui_shadows);
     }
 }
 
@@ -347,11 +429,7 @@ fn refresh_outlined_cursor_on_settings_change(
         return;
     };
     let mut sprite = base_sprite.clone();
-    CursorColorSettings::apply_sprite_settings(
-        &mut sprite,
-        &base_sprite,
-        cursor_color.double_size,
-    );
+    CursorColorSettings::apply_sprite_settings(&mut sprite, &base_sprite, cursor_color.double_size);
 
     for entity in &cursors {
         commands
@@ -359,6 +437,78 @@ fn refresh_outlined_cursor_on_settings_change(
             .remove::<Mesh2dHandle>()
             .remove::<Handle<AtlasSpriteOutlineMaterial>>()
             .insert((sprite.clone(), texture_atlas.clone()));
+    }
+}
+
+/// Local Z of the shadow child relative to its parent sprite. Negative so the
+/// shadow renders *behind* the panel and only its rings peek out around the edges.
+const UI_SHADOW_CHILD_Z: f32 = -0.5;
+
+/// Spawns a non-destructive child shadow mesh behind every `UiShadow`-tagged sprite.
+fn spawn_ui_shadows(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<AtlasSpriteOutlineMaterial>>,
+    mut state: ResMut<UiShadowState>,
+    images: Res<Assets<Image>>,
+    tagged: Query<
+        (
+            Entity,
+            &Sprite,
+            &Handle<Image>,
+            &UiShadow,
+            Option<&RenderLayers>,
+        ),
+        Without<UiShadowApplied>,
+    >,
+) {
+    for (entity, sprite, image_handle, shadow, render_layers) in &tagged {
+        let Some(image) = images.get(image_handle) else {
+            // Texture not loaded yet; retry next frame (no `UiShadowApplied` inserted).
+            continue;
+        };
+
+        let ring_count = shadow.ring_count.clamp(1, 4);
+        let color_key = color_cache_key(shadow.color);
+        let falloff_key = (shadow.falloff.clamp(0.0, 1.0) * 255.0).round() as u32;
+        let variant_key = ring_count | (falloff_key << 8);
+
+        let material = state
+            .materials
+            .entry((image_handle.clone(), color_key, variant_key))
+            .or_insert_with(|| {
+                materials.add(AtlasSpriteOutlineMaterial {
+                    uv_bounds: Vec4::new(0., 0., 1., 1.),
+                    outline_color: shadow.color.into(),
+                    ring_params: Vec4::new(ring_count as f32, shadow.falloff, 1.0, 0.0),
+                    source_texture: Some(image_handle.clone()),
+                })
+            })
+            .clone();
+
+        let mesh = mesh_from_standalone_image(&mut meshes, image, sprite, ring_count as f32);
+        let layers = render_layers
+            .cloned()
+            .unwrap_or_else(|| RenderLayers::layer(3));
+
+        let child = commands
+            .spawn((
+                mesh,
+                material,
+                SpatialBundle::from_transform(Transform::from_xyz(0., 0., UI_SHADOW_CHILD_Z)),
+                layers,
+                UiShadowChild,
+                Name::new("UI Shadow"),
+            ))
+            .id();
+        safe_add_child(&mut commands, entity, child);
+        commands.add(move |world: &mut World| {
+            if world.get_entity(entity).is_some() {
+                if let Some(mut entity_commands) = world.get_entity_mut(entity) {
+                    entity_commands.insert(UiShadowApplied);
+                }
+            }
+        });
     }
 }
 
@@ -461,6 +611,7 @@ fn apply_outline_to_entity(
             materials.add(AtlasSpriteOutlineMaterial {
                 uv_bounds,
                 outline_color: outline_color.into(),
+                ring_params: Vec4::new(1.0, 0.0, 0.0, 0.0),
                 source_texture: Some(atlas.texture.clone()),
             })
         })
@@ -488,6 +639,43 @@ fn color_cache_key(color: Color) -> u32 {
 /// draw even when the art touches its atlas cell edge. The matching UV margin
 /// is one texel, so the quad stays at 1:1 pixel scale.
 const OUTLINE_MARGIN_PX: f32 = 1.0;
+
+fn mesh_from_standalone_image(
+    meshes: &mut Assets<Mesh>,
+    image: &Image,
+    sprite: &Sprite,
+    ring_count: f32,
+) -> Mesh2dHandle {
+    let dims = Vec2::new(
+        image.texture_descriptor.size.width as f32,
+        image.texture_descriptor.size.height as f32,
+    );
+    let texel = Vec2::new(1.0 / dims.x, 1.0 / dims.y);
+
+    // The shadow needs `ring_count` px of margin so the outermost ring has room.
+    let margin = ring_count.max(1.0);
+    let size = sprite.custom_size.unwrap_or(dims) + Vec2::splat(margin * 2.0);
+
+    let lu = 0.0 - margin * texel.x;
+    let ru = 1.0 + margin * texel.x;
+    let bottom_v = 0.0 - margin * texel.y;
+    let top_v = 1.0 + margin * texel.y;
+
+    let (lu, ru) = if sprite.flip_x { (ru, lu) } else { (lu, ru) };
+    let (bottom_v, top_v) = if sprite.flip_y {
+        (top_v, bottom_v)
+    } else {
+        (bottom_v, top_v)
+    };
+
+    let mut mesh = Mesh::from(shape::Quad::new(size));
+    mesh.insert_attribute(
+        Mesh::ATTRIBUTE_UV_0,
+        vec![[lu, top_v], [lu, bottom_v], [ru, bottom_v], [ru, top_v]],
+    );
+
+    meshes.add(mesh).into()
+}
 
 fn mesh_from_atlas_sprite(
     meshes: &mut Assets<Mesh>,
@@ -527,12 +715,7 @@ fn mesh_from_atlas_sprite(
     let mut mesh = Mesh::from(shape::Quad::new(size));
     mesh.insert_attribute(
         Mesh::ATTRIBUTE_UV_0,
-        vec![
-            [lu, top_v],
-            [lu, bottom_v],
-            [ru, bottom_v],
-            [ru, top_v],
-        ],
+        vec![[lu, top_v], [lu, bottom_v], [ru, bottom_v], [ru, top_v]],
     );
 
     meshes.add(mesh).into()
