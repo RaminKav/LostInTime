@@ -1624,6 +1624,12 @@ impl StandStillState {
 // DeathDefiance - Survive death, freeze all enemies
 // ============================================================================
 
+/// Fired when the Cooked Cross ([`Heirloom::DeathDefiance`]) heirloom saves the player from death.
+pub struct DeathDefianceSurvivedEvent;
+
+/// Fired when an orb upgrade ranks a piece of equipment to Legendary rarity.
+pub struct LegendaryEquipmentRankedEvent;
+
 /// Marker component for mobs frozen by Death Defiance. Inserted briefly on
 /// every mob in range when the heirloom procs, removed when the freeze timer
 /// elapses. Stored `SparseSet` so the freeze doesn't move a bunch of mobs to

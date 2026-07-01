@@ -296,6 +296,9 @@ pub fn handle_furnace_slot_update(
     asset_server: Res<AssetServer>,
     mut game_camera: Query<Entity, With<TextureCamera>>,
     player_skills: Query<&crate::player::skills::PlayerSkills, With<Player>>,
+    mut legendary_rank_events: EventWriter<
+        crate::player::combat_heirlooms::LegendaryEquipmentRankedEvent,
+    >,
 ) {
     let mut inv = inv.single_mut();
 
@@ -355,7 +358,12 @@ pub fn handle_furnace_slot_update(
                             &asset_server,
                             Vec3::new(99., 55., 20.),
                         );
-                        if new_rarity == ItemRarity::Legendary {
+                        if new_rarity == ItemRarity::Legendary
+                            && old_item.item_stack.rarity != ItemRarity::Legendary
+                        {
+                            legendary_rank_events.send(
+                                crate::player::combat_heirlooms::LegendaryEquipmentRankedEvent,
+                            );
                             let mut rng = rand::thread_rng();
                             let seed = rng.gen_range(0..100000);
                             let speed = 10.;

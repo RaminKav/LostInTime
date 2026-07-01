@@ -1,19 +1,42 @@
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::{fs::File, io::BufReader};
+use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter};
 
 use crate::{
+    attributes::{CritChance, MaxHealth, Thorns},
     chaos::ChaosTracker,
     client::{analytics::AnalyticsData, handle_append_run_data_after_death, GameData},
+    combat::{
+        damage_tracker::{format_damage, DamageSource, DamageTracker},
+        status_effects::MobStatusEffects,
+    },
     datafiles,
     enemy::Mob,
     item::WorldObject,
-    player::TimeFragmentCurrency,
+    night::InfiniteMode,
+    player::{
+        combat_heirlooms::{
+            DeathDefianceSurvivedEvent, LegendaryEquipmentRankedEvent, OrbitingStone,
+            StoneToothRockLifetime,
+        },
+        currency::CoinCurrency,
+        skills::MeteorShowerSkillState,
+        TimeFragmentCurrency,
+    },
     world::dimension::Era,
     world::portal::BossKillTracker,
-    BounceEvent, GameState,
+    BounceEvent, GameState, Player,
 };
+
+const LIGHTNING_DAMAGE_ACHIEVEMENT_THRESHOLD: i64 = 5_000_000;
+const ENDLESS_SURVIVAL_ACHIEVEMENT_SECONDS: f32 = 12.0 * 60.0;
+const ERA1_BOSS_SPEED_RUN_SECONDS: f64 = 180.0;
+
+fn fmt_count(n: u32) -> String {
+    format_damage(n as i64)
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Display, EnumIter)]
 pub enum Achievement {
@@ -51,6 +74,20 @@ pub enum Achievement {
     FindDagger,
     FindBow,
     FindBlowdart,
+    Thorns500,
+    MaxCritChance300,
+    OneHitThousand,
+    TenBoulders,
+    Poison500Stacks,
+    MeteorShower100,
+    LegendaryEquipment,
+    MaxHp1000,
+    SurviveDeath,
+    Gold5000,
+    LightningFiveMillion,
+    FlawlessEra1,
+    Endless12Minutes,
+    Era1BossUnder3Min,
 }
 
 #[derive(Resource, Debug, Clone, Serialize, Deserialize, Default)]
@@ -67,6 +104,13 @@ impl Achievements {
             completed: Vec::new(),
             claimed: Vec::new(),
         }
+    }
+
+    /// Achievements whose requirements are met (completed but unclaimed, or already claimed).
+    pub fn finished_count(&self) -> usize {
+        Achievement::iter()
+            .filter(|achievement| self.is_completed(*achievement) || self.is_claimed(*achievement))
+            .count()
     }
 }
 
@@ -95,9 +139,9 @@ impl Achievement {
             Achievement::BushlingSlayer1 => "Bushling Slayer".to_string(),
             Achievement::StingflySlayer => "Stingfly Slayer".to_string(),
             Achievement::MushlingSlayer => "Mushling Slayer".to_string(),
-            Achievement::VoidCrawlerSlayer1 => "Void Crawler Slayer".to_string(),
-            Achievement::VoidCrawlerSlayer2 => "Void Crawler Slayer II".to_string(),
-            Achievement::VoidCrawlerSlayer3 => "Void Crawler Slayer III".to_string(),
+            Achievement::VoidCrawlerSlayer1 => "Void Slayer".to_string(),
+            Achievement::VoidCrawlerSlayer2 => "Void Slayer II".to_string(),
+            Achievement::VoidCrawlerSlayer3 => "Void Slayer III".to_string(),
             Achievement::VoidWormSlayer1 => "Void Worm Slayer".to_string(),
             Achievement::SmallCactusSlayer1 => "Small Cactus Slayer".to_string(),
             Achievement::BigCactusSlayer1 => "Large Cactus Slayer".to_string(),
@@ -115,34 +159,64 @@ impl Achievement {
             Achievement::FindDagger => "Find Dagger".to_string(),
             Achievement::FindBow => "Find Bow".to_string(),
             Achievement::FindBlowdart => "Find Blowdart".to_string(),
+            Achievement::Thorns500 => "Prickly".to_string(),
+            Achievement::MaxCritChance300 => "Perfect Aim".to_string(),
+            Achievement::OneHitThousand => "One Hit Wonder".to_string(),
+            Achievement::TenBoulders => "Boulder Buddies".to_string(),
+            Achievement::Poison500Stacks => "Super Toxic".to_string(),
+            Achievement::MeteorShower100 => "Meteor Storm".to_string(),
+            Achievement::LegendaryEquipment => "Legendary".to_string(),
+            Achievement::MaxHp1000 => "Unbreakable".to_string(),
+            Achievement::SurviveDeath => "Second Wind".to_string(),
+            Achievement::Gold5000 => "Hoarder".to_string(),
+            Achievement::LightningFiveMillion => "Storm Bringer".to_string(),
+            Achievement::FlawlessEra1 => "Perfection".to_string(),
+            Achievement::Endless12Minutes => "Will it end?".to_string(),
+            Achievement::Era1BossUnder3Min => "Speed Runner".to_string(),
         }
     }
     pub fn get_desc(&self) -> String {
         match self {
             Achievement::FirstRunComplete => "Complete your first run.".to_string(),
-            Achievement::Kill100FurDevils => "Defeat 5000 Fur Devils.".to_string(),
+            Achievement::Kill100FurDevils => {
+                format!("Defeat {} Fur Devils.", fmt_count(5000))
+            }
             Achievement::SlimePet => "Find the Slime in Act 1.".to_string(),
             Achievement::FairyPet => "Find the Fairy in Act 2.".to_string(),
             Achievement::PorkipinePet => "Find the Porkipine.".to_string(),
             Achievement::GoldenPigPet => "Find the Golden Pig.".to_string(),
-            Achievement::Bouncy => "Bounce on 100 pink petals.".to_string(),
+            Achievement::Bouncy => format!("Bounce on {} pink petals.", fmt_count(100)),
             Achievement::Bouncy2 => "Chain three pink petal bounces.".to_string(),
             Achievement::Act1 => "Defeat the Act 1 boss.".to_string(),
             Achievement::Act2 => "Defeat the Act 2 boss.".to_string(),
             Achievement::Act3 => "Defeat the Act 3 boss.".to_string(),
-            Achievement::BushlingSlayer1 => "Defeat 5000 Bushlings.".to_string(),
-            Achievement::StingflySlayer => "Defeat 5000 Stingflies.".to_string(),
-            Achievement::MushlingSlayer => "Defeat 5000 Red Mushlings.".to_string(),
-            Achievement::VoidCrawlerSlayer1 => "Defeat 5000 Void Crawlers.".to_string(),
-            Achievement::VoidCrawlerSlayer2 => "Defeat 50000 Void Crawlers.".to_string(),
-            Achievement::VoidCrawlerSlayer3 => "Defeat 500000 Void Crawlers.".to_string(),
-            Achievement::VoidWormSlayer1 => "Defeat 1000 Void Worms.".to_string(),
-            Achievement::SmallCactusSlayer1 => "Defeat 5000 Small Cacti.".to_string(),
-            Achievement::BigCactusSlayer1 => "Defeat 5000 Large Cacti.".to_string(),
-            Achievement::BullSlayer1 => "Defeat 5000 Bulls.".to_string(),
-            Achievement::ScorpionSlayer1 => "Defeat 5000 Desert Scorpions.".to_string(),
-            Achievement::LizardSlayer1 => "Defeat 5000 Lizards.".to_string(),
-            Achievement::Chaotic => "Reach 20 total Chaos.".to_string(),
+            Achievement::BushlingSlayer1 => format!("Defeat {} Bushlings.", fmt_count(5000)),
+            Achievement::StingflySlayer => format!("Defeat {} Stingflies.", fmt_count(5000)),
+            Achievement::MushlingSlayer => {
+                format!("Defeat {} Red Mushlings.", fmt_count(5000))
+            }
+            Achievement::VoidCrawlerSlayer1 => {
+                format!("Defeat {} Void Crawlers.", fmt_count(5000))
+            }
+            Achievement::VoidCrawlerSlayer2 => {
+                format!("Defeat {} Void Crawlers.", fmt_count(50_000))
+            }
+            Achievement::VoidCrawlerSlayer3 => {
+                format!("Defeat {} Void Crawlers.", fmt_count(500_000))
+            }
+            Achievement::VoidWormSlayer1 => format!("Defeat {} Void Worms.", fmt_count(1000)),
+            Achievement::SmallCactusSlayer1 => {
+                format!("Defeat {} Small Cacti.", fmt_count(5000))
+            }
+            Achievement::BigCactusSlayer1 => {
+                format!("Defeat {} Large Cacti.", fmt_count(5000))
+            }
+            Achievement::BullSlayer1 => format!("Defeat {} Bulls.", fmt_count(5000)),
+            Achievement::ScorpionSlayer1 => {
+                format!("Defeat {} Desert Scorpions.", fmt_count(5000))
+            }
+            Achievement::LizardSlayer1 => format!("Defeat {} Lizards.", fmt_count(5000)),
+            Achievement::Chaotic => format!("Reach {} total Chaos.", fmt_count(20)),
             Achievement::DungeonCrawler => "Find the key & clear the dungeon.".to_string(),
             Achievement::FindSpear => "Find a Spear.".to_string(),
             Achievement::FindHammer => "Find a Hammer.".to_string(),
@@ -153,6 +227,45 @@ impl Achievement {
             Achievement::FindDagger => "Find a Dagger.".to_string(),
             Achievement::FindBow => "Find a Bow.".to_string(),
             Achievement::FindBlowdart => "Find a Blowdart.".to_string(),
+            Achievement::Thorns500 => format!("Get {} thorns in a run.", fmt_count(500)),
+            Achievement::MaxCritChance300 => {
+                format!("Get max crit chance ({}).", fmt_count(300))
+            }
+            Achievement::OneHitThousand => {
+                format!("Deal {} damage in one hit.", fmt_count(1000))
+            }
+            Achievement::TenBoulders => {
+                format!("Have {} Boulders summoned at once.", fmt_count(10))
+            }
+            Achievement::Poison500Stacks => {
+                format!("Get an enemy to {} stacks of poison.", fmt_count(500))
+            }
+            Achievement::MeteorShower100 => {
+                format!("Get Meteor Shower to {} meteors.", fmt_count(100))
+            }
+            Achievement::LegendaryEquipment => {
+                "Rank up a piece of equipment to\nLegendary rarity.".to_string()
+            }
+            Achievement::MaxHp1000 => format!("Get {} Max HP in a run.", fmt_count(1000)),
+            Achievement::SurviveDeath => "Survive Death...".to_string(),
+            Achievement::Gold5000 => format!("Have {} gold at once.", fmt_count(5000)),
+            Achievement::LightningFiveMillion => format!(
+                "Deal {} damage with lightning in\na run.",
+                fmt_count(LIGHTNING_DAMAGE_ACHIEVEMENT_THRESHOLD as u32)
+            ),
+            Achievement::FlawlessEra1 => "Beat Era 1 without taking any damage.".to_string(),
+            Achievement::Endless12Minutes => {
+                format!(
+                    "Survive {} minutes in Endless mode.",
+                    ENDLESS_SURVIVAL_ACHIEVEMENT_SECONDS as u32 / 60
+                )
+            }
+            Achievement::Era1BossUnder3Min => {
+                format!(
+                    "Defeat the Era 1 boss in under {}\nminutes.",
+                    ERA1_BOSS_SPEED_RUN_SECONDS as u32 / 60
+                )
+            }
         }
     }
 
@@ -175,14 +288,28 @@ impl Achievement {
             Achievement::MushlingSlayer => 10,
             Achievement::VoidCrawlerSlayer1 => 7,
             Achievement::VoidCrawlerSlayer2 => 15,
-            Achievement::VoidCrawlerSlayer3 => 30,
+            Achievement::VoidCrawlerSlayer3 => 25,
             Achievement::VoidWormSlayer1 => 7,
             Achievement::SmallCactusSlayer1 => 7,
             Achievement::BigCactusSlayer1 => 7,
             Achievement::BullSlayer1 => 7,
             Achievement::ScorpionSlayer1 => 7,
             Achievement::LizardSlayer1 => 7,
-            Achievement::Chaotic => 25,
+            Achievement::Thorns500 => 5,
+            Achievement::MaxCritChance300 => 10,
+            Achievement::OneHitThousand => 10,
+            Achievement::TenBoulders => 5,
+            Achievement::Poison500Stacks => 7,
+            Achievement::MeteorShower100 => 10,
+            Achievement::LegendaryEquipment => 3,
+            Achievement::MaxHp1000 => 7,
+            Achievement::SurviveDeath => 8,
+            Achievement::Gold5000 => 10,
+            Achievement::LightningFiveMillion => 5,
+            Achievement::FlawlessEra1 => 25,
+            Achievement::Endless12Minutes => 20,
+            Achievement::Era1BossUnder3Min => 20,
+            Achievement::Chaotic => 5,
             Achievement::FindSpear
             | Achievement::FindClaw
             | Achievement::FindHammer
@@ -204,6 +331,7 @@ impl Achievement {
         cumulative_analytics: Option<&crate::client::analytics::AnalyticsData>,
         current_run_analytics: Option<&crate::client::analytics::AnalyticsData>,
         bounce_tracker: Option<&BounceAchievementTracker>,
+        meteor_shower_state: Option<&MeteorShowerSkillState>,
     ) -> Option<(u32, u32)> {
         // Helper to get combined mob kills from both cumulative and current run
         let get_mob_kills = |mob: &Mob| -> u32 {
@@ -234,19 +362,15 @@ impl Achievement {
             Achievement::BullSlayer1 => Some((get_mob_kills(&Mob::Bull), 5000)),
             Achievement::ScorpionSlayer1 => Some((get_mob_kills(&Mob::Scorpion), 5000)),
             Achievement::LizardSlayer1 => Some((get_mob_kills(&Mob::Lizard), 5000)),
+            Achievement::MeteorShower100 => {
+                meteor_shower_state.map(|state| (state.meteor_count.min(100), 100))
+            }
             // Achievements that don't need analytics
             Achievement::Bouncy => {
                 if let Some(bounce) = bounce_tracker {
                     Some((bounce.total_pink_bounces, 100))
                 } else {
                     Some((0, 100))
-                }
-            }
-            Achievement::Bouncy2 => {
-                if let Some(bounce) = bounce_tracker {
-                    Some((bounce.consecutive_pink_bounces, 3))
-                } else {
-                    Some((0, 3))
                 }
             }
             _ => None, // No progress tracking for other achievements
@@ -350,10 +474,14 @@ pub struct AchievementsPlugin;
 impl Plugin for AchievementsPlugin {
     fn build(&self, app: &mut App) {
         app.add_event::<AchievementUnlockedEvent>()
+            .add_event::<DeathDefianceSurvivedEvent>()
+            .add_event::<LegendaryEquipmentRankedEvent>()
             .init_resource::<BounceAchievementTracker>()
             .add_systems(
                 (
                     track_bounce_achievements,
+                    track_death_defiance_achievement,
+                    track_legendary_equipment_achievement,
                     check_achievements,
                     check_first_run_achievement.before(handle_append_run_data_after_death),
                     handle_achievement_rewards,
@@ -369,8 +497,16 @@ pub fn check_achievements(
     analytics: Option<Res<AnalyticsData>>,
     chaos_tracker: Option<Res<ChaosTracker>>,
     boss_kill_tracker: Option<Res<BossKillTracker>>,
+    damage_tracker: Option<Res<DamageTracker>>,
+    coins: Option<Res<CoinCurrency>>,
+    infinite_mode: Option<Res<InfiniteMode>>,
     mut achievement_events: EventWriter<AchievementUnlockedEvent>,
     game_data: Option<Res<crate::client::GameData>>,
+    player_stats: Query<(&Thorns, &CritChance, &MaxHealth), With<Player>>,
+    meteor_shower_state: Query<&MeteorShowerSkillState, With<Player>>,
+    player_entity: Query<Entity, With<Player>>,
+    orbiting_stones: Query<(&OrbitingStone, Option<&StoneToothRockLifetime>)>,
+    mob_status: Query<&MobStatusEffects, With<Mob>>,
 ) {
     // Get both cumulative and current run analytics
     let cumulative = game_data
@@ -469,6 +605,113 @@ pub fn check_achievements(
         }
     }
 
+    if let Ok((thorns, crit_chance, max_health)) = player_stats.get_single() {
+        if thorns.0 >= 500 {
+            try_unlock(
+                &mut achievements,
+                Achievement::Thorns500,
+                &mut achievement_events,
+            );
+        }
+        if crit_chance.0 >= 300 {
+            try_unlock(
+                &mut achievements,
+                Achievement::MaxCritChance300,
+                &mut achievement_events,
+            );
+        }
+        if max_health.0 >= 1000 {
+            try_unlock(
+                &mut achievements,
+                Achievement::MaxHp1000,
+                &mut achievement_events,
+            );
+        }
+    }
+
+    if let Ok(state) = meteor_shower_state.get_single() {
+        if state.meteor_count >= 100 {
+            try_unlock(
+                &mut achievements,
+                Achievement::MeteorShower100,
+                &mut achievement_events,
+            );
+        }
+    }
+
+    if let Some(coins) = coins.as_ref() {
+        if coins.coins >= 5000 {
+            try_unlock(
+                &mut achievements,
+                Achievement::Gold5000,
+                &mut achievement_events,
+            );
+        }
+    }
+
+    if let Some(tracker) = damage_tracker.as_ref() {
+        if tracker.max_single_hit >= 1000 {
+            try_unlock(
+                &mut achievements,
+                Achievement::OneHitThousand,
+                &mut achievement_events,
+            );
+        }
+        let lightning_damage = tracker
+            .totals
+            .get(&DamageSource::Lightning)
+            .copied()
+            .unwrap_or(0);
+        if lightning_damage >= LIGHTNING_DAMAGE_ACHIEVEMENT_THRESHOLD {
+            try_unlock(
+                &mut achievements,
+                Achievement::LightningFiveMillion,
+                &mut achievement_events,
+            );
+        }
+    }
+
+    if let Some(mode) = infinite_mode.as_ref() {
+        if mode.active && mode.elapsed_seconds >= ENDLESS_SURVIVAL_ACHIEVEMENT_SECONDS {
+            try_unlock(
+                &mut achievements,
+                Achievement::Endless12Minutes,
+                &mut achievement_events,
+            );
+        }
+    }
+
+    if let Ok(player_e) = player_entity.get_single() {
+        let active_boulders = orbiting_stones
+            .iter()
+            .filter(|(stone, lifetime)| {
+                stone.owner == player_e && lifetime.map(|l| !l.lifetime.finished()).unwrap_or(false)
+            })
+            .count();
+        if active_boulders >= 10 {
+            try_unlock(
+                &mut achievements,
+                Achievement::TenBoulders,
+                &mut achievement_events,
+            );
+        }
+    }
+
+    for status in mob_status.iter() {
+        if status
+            .burning
+            .as_ref()
+            .is_some_and(|burning| burning.stacks >= 500)
+        {
+            try_unlock(
+                &mut achievements,
+                Achievement::Poison500Stacks,
+                &mut achievement_events,
+            );
+            break;
+        }
+    }
+
     if let Some(boss_kills) = boss_kill_tracker.as_ref() {
         if boss_kills.is_boss_killed(&Era::Main) {
             try_unlock(
@@ -476,6 +719,26 @@ pub fn check_achievements(
                 Achievement::Act1,
                 &mut achievement_events,
             );
+            if current_run
+                .map(|run| run.total_damage_taken == 0)
+                .unwrap_or(false)
+            {
+                try_unlock(
+                    &mut achievements,
+                    Achievement::FlawlessEra1,
+                    &mut achievement_events,
+                );
+            }
+            if boss_kills
+                .era1_boss_kill_elapsed_seconds
+                .is_some_and(|elapsed| elapsed <= ERA1_BOSS_SPEED_RUN_SECONDS)
+            {
+                try_unlock(
+                    &mut achievements,
+                    Achievement::Era1BossUnder3Min,
+                    &mut achievement_events,
+                );
+            }
         }
         if boss_kills.is_boss_killed(&Era::Second) {
             try_unlock(
@@ -504,6 +767,34 @@ pub fn check_first_run_achievement(
         try_unlock(
             &mut achievements,
             Achievement::FirstRunComplete,
+            &mut achievement_events,
+        );
+    }
+}
+
+pub fn track_death_defiance_achievement(
+    mut events: EventReader<DeathDefianceSurvivedEvent>,
+    mut achievements: ResMut<Achievements>,
+    mut achievement_events: EventWriter<AchievementUnlockedEvent>,
+) {
+    for _ in events.iter() {
+        try_unlock(
+            &mut achievements,
+            Achievement::SurviveDeath,
+            &mut achievement_events,
+        );
+    }
+}
+
+pub fn track_legendary_equipment_achievement(
+    mut events: EventReader<LegendaryEquipmentRankedEvent>,
+    mut achievements: ResMut<Achievements>,
+    mut achievement_events: EventWriter<AchievementUnlockedEvent>,
+) {
+    for _ in events.iter() {
+        try_unlock(
+            &mut achievements,
+            Achievement::LegendaryEquipment,
             &mut achievement_events,
         );
     }

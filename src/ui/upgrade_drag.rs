@@ -83,9 +83,12 @@ pub fn handle_drag_upgrade_material_on_equipment(
     mut inv: Query<&mut Inventory>,
     inv_state: Res<InventoryState>,
     proto: ProtoParam,
-    mut assets: UpgradeDragAssets,
+    assets: UpgradeDragAssets,
     mut game_camera: Query<Entity, With<TextureCamera>>,
     player_skills: Query<&PlayerSkills, With<Player>>,
+    mut legendary_rank_events: EventWriter<
+        crate::player::combat_heirlooms::LegendaryEquipmentRankedEvent,
+    >,
 ) {
     let asset_server = &assets.asset_server;
     if !ui_state.0.is_inv_open() {
@@ -204,15 +207,18 @@ pub fn handle_drag_upgrade_material_on_equipment(
             let Some(existing) = container.items[slot_index].clone() else {
                 return;
             };
+            let old_rarity = existing.item_stack.rarity.clone();
             let new_item = reroll_item_bonus_attributes(&existing.item_stack, &proto);
             let new_rarity = new_item.rarity.clone();
-            let rarity_changed = new_rarity != existing.item_stack.rarity;
+            let rarity_changed = new_rarity != old_rarity;
             container.items[slot_index] = Some(InventoryItemStack::new(new_item, existing.slot));
 
             if rarity_changed {
                 let anim_pos = cursor_pos.ui_coords.truncate().extend(20.);
                 spawn_rarity_animation(new_rarity.clone(), &mut commands, &asset_server, anim_pos);
-                if new_rarity == ItemRarity::Legendary {
+                if new_rarity == ItemRarity::Legendary && old_rarity != ItemRarity::Legendary {
+                    legendary_rank_events
+                        .send(crate::player::combat_heirlooms::LegendaryEquipmentRankedEvent);
                     let mut rng = rand::thread_rng();
                     let seed = rng.gen_range(0..100000);
                     for e in game_camera.iter_mut() {

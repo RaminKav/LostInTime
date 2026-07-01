@@ -5,14 +5,15 @@ use bevy::sprite::Anchor;
 use strum::IntoEnumIterator;
 
 use super::{
-    main_menu::spawn_exit_icon_button,
-    ui_helpers, Interactable, Interaction, MenuButton, UIElement, UIState,
+    main_menu::spawn_exit_icon_button, ui_helpers, Interactable, Interaction, MenuButton,
+    UIElement, UIState,
 };
 
 use crate::{
     animations::enemy_sprites::spawn_attack_warning_aseprite,
     assets::Graphics,
     colors::{LIGHT_GREEN, WHITE},
+    combat::damage_tracker::format_damage,
     player::achievements::{Achievement, Achievements},
     ScreenResolution,
 };
@@ -30,6 +31,9 @@ const ACHIEVEMENT_BUTTON_Y: f32 = -168.0;
 const ACHIEVEMENT_BUTTON_SIZE: Vec2 = Vec2::new(92., 24.);
 const ACHIEVEMENT_BUTTON_GAP: f32 = 12.0;
 const ACHIEVEMENT_BUTTON_STEP: f32 = ACHIEVEMENT_BUTTON_SIZE.x + ACHIEVEMENT_BUTTON_GAP;
+const ACHIEVEMENTS_TITLE_Y: f32 = 160.0;
+const ACHIEVEMENTS_COMPLETION_TRACKER_Y: f32 = 145.0;
+const ACHIEVEMENTS_COMPLETION_TRACKER_X: f32 = 225.0;
 const CONTAINER_Z: f32 = 0.0;
 const ROW_BG_Z: f32 = 1.0;
 const ROW_HITBOX_Z: f32 = 1.5;
@@ -76,6 +80,17 @@ pub struct AchievementsPrevButton;
 #[derive(Component)]
 pub struct AchievementsNextButton;
 
+#[derive(Component)]
+pub struct AchievementsCompletionText;
+
+fn achievements_completion_label(achievements: &Achievements) -> String {
+    format!(
+        "{}/{}",
+        achievements.finished_count(),
+        Achievement::iter().count()
+    )
+}
+
 fn get_row_ui_element(row_index: usize, has_counter: bool) -> UIElement {
     let use_variant_one = row_index % 2 == 0;
     match (has_counter, use_variant_one) {
@@ -105,7 +120,7 @@ fn load_row_texture(
 }
 
 fn achievement_has_counter(achievement: Achievement) -> bool {
-    achievement.get_progress(None, None, None).is_some()
+    achievement.get_progress(None, None, None, None).is_some()
 }
 
 fn name_text_color(is_completed: bool, is_claimed: bool) -> Color {
@@ -114,7 +129,7 @@ fn name_text_color(is_completed: bool, is_claimed: bool) -> Color {
     } else if is_completed {
         LIGHT_GREEN
     } else {
-        crate::colors::LIGHT_BROWN
+        crate::colors::WHITE
     }
 }
 
@@ -203,13 +218,39 @@ pub fn setup_achievements_ui(
             )
             .with_alignment(TextAlignment::Center),
             text_anchor: bevy::sprite::Anchor::Center,
-            transform: Transform::from_translation(Vec3::new(0., 160., 11.)),
+            transform: Transform::from_translation(Vec3::new(0., ACHIEVEMENTS_TITLE_Y, 11.)),
             ..Default::default()
         },
         RenderLayers::from_layers(&[3]),
         AchievementsUI,
         UIState::Achievements,
         Name::new("Achievements Title"),
+    ));
+
+    commands.spawn((
+        Text2dBundle {
+            text: Text::from_section(
+                achievements_completion_label(&achievements),
+                TextStyle {
+                    font: asset_server.load("fonts/slkscr.ttf"),
+                    font_size: 8.5,
+                    color: crate::colors::LIGHT_BROWN,
+                },
+            )
+            .with_alignment(TextAlignment::Right),
+            text_anchor: Anchor::CenterRight,
+            transform: Transform::from_translation(Vec3::new(
+                ACHIEVEMENTS_COMPLETION_TRACKER_X,
+                ACHIEVEMENTS_COMPLETION_TRACKER_Y,
+                11.,
+            )),
+            ..Default::default()
+        },
+        RenderLayers::from_layers(&[3]),
+        AchievementsUI,
+        UIState::Achievements,
+        AchievementsCompletionText,
+        Name::new("Achievements Completion Tracker"),
     ));
 
     let achievements_bg = commands
@@ -262,7 +303,7 @@ pub fn setup_achievements_ui(
         (all_achievements.len() + ACHIEVEMENTS_PER_PAGE - 1) / ACHIEVEMENTS_PER_PAGE
     };
     let font_handle = asset_server.load("fonts/4x5.ttf");
-    let name_font = asset_server.load("fonts/alagard.ttf");
+    let name_font = asset_server.load("fonts/passage.ttf");
 
     for row_index in 0..ACHIEVEMENTS_PER_PAGE {
         let y_pos = LIST_START_Y - (row_index as f32 * ROW_SPACING);
@@ -363,13 +404,13 @@ pub fn setup_achievements_ui(
                         name_text,
                         TextStyle {
                             font: name_font.clone(),
-                            font_size: 15.0,
+                            font_size: 16.0,
                             color: name_color,
                         },
                     )
                     .with_alignment(TextAlignment::Left),
-                    text_anchor: Anchor::CenterLeft,
-                    transform: Transform::from_translation(Vec3::new(-194., y_pos, ROW_TEXT_Z)),
+                    text_anchor: Anchor::Center,
+                    transform: Transform::from_translation(Vec3::new(-134., y_pos, ROW_TEXT_Z)),
                     visibility: if row_visible {
                         Visibility::Visible
                     } else {
@@ -503,7 +544,7 @@ pub fn setup_achievements_ui(
                         custom_size: Some(Vec2::new(16., 16.)),
                         ..Default::default()
                     },
-                    transform: Transform::from_translation(Vec3::new(-8.5, 0., 1.)),
+                    transform: Transform::from_translation(Vec3::new(-68.5, 0., 1.)),
                     visibility: if row_visible {
                         Visibility::Visible
                     } else {
@@ -543,32 +584,6 @@ pub fn setup_achievements_ui(
                 ));
             }
         }
-
-        let crossout_entity = commands
-            .spawn((
-                SpriteBundle {
-                    texture: graphics.get_ui_element_texture(UIElement::AchievementCrossOut),
-                    sprite: Sprite {
-                        custom_size: Some(Vec2::new(289., 7.)),
-                        ..Default::default()
-                    },
-                    transform: Transform::from_translation(Vec3::new(142., 0., 1.)),
-                    visibility: if row_visible && crossout_visible {
-                        Visibility::Visible
-                    } else {
-                        Visibility::Hidden
-                    },
-                    ..Default::default()
-                },
-                RenderLayers::from_layers(&[3]),
-                AchievementsUI,
-                AchievementCrossout,
-                AchievementRow { index: row_index },
-                Name::new("Achievement Crossout"),
-            ))
-            .id();
-
-        commands.entity(crossout_entity).set_parent(name_entity);
     }
 
     let prev_button = spawn_achievement_button(
@@ -643,6 +658,17 @@ pub fn update_achievements_page_display(
     asset_server: Res<AssetServer>,
     analytics: Option<Res<crate::client::analytics::AnalyticsData>>,
     bounce_tracker: Option<Res<crate::player::achievements::BounceAchievementTracker>>,
+    meteor_shower_state: Query<&crate::player::skills::MeteorShowerSkillState, With<crate::Player>>,
+    mut completion_text: Query<
+        &mut Text,
+        (
+            With<AchievementsCompletionText>,
+            Without<AchievementNameText>,
+            Without<AchievementDescText>,
+            Without<AchievementRewardText>,
+            Without<AchievementProgressText>,
+        ),
+    >,
     game_data: Option<Res<crate::client::GameData>>,
     achievements_bg_query: Query<Entity, (With<AchievementsUI>, With<UIState>)>,
     warning_animations: Query<(Entity, &AchievementRow), With<AchievementWarningAnimation>>,
@@ -694,6 +720,10 @@ pub fn update_achievements_page_display(
 
     let mut row_states = Vec::with_capacity(ACHIEVEMENTS_PER_PAGE);
 
+    if let Ok(mut text) = completion_text.get_single_mut() {
+        text.sections[0].value = achievements_completion_label(&achievements);
+    }
+
     for offset in 0..ACHIEVEMENTS_PER_PAGE {
         let maybe_achievement = all_achievements.get(start_index + offset).copied();
         row_states.push(maybe_achievement.map(|achievement| {
@@ -703,10 +733,12 @@ pub fn update_achievements_page_display(
                 .as_ref()
                 .and_then(|gd| gd.cumulative_analytics.as_ref());
             let current_run_analytics = analytics.as_deref();
+            let meteor_state = meteor_shower_state.get_single().ok();
             let progress = achievement.get_progress(
                 cumulative_analytics,
                 current_run_analytics,
                 bounce_tracker.as_deref(),
+                meteor_state,
             );
             (achievement, is_completed, is_claimed, progress)
         }));
@@ -822,7 +854,11 @@ pub fn update_achievements_page_display(
                         text.sections[0].value.clear();
                         *visibility = Visibility::Hidden;
                     } else {
-                        text.sections[0].value = format!("{}/{}", current, target);
+                        text.sections[0].value = format!(
+                            "{}/{}",
+                            format_damage(current as i64),
+                            format_damage(target as i64)
+                        );
                         text.sections[0].style.color = status_text_color(is_completed, is_claimed);
                         *visibility = Visibility::Visible;
                     }

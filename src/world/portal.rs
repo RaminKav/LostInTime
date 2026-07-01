@@ -1,6 +1,7 @@
 use crate::combat::EnemyDeathEvent;
 use crate::enemy::{spawner::MobSpawningPaused, Mob};
 use crate::night::EraTimer;
+use crate::player::score::RunTimer;
 use crate::player::Player;
 use crate::ui::tips::{SeenTips, Tip, TipEvent};
 use crate::world::dimension::{Era, EraManager};
@@ -41,11 +42,18 @@ pub struct TimePortal;
 #[derive(Resource, Default, Debug, Clone)]
 pub struct BossKillTracker {
     pub killed_eras: HashSet<Era>,
+    /// Run elapsed time when the Era 1 boss was defeated, if recorded this run.
+    pub era1_boss_kill_elapsed_seconds: Option<f64>,
 }
 
 impl BossKillTracker {
     pub fn mark_boss_killed(&mut self, era: Era) {
         self.killed_eras.insert(era);
+    }
+
+    pub fn mark_era1_boss_killed(&mut self, elapsed_seconds: f64) {
+        self.killed_eras.insert(Era::Main);
+        self.era1_boss_kill_elapsed_seconds = Some(elapsed_seconds);
     }
 
     pub fn is_boss_killed(&self, era: &Era) -> bool {
@@ -59,6 +67,7 @@ pub fn track_boss_kills(
     mob_query: Query<&Mob>,
     era_manager: Res<EraManager>,
     mut boss_kill_tracker: ResMut<BossKillTracker>,
+    run_timer: Res<RunTimer>,
     era_timer: Res<EraTimer>,
     mut mob_spawning_paused: ResMut<MobSpawningPaused>,
     mut tip_event: EventWriter<TipEvent>,
@@ -69,8 +78,11 @@ pub fn track_boss_kills(
             // Only RedMushking counts for Era::Main (Act1 achievement)
             // StoneGolem is a boss but doesn't count for era completion
             if mob == &Mob::RedMushking {
-                // Mark the current era's boss as killed
-                boss_kill_tracker.mark_boss_killed(era_manager.current_era.clone());
+                if era_manager.current_era == Era::Main {
+                    boss_kill_tracker.mark_era1_boss_killed(run_timer.elapsed_seconds);
+                } else {
+                    boss_kill_tracker.mark_boss_killed(era_manager.current_era.clone());
+                }
                 info!("Boss killed in era {:?}", era_manager.current_era);
 
                 if (era_manager.current_era == Era::Main || era_manager.current_era == Era::Second)

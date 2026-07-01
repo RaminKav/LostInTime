@@ -300,6 +300,8 @@ impl DamageSource {
 #[derive(Resource, Default, Debug, Serialize)]
 pub struct DamageTracker {
     pub totals: HashMap<DamageSource, i64>,
+    #[serde(default)]
+    pub max_single_hit: i32,
 }
 
 #[derive(Debug, Clone, Default, Serialize)]
@@ -371,6 +373,7 @@ impl DamageTracker {
     pub fn record(&mut self, source: DamageSource, amount: i32) {
         if amount > 0 {
             *self.totals.entry(source).or_insert(0) += amount as i64;
+            self.max_single_hit = self.max_single_hit.max(amount);
         }
     }
 

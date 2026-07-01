@@ -1422,6 +1422,9 @@ pub fn clamp_health(
         With<Player>,
     >,
     mut game_over_event: EventWriter<GameOverEvent>,
+    mut death_defiance_events: EventWriter<
+        crate::player::combat_heirlooms::DeathDefianceSurvivedEvent,
+    >,
     mobs: Query<(Entity, &TextureAtlasSprite), With<crate::enemy::Mob>>,
     mut run_beastiary: Option<ResMut<crate::player::beastiary::RunBeastiary>>,
     last_attacker: Option<Res<crate::player::beastiary::LastPlayerAttackerMob>>,
@@ -1441,6 +1444,10 @@ pub fn clamp_health(
 
                     // Restore to 50% max health
                     h.0 = max_h.0 / 2;
+
+                    death_defiance_events.send(
+                        crate::player::combat_heirlooms::DeathDefianceSurvivedEvent,
+                    );
 
                     // Freeze all mobs for 3 seconds with blue tint
                     use crate::combat::status_effects::STATUS_EFFECT_BLUE_TINT;
