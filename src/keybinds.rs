@@ -73,6 +73,31 @@ fn check_binding_input(
     }
 }
 
+/// Whether `keys` currently has the bound key held down (not just this frame). Left/right
+/// Shift, Ctrl, and Alt are treated as interchangeable, matching `key_binding_just_pressed`.
+pub fn key_binding_pressed(bound: KeyCode, keys: &Input<KeyCode>) -> bool {
+    match normalize_key_binding(bound) {
+        KeyCode::LShift => keys.pressed(KeyCode::LShift) || keys.pressed(KeyCode::RShift),
+        KeyCode::LControl => keys.pressed(KeyCode::LControl) || keys.pressed(KeyCode::RControl),
+        KeyCode::LAlt => keys.pressed(KeyCode::LAlt) || keys.pressed(KeyCode::RAlt),
+        key => keys.pressed(key),
+    }
+}
+
+/// Held-down (`.pressed()`) counterpart to `check_binding_input`'s `.just_pressed()` check.
+/// Used by the Mouseless Mode hold-to-aim flow to detect when a ground-targeted skill's
+/// button is released (see `InputMappings::check_skill_input_held`).
+fn check_binding_input_held(
+    binding: InputBinding,
+    keys: &Input<KeyCode>,
+    mouse: &Input<MouseButton>,
+) -> bool {
+    match binding {
+        InputBinding::KeyBinding(key) => key_binding_pressed(key, keys),
+        InputBinding::MouseBinding(button) => mouse.pressed(button),
+    }
+}
+
 #[derive(Resource, Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct InputMappings {
     pub active_skill_slot_0: InputBinding,
@@ -153,6 +178,17 @@ impl InputMappings {
         mouse: &Input<MouseButton>,
     ) -> bool {
         check_binding_input(self.get_active_skill_key(slot), keys, mouse)
+    }
+
+    /// Held-down counterpart to `check_skill_input`, used while charging a ground-targeted
+    /// skill's hold-to-aim reticle in Mouseless Mode to detect when the button is released.
+    pub fn check_skill_input_held(
+        &self,
+        slot: usize,
+        keys: &Input<KeyCode>,
+        mouse: &Input<MouseButton>,
+    ) -> bool {
+        check_binding_input_held(self.get_active_skill_key(slot), keys, mouse)
     }
     pub fn check_inv_input(&self, keys: &Input<KeyCode>, mouse: &Input<MouseButton>) -> bool {
         check_binding_input(self.get_inventory_key(), keys, mouse)

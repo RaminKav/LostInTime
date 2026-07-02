@@ -248,6 +248,17 @@ pub struct GameData {
     pub auto_attack: Option<crate::inputs::AutoAttackState>,
     #[serde(default)]
     pub attack_auto_target: Option<crate::inputs::AttackAutoTargetState>,
+    /// Options screen: "Mouseless Mode" (`MouselessModeState`) — arrow keys aim instead of
+    /// the mouse cursor; see `src/keyboard_aim.rs`.
+    #[serde(default)]
+    pub mouseless_mode: Option<crate::inputs::MouselessModeState>,
+    /// Options screen: "Aim Sensitivity" (1-10), how fast the Mouseless Mode reticle moves.
+    #[serde(default)]
+    pub keyboard_aim_sensitivity: Option<crate::keyboard_aim::KeyboardAimSensitivity>,
+    /// Options screen: "Swap Move/Aim Keys" (`SwapMovementAimKeysState`) — swaps which key
+    /// group moves vs. aims while Mouseless Mode is on.
+    #[serde(default)]
+    pub swap_movement_aim_keys: Option<crate::inputs::SwapMovementAimKeysState>,
     /// Options screen: "Unlock All Classes" cheat (`CheatSettings::bypass_class_unlocks`).
     #[serde(default)]
     pub bypass_class_unlocks: Option<bool>,

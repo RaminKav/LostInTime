@@ -2,6 +2,8 @@ use crate::attributes::ActiveConsumableBuffs;
 use crate::blessings::OwnedBlessings;
 use crate::chaos::ChaosTracker;
 use crate::cursor::CursorPos;
+use crate::gamepad_input::{gamepad_hotbar_just_pressed, gamepad_skill_just_pressed, GamepadAction};
+use leafwing_input_manager::prelude::ActionState;
 use std::time::Duration;
 
 use crate::animations::player_sprite::PlayerAnimation;
@@ -79,6 +81,9 @@ impl Plugin for InputsPlugin {
         app.insert_resource(CursorPos::default())
             .insert_resource(AutoAttackState::load())
             .insert_resource(AttackAutoTargetState::load())
+            .insert_resource(MouselessModeState::load())
+            .insert_resource(SwapMovementAimKeysState::load())
+            .init_resource::<PendingGroundAimSkill>()
             .insert_resource(crate::bounce::NaturalTornadoSpawner::default())
             .register_type::<CursorPos>()
             .add_event::<BounceEvent>()
@@ -153,6 +158,102 @@ pub struct AttackAutoTargetState(pub bool);
 impl Default for AttackAutoTargetState {
     fn default() -> Self {
         Self(false)
+    }
+}
+
+/// Options screen toggle: "Mouseless Mode". When on, arrow keys stop moving the player
+/// (WASD alone drives movement) and instead act as a virtual aim stick — steering facing /
+/// attacks / instant skills the same way the mouse cursor normally would, and letting
+/// ground-targeted skills (`ActiveSkill::is_ground_targeted`) be aimed with a hold-and-release
+/// reticle instead of firing instantly. See `src/keyboard_aim.rs` for the aim/reticle systems
+/// and `dispatch_active_skill_events` for the hold-to-aim gating. Exists mainly so twin-stick
+/// aim logic can be exercised on keyboard alone, sidestepping the current macOS gamepad
+/// hardware-support gap (see `gamepad_input.rs`) while sharing the same design.
+#[derive(Resource, Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+pub struct MouselessModeState(pub bool);
+
+impl Default for MouselessModeState {
+    fn default() -> Self {
+        Self(false)
+    }
+}
+
+impl MouselessModeState {
+    pub fn load() -> Self {
+        let path = crate::datafiles::game_data();
+        if let Ok(file) = std::fs::File::open(&path) {
+            let reader = std::io::BufReader::new(file);
+            if let Ok(game_data) = crate::client::GameData::try_from_json_reader(reader) {
+                return game_data.mouseless_mode.unwrap_or_default();
+            }
+        }
+        Self::default()
+    }
+
+    pub fn save(&self) {
+        let path = crate::datafiles::game_data();
+        let mut game_data = if let Ok(file) = std::fs::File::open(&path) {
+            let reader = std::io::BufReader::new(file);
+            crate::client::GameData::try_from_json_reader(reader).unwrap_or_default()
+        } else {
+            crate::client::GameData::default()
+        };
+
+        game_data.mouseless_mode = Some(*self);
+
+        if let Ok(file) = std::fs::File::create(&path) {
+            let _ = serde_json::to_writer_pretty(file, &game_data);
+        }
+    }
+}
+
+/// Which active-skill slot (if any) is currently mid-"hold to aim" — the button is being held
+/// so the ground-target reticle is showing, but the skill hasn't fired yet. Only used while
+/// `MouselessModeState` is on; see `dispatch_active_skill_events`.
+#[derive(Resource, Default)]
+pub struct PendingGroundAimSkill(pub Option<usize>);
+
+/// Options screen toggle (under "Toggles", alongside Mouseless Mode): when on, swaps which key
+/// group drives movement vs. aim while `MouselessModeState` is active — arrow keys move and
+/// WASD aims, instead of the default WASD-moves/arrows-aim. For left-handed players or anyone
+/// who prefers the opposite hand on movement. Has no effect while Mouseless Mode is off (both
+/// WASD and arrows always move then, same as always). See `player_move_inputs` and
+/// `keyboard_aim::update_keyboard_aim_state`.
+#[derive(Resource, Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+pub struct SwapMovementAimKeysState(pub bool);
+
+impl Default for SwapMovementAimKeysState {
+    fn default() -> Self {
+        Self(false)
+    }
+}
+
+impl SwapMovementAimKeysState {
+    pub fn load() -> Self {
+        let path = crate::datafiles::game_data();
+        if let Ok(file) = std::fs::File::open(&path) {
+            let reader = std::io::BufReader::new(file);
+            if let Ok(game_data) = crate::client::GameData::try_from_json_reader(reader) {
+                return game_data.swap_movement_aim_keys.unwrap_or_default();
+            }
+        }
+        Self::default()
+    }
+
+    pub fn save(&self) {
+        let path = crate::datafiles::game_data();
+        let mut game_data = if let Ok(file) = std::fs::File::open(&path) {
+            let reader = std::io::BufReader::new(file);
+            crate::client::GameData::try_from_json_reader(reader).unwrap_or_default()
+        } else {
+            crate::client::GameData::default()
+        };
+
+        game_data.swap_movement_aim_keys = Some(*self);
+
+        if let Ok(file) = std::fs::File::create(&path) {
+            let _ = serde_json::to_writer_pretty(file, &game_data);
+        }
     }
 }
 
@@ -232,11 +333,16 @@ fn toggle_attack_auto_target(
     ui_state: Res<State<UIState>>,
     mut auto_target: ResMut<AttackAutoTargetState>,
     mut commands: Commands,
+    gamepad_action_q: Query<&ActionState<GamepadAction>, With<Player>>,
 ) {
     if ui_state.0 != UIState::Closed {
         return;
     }
-    if !keybinds.check_attack_auto_target_input(&key_input, &mouse_input) {
+    let gamepad_pressed = gamepad_action_q
+        .get_single()
+        .map(|a| a.just_pressed(GamepadAction::AutoTarget))
+        .unwrap_or(false);
+    if !keybinds.check_attack_auto_target_input(&key_input, &mouse_input) && !gamepad_pressed {
         return;
     }
     auto_target.0 = !auto_target.0;
@@ -407,6 +513,9 @@ pub fn player_move_inputs(
     mut audio_timer: Local<Timer>,
     mut ammo_query: Query<&mut Ammo>,
     proto_param: ProtoParam,
+    gamepad_action_q: Query<&ActionState<GamepadAction>, With<Player>>,
+    mouseless_mode: Res<MouselessModeState>,
+    swap_keys: Res<SwapMovementAimKeysState>,
 ) {
     if audio_timer.duration() == Duration::ZERO {
         *audio_timer = Timer::from_seconds(0.2, TimerMode::Once);
@@ -444,21 +553,52 @@ pub fn player_move_inputs(
         * (if hunger.is_starving() { 0.7 } else { 1. })
         * movement_speed_multiplier;
 
-    if key_input.pressed(KeyCode::A) || key_input.pressed(KeyCode::Left) {
-        d_raw.x -= 1.;
+    // Left stick takes priority over WASD for this frame when it's outside the deadzone;
+    // otherwise fall back to keyboard so mixed keyboard/gamepad play keeps working.
+    let gamepad_move = gamepad_action_q.get_single().ok().and_then(|action_state| {
+        action_state
+            .clamped_axis_pair(GamepadAction::Move)
+            .map(|pair| pair.xy())
+    });
+    if let Some(stick) = gamepad_move.filter(|v| {
+        v.length_squared() > crate::gamepad_input::GAMEPAD_STICK_DEADZONE.powi(2)
+    }) {
+        d_raw = stick;
         player.is_moving = true;
-    }
-    if key_input.pressed(KeyCode::D) || key_input.pressed(KeyCode::Right) {
-        d_raw.x += 1.;
-        player.is_moving = true;
-    }
-    if key_input.pressed(KeyCode::W) || key_input.pressed(KeyCode::Up) {
-        d_raw.y += 1.;
-        player.is_moving = true;
-    }
-    if key_input.pressed(KeyCode::S) || key_input.pressed(KeyCode::Down) {
-        d_raw.y -= 1.;
-        player.is_moving = true;
+    } else {
+        // In Mouseless Mode, one key group moves and the other aims (see `keyboard_aim.rs`);
+        // `SwapMovementAimKeysState` picks which is which (arrows move / WASD aims, instead of
+        // the default WASD moves / arrows aim). Outside Mouseless Mode both groups always move,
+        // same as always.
+        let (wasd_moves, arrows_move) = if mouseless_mode.0 {
+            (!swap_keys.0, swap_keys.0)
+        } else {
+            (true, true)
+        };
+        if (wasd_moves && key_input.pressed(KeyCode::A))
+            || (arrows_move && key_input.pressed(KeyCode::Left))
+        {
+            d_raw.x -= 1.;
+            player.is_moving = true;
+        }
+        if (wasd_moves && key_input.pressed(KeyCode::D))
+            || (arrows_move && key_input.pressed(KeyCode::Right))
+        {
+            d_raw.x += 1.;
+            player.is_moving = true;
+        }
+        if (wasd_moves && key_input.pressed(KeyCode::W))
+            || (arrows_move && key_input.pressed(KeyCode::Up))
+        {
+            d_raw.y += 1.;
+            player.is_moving = true;
+        }
+        if (wasd_moves && key_input.pressed(KeyCode::S))
+            || (arrows_move && key_input.pressed(KeyCode::Down))
+        {
+            d_raw.y -= 1.;
+            player.is_moving = true;
+        }
     }
     clear_ice_slide_when_stuck(&mut player, on_ice, d_raw, kcc_output);
 
@@ -575,6 +715,9 @@ pub fn dispatch_active_skill_events(
     blessings_q: Query<&OwnedBlessings, With<Player>>,
     keybinds: Res<crate::keybinds::InputMappings>,
     bridge_mode: Res<BridgePlacementMode>,
+    gamepad_action_q: Query<&ActionState<GamepadAction>, With<Player>>,
+    mouseless_mode: Res<MouselessModeState>,
+    mut pending_ground_aim: ResMut<PendingGroundAimSkill>,
 ) {
     if bridge_mode.active {
         return;
@@ -585,26 +728,63 @@ pub fn dispatch_active_skill_events(
     let Ok(blessings) = blessings_q.get_single() else {
         return;
     };
+    let gamepad_action_state = gamepad_action_q.get_single().ok();
 
-    // Higher slot index wins when multiple bindings match; skip empty skill slots so a
-    // hidden default (e.g. slot 3 still on Shift) cannot block visible slots 0–2.
-    let pressed_slot = [3usize, 2, 1, 0, 4].into_iter().find(|&slot| {
-        skills.get_active_skill_in_slot(slot).is_some()
-            && keybinds.check_skill_input(slot, &key_input, &mouse_input)
-    });
+    // Mouseless Mode turned off mid-charge (e.g. via options) — drop the pending aim rather
+    // than firing or getting stuck; the player can just press the skill again.
+    if !mouseless_mode.0 {
+        pending_ground_aim.0 = None;
+    }
 
-    if let Some(slot) = pressed_slot {
-        if let Some(skill) = skills.get_active_skill_in_slot(slot) {
-            let effective_cd = skills.effective_skill_cooldown(&skill, blessings);
-            let s = &class_slots.0[slot];
-            if s.max_charges > 0 {
-                if s.current_charges > 0 {
+    // Already charging a ground-targeted skill's hold-to-aim reticle: only watch for the
+    // button being released (fire) — don't look for a new press until this resolves.
+    if let Some(slot) = pending_ground_aim.0 {
+        let still_held = keybinds.check_skill_input_held(slot, &key_input, &mouse_input);
+        if !still_held {
+            pending_ground_aim.0 = None;
+            if let Some(skill) = skills.get_active_skill_in_slot(slot) {
+                let effective_cd = skills.effective_skill_cooldown(&skill, blessings);
+                let s = &class_slots.0[slot];
+                if s.max_charges > 0 && s.current_charges > 0 {
                     ev.send(ActiveSkillUsedEvent {
                         slot,
                         cooldown: effective_cd,
                     });
                 }
             }
+        }
+        return;
+    }
+
+    // Higher slot index wins when multiple bindings match; skip empty skill slots so a
+    // hidden default (e.g. slot 3 still on Shift) cannot block visible slots 0–2.
+    let pressed_slot = [3usize, 2, 1, 0, 4].into_iter().find(|&slot| {
+        skills.get_active_skill_in_slot(slot).is_some()
+            && (keybinds.check_skill_input(slot, &key_input, &mouse_input)
+                || gamepad_skill_just_pressed(gamepad_action_state, slot))
+    });
+
+    if let Some(slot) = pressed_slot {
+        if let Some(skill) = skills.get_active_skill_in_slot(slot) {
+            let s = &class_slots.0[slot];
+            if s.max_charges == 0 || s.current_charges == 0 {
+                return;
+            }
+            // Mouseless Mode + a ground-targeted skill pressed via keyboard/mouse: start a
+            // hold-to-aim charge (reticle shown/steered by `keyboard_aim.rs`) instead of
+            // firing immediately at whatever the aim point happens to be right now.
+            // Gamepad presses are left firing instantly since the gamepad's own aim stick
+            // already continuously drives the aim point (see `gamepad_input.rs`).
+            let via_keyboard_mouse = keybinds.check_skill_input(slot, &key_input, &mouse_input);
+            if mouseless_mode.0 && via_keyboard_mouse && skill.is_ground_targeted() {
+                pending_ground_aim.0 = Some(slot);
+                return;
+            }
+            let effective_cd = skills.effective_skill_cooldown(&skill, blessings);
+            ev.send(ActiveSkillUsedEvent {
+                slot,
+                cooldown: effective_cd,
+            });
         }
     }
 }
@@ -862,7 +1042,9 @@ pub fn handle_hotbar_consume_keys(
     ui_state: Res<State<UIState>>,
     resolution: Res<ScreenResolution>,
     mut bridge_mode: ResMut<BridgePlacementMode>,
+    gamepad_action_q: Query<&ActionState<GamepadAction>, With<Player>>,
 ) {
+    let gamepad_action_state = gamepad_action_q.get_single().ok();
     // Left-clicking a HUD hotbar slot (while the inventory is closed) triggers the same
     // consume action as pressing that slot's bound key.
     let mut clicked_slot: Option<usize> = None;
@@ -885,7 +1067,11 @@ pub fn handle_hotbar_consume_keys(
 
     for slot in 0..HOTBAR_CONSUME_SLOT_COUNT {
         let triggered_by_click = clicked_slot == Some(slot);
-        if !triggered_by_click && !keybinds.check_hotbar_input(slot, &key_input, &mouse_input) {
+        let triggered_by_gamepad = gamepad_hotbar_just_pressed(gamepad_action_state, slot);
+        if !triggered_by_click
+            && !triggered_by_gamepad
+            && !keybinds.check_hotbar_input(slot, &key_input, &mouse_input)
+        {
             continue;
         }
         let held_item_option = inv.single().items.items[slot].clone();
@@ -973,6 +1159,7 @@ pub fn mouse_click_system(
             &PlayerAnimation,
             &OwnedBlessings,
             &mut CurrentMana,
+            Option<&ActionState<GamepadAction>>,
         ),
         With<Player>,
     >,
@@ -994,11 +1181,14 @@ pub fn mouse_click_system(
 
     let cursor_tile_pos = world_pos_to_tile_pos(cursor_pos.world_coords.truncate());
     let player_pos = game.player().position;
-    let (player_e, attack_timer_option, player_anim, blessings, mut current_mana) =
+    let (player_e, attack_timer_option, player_anim, blessings, mut current_mana, gamepad_action_state) =
         player_query.single_mut();
+    let gamepad_attack_pressed = gamepad_action_state
+        .map(|a| a.pressed(GamepadAction::Attack))
+        .unwrap_or(false);
 
     // Hit Item, send attack event
-    if mouse_button_input.pressed(MouseButton::Left) || auto_attack.0 {
+    if mouse_button_input.pressed(MouseButton::Left) || auto_attack.0 || gamepad_attack_pressed {
         if *DEBUG && mouse_button_input.just_pressed(MouseButton::Left) {
             let obj = game.get_object_from_chunk_cache(cursor_tile_pos);
             info!(
@@ -1170,8 +1360,13 @@ pub fn handle_interact_objects(
     key_input: Res<Input<KeyCode>>,
     mouse_input: Res<Input<MouseButton>>,
     keybinds: Res<InputMappings>,
+    gamepad_action_q: Query<&ActionState<GamepadAction>, With<Player>>,
 ) {
-    if !keybinds.check_interact_input(&key_input, &mouse_input) {
+    let gamepad_pressed = gamepad_action_q
+        .get_single()
+        .map(|a| a.just_pressed(GamepadAction::Interact))
+        .unwrap_or(false);
+    if !keybinds.check_interact_input(&key_input, &mouse_input) && !gamepad_pressed {
         return;
     }
     for (obj_e, t, obj_action, obj, anchor) in objs.iter() {
@@ -1202,8 +1397,13 @@ pub fn handle_open_essence_ui(
     mut next_inv_state: ResMut<NextState<UIState>>,
     curr_ui_state: Res<State<UIState>>,
     open_lock: Option<Res<crate::ui::MerchantShopOpenLock>>,
+    gamepad_action_q: Query<&ActionState<GamepadAction>, With<Player>>,
 ) {
-    if !keybinds.check_interact_input(&key_input, &mouse_input) {
+    let gamepad_pressed = gamepad_action_q
+        .get_single()
+        .map(|a| a.just_pressed(GamepadAction::Interact))
+        .unwrap_or(false);
+    if !keybinds.check_interact_input(&key_input, &mouse_input) && !gamepad_pressed {
         return;
     }
     // Re-pressing interact while the shop is open toggles `Essence` closed in

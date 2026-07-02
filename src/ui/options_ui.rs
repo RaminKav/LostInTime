@@ -12,8 +12,9 @@ use crate::{
     cursor::CursorColorSettings,
     cursor::CursorPos,
     datafiles,
-    inputs::AutoAttackState,
+    inputs::{AutoAttackState, MouselessModeState, SwapMovementAimKeysState},
     keybinds::InputMappings,
+    keyboard_aim::KeyboardAimSensitivity,
     player::skills::VISIBLE_CLASS_SKILL_COUNT,
     ui::{
         interactions::Interaction, spawn_back_button, ui_helpers, Interactable, UIElement, UIState,
@@ -114,6 +115,8 @@ pub enum OptionsCheckboxType {
     HideHeirloomAnims,
     DoubleCursorSize,
     AutoAttack,
+    MouselessMode,
+    SwapMovementAimKeys,
 }
 
 #[derive(Component)]
@@ -220,6 +223,14 @@ pub struct CursorColorButton {
 /// Marker for the sprite that previews the currently selected cursor color.
 #[derive(Component)]
 pub struct CursorColorPreview;
+
+#[derive(Component)]
+pub struct SensitivityButton {
+    pub direction: VolumeDirection,
+}
+
+#[derive(Component)]
+pub struct SensitivityValueText;
 
 pub fn handle_options_clicks(
     cursor_pos: Res<CursorPos>,
@@ -446,6 +457,9 @@ pub fn setup_options_ui(
     display_scale: Res<DisplayScaleSettings>,
     cursor_color: Res<CursorColorSettings>,
     auto_attack: Res<AutoAttackState>,
+    mouseless_mode: Res<MouselessModeState>,
+    keyboard_aim_sensitivity: Res<KeyboardAimSensitivity>,
+    swap_movement_aim_keys: Res<SwapMovementAimKeysState>,
     existing_options: Query<Entity, With<OptionsUI>>,
     existing_popup: Query<Entity, With<WipeDataPopup>>,
 ) {
@@ -717,6 +731,27 @@ pub fn setup_options_ui(
         auto_attack.0,
     );
 
+    // Mouseless Mode toggle: arrow keys aim instead of the mouse (see `keyboard_aim.rs`)
+    let mouseless_mode_y = auto_attack_y + row_spacing;
+    spawn_options_checkbox(
+        &mut commands,
+        &graphics,
+        &asset_server,
+        "Mouseless Mode:",
+        Vec3::new(
+            left_side_x + 2.,
+            mouseless_mode_y,
+            ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
+        ),
+        Vec3::new(
+            left_side_x + 100.,
+            mouseless_mode_y + 0.,
+            ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
+        ),
+        OptionsCheckboxType::MouselessMode,
+        mouseless_mode.0,
+    );
+
     // Volume section (center column)
     let volume_section_y = 90. + OPTIONS_BODY_Y_OFFSET;
     commands.spawn((
@@ -858,12 +893,28 @@ pub fn setup_options_ui(
         ),
     );
 
-    // Cheats section
+    // Aim Sensitivity (Mouseless Mode reticle speed), directly under the cursor color row.
+    let sensitivity_y = cursor_color_y - 18.;
+    spawn_sensitivity_row(
+        &mut commands,
+        &graphics,
+        &asset_server,
+        "Aim Sensitivity:",
+        keyboard_aim_sensitivity.0,
+        Vec3::new(
+            center_side_x,
+            sensitivity_y,
+            ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
+        ),
+    );
+
+    // Toggles section (formerly "Cheats" — also home to non-cheat gameplay toggles like
+    // Mouseless Mode's key-swap option)
     let cheats_section_y = 90. + OPTIONS_BODY_Y_OFFSET;
     commands.spawn((
         Text2dBundle {
             text: Text::from_section(
-                "Cheats",
+                "Toggles",
                 TextStyle {
                     font: asset_server.load("fonts/alagard.ttf"),
                     font_size: 15.0,
@@ -881,7 +932,7 @@ pub fn setup_options_ui(
         },
         RenderLayers::from_layers(&[3]),
         OptionsUI,
-        Name::new("Cheats Section Title"),
+        Name::new("Toggles Section Title"),
     ));
 
     // Unlock all classes checkbox
@@ -1127,6 +1178,28 @@ pub fn setup_options_ui(
         ),
         OptionsCheckboxType::DoubleCursorSize,
         cursor_color.double_size,
+    );
+
+    // Swaps which key group moves vs. aims in Mouseless Mode (arrows move / WASD aims,
+    // instead of the default WASD moves / arrows aim) — for left-handed players etc.
+    let swap_keys_y = double_cursor_y - 16.;
+    spawn_options_checkbox(
+        &mut commands,
+        &graphics,
+        &asset_server,
+        "Swap Move/Aim Keys:",
+        Vec3::new(
+            right_side_x,
+            swap_keys_y,
+            ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
+        ),
+        Vec3::new(
+            right_side_x + checkbox_x_offset,
+            swap_keys_y,
+            ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
+        ),
+        OptionsCheckboxType::SwapMovementAimKeys,
+        swap_movement_aim_keys.0,
     );
 
     //TODO: fix restart button
@@ -1397,6 +1470,8 @@ pub fn handle_cheat_checkbox_click(
     >,
     mut cheat_settings: ResMut<CheatSettings>,
     mut auto_attack: ResMut<AutoAttackState>,
+    mut mouseless_mode: ResMut<MouselessModeState>,
+    mut swap_movement_aim_keys: ResMut<SwapMovementAimKeysState>,
     mut cursor_color: ResMut<CursorColorSettings>,
     mut commands: Commands,
     graphics: Res<Graphics>,
@@ -1568,6 +1643,30 @@ pub fn handle_cheat_checkbox_click(
                                     },
                                 )
                             }
+                            OptionsCheckboxType::MouselessMode => {
+                                mouseless_mode.0 = !mouseless_mode.0;
+                                mouseless_mode.save();
+                                (
+                                    mouseless_mode.0,
+                                    if mouseless_mode.0 {
+                                        UIElement::CheckBoxSelected
+                                    } else {
+                                        UIElement::CheckBox
+                                    },
+                                )
+                            }
+                            OptionsCheckboxType::SwapMovementAimKeys => {
+                                swap_movement_aim_keys.0 = !swap_movement_aim_keys.0;
+                                swap_movement_aim_keys.save();
+                                (
+                                    swap_movement_aim_keys.0,
+                                    if swap_movement_aim_keys.0 {
+                                        UIElement::CheckBoxSelected
+                                    } else {
+                                        UIElement::CheckBox
+                                    },
+                                )
+                            }
                         };
                         *texture = graphics.get_ui_element_texture(checkbox_ui).clone();
                         commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.2));
@@ -1589,11 +1688,18 @@ pub fn handle_cheat_checkbox_click(
 pub fn update_cheat_checkbox_visual(
     cheat_settings: Res<CheatSettings>,
     auto_attack: Res<AutoAttackState>,
+    mouseless_mode: Res<MouselessModeState>,
+    swap_movement_aim_keys: Res<SwapMovementAimKeysState>,
     cursor_color: Res<CursorColorSettings>,
     mut checkboxes: Query<(&OptionsCheckbox, &mut Handle<Image>)>,
     graphics: Res<Graphics>,
 ) {
-    if !cheat_settings.is_changed() && !auto_attack.is_changed() && !cursor_color.is_changed() {
+    if !cheat_settings.is_changed()
+        && !auto_attack.is_changed()
+        && !mouseless_mode.is_changed()
+        && !swap_movement_aim_keys.is_changed()
+        && !cursor_color.is_changed()
+    {
         return;
     }
 
@@ -1685,6 +1791,20 @@ pub fn update_cheat_checkbox_visual(
             }
             OptionsCheckboxType::AutoAttack => {
                 if auto_attack.0 {
+                    UIElement::CheckBoxSelected
+                } else {
+                    UIElement::CheckBox
+                }
+            }
+            OptionsCheckboxType::MouselessMode => {
+                if mouseless_mode.0 {
+                    UIElement::CheckBoxSelected
+                } else {
+                    UIElement::CheckBox
+                }
+            }
+            OptionsCheckboxType::SwapMovementAimKeys => {
+                if swap_movement_aim_keys.0 {
                     UIElement::CheckBoxSelected
                 } else {
                     UIElement::CheckBox
@@ -1830,6 +1950,160 @@ fn spawn_volume_row(
         })
         .insert(Interactable::default())
         .insert(Name::new(format!("Volume Up {:?}", channel)))
+        .id();
+
+    commands
+        .spawn((
+            Text2dBundle {
+                text: Text::from_section(
+                    ">",
+                    TextStyle {
+                        font: asset_server.load("fonts/4x5.ttf"),
+                        font_size: 5.0,
+                        color: crate::colors::WHITE,
+                    },
+                )
+                .with_alignment(TextAlignment::Center),
+                text_anchor: bevy::sprite::Anchor::Center,
+                transform: Transform::from_translation(Vec3::new(0., 0.5, 1.)),
+                ..Default::default()
+            },
+            RenderLayers::from_layers(&[3]),
+            UIState::Options,
+        ))
+        .set_parent(plus_entity);
+}
+
+/// "Aim Sensitivity" stepper row (same `-`/value/`+` layout as `spawn_volume_row`), for the
+/// single `KeyboardAimSensitivity` value (1-10) rather than a per-channel value.
+fn spawn_sensitivity_row(
+    commands: &mut Commands,
+    graphics: &Graphics,
+    asset_server: &AssetServer,
+    label: &str,
+    current_value: u8,
+    label_pos: Vec3,
+) {
+    commands.spawn((
+        Text2dBundle {
+            text: Text::from_section(
+                label,
+                TextStyle {
+                    font: asset_server.load("fonts/4x5.ttf"),
+                    font_size: 5.0,
+                    color: crate::colors::WHITE,
+                },
+            )
+            .with_alignment(TextAlignment::Left),
+            text_anchor: bevy::sprite::Anchor::CenterLeft,
+            transform: Transform::from_translation(label_pos - Vec3::new(20., 0., 0.)),
+            ..Default::default()
+        },
+        RenderLayers::from_layers(&[3]),
+        OptionsUI,
+        UIState::Options,
+        Name::new("Sensitivity Label"),
+    ));
+
+    let controls_x = label_pos.x + 50.;
+
+    let minus_entity = commands
+        .spawn(SpriteBundle {
+            texture: graphics.get_ui_element_texture(UIElement::XLKey).clone(),
+            sprite: Sprite {
+                custom_size: Some(Vec2::new(14., 12.)),
+                ..Default::default()
+            },
+            transform: Transform::from_translation(Vec3::new(
+                controls_x,
+                label_pos.y - 3.5,
+                label_pos.z,
+            )),
+            visibility: Visibility::Visible,
+            ..Default::default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(UIState::Options)
+        .insert(UIElement::XLKey)
+        .insert(OptionsUI)
+        .insert(SensitivityButton {
+            direction: VolumeDirection::Down,
+        })
+        .insert(Interactable::default())
+        .insert(Name::new("Sensitivity Down"))
+        .id();
+
+    commands
+        .spawn((
+            Text2dBundle {
+                text: Text::from_section(
+                    "<",
+                    TextStyle {
+                        font: asset_server.load("fonts/4x5.ttf"),
+                        font_size: 5.0,
+                        color: crate::colors::WHITE,
+                    },
+                )
+                .with_alignment(TextAlignment::Center),
+                text_anchor: bevy::sprite::Anchor::Center,
+                transform: Transform::from_translation(Vec3::new(0., 0.5, 1.)),
+                ..Default::default()
+            },
+            RenderLayers::from_layers(&[3]),
+            UIState::Options,
+        ))
+        .set_parent(minus_entity);
+
+    commands.spawn((
+        Text2dBundle {
+            text: Text::from_section(
+                format!("{}", current_value),
+                TextStyle {
+                    font: asset_server.load("fonts/4x5.ttf"),
+                    font_size: 5.0,
+                    color: crate::colors::WHITE,
+                },
+            )
+            .with_alignment(TextAlignment::Center),
+            text_anchor: bevy::sprite::Anchor::Center,
+            transform: Transform::from_translation(Vec3::new(
+                controls_x + 18.,
+                label_pos.y - 3.,
+                label_pos.z,
+            )),
+            ..Default::default()
+        },
+        RenderLayers::from_layers(&[3]),
+        OptionsUI,
+        UIState::Options,
+        SensitivityValueText,
+        Name::new("Sensitivity Value"),
+    ));
+
+    let plus_entity = commands
+        .spawn(SpriteBundle {
+            texture: graphics.get_ui_element_texture(UIElement::XLKey).clone(),
+            sprite: Sprite {
+                custom_size: Some(Vec2::new(14., 12.)),
+                ..Default::default()
+            },
+            transform: Transform::from_translation(Vec3::new(
+                controls_x + 36.,
+                label_pos.y - 3.5,
+                label_pos.z,
+            )),
+            visibility: Visibility::Visible,
+            ..Default::default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(UIState::Options)
+        .insert(UIElement::XLKey)
+        .insert(OptionsUI)
+        .insert(SensitivityButton {
+            direction: VolumeDirection::Up,
+        })
+        .insert(Interactable::default())
+        .insert(Name::new("Sensitivity Up"))
         .id();
 
     commands
@@ -2556,6 +2830,78 @@ pub fn update_scale_text(
         };
         if text.sections[0].value != new_value {
             text.sections[0].value = new_value;
+        }
+    }
+}
+
+pub fn handle_sensitivity_button_click(
+    cursor_pos: Res<CursorPos>,
+    mouse_input: Res<Input<MouseButton>>,
+    ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
+    mut buttons: Query<(Entity, &mut Interactable, &SensitivityButton)>,
+    mut sensitivity: ResMut<KeyboardAimSensitivity>,
+    mut commands: Commands,
+    graphics: Res<Graphics>,
+) {
+    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    let left_mouse_released = mouse_input.just_released(MouseButton::Left);
+
+    for (entity, mut interactable, sens_button) in buttons.iter_mut() {
+        match hit_test {
+            Some(hit) if hit.0 == entity => match interactable.current() {
+                Interaction::None => {
+                    interactable.change(Interaction::Hovering);
+                    commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonHover, 0.05));
+                    commands
+                        .entity(entity)
+                        .insert(UIElement::XLKeyHover)
+                        .insert(graphics.get_ui_element_texture(UIElement::XLKeyHover));
+                }
+                Interaction::Hovering => {
+                    if left_mouse_released {
+                        match sens_button.direction {
+                            VolumeDirection::Down => {
+                                sensitivity.0 = sensitivity
+                                    .0
+                                    .saturating_sub(1)
+                                    .max(KeyboardAimSensitivity::MIN);
+                            }
+                            VolumeDirection::Up => {
+                                sensitivity.0 =
+                                    (sensitivity.0 + 1).min(KeyboardAimSensitivity::MAX);
+                            }
+                        }
+                        sensitivity.save();
+                        commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.2));
+                    }
+                }
+                _ => {}
+            },
+            _ => {
+                let Interaction::Hovering = interactable.current() else {
+                    continue;
+                };
+                interactable.change(Interaction::None);
+                commands
+                    .entity(entity)
+                    .insert(UIElement::XLKey)
+                    .insert(graphics.get_ui_element_texture(UIElement::XLKey));
+            }
+        }
+    }
+}
+
+pub fn update_sensitivity_text(
+    sensitivity: Res<KeyboardAimSensitivity>,
+    mut texts: Query<&mut Text, With<SensitivityValueText>>,
+) {
+    if !sensitivity.is_changed() {
+        return;
+    }
+    let new_value = format!("{}", sensitivity.0);
+    for mut text in texts.iter_mut() {
+        if text.sections[0].value != new_value {
+            text.sections[0].value = new_value.clone();
         }
     }
 }

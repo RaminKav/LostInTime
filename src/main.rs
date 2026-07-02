@@ -16,6 +16,8 @@ mod bounce;
 mod container;
 mod cursor;
 mod datafiles;
+mod gamepad_input;
+mod keyboard_aim;
 mod keybinds;
 mod panic_handler;
 mod pets;
@@ -288,6 +290,8 @@ fn main() {
         .add_plugin(AnimationsPlugin)
         .add_plugin(InputsPlugin)
         .add_plugin(cursor::CustomCursorPlugin)
+        .add_plugin(gamepad_input::GamepadInputPlugin)
+        .add_plugin(keyboard_aim::KeyboardAimPlugin)
         .add_plugin(UIPlugin)
         .add_plugin(NightPlugin)
         .add_plugin(ChaosPlugin)

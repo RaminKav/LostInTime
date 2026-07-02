@@ -1071,6 +1071,10 @@ impl Plugin for UIPlugin {
                     update_cursor_color_preview.run_if(in_state(UIState::Options)),
                     handle_achievement_row_clicks.run_if(in_state(UIState::Achievements)))
                 )
+            .add_systems((
+                    handle_sensitivity_button_click.run_if(in_state(UIState::Options)),
+                    update_sensitivity_text.run_if(in_state(UIState::Options)),
+                ))
             .add_system(
                 handle_tooltip_teardown
                     .in_base_set(CoreSet::PreUpdate)
