@@ -224,7 +224,9 @@ fn focus_nav(
             continue;
         }
         let score = forward + lateral * NAV_LATERAL_PENALTY;
-        if best.is_none_or(|(_, best_score)| score < best_score) {
+        // `map_or` (not `is_none_or`, stabilized in Rust 1.82) so this builds on older
+        // toolchains too — the Windows build machine has been lagging behind macOS's rustc.
+        if best.map_or(true, |(_, best_score)| score < best_score) {
             best = Some((e, score));
         }
     }
