@@ -724,7 +724,7 @@ fn spawn_class_unlock_info_ui(commands: &mut Commands, asset_server: &AssetServe
         .spawn((
             SpriteBundle {
                 sprite: Sprite {
-                    color: Color::rgba(0.08, 0.08, 0.08, 0.92),
+                    color: Color::rgba(0.08, 0.08, 0.08, 0.98),
                     custom_size: Some(Vec2::new(110., 110.)),
                     ..Default::default()
                 },

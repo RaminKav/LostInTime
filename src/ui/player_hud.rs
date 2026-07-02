@@ -172,7 +172,7 @@ pub struct ActiveSkillSlotBg {
     pub slot_index: usize,
 }
 
-pub const ACTIVE_SKILL_LOCK_ICON_PATH: &str = "ui/Icons/lock.png";
+pub const ACTIVE_SKILL_LOCK_ICON_PATH: &str = "ui/icons/lock.png";
 pub const ACTIVE_SKILL_LOCK_ICON_SIZE: Vec2 = Vec2::new(16., 16.);
 
 /// Lock overlay on HUD skill slots that have not been unlocked via Time Fragments.

@@ -322,7 +322,7 @@ fn setup_gamepad_crosshair(
     }
     commands.spawn((
         SpriteBundle {
-            texture: asset_server.load("ui/Icons/Crosshair.png"),
+            texture: asset_server.load("ui/icons/Crosshair.png"),
             sprite: Sprite {
                 custom_size: Some(Vec2::new(20., 20.)),
                 ..default()
