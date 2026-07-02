@@ -8,10 +8,9 @@
 //!
 //! ## Known macOS limitation (shelved as of Bevy 0.10.1)
 //!
-//! This code is functionally complete and was confirmed working (movement, aim reticle,
-//! skills) whenever clean input actually reached it. However, on macOS, Bevy 0.10.1's
-//! gamepad backend (`bevy_gilrs` -> `gilrs` 0.10.x, raw `IOHIDManager`-based) could not
-//! reliably see either controller tested:
+//! Confirmed working end-to-end (movement, twin-stick aim, ground-targeted skill hold-to-aim,
+//! basic skills) on Windows. On macOS, though, Bevy 0.10.1's gamepad backend (`bevy_gilrs` ->
+//! `gilrs` 0.10.x, raw `IOHIDManager`-based) could not reliably see either controller tested:
 //! - Xbox Wireless Controller: not detected at all (not at startup, not on hot-plug),
 //!   despite macOS/Chrome/hardwaretester.com seeing it fine. Bumping to `gilrs` 0.10.10
 //!   (a version cited to help Xbox detection) made no difference.
@@ -33,7 +32,7 @@ use bevy::input::gamepad::{GamepadConnection, GamepadConnectionEvent, GamepadEve
 use bevy::prelude::*;
 use leafwing_input_manager::prelude::*;
 
-use crate::{cursor::CursorPos, player::Player, Game, GameState};
+use crate::{cursor::CursorPos, player::Player, world::y_sort::YSort, Game, GameState};
 
 /// Stick magnitude below this is treated as neutral (no input).
 pub const GAMEPAD_STICK_DEADZONE: f32 = 0.2;
@@ -103,6 +102,18 @@ pub fn gamepad_skill_just_pressed(
         return false;
     };
     action_state.just_pressed(action)
+}
+
+/// True when `slot`'s gamepad button is currently held down (not just this frame) —
+/// gamepad-side counterpart to `InputMappings::check_skill_input_held`. Used to detect
+/// release for the ground-targeted skill hold-to-aim flow (see `dispatch_active_skill_events`
+/// in `inputs.rs`).
+pub fn gamepad_skill_pressed(action_state: Option<&ActionState<GamepadAction>>, slot: usize) -> bool {
+    let (Some(action_state), Some(action)) = (action_state, GamepadAction::skill_slot(slot))
+    else {
+        return false;
+    };
+    action_state.pressed(action)
 }
 
 /// True when `slot`'s gamepad hotbar button was just pressed this frame.
@@ -289,6 +300,14 @@ fn apply_gamepad_aim_to_cursor_world_pos(
     cursor_pos.world_coords = aim_point.extend(cursor_pos.world_coords.z);
 }
 
+/// `YSort` bias for the aim reticle: comfortably above every other `YSort` bias used in the
+/// codebase (max observed elsewhere is `11.`), so the reticle reliably renders in front of the
+/// player/enemies/world sprites at its position instead of being buried by their Y-sorted
+/// depth. Without this, a static/unsorted Z (e.g. `15.`) sits far behind `YSort`-driven world
+/// sprites near the player — which use depths roughly in the 0-900 range — making the
+/// reticle invisible even while correctly positioned and visible.
+const CROSSHAIR_Y_SORT_BIAS: f32 = 50.0;
+
 /// Marker for the world-space aim reticle shown while aiming with the gamepad right stick.
 #[derive(Component)]
 struct GamepadCrosshair;
@@ -312,6 +331,7 @@ fn setup_gamepad_crosshair(
             visibility: Visibility::Hidden,
             ..default()
         },
+        YSort(CROSSHAIR_Y_SORT_BIAS),
         GamepadCrosshair,
         Name::new("GamepadCrosshair"),
     ));

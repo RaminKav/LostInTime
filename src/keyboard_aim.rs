@@ -25,7 +25,7 @@ use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::inputs::{MouselessModeState, PendingGroundAimSkill, SwapMovementAimKeysState};
-use crate::{cursor::CursorPos, Game, GameState};
+use crate::{cursor::CursorPos, world::y_sort::YSort, Game, GameState};
 
 /// Options screen "Aim Sensitivity" setting (1-10): how fast the free-aim reticle moves while
 /// an arrow key is held in Mouseless Mode.
@@ -184,6 +184,15 @@ fn apply_keyboard_aim_to_cursor_world_pos(
     cursor_pos.world_coords = aim_point.extend(cursor_pos.world_coords.z);
 }
 
+/// `YSort` bias for the aim reticle — see `gamepad_input::CROSSHAIR_Y_SORT_BIAS` (same value,
+/// duplicated here since the two crosshairs are independent entities/modules). Comfortably
+/// above every other `YSort` bias used in the codebase (max observed elsewhere is `11.`), so
+/// the reticle reliably renders in front of the player/enemies/world sprites at its position
+/// instead of being buried by their Y-sorted depth — a static/unsorted Z (e.g. `15.`) sits far
+/// behind `YSort`-driven world sprites near the player, which use depths roughly in the 0-900
+/// range.
+const CROSSHAIR_Y_SORT_BIAS: f32 = 50.0;
+
 /// Marker for the world-space reticle shown while charging a ground-targeted skill's
 /// hold-to-aim in Mouseless Mode (see `PendingGroundAimSkill`).
 #[derive(Component)]
@@ -208,6 +217,7 @@ fn setup_keyboard_crosshair(
             visibility: Visibility::Hidden,
             ..default()
         },
+        YSort(CROSSHAIR_Y_SORT_BIAS),
         KeyboardCrosshair,
         Name::new("KeyboardCrosshair"),
     ));

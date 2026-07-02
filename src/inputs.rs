@@ -2,7 +2,9 @@ use crate::attributes::ActiveConsumableBuffs;
 use crate::blessings::OwnedBlessings;
 use crate::chaos::ChaosTracker;
 use crate::cursor::CursorPos;
-use crate::gamepad_input::{gamepad_hotbar_just_pressed, gamepad_skill_just_pressed, GamepadAction};
+use crate::gamepad_input::{
+    gamepad_hotbar_just_pressed, gamepad_skill_just_pressed, gamepad_skill_pressed, GamepadAction,
+};
 use leafwing_input_manager::prelude::ActionState;
 use std::time::Duration;
 
@@ -730,16 +732,13 @@ pub fn dispatch_active_skill_events(
     };
     let gamepad_action_state = gamepad_action_q.get_single().ok();
 
-    // Mouseless Mode turned off mid-charge (e.g. via options) — drop the pending aim rather
-    // than firing or getting stuck; the player can just press the skill again.
-    if !mouseless_mode.0 {
-        pending_ground_aim.0 = None;
-    }
-
     // Already charging a ground-targeted skill's hold-to-aim reticle: only watch for the
-    // button being released (fire) — don't look for a new press until this resolves.
+    // button being released (fire) — don't look for a new press until this resolves. Checked
+    // against whichever input(s) can still be holding it (keyboard/mouse and gamepad are
+    // OR'd together since either one may have started the charge).
     if let Some(slot) = pending_ground_aim.0 {
-        let still_held = keybinds.check_skill_input_held(slot, &key_input, &mouse_input);
+        let still_held = keybinds.check_skill_input_held(slot, &key_input, &mouse_input)
+            || gamepad_skill_pressed(gamepad_action_state, slot);
         if !still_held {
             pending_ground_aim.0 = None;
             if let Some(skill) = skills.get_active_skill_in_slot(slot) {
@@ -770,13 +769,18 @@ pub fn dispatch_active_skill_events(
             if s.max_charges == 0 || s.current_charges == 0 {
                 return;
             }
-            // Mouseless Mode + a ground-targeted skill pressed via keyboard/mouse: start a
-            // hold-to-aim charge (reticle shown/steered by `keyboard_aim.rs`) instead of
-            // firing immediately at whatever the aim point happens to be right now.
-            // Gamepad presses are left firing instantly since the gamepad's own aim stick
-            // already continuously drives the aim point (see `gamepad_input.rs`).
+            // Ground-targeted skills use a hold-to-aim-then-release flow instead of firing
+            // instantly at whatever the aim point happens to be right now: always for
+            // gamepad (a stick-driven reticle is the natural way to place these with a
+            // controller — see `gamepad_input.rs`), and for keyboard/mouse only while
+            // Mouseless Mode is on (reticle steered by `keyboard_aim.rs`). Plain mouse play
+            // stays instant either way — the real cursor is already precisely positioned
+            // before you click, so there's nothing to gain from a hold step.
             let via_keyboard_mouse = keybinds.check_skill_input(slot, &key_input, &mouse_input);
-            if mouseless_mode.0 && via_keyboard_mouse && skill.is_ground_targeted() {
+            let via_gamepad = gamepad_skill_just_pressed(gamepad_action_state, slot);
+            if skill.is_ground_targeted()
+                && (via_gamepad || (mouseless_mode.0 && via_keyboard_mouse))
+            {
                 pending_ground_aim.0 = Some(slot);
                 return;
             }
