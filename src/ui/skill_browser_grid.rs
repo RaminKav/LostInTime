@@ -33,11 +33,7 @@ pub fn despawn_dev_skill_picker_grid_layers(
 /// Every assignable active skill for the dev picker, sorted for grid display.
 pub fn sorted_dev_skill_grid_entries() -> Vec<ActiveSkill> {
     let mut skills: Vec<ActiveSkill> = ActiveSkill::iter()
-        .filter(|skill| {
-            !get_disabled_skills().contains(skill)
-                && *skill != ActiveSkill::LaserBeam
-                && !skill.is_movement_skill()
-        })
+        .filter(|skill| !get_disabled_skills().contains(skill))
         .collect();
     skills.sort_by(|a, b| format!("{a:?}").cmp(&format!("{b:?}")));
     skills
