@@ -235,7 +235,13 @@ fn setup_aim_reticle(
     }
     commands.spawn((
         SpriteBundle {
-            texture: asset_server.load("ui/Icons/Crosshair.png"),
+            // Lowercase "icons" — must match the git-tracked path exactly (`git ls-files`),
+            // not just what's on disk locally. On Windows/Linux, `bevy_embedded_assets` bakes
+            // assets into a case-*sensitive* in-memory map at build time keyed by the checked
+            // out path, so a mismatched case silently fails to load there even though it works
+            // fine on macOS (which skips embedding and reads the case-insensitive filesystem
+            // directly — see the `EmbeddedAssetPlugin` setup in `main.rs`).
+            texture: asset_server.load("ui/icons/Crosshair.png"),
             sprite: Sprite {
                 custom_size: Some(Vec2::new(20., 20.)),
                 ..default()

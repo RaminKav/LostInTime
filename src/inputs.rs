@@ -4,6 +4,7 @@ use crate::chaos::ChaosTracker;
 use crate::cursor::CursorPos;
 use crate::gamepad_input::{
     gamepad_hotbar_just_pressed, gamepad_skill_just_pressed, gamepad_skill_pressed, GamepadAction,
+    UiGamepadAction, UiGamepadInputMarker,
 };
 use leafwing_input_manager::prelude::ActionState;
 use std::time::Duration;
@@ -889,9 +890,13 @@ pub fn manage_ability_phasing(
 }
 
 /// Routes Escape through the same [`MenuButtonClickEvent`] handlers as visible Back buttons
-/// (and related cancel buttons), so cleanup, sound, and guard logic stay in one place.
+/// (and related cancel buttons), so cleanup, sound, and guard logic stay in one place. The
+/// gamepad Cancel button (`UiGamepadAction::Cancel`, B on Xbox layout) is wired in as an
+/// alternate trigger here rather than in every screen's own handler — see `src/ui/focus.rs`'s
+/// module doc for why Confirm needed per-handler plumbing but Cancel didn't.
 pub fn close_container(
     key_input: Res<Input<KeyCode>>,
+    ui_gamepad_q: Query<&ActionState<UiGamepadAction>, With<UiGamepadInputMarker>>,
     curr_state: Res<State<UIState>>,
     game_state: Res<State<GameState>>,
     waiting_for_key: Query<(), With<WaitingForKeyInput>>,
@@ -901,7 +906,11 @@ pub fn close_container(
     mut menu_button_events: EventWriter<MenuButtonClickEvent>,
     mut commands: Commands,
 ) {
-    if !key_input.just_pressed(KeyCode::Escape) {
+    let gamepad_cancel_pressed = ui_gamepad_q
+        .get_single()
+        .map(|a| a.just_pressed(UiGamepadAction::Cancel))
+        .unwrap_or(false);
+    if !key_input.just_pressed(KeyCode::Escape) && !gamepad_cancel_pressed {
         return;
     }
 

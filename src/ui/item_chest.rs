@@ -29,7 +29,8 @@ use super::{
     game_fonts as gf,
     heirloom_tooltip::{HeirloomTooltipRequest, HeirloomTooltipShow},
     interactions::Interaction,
-    ui_helpers, Interactable, ToolTipUpdateEvent, TooltipTeardownEvent, UIElement, UIState,
+    ui_helpers, Focusable, Interactable, ToolTipUpdateEvent, TooltipTeardownEvent, UIElement,
+    UIState,
 };
 
 /// Background container art size (`assets/ui/ChestContainer.png`).
@@ -178,6 +179,18 @@ pub enum ChestButtonKind {
     Done,
 }
 
+impl ChestButtonKind {
+    pub fn focus_index(self) -> u32 {
+        match self {
+            ChestButtonKind::Open => 0,
+            ChestButtonKind::Take => 1,
+            ChestButtonKind::Equip => 2,
+            ChestButtonKind::Banish => 3,
+            ChestButtonKind::Done => 4,
+        }
+    }
+}
+
 #[derive(Component)]
 pub struct ItemChestButton {
     pub kind: ChestButtonKind,
@@ -272,7 +285,12 @@ pub fn spawn_chest_button(
         .insert(RenderLayers::from_layers(&[3]))
         .insert(Name::new(format!("ITEM CHEST BUTTON {label}")));
     if enabled {
-        button.insert(Interactable::default());
+        button
+            .insert(Interactable::default())
+            .insert(Focusable {
+                group: ui_state.clone(),
+                index: kind.focus_index(),
+            });
     }
     let button_entity = button.id();
 

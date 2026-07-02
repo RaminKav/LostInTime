@@ -14,7 +14,10 @@ use crate::{
     colors::{LIGHT_RED, SHIELD_BLUE, WHITE, YELLOW_2},
     cursor::CursorPos,
     inventory::ItemStack,
-    item::{item_drop_outline::{HeirloomIconOutline, UiShadowChild}, WorldObject},
+    item::{
+        item_drop_outline::{HeirloomIconOutline, UiShadowChild},
+        WorldObject,
+    },
     player::{
         class_rank::ClassRankSystem,
         levels::PlayerLevel,
@@ -34,8 +37,8 @@ use crate::{
             spawn_skill_tooltip_shell, SKILL_TOOLTIP_ICON_SIZE,
         },
         ui_helpers::{self, spawn_full_screen_ui_overlay},
-        HeirloomDynamicTooltip, HeirloomTooltipRequest, HeirloomTooltipShow, Interactable,
-        Interaction, ItemOrRecipeTooltip, ToolTipUpdateEvent, UIElement, UIState,
+        Focusable, HeirloomDynamicTooltip, HeirloomTooltipRequest, HeirloomTooltipShow,
+        Interactable, Interaction, ItemOrRecipeTooltip, ToolTipUpdateEvent, UIElement, UIState,
         ITEM_TOOLTIP_LARGE_CARD_SIZE, SKILLS_CHOICE_UI_SIZE,
     },
     GameState, ScreenResolution,
@@ -550,6 +553,7 @@ pub fn setup_blessing_choice_ui(
     let count = offer.choices.len();
     for i in -1i32..(offer.choices.len() as i32 - 1) {
         let choice = offer.choices[(i + 1) as usize].clone();
+        let card_index = (i + 1) as u32;
         let (_, size) = blessing_choice_card_ui(&choice);
         let translation = Vec2::new(
             i as f32 * (size.x + 8.) + if count == 2 { size.x / 2. } else { 0. } + 0.1,
@@ -575,7 +579,11 @@ pub fn setup_blessing_choice_ui(
                 choice: choice.clone(),
             })
             .insert(UIState::BlessingChoice)
-            .insert(Interactable::default());
+            .insert(Interactable::default())
+            .insert(Focusable {
+                group: UIState::BlessingChoice,
+                index: card_index,
+            });
     }
 }
 
@@ -587,15 +595,20 @@ pub fn handle_blessing_choice_card_interactions(
     mut commands: Commands,
     graphics: Res<Graphics>,
     mut blessing_event: EventWriter<AncestorBlessingSelectEvent>,
+    ui_focus: Res<crate::ui::focus::UiFocus>,
 ) {
     let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
 
     for (e, mut interactable, mut state) in blessing_choices.iter_mut() {
         let (default_ui, hover_ui) = blessing_choice_card_hover_ui(&state.choice);
+        let is_hit = matches!(hit_test, Some(hit_ent) if hit_ent.0 == e);
+        let is_focused = ui_focus.is_focused(e);
+        let confirm_pressed =
+            (is_hit && left_mouse_pressed) || (is_focused && ui_focus.confirm_just_pressed);
 
-        match hit_test {
-            Some(hit_ent) if hit_ent.0 == e => match interactable.current() {
+        if is_hit || is_focused {
+            match interactable.current() {
                 Interaction::None => {
                     interactable.change(Interaction::Hovering);
                     commands.spawn(SoundSpawner::new(AudioSoundEffect::UISkillHover, 0.2));
@@ -606,7 +619,7 @@ pub fn handle_blessing_choice_card_interactions(
                         .insert(graphics.get_ui_element_texture(hover_ui));
                 }
                 Interaction::Hovering => {
-                    if left_mouse_pressed {
+                    if confirm_pressed {
                         info!(
                             "CLICKED ANCESTOR BLESSING: {:?} from {:?}",
                             state.choice.blessing, state.ancestor
@@ -630,19 +643,18 @@ pub fn handle_blessing_choice_card_interactions(
                     }
                 }
                 _ => (),
-            },
-            _ => {
-                let Interaction::Hovering = interactable.current() else {
-                    continue;
-                };
-                let ui_element = default_ui;
-
-                interactable.change(Interaction::None);
-                commands
-                    .entity(e)
-                    .insert(ui_element.clone())
-                    .insert(graphics.get_ui_element_texture(ui_element));
             }
+        } else {
+            let Interaction::Hovering = interactable.current() else {
+                continue;
+            };
+            let ui_element = default_ui;
+
+            interactable.change(Interaction::None);
+            commands
+                .entity(e)
+                .insert(ui_element.clone())
+                .insert(graphics.get_ui_element_texture(ui_element));
         }
     }
 }

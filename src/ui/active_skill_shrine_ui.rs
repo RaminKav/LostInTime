@@ -38,7 +38,7 @@ use super::{
         spawn_skill_tooltip_content, spawn_skill_tooltip_shell, SKILL_TOOLTIP_BG_LOCAL,
         SKILL_TOOLTIP_ICON_SIZE,
     },
-    Interactable, UIElement, UIState, KEYBIND_BADGE_COLOR, TOOLTIP_INFO_BOX_SIZE,
+    Interactable, Focusable, UIElement, UIState, KEYBIND_BADGE_COLOR, TOOLTIP_INFO_BOX_SIZE,
 };
 
 const SHRINE_TOOLTIP_GAP: f32 = 24.;
@@ -195,6 +195,7 @@ fn spawn_shrine_interactive_skill_tooltip(
     stats: &ShrineSkillTooltipStats,
     container_name: &'static str,
     hit_name: &'static str,
+    focus_index: u32,
 ) {
     let container_pos = shrine_skill_tooltip_container_pos(Vec3::new(0., visual_center_y, 21.));
     let (container, bg) = spawn_skill_tooltip_shell(
@@ -216,6 +217,10 @@ fn spawn_shrine_interactive_skill_tooltip(
         .entity(bg)
         .insert(shrine_ui)
         .insert(Interactable::default())
+        .insert(Focusable {
+            group: UIState::ActiveSkillShrine,
+            index: focus_index,
+        })
         .insert(UIState::ActiveSkillShrine)
         .insert(Name::new(hit_name));
 
@@ -239,6 +244,7 @@ fn spawn_shrine_interactive_slot_tooltip(
     stats: &ShrineSkillTooltipStats,
     container_name: &'static str,
     hit_name: &'static str,
+    focus_index: u32,
 ) {
     let container_pos = shrine_skill_tooltip_container_pos(Vec3::new(0., visual_center_y, 21.));
     let (container, bg) = spawn_skill_tooltip_shell(
@@ -264,6 +270,10 @@ fn spawn_shrine_interactive_slot_tooltip(
         .entity(bg)
         .insert(slot_ui)
         .insert(Interactable::default())
+        .insert(Focusable {
+            group: UIState::ActiveSkills,
+            index: focus_index,
+        })
         .insert(UIState::ActiveSkills)
         .insert(Name::new(hit_name));
 
@@ -310,6 +320,10 @@ fn spawn_empty_shrine_slot_tooltip(
             interaction_lock_timer: Timer::from_seconds(0.75, TimerMode::Once),
         })
         .insert(Interactable::default())
+        .insert(Focusable {
+            group: UIState::ActiveSkills,
+            index: slot_index as u32,
+        })
         .insert(UIState::ActiveSkills)
         .insert(Name::new("EMPTY_SKILL_SLOT_HIT"));
 
@@ -375,6 +389,7 @@ fn spawn_active_skill_shrine_skill_choices(
             } else {
                 "SHRINE_SKILL_TOOLTIP_1_HIT"
             },
+            index as u32,
         );
     }
 }
@@ -406,7 +421,11 @@ fn spawn_active_skill_shrine_reroll_button(
         .insert(Name::new("Active Skill Shrine Reroll"));
 
     if enabled {
-        btn.insert(Interactable::default());
+        btn.insert(Interactable::default())
+            .insert(Focusable {
+                group: UIState::ActiveSkillShrine,
+                index: 10,
+            });
     }
 
     let btn_e = btn.id();
@@ -690,13 +709,19 @@ pub fn handle_active_skill_shrine_ui_interaction(
     cheat_settings: Res<CheatSettings>,
     mut att_event: EventWriter<crate::attributes::AttributeChangeEvent>,
     mut shrine_query: Query<&mut crate::item::active_skill_shrine::ActiveSkillShrineState>,
+    focus_input: crate::ui::focus::FocusInput,
 ) {
     let hit_test = super::ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
 
     for (e, mut interactable, skill_ui) in skill_choices.iter_mut() {
-        match hit_test {
-            Some(hit_ent) if hit_ent.0 == e => match interactable.current() {
+        let is_hit = matches!(hit_test, Some(hit_ent) if hit_ent.0 == e);
+        let is_focused = focus_input.is_focused(e);
+        let confirm_pressed = (is_hit && left_mouse_pressed)
+            || (is_focused && focus_input.confirm_just_pressed());
+
+        if is_hit || is_focused {
+            match interactable.current() {
                 Interaction::None => {
                     interactable.change(Interaction::Hovering);
                     commands.spawn(crate::audio::SoundSpawner::new(
@@ -710,7 +735,7 @@ pub fn handle_active_skill_shrine_ui_interaction(
                     }
                 }
                 Interaction::Hovering => {
-                    if left_mouse_pressed && skill_ui.interaction_lock_timer.finished() {
+                    if confirm_pressed && skill_ui.interaction_lock_timer.finished() {
                         let picked_skill = skill_ui.skill_choice.clone();
                         let Ok((player_e, mut skills, player_class)) =
                             player_skills.get_single_mut()
@@ -756,14 +781,13 @@ pub fn handle_active_skill_shrine_ui_interaction(
                     }
                 }
                 _ => (),
-            },
-            _ => {
-                // reset hovering states if we stop hovering
-                let Interaction::Hovering = interactable.current() else {
-                    continue;
-                };
-                interactable.change(Interaction::None);
             }
+        } else {
+            // reset hovering states if we stop hovering
+            let Interaction::Hovering = interactable.current() else {
+                continue;
+            };
+            interactable.change(Interaction::None);
         }
     }
 }
@@ -805,6 +829,7 @@ pub fn handle_active_skill_shrine_reroll_button(
     shrine_state: Query<&crate::item::active_skill_shrine::ActiveSkillShrineState>,
     graphics: Res<Graphics>,
     asset_server: Res<AssetServer>,
+    focus_input: crate::ui::focus::FocusInput,
 ) {
     let hit_entity = {
         let ui_sprites = sprites.p0();
@@ -820,9 +845,13 @@ pub fn handle_active_skill_shrine_reroll_button(
         } else {
             Color::rgb(0.45, 0.45, 0.45)
         };
+        let is_hit = hit_entity == Some(e);
+        let is_focused = focus_input.is_focused(e);
+        let confirm_pressed = (is_hit && left_mouse_pressed)
+            || (is_focused && focus_input.confirm_just_pressed());
 
-        match hit_entity {
-            Some(hit_ent) if hit_ent == e => match interactable.current() {
+        if is_hit || is_focused {
+            match interactable.current() {
                 Interaction::None if enabled => {
                     interactable.change(Interaction::Hovering);
                     for child in btn_children.iter() {
@@ -833,7 +862,7 @@ pub fn handle_active_skill_shrine_reroll_button(
                 }
                 Interaction::Hovering => {
                     any_hovered = true;
-                    if left_mouse_pressed && enabled {
+                    if confirm_pressed && enabled {
                         run_unlocks.rerolls_remaining =
                             run_unlocks.rerolls_remaining.saturating_sub(1);
 
@@ -883,15 +912,12 @@ pub fn handle_active_skill_shrine_reroll_button(
                     }
                 }
                 _ => (),
-            },
-            _ => {
-                if matches!(interactable.current(), Interaction::Hovering) {
-                    interactable.change(Interaction::None);
-                    for child in btn_children.iter() {
-                        if let Ok(mut sprite) = sprites.p1().get_mut(*child) {
-                            sprite.color = icon_color;
-                        }
-                    }
+            }
+        } else if matches!(interactable.current(), Interaction::Hovering) {
+            interactable.change(Interaction::None);
+            for child in btn_children.iter() {
+                if let Ok(mut sprite) = sprites.p1().get_mut(*child) {
+                    sprite.color = icon_color;
                 }
             }
         }
@@ -1131,6 +1157,7 @@ pub fn setup_active_skill_shrine_overwrite_ui(
                 } else {
                     "SKILL_SLOT_2_TOOLTIP_HIT"
                 },
+                slot_index as u32,
             );
         } else {
             spawn_empty_shrine_slot_row(
@@ -1156,7 +1183,11 @@ pub fn setup_active_skill_shrine_overwrite_ui(
     );
     commands
         .entity(back_button)
-        .insert(UIState::ActiveSkills);
+        .insert(UIState::ActiveSkills)
+        .insert(Focusable {
+            group: UIState::ActiveSkills,
+            index: 20,
+        });
 }
 
 pub fn handle_active_skill_shrine_overwrite_interaction(
@@ -1176,6 +1207,7 @@ pub fn handle_active_skill_shrine_overwrite_interaction(
     mut att_event: EventWriter<crate::attributes::AttributeChangeEvent>,
     mut shrine_query: Query<&mut crate::item::active_skill_shrine::ActiveSkillShrineState>,
     shrine_overwrite_res: Option<Res<ActiveSkillShrineOverwrite>>,
+    focus_input: crate::ui::focus::FocusInput,
 ) {
     // Only handle if this is a shrine overwrite, not heirloom limbo
     let overwrite = if let Some(overwrite_res) = shrine_overwrite_res.as_ref() {
@@ -1188,8 +1220,13 @@ pub fn handle_active_skill_shrine_overwrite_interaction(
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
 
     for (e, mut interactable, skill_ui) in skill_choices.iter_mut() {
-        match hit_test {
-            Some(hit_ent) if hit_ent.0 == e => match interactable.current() {
+        let is_hit = matches!(hit_test, Some(hit_ent) if hit_ent.0 == e);
+        let is_focused = focus_input.is_focused(e);
+        let confirm_pressed = (is_hit && left_mouse_pressed)
+            || (is_focused && focus_input.confirm_just_pressed());
+
+        if is_hit || is_focused {
+            match interactable.current() {
                 Interaction::None => {
                     interactable.change(Interaction::Hovering);
                     commands.spawn(crate::audio::SoundSpawner::new(
@@ -1203,7 +1240,7 @@ pub fn handle_active_skill_shrine_overwrite_interaction(
                     }
                 }
                 Interaction::Hovering => {
-                    if left_mouse_pressed && skill_ui.interaction_lock_timer.finished() {
+                    if confirm_pressed && skill_ui.interaction_lock_timer.finished() {
                         let (player_e, mut skills, _t) = player_skills.single_mut();
                         let new_skill = overwrite.skill_choice.clone();
 
@@ -1226,13 +1263,12 @@ pub fn handle_active_skill_shrine_overwrite_interaction(
                     }
                 }
                 _ => (),
-            },
-            _ => {
-                let Interaction::Hovering = interactable.current() else {
-                    continue;
-                };
-                interactable.change(Interaction::None);
             }
+        } else {
+            let Interaction::Hovering = interactable.current() else {
+                continue;
+            };
+            interactable.change(Interaction::None);
         }
     }
 }

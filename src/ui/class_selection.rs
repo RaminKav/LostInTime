@@ -37,7 +37,7 @@ use crate::{
         main_menu::GameStartFadein,
         options_ui::CheatSettings,
         ui_helpers::{spawn_full_screen_ui_overlay_tuned_colored, RADIAL_OVERLAY_DEFAULT_COLOR},
-        MenuButton, UIElement, UIState,
+        Focusable, MenuButton, UIElement, UIState,
     },
     world::{dimension::EraManager, portal::UIPortal},
     FairyPetSprite, Pet, RenderLayers, ScreenResolution, SlimePetSprite,
@@ -434,6 +434,10 @@ pub fn setup_class_selection_ui(
                     is_locked: !class_unlocked,
                 },
                 Interactable::default(),
+                Focusable {
+                    group: UIState::ClassSelection,
+                    index: i as u32,
+                },
                 RenderLayers::from_layers(&[3]),
                 Name::new("CLASS OPTION"),
             ))
@@ -575,7 +579,12 @@ pub fn setup_class_selection_ui(
             .insert(RenderLayers::from_layers(&[3]))
             .insert(Name::new("PET OPTION"));
 
-        slot_entity_commands.insert(super::Interactable::default());
+        slot_entity_commands
+            .insert(super::Interactable::default())
+            .insert(Focusable {
+                group: UIState::ClassSelection,
+                index: 10 + i as u32,
+            });
 
         let icon_slot = slot_entity_commands.id();
 
@@ -614,48 +623,60 @@ pub fn setup_class_selection_ui(
     let button_y = -res.game_height / 2. + 16.;
     let back_button_x = -res.game_width / 2. + 42.;
 
-    commands.spawn((
-        SpriteBundle {
-            texture: graphics
-                .get_ui_element_texture(UIElement::StartGameButton)
-                .clone(),
-            sprite: Sprite {
-                custom_size: Some(Vec2::new(170., 26.)),
+    let begin_button = commands
+        .spawn((
+            SpriteBundle {
+                texture: graphics
+                    .get_ui_element_texture(UIElement::StartGameButton)
+                    .clone(),
+                sprite: Sprite {
+                    custom_size: Some(Vec2::new(170., 26.)),
+                    ..Default::default()
+                },
+                transform: Transform::from_translation(Vec3::new(0., button_y, 11.)),
                 ..Default::default()
             },
-            transform: Transform::from_translation(Vec3::new(0., button_y, 11.)),
-            ..Default::default()
-        },
-        super::Interactable::default(),
-        UIElement::StartGameButton,
-        MenuButton::Begin,
-        ConfirmButton,
-        UIState::ClassSelection,
-        ClassSelectionUI,
-        RenderLayers::from_layers(&[3]),
-        Name::new("Start Button"),
-    ));
+            super::Interactable::default(),
+            UIElement::StartGameButton,
+            MenuButton::Begin,
+            ConfirmButton,
+            UIState::ClassSelection,
+            ClassSelectionUI,
+            RenderLayers::from_layers(&[3]),
+            Name::new("Start Button"),
+        ))
+        .id();
+    commands.entity(begin_button).insert(Focusable {
+        group: UIState::ClassSelection,
+        index: 30,
+    });
 
-    commands.spawn((
-        SpriteBundle {
-            texture: graphics
-                .get_ui_element_texture(UIElement::BackButton2)
-                .clone(),
-            sprite: Sprite {
-                custom_size: Some(Vec2::new(60., 26.)),
+    let back_button = commands
+        .spawn((
+            SpriteBundle {
+                texture: graphics
+                    .get_ui_element_texture(UIElement::BackButton2)
+                    .clone(),
+                sprite: Sprite {
+                    custom_size: Some(Vec2::new(60., 26.)),
+                    ..Default::default()
+                },
+                transform: Transform::from_translation(Vec3::new(back_button_x, button_y, 11.)),
                 ..Default::default()
             },
-            transform: Transform::from_translation(Vec3::new(back_button_x, button_y, 11.)),
-            ..Default::default()
-        },
-        super::Interactable::default(),
-        UIElement::BackButton2,
-        MenuButton::Back,
-        UIState::ClassSelection,
-        ClassSelectionUI,
-        RenderLayers::from_layers(&[3]),
-        Name::new("Back Button"),
-    ));
+            super::Interactable::default(),
+            UIElement::BackButton2,
+            MenuButton::Back,
+            UIState::ClassSelection,
+            ClassSelectionUI,
+            RenderLayers::from_layers(&[3]),
+            Name::new("Back Button"),
+        ))
+        .id();
+    commands.entity(back_button).insert(Focusable {
+        group: UIState::ClassSelection,
+        index: 31,
+    });
 
     // Class preview sprite (shows default selected class)
     let _class_preview = spawn_player_preview(
@@ -925,6 +946,7 @@ pub fn handle_class_selection(
     mut hover_state: ResMut<ClassUnlockHoverState>,
     mut confirm_state: ResMut<ClassUnlockConfirmState>,
     cheat_settings: Res<CheatSettings>,
+    focus_input: crate::ui::focus::FocusInput,
 ) {
     let hit_test = super::ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
@@ -939,100 +961,102 @@ pub fn handle_class_selection(
             continue;
         };
 
-        match hit_test {
-            Some(hit_ent) if hit_ent.0 == entity => {
-                if let Some(slot) = class_option.as_mut() {
-                    let class_id = slot.class.clone();
-                    let is_locked = !cheat_settings.bypass_class_unlocks
-                        && !unlocked_classes.contains(&class_id);
-                    slot.is_locked = is_locked;
-                    let slot_pos = global_transform
-                        .map(|t| t.translation())
-                        .unwrap_or(Vec3::ZERO);
-                    if !confirm_state.active {
-                        hover_state.hovered_class = if is_locked {
-                            hover_state.slot_position = slot_pos;
-                            Some(class_id.clone())
-                        } else {
-                            None
-                        };
-                    }
+        let is_hit = matches!(hit_test, Some(hit_ent) if hit_ent.0 == entity);
+        let is_focused = focus_input.is_focused(entity);
+        let confirm_pressed =
+            (is_hit && left_mouse_pressed) || (is_focused && focus_input.confirm_just_pressed());
 
-                    match interactable.current() {
-                        Interaction::None => {
-                            interactable.change(Interaction::Hovering);
-                            slot.is_hovered = true;
-                            if !is_locked {
-                                commands
-                                    .spawn(SoundSpawner::new(AudioSoundEffect::ButtonHover, 0.05));
-                            }
+        if is_hit || is_focused {
+            if let Some(slot) = class_option.as_mut() {
+                let class_id = slot.class.clone();
+                let is_locked = !cheat_settings.bypass_class_unlocks
+                    && !unlocked_classes.contains(&class_id);
+                slot.is_locked = is_locked;
+                let slot_pos = global_transform
+                    .map(|t| t.translation())
+                    .unwrap_or(Vec3::ZERO);
+                if !confirm_state.active {
+                    hover_state.hovered_class = if is_locked {
+                        hover_state.slot_position = slot_pos;
+                        Some(class_id.clone())
+                    } else {
+                        None
+                    };
+                }
+
+                match interactable.current() {
+                    Interaction::None => {
+                        interactable.change(Interaction::Hovering);
+                        slot.is_hovered = true;
+                        if !is_locked {
+                            commands
+                                .spawn(SoundSpawner::new(AudioSoundEffect::ButtonHover, 0.05));
                         }
-                        Interaction::Hovering => {
-                            if left_mouse_pressed {
-                                if is_locked {
-                                    if let (Some(unlock_data), Some(achievements_res)) =
-                                        (class_unlocks.as_ref(), achievements.as_ref())
-                                    {
-                                        if let Some(entry) = unlock_data.entry(&class_id) {
-                                            let requirements_met = entry
-                                                .achievements
-                                                .iter()
-                                                .all(|req| achievements_res.has(*req));
-                                            let can_afford = unlock_currency
-                                                .as_ref()
-                                                .map(|currency| currency.can_spend(entry.cost))
-                                                .unwrap_or(false);
-                                            if requirements_met && can_afford {
-                                                confirm_state.active = true;
-                                                confirm_state.class = Some(class_id.clone());
-                                                confirm_state.cost = entry.cost;
-                                                confirm_state.anchor_position = slot_pos;
-                                            }
+                    }
+                    Interaction::Hovering => {
+                        if confirm_pressed {
+                            if is_locked {
+                                if let (Some(unlock_data), Some(achievements_res)) =
+                                    (class_unlocks.as_ref(), achievements.as_ref())
+                                {
+                                    if let Some(entry) = unlock_data.entry(&class_id) {
+                                        let requirements_met = entry
+                                            .achievements
+                                            .iter()
+                                            .all(|req| achievements_res.has(*req));
+                                        let can_afford = unlock_currency
+                                            .as_ref()
+                                            .map(|currency| currency.can_spend(entry.cost))
+                                            .unwrap_or(false);
+                                        if requirements_met && can_afford {
+                                            confirm_state.active = true;
+                                            confirm_state.class = Some(class_id.clone());
+                                            confirm_state.cost = entry.cost;
+                                            confirm_state.anchor_position = slot_pos;
                                         }
                                     }
-                                } else {
-                                    selection_state.selected_class = Some(class_id.clone());
-                                    slot.is_selected = true;
-                                    commands.spawn(SoundSpawner::new(
-                                        AudioSoundEffect::ButtonClick,
-                                        0.2,
-                                    ));
                                 }
+                            } else {
+                                selection_state.selected_class = Some(class_id.clone());
+                                slot.is_selected = true;
+                                commands.spawn(SoundSpawner::new(
+                                    AudioSoundEffect::ButtonClick,
+                                    0.2,
+                                ));
                             }
                         }
-                        _ => {}
                     }
-                } else if let Some(pet_state) = pet_option.as_mut() {
-                    match interactable.current() {
-                        Interaction::None => {
-                            interactable.change(Interaction::Hovering);
-                            pet_state.is_hovered = true;
-                            commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonHover, 0.05));
-                        }
-                        Interaction::Hovering => {
-                            if left_mouse_pressed {
-                                selection_state.selected_pet = Some(pet_state.pet.clone());
-                                pet_state.is_selected = true;
-                                commands
-                                    .spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.2));
-                            }
-                        }
-                        _ => {}
+                    _ => {}
+                }
+            } else if let Some(pet_state) = pet_option.as_mut() {
+                match interactable.current() {
+                    Interaction::None => {
+                        interactable.change(Interaction::Hovering);
+                        pet_state.is_hovered = true;
+                        commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonHover, 0.05));
                     }
+                    Interaction::Hovering => {
+                        if confirm_pressed {
+                            selection_state.selected_pet = Some(pet_state.pet.clone());
+                            pet_state.is_selected = true;
+                            commands
+                                .spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.2));
+                        }
+                    }
+                    _ => {}
                 }
             }
-            _ => {
-                if let Some(slot) = class_option.as_mut() {
-                    if slot.is_hovered {
-                        interactable.change(Interaction::None);
-                        slot.is_hovered = false;
-                    }
+        } else {
+            if let Some(slot) = class_option.as_mut() {
+                if slot.is_hovered {
+                    interactable.change(Interaction::None);
+                    slot.is_hovered = false;
                 }
-                if let Some(slot) = pet_option.as_mut() {
-                    if slot.is_hovered {
-                        interactable.change(Interaction::None);
-                        slot.is_hovered = false;
-                    }
+            }
+            if let Some(slot) = pet_option.as_mut() {
+                if slot.is_hovered {
+                    interactable.change(Interaction::None);
+                    slot.is_hovered = false;
                 }
             }
         }
@@ -1277,6 +1301,14 @@ pub fn update_class_unlock_confirm_panel(
 
             commands.entity(yes_button).set_parent(panel);
             commands.entity(no_button).set_parent(panel);
+            commands.entity(yes_button).insert(Focusable {
+                group: UIState::ClassSelection,
+                index: 50,
+            });
+            commands.entity(no_button).insert(Focusable {
+                group: UIState::ClassSelection,
+                index: 51,
+            });
 
             // Add button text
             commands

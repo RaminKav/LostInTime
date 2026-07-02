@@ -29,7 +29,7 @@ use super::{
         Z_DEPTH_HEIRLOOM_SKILL_CHOICE_CONTENT, Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND,
         Z_DEPTH_HEIRLOOM_SKILL_CHOICE_OVERLAY,
     },
-    Interactable, UIElement, UIState, SKILLS_CHOICE_UI_SIZE,
+    Interactable, Focusable, UIElement, UIState, SKILLS_CHOICE_UI_SIZE,
 };
 
 /// Side info boxes spawned on hover for a level-up choice card (despawned on unhover).
@@ -211,7 +211,12 @@ pub fn setup_skill_choice_ui(
             .insert(UiShadow::container())
             .insert(Name::new(format!("REROLL BUTTON {slot_index}")));
         if enabled {
-            reroll_entity.insert(Interactable::default());
+            reroll_entity
+                .insert(Interactable::default())
+                .insert(Focusable {
+                    group: UIState::Skills,
+                    index: 10 + slot_index as u32,
+                });
         }
     }
 
@@ -251,6 +256,10 @@ pub fn setup_skill_choice_ui(
             .insert(UIElement::BackButton)
             .insert(BanishButton(slot_index))
             .insert(Interactable::default())
+            .insert(Focusable {
+                group: UIState::Skills,
+                index: 20 + slot_index as u32,
+            })
             .insert(UiShadow::container())
             .insert(Name::new(format!("BANISH BUTTON {slot_index}")));
 
@@ -393,6 +402,10 @@ pub fn spawn_skill_choice_entities(
                 interaction_lock_timer: Timer::from_seconds(0.75, TimerMode::Once),
             })
             .insert(Interactable::default())
+            .insert(Focusable {
+                group: UIState::Skills,
+                index: index as u32,
+            })
             .insert(Name::new("SKILLS UI"));
     }
 }

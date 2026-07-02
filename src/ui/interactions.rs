@@ -411,6 +411,15 @@ pub struct InvSlotInteractionEvents<'w> {
     pub tooltip_teardown: EventWriter<'w, TooltipTeardownEvent>,
 }
 
+/// Extra params for `handle_cursor_skills_buttons` (keeps that system under Bevy's tuple limit).
+#[derive(SystemParam)]
+pub struct SkillChoicePickParams<'w, 's> {
+    pub att_event: EventWriter<'w, AttributeChangeEvent>,
+    pub asset_server: Res<'w, AssetServer>,
+    pub ui_focus: Res<'w, crate::ui::focus::UiFocus>,
+    pub shrine_query: Query<'w, 's, &'static mut HeirloomShrineState>,
+}
+
 #[derive(Debug, Clone)]
 
 pub struct DropInWorldEvent {
@@ -1422,10 +1431,8 @@ pub fn handle_cursor_skills_buttons(
     proto: ProtoParam,
     mut proto_commands: ProtoCommands,
     mut commands: Commands,
-    mut att_event: EventWriter<AttributeChangeEvent>,
     graphics: Res<Graphics>,
-    mut shrine_query: Query<&mut HeirloomShrineState>,
-    asset_server: Res<AssetServer>,
+    mut pick_params: SkillChoicePickParams,
     mut tips_param: ParamSet<(EventWriter<TipEvent>, Res<SeenTips>, ResMut<ChaosTracker>)>,
 ) {
     let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
@@ -1433,8 +1440,13 @@ pub fn handle_cursor_skills_buttons(
     let ui_state = &curr_ui_state.0;
 
     for (e, mut interactable, state) in skill_choices.iter_mut() {
-        match hit_test {
-            Some(hit_ent) if hit_ent.0 == e => match interactable.current() {
+        let is_hit = matches!(hit_test, Some(hit_ent) if hit_ent.0 == e);
+        let is_focused = pick_params.ui_focus.is_focused(e);
+        let confirm_pressed = (is_hit && left_mouse_pressed)
+            || (is_focused && pick_params.ui_focus.confirm_just_pressed);
+
+        if is_hit || is_focused {
+            match interactable.current() {
                 Interaction::None => {
                     interactable.change(Interaction::Hovering);
                     commands.spawn(SoundSpawner::new(AudioSoundEffect::UISkillHover, 0.2));
@@ -1450,7 +1462,7 @@ pub fn handle_cursor_skills_buttons(
                         .insert(graphics.get_ui_element_texture(ui_element));
                 }
                 Interaction::Hovering => {
-                    if left_mouse_pressed && state.interaction_lock_timer.finished() {
+                    if confirm_pressed && state.interaction_lock_timer.finished() {
                         let (e, mut skills, t, level, blessings, mut heirloom_stats) =
                             player_skills.single_mut();
                         let picked_skill = state.skill_choice.clone();
@@ -1489,7 +1501,7 @@ pub fn handle_cursor_skills_buttons(
                                 });
                             }
 
-                            for mut shrine in shrine_query.iter_mut() {
+                            for mut shrine in pick_params.shrine_query.iter_mut() {
                                 if !shrine.is_used {
                                     shrine.is_used = true;
 
@@ -1510,7 +1522,7 @@ pub fn handle_cursor_skills_buttons(
                                         );
                                         spawn_floating_text_with_shadow(
                                             &mut commands,
-                                            &asset_server,
+                                            &pick_params.asset_server,
                                             player_pos + pos_offset,
                                             stat_type.color(),
                                             format!("+{} {}", amount, stat_type.name()),
@@ -1530,7 +1542,7 @@ pub fn handle_cursor_skills_buttons(
                             } else {
                                 next_ui_state.set(UIState::Closed);
                             }
-                            att_event.send(AttributeChangeEvent);
+                            pick_params.att_event.send(AttributeChangeEvent);
                         } else if ui_state == &UIState::ActiveSkills {
                             match state.index {
                                 0 => {
@@ -1561,28 +1573,27 @@ pub fn handle_cursor_skills_buttons(
 
                             skill_queue.active_heirloom_limbo = None;
                             next_ui_state.set(UIState::Closed);
-                            att_event.send(AttributeChangeEvent);
+                            pick_params.att_event.send(AttributeChangeEvent);
                         }
                     }
                 }
                 _ => (),
-            },
-            _ => {
-                // reset hovering states if we stop hovering ?
-                let Interaction::Hovering = interactable.current() else {
-                    continue;
-                };
-                let (ui_element, _) = state
-                    .skill_choice
-                    .heirloom
-                    .get_ui_element(state.skill_choice.rarity.clone());
-
-                interactable.change(Interaction::None);
-                commands
-                    .entity(e)
-                    .insert(ui_element.clone())
-                    .insert(graphics.get_ui_element_texture(ui_element));
             }
+        } else {
+            // reset hovering states if we stop hovering ?
+            let Interaction::Hovering = interactable.current() else {
+                continue;
+            };
+            let (ui_element, _) = state
+                .skill_choice
+                .heirloom
+                .get_ui_element(state.skill_choice.rarity.clone());
+
+            interactable.change(Interaction::None);
+            commands
+                .entity(e)
+                .insert(ui_element.clone())
+                .insert(graphics.get_ui_element_texture(ui_element));
         }
     }
 }
@@ -1595,14 +1606,20 @@ pub fn handle_cursor_reroll_dice_buttons(
     graphics: Res<Graphics>,
     asset_server: Res<AssetServer>,
     mut run_unlocks: ResMut<RunUnlockState>,
+    focus_input: crate::ui::focus::FocusInput,
 ) {
     let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
 
     for (e, mut interactable, state) in reroll_dice.iter_mut() {
         let rerolls_available = run_unlocks.rerolls_remaining > 0;
-        match hit_test {
-            Some(hit_ent) if hit_ent.0 == e => match interactable.current() {
+        let is_hit = matches!(hit_test, Some(hit_ent) if hit_ent.0 == e);
+        let is_focused = focus_input.is_focused(e);
+        let confirm_pressed = (is_hit && left_mouse_pressed)
+            || (is_focused && focus_input.confirm_just_pressed());
+
+        if is_hit || is_focused {
+            match interactable.current() {
                 Interaction::None => {
                     if !rerolls_available {
                         continue;
@@ -1615,7 +1632,7 @@ pub fn handle_cursor_reroll_dice_buttons(
                         .insert(graphics.get_ui_element_texture(ui_element));
                 }
                 Interaction::Hovering => {
-                    if left_mouse_pressed && rerolls_available {
+                    if confirm_pressed && rerolls_available {
                         run_unlocks.rerolls_remaining =
                             run_unlocks.rerolls_remaining.saturating_sub(1);
                         interactable.change(Interaction::None);
@@ -1638,19 +1655,18 @@ pub fn handle_cursor_reroll_dice_buttons(
                     }
                 }
                 _ => (),
-            },
-            _ => {
-                let Interaction::Hovering = interactable.current() else {
-                    continue;
-                };
-                let ui_element = UIElement::RerollDice;
-
-                interactable.change(Interaction::None);
-                commands
-                    .entity(e)
-                    .insert(ui_element.clone())
-                    .insert(graphics.get_ui_element_texture(ui_element));
             }
+        } else {
+            let Interaction::Hovering = interactable.current() else {
+                continue;
+            };
+            let ui_element = UIElement::RerollDice;
+
+            interactable.change(Interaction::None);
+            commands
+                .entity(e)
+                .insert(ui_element.clone())
+                .insert(graphics.get_ui_element_texture(ui_element));
         }
     }
 }
@@ -1671,6 +1687,7 @@ pub fn handle_cursor_banish_buttons(
     skill_ui: Query<(Entity, &SkillChoiceUI), With<SkillChoiceUI>>,
     dice_buttons: Query<(Entity, &RerollDice), With<RerollDice>>,
     asset_server: Res<AssetServer>,
+    focus_input: crate::ui::focus::FocusInput,
 ) {
     let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
@@ -1679,8 +1696,13 @@ pub fn handle_cursor_banish_buttons(
         let no_banishes = run_unlocks.banishes_remaining == 0;
         let slot_allowed = skill_queue.banish_allowed_for_choice_slot(&time_crystals, banish.0);
         let banishes_available = !no_banishes && slot_allowed;
-        match hit_test {
-            Some(hit_ent) if hit_ent.0 == e => match interactable.current() {
+        let is_hit = matches!(hit_test, Some(hit_ent) if hit_ent.0 == e);
+        let is_focused = focus_input.is_focused(e);
+        let confirm_pressed = (is_hit && left_mouse_pressed)
+            || (is_focused && focus_input.confirm_just_pressed());
+
+        if is_hit || is_focused {
+            match interactable.current() {
                 Interaction::None => {
                     interactable.change(Interaction::Hovering);
                     if banishes_available {
@@ -1692,7 +1714,7 @@ pub fn handle_cursor_banish_buttons(
                     }
                 }
                 Interaction::Hovering => {
-                    if left_mouse_pressed && !banishes_available {
+                    if confirm_pressed && !banishes_available {
                         let btn_pos = ui_sprites
                             .get(e)
                             .map(|(_, _, gt)| gt.translation())
@@ -1714,7 +1736,7 @@ pub fn handle_cursor_banish_buttons(
                             .entity(text)
                             .insert(bevy::render::view::RenderLayers::from_layers(&[3]));
                     }
-                    if left_mouse_pressed && banishes_available {
+                    if confirm_pressed && banishes_available {
                         if skill_queue.banish_slot(&time_crystals, banish.0).is_some() {
                             run_unlocks.banishes_remaining =
                                 run_unlocks.banishes_remaining.saturating_sub(1);
@@ -1739,16 +1761,13 @@ pub fn handle_cursor_banish_buttons(
                     }
                 }
                 _ => (),
-            },
-            _ => {
-                if matches!(interactable.current(), Interaction::Hovering) {
-                    interactable.change(Interaction::None);
-                    commands
-                        .entity(e)
-                        .insert(UIElement::BackButton)
-                        .insert(graphics.get_ui_element_texture(UIElement::BackButton));
-                }
             }
+        } else if matches!(interactable.current(), Interaction::Hovering) {
+            interactable.change(Interaction::None);
+            commands
+                .entity(e)
+                .insert(UIElement::BackButton)
+                .insert(graphics.get_ui_element_texture(UIElement::BackButton));
         }
     }
     // disable other banish buttons if we banish one
@@ -1872,6 +1891,7 @@ pub fn handle_cursor_item_chest_button(
     proto: ProtoParam,
     mut att_event: EventWriter<AttributeChangeEvent>,
     pets: Query<(), With<crate::pets::state::Pet>>,
+    ui_focus: Res<crate::ui::focus::UiFocus>,
 ) {
     if item_chest_state.chest_type != ChestType::Item {
         return;
@@ -1893,13 +1913,18 @@ pub fn handle_cursor_item_chest_button(
 
     for (e, mut interactable, button) in item_chest_button.iter_mut() {
         let kind = button.kind;
-        match hit_test {
-            Some(hit_ent) if hit_ent.0 == e => match interactable.current() {
+        let is_hit = matches!(hit_test, Some(hit_ent) if hit_ent.0 == e);
+        let is_focused = ui_focus.is_focused(e);
+        let confirm_pressed = (is_hit && left_mouse_pressed)
+            || (is_focused && ui_focus.confirm_just_pressed);
+
+        if is_hit || is_focused {
+            match interactable.current() {
                 Interaction::None => {
                     interactable.change(Interaction::Hovering);
                 }
                 Interaction::Hovering => {
-                    if left_mouse_pressed {
+                    if confirm_pressed {
                         match kind {
                             ChestButtonKind::Open => advance_item_chest_state(
                                 &mut item_chest_state,
@@ -1931,12 +1956,9 @@ pub fn handle_cursor_item_chest_button(
                     }
                 }
                 _ => (),
-            },
-            _ => {
-                if matches!(interactable.current(), Interaction::Hovering) {
-                    interactable.change(Interaction::None);
-                }
             }
+        } else if matches!(interactable.current(), Interaction::Hovering) {
+            interactable.change(Interaction::None);
         }
     }
 }
@@ -2100,6 +2122,7 @@ fn equip_item_chest_reward(
 pub struct HeirloomChestEvents<'w> {
     pub chest_event: EventWriter<'w, ItemChestAnimChangeEvent>,
     pub att_event: EventWriter<'w, AttributeChangeEvent>,
+    pub ui_focus: Res<'w, crate::ui::focus::UiFocus>,
 }
 
 /// Handles heirloom chest button interactions (for ChestType::Heirloom).
@@ -2151,13 +2174,18 @@ pub fn handle_cursor_heirloom_chest_button(
 
     for (e, mut interactable, button) in item_chest_button.iter_mut() {
         let kind = button.kind;
-        match hit_test {
-            Some(hit_ent) if hit_ent.0 == e => match interactable.current() {
+        let is_hit = matches!(hit_test, Some(hit_ent) if hit_ent.0 == e);
+        let is_focused = heirloom_chest_events.ui_focus.is_focused(e);
+        let confirm_pressed = (is_hit && left_mouse_pressed)
+            || (is_focused && heirloom_chest_events.ui_focus.confirm_just_pressed);
+
+        if is_hit || is_focused {
+            match interactable.current() {
                 Interaction::None => {
                     interactable.change(Interaction::Hovering);
                 }
                 Interaction::Hovering => {
-                    if left_mouse_pressed {
+                    if confirm_pressed {
                         match kind {
                             ChestButtonKind::Open => advance_heirloom_chest_state(
                                 &mut item_chest_state,
@@ -2190,7 +2218,7 @@ pub fn handle_cursor_heirloom_chest_button(
                                     })
                                     .unwrap_or(false);
                                 let banishes_available = !no_banishes && slot_allowed;
-                                if left_mouse_pressed && !banishes_available {
+                                if confirm_pressed && !banishes_available {
                                     let btn_pos = ui_sprites
                                         .get(e)
                                         .map(|(_, _, gt)| gt.translation())
@@ -2212,7 +2240,7 @@ pub fn handle_cursor_heirloom_chest_button(
                                         bevy::render::view::RenderLayers::from_layers(&[3]),
                                     );
                                 }
-                                if left_mouse_pressed && banishes_available {
+                                if confirm_pressed && banishes_available {
                                     banish_heirloom_chest_reward(
                                         &mut item_chest_state,
                                         &mut commands,
@@ -2230,12 +2258,9 @@ pub fn handle_cursor_heirloom_chest_button(
                     }
                 }
                 _ => (),
-            },
-            _ => {
-                if matches!(interactable.current(), Interaction::Hovering) {
-                    interactable.change(Interaction::None);
-                }
             }
+        } else if matches!(interactable.current(), Interaction::Hovering) {
+            interactable.change(Interaction::None);
         }
     }
 }
@@ -2380,6 +2405,7 @@ pub fn handle_cursor_main_menu_buttons(
     graphics: Res<Graphics>,
     info_check: Query<&InfoModal>,
     curr_ui_state: Res<State<UIState>>,
+    focus_input: crate::ui::focus::FocusInput,
 ) {
     let menu_open = curr_ui_state.0 == UIState::ClassSelection
         || curr_ui_state.0 == UIState::Unlocks
@@ -2449,8 +2475,12 @@ pub fn handle_cursor_main_menu_buttons(
                 | MenuButton::WipeDataConfirm
                 | MenuButton::WipeDataCancel
         );
-        match hit_test {
-            Some(hit_ent) if hit_ent.0 == e => match interactable.current() {
+        let is_hit = matches!(hit_test, Some(hit_ent) if hit_ent.0 == e);
+        // Keyboard/gamepad focus (Track 3) is an alternate way to "point at" a button, alongside
+        // the mouse actually sitting over it — see `FocusInput`'s doc comment.
+        let is_focused = focus_input.is_focused(e);
+        if is_hit || is_focused {
+            match interactable.current() {
                 Interaction::None => {
                     interactable.change(Interaction::Hovering);
                     commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonHover, 0.05));
@@ -2483,7 +2513,9 @@ pub fn handle_cursor_main_menu_buttons(
                     }
                 }
                 Interaction::Hovering => {
-                    if left_mouse_pressed {
+                    if (is_hit && left_mouse_pressed)
+                        || (is_focused && focus_input.confirm_just_pressed())
+                    {
                         send_menu_button_event.send(MenuButtonClickEvent {
                             button: menu_button.clone(),
                         });
@@ -2491,34 +2523,33 @@ pub fn handle_cursor_main_menu_buttons(
                     }
                 }
                 _ => (),
-            },
-            _ => {
-                // reset hovering states if we stop hovering
-                let Interaction::Hovering = interactable.current() else {
-                    continue;
-                };
-                interactable.change(Interaction::None);
+            }
+        } else {
+            // reset hovering states if we stop hovering
+            let Interaction::Hovering = interactable.current() else {
+                continue;
+            };
+            interactable.change(Interaction::None);
 
-                if uses_sprite {
-                    commands
-                        .entity(e)
-                        .insert(ui_element.clone().get_normal_state().unwrap())
-                        .insert(graphics.get_ui_element_texture(
-                            ui_element.clone().get_normal_state().unwrap(),
-                        ));
-                    if matches!(
-                        ui_element,
-                        UIElement::AchievementButton | UIElement::AchievementButtonHover
-                    ) {
-                        set_achievement_button_label_color(e, WHITE);
-                    }
-                } else {
-                    if let Ok(mut text_comp) = text.get_mut(e) {
-                        text_comp.sections[0].style.color = Color::WHITE;
-                    }
-                    commands.entity(e).remove::<UIElement>();
-                    commands.entity(e).remove::<Handle<Image>>();
+            if uses_sprite {
+                commands
+                    .entity(e)
+                    .insert(ui_element.clone().get_normal_state().unwrap())
+                    .insert(graphics.get_ui_element_texture(
+                        ui_element.clone().get_normal_state().unwrap(),
+                    ));
+                if matches!(
+                    ui_element,
+                    UIElement::AchievementButton | UIElement::AchievementButtonHover
+                ) {
+                    set_achievement_button_label_color(e, WHITE);
                 }
+            } else {
+                if let Ok(mut text_comp) = text.get_mut(e) {
+                    text_comp.sections[0].style.color = Color::WHITE;
+                }
+                commands.entity(e).remove::<UIElement>();
+                commands.entity(e).remove::<Handle<Image>>();
             }
         }
     }
@@ -2892,20 +2923,26 @@ pub fn handle_merchant_shop_interactions(
     mut shop: ResMut<EssenceShopChoices>,
     mut cache: ResMut<super::EssenceShopCache>,
     mut commands: Commands,
+    focus_input: crate::ui::focus::FocusInput,
 ) {
     let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
     let right_mouse_pressed = mouse_input.just_pressed(MouseButton::Right);
 
     for (e, mut interactable, slot_index) in shop_slots.iter_mut() {
-        match hit_test {
-            Some(hit_ent) if hit_ent.0 == e => match interactable.current() {
+        let is_hit = matches!(hit_test, Some(hit_ent) if hit_ent.0 == e);
+        let is_focused = focus_input.is_focused(e);
+        let confirm_pressed = (is_hit && left_mouse_pressed)
+            || (is_focused && focus_input.confirm_just_pressed());
+
+        if is_hit || is_focused {
+            match interactable.current() {
                 Interaction::None => {
                     interactable.change(Interaction::Hovering);
                     bounce_merchant_slot_icon(&mut commands, e, &parents, &children, &icons);
                 }
                 Interaction::Hovering => {
-                    if left_mouse_pressed {
+                    if confirm_pressed {
                         purchase_event.send(SubmitMerchantPurchase {
                             slot_index: slot_index.0,
                         });
@@ -2920,13 +2957,9 @@ pub fn handle_merchant_shop_interactions(
                     }
                 }
                 _ => (),
-            },
-            _ => {
-                let Interaction::Hovering = interactable.current() else {
-                    continue;
-                };
-                interactable.change(Interaction::None);
             }
+        } else if matches!(interactable.current(), Interaction::Hovering) {
+            interactable.change(Interaction::None);
         }
     }
 }
@@ -2940,27 +2973,30 @@ pub fn handle_merchant_done_button(
     shop: Res<EssenceShopChoices>,
     mut cache: ResMut<super::EssenceShopCache>,
     mut commands: Commands,
+    focus_input: crate::ui::focus::FocusInput,
 ) {
     let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
 
     for (e, mut interactable) in done_buttons.iter_mut() {
-        match hit_test {
-            Some(hit_ent) if hit_ent.0 == e => match interactable.current() {
+        let is_hit = matches!(hit_test, Some(hit_ent) if hit_ent.0 == e);
+        let is_focused = focus_input.is_focused(e);
+        let confirm_pressed = (is_hit && left_mouse_pressed)
+            || (is_focused && focus_input.confirm_just_pressed());
+
+        if is_hit || is_focused {
+            match interactable.current() {
                 Interaction::None => interactable.change(Interaction::Hovering),
                 Interaction::Hovering => {
-                    if left_mouse_pressed {
+                    if confirm_pressed {
                         sync_merchant_shop_to_world(&shop, &mut commands, &mut cache);
                         next_ui_state.set(UIState::Closed);
                     }
                 }
                 _ => (),
-            },
-            _ => {
-                if matches!(interactable.current(), Interaction::Hovering) {
-                    interactable.change(Interaction::None);
-                }
             }
+        } else if matches!(interactable.current(), Interaction::Hovering) {
+            interactable.change(Interaction::None);
         }
     }
 }
@@ -2983,6 +3019,7 @@ pub fn handle_merchant_category_reroll_buttons(
     mut run_unlocks: ResMut<RunUnlockState>,
     shop: Res<EssenceShopChoices>,
     mut reroll_event: EventWriter<MerchantCategoryRerollEvent>,
+    focus_input: crate::ui::focus::FocusInput,
 ) {
     let hit_entity = {
         let ui_sprites = sprites.p0();
@@ -3001,9 +3038,13 @@ pub fn handle_merchant_category_reroll_buttons(
         } else {
             Color::rgb(0.45, 0.45, 0.45)
         };
+        let is_hit = hit_entity == Some(e);
+        let is_focused = focus_input.is_focused(e);
+        let confirm_pressed = (is_hit && left_mouse_pressed)
+            || (is_focused && focus_input.confirm_just_pressed());
 
-        match hit_entity {
-            Some(hit_ent) if hit_ent == e => match interactable.current() {
+        if is_hit || is_focused {
+            match interactable.current() {
                 Interaction::None => {
                     if enabled {
                         interactable.change(Interaction::Hovering);
@@ -3017,7 +3058,7 @@ pub fn handle_merchant_category_reroll_buttons(
                 }
                 Interaction::Hovering => {
                     any_hovered = true;
-                    if left_mouse_pressed && enabled {
+                    if confirm_pressed && enabled {
                         run_unlocks.rerolls_remaining =
                             run_unlocks.rerolls_remaining.saturating_sub(1);
                         interactable.change(Interaction::None);
@@ -3031,15 +3072,12 @@ pub fn handle_merchant_category_reroll_buttons(
                     }
                 }
                 _ => (),
-            },
-            _ => {
-                if matches!(interactable.current(), Interaction::Hovering) {
-                    interactable.change(Interaction::None);
-                    for child in btn_children.iter() {
-                        if let Ok(mut sprite) = sprites.p1().get_mut(*child) {
-                            sprite.color = icon_color;
-                        }
-                    }
+            }
+        } else if matches!(interactable.current(), Interaction::Hovering) {
+            interactable.change(Interaction::None);
+            for child in btn_children.iter() {
+                if let Ok(mut sprite) = sprites.p1().get_mut(*child) {
+                    sprite.color = icon_color;
                 }
             }
         }

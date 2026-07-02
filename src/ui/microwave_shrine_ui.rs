@@ -17,11 +17,9 @@ use crate::{
         heirloom_tooltip::{
             heirloom_hud_hover_tooltip_position, HeirloomTooltipRequest, HeirloomTooltipShow,
         },
-    },
-    ui::{
         interactions::{Interactable, Interaction},
         main_menu::spawn_back_button,
-        UIElement, UIState,
+        Focusable, UIElement, UIState,
     },
     ScreenResolution, GAME_HEIGHT,
 };
@@ -193,6 +191,10 @@ pub fn setup_microwave_shrine_ui(
             .insert(RenderLayers::from_layers(&[3]))
             .insert(UIElement::MenuButton)
             .insert(Interactable::default())
+            .insert(Focusable {
+                group: UIState::MicrowaveShrine,
+                index: i as u32,
+            })
             .insert(MicrowaveRarityButton {
                 rarity: rarity.clone(),
                 cost,
@@ -241,7 +243,11 @@ pub fn setup_microwave_shrine_ui(
     commands
         .entity(back_button)
         .set_parent(container)
-        .insert(UIState::MicrowaveShrine);
+        .insert(UIState::MicrowaveShrine)
+        .insert(Focusable {
+            group: UIState::MicrowaveShrine,
+            index: 100,
+        });
 }
 
 fn point_in_sprite(cursor: &Vec3, size: Vec2, xform: &GlobalTransform) -> bool {
@@ -268,6 +274,7 @@ pub fn handle_microwave_shrine_rarity_click(
     player_skills: Query<&PlayerSkills>,
     asset_server: Res<AssetServer>,
     graphics: Res<Graphics>,
+    ui_focus: Res<crate::ui::focus::UiFocus>,
 ) {
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
     let cursor = cursor_pos.ui_coords;
@@ -277,8 +284,11 @@ pub fn handle_microwave_shrine_rarity_click(
         let hit = point_in_sprite(&cursor, size, global_transform);
 
         let enabled = btn.can_afford && btn.has_enough_heirlooms;
+        let is_focused = ui_focus.is_focused(e);
+        let confirm_pressed = (hit && left_mouse_pressed)
+            || (is_focused && ui_focus.confirm_just_pressed);
 
-        if hit {
+        if hit || is_focused {
             match interactable.current() {
                 Interaction::None => {
                     if enabled {
@@ -297,7 +307,7 @@ pub fn handle_microwave_shrine_rarity_click(
                             .entity(e)
                             .insert(UIElement::MenuButton)
                             .insert(graphics.get_ui_element_texture(UIElement::MenuButton));
-                    } else if left_mouse_pressed {
+                    } else if confirm_pressed {
                         if let Ok(root) = ui_root.get_single() {
                             // Remove only the three rarity buttons; keep overlay (bg, title, gold)
                             let to_despawn: Vec<Entity> = rarity_buttons_to_remove
@@ -343,6 +353,10 @@ pub fn handle_microwave_shrine_rarity_click(
                                     })
                                     .insert(RenderLayers::from_layers(&[3]))
                                     .insert(Interactable::default())
+                                    .insert(Focusable {
+                                        group: UIState::MicrowaveShrine,
+                                        index: 10 + i as u32,
+                                    })
                                     .insert(MicrowaveHeirloomButton {
                                         heirloom: heirloom.clone(),
                                     })
@@ -373,14 +387,12 @@ pub fn handle_microwave_shrine_rarity_click(
                 }
                 _ => {}
             }
-        } else {
-            if matches!(interactable.current(), Interaction::Hovering) {
-                interactable.change(Interaction::None);
-                commands
-                    .entity(e)
-                    .insert(UIElement::MenuButton)
-                    .insert(graphics.get_ui_element_texture(UIElement::MenuButton));
-            }
+        } else if matches!(interactable.current(), Interaction::Hovering) {
+            interactable.change(Interaction::None);
+            commands
+                .entity(e)
+                .insert(UIElement::MenuButton)
+                .insert(graphics.get_ui_element_texture(UIElement::MenuButton));
         }
     }
 }
@@ -465,6 +477,7 @@ pub fn handle_microwave_shrine_heirloom_click(
     mut modify_currency: EventWriter<ModifyCurencyEvent>,
     mut attribute_event: EventWriter<AttributeChangeEvent>,
     player_query: Query<(Entity, &Transform), With<crate::player::Player>>,
+    ui_focus: Res<crate::ui::focus::UiFocus>,
 ) {
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
     let cursor = cursor_pos.ui_coords;
@@ -472,15 +485,18 @@ pub fn handle_microwave_shrine_heirloom_click(
 
     for (e, global_transform, btn, mut interactable) in buttons.iter_mut() {
         let hit = point_in_sprite(&cursor, hit_size, global_transform);
+        let is_focused = ui_focus.is_focused(e);
+        let confirm_pressed = (hit && left_mouse_pressed)
+            || (is_focused && ui_focus.confirm_just_pressed);
 
-        if hit {
+        if hit || is_focused {
             match interactable.current() {
                 Interaction::None => {
                     interactable.change(Interaction::Hovering);
                     commands.entity(e).insert(BounceOnHit::new());
                 }
                 Interaction::Hovering => {
-                    if left_mouse_pressed {
+                    if confirm_pressed {
                         let Ok(mut skills) = player_skills.get_single_mut() else {
                             return;
                         };
@@ -607,10 +623,8 @@ pub fn handle_microwave_shrine_heirloom_click(
                 }
                 _ => {}
             }
-        } else {
-            if matches!(interactable.current(), Interaction::Hovering) {
-                interactable.change(Interaction::None);
-            }
+        } else if matches!(interactable.current(), Interaction::Hovering) {
+            interactable.change(Interaction::None);
         }
     }
 }

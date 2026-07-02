@@ -118,7 +118,7 @@ use super::{
     heirloom_tooltip::{HeirloomTooltipRequest, HeirloomTooltipShow},
     spawn_item_stack_icon,
     tooltips::{ToolTipUpdateEvent, TooltipTeardownEvent},
-    Interactable, UIElement, UIState, CURRENCY_BACKGROUND_SIZE, KEYBIND_BADGE_COLOR,
+    Interactable, Focusable, UIElement, UIState, CURRENCY_BACKGROUND_SIZE, KEYBIND_BADGE_COLOR,
     TOOLTIP_INFO_BOX_SIZE,
 };
 
@@ -169,6 +169,14 @@ impl MerchantCategory {
             MerchantCategory::Materials => Vec2::new(32., -10. + MERCHANT_CATEGORY_Y_OFFSET),
         };
         Vec3::new(p.x, p.y, 15.)
+    }
+
+    pub fn focus_index(self) -> u32 {
+        match self {
+            MerchantCategory::Heirlooms => 20,
+            MerchantCategory::Equipment => 21,
+            MerchantCategory::Materials => 22,
+        }
     }
 }
 
@@ -747,7 +755,11 @@ fn spawn_merchant_slot_icon(
     if !faded {
         hit_cmd
             .insert(Interactable::default())
-            .insert(MerchantShopSlotIndex(slot_index));
+            .insert(MerchantShopSlotIndex(slot_index))
+            .insert(Focusable {
+                group: UIState::Essence,
+                index: slot_index as u32,
+            });
     }
     hit_cmd.set_parent(slot_root);
 }
@@ -1172,7 +1184,11 @@ pub fn spawn_merchant_category_reroll_button(
         .insert(Name::new(format!("Merchant Reroll {:?}", category.label())));
 
     if enabled {
-        btn.insert(Interactable::default());
+        btn.insert(Interactable::default())
+            .insert(Focusable {
+                group: UIState::Essence,
+                index: category.focus_index(),
+            });
     }
 
     let btn_e = btn.id();
@@ -1618,7 +1634,13 @@ pub fn setup_essence_ui(
         true,
         UIState::Essence,
     );
-    commands.entity(done_btn).insert(MerchantDoneButton);
+    commands
+        .entity(done_btn)
+        .insert(MerchantDoneButton)
+        .insert(Focusable {
+            group: UIState::Essence,
+            index: 100,
+        });
 
     commands.insert_resource(MerchantShopUiDirty::default());
 }

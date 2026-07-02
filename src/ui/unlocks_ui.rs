@@ -15,7 +15,7 @@ use crate::{
     },
     ui::{
         interactions::Interaction, main_menu::spawn_exit_icon_button, spawn_item_stack_icon,
-        ui_helpers, Interactable, UIElement, UIState,
+        ui_helpers, Focusable, Interactable, UIElement, UIState,
     },
     ScreenResolution,
 };
@@ -175,6 +175,7 @@ pub fn handle_unlocks_clicks(
     mut upgrades: ResMut<UnlockUpgrades>,
     unlocked_classes: Res<UnlockedClasses>,
     achievements: Res<Achievements>,
+    focus_input: crate::ui::focus::FocusInput,
 ) {
     let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
     let left_mouse_released = mouse_input.just_released(MouseButton::Left);
@@ -187,8 +188,10 @@ pub fn handle_unlocks_clicks(
 
         let cost = upgrades.next_cost(button.kind);
         let affordable = currency.time_fragments.max(0) as u32 >= cost;
-        match hit_test {
-            Some(hit) if hit.0 == entity => match interactable.current() {
+        let is_hit = matches!(hit_test, Some(hit) if hit.0 == entity);
+        let is_focused = focus_input.is_focused(entity);
+        if is_hit || is_focused {
+            match interactable.current() {
                 Interaction::None => {
                     if !affordable {
                         continue;
@@ -201,7 +204,9 @@ pub fn handle_unlocks_clicks(
                         .insert(graphics.get_ui_element_texture(UIElement::BackButtonHover));
                 }
                 Interaction::Hovering => {
-                    if left_mouse_released && affordable {
+                    if (left_mouse_released && is_hit && affordable)
+                        || (is_focused && focus_input.confirm_just_pressed() && affordable)
+                    {
                         if currency.spend(cost) {
                             upgrades.increment(button.kind);
                             commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.2));
@@ -222,18 +227,17 @@ pub fn handle_unlocks_clicks(
                     }
                 }
                 _ => {}
-            },
-            _ => {
-                // reset hovering states if we stop hovering
-                let Interaction::Hovering = interactable.current() else {
-                    continue;
-                };
-                interactable.change(Interaction::None);
-                commands
-                    .entity(entity)
-                    .insert(UIElement::BackButton)
-                    .insert(graphics.get_ui_element_texture(UIElement::BackButton));
             }
+        } else {
+            // reset hovering states if we stop hovering
+            let Interaction::Hovering = interactable.current() else {
+                continue;
+            };
+            interactable.change(Interaction::None);
+            commands
+                .entity(entity)
+                .insert(UIElement::BackButton)
+                .insert(graphics.get_ui_element_texture(UIElement::BackButton));
         }
     }
 }
@@ -421,12 +425,16 @@ pub fn setup_unlocks_ui(
             Vec3::new(110.5, y - 6.5, 11.),
             upgrades.as_ref(),
             currency.as_ref(),
+            index as u32,
         );
     }
 
     // Exit button
     let exit_button = spawn_exit_icon_button(Vec3::new(0., -158., 11.), &mut commands, &graphics);
-    commands.entity(exit_button).insert(UnlocksUI);
+    commands.entity(exit_button).insert(UnlocksUI).insert(Focusable {
+        group: UIState::Unlocks,
+        index: 100,
+    });
 }
 
 fn spawn_unlock_row(
@@ -438,6 +446,7 @@ fn spawn_unlock_row(
     button_pos: Vec3,
     upgrades: &UnlockUpgrades,
     currency: &TimeFragmentCurrency,
+    focus_index: u32,
 ) {
     let title_name = format!("Unlock Row Title {}", kind.display_name());
     commands.spawn((
@@ -546,7 +555,10 @@ fn spawn_unlock_row(
         )));
 
     if enabled {
-        button_cmd.insert(Interactable::default());
+        button_cmd.insert(Interactable::default()).insert(Focusable {
+            group: UIState::Unlocks,
+            index: focus_index,
+        });
     }
 
     let button_entity = button_cmd.id();

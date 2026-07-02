@@ -5,8 +5,8 @@ use bevy::sprite::Anchor;
 use strum::IntoEnumIterator;
 
 use super::{
-    main_menu::spawn_exit_icon_button, ui_helpers, Interactable, Interaction, MenuButton,
-    UIElement, UIState,
+    focus::FocusInput, main_menu::spawn_exit_icon_button, ui_helpers, Focusable, Interactable,
+    Interaction, MenuButton, UIElement, UIState,
 };
 
 use crate::{
@@ -392,6 +392,10 @@ pub fn setup_achievements_ui(
                 UIState::Achievements,
                 AchievementRow { index: row_index },
                 Interactable::default(),
+                Focusable {
+                    group: UIState::Achievements,
+                    index: row_index as u32,
+                },
                 Name::new("Achievement Row Clickable"),
             ))
             .id();
@@ -598,6 +602,10 @@ pub fn setup_achievements_ui(
             UIState::Achievements,
             MenuButton::AchievementsPrev,
             AchievementsPrevButton,
+            Focusable {
+                group: UIState::Achievements,
+                index: 90,
+            },
             Name::new("Achievements Prev Button"),
             Visibility::Hidden,
         ))
@@ -616,6 +624,10 @@ pub fn setup_achievements_ui(
             UIState::Achievements,
             MenuButton::AchievementsNext,
             AchievementsNextButton,
+            Focusable {
+                group: UIState::Achievements,
+                index: 91,
+            },
             Name::new("Achievements Next Button"),
             if pagination.page + 1 < total_pages {
                 Visibility::Visible
@@ -636,6 +648,10 @@ pub fn setup_achievements_ui(
         .insert((
             AchievementsUI,
             UIState::Achievements,
+            Focusable {
+                group: UIState::Achievements,
+                index: 100,
+            },
             Name::new("Achievements Exit Button"),
         ))
         .set_parent(achievements_bg);
@@ -1015,11 +1031,13 @@ pub fn handle_achievement_row_clicks(
     mut commands: Commands,
     achievement_rows: Query<(Entity, &AchievementRow), With<Interactable>>,
     pagination: Res<AchievementsPagination>,
+    focus_input: FocusInput,
 ) {
     let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
     let left_mouse_released = mouse_input.just_released(MouseButton::Left);
+    let confirm_pressed = focus_input.confirm_just_pressed();
 
-    if !left_mouse_released {
+    if !left_mouse_released && !confirm_pressed {
         return;
     }
 
@@ -1038,32 +1056,32 @@ pub fn handle_achievement_row_clicks(
     });
 
     for (entity, row) in achievement_rows.iter() {
-        if let Some(hit) = hit_test {
-            if hit.0 == entity {
-                let achievement_index = pagination.page * ACHIEVEMENTS_PER_PAGE + row.index;
-                if let Some(achievement) = all_achievements.get(achievement_index).copied() {
-                    if achievements.is_completed(achievement) {
-                        if achievements.claim(achievement) {
-                            crate::player::achievements::persist_achievements_state(&*achievements);
+        let is_hit = left_mouse_released && matches!(hit_test, Some(hit) if hit.0 == entity);
+        let is_focused = confirm_pressed && focus_input.is_focused(entity);
+        if is_hit || is_focused {
+            let achievement_index = pagination.page * ACHIEVEMENTS_PER_PAGE + row.index;
+            if let Some(achievement) = all_achievements.get(achievement_index).copied() {
+                if achievements.is_completed(achievement) {
+                    if achievements.claim(achievement) {
+                        crate::player::achievements::persist_achievements_state(&*achievements);
 
-                            let reward = achievement.reward_currency();
-                            if reward > 0 {
-                                currency.time_fragments =
-                                    currency.time_fragments.saturating_add(reward as i32);
-                                crate::player::unlocks::persist_unlock_data(
-                                    Some(&*currency),
-                                    None,
-                                    None,
-                                    None,
-                                    None,
-                                );
-                            }
-                            commands.spawn(crate::audio::SoundSpawner::new(
-                                crate::audio::AudioSoundEffect::ButtonClick,
-                                0.2,
-                            ));
-                            return;
+                        let reward = achievement.reward_currency();
+                        if reward > 0 {
+                            currency.time_fragments =
+                                currency.time_fragments.saturating_add(reward as i32);
+                            crate::player::unlocks::persist_unlock_data(
+                                Some(&*currency),
+                                None,
+                                None,
+                                None,
+                                None,
+                            );
                         }
+                        commands.spawn(crate::audio::SoundSpawner::new(
+                            crate::audio::AudioSoundEffect::ButtonClick,
+                            0.2,
+                        ));
+                        return;
                     }
                 }
             }

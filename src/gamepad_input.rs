@@ -1,6 +1,8 @@
-//! Gamepad support for gameplay only (movement, aiming, skills). UI screens (menus,
-//! inventory, hovers, options, etc.) are intentionally NOT wired to the gamepad yet — the
-//! mouse remains the only way to interact with them. See the controller support plan.
+//! Gamepad support: [`GamepadAction`] covers gameplay (movement, aiming, skills), bound to the
+//! `Player` entity. [`UiGamepadAction`] separately covers UI focus navigation (main menu,
+//! inventory, options, etc. — see `src/ui/focus.rs`), bound to its own always-present entity
+//! since it needs to work before a `Player` even exists (main menu). See the controller
+//! support plan.
 //!
 //! Bindings are a fixed Xbox-style layout (no rebind UI in v1) built on
 //! `leafwing-input-manager`, which is bound alongside the existing keyboard/mouse
@@ -159,6 +161,62 @@ fn insert_gamepad_input_on_player(
             });
         info!("[Gamepad] Input bindings attached to player entity {player_e:?}");
     }
+}
+
+/// UI-navigation gamepad actions (`src/ui/focus.rs`) — deliberately **separate** from
+/// [`GamepadAction`] because that one only lives on the `Player` entity, which doesn't exist
+/// yet on the main menu / title screen. These live on a standalone marker entity spawned once
+/// at startup instead, so focus navigation works everywhere a `Focusable` might appear
+/// (main menu, pause-style overlays during a run, etc.), not just mid-run.
+///
+/// Some of these intentionally share a physical button with a [`GamepadAction`] (e.g. South is
+/// both `Confirm` here and `Skill0` there, the D-pad is both `Nav*` here and `Hotbar*` there) —
+/// same pattern as `RightTrigger2` already doing double duty for `Attack`/`Skill1`. There's no
+/// real conflict since focus navigation only ever runs while gameplay itself is *not* consuming
+/// D-pad/South for hotbar/skills (see `focus_nav_should_run` in `src/ui/focus.rs`).
+#[derive(Actionlike, PartialEq, Eq, Clone, Copy, Hash, Debug)]
+pub enum UiGamepadAction {
+    /// A button — activates whatever's currently focused (mirrors a mouse click).
+    Confirm,
+    /// B button — back/close (mirrors the keyboard Escape handling in `close_container`).
+    Cancel,
+    /// Left stick, read as a `Vec2` for continuous analog nav (see `focus_nav_should_run`'s
+    /// caller for the discrete-step logic built on top of it).
+    NavStick,
+    NavUp,
+    NavDown,
+    NavLeft,
+    NavRight,
+}
+
+/// Marker for the standalone entity carrying [`UiGamepadAction`]'s `ActionState` — see that
+/// type's doc comment for why this isn't just attached to the `Player` entity.
+#[derive(Component)]
+pub struct UiGamepadInputMarker;
+
+fn default_ui_gamepad_input_map() -> InputMap<UiGamepadAction> {
+    let mut map = InputMap::default();
+    map.insert(DualAxis::left_stick(), UiGamepadAction::NavStick);
+    map.insert(GamepadButtonType::South, UiGamepadAction::Confirm);
+    map.insert(GamepadButtonType::East, UiGamepadAction::Cancel);
+    map.insert(GamepadButtonType::DPadUp, UiGamepadAction::NavUp);
+    map.insert(GamepadButtonType::DPadDown, UiGamepadAction::NavDown);
+    map.insert(GamepadButtonType::DPadLeft, UiGamepadAction::NavLeft);
+    map.insert(GamepadButtonType::DPadRight, UiGamepadAction::NavRight);
+    map
+}
+
+/// Spawns the standalone `UiGamepadAction` entity once at startup (not gated on `GameState` or
+/// the `Player` existing — see [`UiGamepadAction`]'s doc comment).
+fn setup_ui_gamepad_input(mut commands: Commands) {
+    commands.spawn((
+        InputManagerBundle::<UiGamepadAction> {
+            action_state: ActionState::default(),
+            input_map: default_ui_gamepad_input_map(),
+        },
+        UiGamepadInputMarker,
+        Name::new("UiGamepadInput"),
+    ));
 }
 
 /// Logs gamepad connect/disconnect so it's easy to tell, from the log file alone, whether the
@@ -373,7 +431,9 @@ pub struct GamepadInputPlugin;
 impl Plugin for GamepadInputPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugin(InputManagerPlugin::<GamepadAction>::default())
+            .add_plugin(InputManagerPlugin::<UiGamepadAction>::default())
             .init_resource::<ActiveInputDevice>()
+            .add_startup_system(setup_ui_gamepad_input)
             // Connection logging runs unconditionally (not gated to GameState::Main) since a
             // controller can be plugged in from the main menu, before a Player even exists.
             .add_system(log_gamepad_connections)

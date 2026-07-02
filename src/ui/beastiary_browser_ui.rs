@@ -13,10 +13,11 @@ use crate::{
     },
     proto::proto_param::ProtoParam,
     ui::{
+        focus::FocusInput,
         interactions::{Interactable, Interaction},
         inventory_ui::UIState,
         main_menu::spawn_exit_icon_button,
-        ui_helpers, UIElement,
+        ui_helpers, Focusable, UIElement,
     },
     ScreenResolution,
 };
@@ -159,6 +160,10 @@ pub fn setup_beastiary_browser_ui(
         BeastiaryBrowserPrevButton,
         BeastiaryBrowserUI,
         UIState::BeastiaryBrowser,
+        Focusable {
+            group: UIState::BeastiaryBrowser,
+            index: 90,
+        },
         Name::new("Beastiary Browser Prev"),
     ));
 
@@ -178,6 +183,10 @@ pub fn setup_beastiary_browser_ui(
         BeastiaryBrowserNextButton,
         BeastiaryBrowserUI,
         UIState::BeastiaryBrowser,
+        Focusable {
+            group: UIState::BeastiaryBrowser,
+            index: 91,
+        },
         Name::new("Beastiary Browser Next"),
     ));
 
@@ -195,6 +204,10 @@ pub fn setup_beastiary_browser_ui(
     commands.entity(exit_button).insert((
         BeastiaryBrowserUI,
         UIState::BeastiaryBrowser,
+        Focusable {
+            group: UIState::BeastiaryBrowser,
+            index: 100,
+        },
         Name::new("Beastiary Browser Exit"),
     ));
 
@@ -278,6 +291,10 @@ fn spawn_grid_cell(
                 BeastiaryBrowserUI,
                 UIState::BeastiaryBrowser,
                 BeastiaryCardCell { mob_index },
+                Focusable {
+                    group: UIState::BeastiaryBrowser,
+                    index: mob_index as u32,
+                },
                 Name::new("Beastiary locked card cell"),
             ))
             .id();
@@ -323,6 +340,10 @@ fn spawn_grid_cell(
                 BeastiaryBrowserUI,
                 UIState::BeastiaryBrowser,
                 BeastiaryCardCell { mob_index },
+                Focusable {
+                    group: UIState::BeastiaryBrowser,
+                    index: mob_index as u32,
+                },
                 Name::new("Beastiary owned card cell"),
             ))
             .id();
@@ -813,31 +834,33 @@ pub fn handle_beastiary_card_click(
     beastiary: Res<Beastiary>,
     proto: ProtoParam,
     mut texture_atlases: ResMut<Assets<TextureAtlas>>,
+    focus_input: FocusInput,
 ) {
     let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
     let left_mouse_released = mouse_input.just_released(MouseButton::Left);
 
     let mut clicked: Option<Mob> = None;
     for (entity, mut interactable, cell, mut bounce) in cells.iter_mut() {
-        match hit_test {
-            Some(hit) if hit.0 == entity => match interactable.current() {
+        let is_hit = matches!(hit_test, Some(hit) if hit.0 == entity);
+        let is_focused = focus_input.is_focused(entity);
+        if is_hit || is_focused {
+            match interactable.current() {
                 Interaction::None => {
                     interactable.change(Interaction::Hovering);
                     bounce.activate();
                     commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonHover, 0.05));
                 }
                 Interaction::Hovering => {
-                    if left_mouse_released {
+                    if left_mouse_released || focus_input.confirm_just_pressed() {
                         if let Some((_, mob)) = BEASTIARY_MOBS.get(cell.mob_index) {
                             clicked = Some(mob.clone());
                         }
                     }
                 }
                 _ => {}
-            },
-            _ => {
-                interactable.change(Interaction::None);
             }
+        } else {
+            interactable.change(Interaction::None);
         }
     }
 
@@ -924,29 +947,16 @@ pub fn handle_beastiary_pagination_clicks(
     mut pagination: ResMut<BeastiaryPagination>,
     mut commands: Commands,
     graphics: Res<Graphics>,
+    focus_input: FocusInput,
 ) {
     let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
     let left_mouse_released = mouse_input.just_released(MouseButton::Left);
     let total_pages = beastiary_total_pages();
 
-    let Some(hit) = hit_test else {
-        for (entity, mut interactable) in prev_buttons.iter_mut() {
-            if matches!(interactable.current(), Interaction::Hovering) {
-                interactable.change(Interaction::None);
-                beastiary_prev_normal_sprite(&mut commands, &graphics, entity);
-            }
-        }
-        for (entity, mut interactable) in next_buttons.iter_mut() {
-            if matches!(interactable.current(), Interaction::Hovering) {
-                interactable.change(Interaction::None);
-                beastiary_next_normal_sprite(&mut commands, &graphics, entity);
-            }
-        }
-        return;
-    };
-
     for (entity, mut interactable) in prev_buttons.iter_mut() {
-        if hit.0 == entity {
+        let is_hit = matches!(hit_test, Some(hit) if hit.0 == entity);
+        let is_focused = focus_input.is_focused(entity);
+        if is_hit || is_focused {
             match interactable.current() {
                 Interaction::None => {
                     interactable.change(Interaction::Hovering);
@@ -959,7 +969,9 @@ pub fn handle_beastiary_pagination_clicks(
                     commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonHover, 0.05));
                 }
                 Interaction::Hovering => {
-                    if left_mouse_released && pagination.page > 0 {
+                    if (left_mouse_released || focus_input.confirm_just_pressed())
+                        && pagination.page > 0
+                    {
                         pagination.page -= 1;
                         commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.2));
                     }
@@ -973,7 +985,9 @@ pub fn handle_beastiary_pagination_clicks(
     }
 
     for (entity, mut interactable) in next_buttons.iter_mut() {
-        if hit.0 == entity {
+        let is_hit = matches!(hit_test, Some(hit) if hit.0 == entity);
+        let is_focused = focus_input.is_focused(entity);
+        if is_hit || is_focused {
             match interactable.current() {
                 Interaction::None => {
                     interactable.change(Interaction::Hovering);
@@ -986,7 +1000,9 @@ pub fn handle_beastiary_pagination_clicks(
                     commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonHover, 0.05));
                 }
                 Interaction::Hovering => {
-                    if left_mouse_released && pagination.page + 1 < total_pages {
+                    if (left_mouse_released || focus_input.confirm_just_pressed())
+                        && pagination.page + 1 < total_pages
+                    {
                         pagination.page += 1;
                         commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.2));
                     }

@@ -11,10 +11,11 @@ use crate::{
             despawn_heirloom_browser_grid_layers, sorted_grid_entries_with_unlock_state,
             spawn_heirloom_grid_overlay, HeirloomBrowserGridLayer, HeirloomGridContext,
         },
+        focus::FocusInput,
         interactions::{Interactable, Interaction},
         inventory_ui::UIState,
         time_crystal_progress_ui::CrystalUnlockIcon,
-        ui_helpers, UIElement,
+        ui_helpers, Focusable, UIElement,
     },
     ScreenResolution,
 };
@@ -365,6 +366,10 @@ pub fn setup_time_crystals_browser_ui(
             TimeCrystalsBrowserDoneButton,
             TimeCrystalsBrowserUI,
             UIState::TimeCrystalsBrowser,
+            Focusable {
+                group: UIState::TimeCrystalsBrowser,
+                index: 0,
+            },
             Name::new("Time Crystals Browser Done"),
         ))
         .id();
@@ -406,6 +411,10 @@ pub fn setup_time_crystals_browser_ui(
             TimeCrystalsViewHeirloomsButton,
             TimeCrystalsBrowserUI,
             UIState::TimeCrystalsBrowser,
+            Focusable {
+                group: UIState::TimeCrystalsBrowser,
+                index: 1,
+            },
             Name::new("View Heirlooms"),
         ))
         .id();
@@ -448,19 +457,22 @@ pub fn handle_time_crystals_view_heirlooms_button(
     asset_server: Res<AssetServer>,
     graphics: Res<Graphics>,
     grid_layers: Query<Entity, With<HeirloomBrowserGridLayer>>,
+    focus_input: FocusInput,
 ) {
     let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
     let left_mouse_released = mouse_input.just_released(MouseButton::Left);
 
     for (entity, mut interactable) in buttons.iter_mut() {
-        match hit_test {
-            Some(hit) if hit.0 == entity => match interactable.current() {
+        let is_hit = matches!(hit_test, Some(hit) if hit.0 == entity);
+        let is_focused = focus_input.is_focused(entity);
+        if is_hit || is_focused {
+            match interactable.current() {
                 Interaction::None => {
                     interactable.change(Interaction::Hovering);
                     commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonHover, 0.05));
                 }
                 Interaction::Hovering => {
-                    if left_mouse_released {
+                    if left_mouse_released || focus_input.confirm_just_pressed() {
                         let show = !grid_open.0;
                         despawn_heirloom_browser_grid_layers(&mut commands, &grid_layers);
                         if show {
@@ -480,10 +492,9 @@ pub fn handle_time_crystals_view_heirlooms_button(
                     }
                 }
                 _ => {}
-            },
-            _ => {
-                interactable.change(Interaction::None);
             }
+        } else {
+            interactable.change(Interaction::None);
         }
     }
 }
@@ -495,28 +506,30 @@ pub fn handle_time_crystals_browser_done_button(
     mut buttons: Query<(Entity, &mut Interactable), With<TimeCrystalsBrowserDoneButton>>,
     mut next_ui_state: ResMut<NextState<UIState>>,
     mut commands: Commands,
+    focus_input: FocusInput,
 ) {
     let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
     let left_mouse_released = mouse_input.just_released(MouseButton::Left);
 
     for (entity, mut interactable) in buttons.iter_mut() {
-        match hit_test {
-            Some(hit) if hit.0 == entity => match interactable.current() {
+        let is_hit = matches!(hit_test, Some(hit) if hit.0 == entity);
+        let is_focused = focus_input.is_focused(entity);
+        if is_hit || is_focused {
+            match interactable.current() {
                 Interaction::None => {
                     interactable.change(Interaction::Hovering);
                     commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonHover, 0.05));
                 }
                 Interaction::Hovering => {
-                    if left_mouse_released {
+                    if left_mouse_released || focus_input.confirm_just_pressed() {
                         next_ui_state.set(UIState::Closed);
                         commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.2));
                     }
                 }
                 _ => {}
-            },
-            _ => {
-                interactable.change(Interaction::None);
             }
+        } else {
+            interactable.change(Interaction::None);
         }
     }
 }

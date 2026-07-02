@@ -37,7 +37,7 @@ use crate::{
             ClassUnlockHoverState, PendingGameStart, PlayerSelectSlot, SkillUnlockConfirmState,
         },
         options_ui::CheatSettings,
-        ChestContainer, FurnaceContainer, UIState,
+        ChestContainer, FurnaceContainer, Focusable, UIState,
     },
     world::{
         dimension::{ActiveDimension, EraManager, GenerationSeed},
@@ -998,6 +998,10 @@ pub fn setup_archives_ui(
             .entity(button)
             .insert(ArchivesUI)
             .insert(UIState::Archives)
+            .insert(Focusable {
+                group: UIState::Archives,
+                index: i as u32,
+            })
             .set_parent(archives_root);
     }
 
@@ -1018,6 +1022,10 @@ pub fn setup_archives_ui(
         .entity(exit_button)
         .insert(ArchivesUI)
         .insert(UIState::Archives)
+        .insert(Focusable {
+            group: UIState::Archives,
+            index: 100,
+        })
         .set_parent(archives_root);
 }
 
@@ -1036,7 +1044,7 @@ pub fn spawn_menu_text_buttons(
     let row_y = main_menu_button_row_y(resolution.game_height);
     let button_z = ui_helpers::Z_DEPTH_MAIN_MENU_BUTTONS;
 
-    spawn_main_menu_icon_button(
+    let archive_button = spawn_main_menu_icon_button(
         Vec3::new(
             main_menu_left_icon_x(resolution.game_width, 0),
             row_y,
@@ -1048,6 +1056,10 @@ pub fn spawn_menu_text_buttons(
         &mut commands,
         &graphics,
     );
+    commands.entity(archive_button).insert(Focusable {
+        group: UIState::Closed,
+        index: 1,
+    });
 
     let achievements_button = spawn_main_menu_icon_button(
         Vec3::new(
@@ -1063,9 +1075,13 @@ pub fn spawn_menu_text_buttons(
     );
     commands
         .entity(achievements_button)
-        .insert(AchievementsButton);
+        .insert(AchievementsButton)
+        .insert(Focusable {
+            group: UIState::Closed,
+            index: 2,
+        });
 
-    spawn_main_menu_icon_button(
+    let unlocks_button = spawn_main_menu_icon_button(
         Vec3::new(
             main_menu_left_icon_x(resolution.game_width, 2),
             row_y,
@@ -1077,8 +1093,12 @@ pub fn spawn_menu_text_buttons(
         &mut commands,
         &graphics,
     );
+    commands.entity(unlocks_button).insert(Focusable {
+        group: UIState::Closed,
+        index: 3,
+    });
 
-    spawn_main_menu_wide_button(
+    let start_button = spawn_main_menu_wide_button(
         Vec3::new(0., row_y, button_z),
         "Enter",
         MenuButton::Start,
@@ -1087,8 +1107,13 @@ pub fn spawn_menu_text_buttons(
         &graphics,
         &asset_server,
     );
+    // Index 0: the natural first focus when the title screen appears (front and center).
+    commands.entity(start_button).insert(Focusable {
+        group: UIState::Closed,
+        index: 0,
+    });
 
-    spawn_main_menu_icon_button(
+    let quit_button = spawn_main_menu_icon_button(
         Vec3::new(
             main_menu_right_icon_x(resolution.game_width, 0),
             row_y,
@@ -1100,8 +1125,12 @@ pub fn spawn_menu_text_buttons(
         &mut commands,
         &graphics,
     );
+    commands.entity(quit_button).insert(Focusable {
+        group: UIState::Closed,
+        index: 4,
+    });
 
-    spawn_main_menu_icon_button(
+    let options_button = spawn_main_menu_icon_button(
         Vec3::new(
             main_menu_right_icon_x(resolution.game_width, 1),
             row_y,
@@ -1113,8 +1142,12 @@ pub fn spawn_menu_text_buttons(
         &mut commands,
         &graphics,
     );
+    commands.entity(options_button).insert(Focusable {
+        group: UIState::Closed,
+        index: 5,
+    });
 
-    spawn_main_menu_icon_button(
+    let leaderboard_button = spawn_main_menu_icon_button(
         Vec3::new(
             main_menu_right_icon_x(resolution.game_width, 2),
             row_y,
@@ -1126,6 +1159,10 @@ pub fn spawn_menu_text_buttons(
         &mut commands,
         &graphics,
     );
+    commands.entity(leaderboard_button).insert(Focusable {
+        group: UIState::Closed,
+        index: 6,
+    });
 }
 
 pub fn tick_game_start_overlay(
