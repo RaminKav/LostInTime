@@ -167,10 +167,10 @@ impl Default for AttackAutoTargetState {
 /// (WASD alone drives movement) and instead act as a virtual aim stick — steering facing /
 /// attacks / instant skills the same way the mouse cursor normally would, and letting
 /// ground-targeted skills (`ActiveSkill::is_ground_targeted`) be aimed with a hold-and-release
-/// reticle instead of firing instantly. See `src/keyboard_aim.rs` for the aim/reticle systems
-/// and `dispatch_active_skill_events` for the hold-to-aim gating. Exists mainly so twin-stick
-/// aim logic can be exercised on keyboard alone, sidestepping the current macOS gamepad
-/// hardware-support gap (see `gamepad_input.rs`) while sharing the same design.
+/// reticle instead of firing instantly. See `src/aim.rs` for the aim/reticle systems (shared
+/// with gamepad right-stick aiming) and `dispatch_active_skill_events` for the hold-to-aim
+/// gating. Exists mainly so twin-stick aim logic can be exercised on keyboard alone,
+/// sidestepping the current macOS gamepad hardware-support gap (see `gamepad_input.rs`).
 #[derive(Resource, Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
 pub struct MouselessModeState(pub bool);
 
@@ -210,8 +210,9 @@ impl MouselessModeState {
 }
 
 /// Which active-skill slot (if any) is currently mid-"hold to aim" — the button is being held
-/// so the ground-target reticle is showing, but the skill hasn't fired yet. Only used while
-/// `MouselessModeState` is on; see `dispatch_active_skill_events`.
+/// so the ground-target reticle is showing, but the skill hasn't fired yet. Set while charging
+/// via gamepad, or via keyboard/mouse while `MouselessModeState` is on; see
+/// `dispatch_active_skill_events`.
 #[derive(Resource, Default)]
 pub struct PendingGroundAimSkill(pub Option<usize>);
 
@@ -220,7 +221,7 @@ pub struct PendingGroundAimSkill(pub Option<usize>);
 /// WASD aims, instead of the default WASD-moves/arrows-aim. For left-handed players or anyone
 /// who prefers the opposite hand on movement. Has no effect while Mouseless Mode is off (both
 /// WASD and arrows always move then, same as always). See `player_move_inputs` and
-/// `keyboard_aim::update_keyboard_aim_state`.
+/// `aim::update_aim_state`.
 #[derive(Resource, Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
 pub struct SwapMovementAimKeysState(pub bool);
 
@@ -568,7 +569,7 @@ pub fn player_move_inputs(
         d_raw = stick;
         player.is_moving = true;
     } else {
-        // In Mouseless Mode, one key group moves and the other aims (see `keyboard_aim.rs`);
+        // In Mouseless Mode, one key group moves and the other aims (see `aim.rs`);
         // `SwapMovementAimKeysState` picks which is which (arrows move / WASD aims, instead of
         // the default WASD moves / arrows aim). Outside Mouseless Mode both groups always move,
         // same as always.
@@ -773,7 +774,7 @@ pub fn dispatch_active_skill_events(
             // instantly at whatever the aim point happens to be right now: always for
             // gamepad (a stick-driven reticle is the natural way to place these with a
             // controller — see `gamepad_input.rs`), and for keyboard/mouse only while
-            // Mouseless Mode is on (reticle steered by `keyboard_aim.rs`). Plain mouse play
+            // Mouseless Mode is on (reticle steered by `aim.rs`). Plain mouse play
             // stays instant either way — the real cursor is already precisely positioned
             // before you click, so there's nothing to gain from a hold step.
             let via_keyboard_mouse = keybinds.check_skill_input(slot, &key_input, &mouse_input);

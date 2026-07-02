@@ -603,7 +603,7 @@ impl PhasingThroughEnemies {
 impl ActiveSkill {
     /// True for skills that target a specific ground/world point (placed at
     /// `cursor.world_coords` when cast) rather than firing in a direction or on self. Used to
-    /// gate the keyboard/gamepad hold-to-aim-and-release flow (see `keyboard_aim.rs` /
+    /// gate the keyboard/gamepad hold-to-aim-and-release flow (see `aim.rs` /
     /// `gamepad_input.rs`) — mouse play always aims these instantly at the live cursor
     /// position and is unaffected either way.
     pub fn is_ground_targeted(&self) -> bool {

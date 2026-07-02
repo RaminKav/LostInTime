@@ -32,14 +32,10 @@ use bevy::input::gamepad::{GamepadConnection, GamepadConnectionEvent, GamepadEve
 use bevy::prelude::*;
 use leafwing_input_manager::prelude::*;
 
-use crate::{cursor::CursorPos, player::Player, world::y_sort::YSort, Game, GameState};
+use crate::{player::Player, GameState};
 
 /// Stick magnitude below this is treated as neutral (no input).
 pub const GAMEPAD_STICK_DEADZONE: f32 = 0.2;
-/// World-space distance from the player used to place the aim reticle / ground-target
-/// skills when driven by the right stick. Direction-only aiming (facing, weapon swings,
-/// projectile direction) ignores this and only uses the stick's normalized direction.
-pub const GAMEPAD_AIM_RETICLE_RANGE: f32 = 80.0;
 
 /// Gameplay actions bound to a fixed Xbox-style layout.
 ///
@@ -258,109 +254,6 @@ fn update_active_input_device(
     }
 }
 
-/// Last non-zero right-stick direction, so aim/facing holds steady when the stick is
-/// released instead of snapping back to zero.
-#[derive(Resource, Default)]
-pub struct GamepadAimState {
-    pub aim_dir: Vec2,
-}
-
-fn update_gamepad_aim_state(
-    mut aim: ResMut<GamepadAimState>,
-    action_query: Query<&ActionState<GamepadAction>, With<Player>>,
-) {
-    let Ok(action_state) = action_query.get_single() else {
-        return;
-    };
-    let Some(pair) = action_state.clamped_axis_pair(GamepadAction::Aim) else {
-        return;
-    };
-    let v = pair.xy();
-    if v.length_squared() > GAMEPAD_STICK_DEADZONE * GAMEPAD_STICK_DEADZONE {
-        aim.aim_dir = v.normalize();
-    }
-}
-
-/// Overrides `CursorPos::world_coords` with the gamepad aim reticle position while the
-/// gamepad is the active device. Every gameplay system that aims off of
-/// `cursor.world_coords` (attacks, facing, active skills) picks this up automatically.
-/// `screen_coords`/`ui_coords` are left untouched, so all UI hit-testing (`pointcast_2d`)
-/// stays mouse-only. Must run after `update_cursor_pos`.
-fn apply_gamepad_aim_to_cursor_world_pos(
-    device: Res<ActiveInputDevice>,
-    aim: Res<GamepadAimState>,
-    game: Res<Game>,
-    mut cursor_pos: ResMut<CursorPos>,
-) {
-    if device.0 != InputDeviceKind::Gamepad || aim.aim_dir == Vec2::ZERO {
-        return;
-    }
-    let player_pos = game.player_state.position.truncate();
-    let aim_point = player_pos + aim.aim_dir * GAMEPAD_AIM_RETICLE_RANGE;
-    cursor_pos.world_coords = aim_point.extend(cursor_pos.world_coords.z);
-}
-
-/// `YSort` bias for the aim reticle: comfortably above every other `YSort` bias used in the
-/// codebase (max observed elsewhere is `11.`), so the reticle reliably renders in front of the
-/// player/enemies/world sprites at its position instead of being buried by their Y-sorted
-/// depth. Without this, a static/unsorted Z (e.g. `15.`) sits far behind `YSort`-driven world
-/// sprites near the player — which use depths roughly in the 0-900 range — making the
-/// reticle invisible even while correctly positioned and visible.
-const CROSSHAIR_Y_SORT_BIAS: f32 = 50.0;
-
-/// Marker for the world-space aim reticle shown while aiming with the gamepad right stick.
-#[derive(Component)]
-struct GamepadCrosshair;
-
-fn setup_gamepad_crosshair(
-    mut commands: Commands,
-    asset_server: Res<AssetServer>,
-    existing: Query<Entity, With<GamepadCrosshair>>,
-) {
-    if !existing.is_empty() {
-        return;
-    }
-    commands.spawn((
-        SpriteBundle {
-            texture: asset_server.load("ui/icons/Crosshair.png"),
-            sprite: Sprite {
-                custom_size: Some(Vec2::new(20., 20.)),
-                ..default()
-            },
-            transform: Transform::from_translation(Vec3::new(0., 0., 15.)),
-            visibility: Visibility::Hidden,
-            ..default()
-        },
-        YSort(CROSSHAIR_Y_SORT_BIAS),
-        GamepadCrosshair,
-        Name::new("GamepadCrosshair"),
-    ));
-}
-
-fn update_gamepad_crosshair(
-    device: Res<ActiveInputDevice>,
-    aim: Res<GamepadAimState>,
-    game: Res<Game>,
-    mut crosshair_query: Query<(&mut Transform, &mut Visibility), With<GamepadCrosshair>>,
-) {
-    let Ok((mut transform, mut visibility)) = crosshair_query.get_single_mut() else {
-        return;
-    };
-    let show = device.0 == InputDeviceKind::Gamepad && aim.aim_dir != Vec2::ZERO;
-    *visibility = if show {
-        Visibility::Visible
-    } else {
-        Visibility::Hidden
-    };
-    if !show {
-        return;
-    }
-    let player_pos = game.player_state.position.truncate();
-    let pos = player_pos + aim.aim_dir * GAMEPAD_AIM_RETICLE_RANGE;
-    transform.translation.x = pos.x;
-    transform.translation.y = pos.y;
-}
-
 /// `DEBUG=1` only: periodically logs which gamepads Bevy currently sees connected, plus every
 /// raw button press and any stick/trigger axis reading above a small noise threshold,
 /// regardless of whether it's mapped to a `GamepadAction`. Useful for telling apart "OS/gilrs
@@ -481,26 +374,16 @@ impl Plugin for GamepadInputPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugin(InputManagerPlugin::<GamepadAction>::default())
             .init_resource::<ActiveInputDevice>()
-            .init_resource::<GamepadAimState>()
             // Connection logging runs unconditionally (not gated to GameState::Main) since a
             // controller can be plugged in from the main menu, before a Player even exists.
             .add_system(log_gamepad_connections)
             .add_system(insert_gamepad_input_on_player)
-            .add_system(setup_gamepad_crosshair.in_schedule(OnEnter(GameState::Main)))
             .add_systems(
                 (
                     update_active_input_device,
                     log_active_input_device_changes.after(update_active_input_device),
-                    update_gamepad_aim_state.after(update_active_input_device),
-                    update_gamepad_crosshair.after(update_gamepad_aim_state),
                 )
                     .in_set(OnUpdate(GameState::Main)),
-            )
-            .add_system(
-                apply_gamepad_aim_to_cursor_world_pos
-                    .in_base_set(CoreSet::PostUpdate)
-                    .after(crate::cursor::update_cursor_pos)
-                    .run_if(in_state(GameState::Main)),
             );
 
         if *crate::DEBUG {

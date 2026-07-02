@@ -14,7 +14,7 @@ use crate::{
     datafiles,
     inputs::{AutoAttackState, MouselessModeState, SwapMovementAimKeysState},
     keybinds::InputMappings,
-    keyboard_aim::KeyboardAimSensitivity,
+    aim::AimSensitivity,
     player::skills::VISIBLE_CLASS_SKILL_COUNT,
     ui::{
         interactions::Interaction, spawn_back_button, ui_helpers, Interactable, UIElement, UIState,
@@ -458,7 +458,7 @@ pub fn setup_options_ui(
     cursor_color: Res<CursorColorSettings>,
     auto_attack: Res<AutoAttackState>,
     mouseless_mode: Res<MouselessModeState>,
-    keyboard_aim_sensitivity: Res<KeyboardAimSensitivity>,
+    keyboard_aim_sensitivity: Res<AimSensitivity>,
     swap_movement_aim_keys: Res<SwapMovementAimKeysState>,
     existing_options: Query<Entity, With<OptionsUI>>,
     existing_popup: Query<Entity, With<WipeDataPopup>>,
@@ -731,7 +731,7 @@ pub fn setup_options_ui(
         auto_attack.0,
     );
 
-    // Mouseless Mode toggle: arrow keys aim instead of the mouse (see `keyboard_aim.rs`)
+    // Mouseless Mode toggle: arrow keys aim instead of the mouse (see `aim.rs`)
     let mouseless_mode_y = auto_attack_y + row_spacing;
     spawn_options_checkbox(
         &mut commands,
@@ -1975,7 +1975,7 @@ fn spawn_volume_row(
 }
 
 /// "Aim Sensitivity" stepper row (same `-`/value/`+` layout as `spawn_volume_row`), for the
-/// single `KeyboardAimSensitivity` value (1-10) rather than a per-channel value.
+/// single `AimSensitivity` value (1-10) rather than a per-channel value.
 fn spawn_sensitivity_row(
     commands: &mut Commands,
     graphics: &Graphics,
@@ -2839,7 +2839,7 @@ pub fn handle_sensitivity_button_click(
     mouse_input: Res<Input<MouseButton>>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     mut buttons: Query<(Entity, &mut Interactable, &SensitivityButton)>,
-    mut sensitivity: ResMut<KeyboardAimSensitivity>,
+    mut sensitivity: ResMut<AimSensitivity>,
     mut commands: Commands,
     graphics: Res<Graphics>,
 ) {
@@ -2864,11 +2864,11 @@ pub fn handle_sensitivity_button_click(
                                 sensitivity.0 = sensitivity
                                     .0
                                     .saturating_sub(1)
-                                    .max(KeyboardAimSensitivity::MIN);
+                                    .max(AimSensitivity::MIN);
                             }
                             VolumeDirection::Up => {
                                 sensitivity.0 =
-                                    (sensitivity.0 + 1).min(KeyboardAimSensitivity::MAX);
+                                    (sensitivity.0 + 1).min(AimSensitivity::MAX);
                             }
                         }
                         sensitivity.save();
@@ -2892,7 +2892,7 @@ pub fn handle_sensitivity_button_click(
 }
 
 pub fn update_sensitivity_text(
-    sensitivity: Res<KeyboardAimSensitivity>,
+    sensitivity: Res<AimSensitivity>,
     mut texts: Query<&mut Text, With<SensitivityValueText>>,
 ) {
     if !sensitivity.is_changed() {

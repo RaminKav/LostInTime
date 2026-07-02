@@ -249,12 +249,13 @@ pub struct GameData {
     #[serde(default)]
     pub attack_auto_target: Option<crate::inputs::AttackAutoTargetState>,
     /// Options screen: "Mouseless Mode" (`MouselessModeState`) — arrow keys aim instead of
-    /// the mouse cursor; see `src/keyboard_aim.rs`.
+    /// the mouse cursor; see `src/aim.rs`.
     #[serde(default)]
     pub mouseless_mode: Option<crate::inputs::MouselessModeState>,
-    /// Options screen: "Aim Sensitivity" (1-10), how fast the Mouseless Mode reticle moves.
+    /// Options screen: "Aim Sensitivity" (1-10), how fast the aim reticle moves (gamepad stick
+    /// or, in Mouseless Mode, arrow keys). Field name kept for save-file compatibility.
     #[serde(default)]
-    pub keyboard_aim_sensitivity: Option<crate::keyboard_aim::KeyboardAimSensitivity>,
+    pub keyboard_aim_sensitivity: Option<crate::aim::AimSensitivity>,
     /// Options screen: "Swap Move/Aim Keys" (`SwapMovementAimKeysState`) — swaps which key
     /// group moves vs. aims while Mouseless Mode is on.
     #[serde(default)]
