@@ -1,4 +1,4 @@
-use crate::{cursor::CursorPos, keybinds::InputBinding, world, Game, ScreenResolution};
+use crate::{cursor::CursorPos, juice::bounce::BounceOnHit, keybinds::InputBinding, world, Game, ScreenResolution};
 use bevy::{
     prelude::*,
     reflect::TypeUuid,
@@ -100,6 +100,35 @@ pub const Z_DEPTH_HUD_HEIRLOOM_ICONS_FOREGROUND: f32 = 62.0;
 /// Kept below name-entry / loading overlays (z ≈ 100+).
 pub const Z_DEPTH_OPTIONS_OVERLAY: f32 = 85.0;
 pub const Z_DEPTH_OPTIONS_CONTENT: f32 = 86.0;
+
+/// Scale multiplier applied to UI cards/containers while hovered or focused.
+pub const UI_HOVER_SCALE: f32 = 1.1;
+
+/// Sets idle scale for a hoverable UI element. When a [`BounceOnHit`] is present, updates its
+/// `rest_scale` so the bounce animation peaks above the hover size and settles back to it.
+pub fn apply_ui_hover_scale(
+    transform: &mut Transform,
+    bounce: Option<&mut BounceOnHit>,
+    hovered: bool,
+) {
+    let scale = if hovered { UI_HOVER_SCALE } else { 1.0 };
+    if let Some(bounce) = bounce {
+        bounce.rest_scale = scale;
+        if hovered {
+            if !bounce.is_active {
+                transform.scale = Vec3::splat(scale);
+            }
+        } else {
+            // Always snap back on unhover — if the bounce system isn't running (e.g.
+            // `GameState::BlessingChoice` before this was wired up), `activate()` can leave
+            // `is_active` stuck true and block the scale reset above.
+            bounce.is_active = false;
+            transform.scale = Vec3::splat(scale);
+        }
+    } else {
+        transform.scale = Vec3::splat(scale);
+    }
+}
 
 pub fn pointcast_2d<'a>(
     cursor_pos: &Res<CursorPos>,

@@ -82,7 +82,21 @@ fn poll_ui_focus_confirm(
             .unwrap_or(false);
 }
 
-/// Keeps [`UiFocus::focused`] pointing at a valid `Focusable` in the currently-active group.
+/// Screens where nothing should appear focused/hovered until the player actually presses a nav
+/// direction — a heirloom/blessing card auto-highlighting itself (hover art, scale-up, sound)
+/// the instant these choice screens open reads as an unintended default pick rather than
+/// deliberate navigation. Everywhere else (main menu, class selection, etc.) keeps the original
+/// "always something focused" behavior, which is what game-pad-first UIs normally expect.
+fn group_defers_default_focus(group: &UIState) -> bool {
+    matches!(
+        group,
+        UIState::Pause | UIState::Skills | UIState::BlessingChoice
+    )
+}
+
+/// Keeps [`UiFocus::focused`] pointing at a valid `Focusable` in the currently-active group —
+/// except for [`group_defers_default_focus`] groups, which start with nothing focused at all
+/// until [`focus_nav`] sees the first explicit direction press.
 fn ensure_default_focus(
     ui_state: Res<State<UIState>>,
     mut ui_focus: ResMut<UiFocus>,
@@ -94,6 +108,10 @@ fn ensure_default_focus(
         .and_then(|e| focusables.get(e).ok())
         .is_some_and(|(_, f)| &f.group == group);
     if still_valid {
+        return;
+    }
+    if group_defers_default_focus(group) {
+        ui_focus.focused = None;
         return;
     }
     ui_focus.focused = focusables
@@ -188,10 +206,21 @@ fn focus_nav(
     ) else {
         return;
     };
-    let Some(cur_e) = ui_focus.focused else {
-        return;
-    };
     let group = &ui_state.0;
+    let cur_e = match ui_focus.focused {
+        Some(e) => e,
+        // No focus yet — either a `group_defers_default_focus` screen (see that fn) that starts
+        // with nothing picked, or the group just changed. Either way, this first direction press
+        // just reveals the default pick instead of navigating from it.
+        None => {
+            ui_focus.focused = focusables
+                .iter()
+                .filter(|(_, _, f)| &f.group == group)
+                .min_by_key(|(_, _, f)| f.index)
+                .map(|(e, _, _)| e);
+            return;
+        }
+    };
     let Ok((_, cur_xf, cur_focusable)) = focusables.get(cur_e) else {
         return;
     };
@@ -240,13 +269,21 @@ pub struct FocusPlugin;
 
 impl Plugin for FocusPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<UiFocus>().add_systems(
-            (
-                poll_ui_focus_confirm,
-                ensure_default_focus,
-                focus_nav.after(ensure_default_focus),
-            )
-                .distributive_run_if(focus_should_run),
-        );
+        app.init_resource::<UiFocus>()
+            // `ensure_default_focus` runs unconditionally (not gated on `focus_should_run`) so
+            // it can still clear `UiFocus::focused` the moment a screen closes (e.g. gamepad
+            // pause via `UIState::Pause` -> `Closed`). Without this, closing a screen while
+            // something was focused left `UiFocus::focused` pointing at a now-stale entity
+            // forever (nothing ever ran to reset it), which downstream per-screen handlers
+            // (e.g. HUD icon tooltips) kept reading as "still focused" — a tooltip stuck open
+            // after unpausing with no way to dismiss it.
+            .add_system(ensure_default_focus)
+            .add_systems(
+                (
+                    poll_ui_focus_confirm,
+                    focus_nav.after(ensure_default_focus),
+                )
+                    .distributive_run_if(focus_should_run),
+            );
     }
 }

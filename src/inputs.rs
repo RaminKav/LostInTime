@@ -135,6 +135,7 @@ impl Plugin for InputsPlugin {
                 toggle_inventory.run_if(in_state(GameState::Main)),
                 close_container
                     .run_if(in_state(GameState::Main).or_else(in_state(GameState::MainMenu))),
+                toggle_gamepad_pause.run_if(in_state(GameState::Main)),
             ))
             .add_system(
                 move_camera_with_player
@@ -938,6 +939,36 @@ pub fn close_container(
     menu_button_events.send(MenuButtonClickEvent { button });
     commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.2));
 }
+
+/// Start button (gamepad) or P (keyboard) toggles the pause overlay (`UIState::Pause`) while
+/// playing with no other menu open. Closing it (same button again, or B/Escape via
+/// `close_container`'s generic `MenuButton::Back` fallback) just returns to `UIState::Closed`
+/// — see `UIState::Pause`'s doc comment for what this state is for.
+pub fn toggle_gamepad_pause(
+    key_input: Res<Input<KeyCode>>,
+    ui_gamepad_q: Query<&ActionState<UiGamepadAction>, With<UiGamepadInputMarker>>,
+    game_state: Res<State<GameState>>,
+    curr_ui_state: Res<State<UIState>>,
+    mut next_ui_state: ResMut<NextState<UIState>>,
+) {
+    if game_state.0 != GameState::Main {
+        return;
+    }
+    let pause_pressed = key_input.just_pressed(KeyCode::P)
+        || ui_gamepad_q
+            .get_single()
+            .map(|a| a.just_pressed(UiGamepadAction::Pause))
+            .unwrap_or(false);
+    if !pause_pressed {
+        return;
+    }
+    match curr_ui_state.0 {
+        UIState::Closed => next_ui_state.set(UIState::Pause),
+        UIState::Pause => next_ui_state.set(UIState::Closed),
+        _ => {}
+    }
+}
+
 pub fn toggle_inventory(
     mut commands: Commands,
     mut game: GameParam,
@@ -953,8 +984,13 @@ pub fn toggle_inventory(
     mut flash_event: EventWriter<FlashExpBarEvent>,
     keybinds: Res<InputMappings>,
     mut chaos_tracker: ResMut<ChaosTracker>,
+    gamepad_action_q: Query<&ActionState<GamepadAction>, With<Player>>,
 ) {
-    if keybinds.check_inv_input(&key_input, &mouse_input) {
+    let gamepad_pressed = crate::gamepad_input::gamepad_action_just_pressed(
+        gamepad_action_q.get_single().ok(),
+        GamepadAction::ToggleInventory,
+    );
+    if keybinds.check_inv_input(&key_input, &mouse_input) || gamepad_pressed {
         // Don't allow opening inventory while item chest is open
         if curr_ui_state.0 != UIState::ItemChest {
             // Closing the inventory from `InventoryCrafting` still acts as a toggle off.

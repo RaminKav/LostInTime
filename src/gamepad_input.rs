@@ -40,10 +40,6 @@ use crate::{player::Player, GameState};
 pub const GAMEPAD_STICK_DEADZONE: f32 = 0.2;
 
 /// Gameplay actions bound to a fixed Xbox-style layout.
-///
-/// Right Bumper / Left Bumper are deliberately left unbound for now — they're reserved for
-/// Track 4 (inventory section navigation: bag/equipment/sidebar/craft cycling), matching the
-/// original controller support plan.
 #[derive(Actionlike, PartialEq, Eq, Clone, Copy, Hash, Debug)]
 pub enum GamepadAction {
     Move,
@@ -62,6 +58,10 @@ pub enum GamepadAction {
     Hotbar1,
     Hotbar2,
     Hotbar3,
+    /// Left Bumper — opens/closes the inventory (mirrors the keyboard inventory keybind).
+    ToggleInventory,
+    /// Right Bumper — opens/closes the island map (mirrors the keyboard map keybind).
+    ToggleMap,
 }
 
 impl GamepadAction {
@@ -114,6 +114,18 @@ pub fn gamepad_skill_pressed(action_state: Option<&ActionState<GamepadAction>>, 
     action_state.pressed(action)
 }
 
+/// True when `action` was just pressed this frame on the player's gamepad — generic
+/// counterpart to [`gamepad_skill_just_pressed`]/[`gamepad_hotbar_just_pressed`] for one-off
+/// actions like [`GamepadAction::ToggleInventory`]/[`GamepadAction::ToggleMap`].
+pub fn gamepad_action_just_pressed(
+    action_state: Option<&ActionState<GamepadAction>>,
+    action: GamepadAction,
+) -> bool {
+    action_state
+        .map(|a| a.just_pressed(action))
+        .unwrap_or(false)
+}
+
 /// True when `slot`'s gamepad hotbar button was just pressed this frame.
 pub fn gamepad_hotbar_just_pressed(
     action_state: Option<&ActionState<GamepadAction>>,
@@ -136,8 +148,8 @@ fn default_gamepad_input_map() -> InputMap<GamepadAction> {
     map.insert(GamepadButtonType::RightTrigger2, GamepadAction::Skill1);
     map.insert(GamepadButtonType::South, GamepadAction::Skill0);
     map.insert(GamepadButtonType::LeftTrigger2, GamepadAction::Skill2);
-    // RightTrigger (RB) / LeftTrigger (LB) intentionally unbound — reserved for Track 4
-    // inventory section navigation.
+    map.insert(GamepadButtonType::LeftTrigger, GamepadAction::ToggleInventory);
+    map.insert(GamepadButtonType::RightTrigger, GamepadAction::ToggleMap);
     map.insert(GamepadButtonType::North, GamepadAction::Interact);
     map.insert(GamepadButtonType::West, GamepadAction::AutoTarget);
     map.insert(GamepadButtonType::DPadUp, GamepadAction::Hotbar0);
@@ -187,6 +199,9 @@ pub enum UiGamepadAction {
     NavDown,
     NavLeft,
     NavRight,
+    /// Start button — toggles the gamepad pause overlay (`UIState::Pause`) while playing with
+    /// no other menu open. See `toggle_gamepad_pause` in `src/inputs.rs`.
+    Pause,
 }
 
 /// Marker for the standalone entity carrying [`UiGamepadAction`]'s `ActionState` — see that
@@ -203,6 +218,7 @@ fn default_ui_gamepad_input_map() -> InputMap<UiGamepadAction> {
     map.insert(GamepadButtonType::DPadDown, UiGamepadAction::NavDown);
     map.insert(GamepadButtonType::DPadLeft, UiGamepadAction::NavLeft);
     map.insert(GamepadButtonType::DPadRight, UiGamepadAction::NavRight);
+    map.insert(GamepadButtonType::Start, UiGamepadAction::Pause);
     map
 }
 

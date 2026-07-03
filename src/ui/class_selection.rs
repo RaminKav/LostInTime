@@ -2241,17 +2241,27 @@ pub fn update_slot_visuals(
     cheat_settings: Res<CheatSettings>,
     graphics: Res<Graphics>,
 ) {
-    // Update class slot visuals
+    // Update class slot visuals. Hover (mouse-over or keyboard/gamepad focus) always wins
+    // over Selected so the player can tell what they're about to confirm; the Selected art
+    // (plus its glow, see `selection_glow.rs`) is what shows the rest of the time.
     for (mut texture, slot) in class_slots.iter_mut() {
         let is_locked =
             !cheat_settings.bypass_class_unlocks && !unlocked_classes.contains(&slot.class);
         if is_locked {
             *texture = graphics
-                .get_ui_element_texture(UIElement::PlayerSelectSlot)
+                .get_ui_element_texture(if slot.is_hovered {
+                    UIElement::PlayerSelectSlotHover
+                } else {
+                    UIElement::PlayerSelectSlot
+                })
                 .clone();
-        } else if slot.is_selected || slot.is_hovered {
+        } else if slot.is_hovered {
             *texture = graphics
                 .get_ui_element_texture(UIElement::PlayerSelectSlotHover)
+                .clone();
+        } else if slot.is_selected {
+            *texture = graphics
+                .get_ui_element_texture(UIElement::PlayerSelectSlotSelected)
                 .clone();
         } else {
             *texture = graphics
@@ -2260,16 +2270,15 @@ pub fn update_slot_visuals(
         }
     }
 
-    // Update pet slot visuals
+    // Update pet slot visuals (same Hover > Selected > Normal priority as class slots).
     for (mut texture, slot) in pet_slots.iter_mut() {
-        if slot.is_selected {
-            // Use selected texture (could be the same as hover for now)
+        if slot.is_hovered {
             *texture = graphics
                 .get_ui_element_texture(UIElement::PetSelectSlotHover)
                 .clone();
-        } else if slot.is_hovered {
+        } else if slot.is_selected {
             *texture = graphics
-                .get_ui_element_texture(UIElement::PetSelectSlotHover)
+                .get_ui_element_texture(UIElement::PetSelectSlotSelected)
                 .clone();
         } else {
             *texture = graphics

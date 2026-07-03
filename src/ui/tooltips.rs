@@ -638,7 +638,6 @@ pub fn handle_spawn_inv_item_tooltip(
             .id();
 
         if should_show_attributes {
-            info!("SHOW ATTRIBUTES!");
             // Skip the second "Bonus Stats" header for accessories — their stats render
             // directly under the top header (which we've already retitled to "Bonus Stats").
             if !is_accessory_tooltip {
@@ -1768,7 +1767,6 @@ pub fn get_num_stars(
     if equip_type == Some(&EquipmentType::Cape) {
         return 3;
     }
-    info!("Score {score:?} {total_atts:?}");
     if let Some(_equip_type) = equip_type {
         // `total_atts` already counts only the bonus stat lines (base attributes
         // are not included in the score average), so we don't need to subtract

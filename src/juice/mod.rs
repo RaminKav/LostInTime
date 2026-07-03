@@ -58,6 +58,8 @@ impl Plugin for JuicePlugin {
             )
             // Also run the bounce animation system on the main menu so UI
             // elements (e.g. the bestiary card cells) can play hover bounces.
-            .add_system(bounce_on_hit.in_set(OnUpdate(GameState::MainMenu)));
+            .add_system(bounce_on_hit.in_set(OnUpdate(GameState::MainMenu)))
+            // Blessing choice is its own game state but uses the same hover bounce/scale UI.
+            .add_system(bounce_on_hit.in_set(OnUpdate(GameState::BlessingChoice)));
     }
 }

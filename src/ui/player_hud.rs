@@ -11,6 +11,7 @@ use super::{
     hud_keybind_badge_center_y, hud_progress_bar_center_x, hud_row_below_xp_y,
     hud_timeline_arrow_local_x, hud_timeline_center_x,
     icon_hover_tooltips::ICON_HOVER_TOOLTIP_BG_COLOR,
+    focus::{Focusable, UiFocus},
     interactions::{DraggedItem, Interaction},
     spawn_inv_slot, spawn_item_stack_icon,
     tooltips::spawn_world_item_tooltip_for_stack,
@@ -1353,19 +1354,23 @@ pub fn handle_heirloom_hud_tooltip(
     coins: Res<CoinCurrency>,
     trigger_counts: Res<crate::player::skills::HeirloomTriggerCounts>,
     res: Res<ScreenResolution>,
+    ui_focus: Res<UiFocus>,
 ) {
     use super::interactions::Interaction;
 
     // First, do hit detection and update interactable states
     let hit_entity = super::ui_helpers::pointcast_2d(&cursor_pos, &hit_detection_sprites, None);
 
-    // Update all heirloom hud icons' interactable state based on cursor position
+    // Update all heirloom hud icons' interactable state based on cursor position, or — while
+    // the gamepad pause overlay (`UIState::Pause`) is active — whichever icon has d-pad/stick
+    // focus, so gamepad players can browse these tooltips the same way a mouse hover would.
     for (entity, _, ui_elem, mut interactable, _) in hud_icons.iter_mut() {
         if ui_elem == &UIElement::HeirloomHudIcon {
             let is_hit = hit_entity
                 .as_ref()
                 .map(|(e, _sprite, _transform)| *e == entity)
-                .unwrap_or(false);
+                .unwrap_or(false)
+                || ui_focus.is_focused(entity);
 
             if is_hit && !matches!(interactable.current(), Interaction::Hovering) {
                 interactable.change(Interaction::Hovering);
@@ -1469,11 +1474,15 @@ fn set_interactable_hover(is_hit: bool, interactable: &mut Interactable) {
 }
 
 /// Pixel-snapped world position for a HUD skill/pet tooltip anchored to a hotbar icon.
+///
+/// Z is a fixed depth above [`Z_DEPTH_HUD_ORB_TRACKERS_FOREGROUND`] (rather than
+/// `icon_pos.z + HUD_SKILL_TOOLTIP_Z_BUMP`) so this tooltip always renders on top of the HP/MP
+/// tracker breakdown panels — both can be visible at once in the gamepad pause overlay.
 fn hud_skill_tooltip_world_position(icon_pos: Vec3, ui_scale: u32) -> Vec3 {
     Vec3::new(
         super::snap_world_to_pixel_grid(icon_pos.x + HUD_SKILL_TOOLTIP_OFFSET_X, ui_scale),
         super::snap_world_to_pixel_grid(icon_pos.y + HUD_SKILL_TOOLTIP_OFFSET_Y, ui_scale),
-        icon_pos.z + HUD_SKILL_TOOLTIP_Z_BUMP,
+        Z_DEPTH_HUD_ORB_TRACKERS_FOREGROUND + HUD_SKILL_TOOLTIP_Z_BUMP,
     )
 }
 
@@ -1781,11 +1790,14 @@ pub fn handle_active_skill_hud_tooltip(
         With<Player>,
     >,
     meteor_shower_state: Query<&crate::player::skills::MeteorShowerSkillState, With<Player>>,
+    ui_focus: Res<UiFocus>,
 ) {
     // First, do hit detection and update interactable states
     let hit_entity = super::ui_helpers::pointcast_2d(&cursor_pos, &hit_detection_sprites, None);
 
-    // Update all skill icons' interactable state based on cursor position
+    // Update all skill icons' interactable state based on cursor position, or — while the
+    // gamepad pause overlay is active — whichever icon has d-pad/stick focus (see
+    // `handle_heirloom_hud_tooltip` for the same pattern on the heirloom row).
     for (entity, _, ui_elem, mut interactable, _) in skill_icons.iter_mut() {
         if *ui_elem != UIElement::HeirloomHudIcon {
             continue;
@@ -1793,7 +1805,8 @@ pub fn handle_active_skill_hud_tooltip(
         let is_hit = hit_entity
             .as_ref()
             .map(|(e, _, _)| *e == entity)
-            .unwrap_or(false);
+            .unwrap_or(false)
+            || ui_focus.is_focused(entity);
         set_interactable_hover(is_hit, &mut interactable);
     }
 
@@ -2447,12 +2460,17 @@ fn spawn_health_tracker_tooltip(
     root
 }
 
-/// Shows a breakdown of mana spent per heirloom while hovering the mana orb.
+/// Shows a breakdown of mana spent per heirloom while hovering the mana orb — or continuously
+/// while the gamepad pause overlay (`UIState::Pause`) is open, per that state's doc comment
+/// ("HP/MP trackers ... open the whole time in this state"). The orb's hover hitbox has no
+/// visible sprite of its own, so rather than force gamepad focus onto an invisible target, pause
+/// mode just always shows the breakdown instead of gating it on hover/focus.
 pub fn handle_mana_tracker_hud_tooltip(
     mut commands: Commands,
     graphics: Res<Graphics>,
     asset_server: Res<AssetServer>,
     cursor_pos: Res<CursorPos>,
+    ui_state: Res<State<UIState>>,
     trigger_counts: Res<HeirloomTriggerCounts>,
     tracker_timer: Res<ManaTrackerResetTimer>,
     hit_detection_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
@@ -2477,9 +2495,11 @@ pub fn handle_mana_tracker_hud_tooltip(
         }
     }
 
-    let hovering = hover_targets
-        .iter()
-        .any(|(_, _, interactable)| matches!(interactable.current(), Interaction::Hovering));
+    let force_open = ui_state.0 == UIState::Pause;
+    let hovering = force_open
+        || hover_targets
+            .iter()
+            .any(|(_, _, interactable)| matches!(interactable.current(), Interaction::Hovering));
 
     let snapshot = (
         trigger_counts.total_mana_consumed(),
@@ -2499,6 +2519,7 @@ pub fn handle_mana_tracker_hud_tooltip(
         let anchor_pos = hover_targets
             .iter()
             .find(|(_, _, interactable)| matches!(interactable.current(), Interaction::Hovering))
+            .or_else(|| hover_targets.iter().next())
             .map(|(_, transform, _)| transform.translation())
             .unwrap_or(Vec3::ZERO);
         let window_elapsed_secs = tracker_timer.0.elapsed().as_secs_f32();
@@ -2513,12 +2534,15 @@ pub fn handle_mana_tracker_hud_tooltip(
     }
 }
 
-/// Shows a breakdown of health gained by source while hovering the health orb.
+/// Shows a breakdown of health gained by source while hovering the health orb — or continuously
+/// while the gamepad pause overlay is open (see [`handle_mana_tracker_hud_tooltip`]'s doc
+/// comment for why pause mode always-shows instead of gating on hover/focus).
 pub fn handle_health_tracker_hud_tooltip(
     mut commands: Commands,
     graphics: Res<Graphics>,
     asset_server: Res<AssetServer>,
     cursor_pos: Res<CursorPos>,
+    ui_state: Res<State<UIState>>,
     trigger_counts: Res<HeirloomTriggerCounts>,
     tracker_timer: Res<ManaTrackerResetTimer>,
     hit_detection_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
@@ -2546,9 +2570,11 @@ pub fn handle_health_tracker_hud_tooltip(
         }
     }
 
-    let hovering = hover_targets
-        .iter()
-        .any(|(_, _, interactable)| matches!(interactable.current(), Interaction::Hovering));
+    let force_open = ui_state.0 == UIState::Pause;
+    let hovering = force_open
+        || hover_targets
+            .iter()
+            .any(|(_, _, interactable)| matches!(interactable.current(), Interaction::Hovering));
 
     let snapshot = trigger_counts.total_health_gained();
     if hovering == *last_hovered && (!hovering || snapshot == *last_snapshot) {
@@ -2565,6 +2591,7 @@ pub fn handle_health_tracker_hud_tooltip(
         let anchor_pos = hover_targets
             .iter()
             .find(|(_, _, interactable)| matches!(interactable.current(), Interaction::Hovering))
+            .or_else(|| hover_targets.iter().next())
             .map(|(_, transform, _)| transform.translation())
             .unwrap_or(Vec3::ZERO);
         let window_elapsed_secs = tracker_timer.0.elapsed().as_secs_f32();
@@ -2811,6 +2838,10 @@ pub fn handle_update_player_skills(
                     ))
                     .insert(super::interactions::Interactable::default())
                     .insert(UIElement::HeirloomHudIcon)
+                    .insert(Focusable {
+                        group: UIState::Pause,
+                        index: i as u32,
+                    })
                     .insert(Name::new("HUD ICON!!"))
                     .id();
 
@@ -3007,6 +3038,13 @@ pub fn handle_update_player_skills(
                     })
                     .insert(super::interactions::Interactable::default())
                     .insert(UIElement::HeirloomHudIcon) // Reuse this for hit detection
+                    .insert(Focusable {
+                        // Offset past the heirloom row's indices so both rows can share the
+                        // `Pause` focus group without index collisions confusing the
+                        // default-focus tie-breaker.
+                        group: UIState::Pause,
+                        index: 1000 + *slot_index as u32,
+                    })
                     .insert(Name::new("HUD ICON!!"))
                     .set_parent(icon_bg);
             }

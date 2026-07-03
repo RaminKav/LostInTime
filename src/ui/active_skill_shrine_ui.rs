@@ -699,7 +699,7 @@ pub fn handle_active_skill_shrine_ui_interaction(
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     mut skill_choices: Query<(Entity, &mut Interactable, &ActiveSkillShrineUI)>,
     parents: Query<&Parent>,
-    mut bounce_query: Query<&mut BounceOnHit>,
+    mut containers: Query<(&mut Transform, &mut BounceOnHit)>,
     shrine_selection: ResMut<ActiveSkillShrineSelection>,
     mut next_ui_state: ResMut<NextState<UIState>>,
     mut commands: Commands,
@@ -729,7 +729,12 @@ pub fn handle_active_skill_shrine_ui_interaction(
                         0.2,
                     ));
                     if let Ok(parent) = parents.get(e) {
-                        if let Ok(mut bounce) = bounce_query.get_mut(parent.get()) {
+                        if let Ok((mut transform, mut bounce)) = containers.get_mut(parent.get()) {
+                            super::ui_helpers::apply_ui_hover_scale(
+                                &mut transform,
+                                Some(&mut bounce),
+                                true,
+                            );
                             bounce.activate();
                         }
                     }
@@ -788,6 +793,15 @@ pub fn handle_active_skill_shrine_ui_interaction(
                 continue;
             };
             interactable.change(Interaction::None);
+            if let Ok(parent) = parents.get(e) {
+                if let Ok((mut transform, mut bounce)) = containers.get_mut(parent.get()) {
+                    super::ui_helpers::apply_ui_hover_scale(
+                        &mut transform,
+                        Some(&mut bounce),
+                        false,
+                    );
+                }
+            }
         }
     }
 }
@@ -1196,7 +1210,7 @@ pub fn handle_active_skill_shrine_overwrite_interaction(
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     mut skill_choices: Query<(Entity, &mut Interactable, &ActiveSkillSlotChoiceUI)>,
     parents: Query<&Parent>,
-    mut bounce_query: Query<&mut BounceOnHit>,
+    mut containers: Query<(&mut Transform, &mut BounceOnHit)>,
     mut player_skills: Query<(
         Entity,
         &mut crate::player::skills::PlayerSkills,
@@ -1234,7 +1248,12 @@ pub fn handle_active_skill_shrine_overwrite_interaction(
                         0.2,
                     ));
                     if let Ok(parent) = parents.get(e) {
-                        if let Ok(mut bounce) = bounce_query.get_mut(parent.get()) {
+                        if let Ok((mut transform, mut bounce)) = containers.get_mut(parent.get()) {
+                            super::ui_helpers::apply_ui_hover_scale(
+                                &mut transform,
+                                Some(&mut bounce),
+                                true,
+                            );
                             bounce.activate();
                         }
                     }
@@ -1269,6 +1288,15 @@ pub fn handle_active_skill_shrine_overwrite_interaction(
                 continue;
             };
             interactable.change(Interaction::None);
+            if let Ok(parent) = parents.get(e) {
+                if let Ok((mut transform, mut bounce)) = containers.get_mut(parent.get()) {
+                    super::ui_helpers::apply_ui_hover_scale(
+                        &mut transform,
+                        Some(&mut bounce),
+                        false,
+                    );
+                }
+            }
         }
     }
 }

@@ -7,6 +7,7 @@ use crate::{
     attributes::LootRateBonus,
     colors::WHITE,
     item::item_drop_outline::UiShadow,
+    juice::bounce::BounceOnHit,
     player::{
         levels::PlayerLevel,
         skills::{HeirloomChoiceQueue, HeirloomChoiceState},
@@ -29,8 +30,11 @@ use super::{
         Z_DEPTH_HEIRLOOM_SKILL_CHOICE_CONTENT, Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND,
         Z_DEPTH_HEIRLOOM_SKILL_CHOICE_OVERLAY,
     },
-    Interactable, Focusable, UIElement, UIState, SKILLS_CHOICE_UI_SIZE,
+    Interactable, Focusable,     UIElement, UIState, SKILLS_CHOICE_UI_SIZE,
 };
+
+/// Bounce strength for heirloom choice cards on hover (fraction of default mob bounce).
+const HEIRLOOM_CARD_BOUNCE_STRENGTH: f32 = 0.4;
 
 /// Side info boxes spawned on hover for a level-up choice card (despawned on unhover).
 #[derive(Component)]
@@ -406,6 +410,7 @@ pub fn spawn_skill_choice_entities(
                 group: UIState::Skills,
                 index: index as u32,
             })
+            .insert(BounceOnHit::with_strength_fraction(HEIRLOOM_CARD_BOUNCE_STRENGTH))
             .insert(Name::new("SKILLS UI"));
     }
 }

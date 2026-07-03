@@ -357,8 +357,16 @@ fn toggle_island_map(
     mouse_input: Res<Input<MouseButton>>,
     mut map_open: ResMut<IslandMapOpen>,
     keybinds: Res<InputMappings>,
+    gamepad_action_q: Query<
+        &leafwing_input_manager::prelude::ActionState<crate::gamepad_input::GamepadAction>,
+        With<Player>,
+    >,
 ) {
-    if keybinds.check_map_input(&key_input, &mouse_input) {
+    let gamepad_pressed = crate::gamepad_input::gamepad_action_just_pressed(
+        gamepad_action_q.get_single().ok(),
+        crate::gamepad_input::GamepadAction::ToggleMap,
+    );
+    if keybinds.check_map_input(&key_input, &mouse_input) || gamepad_pressed {
         map_open.0 = !map_open.0;
     }
 }

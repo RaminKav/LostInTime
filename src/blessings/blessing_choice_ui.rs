@@ -18,6 +18,7 @@ use crate::{
         item_drop_outline::{HeirloomIconOutline, UiShadowChild},
         WorldObject,
     },
+    juice::bounce::BounceOnHit,
     player::{
         class_rank::ClassRankSystem,
         levels::PlayerLevel,
@@ -81,6 +82,32 @@ const BLESSING_CARD_DESC_Y_OFFSET: f32 = -2.;
 const BLESSING_CHAOS_DESC_GAP: f32 = 4.0;
 const BLESSING_HEIRLOOM_REVEAL_TEXT_Y: f32 = -102.;
 const BLESSING_CARD_ICON_OFFSET: Vec3 = Vec3::new(2., 52., 4.);
+/// Bounce strength for blessing choice cards on hover (fraction of default mob bounce).
+const BLESSING_CARD_BOUNCE_STRENGTH: f32 = 0.4;
+/// Layer-3 z for blessing hover tooltips — matches [`HEIRLOOM_TOOLTIP_CARD_Z`] so skill/item
+/// cards render above the ancestor title copy (z ≈ 20) and choice cards (z ≈ 10).
+const BLESSING_CHOICE_TOOLTIP_Z: f32 = 140.0;
+/// Horizontal gap left between a card's edge and the tooltip docked beside it.
+const BLESSING_TOOLTIP_CARD_GAP: f32 = 8.0;
+
+/// Docks a tooltip beside its card rather than a fixed offset, so cards of any width never
+/// overlap their own tooltip: cards in the "left half" of the row dock their tooltip to the
+/// right, cards in the "right half" dock to the left. Returns the *unclamped* desired tooltip
+/// center x (screen-edge clamping still happens afterward).
+fn blessing_tooltip_dock_x(
+    card_center_x: f32,
+    card_half_width: f32,
+    tooltip_half_width: f32,
+    card_index: u32,
+    card_count: u32,
+) -> f32 {
+    let dock_right = card_count <= 1 || card_index as f32 <= (card_count as f32 - 1.0) / 2.0;
+    if dock_right {
+        card_center_x + card_half_width + BLESSING_TOOLTIP_CARD_GAP + tooltip_half_width
+    } else {
+        card_center_x - card_half_width - BLESSING_TOOLTIP_CARD_GAP - tooltip_half_width
+    }
+}
 
 fn blessing_choice_tooltip_target(
     choice: &ResolvedAncestorBlessing,
@@ -583,7 +610,8 @@ pub fn setup_blessing_choice_ui(
             .insert(Focusable {
                 group: UIState::BlessingChoice,
                 index: card_index,
-            });
+            })
+            .insert(BounceOnHit::with_strength_fraction(BLESSING_CARD_BOUNCE_STRENGTH));
     }
 }
 
@@ -591,7 +619,13 @@ pub fn handle_blessing_choice_card_interactions(
     cursor_pos: Res<CursorPos>,
     mouse_input: Res<Input<MouseButton>>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
-    mut blessing_choices: Query<(Entity, &mut Interactable, &mut BlessingChoiceUI)>,
+    mut blessing_choices: Query<(
+        Entity,
+        &mut Interactable,
+        &mut BlessingChoiceUI,
+        &mut Transform,
+        &mut BounceOnHit,
+    )>,
     mut commands: Commands,
     graphics: Res<Graphics>,
     mut blessing_event: EventWriter<AncestorBlessingSelectEvent>,
@@ -600,7 +634,7 @@ pub fn handle_blessing_choice_card_interactions(
     let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
 
-    for (e, mut interactable, mut state) in blessing_choices.iter_mut() {
+    for (e, mut interactable, mut state, mut transform, mut bounce) in blessing_choices.iter_mut() {
         let (default_ui, hover_ui) = blessing_choice_card_hover_ui(&state.choice);
         let is_hit = matches!(hit_test, Some(hit_ent) if hit_ent.0 == e);
         let is_focused = ui_focus.is_focused(e);
@@ -617,6 +651,8 @@ pub fn handle_blessing_choice_card_interactions(
                         .entity(e)
                         .insert(hover_ui.clone())
                         .insert(graphics.get_ui_element_texture(hover_ui));
+                    ui_helpers::apply_ui_hover_scale(&mut transform, Some(&mut bounce), true);
+                    bounce.activate();
                 }
                 Interaction::Hovering => {
                     if confirm_pressed {
@@ -655,6 +691,7 @@ pub fn handle_blessing_choice_card_interactions(
                 .entity(e)
                 .insert(ui_element.clone())
                 .insert(graphics.get_ui_element_texture(ui_element));
+            ui_helpers::apply_ui_hover_scale(&mut transform, Some(&mut bounce), false);
         }
     }
 }
@@ -672,7 +709,7 @@ pub fn handle_blessing_choice_icon_tooltips(
     asset_server: Res<AssetServer>,
     res: Res<ScreenResolution>,
     proto: ProtoParam,
-    cards: Query<(&BlessingChoiceUI, &Interactable, &GlobalTransform)>,
+    cards: Query<(&BlessingChoiceUI, &Interactable, &Transform, &Focusable)>,
     existing_heirloom_tooltips: Query<Entity, With<HeirloomDynamicTooltip>>,
     existing_skill_tooltips: Query<Entity, With<BlessingChoiceSkillTooltip>>,
     existing_item_tooltips: Query<Entity, With<ItemOrRecipeTooltip>>,
@@ -697,22 +734,31 @@ pub fn handle_blessing_choice_icon_tooltips(
     meteor_shower_state: Query<&crate::player::skills::MeteorShowerSkillState, With<Player>>,
     mut last_hovered: Local<Option<BlessingIconHoverState>>,
 ) {
+    let card_count = cards.iter().count() as u32;
     let currently_hovered = cards
         .iter()
-        .find(|(_, interactable, _)| matches!(interactable.current(), Interaction::Hovering))
-        .and_then(|(ui, _, transform)| {
+        .find(|(_, interactable, _, _)| matches!(interactable.current(), Interaction::Hovering))
+        .and_then(|(ui, _, transform, focusable)| {
             blessing_choice_tooltip_target(&ui.choice).map(|target| {
+                let card_half_width = blessing_choice_card_ui(&ui.choice).1.x * 0.5;
                 (
                     ui.choice.clone(),
                     target,
-                    transform.translation() + BLESSING_CARD_ICON_OFFSET,
+                    // Use the local `Transform`, not `GlobalTransform`: these cards are
+                    // unparented root sprites, but on the very frame they're spawned (and the
+                    // default focus first lands on one of them) `GlobalTransform` hasn't been
+                    // propagated yet, so reading it here would place the very first tooltip at
+                    // a stale/zeroed position until the player un-hovers and re-hovers.
+                    transform.translation,
+                    focusable.index,
+                    card_half_width,
                 )
             })
         });
 
     let hover_state = currently_hovered
         .as_ref()
-        .map(|(_, target, _)| match target {
+        .map(|(_, target, _, _, _)| match target {
             BlessingChoiceTooltipTarget::Heirloom(heirloom, _) => {
                 BlessingIconHoverState::Heirloom(heirloom.clone())
             }
@@ -740,16 +786,32 @@ pub fn handle_blessing_choice_icon_tooltips(
         None => {
             tooltip_requests.send(HeirloomTooltipRequest::Clear);
         }
-        Some((_choice, BlessingChoiceTooltipTarget::Heirloom(heirloom, rarity), icon_pos)) => {
+        Some((
+            _choice,
+            BlessingChoiceTooltipTarget::Heirloom(heirloom, rarity),
+            card_pos,
+            card_index,
+            card_half_width,
+        )) => {
             const TOOLTIP_EDGE_PAD: f32 = 8.;
             let (_, card_size) = heirloom.get_ui_element(*rarity);
+            let tooltip_half_width = card_size.x * 0.5;
+            let desired_x = blessing_tooltip_dock_x(
+                card_pos.x,
+                *card_half_width,
+                tooltip_half_width,
+                *card_index,
+                card_count,
+            );
             let clamped_x = clamp_tooltip_center_x(
-                icon_pos.x + 90.,
-                card_size.x * 0.5,
+                desired_x,
+                tooltip_half_width,
                 res.game_width,
                 TOOLTIP_EDGE_PAD,
             );
-            let tooltip_pos = Vec3::new(clamped_x, icon_pos.y, icon_pos.z + 10.);
+            let icon_y = card_pos.y + BLESSING_CARD_ICON_OFFSET.y;
+            // `spawn_heirloom_tooltip_card` adds [`HEIRLOOM_TOOLTIP_CARD_Z`] on top of this z.
+            let tooltip_pos = Vec3::new(clamped_x, icon_y, 0.);
             tooltip_requests.send(HeirloomTooltipRequest::Show(HeirloomTooltipShow {
                 heirloom: heirloom.clone(),
                 rarity: *rarity,
@@ -759,26 +821,34 @@ pub fn handle_blessing_choice_icon_tooltips(
                 ui_state: Some(UIState::BlessingChoice),
             }));
         }
-        Some((_, BlessingChoiceTooltipTarget::Skill(skill), icon_pos)) => {
+        Some((_, BlessingChoiceTooltipTarget::Skill(skill), card_pos, card_index, card_half_width)) => {
             tooltip_requests.send(HeirloomTooltipRequest::Clear);
             // The visible skill panel background is offset +72 in x from the container and is
             // 246 wide, so clamp its *center* to the screen then back out the container x.
             const TOOLTIP_EDGE_PAD: f32 = 8.;
             const SKILL_PANEL_BG_X_OFFSET: f32 = 72.;
             const SKILL_PANEL_HALF_WIDTH: f32 = 123.;
+            let desired_x = blessing_tooltip_dock_x(
+                card_pos.x,
+                *card_half_width,
+                SKILL_PANEL_HALF_WIDTH,
+                *card_index,
+                card_count,
+            );
             let panel_center_x = clamp_tooltip_center_x(
-                icon_pos.x - 30. + SKILL_PANEL_BG_X_OFFSET,
+                desired_x,
                 SKILL_PANEL_HALF_WIDTH,
                 res.game_width,
                 TOOLTIP_EDGE_PAD,
             );
+            let icon_y = card_pos.y + BLESSING_CARD_ICON_OFFSET.y;
             let tooltip_pos = Vec3::new(
                 crate::ui::snap_world_to_pixel_grid(
                     panel_center_x - SKILL_PANEL_BG_X_OFFSET,
                     res.scale,
                 ),
-                crate::ui::snap_world_to_pixel_grid(icon_pos.y + 56., res.scale),
-                icon_pos.z + 10.,
+                crate::ui::snap_world_to_pixel_grid(icon_y + 56., res.scale),
+                BLESSING_CHOICE_TOOLTIP_Z,
             );
             let (container, _) = spawn_skill_tooltip_shell(
                 &mut commands,
@@ -811,7 +881,7 @@ pub fn handle_blessing_choice_icon_tooltips(
                 SKILL_TOOLTIP_ICON_SIZE,
             );
         }
-        Some((choice, BlessingChoiceTooltipTarget::Item(item), icon_pos)) => {
+        Some((choice, BlessingChoiceTooltipTarget::Item(item), card_pos, card_index, card_half_width)) => {
             tooltip_requests.send(HeirloomTooltipRequest::Clear);
             let item_stack = blessing_item_stack_for_tooltip(
                 *item,
@@ -823,10 +893,13 @@ pub fn handle_blessing_choice_icon_tooltips(
             const TOOLTIP_EDGE_PAD: f32 = 8.;
             let half_w = ITEM_TOOLTIP_LARGE_CARD_SIZE.x * 0.5;
             let half_h = ITEM_TOOLTIP_LARGE_CARD_SIZE.y * 0.5;
+            let desired_x =
+                blessing_tooltip_dock_x(card_pos.x, *card_half_width, half_w, *card_index, card_count);
+            let icon_y = card_pos.y + BLESSING_CARD_ICON_OFFSET.y;
             let panel_center = Vec3::new(
-                clamp_tooltip_center_x(icon_pos.x + 90., half_w, res.game_width, TOOLTIP_EDGE_PAD),
-                clamp_tooltip_center_y(icon_pos.y, half_h, res.game_height, TOOLTIP_EDGE_PAD),
-                icon_pos.z + 10.,
+                clamp_tooltip_center_x(desired_x, half_w, res.game_width, TOOLTIP_EDGE_PAD),
+                clamp_tooltip_center_y(icon_y, half_h, res.game_height, TOOLTIP_EDGE_PAD),
+                BLESSING_CHOICE_TOOLTIP_Z,
             );
             // Reuse the real inventory item tooltip renderer (`handle_spawn_inv_item_tooltip`),
             // placing the card unparented in world space at `panel_center`.

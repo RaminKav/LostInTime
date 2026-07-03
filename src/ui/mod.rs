@@ -51,6 +51,8 @@ mod achievement_banner;
 mod active_skill_shrine_ui;
 pub mod focus;
 pub use focus::*;
+pub mod selection_glow;
+pub use selection_glow::*;
 mod interactions;
 mod inventory_ui;
 pub mod upgrade_drag;
@@ -538,6 +540,7 @@ impl Plugin for UIPlugin {
     fn build(&self, app: &mut App) {
         app.add_state::<UIState>()
             .add_plugin(FocusPlugin)
+            .add_plugin(SelectionGlowPlugin)
             .insert_resource(InventoryState::default())
             .init_resource::<SelectedCraftingRecipe>()
             .init_resource::<crate::ui::inventory_ui::BlueprintsPagination>()

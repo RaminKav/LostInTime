@@ -26,6 +26,8 @@ pub struct BounceOnHit {
     pub modifier: Option<f32>,
     /// When set, overrides [`DEFAULT_BOUNCE_BUMP_RATE`].
     pub bump_rate: Option<f32>,
+    /// Scale to return to when idle (e.g. 1.1 while a UI element is hovered).
+    pub rest_scale: f32,
 }
 
 impl BounceOnHit {
@@ -36,6 +38,7 @@ impl BounceOnHit {
             max_bounce: None,
             modifier: None,
             bump_rate: None,
+            rest_scale: 1.0,
         }
     }
 
@@ -58,6 +61,7 @@ impl BounceOnHit {
             max_bounce: Some(1.0 + (DEFAULT_BOUNCE_MAX - 1.0) * fraction),
             modifier: Some(DEFAULT_BOUNCE_MODIFIER * fraction),
             bump_rate: Some(DEFAULT_BOUNCE_BUMP_RATE * fraction),
+            rest_scale: 1.0,
         }
     }
 }
@@ -70,6 +74,7 @@ impl Default for BounceOnHit {
             max_bounce: None,
             modifier: None,
             bump_rate: None,
+            rest_scale: 1.0,
         }
     }
 }
@@ -126,6 +131,8 @@ pub fn bounce_on_hit(
         }
         let (max_bounce, modifier, bump_rate) =
             bounce_strength(&bounce_on_hit, mob_option, obj_option, &proto_param);
+        let rest = bounce_on_hit.rest_scale.max(0.01);
+        let peak = rest + (max_bounce - 1.0).max(0.0);
         bounce_on_hit.timer.tick(time.delta());
         // Bounce magnitude only; negative scale.x is used for horizontal flip (e.g. scorpion).
         // Old code used `.clamp(1., max)` on signed scale, which forced left-facing sprites to +1.
@@ -143,13 +150,13 @@ pub fn bounce_on_hit(
             mag_x -= bump;
             mag_y -= bump;
         }
-        mag_x = mag_x.clamp(1., max_bounce);
-        mag_y = mag_y.clamp(1., max_bounce);
+        mag_x = mag_x.clamp(rest, peak);
+        mag_y = mag_y.clamp(rest, peak);
         t.scale.x = sign_x * mag_x;
         t.scale.y = sign_y * mag_y;
         if bounce_on_hit.timer.finished() {
-            t.scale.x = sign_x * 1.0;
-            t.scale.y = sign_y * 1.0;
+            t.scale.x = sign_x * rest;
+            t.scale.y = sign_y * rest;
             bounce_on_hit.is_active = false;
         }
     }

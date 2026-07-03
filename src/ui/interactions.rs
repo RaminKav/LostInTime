@@ -54,6 +54,7 @@ use crate::{
         unlocks::RunUnlockState,
     },
     proto::proto_param::ProtoParam,
+    juice::bounce::BounceOnHit,
     ui::{
         crafting_ui::UpgradeButton,
         item_chest::{
@@ -193,10 +194,12 @@ pub enum UIElement {
     PlayerSelect,
     PlayerSelectSlot,
     PlayerSelectSlotHover,
+    PlayerSelectSlotSelected,
     LockedClass,
     LockedClassHover,
     PetSelectSlot,
     PetSelectSlotHover,
+    PetSelectSlotSelected,
     MeleePowerIcon,
     ClassWeaponSlot,
     DefenceIcon,
@@ -1414,7 +1417,13 @@ pub fn handle_cursor_skills_buttons(
     mouse_input: Res<Input<MouseButton>>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     mut skill_choices: Query<
-        (Entity, &mut Interactable, &SkillChoiceUI),
+        (
+            Entity,
+            &mut Interactable,
+            &SkillChoiceUI,
+            &mut Transform,
+            &mut BounceOnHit,
+        ),
         Without<InventorySlotState>,
     >,
     mut player_skills: Query<(
@@ -1439,7 +1448,7 @@ pub fn handle_cursor_skills_buttons(
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
     let ui_state = &curr_ui_state.0;
 
-    for (e, mut interactable, state) in skill_choices.iter_mut() {
+    for (e, mut interactable, state, mut transform, mut bounce) in skill_choices.iter_mut() {
         let is_hit = matches!(hit_test, Some(hit_ent) if hit_ent.0 == e);
         let is_focused = pick_params.ui_focus.is_focused(e);
         let confirm_pressed = (is_hit && left_mouse_pressed)
@@ -1460,6 +1469,8 @@ pub fn handle_cursor_skills_buttons(
                         .entity(e)
                         .insert(ui_element.clone())
                         .insert(graphics.get_ui_element_texture(ui_element));
+                    ui_helpers::apply_ui_hover_scale(&mut transform, Some(&mut bounce), true);
+                    bounce.activate();
                 }
                 Interaction::Hovering => {
                     if confirm_pressed && state.interaction_lock_timer.finished() {
@@ -1594,6 +1605,7 @@ pub fn handle_cursor_skills_buttons(
                 .entity(e)
                 .insert(ui_element.clone())
                 .insert(graphics.get_ui_element_texture(ui_element));
+            ui_helpers::apply_ui_hover_scale(&mut transform, Some(&mut bounce), false);
         }
     }
 }

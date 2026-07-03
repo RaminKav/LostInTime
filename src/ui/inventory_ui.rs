@@ -128,6 +128,12 @@ pub enum UIState {
     BeastiaryBrowser,
     /// Main-menu archive modal: bestiary / time crystals / unlocks shortcuts.
     Archives,
+    /// Gamepad-only pause overlay during a run (bound to the Start button): pauses gameplay
+    /// like any other menu, but doesn't spawn its own panel — instead it lets the player
+    /// navigate the always-visible HUD (heirloom icons, active skill icons, pet skill icon)
+    /// with the d-pad/stick and see the same tooltips a mouse hover would show. HP/MP bars are
+    /// already always-on in the HUD so nothing special is needed to "open" them for this state.
+    Pause,
 }
 impl UIState {
     pub fn is_inv_open(&self) -> bool {
