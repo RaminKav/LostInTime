@@ -11,7 +11,7 @@ use crate::{
     blessings::OwnedBlessings,
     combat_helpers::{spawn_deferred_aseprite_collider, DeferredComponent},
     custom_commands::CommandsExt,
-    inputs::MovementVector,
+    inputs::{skill_aim_direction, FacingDirection, MovementVector},
     item::{
         projectile::{AnimVisualCategory, FromActiveSkill, Projectile},
         WorldObject,
@@ -116,21 +116,6 @@ pub(crate) fn resolve_teleport_destination_tile(
         .find(|&t| !teleport_tile_blocked_by_collider(t, game, proto_param))
 }
 
-/// Snap movement to the nearest cardinals/diagonal so teleport VFX stay aligned with input.
-fn cardinalize_teleport_direction(dir: Vec2) -> Vec2 {
-    if dir.length_squared() < f32::EPSILON {
-        return Vec2::ZERO;
-    }
-    let dir = dir.normalize();
-    if dir.x.abs() > dir.y.abs() {
-        Vec2::new(dir.x.signum(), 0.)
-    } else if dir.y.abs() > dir.x.abs() {
-        Vec2::new(0., dir.y.signum())
-    } else {
-        dir
-    }
-}
-
 pub fn handle_teleport(
     mut active_skill_events: EventReader<ActiveSkillUsedEvent>,
     mut move_player: EventWriter<MovePlayerEvent>,
@@ -140,6 +125,7 @@ pub fn handle_teleport(
             &GlobalTransform,
             &PlayerSkills,
             &mut MovementVector,
+            &FacingDirection,
             &Attack,
             &SkillPower,
             &AsepriteAnimation,
@@ -149,6 +135,7 @@ pub fn handle_teleport(
         ),
         (With<Player>, With<TeleportState>),
     >,
+    aim: Res<crate::aim::AimState>,
     game: GameParam,
     proto_param: ProtoParam,
     mut proto_commands: ProtoCommands,
@@ -160,6 +147,7 @@ pub fn handle_teleport(
         player_pos,
         skills,
         mut move_direction,
+        facing,
         dmg,
         skill_power,
         aseprite,
@@ -195,9 +183,10 @@ pub fn handle_teleport(
     }
 
     let player_pos = player_pos.translation();
-    if move_direction.0.length() != 0. && teleport_state.timer.just_finished() {
+    if teleport_state.timer.just_finished() {
         teleport_state.timer.reset();
-        let direction = cardinalize_teleport_direction(move_direction.0);
+        let direction =
+            skill_aim_direction(move_direction.0, aim.facing_dir, facing.get_dir_vec());
         if direction == Vec2::ZERO {
             return;
         }

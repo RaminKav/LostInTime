@@ -423,6 +423,7 @@ pub fn handle_game_over_fadeout(
                 },
                 Interactable::default(),
                 GameOverFinalStatsHitbox,
+                crate::ui::focus::OverlayFocusable { index: 1 },
                 GameOverText,
                 RenderLayers::from_layers(&[3]),
                 Name::new("Game Over Final Stats Hitbox"),
@@ -470,6 +471,7 @@ pub fn handle_game_over_fadeout(
                 Interactable::default(),
                 UIElement::UnlocksButton,
                 MenuButton::GameOverOK,
+                crate::ui::focus::OverlayFocusable { index: 0 },
                 GameOverText,
                 RenderLayers::from_layers(&[3]),
                 Name::new("Game Over OK Button"),
@@ -799,6 +801,7 @@ pub fn update_game_over_rank_text(
 pub fn handle_game_over_final_stats_tooltip(
     mut commands: Commands,
     cursor_pos: Res<crate::cursor::CursorPos>,
+    ui_focus: Res<crate::ui::focus::UiFocus>,
     hit_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     mut hitbox_query: Query<(Entity, &mut Interactable), With<GameOverFinalStatsHitbox>>,
     existing_tooltips: Query<Entity, With<GameOverStatsTooltip>>,
@@ -840,7 +843,8 @@ pub fn handle_game_over_final_stats_tooltip(
         let is_hit = hit_entity
             .as_ref()
             .map(|(e, _sprite, _transform)| *e == entity)
-            .unwrap_or(false);
+            .unwrap_or(false)
+            || ui_focus.is_focused(entity);
 
         if is_hit {
             panel_e = Some(entity);

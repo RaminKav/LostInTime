@@ -384,6 +384,26 @@ impl AutoAttackState {
     }
 }
 
+/// Movement-input deadzone for [`skill_aim_direction`]: stick/WASD below this falls through to
+/// aim/facing instead of locking a skill to a stale movement vector.
+pub const SKILL_MOVEMENT_INPUT_THRESHOLD: f32 = 0.15;
+
+/// Direction for movement-based active skills (teleport, lunge, roll): prefer the current
+/// movement vector when the player is actively moving, otherwise aim (right stick / mouseless
+/// arrows / cursor override), otherwise sprite facing.
+pub fn skill_aim_direction(movement: Vec2, aim_facing: Vec2, facing: Vec2) -> Vec2 {
+    if movement.length_squared() > SKILL_MOVEMENT_INPUT_THRESHOLD.powi(2) {
+        return movement.normalize();
+    }
+    if aim_facing.length_squared() > f32::EPSILON {
+        return aim_facing.normalize();
+    }
+    if facing.length_squared() > f32::EPSILON {
+        return facing.normalize();
+    }
+    Vec2::ZERO
+}
+
 #[derive(Component, Debug, Default)]
 pub struct MovementVector(pub Vec2);
 
@@ -521,6 +541,7 @@ pub fn player_move_inputs(
     gamepad_action_q: Query<&ActionState<GamepadAction>, With<Player>>,
     mouseless_mode: Res<MouselessModeState>,
     swap_keys: Res<SwapMovementAimKeysState>,
+    aim: Res<crate::aim::AimState>,
 ) {
     if audio_timer.duration() == Duration::ZERO {
         *audio_timer = Timer::from_seconds(0.2, TimerMode::Once);
@@ -605,6 +626,16 @@ pub fn player_move_inputs(
             player.is_moving = true;
         }
     }
+
+    // Roll/dash while standing still: movement stick is zero but aim stick (or mouseless aim
+    // keys) may still point somewhere — use that so controller roll isn't stuck going nowhere.
+    if player.is_dashing
+        && d_raw.length_squared() <= crate::gamepad_input::GAMEPAD_STICK_DEADZONE.powi(2)
+        && aim.facing_dir.length_squared() > f32::EPSILON
+    {
+        d_raw = aim.facing_dir;
+    }
+
     clear_ice_slide_when_stuck(&mut player, on_ice, d_raw, kcc_output);
 
     let is_dashing = player.is_dashing;

@@ -63,6 +63,10 @@ pub(crate) fn pointcast_unlock_tooltip_sprite_hit(
         ),
     >,
 ) -> Option<Entity> {
+    if !cursor_pos.ui_hover_hit_allowed() {
+        return None;
+    }
+
     let mut ret: Option<(Entity, f32)> = None;
     for (ent, sprite, xform) in q.iter() {
         let Some(size) = sprite.custom_size else {

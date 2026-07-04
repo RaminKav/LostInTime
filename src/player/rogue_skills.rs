@@ -10,7 +10,7 @@ use crate::{
     cursor::CursorPos,
     ecs_helpers::{safe_set_parent, SafeHierarchyExt},
     enemy::Mob,
-    inputs::{FacingDirection, MovementVector},
+    inputs::{skill_aim_direction, FacingDirection, MovementVector},
     item::projectile::Projectile,
     ui::{
         damage_numbers::{spawn_text, DodgeEvent},
@@ -228,6 +228,7 @@ pub fn handle_lunge(
     asset_server: Res<AssetServer>,
     projectile_size: Query<&crate::attributes::ProjectileSize, With<Player>>,
     mut trigger_counts: ResMut<crate::player::skills::HeirloomTriggerCounts>,
+    aim: Res<crate::aim::AimState>,
 ) {
     let activated_slots: Vec<usize> = active_skill_events.iter().map(|ev| ev.slot).collect();
 
@@ -257,14 +258,10 @@ pub fn handle_lunge(
             commands.entity(e).insert(PlayerAnimation::Lunge);
             commands.spawn(SoundSpawner::new(AudioSoundEffect::Lunge, 0.2));
 
-            // Prefer the active movement input direction (mv.0 reflects this frame's WASD
-            // input since `handle_lunge` runs after `player_move_inputs`). Fall back to the
-            // player's facing direction when they activated the lunge while standing still.
-            let dash_direction = if mv.0.length_squared() > 0.0 {
-                mv.0.normalize()
-            } else {
-                dir.get_dir_vec()
-            };
+            // Prefer movement input when actively moving; otherwise aim (right stick /
+            // mouseless mode) or sprite facing — same rules as teleport / roll.
+            let dash_direction =
+                skill_aim_direction(mv.0, aim.facing_dir, dir.get_dir_vec());
             // Tracer #1 fires immediately at the activation position. Subsequent tracers
             // are gated on `LungeDashInfo` which lives in its own component so it isn't
             // wiped by the `LungeState` re-insert that happens later this frame in

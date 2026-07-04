@@ -1322,6 +1322,11 @@ fn spawn_button(
     label: &str,
     kind: TutorialButtonKind,
 ) {
+    let focus_index = match kind {
+        TutorialButtonKind::Prev => 0,
+        TutorialButtonKind::Next => 1,
+        TutorialButtonKind::Done => 2,
+    };
     let button_size = Vec2::new(54., 16.);
     let button_e = commands
         .spawn((
@@ -1338,6 +1343,9 @@ fn spawn_button(
             RenderLayers::from_layers(&[3]),
             TutorialUI,
             TutorialButton(kind),
+            crate::ui::focus::OverlayFocusable {
+                index: focus_index,
+            },
             Name::new(format!("Tutorial Button: {}", label)),
         ))
         .id();
@@ -1545,6 +1553,10 @@ fn tutorial_button_hit_under_cursor(
     cursor_pos: &Res<CursorPos>,
     query: &Query<(Entity, &Sprite, &GlobalTransform), With<TutorialButton>>,
 ) -> Option<Entity> {
+    if !cursor_pos.ui_hover_hit_allowed() {
+        return None;
+    }
+
     let mut ret: Option<Entity> = None;
     for (ent, sprite, xform) in query.iter() {
         let Some(size) = sprite.custom_size else {
@@ -1568,6 +1580,7 @@ fn handle_tutorial_buttons(
     mut commands: Commands,
     cursor_pos: Res<CursorPos>,
     mouse_input: Res<Input<MouseButton>>,
+    ui_focus: Res<crate::ui::focus::UiFocus>,
     asset_server: Res<AssetServer>,
     mut button_queries: ParamSet<(
         Query<(Entity, &Sprite, &GlobalTransform), With<TutorialButton>>,
@@ -1592,13 +1605,16 @@ fn handle_tutorial_buttons(
 
     for (e, mut interactable, button, mut sprite) in button_queries.p1().iter_mut() {
         let hovering = matches!(hit, Some(ent) if ent == e);
-        if hovering {
+        let is_focused = ui_focus.is_focused(e);
+        let confirm_pressed =
+            (hovering && just_clicked) || (is_focused && ui_focus.confirm_just_pressed);
+        if hovering || is_focused {
             sprite.color = DARK_GREEN;
             if !matches!(interactable.current(), Interaction::Hovering) {
                 interactable.change(Interaction::Hovering);
                 commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonHover, 0.05));
             }
-            if just_clicked {
+            if confirm_pressed {
                 requested = Some(button.0);
                 commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.2));
             }

@@ -94,6 +94,10 @@ pub struct CursorPos {
     pub world_coords: Vec3,
     pub screen_coords: Vec3,
     pub ui_coords: Vec3,
+    /// When true, UI hit-tests act as if the cursor is off-screen. Set while mouseless mode is
+    /// on or a gamepad is connected whenever a UI screen/overlay opens, until the player moves
+    /// the mouse (see `update_cursor_ui_hover_suppression` in `ui/focus.rs`).
+    pub suppress_ui_hover: bool,
 }
 impl Default for CursorPos {
     fn default() -> Self {
@@ -101,7 +105,15 @@ impl Default for CursorPos {
             world_coords: Vec3::new(999., 0., 0.),
             screen_coords: Vec3::new(999., 0., 0.),
             ui_coords: Vec3::new(999., 0., 0.),
+            suppress_ui_hover: false,
         }
+    }
+}
+
+impl CursorPos {
+    /// Whether UI sprites under the cursor should register mouse hover this frame.
+    pub fn ui_hover_hit_allowed(&self) -> bool {
+        !self.suppress_ui_hover
     }
 }
 /// Marker component for the custom cursor sprite

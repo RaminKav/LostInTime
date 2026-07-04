@@ -9,6 +9,8 @@
 //!   for mouse hit-testing), so pressing a direction finds the nearest `Focusable` in that
 //!   direction with no hand-authored grid geometry needed. `index` is only a tie-breaker /
 //!   default-focus pick, never the thing that drives navigation.
+//! - [`OverlayFocusable`] is the same idea for transient HUD overlays (game over, tip OK,
+//!   tutorial Done) that appear while `UIState::Closed`.
 //! - [`UiFocus`] holds the currently-focused entity and whether Confirm was pressed this frame.
 //! - Per-screen `handle_cursor_*` handlers OR in `ui_focus.is_focused(entity)` /
 //!   `ui_focus.confirm_just_pressed` alongside their existing mouse checks — see
@@ -16,11 +18,15 @@
 //! - Cancel (gamepad B / keyboard Escape) needed **no** new plumbing — `close_container` in
 //!   `src/inputs.rs` already centralizes Escape handling for every screen.
 use bevy::ecs::system::SystemParam;
+use bevy::input::gamepad::Gamepads;
+use bevy::input::mouse::MouseMotion;
 use bevy::prelude::*;
 use leafwing_input_manager::prelude::ActionState;
 
+use crate::cursor::CursorPos;
 use crate::gamepad_input::{UiGamepadAction, UiGamepadInputMarker, GAMEPAD_STICK_DEADZONE};
-use crate::ui::UIState;
+use crate::inputs::MouselessModeState;
+use crate::ui::{tips::TipBox, tutorial_ui::TutorialUI, UIState};
 use crate::GameState;
 
 /// Tags a clickable sprite (alongside the existing `Interactable`) as part of directional focus
@@ -32,8 +38,15 @@ pub struct Focusable {
     pub index: u32,
 }
 
-/// The single currently-focused `Focusable` entity (if any) plus whether Confirm was pressed
-/// this frame. Updated by [`ensure_default_focus`], [`focus_nav`], and [`poll_ui_focus_confirm`].
+/// Focus target for transient overlays that appear without changing [`UIState`] (game over
+/// buttons, tip OK, tutorial Done/Prev/Next).
+#[derive(Component, Debug, Clone, Copy)]
+pub struct OverlayFocusable {
+    pub index: u32,
+}
+
+/// The single currently-focused entity (if any) plus whether Confirm was pressed this frame.
+/// Updated by [`ensure_default_focus`], [`focus_nav`], and [`poll_ui_focus_confirm`].
 #[derive(Resource, Default)]
 pub struct UiFocus {
     pub focused: Option<Entity>,
@@ -63,11 +76,50 @@ impl FocusInput<'_> {
     }
 }
 
+#[derive(Clone, PartialEq, Eq)]
+enum FocusMode {
+    Screen(UIState),
+    Overlay,
+    None,
+}
+
+/// Tracks the active focus context so we can tell when a UI screen or overlay just opened.
+#[derive(Clone, PartialEq, Eq)]
+struct FocusContextKey(FocusMode);
+
+fn resolve_focus_mode(
+    game_state: &GameState,
+    ui_state: &UIState,
+    has_tip_boxes: bool,
+    has_tutorial_ui: bool,
+) -> FocusMode {
+    if *ui_state != UIState::Closed {
+        FocusMode::Screen(ui_state.clone())
+    } else if *game_state == GameState::GameOver || has_tip_boxes || has_tutorial_ui {
+        FocusMode::Overlay
+    } else if *game_state == GameState::MainMenu {
+        // Main-menu buttons use `Focusable { group: UIState::Closed, .. }`.
+        FocusMode::Screen(UIState::Closed)
+    } else {
+        FocusMode::None
+    }
+}
+
 /// Focus navigation (and therefore the d-pad/left-stick) is only "live" outside of plain
 /// gameplay — while actually playing with no panel open, the d-pad/South button mean
 /// hotbar/skills instead (see `GamepadAction` in `gamepad_input.rs`).
-fn focus_should_run(game_state: Res<State<GameState>>, ui_state: Res<State<UIState>>) -> bool {
-    game_state.0 == GameState::MainMenu || ui_state.0 != UIState::Closed
+fn focus_should_run(
+    game_state: Res<State<GameState>>,
+    ui_state: Res<State<UIState>>,
+    tip_boxes: Query<Entity, With<TipBox>>,
+    tutorial_ui: Query<(), With<TutorialUI>>,
+) -> bool {
+    resolve_focus_mode(
+        &game_state.0,
+        &ui_state.0,
+        !tip_boxes.is_empty(),
+        !tutorial_ui.is_empty(),
+    ) != FocusMode::None
 }
 
 fn poll_ui_focus_confirm(
@@ -94,31 +146,106 @@ fn group_defers_default_focus(group: &UIState) -> bool {
     )
 }
 
-/// Keeps [`UiFocus::focused`] pointing at a valid `Focusable` in the currently-active group —
-/// except for [`group_defers_default_focus`] groups, which start with nothing focused at all
-/// until [`focus_nav`] sees the first explicit direction press.
-fn ensure_default_focus(
+fn entity_in_active_focus(
+    entity: Entity,
+    mode: &FocusMode,
+    focusables: &Query<(Entity, &Focusable)>,
+    overlays: &Query<(Entity, &OverlayFocusable)>,
+) -> bool {
+    match mode {
+        FocusMode::Screen(group) => focusables
+            .get(entity)
+            .map(|(_, f)| f.group == *group)
+            .unwrap_or(false),
+        FocusMode::Overlay => overlays.get(entity).is_ok(),
+        FocusMode::None => false,
+    }
+}
+
+fn default_focus_entity(
+    mode: &FocusMode,
+    focusables: &Query<(Entity, &Focusable)>,
+    overlays: &Query<(Entity, &OverlayFocusable)>,
+) -> Option<Entity> {
+    match mode {
+        FocusMode::Screen(group) => {
+            if group_defers_default_focus(group) {
+                return None;
+            }
+            focusables
+                .iter()
+                .filter(|(_, f)| f.group == *group)
+                .min_by_key(|(_, f)| f.index)
+                .map(|(e, _)| e)
+        }
+        FocusMode::Overlay => overlays
+            .iter()
+            .min_by_key(|(_, f)| f.index)
+            .map(|(e, _)| e),
+        FocusMode::None => None,
+    }
+}
+
+/// While mouseless mode is on or a gamepad is connected, ignore a stationary cursor when a UI
+/// screen/overlay first opens. Without this, a mouse resting in the middle of the screen would
+/// immediately hover whatever it sits on (e.g. a skill-choice card) until the player nudges it.
+/// Mouse hover resumes as soon as the player actually moves the mouse.
+fn update_cursor_ui_hover_suppression(
+    mut cursor_pos: ResMut<CursorPos>,
+    game_state: Res<State<GameState>>,
     ui_state: Res<State<UIState>>,
+    tip_boxes: Query<Entity, With<TipBox>>,
+    tutorial_ui: Query<(), With<TutorialUI>>,
+    mouseless_mode: Res<MouselessModeState>,
+    gamepads: Res<Gamepads>,
+    mut mouse_motion: EventReader<MouseMotion>,
+    mut last_context: Local<Option<FocusContextKey>>,
+) {
+    if mouse_motion.iter().next().is_some() {
+        cursor_pos.suppress_ui_hover = false;
+    }
+
+    let mode = resolve_focus_mode(
+        &game_state.0,
+        &ui_state.0,
+        !tip_boxes.is_empty(),
+        !tutorial_ui.is_empty(),
+    );
+    let context = FocusContextKey(mode.clone());
+    let context_changed = last_context.as_ref() != Some(&context);
+    if context_changed {
+        *last_context = Some(context);
+        let prefer_non_mouse_ui = mouseless_mode.0 || gamepads.iter().next().is_some();
+        if mode != FocusMode::None && prefer_non_mouse_ui {
+            cursor_pos.suppress_ui_hover = true;
+        }
+    }
+}
+
+/// Keeps [`UiFocus::focused`] pointing at a valid focus target for the active mode.
+fn ensure_default_focus(
+    game_state: Res<State<GameState>>,
+    ui_state: Res<State<UIState>>,
+    tip_boxes: Query<Entity, With<TipBox>>,
+    tutorial_ui: Query<(), With<TutorialUI>>,
     mut ui_focus: ResMut<UiFocus>,
     focusables: Query<(Entity, &Focusable)>,
+    overlays: Query<(Entity, &OverlayFocusable)>,
 ) {
-    let group = &ui_state.0;
+    let mode = resolve_focus_mode(
+        &game_state.0,
+        &ui_state.0,
+        !tip_boxes.is_empty(),
+        !tutorial_ui.is_empty(),
+    );
     let still_valid = ui_focus
         .focused
-        .and_then(|e| focusables.get(e).ok())
-        .is_some_and(|(_, f)| &f.group == group);
+        .and_then(|e| entity_in_active_focus(e, &mode, &focusables, &overlays).then_some(e))
+        .is_some();
     if still_valid {
         return;
     }
-    if group_defers_default_focus(group) {
-        ui_focus.focused = None;
-        return;
-    }
-    ui_focus.focused = focusables
-        .iter()
-        .filter(|(_, f)| &f.group == group)
-        .min_by_key(|(_, f)| f.index)
-        .map(|(e, _)| e);
+    ui_focus.focused = default_focus_entity(&mode, &focusables, &overlays);
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -194,11 +321,21 @@ const NAV_LATERAL_PENALTY: f32 = 3.0;
 fn focus_nav(
     key_input: Res<Input<KeyCode>>,
     ui_gamepad_q: Query<&ActionState<UiGamepadAction>, With<UiGamepadInputMarker>>,
+    game_state: Res<State<GameState>>,
     ui_state: Res<State<UIState>>,
+    tip_boxes: Query<Entity, With<TipBox>>,
+    tutorial_ui: Query<(), With<TutorialUI>>,
     mut ui_focus: ResMut<UiFocus>,
     focusables: Query<(Entity, &GlobalTransform, &Focusable)>,
+    overlays: Query<(Entity, &GlobalTransform, &OverlayFocusable)>,
     mut last_stick_dir: Local<Option<NavDir>>,
 ) {
+    let mode = resolve_focus_mode(
+        &game_state.0,
+        &ui_state.0,
+        !tip_boxes.is_empty(),
+        !tutorial_ui.is_empty(),
+    );
     let Some(dir) = pressed_nav_dir(
         &key_input,
         ui_gamepad_q.get_single().ok(),
@@ -206,28 +343,37 @@ fn focus_nav(
     ) else {
         return;
     };
-    let group = &ui_state.0;
+
     let cur_e = match ui_focus.focused {
         Some(e) => e,
-        // No focus yet — either a `group_defers_default_focus` screen (see that fn) that starts
-        // with nothing picked, or the group just changed. Either way, this first direction press
-        // just reveals the default pick instead of navigating from it.
         None => {
-            ui_focus.focused = focusables
-                .iter()
-                .filter(|(_, _, f)| &f.group == group)
-                .min_by_key(|(_, _, f)| f.index)
-                .map(|(e, _, _)| e);
+            // Screens that defer auto-focus on open (`Pause`, `Skills`, `BlessingChoice`) still
+            // need the first nav input to *establish* focus — only `ensure_default_focus` skips
+            // them. Without this, mouse-hover suppression leaves nothing highlighted until focus
+            // exists, so arrow keys appear dead on those screens.
+            ui_focus.focused = match &mode {
+                FocusMode::Screen(group) => focusables
+                    .iter()
+                    .filter(|(_, _, f)| &f.group == group)
+                    .min_by_key(|(_, _, f)| f.index)
+                    .map(|(e, _, _)| e),
+                FocusMode::Overlay => overlays
+                    .iter()
+                    .min_by_key(|(_, _, f)| f.index)
+                    .map(|(e, _, _)| e),
+                FocusMode::None => None,
+            };
             return;
         }
     };
-    let Ok((_, cur_xf, cur_focusable)) = focusables.get(cur_e) else {
+
+    let cur_pos = if let Ok((_, xf, _)) = focusables.get(cur_e) {
+        xf.translation().truncate()
+    } else if let Ok((_, xf, _)) = overlays.get(cur_e) {
+        xf.translation().truncate()
+    } else {
         return;
     };
-    if &cur_focusable.group != group {
-        return;
-    }
-    let cur_pos = cur_xf.translation().truncate();
 
     let axis = match dir {
         NavDir::Up | NavDir::Down => Vec2::Y,
@@ -239,25 +385,41 @@ fn focus_nav(
     };
 
     let mut best: Option<(Entity, f32)> = None;
-    for (e, xf, focusable) in focusables.iter() {
-        if e == cur_e || &focusable.group != group {
-            continue;
+
+    let mut consider = |e: Entity, pos: Vec2| {
+        if e == cur_e {
+            return;
         }
-        let delta = xf.translation().truncate() - cur_pos;
+        let delta = pos - cur_pos;
         let forward = delta.dot(axis) * sign;
         if forward <= 0.5 {
-            continue;
+            return;
         }
         let lateral = (delta - axis * delta.dot(axis)).length();
         if lateral > forward * NAV_LATERAL_PENALTY {
-            continue;
+            return;
         }
         let score = forward + lateral * NAV_LATERAL_PENALTY;
-        // `map_or` (not `is_none_or`, stabilized in Rust 1.82) so this builds on older
-        // toolchains too — the Windows build machine has been lagging behind macOS's rustc.
         if best.map_or(true, |(_, best_score)| score < best_score) {
             best = Some((e, score));
         }
+    };
+
+    match &mode {
+        FocusMode::Screen(group) => {
+            for (e, xf, focusable) in focusables.iter() {
+                if &focusable.group != group {
+                    continue;
+                }
+                consider(e, xf.translation().truncate());
+            }
+        }
+        FocusMode::Overlay => {
+            for (e, xf, _) in overlays.iter() {
+                consider(e, xf.translation().truncate());
+            }
+        }
+        FocusMode::None => {}
     }
 
     if let Some((e, _)) = best {
@@ -270,6 +432,9 @@ pub struct FocusPlugin;
 impl Plugin for FocusPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<UiFocus>()
+            .add_system(
+                update_cursor_ui_hover_suppression.in_base_set(CoreSet::PreUpdate),
+            )
             // `ensure_default_focus` runs unconditionally (not gated on `focus_should_run`) so
             // it can still clear `UiFocus::focused` the moment a screen closes (e.g. gamepad
             // pause via `UIState::Pause` -> `Closed`). Without this, closing a screen while

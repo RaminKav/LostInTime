@@ -135,6 +135,10 @@ pub fn pointcast_2d<'a>(
     ui_sprites: &'a Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     excluded_entity: Option<Entity>,
 ) -> Option<(Entity, &'a Sprite, &'a GlobalTransform)> {
+    if !cursor_pos.ui_hover_hit_allowed() {
+        return None;
+    }
+
     let mut ret: Option<(Entity, &Sprite, &GlobalTransform)> = None;
 
     for (ent, sprite, xform) in ui_sprites.iter() {

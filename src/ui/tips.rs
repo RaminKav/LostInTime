@@ -216,6 +216,7 @@ pub fn spawn_tip_handler(
             .insert(Interactable::default())
             .insert(UIElement::BackButton)
             .insert(TipOkButton)
+            .insert(crate::ui::focus::OverlayFocusable { index: 0 })
             .insert(RenderLayers::from_layers(&[3]))
             .insert(Name::new("TIP OK BUTTON"))
             .id();
@@ -244,6 +245,7 @@ pub fn spawn_tip_handler(
 pub fn handle_tip_ok_button_click(
     cursor_pos: Res<CursorPos>,
     mouse_input: Res<Input<MouseButton>>,
+    ui_focus: Res<crate::ui::focus::UiFocus>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     mut ok_buttons: Query<(Entity, &mut Interactable, &Parent), With<TipOkButton>>,
     tip_boxes: Query<(Entity, &TipBox)>,
@@ -255,8 +257,13 @@ pub fn handle_tip_ok_button_click(
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
 
     for (button_entity, mut interactable, parent) in ok_buttons.iter_mut() {
-        match hit_test {
-            Some(hit_ent) if hit_ent.0 == button_entity => match interactable.current() {
+        let is_hit = matches!(hit_test, Some(hit_ent) if hit_ent.0 == button_entity);
+        let is_focused = ui_focus.is_focused(button_entity);
+        let confirm_pressed =
+            (is_hit && left_mouse_pressed) || (is_focused && ui_focus.confirm_just_pressed);
+
+        if is_hit || is_focused {
+            match interactable.current() {
                 Interaction::None => {
                     interactable.change(Interaction::Hovering);
                     commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonHover, 0.05));
@@ -266,7 +273,7 @@ pub fn handle_tip_ok_button_click(
                         .insert(graphics.get_ui_element_texture(UIElement::BackButtonHover));
                 }
                 Interaction::Hovering => {
-                    if left_mouse_pressed {
+                    if confirm_pressed {
                         commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.2));
                         if let Ok((tip_box_entity, tip_box)) = tip_boxes.get(parent.get()) {
                             seen_tips.mark_seen(tip_box.tip.clone());
@@ -278,16 +285,13 @@ pub fn handle_tip_ok_button_click(
                     }
                 }
                 _ => {}
-            },
-            _ => {
-                if matches!(interactable.current(), Interaction::Hovering) {
-                    interactable.change(Interaction::None);
-                    commands
-                        .entity(button_entity)
-                        .insert(UIElement::BackButton)
-                        .insert(graphics.get_ui_element_texture(UIElement::BackButton));
-                }
             }
+        } else if matches!(interactable.current(), Interaction::Hovering) {
+            interactable.change(Interaction::None);
+            commands
+                .entity(button_entity)
+                .insert(UIElement::BackButton)
+                .insert(graphics.get_ui_element_texture(UIElement::BackButton));
         }
     }
 }

@@ -281,7 +281,8 @@ pub fn handle_microwave_shrine_rarity_click(
 
     for (e, sprite, global_transform, btn, mut interactable) in buttons.iter_mut() {
         let size = sprite.custom_size.unwrap_or(Vec2::ZERO);
-        let hit = point_in_sprite(&cursor, size, global_transform);
+        let hit = cursor_pos.ui_hover_hit_allowed()
+            && point_in_sprite(&cursor, size, global_transform);
 
         let enabled = btn.can_afford && btn.has_enough_heirlooms;
         let is_focused = ui_focus.is_focused(e);
@@ -484,7 +485,8 @@ pub fn handle_microwave_shrine_heirloom_click(
     let hit_size = Vec2::splat(HEIRLOOM_BUTTON_HIT_SIZE);
 
     for (e, global_transform, btn, mut interactable) in buttons.iter_mut() {
-        let hit = point_in_sprite(&cursor, hit_size, global_transform);
+        let hit = cursor_pos.ui_hover_hit_allowed()
+            && point_in_sprite(&cursor, hit_size, global_transform);
         let is_focused = ui_focus.is_focused(e);
         let confirm_pressed = (hit && left_mouse_pressed)
             || (is_focused && ui_focus.confirm_just_pressed);
