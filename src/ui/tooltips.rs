@@ -23,7 +23,7 @@ use crate::{
     },
     cursor::CursorPos,
     inventory::{Inventory, ItemStack},
-    item::{item_actions::ItemActions, item_drop_outline::UiShadow, EquipmentType, WorldObject},
+    item::{item_actions::{ConsumableItem, ItemActions}, item_drop_outline::UiShadow, EquipmentType, WorldObject},
     player::{
         skills::{Heirloom, PlayerSkills},
         stats::StatType,
@@ -534,33 +534,35 @@ pub fn handle_spawn_inv_item_tooltip(
                 ))
                 .set_parent(tooltip)
                 .id();
-            // instructions text
-            let consume_text = vec!["Place in Hotbar or", "Right-Click to", "Consume Now!"];
-            for (i, text) in consume_text.iter().enumerate() {
-                let _instructions_to_consume = commands
-                    .spawn((
-                        Text2dBundle {
-                            text: Text::from_section(
-                                text.to_string(),
-                                TextStyle {
-                                    font: gf::TOOLTIP_CARD_SUBHEAD_BOLD.load_font(asset_server),
-                                    font_size: gf::TOOLTIP_CARD_SUBHEAD_BOLD.size,
-                                    color: YELLOW_2,
+            // Consumable usage hint — only for proto-tagged consumables.
+            if proto.get_component::<ConsumableItem, _>(obj_type).is_some() {
+                let consume_text = vec!["Place in Hotbar or", "Right-Click to", "Consume Now!"];
+                for (i, text) in consume_text.iter().enumerate() {
+                    let _instructions_to_consume = commands
+                        .spawn((
+                            Text2dBundle {
+                                text: Text::from_section(
+                                    text.to_string(),
+                                    TextStyle {
+                                        font: gf::TOOLTIP_CARD_SUBHEAD_BOLD.load_font(asset_server),
+                                        font_size: gf::TOOLTIP_CARD_SUBHEAD_BOLD.size,
+                                        color: YELLOW_2,
+                                    },
+                                ),
+                                text_anchor: Anchor::CenterLeft,
+                                transform: Transform {
+                                    translation: Vec3::new(-58., 16. - (i as f32 * 10.), 1.),
+                                    scale: Vec3::new(1., 1., 1.),
+                                    ..Default::default()
                                 },
-                            ),
-                            text_anchor: Anchor::CenterLeft,
-                            transform: Transform {
-                                translation: Vec3::new(-58., 16. - (i as f32 * 10.), 1.),
-                                scale: Vec3::new(1., 1., 1.),
-                                ..Default::default()
+                                ..default()
                             },
-                            ..default()
-                        },
-                        Name::new("TOOLTIP Rarity TEXT"),
-                        RenderLayers::from_layers(&[3]),
-                    ))
-                    .set_parent(tooltip)
-                    .id();
+                            Name::new("TOOLTIP Rarity TEXT"),
+                            RenderLayers::from_layers(&[3]),
+                        ))
+                        .set_parent(tooltip)
+                        .id();
+                }
             }
         }
         // ======== rarity ========

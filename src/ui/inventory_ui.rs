@@ -693,7 +693,10 @@ pub fn setup_inv_ui(
                     ..Default::default()
                 })
                 .insert(Name::new(format!("CRAFTING INGREDIENT SLOT {}", i)))
-                .insert(UIElement::InventorySlot)
+                // No `UIElement::InventorySlot` — `handle_hovering` requires `InventorySlotState`
+                // on that tag. Hover + tooltip are handled in
+                // `handle_crafting_ingredient_tooltip_hover`.
+                .insert(Interactable::default())
                 .insert(CraftingIngredientDisplaySlot { slot_index: i })
                 .insert(cur_inv_state.0.clone())
                 .insert(RenderLayers::from_layers(&[3]))
@@ -2794,6 +2797,111 @@ pub fn handle_cursor_inventory_craft_toggle_button(
                 }
             }
         }
+    }
+}
+
+/// Hover handler for the three ingredient display slots on the crafting side panel.
+/// Shows the ingredient item tooltip (same pipeline as inventory slots, not recipe view).
+pub fn handle_crafting_ingredient_tooltip_hover(
+    cursor_pos: Res<CursorPos>,
+    key_input: Res<Input<KeyCode>>,
+    ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
+    slot_transforms: Query<&GlobalTransform>,
+    mut ingredient_slots: Query<(Entity, &mut Interactable, &CraftingIngredientDisplaySlot)>,
+    selected: Res<SelectedCraftingRecipe>,
+    recipes: Res<Recipes>,
+    proto: ProtoParam,
+    mut commands: Commands,
+    graphics: Res<Graphics>,
+    mut tooltip_update: EventWriter<crate::ui::ToolTipUpdateEvent>,
+    mut tooltip_teardown: EventWriter<crate::ui::TooltipTeardownEvent>,
+    cur_ui_state: Res<State<UIState>>,
+) {
+    if cur_ui_state.0 != UIState::InventoryCrafting {
+        return;
+    }
+    let hit_test = super::ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    let shift_key_pressed = key_input.pressed(KeyCode::LShift);
+    let shift_key_just_pressed = key_input.just_pressed(KeyCode::LShift);
+    let shift_key_just_released = key_input.just_released(KeyCode::LShift);
+
+    for (e, mut interactable, slot) in ingredient_slots.iter_mut() {
+        match hit_test {
+            Some((hit_ent, _, _)) if hit_ent == e => match interactable.current() {
+                Interaction::None => {
+                    interactable.change(Interaction::Hovering);
+                    commands
+                        .entity(e)
+                        .insert(graphics.get_ui_element_texture(UIElement::InventorySlotHover));
+                    commands.spawn(crate::audio::SoundSpawner::new(
+                        crate::audio::AudioSoundEffect::UISlotHover,
+                        0.2,
+                    ));
+                    send_crafting_ingredient_tooltip(
+                        &selected,
+                        &recipes,
+                        &proto,
+                        slot.slot_index,
+                        shift_key_pressed,
+                        slot_transforms.get(e).ok().map(|t| t.translation().y),
+                        &mut tooltip_update,
+                    );
+                }
+                Interaction::Hovering => {
+                    if shift_key_just_pressed || shift_key_just_released {
+                        tooltip_teardown.send_default();
+                        send_crafting_ingredient_tooltip(
+                            &selected,
+                            &recipes,
+                            &proto,
+                            slot.slot_index,
+                            shift_key_pressed,
+                            slot_transforms.get(e).ok().map(|t| t.translation().y),
+                            &mut tooltip_update,
+                        );
+                    }
+                }
+                _ => (),
+            },
+            _ => {
+                if matches!(interactable.current(), Interaction::Hovering) {
+                    interactable.change(Interaction::None);
+                    tooltip_teardown.send_default();
+                    commands
+                        .entity(e)
+                        .insert(graphics.get_ui_element_texture(UIElement::InventorySlot));
+                }
+            }
+        }
+    }
+}
+
+fn send_crafting_ingredient_tooltip(
+    selected: &SelectedCraftingRecipe,
+    recipes: &Recipes,
+    proto: &ProtoParam,
+    slot_index: usize,
+    show_range: bool,
+    anchor_ui_y: Option<f32>,
+    tooltip_update: &mut EventWriter<crate::ui::ToolTipUpdateEvent>,
+) {
+    let Some(recipe_obj) = selected.0 else {
+        return;
+    };
+    let Some(recipe) = recipes.crafting_list.get(&recipe_obj) else {
+        return;
+    };
+    let Some(ingredient) = recipe.0.get(slot_index) else {
+        return;
+    };
+    if let Some(item_data) = proto.get_item_data(ingredient.item) {
+        tooltip_update.send(crate::ui::ToolTipUpdateEvent {
+            item_stack: item_data.clone(),
+            is_recipe: false,
+            show_range,
+            anchor_ui_y,
+            ..Default::default()
+        });
     }
 }
 

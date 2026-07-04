@@ -2,22 +2,66 @@ use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
 
 use crate::{
     assets::SpriteAnchor,
+    colors::WHITE,
     ecs_helpers::{safe_push_children, safe_set_parent, SafeHierarchyExt},
     inventory::{Inventory, ItemStack},
     item::{boss_shrine::BossSummonTracker, WorldObject},
-    keybinds::InputMappings,
+    keybinds::{get_key_display_name, InputBinding, InputMappings},
     player::Player,
     GameParam,
 };
 
 use super::{
-    damage_numbers::spawn_text,
-    game_fonts::FLOATING_TEXT,
-    spawn_item_stack_icon,
-    ui_helpers::spawn_keybind_badge,
-    KEYBIND_BADGE_SIZE,
-    UIElement,
+    damage_numbers::spawn_text, game_fonts::FLOATING_TEXT, spawn_item_stack_icon, UIElement,
 };
+
+/// Interact-guide key badge — larger than the default HUD keybind badge, with darker fill.
+const INTERACT_GUIDE_KEY_BADGE_SIZE: Vec2 = Vec2::new(26., 18.);
+const INTERACT_GUIDE_KEY_BADGE_COLOR: Color = Color::rgba(18. / 255., 16. / 255., 16. / 255., 0.88);
+const INTERACT_GUIDE_KEY_FONT_SIZE: f32 = 15.0;
+
+fn spawn_interact_guide_keybind_badge(
+    commands: &mut Commands,
+    asset_server: &AssetServer,
+    key: InputBinding,
+    transform: Transform,
+    parent: Entity,
+) -> (Entity, Entity) {
+    let key_bg = commands
+        .spawn(SpriteBundle {
+            sprite: Sprite {
+                color: INTERACT_GUIDE_KEY_BADGE_COLOR,
+                custom_size: Some(INTERACT_GUIDE_KEY_BADGE_SIZE),
+                ..default()
+            },
+            transform,
+            ..default()
+        })
+        .insert(RenderLayers::from_layers(&[INTERACT_GUIDE_RENDER_LAYER]))
+        .set_parent(parent)
+        .id();
+
+    let key_text = commands
+        .spawn(Text2dBundle {
+            text: Text::from_section(
+                get_key_display_name(key),
+                TextStyle {
+                    font: asset_server.load("fonts/alagard.ttf"),
+                    font_size: INTERACT_GUIDE_KEY_FONT_SIZE,
+                    color: WHITE,
+                },
+            )
+            .with_alignment(TextAlignment::Center),
+            text_anchor: Anchor::Center,
+            transform: Transform::from_translation(Vec3::new(0., -1., 1.)),
+            ..default()
+        })
+        .insert(RenderLayers::from_layers(&[INTERACT_GUIDE_RENDER_LAYER]))
+        .set_parent(key_bg)
+        .id();
+
+    (key_bg, key_text)
+}
 
 const INTERACT_GUIDE_RENDER_LAYER: u8 = 0;
 
@@ -234,27 +278,25 @@ pub fn spawn_shrine_interact_key_guide(
 
                         // Key badge sits left of the label.
                         let key_x_offset = f32::round(
-                            char_count * -4. - 12. - (KEYBIND_BADGE_SIZE.x - 10.) / 2.,
+                            char_count * -4. - 14. - INTERACT_GUIDE_KEY_BADGE_SIZE.x * 0.5,
                         );
-                        let (key_bg, key_text) = spawn_keybind_badge(
+                        let (key_bg, key_text) = spawn_interact_guide_keybind_badge(
                             &mut commands,
                             &asset_server,
                             interact_key,
                             Transform::from_translation(Vec3::new(key_x_offset, 0.5, 1.)),
-                            Some(text_e),
-                            INTERACT_GUIDE_RENDER_LAYER,
+                            text_e,
                         );
                         commands.entity(key_bg).insert(InteractGuideKeyBackground);
                         commands.entity(key_text).insert(InteractGuideKeybindText);
                     }
                     None => {
-                        let (key_bg, key_text) = spawn_keybind_badge(
+                        let (key_bg, key_text) = spawn_interact_guide_keybind_badge(
                             &mut commands,
                             &asset_server,
                             interact_key,
                             Transform::from_translation(Vec3::new(0., 0.5, 1.)),
-                            Some(parent_entity),
-                            INTERACT_GUIDE_RENDER_LAYER,
+                            parent_entity,
                         );
                         commands.entity(key_bg).insert(InteractGuideKeyBackground);
                         commands.entity(key_text).insert(InteractGuideKeybindText);
@@ -319,6 +361,6 @@ pub fn update_interact_guide_keybind_text(
 
     let interact_key = keybinds.get_interact_key();
     for mut text in texts.iter_mut() {
-        text.sections[0].value = crate::keybinds::get_key_display_name(interact_key);
+        text.sections[0].value = get_key_display_name(interact_key);
     }
 }

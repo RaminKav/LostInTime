@@ -1487,6 +1487,11 @@ impl Plugin for UIPlugin {
                     .in_set(OnUpdate(GameState::Main)),
             )
             .add_system(handle_hovering.run_if(ui_hover_interactions_condition).after(crate::ui::inventory_ui::update_inventory_ui))
+            .add_system(
+                handle_crafting_ingredient_tooltip_hover
+                    .run_if(in_state(UIState::InventoryCrafting))
+                    .in_set(OnUpdate(GameState::Main)),
+            )
             .add_system(handle_cursor_main_menu_buttons)
             .add_system(
                 handle_main_menu_icon_tooltips.run_if(in_state(GameState::MainMenu)),
