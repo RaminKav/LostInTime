@@ -337,9 +337,7 @@ impl Plugin for PlayerPlugin {
                     .in_set(OnUpdate(GameState::Main)),
             )
             .add_system(
-                skill_heirlooms::initialize_class_skill_slots
-                    .run_if(is_not_paused)
-                    .in_set(OnUpdate(GameState::Main)),
+                skill_heirlooms::initialize_class_skill_slots.in_set(OnUpdate(GameState::Main)),
             )
             .add_system(
                 handle_spear_pull_delay

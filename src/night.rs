@@ -22,6 +22,10 @@ use crate::{
     player::Player,
     run_once_per_run,
     ui::global_text_message::GlobalTextMessageEvent,
+    ui::tutorial_ui::{
+        try_send_contextual_popup, SeenTutorialChunks, TutorialContent, TutorialPopupEvent,
+        TutorialUI,
+    },
     world::dimension::{ActiveDimension, EraManager},
     world::dungeon::Dungeon,
     GameState, ScreenResolution, TextureCamera,
@@ -707,6 +711,9 @@ pub fn tick_night_color(
     infinite_mode: Res<InfiniteMode>,
     mut chaos_tracker: ResMut<ChaosTracker>,
     dungeon_check: Query<&Dungeon, With<ActiveDimension>>,
+    mut tutorial_popup_events: EventWriter<TutorialPopupEvent>,
+    seen_tutorial_chunks: Option<Res<SeenTutorialChunks>>,
+    existing_tutorial: Query<(), With<TutorialUI>>,
 ) {
     // Day/night cycle is frozen while in a dungeon (see manage_dungeon_night_freeze).
     if dungeon_check.get_single().is_ok() {
@@ -756,12 +763,17 @@ pub fn tick_night_color(
                 asset_path: "sounds/bgm_night.ogg".to_owned(),
             });
 
-            // if !seen_tips.has_seen(&Tip::Night) {
-            //     tip_event.send(TipEvent {
-            //         tip: Tip::Night,
-            //         pos: Vec3::new(-184., -116., 70.),
-            //     });
-            // }
+            // The first night starting replaces the old "night is dangerous" warning tip —
+            // nudge players toward the era timer (in the progress/timeline tutorial) instead,
+            // since surviving to the era boss is the actual goal night puts a clock on.
+            if let Some(seen_tutorial_chunks) = seen_tutorial_chunks.as_ref() {
+                try_send_contextual_popup(
+                    &mut tutorial_popup_events,
+                    seen_tutorial_chunks,
+                    &existing_tutorial,
+                    &[TutorialContent::Timeline],
+                );
+            }
         } else if !night_tracker.is_night() && bgm_tracker.current_track != *"sounds/bgm_day.ogg" {
             bgm_track_event.send(UpdateBGMTrackEvent {
                 asset_path: "sounds/bgm_day.ogg".to_owned(),

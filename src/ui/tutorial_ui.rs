@@ -7,16 +7,33 @@ use std::collections::HashSet;
 use std::fs::File;
 use std::io::{BufReader, BufWriter};
 
+use crate::attributes::CurrentMana;
 use crate::audio::{AudioSoundEffect, SoundSpawner};
+use crate::chaos::ChaosTracker;
 use crate::client::GameData;
-use crate::colors::{BLACK, DARK_GREEN, DARK_WOOD_BROWN, WHITE, YELLOW_2};
+use crate::colors::{BLACK, DARK_GREEN, WHITE, YELLOW_2};
 use crate::cursor::CursorPos;
 use crate::datafiles;
 use crate::item::WorldObject;
 use crate::player::score::RunTimer;
 use crate::player::skills::PlayerSkills;
+use crate::player::Player;
 use crate::proto::proto_param::ProtoParam;
-use crate::ui::{global_text_message::GlobalTextMessageEvent, Interactable, Interaction};
+use crate::ui::player_hud::{
+    hud_bottom_corner_icon_row_y, hud_mana_orb_center, hud_map_icon_x, hud_settings_icon_x,
+    HUD_CORNER_ICON_SIZE, HUD_FILL_PIXEL_SIZE,
+};
+use crate::ui::tip_highlight::{
+    spawn_tip_highlight_overlay, TipHighlightMaterial, TipHighlightRect,
+};
+use crate::ui::{
+    global_text_message::GlobalTextMessageEvent, hud_heirloom_first_icon_x, hud_heirloom_row_y,
+    hud_progress_bar_center_x, hud_row_below_xp_y, hud_timeline_center_x, Interactable,
+    Interaction, HUD_ACTION_ROW_Y_FROM_BOTTOM, HUD_HEIRLOOM_ICON_HALF, HUD_HEIRLOOM_ICON_SPACING,
+    HUD_HOTBAR_CENTER_X, HUD_HOTBAR_SLOTS, HUD_SKILLS_CENTER_X, HUD_SKILL_SLOT_HIT_SIZE,
+    HUD_SKILL_SPACING_X, HUD_TIMELINE_SIZE, INV_SLOT_SPACING_X, PROGRESS_BACKGROUND_SIZE,
+    UI_SLOT_SIZE,
+};
 use crate::{inventory::Inventory, GameState, ScreenResolution};
 
 /// Z layers (sit above gameplay HUD but below pause overlays).
@@ -41,8 +58,247 @@ const TUTORIAL_ANIM_CENTER_Y: f32 = CONTENT_BAND_CENTER_Y - 54.0;
 /// Delay before showing the biomes / environment tutorial.
 pub const BIOME_TUTORIAL_DELAY_SECS: f64 = 60.0;
 
+/// Delay before showing the map-navigation tutorial (nudges players to check the map for
+/// shrines / the boss shrine around the 2-minute mark).
+pub const MAP_NAVIGATION_TUTORIAL_DELAY_SECS: f64 = 120.0;
+
 /// Heirloom picks required before the heirlooms tutorial appears.
 pub const HEIRLOOM_TUTORIAL_PICK_COUNT: usize = 3;
+
+/// Buffer kept clear around the highlighted heirloom icons in the [`TutorialContent::Heirlooms`]
+/// spotlight overlay.
+const HEIRLOOM_HIGHLIGHT_BUFFER: f32 = 4.0;
+/// Nudge the heirloom spotlight rect right so its left edge (buffer included) doesn't clip
+/// against the screen's left edge, since the first heirloom icon sits very close to it.
+const HEIRLOOM_HIGHLIGHT_X_NUDGE: f32 = 3.0;
+
+/// Rect (in UI render-layer-3 coordinates) spanning the first `heirloom_count` heirloom HUD
+/// icons plus [`HEIRLOOM_HIGHLIGHT_BUFFER`] of padding, for the heirloom tutorial's spotlight.
+fn heirloom_row_highlight_rect(res: &ScreenResolution, heirloom_count: usize) -> TipHighlightRect {
+    let heirloom_count = heirloom_count.max(1);
+    let first_icon_x = hud_heirloom_first_icon_x(res.game_width) + HEIRLOOM_HIGHLIGHT_X_NUDGE;
+    let row_y = hud_heirloom_row_y(res.game_height);
+    let last_icon_x = first_icon_x + HUD_HEIRLOOM_ICON_SPACING * (heirloom_count as f32 - 1.0);
+
+    let left_edge = first_icon_x - HUD_HEIRLOOM_ICON_HALF - HEIRLOOM_HIGHLIGHT_BUFFER;
+    let right_edge = last_icon_x + HUD_HEIRLOOM_ICON_HALF + HEIRLOOM_HIGHLIGHT_BUFFER;
+    let top_edge = row_y + HUD_HEIRLOOM_ICON_HALF + HEIRLOOM_HIGHLIGHT_BUFFER;
+    let bottom_edge = row_y - HUD_HEIRLOOM_ICON_HALF - HEIRLOOM_HIGHLIGHT_BUFFER;
+
+    TipHighlightRect {
+        center: Vec2::new(
+            (left_edge + right_edge) * 0.5,
+            (top_edge + bottom_edge) * 0.5,
+        ),
+        size: Vec2::new(right_edge - left_edge, top_edge - bottom_edge),
+    }
+}
+
+/// Buffer kept clear around the highlighted map/inventory/settings HUD icons in the
+/// [`TutorialContent::MapNavigation`] spotlight overlay.
+const MAP_NAV_HIGHLIGHT_BUFFER: f32 = 4.0;
+
+/// Rect (in UI render-layer-3 coordinates) spanning the bottom-left minimap + inventory +
+/// options HUD corner icons plus [`MAP_NAV_HIGHLIGHT_BUFFER`] of padding, for the
+/// map-navigation tutorial's spotlight.
+fn map_nav_highlight_rect(res: &ScreenResolution) -> TipHighlightRect {
+    let row_y = hud_bottom_corner_icon_row_y(res.game_height);
+    let map_x = hud_map_icon_x(res.game_width);
+    let settings_x = hud_settings_icon_x(res.game_width);
+    let icon_half = HUD_CORNER_ICON_SIZE * 0.5;
+
+    let left_edge = map_x - icon_half.x - MAP_NAV_HIGHLIGHT_BUFFER;
+    let right_edge = settings_x + icon_half.x + MAP_NAV_HIGHLIGHT_BUFFER;
+    let top_edge = row_y + icon_half.y + MAP_NAV_HIGHLIGHT_BUFFER;
+    let bottom_edge = row_y - icon_half.y - MAP_NAV_HIGHLIGHT_BUFFER;
+
+    TipHighlightRect {
+        center: Vec2::new(
+            (left_edge + right_edge) * 0.5,
+            (top_edge + bottom_edge) * 0.5,
+        ),
+        size: Vec2::new(right_edge - left_edge, top_edge - bottom_edge),
+    }
+}
+
+/// Buffer kept clear around the highlighted skill icons in the [`TutorialContent::Skills`]
+/// spotlight overlay.
+const SKILLS_HIGHLIGHT_BUFFER: f32 = 4.0;
+/// Extra padding below the skill icons so the spotlight box extends slightly downward.
+const SKILLS_HIGHLIGHT_BOTTOM_EXTRA: f32 = 3.0;
+
+/// Rect (in UI render-layer-3 coordinates) spanning the class-skill + pet-skill HUD icon group
+/// on the right side of the action row, for the skills tutorial's spotlight.
+fn skills_highlight_rect(res: &ScreenResolution) -> TipHighlightRect {
+    let action_row_y = -res.game_height * 0.5 + HUD_ACTION_ROW_Y_FROM_BOTTOM;
+    // 3 class skill slots + 1 pet slot, grouped as one visual unit (see `HUD_SKILLS_CENTER_X`).
+    let num_skills = 4.0;
+    let skill_half_span = (num_skills - 1.0) * 0.5;
+    let leftmost_x = HUD_SKILLS_CENTER_X - skill_half_span * HUD_SKILL_SPACING_X;
+    let rightmost_x = HUD_SKILLS_CENTER_X + skill_half_span * HUD_SKILL_SPACING_X;
+    let icon_half = HUD_SKILL_SLOT_HIT_SIZE * 0.5;
+
+    let left_edge = leftmost_x - icon_half.x - SKILLS_HIGHLIGHT_BUFFER;
+    let right_edge = rightmost_x + icon_half.x + SKILLS_HIGHLIGHT_BUFFER;
+    let top_edge = action_row_y + icon_half.y + SKILLS_HIGHLIGHT_BUFFER;
+    let bottom_edge =
+        action_row_y - icon_half.y - SKILLS_HIGHLIGHT_BUFFER - SKILLS_HIGHLIGHT_BOTTOM_EXTRA;
+
+    TipHighlightRect {
+        center: Vec2::new(
+            (left_edge + right_edge) * 0.5,
+            (top_edge + bottom_edge) * 0.5,
+        ),
+        size: Vec2::new(right_edge - left_edge, top_edge - bottom_edge),
+    }
+}
+
+/// Buffer kept clear around the highlighted hotbar slots in the [`TutorialContent::HotbarFood`]
+/// spotlight overlay (matches the skills tutorial padding).
+const HOTBAR_HIGHLIGHT_BUFFER: f32 = SKILLS_HIGHLIGHT_BUFFER;
+const HOTBAR_HIGHLIGHT_BOTTOM_EXTRA: f32 = SKILLS_HIGHLIGHT_BOTTOM_EXTRA;
+
+/// Rect (in UI render-layer-3 coordinates) spanning the four keyed hotbar slots on the left side
+/// of the HUD action row, for the hotbar tutorial's spotlight.
+fn hotbar_highlight_rect(res: &ScreenResolution) -> TipHighlightRect {
+    let action_row_y = -res.game_height * 0.5 + HUD_ACTION_ROW_Y_FROM_BOTTOM;
+    let slot_spacing = INV_SLOT_SPACING_X - 5.0;
+    let half_span = (HUD_HOTBAR_SLOTS as f32 - 1.0) * 0.5;
+    let leftmost_x = HUD_HOTBAR_CENTER_X - half_span * slot_spacing;
+    let rightmost_x = HUD_HOTBAR_CENTER_X + half_span * slot_spacing;
+    let slot_half = UI_SLOT_SIZE * 0.5;
+
+    let left_edge = leftmost_x - slot_half.x - HOTBAR_HIGHLIGHT_BUFFER;
+    let right_edge = rightmost_x + slot_half.x + HOTBAR_HIGHLIGHT_BUFFER;
+    let top_edge = action_row_y + slot_half.y + HOTBAR_HIGHLIGHT_BUFFER;
+    let bottom_edge =
+        action_row_y - slot_half.y - HOTBAR_HIGHLIGHT_BUFFER - HOTBAR_HIGHLIGHT_BOTTOM_EXTRA;
+
+    TipHighlightRect {
+        center: Vec2::new(
+            (left_edge + right_edge) * 0.5,
+            (top_edge + bottom_edge) * 0.5,
+        ),
+        size: Vec2::new(right_edge - left_edge, top_edge - bottom_edge),
+    }
+}
+
+/// Buffer kept clear around the highlighted mana orb in the [`TutorialContent::Mana`]
+/// spotlight overlay.
+const MANA_HIGHLIGHT_BUFFER: f32 = 4.0;
+
+/// Rect (in UI render-layer-3 coordinates) spanning the blue mana orb on the right side of
+/// the HUD bar, for the mana tutorial's spotlight.
+fn mana_orb_highlight_rect(res: &ScreenResolution) -> TipHighlightRect {
+    let center = hud_mana_orb_center(res);
+    let size = HUD_FILL_PIXEL_SIZE + Vec2::splat(MANA_HIGHLIGHT_BUFFER * 2.0);
+
+    TipHighlightRect { center, size }
+}
+
+/// Buffer kept clear around the highlighted progress bar / era timeline in the
+/// [`TutorialContent::Chaos`] / [`TutorialContent::Timeline`] spotlight overlays.
+const PROGRESS_BAR_HIGHLIGHT_BUFFER: f32 = 4.0;
+
+/// Rect (in UI render-layer-3 coordinates) spanning just the score/chaos progress bar itself
+/// (to the right of the era timeline), for the chaos tutorial's spotlight.
+fn progress_bar_highlight_rect(res: &ScreenResolution) -> TipHighlightRect {
+    let row_y = hud_row_below_xp_y(res.game_height);
+    let center_x = hud_progress_bar_center_x(res);
+    let size = PROGRESS_BACKGROUND_SIZE + Vec2::splat(PROGRESS_BAR_HIGHLIGHT_BUFFER * 2.0);
+
+    TipHighlightRect {
+        center: Vec2::new(center_x, row_y),
+        size,
+    }
+}
+
+/// Rect (in UI render-layer-3 coordinates) spanning the era timeline bar (to the left of the
+/// score/chaos progress bar), for the [`TutorialContent::Timeline`] tutorial's spotlight.
+fn timeline_highlight_rect(res: &ScreenResolution) -> TipHighlightRect {
+    let row_y = hud_row_below_xp_y(res.game_height) + 2.;
+    let center_x = hud_timeline_center_x(res.game_width);
+    let size = HUD_TIMELINE_SIZE + Vec2::splat(PROGRESS_BAR_HIGHLIGHT_BUFFER * 2.0);
+
+    TipHighlightRect {
+        center: Vec2::new(center_x, row_y),
+        size,
+    }
+}
+
+/// Gap kept between a compact tutorial's spotlight rect and its (image-less) panel.
+const COMPACT_PANEL_GAP: f32 = 6.0;
+
+/// Compact panel width/height — smaller than the standard image + text panel since there's no
+/// aseprite art, just a title + short body + Done button.
+const PANEL_WIDTH_COMPACT: f32 = 170.0;
+const PANEL_HEIGHT_COMPACT: f32 = 86.0;
+
+/// Screen-edge padding kept clear when clamping a compact panel horizontally on-screen.
+const COMPACT_PANEL_EDGE_PADDING: f32 = 6.0;
+
+/// Clamps a compact panel's horizontal center so it stays fully on-screen (with
+/// [`COMPACT_PANEL_EDGE_PADDING`] of breathing room), preventing left/right clipping when its
+/// spotlight rect sits close to a screen edge.
+fn clamp_compact_panel_x(x: f32, res: &ScreenResolution) -> f32 {
+    let half_panel = PANEL_WIDTH_COMPACT * 0.5;
+    let min_x = -res.game_width * 0.5 + half_panel + COMPACT_PANEL_EDGE_PADDING;
+    let max_x = res.game_width * 0.5 - half_panel - COMPACT_PANEL_EDGE_PADDING;
+    x.clamp(min_x, max_x)
+}
+
+/// Center a compact panel directly above `rect` (its bottom edge `COMPACT_PANEL_GAP` above the
+/// rect's top edge), horizontally centered on it (clamped to stay on-screen).
+fn compact_panel_above_rect(rect: TipHighlightRect, res: &ScreenResolution) -> Vec2 {
+    Vec2::new(
+        clamp_compact_panel_x(rect.center.x, res),
+        rect.center.y + rect.size.y * 0.5 + COMPACT_PANEL_GAP + PANEL_HEIGHT_COMPACT * 0.5,
+    )
+}
+
+/// Center a compact panel directly below `rect` (its top edge `COMPACT_PANEL_GAP` below the
+/// rect's bottom edge), horizontally centered on it (clamped to stay on-screen).
+fn compact_panel_below_rect(rect: TipHighlightRect, res: &ScreenResolution) -> Vec2 {
+    Vec2::new(
+        clamp_compact_panel_x(rect.center.x, res),
+        rect.center.y - rect.size.y * 0.5 - COMPACT_PANEL_GAP - PANEL_HEIGHT_COMPACT * 0.5,
+    )
+}
+
+/// Computes the spotlight rect + compact panel center for a compact [`TutorialContent`].
+/// Returns `None` if `content` isn't a compact tutorial (see [`TutorialContent::is_compact`]).
+fn compact_tutorial_layout(
+    content: TutorialContent,
+    res: &ScreenResolution,
+) -> Option<(TipHighlightRect, Vec2)> {
+    match content {
+        TutorialContent::MapNavigation => {
+            let rect = map_nav_highlight_rect(res);
+            Some((rect, compact_panel_above_rect(rect, res)))
+        }
+        TutorialContent::Skills => {
+            let rect = skills_highlight_rect(res);
+            Some((rect, compact_panel_above_rect(rect, res)))
+        }
+        TutorialContent::HotbarFood => {
+            let rect = hotbar_highlight_rect(res);
+            Some((rect, compact_panel_above_rect(rect, res)))
+        }
+        TutorialContent::Mana => {
+            let rect = mana_orb_highlight_rect(res);
+            Some((rect, compact_panel_above_rect(rect, res)))
+        }
+        TutorialContent::Chaos => {
+            let rect = progress_bar_highlight_rect(res);
+            Some((rect, compact_panel_below_rect(rect, res)))
+        }
+        TutorialContent::Timeline => {
+            let rect = timeline_highlight_rect(res);
+            Some((rect, compact_panel_below_rect(rect, res)))
+        }
+        _ => None,
+    }
+}
 
 aseprite!(pub TutorialAnims, "ui/TutorialAnims.ase");
 
@@ -87,10 +343,15 @@ pub enum TutorialContent {
     ShrinesExplore,
     PinkFlowers,
     Crafting,
+    MapNavigation,
+    Timeline,
+    Chaos,
+    HotbarFood,
+    Mana,
 }
 
 impl TutorialContent {
-    pub const ALL: [TutorialContent; 9] = [
+    pub const ALL: [TutorialContent; 14] = [
         TutorialContent::Attacking,
         TutorialContent::Skills,
         TutorialContent::Heirlooms,
@@ -100,6 +361,11 @@ impl TutorialContent {
         TutorialContent::ShrinesExplore,
         TutorialContent::PinkFlowers,
         TutorialContent::Crafting,
+        TutorialContent::MapNavigation,
+        TutorialContent::Timeline,
+        TutorialContent::Chaos,
+        TutorialContent::HotbarFood,
+        TutorialContent::Mana,
     ];
 
     fn title(self) -> &'static str {
@@ -113,6 +379,11 @@ impl TutorialContent {
             TutorialContent::ShrinesExplore => "Shrines",
             TutorialContent::PinkFlowers => "Biomes",
             TutorialContent::Crafting => "Crafting",
+            TutorialContent::MapNavigation => "Map",
+            TutorialContent::Timeline => "Timeline",
+            TutorialContent::Chaos => "Chaos",
+            TutorialContent::HotbarFood => "Hotbar & Food",
+            TutorialContent::Mana => "Mana",
         }
     }
 
@@ -122,10 +393,10 @@ impl TutorialContent {
                 "Weapons attack automatically,\n\nuse your mouse to aim them."
             }
             TutorialContent::Skills => {
-                "Skills are powerful, dont forget\n\nto use them! Drag to rearrange them."
+                "Skills are powerful, don't forget\n\nto use them! Drag to rearrange them."
             }
             TutorialContent::Heirlooms => {
-                "Heirlooms will boost stats or\n\ngrant strong effects. Use them\n\nto create a strong build!"
+                "Hover here to view your heirlooms.\n\nHeirlooms boost stats or trigger\n\nstrong effects. They are the key\n\nto getting stronger!"
             }
             TutorialContent::Equipment => {
                 "Equipment can be equipped to boost\n\nyour stats. Upgrade them to make\n\nthem stronger!"
@@ -144,6 +415,21 @@ impl TutorialContent {
             }
             TutorialContent::Crafting => {
                 "Craft different foods and tools\n\nto help you on your journey.\n\nBiomes unlock different blueprints."
+            }
+            TutorialContent::MapNavigation => {
+                "Check your map to navigate\n\nthe island and find shrines,\n\nincluding the Boss Shrine!\n\nYou can even mark locations!"
+            }
+            TutorialContent::Timeline => {
+                "Night time is dangerous! Keep\n\ntrack of time here, and find the\n\nboss shrine before its too late"
+            }
+            TutorialContent::Chaos => {
+                "Chaos makes enemies tougher but\n\ngrant more score. It rises over time,\n\nand through some player actions."
+            }
+            TutorialContent::HotbarFood => {
+                "Place food in the hotbar for\n\nquick access when you need it!"
+            }
+            TutorialContent::Mana => {
+                "Some heirloom triggers cost\n\nmana. Hover your mana orb for\n\ninfo on mana efficiency."
             }
         }
     }
@@ -285,6 +571,10 @@ impl Plugin for TutorialPlugin {
                         .after(crate::ui::main_menu::handle_menu_button_click_events),
                     check_heirloom_tutorial,
                     check_biome_timer_tutorial,
+                    check_map_navigation_tutorial,
+                    check_chaos_tutorial,
+                    check_hotbar_food_tutorial,
+                    check_mana_tutorial,
                     process_pending_inventory_tutorials,
                     handle_tutorial_buttons,
                     tick_pending_find_boss_shrine_hint,
@@ -311,15 +601,21 @@ fn panel_height_for_entry_count(count: usize) -> f32 {
     }
 }
 
-/// Right-align a single-tip panel so its right edge sits on the UI view edge.
-fn panel_center_x(entry_count: usize, panel_width: f32, game_width: f32) -> f32 {
+/// Align a single-tip panel so its right (or, if `left_aligned`, left) edge sits on the UI view
+/// edge. Multi-entry panels stay centered regardless.
+fn panel_center_x(
+    entry_count: usize,
+    panel_width: f32,
+    game_width: f32,
+    left_aligned: bool,
+) -> f32 {
     if entry_count == 1 {
-        super::tooltips::clamp_tooltip_center_x(
-            game_width * 0.5 - panel_width * 0.5,
-            panel_width * 0.5,
-            game_width,
-            0.0,
-        )
+        let edge_x = if left_aligned {
+            -game_width * 0.5 + panel_width * 0.5
+        } else {
+            game_width * 0.5 - panel_width * 0.5
+        };
+        super::tooltips::clamp_tooltip_center_x(edge_x, panel_width * 0.5, game_width, 0.0)
     } else {
         0.0
     }
@@ -372,6 +668,7 @@ fn tick_pending_tutorial_ready(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn handle_tutorial_popup_events(
     mut commands: Commands,
     mut events: EventReader<TutorialPopupEvent>,
@@ -379,6 +676,9 @@ fn handle_tutorial_popup_events(
     resolution: Res<ScreenResolution>,
     mut state: ResMut<TutorialState>,
     existing: Query<(), With<TutorialUI>>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut highlight_materials: ResMut<Assets<TipHighlightMaterial>>,
+    skills: Query<&PlayerSkills>,
 ) {
     if !existing.is_empty() {
         events.clear();
@@ -393,10 +693,48 @@ fn handle_tutorial_popup_events(
         return;
     };
     if !event.entries.is_empty() {
+        // Compact tutorials (see `compact_tutorial_layout`) always show alone, positioned right
+        // next to the specific HUD element they're spotlighting, with a small image-less box
+        // instead of the standard modal. The heirloom tutorial is also compact, but its
+        // spotlight rect depends on the player's current heirloom count, so it's computed here
+        // rather than in `compact_tutorial_layout`.
+        if let [content] = event.entries[..] {
+            let compact_layout = if content == TutorialContent::Heirlooms {
+                let heirloom_count = skills
+                    .get_single()
+                    .map(|s| s.heirlooms.len())
+                    .unwrap_or(HEIRLOOM_TUTORIAL_PICK_COUNT);
+                let rect = heirloom_row_highlight_rect(&resolution, heirloom_count);
+                Some((rect, compact_panel_below_rect(rect, &resolution)))
+            } else {
+                compact_tutorial_layout(content, &resolution)
+            };
+            if let Some((highlight, panel_center)) = compact_layout {
+                state.page = 0;
+                state.mode = event.mode;
+                state.entries = event.entries.clone();
+                state.panel_width = PANEL_WIDTH_COMPACT;
+                state.panel_height = PANEL_HEIGHT_COMPACT;
+                state.panel_offset_x = panel_center.x;
+
+                spawn_compact_tutorial(
+                    &mut commands,
+                    &asset_server,
+                    &mut meshes,
+                    &mut highlight_materials,
+                    &resolution,
+                    content,
+                    panel_center,
+                    Some(highlight),
+                );
+                return;
+            }
+        }
+
         let entry_count = event.entries.len().min(ENTRIES_PER_PAGE);
         let panel_width = panel_width_for_entry_count(entry_count);
         let panel_height = panel_height_for_entry_count(entry_count);
-        let panel_offset_x = panel_center_x(entry_count, panel_width, resolution.game_width);
+        let panel_offset_x = panel_center_x(entry_count, panel_width, resolution.game_width, false);
 
         state.page = 0;
         state.mode = event.mode;
@@ -408,10 +746,14 @@ fn handle_tutorial_popup_events(
         spawn_tutorial_root(
             &mut commands,
             &asset_server,
+            &mut meshes,
+            &mut highlight_materials,
+            &resolution,
             state.mode,
             panel_width,
             panel_height,
             panel_offset_x,
+            None,
         );
         spawn_current_page(
             &mut commands,
@@ -533,7 +875,114 @@ fn check_biome_timer_tutorial(
     );
 }
 
-/// Call when the active skill shrine UI opens.
+fn check_map_navigation_tutorial(
+    run_timer: Res<RunTimer>,
+    mut popup_events: EventWriter<TutorialPopupEvent>,
+    seen_chunks: Option<Res<SeenTutorialChunks>>,
+    existing: Query<(), With<TutorialUI>>,
+) {
+    let Some(seen_chunks) = seen_chunks else {
+        return;
+    };
+    if seen_chunks.has_seen(&TutorialContent::MapNavigation) {
+        return;
+    }
+    if run_timer.elapsed_seconds < MAP_NAVIGATION_TUTORIAL_DELAY_SECS {
+        return;
+    }
+    try_send_contextual_popup(
+        &mut popup_events,
+        &seen_chunks,
+        &existing,
+        &[TutorialContent::MapNavigation],
+    );
+}
+
+/// Chaos level required before the chaos tutorial appears.
+pub const CHAOS_TUTORIAL_THRESHOLD: f32 = 4.0;
+
+fn check_chaos_tutorial(
+    chaos_tracker: Option<Res<ChaosTracker>>,
+    mut popup_events: EventWriter<TutorialPopupEvent>,
+    seen_chunks: Option<Res<SeenTutorialChunks>>,
+    existing: Query<(), With<TutorialUI>>,
+) {
+    let (Some(seen_chunks), Some(chaos_tracker)) = (seen_chunks, chaos_tracker) else {
+        return;
+    };
+    if seen_chunks.has_seen(&TutorialContent::Chaos) {
+        return;
+    }
+    if chaos_tracker.get_chaos() < CHAOS_TUTORIAL_THRESHOLD {
+        return;
+    }
+    try_send_contextual_popup(
+        &mut popup_events,
+        &seen_chunks,
+        &existing,
+        &[TutorialContent::Chaos],
+    );
+}
+
+/// Shows the hotbar tutorial the first time all four keyed hotbar slots (keys 1–4) are occupied.
+fn check_hotbar_food_tutorial(
+    inventory: Query<&Inventory, (With<Player>, Changed<Inventory>)>,
+    mut popup_events: EventWriter<TutorialPopupEvent>,
+    seen_chunks: Option<Res<SeenTutorialChunks>>,
+    existing: Query<(), With<TutorialUI>>,
+) {
+    let (Some(seen_chunks), Ok(inv)) = (seen_chunks, inventory.get_single()) else {
+        return;
+    };
+    if seen_chunks.has_seen(&TutorialContent::HotbarFood) {
+        return;
+    }
+    let hotbar_full = inv
+        .items
+        .items
+        .iter()
+        .take(HUD_HOTBAR_SLOTS)
+        .all(|slot| slot.is_some());
+    if !hotbar_full {
+        return;
+    }
+    try_send_contextual_popup(
+        &mut popup_events,
+        &seen_chunks,
+        &existing,
+        &[TutorialContent::HotbarFood],
+    );
+}
+
+/// Mana level at or below which the mana tutorial appears for the first time.
+pub const MANA_TUTORIAL_THRESHOLD: i32 = 5;
+
+/// Shows the mana tutorial the first time the player's current mana drops below
+/// [`MANA_TUTORIAL_THRESHOLD`].
+fn check_mana_tutorial(
+    player_mana: Query<&CurrentMana, (With<Player>, Changed<CurrentMana>)>,
+    mut popup_events: EventWriter<TutorialPopupEvent>,
+    seen_chunks: Option<Res<SeenTutorialChunks>>,
+    existing: Query<(), With<TutorialUI>>,
+) {
+    let (Some(seen_chunks), Ok(mana)) = (seen_chunks, player_mana.get_single()) else {
+        return;
+    };
+    if seen_chunks.has_seen(&TutorialContent::Mana) {
+        return;
+    }
+    if mana.0 >= MANA_TUTORIAL_THRESHOLD {
+        return;
+    }
+    try_send_contextual_popup(
+        &mut popup_events,
+        &seen_chunks,
+        &existing,
+        &[TutorialContent::Mana],
+    );
+}
+
+/// Call when the active skill shrine UI closes (a skill pick has been finalized).
 pub fn try_active_skill_shrine_tutorial(
     popup_events: &mut EventWriter<TutorialPopupEvent>,
     seen_chunks: &SeenTutorialChunks,
@@ -647,31 +1096,50 @@ pub fn try_craft_button_tutorial(
     );
 }
 
+#[allow(clippy::too_many_arguments)]
 fn spawn_tutorial_root(
     commands: &mut Commands,
     asset_server: &AssetServer,
+    meshes: &mut Assets<Mesh>,
+    highlight_materials: &mut Assets<TipHighlightMaterial>,
+    res: &ScreenResolution,
     mode: TutorialPopupMode,
     panel_width: f32,
     panel_height: f32,
     panel_offset_x: f32,
+    highlight: Option<TipHighlightRect>,
 ) {
-    let use_dim =
-        mode == TutorialPopupMode::FullReplay || panel_width > PANEL_WIDTH_SINGLE + f32::EPSILON;
-    if use_dim {
-        commands.spawn((
-            SpriteBundle {
-                sprite: Sprite {
-                    color: Color::rgba(0., 0., 0., 0.85),
-                    custom_size: Some(Vec2::new(2000., 2000.)),
+    if let Some(rect) = highlight {
+        // Spotlight overlay: dark everywhere except a cutout + glowing border around `rect`,
+        // instead of the plain dim below, to draw the player's eye to that part of the HUD.
+        let overlay = spawn_tip_highlight_overlay(
+            commands,
+            meshes,
+            highlight_materials,
+            res,
+            rect,
+            Z_TUTORIAL_OVERLAY,
+        );
+        commands.entity(overlay).insert(TutorialUI);
+    } else {
+        let use_dim = mode == TutorialPopupMode::FullReplay
+            || panel_width > PANEL_WIDTH_SINGLE + f32::EPSILON;
+        if use_dim {
+            commands.spawn((
+                SpriteBundle {
+                    sprite: Sprite {
+                        color: Color::rgba(0., 0., 0., 0.85),
+                        custom_size: Some(Vec2::new(2000., 2000.)),
+                        ..default()
+                    },
+                    transform: Transform::from_translation(Vec3::new(0., 0., Z_TUTORIAL_OVERLAY)),
                     ..default()
                 },
-                transform: Transform::from_translation(Vec3::new(0., 0., Z_TUTORIAL_OVERLAY)),
-                ..default()
-            },
-            RenderLayers::from_layers(&[3]),
-            TutorialUI,
-            Name::new("Tutorial Overlay Dim"),
-        ));
+                RenderLayers::from_layers(&[3]),
+                TutorialUI,
+                Name::new("Tutorial Overlay Dim"),
+            ));
+        }
     }
 
     let panel_alpha = if mode == TutorialPopupMode::Contextual {
@@ -740,6 +1208,108 @@ fn spawn_tutorial_root(
         commands,
         asset_server,
         Vec3::new(panel_offset_x, button_y, Z_TUTORIAL_CONTENT),
+        "Done",
+        TutorialButtonKind::Done,
+    );
+}
+
+/// Spawns a compact, image-less tutorial box (title + short body + Done button) at
+/// `panel_center`, optionally with a spotlight overlay cutting out `highlight`. Used for
+/// compact entries (see [`compact_tutorial_layout`]) instead of
+/// [`spawn_tutorial_root`]/[`spawn_current_page`].
+fn spawn_compact_tutorial(
+    commands: &mut Commands,
+    asset_server: &AssetServer,
+    meshes: &mut Assets<Mesh>,
+    highlight_materials: &mut Assets<TipHighlightMaterial>,
+    res: &ScreenResolution,
+    content: TutorialContent,
+    panel_center: Vec2,
+    highlight: Option<TipHighlightRect>,
+) {
+    if let Some(rect) = highlight {
+        let overlay = spawn_tip_highlight_overlay(
+            commands,
+            meshes,
+            highlight_materials,
+            res,
+            rect,
+            Z_TUTORIAL_OVERLAY,
+        );
+        commands.entity(overlay).insert(TutorialUI);
+    }
+
+    commands.spawn((
+        SpriteBundle {
+            sprite: Sprite {
+                color: Color::rgba(0.15, 0.12, 0.10, 0.98),
+                custom_size: Some(Vec2::new(PANEL_WIDTH_COMPACT, PANEL_HEIGHT_COMPACT)),
+                ..default()
+            },
+            transform: Transform::from_translation(panel_center.extend(Z_TUTORIAL_PANEL)),
+            ..default()
+        },
+        RenderLayers::from_layers(&[3]),
+        TutorialUI,
+        Name::new("Tutorial Compact Panel"),
+    ));
+
+    commands.spawn((
+        Text2dBundle {
+            text: Text::from_section(
+                content.title(),
+                TextStyle {
+                    font: asset_server.load("fonts/alagard.ttf"),
+                    font_size: 15.0,
+                    color: YELLOW_2,
+                },
+            )
+            .with_alignment(TextAlignment::Center),
+            text_anchor: Anchor::Center,
+            transform: Transform::from_translation(Vec3::new(
+                panel_center.x,
+                panel_center.y + PANEL_HEIGHT_COMPACT * 0.5 - 14.0,
+                Z_TUTORIAL_TEXT,
+            )),
+            ..default()
+        },
+        RenderLayers::from_layers(&[3]),
+        TutorialUI,
+        Name::new("Tutorial Compact Title"),
+    ));
+
+    commands.spawn((
+        Text2dBundle {
+            text: Text::from_section(
+                content.body(),
+                TextStyle {
+                    font: asset_server.load("fonts/4x5.ttf"),
+                    font_size: 5.0,
+                    color: WHITE,
+                },
+            )
+            .with_alignment(TextAlignment::Center),
+            text_anchor: Anchor::Center,
+            transform: Transform::from_translation(Vec3::new(
+                panel_center.x,
+                panel_center.y + 2.0,
+                Z_TUTORIAL_TEXT,
+            )),
+            ..default()
+        },
+        RenderLayers::from_layers(&[3]),
+        TutorialUI,
+        Name::new("Tutorial Compact Body"),
+    ));
+
+    spawn_button(
+        commands,
+        asset_server,
+        Vec3::new(
+            panel_center.x,
+            panel_center.y - PANEL_HEIGHT_COMPACT * 0.5 + 12.0,
+            Z_TUTORIAL_CONTENT,
+        ),
         "Done",
         TutorialButtonKind::Done,
     );
@@ -932,6 +1502,13 @@ fn tutorial_content_aseprite_tag(content: TutorialContent) -> &'static str {
         TutorialContent::ShrinesExplore => TutorialAnims::tags::SHRINE,
         TutorialContent::PinkFlowers => TutorialAnims::tags::PINK_FLOWER,
         TutorialContent::Crafting => TutorialAnims::tags::CRAFTING,
+        // Compact tutorials (this one included) never render an aseprite image, so these tags
+        // are unused — picked only so this match stays exhaustive.
+        TutorialContent::MapNavigation => TutorialAnims::tags::SHRINE,
+        TutorialContent::Timeline => TutorialAnims::tags::SHRINE,
+        TutorialContent::Chaos => TutorialAnims::tags::SHRINE,
+        TutorialContent::HotbarFood => TutorialAnims::tags::SHRINE,
+        TutorialContent::Mana => TutorialAnims::tags::SHRINE,
     }
 }
 

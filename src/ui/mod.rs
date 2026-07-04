@@ -15,6 +15,8 @@ use item_chest::*;
 pub mod ui_container_param;
 pub mod tips;
 use tips::*;
+pub mod tip_highlight;
+use tip_highlight::TipHighlightPlugin;
 pub mod tutorial_ui;
 use bevy::{render::view::RenderLayers, sprite::Material2dPlugin};
 use damage_numbers::FloatingTextQueue;
@@ -605,6 +607,7 @@ impl Plugin for UIPlugin {
             .add_plugin(MinimapPlugin)
             .add_plugin(map_markers::MapMarkerPlugin)
             .add_plugin(TipPlugin)
+            .add_plugin(TipHighlightPlugin)
             .add_plugin(IntroGuidePlugin)
             .add_plugin(tutorial_ui::TutorialPlugin)
             .add_system(setup_loading_screen.in_schedule(OnEnter(GameState::Initializing)))
@@ -1161,7 +1164,10 @@ impl Plugin for UIPlugin {
                     .run_if(in_state(UIState::Essence)),
             )
             .add_system(
-                    handle_update_player_skills.after(clamp_health).run_if(in_state(GameState::Main).or_else(in_state(GameState::BlessingChoice))),
+                    handle_update_player_skills
+                        .after(clamp_health)
+                        .after(crate::player::skill_heirlooms::initialize_class_skill_slots)
+                        .run_if(in_state(GameState::Main).or_else(in_state(GameState::BlessingChoice))),
             )
             .add_systems(
                 (
@@ -1308,9 +1314,8 @@ impl Plugin for UIPlugin {
             )
             .add_systems(
                 (
-                    tick_skill_cooldown_overlays.run_if(is_not_paused),
+                    tick_skill_cooldown_overlays,
                     update_player_movement_cooldown_bar
-                        .run_if(is_not_paused)
                         .after(tick_skill_cooldown_overlays),
                     player_hud::handle_active_skill_event
                         .run_if(is_not_paused)

@@ -11,7 +11,7 @@ use crate::{
             spawn_floating_text_with_shadow, spawn_floating_text_with_shadow_on_layer,
         },
         game_fonts::FLOATING_TEXT,
-        tips::{SeenTips, Tip, TipEvent},
+        tips::{SeenTips, TipEvent},
     },
 };
 use bevy::ecs::system::SystemParam;
@@ -1499,17 +1499,6 @@ pub fn handle_cursor_skills_buttons(
                             // Add chaos if ChaosStats heirloom was picked (+2 chaos)
                             if picked_skill.heirloom == Heirloom::ChaosStats {
                                 tips_param.p2().add_chaos(2.0);
-                            }
-
-                            // Chaos tip: when gaining ChaosBoost or ChaosStats heirlooms
-                            if (picked_skill.heirloom == Heirloom::ChaosBoost
-                                || picked_skill.heirloom == Heirloom::ChaosStats)
-                                && !tips_param.p1().has_seen(&Tip::Chaos)
-                            {
-                                tips_param.p0().send(TipEvent {
-                                    tip: Tip::Chaos,
-                                    pos: Vec3::new(-184., -116., 45.),
-                                });
                             }
 
                             for mut shrine in pick_params.shrine_query.iter_mut() {

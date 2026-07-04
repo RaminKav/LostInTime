@@ -268,7 +268,27 @@ const HUD_CORNER_ICON_SPACING: f32 = 30.0;
 const HUD_CORNER_LEFT_PADDING: f32 = 6.0;
 
 /// `assets/ui/InventoryIcon.png` / `MapIcon.png` / `SettingsIcon.png` draw size.
-const HUD_CORNER_ICON_SIZE: Vec2 = Vec2::new(27., 27.);
+pub const HUD_CORNER_ICON_SIZE: Vec2 = Vec2::new(27., 27.);
+
+/// World-space y for the bottom-left HUD corner icon row (minimap / inventory / settings).
+pub fn hud_bottom_corner_icon_row_y(game_height: f32) -> f32 {
+    -game_height / 2. + 18.
+}
+
+/// World-space x for the minimap (map) HUD corner icon.
+pub fn hud_map_icon_x(game_width: f32) -> f32 {
+    -game_width * 0.5 + HUD_CORNER_ICON_SIZE.x * 0.5 + HUD_CORNER_LEFT_PADDING
+}
+
+/// World-space x for the inventory (bag) HUD corner icon.
+pub fn hud_bag_icon_x(game_width: f32) -> f32 {
+    hud_map_icon_x(game_width) + HUD_CORNER_ICON_SPACING
+}
+
+/// World-space x for the options/settings HUD corner icon.
+pub fn hud_settings_icon_x(game_width: f32) -> f32 {
+    hud_bag_icon_x(game_width) + HUD_CORNER_ICON_SPACING
+}
 
 #[derive(Component)]
 pub struct HotbarKeybindText {
@@ -313,6 +333,18 @@ pub const HUD_FILL_PIXEL_SIZE: Vec2 = Vec2::new(50.0, 50.0);
 /// outer edge so the liquid is centered on the visible cap interior rather than the
 /// outermost pixel column.
 pub const HUD_FILL_X_OFFSET: f32 = HUD_FRAME_SIZE.x * 0.5 - HUD_FILL_PIXEL_SIZE.x;
+
+/// Local offset of the mana fill quad from the HUD frame center (see `setup_bars_ui`).
+const HUD_MANA_FILL_LOCAL_X: f32 = HUD_FILL_X_OFFSET + 1.0;
+const HUD_MANA_FILL_LOCAL_Y: f32 = -5.0;
+
+/// World-space center of the blue mana orb fill on the right side of the HUD bar.
+pub fn hud_mana_orb_center(res: &ScreenResolution) -> Vec2 {
+    Vec2::new(
+        HUD_MANA_FILL_LOCAL_X,
+        -res.game_height * 0.5 + HUD_FRAME_Y_FROM_BOTTOM + HUD_MANA_FILL_LOCAL_Y,
+    )
+}
 
 #[derive(Component)]
 pub struct BarFlashTimer {
@@ -432,7 +464,7 @@ pub fn setup_bars_ui(
         .spawn(MaterialMesh2dBundle {
             mesh: mana_mesh,
             material: mana_material,
-            transform: Transform::from_translation(Vec3::new(HUD_FILL_X_OFFSET + 1., -5.0, 1.0)),
+            transform: Transform::from_translation(Vec3::new(HUD_MANA_FILL_LOCAL_X, HUD_MANA_FILL_LOCAL_Y, 1.0)),
             ..default()
         })
         .insert(RenderLayers::from_layers(&[3]))
@@ -741,9 +773,9 @@ pub fn setup_currency_ui(
         .set_parent(progress_bar);
 
     // Minimap + inventory + options icons (bottom-left HUD corner).
-    let corner_y = -res.game_height / 2. + 18.;
-    let map_x = -res.game_width * 0.5 + HUD_CORNER_ICON_SIZE.x * 0.5 + HUD_CORNER_LEFT_PADDING;
-    let bag_x = map_x + HUD_CORNER_ICON_SPACING;
+    let corner_y = hud_bottom_corner_icon_row_y(res.game_height);
+    let map_x = hud_map_icon_x(res.game_width);
+    let bag_x = hud_bag_icon_x(res.game_width);
     let settings_x = bag_x + HUD_CORNER_ICON_SPACING;
 
     let map_icon = commands
@@ -3722,6 +3754,34 @@ pub fn spawn_skill_cooldown_overlay_with_elapsed(
     index: usize,
 ) -> Entity {
     use bevy::utils::Duration;
+
+    // Ready / not on cooldown — spawn a finished timer with zero height so the overlay stays
+    // invisible even when gameplay is paused (e.g. tutorial popups skip tick systems).
+    if duration <= 0.0 {
+        let mut timer = Timer::from_seconds(0.001, TimerMode::Once);
+        timer.tick(Duration::from_secs_f32(0.001));
+        return commands
+            .spawn(SpriteBundle {
+                sprite: Sprite {
+                    color: Color::rgba(1., 1., 1., 0.45),
+                    custom_size: Some(Vec2::new(16., 0.)),
+                    anchor: Anchor::BottomCenter,
+                    ..default()
+                },
+                transform: Transform {
+                    translation: Vec3::new(0., -8., 3.),
+                    scale: Vec3::new(1., 1., 1.),
+                    ..Default::default()
+                },
+                ..default()
+            })
+            .insert(SkillCooldownOverlay { timer, index })
+            .insert(RenderLayers::from_layers(&[3]))
+            .insert(Name::new("overlay"))
+            .set_parent(parent)
+            .id();
+    }
+
     let duration = duration.max(0.001); // avoid negative/zero Duration panic
     let mut timer = Timer::from_seconds(duration, TimerMode::Once);
     // Tick the timer to the preserved elapsed time to maintain visual state
@@ -3731,11 +3791,7 @@ pub fn spawn_skill_cooldown_overlay_with_elapsed(
     }
 
     // Calculate initial overlay size based on timer progress
-    let initial_size = if duration > 0.0 {
-        16.0 * (1.0 - timer.percent())
-    } else {
-        0.0
-    };
+    let initial_size = 16.0 * (1.0 - timer.percent());
 
     commands
         .spawn(SpriteBundle {
@@ -4545,9 +4601,9 @@ pub fn sync_player_hud_layout_to_resolution(
         transform.translation.y = xp_y;
     }
 
-    let corner_y = -res.game_height / 2. + 18.;
-    let map_x = -res.game_width * 0.5 + HUD_CORNER_ICON_SIZE.x * 0.5 + HUD_CORNER_LEFT_PADDING;
-    let bag_x = map_x + HUD_CORNER_ICON_SPACING;
+    let corner_y = hud_bottom_corner_icon_row_y(res.game_height);
+    let map_x = hud_map_icon_x(res.game_width);
+    let bag_x = hud_bag_icon_x(res.game_width);
     let settings_x = bag_x + HUD_CORNER_ICON_SPACING;
     for (icon, mut transform) in layout.p4().iter_mut() {
         transform.translation.y = corner_y;

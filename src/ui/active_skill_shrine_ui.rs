@@ -41,6 +41,36 @@ use super::{
     Interactable, Focusable, UIElement, UIState, KEYBIND_BADGE_COLOR, TOOLTIP_INFO_BOX_SIZE,
 };
 
+/// Bundles the params needed to fire the skills tutorial popup when the active skill shrine UI
+/// closes, keeping the interaction-handler system param counts under Bevy's tuple limit.
+#[derive(bevy::ecs::system::SystemParam)]
+pub struct ActiveSkillShrineTutorialTrigger<'w, 's> {
+    popup_events: EventWriter<'w, crate::ui::tutorial_ui::TutorialPopupEvent>,
+    seen_chunks: Option<Res<'w, crate::ui::tutorial_ui::SeenTutorialChunks>>,
+    tutorial_ui: Query<'w, 's, (), With<crate::ui::tutorial_ui::TutorialUI>>,
+}
+
+impl<'w, 's> ActiveSkillShrineTutorialTrigger<'w, 's> {
+    fn try_trigger(&mut self) {
+        if let Some(seen_chunks) = self.seen_chunks.as_ref() {
+            crate::ui::tutorial_ui::try_active_skill_shrine_tutorial(
+                &mut self.popup_events,
+                seen_chunks,
+                &self.tutorial_ui,
+            );
+        }
+    }
+}
+
+/// Bundles the read-only unlock/cheat resources needed to decide how a shrine skill pick gets
+/// assigned, keeping the interaction-handler system param counts under Bevy's tuple limit.
+#[derive(bevy::ecs::system::SystemParam)]
+pub struct ShrineAssignUnlockParams<'w> {
+    unlocked_skills: Res<'w, UnlockedSkills>,
+    unlock_upgrades: Res<'w, UnlockUpgrades>,
+    cheat_settings: Res<'w, CheatSettings>,
+}
+
 const SHRINE_TOOLTIP_GAP: f32 = 24.;
 const SHRINE_TOOLTIP_SPACING: f32 = SKILL_TOOLTIP_SIZE.y + SHRINE_TOOLTIP_GAP;
 /// Below the lower skill tooltip panel.
@@ -524,9 +554,6 @@ pub fn setup_active_skill_shrine_ui(
     shrine_selection: Res<ActiveSkillShrineSelection>,
     run_unlocks: Res<RunUnlockState>,
     res: Res<ScreenResolution>,
-    mut popup_events: EventWriter<crate::ui::tutorial_ui::TutorialPopupEvent>,
-    seen_chunks: Option<Res<crate::ui::tutorial_ui::SeenTutorialChunks>>,
-    tutorial_ui: Query<(), With<crate::ui::tutorial_ui::TutorialUI>>,
     skill_power: Query<
         (
             &SkillPower,
@@ -660,13 +687,6 @@ pub fn setup_active_skill_shrine_ui(
         .entity(back_button)
         .insert(UIState::ActiveSkillShrine);
 
-    if let Some(seen_chunks) = seen_chunks.as_ref() {
-        crate::ui::tutorial_ui::try_active_skill_shrine_tutorial(
-            &mut popup_events,
-            seen_chunks,
-            &tutorial_ui,
-        );
-    }
 }
 
 pub fn tick_active_skill_shrine_ui_interaction_lock_timers(
@@ -704,12 +724,11 @@ pub fn handle_active_skill_shrine_ui_interaction(
     mut next_ui_state: ResMut<NextState<UIState>>,
     mut commands: Commands,
     mut player_skills: Query<(Entity, &mut PlayerSkills, &PlayerClass), With<Player>>,
-    unlocked_skills: Res<UnlockedSkills>,
-    unlock_upgrades: Res<UnlockUpgrades>,
-    cheat_settings: Res<CheatSettings>,
+    unlock_params: ShrineAssignUnlockParams,
     mut att_event: EventWriter<crate::attributes::AttributeChangeEvent>,
     mut shrine_query: Query<&mut crate::item::active_skill_shrine::ActiveSkillShrineState>,
     focus_input: crate::ui::focus::FocusInput,
+    mut tutorial_trigger: ActiveSkillShrineTutorialTrigger,
 ) {
     let hit_test = super::ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
@@ -751,9 +770,9 @@ pub fn handle_active_skill_shrine_ui_interaction(
                         match shrine_assign_action(
                             &skills,
                             &player_class.class,
-                            &unlocked_skills,
-                            &unlock_upgrades,
-                            cheat_settings.bypass_class_unlocks,
+                            &unlock_params.unlocked_skills,
+                            &unlock_params.unlock_upgrades,
+                            unlock_params.cheat_settings.bypass_class_unlocks,
                         ) {
                             ShrineAssignAction::AutoFill(slot) => {
                                 assign_shrine_skill_to_slot(
@@ -772,6 +791,7 @@ pub fn handle_active_skill_shrine_ui_interaction(
                                 commands.remove_resource::<ActiveSkillShrineSelection>();
                                 next_ui_state.set(UIState::Closed);
                                 att_event.send(crate::attributes::AttributeChangeEvent);
+                                tutorial_trigger.try_trigger();
                             }
                             ShrineAssignAction::ShowSlotPicker => {
                                 commands.insert_resource(ActiveSkillShrineOverwrite {
@@ -1222,6 +1242,7 @@ pub fn handle_active_skill_shrine_overwrite_interaction(
     mut shrine_query: Query<&mut crate::item::active_skill_shrine::ActiveSkillShrineState>,
     shrine_overwrite_res: Option<Res<ActiveSkillShrineOverwrite>>,
     focus_input: crate::ui::focus::FocusInput,
+    mut tutorial_trigger: ActiveSkillShrineTutorialTrigger,
 ) {
     // Only handle if this is a shrine overwrite, not heirloom limbo
     let overwrite = if let Some(overwrite_res) = shrine_overwrite_res.as_ref() {
@@ -1279,6 +1300,7 @@ pub fn handle_active_skill_shrine_overwrite_interaction(
                         commands.remove_resource::<ActiveSkillShrineSelection>();
                         next_ui_state.set(UIState::Closed);
                         att_event.send(crate::attributes::AttributeChangeEvent);
+                        tutorial_trigger.try_trigger();
                     }
                 }
                 _ => (),

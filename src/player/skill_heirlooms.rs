@@ -2192,13 +2192,10 @@ fn update_one_slot_runtime(
             let current_skill = choice.active_skill;
             let skill_changed = slot.tracked_skill != current_skill;
             if skill_changed {
-                let base_cd = base_cooldown.max(0.0);
-                let mut init_timer = Timer::from_seconds(base_cd, TimerMode::Once);
-                init_timer.tick(Duration::from_secs_f32(base_cd));
                 slot.current_charges = max_charges;
                 slot.max_charges = max_charges;
                 slot.base_cooldown = base_cooldown;
-                slot.cooldown_timer = init_timer;
+                slot.cooldown_timer = finished_timer_init();
                 slot.tracked_skill = current_skill;
             } else {
                 let old_max = slot.max_charges;
