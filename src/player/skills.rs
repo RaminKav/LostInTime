@@ -609,7 +609,10 @@ impl ActiveSkill {
     pub fn is_ground_targeted(&self) -> bool {
         matches!(
             self,
-            ActiveSkill::FirePillar | ActiveSkill::IceWall | ActiveSkill::DruidTree | ActiveSkill::Bomb
+            ActiveSkill::FirePillar
+                | ActiveSkill::IceWall
+                | ActiveSkill::DruidTree
+                | ActiveSkill::Bomb
         )
     }
 
@@ -1597,7 +1600,7 @@ impl Heirloom {
             ],
 
             Heirloom::IceStaffAoE => vec![
-                "Your Attacks have".to_string(),
+                "Your weapons have".to_string(),
                 "a 7% chance to ".to_string(),
                 "trigger an ice".to_string(),
                 "explosion.".to_string(),

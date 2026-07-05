@@ -13,6 +13,7 @@ use crate::enemy::Mob;
 use crate::inputs::{attack_aim_direction, AttackAutoTargetState, AutoAttackState};
 use crate::item::ammo::Ammo;
 use crate::item::WorldObject;
+use crate::player::combat_heirlooms::hit_is_weapon_damage;
 use crate::player::mage_skills::spawn_ice_explosion_hitbox;
 use crate::player::skills::{Heirloom, PlayerSkills};
 use crate::status_effects::{
@@ -256,12 +257,6 @@ pub fn handle_on_hit_upgrades(
         if current_hp.0 > 1 && kevin_chance > 0.0 && rng.gen_bool(kevin_chance as f64) {
             events.p3().send(ModifyHealthEvent(-1));
         }
-        if let Some(proj) = &hit.hit_with_projectile {
-            // if proj.is_skill_projectile() {
-            //     continue;
-            // }
-        }
-
         if skills.has(Heirloom::IncreaseProjectileCount)
             && hit.hit_with_projectile == Some(Projectile::Electricity)
             && *elec_count == 0
@@ -302,9 +297,7 @@ pub fn handle_on_hit_upgrades(
         let Some(main_hand) = game.player_state.main_hand_slot.clone() else {
             continue;
         };
-        if hit.hit_with_projectile.clone().unwrap_or_default() != Projectile::IceExplosionAOE
-            && hit.hit_with_projectile.clone().unwrap_or_default() != Projectile::SmallExplosionAOE
-            && hit.hit_with_projectile.clone().unwrap_or_default() != Projectile::IceFloor
+        if hit_is_weapon_damage(hit)
             && skills.has(Heirloom::IceStaffAoE)
             && rng.gen_bool((skills.get_count(Heirloom::IceStaffAoE) as f64 * 0.07).clamp(0., 1.))
         {

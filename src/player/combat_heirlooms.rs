@@ -1837,10 +1837,15 @@ pub fn handle_dodge_crit_next_hit_reset(
 /// A hit counts as weapon damage when it comes from a melee weapon swing or from a
 /// weapon-fired projectile (i.e. not an active skill and not a heirloom proc).
 pub fn hit_is_weapon_damage(hit: &crate::combat::HitEvent) -> bool {
-    hit.hit_with_melee.is_some()
-        || (hit.hit_with_projectile.is_some()
-            && !hit.from_active_skill
-            && hit.from_heirloom_effect.is_none())
+    if hit.hit_with_melee.is_some() {
+        return true;
+    }
+    let Some(proj) = hit.hit_with_projectile.as_ref() else {
+        return false;
+    };
+    proj.animation_category() == AnimVisualCategory::Attack
+        && !hit.from_active_skill
+        && hit.from_heirloom_effect.is_none()
 }
 
 // ============================================================================
