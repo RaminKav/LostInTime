@@ -25,6 +25,7 @@ use crate::player::skills::{
 use crate::ui::key_input_guide::InteractionGuideTrigger;
 use crate::world::dimension::{DimensionSpawnEvent, Era};
 use bevy::prelude::*;
+use bevy::ecs::system::SystemParam;
 use bevy::transform::TransformSystem;
 use bevy::window::PrimaryWindow;
 
@@ -293,14 +294,16 @@ impl AttackAutoTargetState {
 }
 
 /// Aim direction for weapon attacks. When auto-target is enabled, aims at the
-/// nearest mob; otherwise uses the cursor position.
+/// nearest mob unless `manual_aim_override` is true (player is actively holding aim input on
+/// controller / mouseless keyboard).
 pub fn attack_aim_direction(
     player_pos: Vec2,
     cursor_pos: Vec2,
     auto_target: bool,
+    manual_aim_override: bool,
     enemies: &Query<&GlobalTransform, With<Mob>>,
 ) -> Vec2 {
-    if auto_target {
+    if auto_target && !manual_aim_override {
         let mut nearest_pos = None;
         let mut nearest_dist_sq = f32::MAX;
         for enemy_txfm in enemies.iter() {
@@ -319,6 +322,26 @@ pub fn attack_aim_direction(
         }
     }
     (cursor_pos - player_pos).normalize_or_zero()
+}
+
+/// Bundles auto-target + manual-aim override + mob query for attack aiming systems.
+#[derive(SystemParam)]
+pub struct AttackAimParams<'w, 's> {
+    pub auto_target: Res<'w, AttackAutoTargetState>,
+    pub manual_aim: Res<'w, crate::aim::ManualAimOverride>,
+    pub enemies: Query<'w, 's, &'static GlobalTransform, With<Mob>>,
+}
+
+impl AttackAimParams<'_, '_> {
+    pub fn direction(&self, player_pos: Vec2, cursor_pos: Vec2) -> Vec2 {
+        attack_aim_direction(
+            player_pos,
+            cursor_pos,
+            self.auto_target.0,
+            self.manual_aim.active,
+            &self.enemies,
+        )
+    }
 }
 
 pub fn weapon_projectile_spawn_delay(obj: &WorldObject, burst_index: usize) -> f32 {
@@ -485,17 +508,11 @@ fn turn_player(
     mut game: ResMut<Game>,
     player_query: Query<&FacingDirection, With<Player>>,
     cursor_pos: Res<CursorPos>,
-    auto_target: Res<AttackAutoTargetState>,
-    enemies: Query<&GlobalTransform, With<Mob>>,
+    aim_params: AttackAimParams,
     mut commands: Commands,
 ) {
     let player_pos = game.player_state.position.truncate();
-    let aim = attack_aim_direction(
-        player_pos,
-        cursor_pos.world_coords.truncate(),
-        auto_target.0,
-        &enemies,
-    );
+    let aim = aim_params.direction(player_pos, cursor_pos.world_coords.truncate());
     if aim.length_squared() < 1e-4 {
         return;
     }
@@ -1279,8 +1296,7 @@ pub fn mouse_click_system(
     mut ranged_attack_event: EventWriter<RangedAttackEvent>,
     ammo_query_any: Query<&Ammo>,
     auto_attack: Res<AutoAttackState>,
-    auto_target: Res<AttackAutoTargetState>,
-    enemies: Query<&GlobalTransform, With<Mob>>,
+    aim_params: AttackAimParams,
     bridge_mode: Res<BridgePlacementMode>,
 ) {
     if ui_state.0 != UIState::Closed {
@@ -1325,11 +1341,9 @@ pub fn mouse_click_system(
         if let Some(tool) = &game.player().main_hand_slot {
             main_hand_option = Some(tool.get_obj());
         }
-        let direction = attack_aim_direction(
+        let direction = aim_params.direction(
             player_pos.truncate(),
             cursor_pos.world_coords.truncate(),
-            auto_target.0,
-            &enemies,
         );
         if let Ok((obj, ranged_tool)) = ranged_query.get_single() {
             // Gate ranged attacks on ammo availability for non-magic ranged weapons

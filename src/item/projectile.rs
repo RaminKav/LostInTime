@@ -615,6 +615,7 @@ fn handle_spawn_projectiles_after_delay(
     enemies: Query<&GlobalTransform, With<Mob>>,
     mobs: Query<&Mob>,
     auto_target: Res<crate::inputs::AttackAutoTargetState>,
+    manual_aim: Res<crate::aim::ManualAimOverride>,
     asset_server: Res<AssetServer>,
     player_projectile_size: Query<&ProjectileSize, With<Player>>,
 ) {
@@ -631,6 +632,7 @@ fn handle_spawn_projectiles_after_delay(
                     player_pos,
                     cursor_pos.world_coords.truncate(),
                     auto_target.0,
+                    manual_aim.active,
                     &enemies,
                 );
                 (player_pos, direction)
@@ -640,6 +642,7 @@ fn handle_spawn_projectiles_after_delay(
                     player_pos,
                     cursor_pos.world_coords.truncate(),
                     auto_target.0,
+                    manual_aim.active,
                     &enemies,
                 );
                 (proj.pos, direction)

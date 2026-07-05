@@ -12,7 +12,9 @@
 //! - **Facing / basic attacks / instant-fire skills**: the aim direction snaps instantly (like a
 //!   digital twin-stick) — pointing the stick/arrow-keys left faces/attacks left immediately, no
 //!   ramp-up. This overrides `CursorPos::world_coords` at a fixed distance from the player, which
-//!   every gameplay system that aims off the cursor already picks up automatically.
+//!   every gameplay system that aims off the cursor already picks up automatically. While **Attack
+//!   Auto Target** is enabled, holding the aim stick/keys temporarily overrides auto-aim so the
+//!   player can aim manually; releasing returns to nearest-enemy targeting.
 //! - **Ground-targeted skills** (`ActiveSkill::is_ground_targeted`: Fire Pillar, Ice Wall, Druid
 //!   Tree, Bomb): holding the skill's button shows a free-roam reticle centered on the player;
 //!   while held, the stick/arrow-keys nudge it anywhere (speed set by the "Aim Sensitivity"
@@ -106,6 +108,14 @@ pub struct AimState {
     pub ground_aim_offset: Vec2,
 }
 
+/// True while the player is actively holding an aim direction this frame (right stick outside the
+/// deadzone, or mouseless-mode aim keys). Used to temporarily override **Attack Auto Target** so
+/// controller / keyboard aim can snap back to manual targeting until the input is released.
+#[derive(Resource, Default)]
+pub struct ManualAimOverride {
+    pub active: bool,
+}
+
 /// Reads whichever device is currently providing aim input and updates `AimState` from it.
 /// Gamepad right stick wins whenever it's outside the deadzone (same precedence movement uses
 /// for left-stick-vs-WASD); otherwise falls back to keyboard arrow keys, but only while
@@ -119,6 +129,7 @@ fn update_aim_state(
     swap_keys: Res<SwapMovementAimKeysState>,
     time: Res<Time>,
     mut aim: ResMut<AimState>,
+    mut manual_override: ResMut<ManualAimOverride>,
     mut last_pending_slot: Local<Option<usize>>,
 ) {
     // Recenter the reticle on the player at the start of each hold-to-aim charge, so every
@@ -165,6 +176,8 @@ fn update_aim_state(
     } else {
         (Vec2::ZERO, false)
     };
+
+    manual_override.active = dir != Vec2::ZERO;
 
     if dir != Vec2::ZERO {
         let normalized = dir.normalize();
@@ -285,6 +298,7 @@ pub struct AimPlugin;
 impl Plugin for AimPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<AimState>()
+            .init_resource::<ManualAimOverride>()
             .insert_resource(AimSensitivity::load())
             .add_system(setup_aim_reticle.in_schedule(OnEnter(GameState::Main)))
             .add_systems(

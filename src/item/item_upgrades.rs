@@ -11,6 +11,7 @@ use crate::blessings::OwnedBlessings;
 use crate::custom_commands::CommandsExt;
 use crate::enemy::Mob;
 use crate::inputs::{attack_aim_direction, AttackAutoTargetState, AutoAttackState};
+use crate::aim::ManualAimOverride;
 use crate::item::ammo::Ammo;
 use crate::item::WorldObject;
 use crate::player::combat_heirlooms::hit_is_weapon_damage;
@@ -68,6 +69,7 @@ pub fn handle_delayed_ranged_attack(
     game: GameParam,
     cursor_pos: Res<CursorPos>,
     auto_target: Res<AttackAutoTargetState>,
+    manual_aim: Res<ManualAimOverride>,
     enemies: Query<&GlobalTransform, With<Mob>>,
     time: Res<Time>,
     mut multi_throw_query: Query<&mut ClawUpgradeMultiThrow, With<Player>>,
@@ -116,6 +118,7 @@ pub fn handle_delayed_ranged_attack(
                     game.player().position.truncate(),
                     cursor_pos.world_coords.truncate(),
                     auto_target.0,
+                    manual_aim.active,
                     &enemies,
                 ),
                 from_enemy: false,
@@ -138,6 +141,7 @@ pub fn handle_spread_arrows_attack(
     mouse_button_input: Res<Input<MouseButton>>,
     auto_attack: Res<AutoAttackState>,
     auto_target: Res<AttackAutoTargetState>,
+    manual_aim: Res<ManualAimOverride>,
     cursor_pos: Res<CursorPos>,
     enemies: Query<&GlobalTransform, With<Mob>>,
     att_cooldown_query: Query<
@@ -177,6 +181,7 @@ pub fn handle_spread_arrows_attack(
             game.player().position.truncate(),
             cursor_pos.world_coords.truncate(),
             auto_target.0,
+            manual_aim.active,
             &enemies,
         );
 
