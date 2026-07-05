@@ -601,6 +601,7 @@ impl Plugin for UIPlugin {
             .init_resource::<ui_helpers::RadialOverlayMeshCache>()
             .init_resource::<ui_helpers::RadialOverlayMaterialCache>()
             .init_resource::<OptionsUiLayoutRevision>()
+            .init_resource::<ActiveOptionsTab>()
             .init_resource::<layout_sync::UiLayoutSyncState>()
             .add_plugin(hud_bar_fill::HudBarFillPlugin)
             .register_type::<InventorySlotState>()
@@ -1063,13 +1064,18 @@ impl Plugin for UIPlugin {
                     handle_unlocks_clicks.run_if(in_state(UIState::Unlocks)),
                     update_unlocks_currency_text.run_if(in_state(UIState::Unlocks)),
                     refresh_unlock_button_states.run_if(in_state(UIState::Unlocks)),
+                ))
+            .add_systems(
+                (
                     handle_options_clicks.run_if(in_state(UIState::Options)),
                     handle_key_rebind_input.run_if(in_state(UIState::Options)),
                     update_keybind_text
                         .run_if(in_state(UIState::Options))
                         .after(handle_key_rebind_input),
                     handle_cheat_checkbox_click.run_if(in_state(UIState::Options)),
-                    update_cheat_checkbox_visual.run_if(in_state(UIState::Options)),
+                    update_cheat_checkbox_visual
+                        .run_if(in_state(UIState::Options))
+                        .after(handle_cheat_checkbox_click),
                     handle_volume_button_click.run_if(in_state(UIState::Options)),
                     update_volume_text.run_if(in_state(UIState::Options)),
                     handle_scale_button_click
@@ -1078,12 +1084,25 @@ impl Plugin for UIPlugin {
                     update_scale_text.run_if(in_state(UIState::Options)),
                     handle_cursor_color_button_click.run_if(in_state(UIState::Options)),
                     update_cursor_color_preview.run_if(in_state(UIState::Options)),
-                    handle_achievement_row_clicks.run_if(in_state(UIState::Achievements)))
+                    handle_achievement_row_clicks.run_if(in_state(UIState::Achievements)),
                 )
-            .add_systems((
+                    .after(crate::ui::focus::FocusConfirmSet),
+            )
+            .add_systems(
+                (
+                    handle_options_tab_buttons.run_if(in_state(UIState::Options)),
+                    sync_options_tab_visibility.run_if(in_state(UIState::Options)),
+                    update_options_row_label_colors.run_if(in_state(UIState::Options)),
                     handle_sensitivity_button_click.run_if(in_state(UIState::Options)),
                     update_sensitivity_text.run_if(in_state(UIState::Options)),
-                ))
+                )
+                    .after(crate::ui::focus::FocusConfirmSet),
+            )
+            .add_system(
+                handle_options_focus_row_input
+                    .before(crate::ui::focus::FocusNavSet)
+                    .run_if(in_state(UIState::Options)),
+            )
             .add_system(
                 handle_tooltip_teardown
                     .in_base_set(CoreSet::PreUpdate)

@@ -128,6 +128,7 @@ fn poll_ui_focus_confirm(
     ui_gamepad_q: Query<&ActionState<UiGamepadAction>, With<UiGamepadInputMarker>>,
 ) {
     ui_focus.confirm_just_pressed = key_input.just_pressed(KeyCode::Return)
+        || key_input.just_pressed(KeyCode::NumpadEnter)
         || ui_gamepad_q
             .get_single()
             .map(|a| a.just_pressed(UiGamepadAction::Confirm))
@@ -146,12 +147,23 @@ fn group_defers_default_focus(group: &UIState) -> bool {
     )
 }
 
+pub fn focus_entity_visible(entity: Entity, visibility: &Query<&Visibility>) -> bool {
+    visibility
+        .get(entity)
+        .map(|v| *v != Visibility::Hidden)
+        .unwrap_or(true)
+}
+
 fn entity_in_active_focus(
     entity: Entity,
     mode: &FocusMode,
     focusables: &Query<(Entity, &Focusable)>,
     overlays: &Query<(Entity, &OverlayFocusable)>,
+    visibility: &Query<&Visibility>,
 ) -> bool {
+    if !focus_entity_visible(entity, visibility) {
+        return false;
+    }
     match mode {
         FocusMode::Screen(group) => focusables
             .get(entity)
@@ -166,6 +178,7 @@ fn default_focus_entity(
     mode: &FocusMode,
     focusables: &Query<(Entity, &Focusable)>,
     overlays: &Query<(Entity, &OverlayFocusable)>,
+    visibility: &Query<&Visibility>,
 ) -> Option<Entity> {
     match mode {
         FocusMode::Screen(group) => {
@@ -174,12 +187,13 @@ fn default_focus_entity(
             }
             focusables
                 .iter()
-                .filter(|(_, f)| f.group == *group)
+                .filter(|(e, f)| f.group == *group && focus_entity_visible(*e, visibility))
                 .min_by_key(|(_, f)| f.index)
                 .map(|(e, _)| e)
         }
         FocusMode::Overlay => overlays
             .iter()
+            .filter(|(e, _)| focus_entity_visible(*e, visibility))
             .min_by_key(|(_, f)| f.index)
             .map(|(e, _)| e),
         FocusMode::None => None,
@@ -231,6 +245,7 @@ fn ensure_default_focus(
     mut ui_focus: ResMut<UiFocus>,
     focusables: Query<(Entity, &Focusable)>,
     overlays: Query<(Entity, &OverlayFocusable)>,
+    visibility: Query<&Visibility>,
 ) {
     let mode = resolve_focus_mode(
         &game_state.0,
@@ -240,12 +255,14 @@ fn ensure_default_focus(
     );
     let still_valid = ui_focus
         .focused
-        .and_then(|e| entity_in_active_focus(e, &mode, &focusables, &overlays).then_some(e))
+        .and_then(|e| {
+            entity_in_active_focus(e, &mode, &focusables, &overlays, &visibility).then_some(e)
+        })
         .is_some();
     if still_valid {
         return;
     }
-    ui_focus.focused = default_focus_entity(&mode, &focusables, &overlays);
+    ui_focus.focused = default_focus_entity(&mode, &focusables, &overlays, &visibility);
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -256,38 +273,64 @@ enum NavDir {
     Right,
 }
 
-fn pressed_nav_dir(
+/// Directional UI navigation input (keyboard arrows, d-pad, or left stick).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum UiNavDir {
+    Up,
+    Down,
+    Left,
+    Right,
+}
+
+impl From<UiNavDir> for NavDir {
+    fn from(d: UiNavDir) -> Self {
+        match d {
+            UiNavDir::Up => NavDir::Up,
+            UiNavDir::Down => NavDir::Down,
+            UiNavDir::Left => NavDir::Left,
+            UiNavDir::Right => NavDir::Right,
+        }
+    }
+}
+
+/// Clears [`FocusNavBlocked`] at the start of each frame before row-level handlers run.
+pub fn reset_focus_nav_blocked(mut blocked: ResMut<FocusNavBlocked>) {
+    blocked.0 = false;
+}
+
+/// Returns a direction if the player pressed a UI navigation input this frame.
+pub fn ui_nav_dir_just_pressed(
     keys: &Input<KeyCode>,
     gamepad: Option<&ActionState<UiGamepadAction>>,
-    last_stick_dir: &mut Option<NavDir>,
-) -> Option<NavDir> {
+    last_stick_dir: &mut Option<UiNavDir>,
+) -> Option<UiNavDir> {
     if keys.just_pressed(KeyCode::Up) {
-        return Some(NavDir::Up);
+        return Some(UiNavDir::Up);
     }
     if keys.just_pressed(KeyCode::Down) {
-        return Some(NavDir::Down);
+        return Some(UiNavDir::Down);
     }
     if keys.just_pressed(KeyCode::Left) {
-        return Some(NavDir::Left);
+        return Some(UiNavDir::Left);
     }
     if keys.just_pressed(KeyCode::Right) {
-        return Some(NavDir::Right);
+        return Some(UiNavDir::Right);
     }
 
     let Some(gamepad) = gamepad else {
         return None;
     };
     if gamepad.just_pressed(UiGamepadAction::NavUp) {
-        return Some(NavDir::Up);
+        return Some(UiNavDir::Up);
     }
     if gamepad.just_pressed(UiGamepadAction::NavDown) {
-        return Some(NavDir::Down);
+        return Some(UiNavDir::Down);
     }
     if gamepad.just_pressed(UiGamepadAction::NavLeft) {
-        return Some(NavDir::Left);
+        return Some(UiNavDir::Left);
     }
     if gamepad.just_pressed(UiGamepadAction::NavRight) {
-        return Some(NavDir::Right);
+        return Some(UiNavDir::Right);
     }
 
     let stick = gamepad
@@ -298,15 +341,15 @@ fn pressed_nav_dir(
         None
     } else if stick.x.abs() >= stick.y.abs() {
         Some(if stick.x > 0.0 {
-            NavDir::Right
+            UiNavDir::Right
         } else {
-            NavDir::Left
+            UiNavDir::Left
         })
     } else {
         Some(if stick.y > 0.0 {
-            NavDir::Up
+            UiNavDir::Up
         } else {
-            NavDir::Down
+            UiNavDir::Down
         })
     };
     if dir != *last_stick_dir {
@@ -314,6 +357,22 @@ fn pressed_nav_dir(
         return dir;
     }
     None
+}
+
+fn pressed_nav_dir(
+    keys: &Input<KeyCode>,
+    gamepad: Option<&ActionState<UiGamepadAction>>,
+    last_stick_dir: &mut Option<NavDir>,
+) -> Option<NavDir> {
+    let mut ui_stick = last_stick_dir.map(|d| match d {
+        NavDir::Up => UiNavDir::Up,
+        NavDir::Down => UiNavDir::Down,
+        NavDir::Left => UiNavDir::Left,
+        NavDir::Right => UiNavDir::Right,
+    });
+    let result = ui_nav_dir_just_pressed(keys, gamepad, &mut ui_stick);
+    *last_stick_dir = ui_stick.map(Into::into);
+    result.map(Into::into)
 }
 
 const NAV_LATERAL_PENALTY: f32 = 3.0;
@@ -328,8 +387,13 @@ fn focus_nav(
     mut ui_focus: ResMut<UiFocus>,
     focusables: Query<(Entity, &GlobalTransform, &Focusable)>,
     overlays: Query<(Entity, &GlobalTransform, &OverlayFocusable)>,
+    visibility: Query<&Visibility>,
+    focus_nav_blocked: Res<FocusNavBlocked>,
     mut last_stick_dir: Local<Option<NavDir>>,
 ) {
+    if focus_nav_blocked.0 {
+        return;
+    }
     let mode = resolve_focus_mode(
         &game_state.0,
         &ui_state.0,
@@ -344,28 +408,41 @@ fn focus_nav(
         return;
     };
 
-    let cur_e = match ui_focus.focused {
-        Some(e) => e,
-        None => {
-            // Screens that defer auto-focus on open (`Pause`, `Skills`, `BlessingChoice`) still
-            // need the first nav input to *establish* focus — only `ensure_default_focus` skips
-            // them. Without this, mouse-hover suppression leaves nothing highlighted until focus
-            // exists, so arrow keys appear dead on those screens.
-            ui_focus.focused = match &mode {
-                FocusMode::Screen(group) => focusables
-                    .iter()
-                    .filter(|(_, _, f)| &f.group == group)
-                    .min_by_key(|(_, _, f)| f.index)
-                    .map(|(e, _, _)| e),
-                FocusMode::Overlay => overlays
-                    .iter()
-                    .min_by_key(|(_, _, f)| f.index)
-                    .map(|(e, _, _)| e),
-                FocusMode::None => None,
-            };
-            return;
-        }
+    let Some(cur_e) = ui_focus.focused else {
+        ui_focus.focused = match &mode {
+            FocusMode::Screen(group) => focusables
+                .iter()
+                .filter(|(e, _, f)| &f.group == group && focus_entity_visible(*e, &visibility))
+                .min_by_key(|(_, _, f)| f.index)
+                .map(|(e, _, _)| e),
+            FocusMode::Overlay => overlays
+                .iter()
+                .filter(|(e, _, _)| focus_entity_visible(*e, &visibility))
+                .min_by_key(|(_, _, f)| f.index)
+                .map(|(e, _, _)| e),
+            FocusMode::None => None,
+        };
+        return;
     };
+
+    if !focus_entity_visible(cur_e, &visibility) {
+        ui_focus.focused = match &mode {
+            FocusMode::Screen(group) => focusables
+                .iter()
+                .filter(|(entity, _, focusable)| {
+                    &focusable.group == group && focus_entity_visible(*entity, &visibility)
+                })
+                .min_by_key(|(_, _, focusable)| focusable.index)
+                .map(|(entity, _, _)| entity),
+            FocusMode::Overlay => overlays
+                .iter()
+                .filter(|(entity, _, _)| focus_entity_visible(*entity, &visibility))
+                .min_by_key(|(_, _, overlay)| overlay.index)
+                .map(|(entity, _, _)| entity),
+            FocusMode::None => None,
+        };
+        return;
+    }
 
     let cur_pos = if let Ok((_, xf, _)) = focusables.get(cur_e) {
         xf.translation().truncate()
@@ -408,7 +485,7 @@ fn focus_nav(
     match &mode {
         FocusMode::Screen(group) => {
             for (e, xf, focusable) in focusables.iter() {
-                if &focusable.group != group {
+                if &focusable.group != group || !focus_entity_visible(e, &visibility) {
                     continue;
                 }
                 consider(e, xf.translation().truncate());
@@ -416,6 +493,9 @@ fn focus_nav(
         }
         FocusMode::Overlay => {
             for (e, xf, _) in overlays.iter() {
+                if !focus_entity_visible(e, &visibility) {
+                    continue;
+                }
                 consider(e, xf.translation().truncate());
             }
         }
@@ -427,27 +507,34 @@ fn focus_nav(
     }
 }
 
+/// When true, [`focus_nav`] skips this frame (e.g. options stepper rows consumed Left/Right).
+#[derive(Resource, Default)]
+pub struct FocusNavBlocked(pub bool);
+
+#[derive(SystemSet, Debug, Hash, PartialEq, Eq, Clone)]
+pub struct FocusNavSet;
+
+#[derive(SystemSet, Debug, Hash, PartialEq, Eq, Clone)]
+pub struct FocusConfirmSet;
+
 pub struct FocusPlugin;
 
 impl Plugin for FocusPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<UiFocus>()
+            .init_resource::<FocusNavBlocked>()
             .add_system(
                 update_cursor_ui_hover_suppression.in_base_set(CoreSet::PreUpdate),
             )
-            // `ensure_default_focus` runs unconditionally (not gated on `focus_should_run`) so
-            // it can still clear `UiFocus::focused` the moment a screen closes (e.g. gamepad
-            // pause via `UIState::Pause` -> `Closed`). Without this, closing a screen while
-            // something was focused left `UiFocus::focused` pointing at a now-stale entity
-            // forever (nothing ever ran to reset it), which downstream per-screen handlers
-            // (e.g. HUD icon tooltips) kept reading as "still focused" — a tooltip stuck open
-            // after unpausing with no way to dismiss it.
             .add_system(ensure_default_focus)
+            .add_system(reset_focus_nav_blocked.before(FocusNavSet))
             .add_systems(
                 (
-                    poll_ui_focus_confirm,
-                    focus_nav.after(ensure_default_focus),
+                    poll_ui_focus_confirm.in_set(FocusConfirmSet),
+                    focus_nav.in_set(FocusNavSet),
                 )
+                    .chain()
+                    .after(ensure_default_focus)
                     .distributive_run_if(focus_should_run),
             );
     }

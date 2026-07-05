@@ -56,9 +56,10 @@ use crate::item::{Equipment, WorldObject};
 use crate::proto::proto_param::ProtoParam;
 use crate::ui::{
     class_selection::{ClassUnlockConfirmState, SkillUnlockConfirmState},
+    focus::UiFocus,
     tutorial_ui::PendingInventoryTutorialCheck,
-    EssenceShopChoices, FlashExpBarEvent, MenuButton, MenuButtonClickEvent, UIState,
-    WaitingForKeyInput, WipeDataPopup,
+    ActiveOptionsTab, EssenceShopChoices, FlashExpBarEvent, MenuButton, MenuButtonClickEvent,
+    OptionsTabButton, UIState, WaitingForKeyInput, WipeDataPopup,
 };
 use crate::world::chunk::Chunk;
 
@@ -937,6 +938,9 @@ pub fn close_container(
     skill_confirm: Res<SkillUnlockConfirmState>,
     mut menu_button_events: EventWriter<MenuButtonClickEvent>,
     mut commands: Commands,
+    mut ui_focus: ResMut<UiFocus>,
+    active_options_tab: Res<ActiveOptionsTab>,
+    tab_buttons: Query<(Entity, &OptionsTabButton)>,
 ) {
     let gamepad_cancel_pressed = ui_gamepad_q
         .get_single()
@@ -949,6 +953,25 @@ pub fn close_container(
     // Options key-rebind capture handles Escape itself.
     if !waiting_for_key.is_empty() {
         return;
+    }
+
+    // Options: first cancel from content/bottom controls returns focus to the tab bar;
+    // a second cancel while a tab is focused closes the menu (Back below).
+    if curr_state.0 == UIState::Options && wipe_popup.is_empty() {
+        let on_tab_bar = ui_focus
+            .focused
+            .map(|entity| tab_buttons.get(entity).is_ok())
+            .unwrap_or(false);
+        if !on_tab_bar {
+            if let Some((tab_entity, _)) = tab_buttons
+                .iter()
+                .find(|(_, tab)| tab.0 == active_options_tab.0)
+            {
+                ui_focus.focused = Some(tab_entity);
+                commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.2));
+                return;
+            }
+        }
     }
 
     let button = if game_state.0 == GameState::Main && curr_state.0 == UIState::Closed {

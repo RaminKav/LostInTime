@@ -1,6 +1,6 @@
 ---
 name: bevy-system-param-conflicts
-description: Detect and prevent Bevy 0.10 runtime system-param conflict panics (B0001/B0002) in this survival-rogue-like project. Use when adding or editing a Bevy system, adding a param to a SystemParam struct (e.g. GameParam, ProtoParam, ItemActionParam), adding multiple Queries that touch the same component, using ParamSet, or when a panic mentions "conflicts with a previous", "B0001", "B0002", "conflicting access", or "EraManager/Graphics/Player/Visibility ... conflicts".
+description: Detect and prevent Bevy 0.10 runtime system-param conflict panics (B0001/B0002) in this survival-rogue-like project. Use when adding or editing a Bevy system, adding a param to a SystemParam struct (e.g. GameParam, ProtoParam, ItemActionParam), adding multiple Queries that touch the same component, using ParamSet, FocusInput/UiFocus focus handlers, options/tab button handlers, or when a panic mentions "conflicts with a previous", "B0001", "B0002", "conflicting access", or "EraManager/Graphics/Player/Visibility/Sprite ... conflicts".
 ---
 
 # Bevy System-Param Conflicts (B0001 / B0002)
@@ -138,3 +138,51 @@ fn my_system(game: GameParam) { let era = &game.era; }
 fn s(game: GameParam, mut q: Query<&mut Transform, With<Player>>) { /* may conflict */ }
 ```
 **Fixed:** read through `game`, or make disjoint, or split the system.
+
+### Project-specific traps (focus UI)
+
+**B0002 — `FocusInput` + `ResMut<UiFocus>`:** `FocusInput` wraps `Res<UiFocus>`.
+Never combine it with `ResMut<UiFocus>` in the same system.
+
+```rust
+// B0002
+fn bad(focus_input: FocusInput, mut ui_focus: ResMut<UiFocus>) { ... }
+
+// Fixed — read-only confirm/hover checks
+fn read_only(focus_input: FocusInput) { ... }
+
+// Fixed — need to mutate focused (e.g. clear on tab switch)
+fn mutating(mut ui_focus: ResMut<UiFocus>) {
+    let confirm = ui_focus.confirm_just_pressed;
+    ui_focus.focused = None;
+}
+```
+
+Reference: `src/ui/tutorial_ui.rs` → `handle_tutorial_buttons` uses `Res<UiFocus>` only;
+`src/ui/options_ui.rs` → `handle_options_tab_buttons` uses `ResMut<UiFocus>` when clearing focus.
+
+**B0001 — hit-test query + mutable sprite on the same buttons:** A broad
+`Query<..., &Sprite, With<Interactable>>` for `pointcast_2d` conflicts with
+`Query<..., &mut Sprite, With<SomeButton>>` on overlapping entities.
+
+```rust
+// B0001 — ui_sprites overlaps tab_buttons on Sprite
+fn bad(
+    mut tab_buttons: Query<(..., &mut Sprite), With<OptionsTabButton>>,
+    ui_sprites: Query<(..., &Sprite), With<Interactable>>,
+) { ... }
+
+// Fixed — ParamSet, scoped hit test on the same marker (see tutorial_ui)
+fn good(
+    mut button_queries: ParamSet<(
+        Query<(Entity, &Sprite, &GlobalTransform), With<OptionsTabButton>>,
+        Query<(Entity, &mut Interactable, &OptionsTabButton, &mut Sprite), With<OptionsTabButton>>,
+    )>,
+) {
+    let hit = { let q = button_queries.p0(); pointcast_2d(..., &q, None) };
+    for (...) in button_queries.p1().iter_mut() { ... }
+}
+```
+
+Reference: `src/ui/tutorial_ui.rs` → `handle_tutorial_buttons`;
+`src/ui/options_ui.rs` → `handle_options_tab_buttons`.
