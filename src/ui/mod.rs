@@ -1073,7 +1073,9 @@ impl Plugin for UIPlugin {
                     update_keybind_text
                         .run_if(in_state(UIState::Options))
                         .after(handle_key_rebind_input),
-                    update_options_controls_section_titles.run_if(in_state(UIState::Options)),
+                    update_options_controls_section_titles
+                        .run_if(in_state(UIState::Options))
+                        .after(update_keybind_text),
                     handle_cheat_checkbox_click.run_if(in_state(UIState::Options)),
                     update_cheat_checkbox_visual
                         .run_if(in_state(UIState::Options))
@@ -1239,6 +1241,7 @@ impl Plugin for UIPlugin {
             )
             .add_system(
                 update_active_skill_keybind_text
+                    .after(handle_update_player_skills)
                     .in_set(OnUpdate(GameState::Main)),
             )
             .add_system(

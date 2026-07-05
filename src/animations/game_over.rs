@@ -837,7 +837,7 @@ pub fn handle_game_over_final_stats_tooltip(
     graphics: Res<Graphics>,
     asset_server: Res<AssetServer>,
 ) {
-    let hit_entity = ui_helpers::pointcast_2d(&cursor_pos, &hit_sprites, None);
+    let hit_entity = ui_helpers::pointcast_2d(&cursor_pos, &hit_sprites, None, None);
     let mut panel_e = None;
     for (entity, mut interactable) in hitbox_query.iter_mut() {
         let is_hit = hit_entity

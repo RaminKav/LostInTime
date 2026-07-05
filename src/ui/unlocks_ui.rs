@@ -177,7 +177,7 @@ pub fn handle_unlocks_clicks(
     achievements: Res<Achievements>,
     focus_input: crate::ui::focus::FocusInput,
 ) {
-    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None);
     let left_mouse_released = mouse_input.just_released(MouseButton::Left);
 
     for (entity, mut interactable, button) in buttons.iter_mut() {

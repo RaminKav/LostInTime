@@ -149,7 +149,7 @@ pub fn handle_icon_hover_tooltips(
     }
 
     let hovered =
-        ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None).and_then(|(entity, _, _)| {
+        ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None).and_then(|(entity, _, _)| {
             tooltip_targets
                 .get(entity)
                 .ok()

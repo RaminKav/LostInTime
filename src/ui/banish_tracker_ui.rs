@@ -216,7 +216,7 @@ pub fn handle_banish_tracker_tooltip(
     mut tooltip_requests: EventWriter<HeirloomTooltipRequest>,
     mut last_hovered: Local<Option<Heirloom>>,
 ) {
-    let hit_entity = super::ui_helpers::pointcast_2d(&cursor_pos, &hit_detection_sprites, None);
+    let hit_entity = super::ui_helpers::pointcast_2d(&cursor_pos, &hit_detection_sprites, None, None);
 
     for (entity, _, mut interactable, _, _) in tracker_icons.iter_mut() {
         let is_hit = hit_entity

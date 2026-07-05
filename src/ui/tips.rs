@@ -253,7 +253,7 @@ pub fn handle_tip_ok_button_click(
     graphics: Res<Graphics>,
     mut seen_tips: ResMut<SeenTips>,
 ) {
-    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
 
     for (button_entity, mut interactable, parent) in ok_buttons.iter_mut() {

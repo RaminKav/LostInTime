@@ -1033,7 +1033,7 @@ pub fn handle_achievement_row_clicks(
     pagination: Res<AchievementsPagination>,
     focus_input: FocusInput,
 ) {
-    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None);
     let left_mouse_released = mouse_input.just_released(MouseButton::Left);
     let confirm_pressed = focus_input.confirm_just_pressed();
 

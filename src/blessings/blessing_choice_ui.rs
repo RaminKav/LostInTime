@@ -631,7 +631,7 @@ pub fn handle_blessing_choice_card_interactions(
     mut blessing_event: EventWriter<AncestorBlessingSelectEvent>,
     ui_focus: Res<crate::ui::focus::UiFocus>,
 ) {
-    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
 
     for (e, mut interactable, mut state, mut transform, mut bounce) in blessing_choices.iter_mut() {

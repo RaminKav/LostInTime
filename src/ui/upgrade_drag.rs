@@ -101,7 +101,7 @@ pub fn handle_drag_upgrade_material_on_equipment(
         return;
     }
 
-    let Some(hit) = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None) else {
+    let Some(hit) = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None) else {
         return;
     };
     let hit_entity = hit.0;

@@ -2246,7 +2246,7 @@ pub fn handle_dev_button_clicks(
     mut run_unlock_state: ResMut<RunUnlockState>,
     mut grant_heirloom_dev: EventWriter<GrantHeirloomDevEvent>,
 ) {
-    let hit_test = super::ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    let hit_test = super::ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
 
     for (e, action, mut interactable) in dev_buttons.iter_mut() {
@@ -2457,7 +2457,7 @@ pub fn handle_dev_heirloom_picker_toggle(
     skill_grid_layers: Query<Entity, With<DevSkillPickerGridLayer>>,
     inv_ui: Query<Entity, With<InventoryUI>>,
 ) {
-    let hit_test = super::ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    let hit_test = super::ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
 
     for (e, mut interactable) in toggle_buttons.iter_mut() {
@@ -2528,7 +2528,7 @@ pub fn handle_dev_heirloom_picker_clicks(
         return;
     }
 
-    let hit_test = super::ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    let hit_test = super::ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
     let right_mouse_pressed = mouse_input.just_pressed(MouseButton::Right);
     let skills = player_skills.get_single().ok();
@@ -2598,7 +2598,7 @@ pub fn handle_dev_skill_picker_toggle(
     heirloom_grid_layers: Query<Entity, With<DevHeirloomPickerGridLayer>>,
     inv_ui: Query<Entity, With<InventoryUI>>,
 ) {
-    let hit_test = super::ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    let hit_test = super::ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
 
     for (e, mut interactable) in toggle_buttons.iter_mut() {
@@ -2661,7 +2661,7 @@ pub fn handle_dev_skill_picker_clicks(
         return;
     }
 
-    let hit_test = super::ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    let hit_test = super::ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
     let right_mouse_pressed = mouse_input.just_pressed(MouseButton::Right);
 
@@ -2749,7 +2749,7 @@ pub fn handle_cursor_inventory_craft_toggle_button(
     seen_tutorial_chunks: Option<Res<crate::ui::tutorial_ui::SeenTutorialChunks>>,
     tutorial_ui: Query<(), With<crate::ui::tutorial_ui::TutorialUI>>,
 ) {
-    let hit_test = super::ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    let hit_test = super::ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
 
     for (e, mut interactable, _) in toggle_buttons.iter_mut() {
@@ -2820,7 +2820,7 @@ pub fn handle_crafting_ingredient_tooltip_hover(
     if cur_ui_state.0 != UIState::InventoryCrafting {
         return;
     }
-    let hit_test = super::ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    let hit_test = super::ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None);
     let shift_key_pressed = key_input.pressed(KeyCode::LShift);
     let shift_key_just_pressed = key_input.just_pressed(KeyCode::LShift);
     let shift_key_just_released = key_input.just_released(KeyCode::LShift);
@@ -2924,7 +2924,7 @@ pub fn handle_blueprint_slot_interaction(
     if cur_ui_state.0 != UIState::InventoryCrafting {
         return;
     }
-    let hit_test = super::ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    let hit_test = super::ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
 
     for (e, mut interactable, bp) in blueprint_slots.iter_mut() {
@@ -3148,7 +3148,7 @@ pub fn handle_crafting_result_slot_click(
     if cur_ui_state.0 != UIState::InventoryCrafting {
         return;
     }
-    let hit_test = super::ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    let hit_test = super::ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
     let shift_key_pressed = key_input.pressed(KeyCode::LShift);
 
@@ -3563,7 +3563,7 @@ pub fn handle_blueprint_pagination_clicks(
     mut commands: Commands,
     graphics: Res<Graphics>,
 ) {
-    let hit = super::ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    let hit = super::ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None);
     let left_pressed = mouse_input.just_pressed(MouseButton::Left);
 
     let total_unlocked = recipes

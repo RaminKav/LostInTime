@@ -328,7 +328,7 @@ pub fn handle_name_entry_ok_button(
     mut commands: Commands,
     mut game_data: ResMut<GameData>,
 ) {
-    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None);
     let left_mouse_released = mouse_input.just_released(MouseButton::Left);
 
     for (entity, mut interactable) in buttons.iter_mut() {

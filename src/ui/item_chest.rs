@@ -1136,7 +1136,7 @@ pub fn handle_item_chest_final_item_hover(
 ) {
     use super::CHEST_INVENTORY_UI_SIZE;
 
-    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None);
     for (e, mut interactable, item_stack) in final_items.iter_mut() {
         match hit_test {
             Some(hit_ent) if hit_ent.0 == e => {
@@ -1208,7 +1208,7 @@ pub fn handle_heirloom_chest_final_item_hover(
 ) {
     use super::interactions::Interaction;
 
-    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None);
 
     for (e, transform, mut interactable, heirloom_data) in final_heirlooms.iter_mut() {
         match hit_test {

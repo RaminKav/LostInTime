@@ -395,7 +395,7 @@ pub fn handle_time_crystal_progress_ok_button(
     mut next_ui_state: ResMut<NextState<UIState>>,
     mut commands: Commands,
 ) {
-    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None);
     let left_mouse_released = mouse_input.just_released(MouseButton::Left);
 
     for (entity, mut interactable) in buttons.iter_mut() {

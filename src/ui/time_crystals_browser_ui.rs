@@ -459,7 +459,7 @@ pub fn handle_time_crystals_view_heirlooms_button(
     grid_layers: Query<Entity, With<HeirloomBrowserGridLayer>>,
     focus_input: FocusInput,
 ) {
-    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None);
     let left_mouse_released = mouse_input.just_released(MouseButton::Left);
 
     for (entity, mut interactable) in buttons.iter_mut() {
@@ -508,7 +508,7 @@ pub fn handle_time_crystals_browser_done_button(
     mut commands: Commands,
     focus_input: FocusInput,
 ) {
-    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None);
     let left_mouse_released = mouse_input.just_released(MouseButton::Left);
 
     for (entity, mut interactable) in buttons.iter_mut() {

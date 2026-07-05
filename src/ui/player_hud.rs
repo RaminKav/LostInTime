@@ -232,6 +232,14 @@ pub struct ActiveSkillKeybindText {
     pub slot: usize,
 }
 
+/// Keyboard + gamepad resources for HUD binding label text.
+#[derive(SystemParam)]
+pub struct HudBindingDisplay<'w> {
+    pub keybinds: Res<'w, crate::keybinds::InputMappings>,
+    pub gamepad_mappings: Res<'w, GamepadMappings>,
+    pub gamepads: Res<'w, Gamepads>,
+}
+
 #[derive(Component)]
 pub struct ActiveSkillKeyBackground {
     pub slot: usize,
@@ -1409,7 +1417,7 @@ pub fn handle_heirloom_hud_tooltip(
     use super::interactions::Interaction;
 
     // First, do hit detection and update interactable states
-    let hit_entity = super::ui_helpers::pointcast_2d(&cursor_pos, &hit_detection_sprites, None);
+    let hit_entity = super::ui_helpers::pointcast_2d(&cursor_pos, &hit_detection_sprites, None, None);
 
     // Update all heirloom hud icons' interactable state based on cursor position, or — while
     // the gamepad pause overlay (`UIState::Pause`) is active — whichever icon has d-pad/stick
@@ -1831,7 +1839,7 @@ pub fn handle_active_skill_hud_tooltip(
     ui_focus: Res<UiFocus>,
 ) {
     // First, do hit detection and update interactable states
-    let hit_entity = super::ui_helpers::pointcast_2d(&cursor_pos, &hit_detection_sprites, None);
+    let hit_entity = super::ui_helpers::pointcast_2d(&cursor_pos, &hit_detection_sprites, None, None);
 
     // Update all skill icons' interactable state based on cursor position, or — while the
     // gamepad pause overlay is active — whichever icon has d-pad/stick focus (see
@@ -2518,7 +2526,7 @@ pub fn handle_mana_tracker_hud_tooltip(
 ) {
     use Interaction;
 
-    let hit_entity = super::ui_helpers::pointcast_2d(&cursor_pos, &hit_detection_sprites, None);
+    let hit_entity = super::ui_helpers::pointcast_2d(&cursor_pos, &hit_detection_sprites, None, None);
 
     for (entity, _, mut interactable) in hover_targets.iter_mut() {
         let is_hit = hit_entity
@@ -2593,7 +2601,7 @@ pub fn handle_health_tracker_hud_tooltip(
 ) {
     use Interaction;
 
-    let hit_entity = super::ui_helpers::pointcast_2d(&cursor_pos, &hit_detection_sprites, None);
+    let hit_entity = super::ui_helpers::pointcast_2d(&cursor_pos, &hit_detection_sprites, None, None);
 
     for (entity, _, mut interactable) in hover_targets.iter_mut() {
         let is_hit = hit_entity
@@ -2763,7 +2771,7 @@ pub fn handle_update_player_skills(
     _counter_texts: Query<&mut Text, With<HeirloomCounterText>>, // Query counter texts to update
     existing_cooldown_overlays: Query<(Entity, &SkillCooldownOverlay)>, // Query existing cooldown overlays to preserve state
     existing_skill_keybinds: Query<Entity, With<ActiveSkillKeyBackground>>,
-    keybinds: Res<crate::keybinds::InputMappings>,
+    bindings: HudBindingDisplay,
     mut prev_active_skills: Local<Vec<Option<ActiveSkill>>>, // Track previous active skills per slot to detect swaps
     slot_unlock_state: SkillSlotUnlockState,
 ) {
@@ -3016,8 +3024,12 @@ pub fn handle_update_player_skills(
                 })
                 .id();
             let skill_x = HUD_SKILLS_CENTER_X + (i as f32 - skill_half_span) * HUD_SKILL_SPACING_X;
-            let keybind =
-                crate::keybinds::get_key_display_name(keybinds.get_active_skill_key(*slot_index));
+            let keybind = format_binding_label(
+                BindingLabel::ActiveSkill(*slot_index),
+                &bindings.keybinds,
+                &bindings.gamepad_mappings,
+                &bindings.gamepads,
+            );
             let (key_bg, key_text) = spawn_keybind_badge(
                 &mut commands,
                 &asset_server,
@@ -4017,27 +4029,29 @@ pub fn update_pet_skill_tooltip_cooldown(
 }
 
 pub fn update_active_skill_keybind_text(
-    keybinds: Res<crate::keybinds::InputMappings>,
-    gamepad_mappings: Res<GamepadMappings>,
-    gamepads: Res<Gamepads>,
+    bindings: HudBindingDisplay,
+    respawned_skill_labels: Query<(), Changed<PlayerSkills>>,
     mut texts: Query<(&ActiveSkillKeybindText, &mut Text)>,
     mut last_gamepad_connected: Local<Option<bool>>,
 ) {
-    if !binding_labels_dirty(
-        keybinds.is_changed(),
-        gamepad_mappings.is_changed(),
-        &gamepads,
-        &mut last_gamepad_connected,
-    ) {
+    let labels_respawned = !respawned_skill_labels.is_empty();
+    if !labels_respawned
+        && !binding_labels_dirty(
+            bindings.keybinds.is_changed(),
+            bindings.gamepad_mappings.is_changed(),
+            &bindings.gamepads,
+            &mut last_gamepad_connected,
+        )
+    {
         return;
     }
 
     for (keybind_text, mut text) in texts.iter_mut() {
         text.sections[0].value = format_binding_label(
             BindingLabel::ActiveSkill(keybind_text.slot),
-            &keybinds,
-            &gamepad_mappings,
-            &gamepads,
+            &bindings.keybinds,
+            &bindings.gamepad_mappings,
+            &bindings.gamepads,
         );
     }
 }
@@ -4323,7 +4337,7 @@ pub fn handle_consumable_buff_hud_tooltip(
 ) {
     use super::interactions::Interaction;
 
-    let hit_entity = super::ui_helpers::pointcast_2d(&cursor_pos, &hit_detection_sprites, None);
+    let hit_entity = super::ui_helpers::pointcast_2d(&cursor_pos, &hit_detection_sprites, None, None);
 
     for (entity, _, mut interactable, _) in hud_icons.iter_mut() {
         let is_hit = hit_entity
@@ -4551,7 +4565,7 @@ pub fn handle_pet_skill_hud_tooltip(
     mut last_hovered: Local<Option<Pet>>,
     res: Res<ScreenResolution>,
 ) {
-    let hit_entity = super::ui_helpers::pointcast_2d(&cursor_pos, &hit_detection_sprites, None);
+    let hit_entity = super::ui_helpers::pointcast_2d(&cursor_pos, &hit_detection_sprites, None, None);
     for (entity, _, mut interactable, _) in pet_icons.iter_mut() {
         let is_hit = hit_entity
             .as_ref()

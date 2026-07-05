@@ -50,10 +50,22 @@ pub struct OverlayFocusable {
 #[derive(Component, Debug, Clone, Copy)]
 pub struct FocusNavHorizontalSkip;
 
+/// Confirmation popup control (wipe data, class/skill unlock, etc.). While any visible
+/// [`ModalFocusable`] exists, keyboard/gamepad navigation is limited to those targets.
+#[derive(Component, Debug, Clone, Copy)]
+pub struct ModalFocusable {
+    pub index: u32,
+}
+
 /// Options menu footer controls (Back, Wipe, etc.). Only reachable horizontally when focus is
 /// already on another bottom-row control; otherwise the player must press Down to get there.
 #[derive(Component, Debug, Clone, Copy)]
 pub struct FocusNavBottomRow;
+
+/// Left-hand tab strip in the options menu. Horizontal nav from here may enter stepper rows
+/// that are otherwise skipped when moving between columns inside the content area.
+#[derive(Component, Debug, Clone, Copy)]
+pub struct FocusNavTabColumn;
 
 /// The single currently-focused entity (if any) plus whether Confirm was pressed this frame.
 /// Updated by [`ensure_default_focus`], [`focus_nav`], and [`poll_ui_focus_confirm`].
@@ -90,6 +102,7 @@ impl FocusInput<'_> {
 enum FocusMode {
     Screen(UIState),
     Overlay,
+    Modal,
     None,
 }
 
@@ -115,6 +128,30 @@ fn resolve_focus_mode(
     }
 }
 
+fn modal_focus_active(
+    modals: &Query<(Entity, &ModalFocusable)>,
+    visibility: &Query<&Visibility>,
+) -> bool {
+    modals
+        .iter()
+        .any(|(entity, _)| focus_entity_visible(entity, visibility))
+}
+
+fn resolve_focus_mode_for_frame(
+    game_state: &GameState,
+    ui_state: &UIState,
+    has_tip_boxes: bool,
+    has_tutorial_ui: bool,
+    modals: &Query<(Entity, &ModalFocusable)>,
+    visibility: &Query<&Visibility>,
+) -> FocusMode {
+    if modal_focus_active(modals, visibility) {
+        FocusMode::Modal
+    } else {
+        resolve_focus_mode(game_state, ui_state, has_tip_boxes, has_tutorial_ui)
+    }
+}
+
 /// Focus navigation (and therefore the d-pad/left-stick) is only "live" outside of plain
 /// gameplay — while actually playing with no panel open, the d-pad/South button mean
 /// hotbar/skills instead (see `GamepadAction` in `gamepad_input.rs`).
@@ -123,12 +160,16 @@ fn focus_should_run(
     ui_state: Res<State<UIState>>,
     tip_boxes: Query<Entity, With<TipBox>>,
     tutorial_ui: Query<(), With<TutorialUI>>,
+    modals: Query<(Entity, &ModalFocusable)>,
+    visibility: Query<&Visibility>,
 ) -> bool {
-    resolve_focus_mode(
+    resolve_focus_mode_for_frame(
         &game_state.0,
         &ui_state.0,
         !tip_boxes.is_empty(),
         !tutorial_ui.is_empty(),
+        &modals,
+        &visibility,
     ) != FocusMode::None
 }
 
@@ -169,6 +210,7 @@ fn entity_in_active_focus(
     mode: &FocusMode,
     focusables: &Query<(Entity, &Focusable)>,
     overlays: &Query<(Entity, &OverlayFocusable)>,
+    modals: &Query<(Entity, &ModalFocusable)>,
     visibility: &Query<&Visibility>,
 ) -> bool {
     if !focus_entity_visible(entity, visibility) {
@@ -180,6 +222,7 @@ fn entity_in_active_focus(
             .map(|(_, f)| f.group == *group)
             .unwrap_or(false),
         FocusMode::Overlay => overlays.get(entity).is_ok(),
+        FocusMode::Modal => modals.get(entity).is_ok(),
         FocusMode::None => false,
     }
 }
@@ -188,6 +231,7 @@ fn default_focus_entity(
     mode: &FocusMode,
     focusables: &Query<(Entity, &Focusable)>,
     overlays: &Query<(Entity, &OverlayFocusable)>,
+    modals: &Query<(Entity, &ModalFocusable)>,
     visibility: &Query<&Visibility>,
 ) -> Option<Entity> {
     match mode {
@@ -202,6 +246,11 @@ fn default_focus_entity(
                 .map(|(e, _)| e)
         }
         FocusMode::Overlay => overlays
+            .iter()
+            .filter(|(e, _)| focus_entity_visible(*e, visibility))
+            .min_by_key(|(_, f)| f.index)
+            .map(|(e, _)| e),
+        FocusMode::Modal => modals
             .iter()
             .filter(|(e, _)| focus_entity_visible(*e, visibility))
             .min_by_key(|(_, f)| f.index)
@@ -222,6 +271,8 @@ fn update_cursor_ui_hover_suppression(
     tutorial_ui: Query<(), With<TutorialUI>>,
     mouseless_mode: Res<MouselessModeState>,
     gamepads: Res<Gamepads>,
+    modals: Query<(Entity, &ModalFocusable)>,
+    visibility: Query<&Visibility>,
     mut mouse_motion: EventReader<MouseMotion>,
     mut last_context: Local<Option<FocusContextKey>>,
 ) {
@@ -229,11 +280,13 @@ fn update_cursor_ui_hover_suppression(
         cursor_pos.suppress_ui_hover = false;
     }
 
-    let mode = resolve_focus_mode(
+    let mode = resolve_focus_mode_for_frame(
         &game_state.0,
         &ui_state.0,
         !tip_boxes.is_empty(),
         !tutorial_ui.is_empty(),
+        &modals,
+        &visibility,
     );
     let context = FocusContextKey(mode.clone());
     let context_changed = last_context.as_ref() != Some(&context);
@@ -255,24 +308,28 @@ fn ensure_default_focus(
     mut ui_focus: ResMut<UiFocus>,
     focusables: Query<(Entity, &Focusable)>,
     overlays: Query<(Entity, &OverlayFocusable)>,
+    modals: Query<(Entity, &ModalFocusable)>,
     visibility: Query<&Visibility>,
 ) {
-    let mode = resolve_focus_mode(
+    let mode = resolve_focus_mode_for_frame(
         &game_state.0,
         &ui_state.0,
         !tip_boxes.is_empty(),
         !tutorial_ui.is_empty(),
+        &modals,
+        &visibility,
     );
     let still_valid = ui_focus
         .focused
         .and_then(|e| {
-            entity_in_active_focus(e, &mode, &focusables, &overlays, &visibility).then_some(e)
+            entity_in_active_focus(e, &mode, &focusables, &overlays, &modals, &visibility)
+                .then_some(e)
         })
         .is_some();
     if still_valid {
         return;
     }
-    ui_focus.focused = default_focus_entity(&mode, &focusables, &overlays, &visibility);
+    ui_focus.focused = default_focus_entity(&mode, &focusables, &overlays, &modals, &visibility);
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -397,21 +454,30 @@ fn focus_nav(
     mut ui_focus: ResMut<UiFocus>,
     focusables: Query<(Entity, &GlobalTransform, &Focusable)>,
     overlays: Query<(Entity, &GlobalTransform, &OverlayFocusable)>,
+    modals: Query<(Entity, &GlobalTransform, &ModalFocusable)>,
     visibility: Query<&Visibility>,
     focus_nav_blocked: Res<FocusNavBlocked>,
     focus_nav_horizontal_skip: Query<(), With<FocusNavHorizontalSkip>>,
     focus_nav_bottom_row: Query<(), With<FocusNavBottomRow>>,
+    focus_nav_tab_column: Query<(), With<FocusNavTabColumn>>,
     mut last_stick_dir: Local<Option<NavDir>>,
 ) {
     if focus_nav_blocked.0 {
         return;
     }
-    let mode = resolve_focus_mode(
-        &game_state.0,
-        &ui_state.0,
-        !tip_boxes.is_empty(),
-        !tutorial_ui.is_empty(),
-    );
+    let modal_active = modals
+        .iter()
+        .any(|(entity, _, _)| focus_entity_visible(entity, &visibility));
+    let mode = if modal_active {
+        FocusMode::Modal
+    } else {
+        resolve_focus_mode(
+            &game_state.0,
+            &ui_state.0,
+            !tip_boxes.is_empty(),
+            !tutorial_ui.is_empty(),
+        )
+    };
     let Some(dir) = pressed_nav_dir(
         &key_input,
         ui_gamepad_q.get_single().ok(),
@@ -428,6 +494,11 @@ fn focus_nav(
                 .min_by_key(|(_, _, f)| f.index)
                 .map(|(e, _, _)| e),
             FocusMode::Overlay => overlays
+                .iter()
+                .filter(|(e, _, _)| focus_entity_visible(*e, &visibility))
+                .min_by_key(|(_, _, f)| f.index)
+                .map(|(e, _, _)| e),
+            FocusMode::Modal => modals
                 .iter()
                 .filter(|(e, _, _)| focus_entity_visible(*e, &visibility))
                 .min_by_key(|(_, _, f)| f.index)
@@ -451,6 +522,11 @@ fn focus_nav(
                 .filter(|(entity, _, _)| focus_entity_visible(*entity, &visibility))
                 .min_by_key(|(_, _, overlay)| overlay.index)
                 .map(|(entity, _, _)| entity),
+            FocusMode::Modal => modals
+                .iter()
+                .filter(|(entity, _, _)| focus_entity_visible(*entity, &visibility))
+                .min_by_key(|(_, _, modal)| modal.index)
+                .map(|(entity, _, _)| entity),
             FocusMode::None => None,
         };
         return;
@@ -459,6 +535,8 @@ fn focus_nav(
     let cur_pos = if let Ok((_, xf, _)) = focusables.get(cur_e) {
         xf.translation().truncate()
     } else if let Ok((_, xf, _)) = overlays.get(cur_e) {
+        xf.translation().truncate()
+    } else if let Ok((_, xf, _)) = modals.get(cur_e) {
         xf.translation().truncate()
     } else {
         return;
@@ -477,12 +555,13 @@ fn focus_nav(
 
     let horizontal_nav = matches!(dir, NavDir::Left | NavDir::Right);
     let cur_in_bottom_row = focus_nav_bottom_row.get(cur_e).is_ok();
+    let cur_in_tab_column = focus_nav_tab_column.get(cur_e).is_ok();
     let mut consider = |e: Entity, pos: Vec2| {
         if e == cur_e {
             return;
         }
         if horizontal_nav {
-            if focus_nav_horizontal_skip.get(e).is_ok() {
+            if focus_nav_horizontal_skip.get(e).is_ok() && !cur_in_tab_column {
                 return;
             }
             if cur_in_bottom_row != focus_nav_bottom_row.get(e).is_ok() {
@@ -515,6 +594,14 @@ fn focus_nav(
         }
         FocusMode::Overlay => {
             for (e, xf, _) in overlays.iter() {
+                if !focus_entity_visible(e, &visibility) {
+                    continue;
+                }
+                consider(e, xf.translation().truncate());
+            }
+        }
+        FocusMode::Modal => {
+            for (e, xf, _) in modals.iter() {
                 if !focus_entity_visible(e, &visibility) {
                     continue;
                 }

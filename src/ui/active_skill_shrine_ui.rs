@@ -730,7 +730,7 @@ pub fn handle_active_skill_shrine_ui_interaction(
     focus_input: crate::ui::focus::FocusInput,
     mut tutorial_trigger: ActiveSkillShrineTutorialTrigger,
 ) {
-    let hit_test = super::ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    let hit_test = super::ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
 
     for (e, mut interactable, skill_ui) in skill_choices.iter_mut() {
@@ -867,7 +867,7 @@ pub fn handle_active_skill_shrine_reroll_button(
 ) {
     let hit_entity = {
         let ui_sprites = sprites.p0();
-        super::ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None).map(|(e, _, _)| e)
+        super::ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None).map(|(e, _, _)| e)
     };
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
     let mut any_hovered = false;
@@ -1251,7 +1251,7 @@ pub fn handle_active_skill_shrine_overwrite_interaction(
         return; // This is an heirloom limbo overwrite, handled elsewhere
     };
 
-    let hit_test = super::ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    let hit_test = super::ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
 
     for (e, mut interactable, skill_ui) in skill_choices.iter_mut() {

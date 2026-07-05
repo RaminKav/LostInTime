@@ -860,7 +860,7 @@ pub fn handle_item_drop_clicks(
     }
     let inv_open = ui_state.0.is_inv_open();
     let hit_test = if inv_open {
-        ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None)
+        ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None)
     } else {
         None
     };
@@ -977,7 +977,7 @@ pub fn handle_inventory_consumable_right_click(
         return;
     }
 
-    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None);
     let Some((hit_entity, _, _)) = hit_test else {
         return;
     };
@@ -1077,7 +1077,7 @@ pub fn handle_interaction_clicks(
         return;
     }
 
-    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
     let _left_mouse_pressing = mouse_input.pressed(MouseButton::Left);
     let right_mouse_pressed = mouse_input.just_pressed(MouseButton::Right);
@@ -1444,7 +1444,7 @@ pub fn handle_cursor_skills_buttons(
     mut pick_params: SkillChoicePickParams,
     mut tips_param: ParamSet<(EventWriter<TipEvent>, Res<SeenTips>, ResMut<ChaosTracker>)>,
 ) {
-    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
     let ui_state = &curr_ui_state.0;
 
@@ -1609,7 +1609,7 @@ pub fn handle_cursor_reroll_dice_buttons(
     mut run_unlocks: ResMut<RunUnlockState>,
     focus_input: crate::ui::focus::FocusInput,
 ) {
-    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
 
     for (e, mut interactable, state) in reroll_dice.iter_mut() {
@@ -1690,7 +1690,7 @@ pub fn handle_cursor_banish_buttons(
     asset_server: Res<AssetServer>,
     focus_input: crate::ui::focus::FocusInput,
 ) {
-    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
     let mut banished_slot: Option<usize> = None;
     for (e, mut interactable, banish) in banish_buttons.iter_mut() {
@@ -1792,7 +1792,7 @@ pub fn handle_cursor_inventory_upgrade_button(
     graphics: Res<Graphics>,
     asset_server: Res<AssetServer>,
 ) {
-    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
 
     for (e, mut interactable, _, button_transform) in upgrade_button.iter_mut() {
@@ -1909,7 +1909,7 @@ pub fn handle_cursor_item_chest_button(
         return;
     }
 
-    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
 
     for (e, mut interactable, button) in item_chest_button.iter_mut() {
@@ -2170,7 +2170,7 @@ pub fn handle_cursor_heirloom_chest_button(
         return;
     }
 
-    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
 
     for (e, mut interactable, button) in item_chest_button.iter_mut() {
@@ -2416,7 +2416,7 @@ pub fn handle_cursor_main_menu_buttons(
         || curr_ui_state.0 == UIState::TimeCrystalsBrowser
         || curr_ui_state.0 == UIState::BeastiaryBrowser
         || curr_ui_state.0 == UIState::Archives;
-    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None);
     let left_mouse_pressed = mouse_input.just_released(MouseButton::Left);
 
     let mut set_achievement_button_label_color = |button_entity: Entity, color: Color| {
@@ -2579,7 +2579,7 @@ pub fn handle_sort_inventory_button_click(
     if !ui_state.0.is_inv_open() {
         return;
     }
-    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
 
     for (e, mut interactable) in sort_button.iter_mut() {
@@ -2634,7 +2634,7 @@ pub fn handle_material_drops_toggle_button_click(
     if !ui_state.0.is_inv_open() {
         return;
     }
-    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
 
     for (e, mut interactable) in toggle_button.iter_mut() {
@@ -2695,7 +2695,7 @@ pub fn handle_damage_tracker_toggle_button_click(
     if !matches!(ui_state.0, UIState::Inventory | UIState::InventoryCrafting) {
         return;
     }
-    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
 
     for (e, mut interactable) in toggle_button.iter_mut() {
@@ -2845,7 +2845,7 @@ pub fn handle_material_drop_filter_menu_click(
     if !ui_state.0.is_inv_open() || !menu_open.0 {
         return;
     }
-    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
     let hit_entity = hit_test.map(|(e, _, _)| e);
 
@@ -2926,7 +2926,7 @@ pub fn handle_merchant_shop_interactions(
     mut commands: Commands,
     focus_input: crate::ui::focus::FocusInput,
 ) {
-    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
     let right_mouse_pressed = mouse_input.just_pressed(MouseButton::Right);
 
@@ -2976,7 +2976,7 @@ pub fn handle_merchant_done_button(
     mut commands: Commands,
     focus_input: crate::ui::focus::FocusInput,
 ) {
-    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
 
     for (e, mut interactable) in done_buttons.iter_mut() {
@@ -3024,7 +3024,7 @@ pub fn handle_merchant_category_reroll_buttons(
 ) {
     let hit_entity = {
         let ui_sprites = sprites.p0();
-        ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None).map(|(e, _, _)| e)
+        ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None).map(|(e, _, _)| e)
     };
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
 

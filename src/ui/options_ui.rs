@@ -28,7 +28,8 @@ use crate::{
     ui::{
         focus::{
             focus_entity_visible, ui_nav_dir_just_pressed, FocusInput, FocusNavBlocked,
-            FocusNavBottomRow, FocusNavHorizontalSkip, Focusable, UiFocus, UiNavDir,
+            FocusNavBottomRow, FocusNavHorizontalSkip, FocusNavTabColumn, Focusable,
+            ModalFocusable, UiFocus, UiNavDir,
         },
         interactions::Interaction,
         main_menu::{spawn_exit_icon_button, spawn_main_menu_wide_button, MenuButton},
@@ -153,6 +154,10 @@ pub struct OptionsUI;
 #[derive(Resource, Default, Debug, Clone, Copy)]
 pub struct OptionsUiLayoutRevision(pub u32);
 
+/// Set when the options menu is (re)built so control labels refresh for the active input device.
+#[derive(Resource, Debug, Clone, Copy)]
+pub struct OptionsControlsNeedsLabelSync;
+
 /// Shifts tab body content up; title and bottom button row stay put.
 const OPTIONS_BODY_Y_OFFSET: f32 = 20.;
 
@@ -260,6 +265,14 @@ fn tab_visibility(tab: OptionsTab, active: OptionsTab) -> Visibility {
     } else {
         Visibility::Hidden
     }
+}
+
+fn options_pointcast<'a>(
+    cursor_pos: &Res<CursorPos>,
+    ui_sprites: &'a Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
+    computed_visibility: &Query<&ComputedVisibility>,
+) -> Option<(Entity, &'a Sprite, &'a GlobalTransform)> {
+    ui_helpers::pointcast_2d(cursor_pos, ui_sprites, None, Some(computed_visibility))
 }
 
 fn options_focus(index: u32) -> Focusable {
@@ -418,12 +431,13 @@ pub fn handle_options_clicks(
     mouse_input: Res<Input<MouseButton>>,
     focus_input: FocusInput,
     gamepads: Res<Gamepads>,
+    computed_visibility: Query<&ComputedVisibility>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     mut buttons: Query<(Entity, &mut Interactable, &KeyBindButton), Without<WaitingForKeyInput>>,
     mut commands: Commands,
     graphics: Res<Graphics>,
 ) {
-    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    let hit_test = options_pointcast(&cursor_pos, &ui_sprites, &computed_visibility);
     let left_mouse_released = mouse_input.just_released(MouseButton::Left);
 
     for (entity, mut interactable, button) in buttons.iter_mut() {
@@ -653,6 +667,7 @@ pub fn update_keybind_text(
     keybinds: Res<InputMappings>,
     gamepad_mappings: Res<GamepadMappings>,
     gamepads: Res<Gamepads>,
+    needs_sync: Option<Res<OptionsControlsNeedsLabelSync>>,
     waiting: Query<&WaitingForKeyInput>,
     mut texts: Query<(&KeyBindText, &mut Text)>,
     mut was_waiting: Local<bool>,
@@ -662,6 +677,7 @@ pub fn update_keybind_text(
     let is_waiting = !waiting_binds.is_empty();
     let use_gamepad = gamepad_connected(&gamepads);
     let device_changed = last_gamepad_connected.map_or(true, |prev| prev != use_gamepad);
+    let force_sync = needs_sync.is_some();
     *last_gamepad_connected = Some(use_gamepad);
 
     if !keybinds.is_changed()
@@ -669,6 +685,7 @@ pub fn update_keybind_text(
         && !is_waiting
         && !*was_waiting
         && !device_changed
+        && !force_sync
     {
         return;
     }
@@ -702,15 +719,21 @@ pub fn update_keybind_text(
 
 pub fn update_options_controls_section_titles(
     gamepads: Res<Gamepads>,
+    needs_sync: Option<Res<OptionsControlsNeedsLabelSync>>,
+    mut commands: Commands,
     mut titles: Query<(&OptionsControlsSectionTitle, &mut Text)>,
     mut last_gamepad_connected: Local<Option<bool>>,
 ) {
     let use_gamepad = gamepad_connected(&gamepads);
     let device_changed = last_gamepad_connected.map_or(true, |prev| prev != use_gamepad);
-    if !device_changed {
+    let force_sync = needs_sync.is_some();
+    if !device_changed && !force_sync {
         return;
     }
     *last_gamepad_connected = Some(use_gamepad);
+    if force_sync {
+        commands.remove_resource::<OptionsControlsNeedsLabelSync>();
+    }
 
     let suffix = if use_gamepad { " (Controller)" } else { "" };
     for (title, mut text) in titles.iter_mut() {
@@ -886,6 +909,8 @@ pub fn setup_options_ui(
     commands
         .entity(back_button)
         .insert((OptionsUI, options_focus(502), FocusNavBottomRow));
+
+    commands.insert_resource(OptionsControlsNeedsLabelSync);
 }
 
 fn spawn_options_tab_column(
@@ -920,6 +945,7 @@ fn spawn_options_tab_column(
                 RenderLayers::from_layers(&[3]),
                 OptionsUI,
                 OptionsTabButton(*tab),
+                FocusNavTabColumn,
                 options_focus(tab.focus_index()),
                 Name::new(format!("Options Tab: {}", tab.label())),
             ))
@@ -1560,14 +1586,25 @@ fn spawn_video_tab_content(
 
 pub fn sync_options_tab_visibility(
     active_tab: Res<ActiveOptionsTab>,
-    mut tab_content: Query<(&OptionsTabContent, &mut Visibility)>,
+    mut tab_content: Query<(Entity, &OptionsTabContent, &mut Visibility)>,
+    mut hidden_interactables: Query<&mut Interactable, With<OptionsTabContent>>,
 ) {
     if !active_tab.is_changed() {
         return;
     }
     let active = active_tab.0;
-    for (content, mut visibility) in tab_content.iter_mut() {
-        *visibility = tab_visibility(content.0, active);
+    for (entity, content, mut visibility) in tab_content.iter_mut() {
+        let now_visible = content.0 == active;
+        *visibility = if now_visible {
+            Visibility::Visible
+        } else {
+            Visibility::Hidden
+        };
+        if !now_visible {
+            if let Ok(mut interactable) = hidden_interactables.get_mut(entity) {
+                interactable.change(Interaction::None);
+            }
+        }
     }
 }
 
@@ -1866,6 +1903,7 @@ pub fn handle_cheat_checkbox_click(
     cursor_pos: Res<CursorPos>,
     mouse_input: Res<Input<MouseButton>>,
     focus_input: FocusInput,
+    computed_visibility: Query<&ComputedVisibility>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     mut checkboxes: Query<(Entity, &OptionsCheckbox, &mut Interactable), With<OptionsCheckbox>>,
     mut cheat_settings: ResMut<CheatSettings>,
@@ -1875,7 +1913,7 @@ pub fn handle_cheat_checkbox_click(
     mut cursor_color: ResMut<CursorColorSettings>,
     mut commands: Commands,
 ) {
-    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    let hit_test = options_pointcast(&cursor_pos, &ui_sprites, &computed_visibility);
     let left_mouse_released = mouse_input.just_released(MouseButton::Left);
 
     for (entity, options_checkbox, mut interactable) in checkboxes.iter_mut() {
@@ -2805,13 +2843,14 @@ pub fn handle_cursor_color_button_click(
     cursor_pos: Res<CursorPos>,
     mouse_input: Res<Input<MouseButton>>,
     focus_input: FocusInput,
+    computed_visibility: Query<&ComputedVisibility>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     mut buttons: Query<(Entity, &mut Interactable, &CursorColorButton)>,
     mut cursor_color: ResMut<CursorColorSettings>,
     mut commands: Commands,
     graphics: Res<Graphics>,
 ) {
-    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    let hit_test = options_pointcast(&cursor_pos, &ui_sprites, &computed_visibility);
     let left_mouse_released = mouse_input.just_released(MouseButton::Left);
 
     for (entity, mut interactable, color_button) in buttons.iter_mut() {
@@ -2872,13 +2911,14 @@ pub fn handle_volume_button_click(
     cursor_pos: Res<CursorPos>,
     mouse_input: Res<Input<MouseButton>>,
     focus_input: FocusInput,
+    computed_visibility: Query<&ComputedVisibility>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     mut buttons: Query<(Entity, &mut Interactable, &VolumeButton)>,
     mut audio_volume: ResMut<AudioVolume>,
     mut commands: Commands,
     graphics: Res<Graphics>,
 ) {
-    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    let hit_test = options_pointcast(&cursor_pos, &ui_sprites, &computed_visibility);
     let left_mouse_released = mouse_input.just_released(MouseButton::Left);
 
     for (entity, mut interactable, vol_button) in buttons.iter_mut() {
@@ -2934,13 +2974,14 @@ pub fn handle_scale_button_click(
     cursor_pos: Res<CursorPos>,
     mouse_input: Res<Input<MouseButton>>,
     focus_input: FocusInput,
+    computed_visibility: Query<&ComputedVisibility>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     mut buttons: Query<(Entity, &mut Interactable, &ScaleButton), Without<VolumeButton>>,
     mut display_scale: ResMut<DisplayScaleSettings>,
     mut commands: Commands,
     graphics: Res<Graphics>,
 ) {
-    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    let hit_test = options_pointcast(&cursor_pos, &ui_sprites, &computed_visibility);
     let left_mouse_released = mouse_input.just_released(MouseButton::Left);
 
     for (entity, mut interactable, scale_button) in buttons.iter_mut() {
@@ -3010,6 +3051,7 @@ fn options_row_entity(
 pub fn update_options_row_label_colors(
     ui_focus: Res<UiFocus>,
     cursor_pos: Res<CursorPos>,
+    computed_visibility: Query<&ComputedVisibility>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     mut row_labels: Query<(&OptionsRowLabel, &mut Text), With<OptionsRowLabel>>,
     focus_rows: Query<Entity, With<OptionsFocusRow>>,
@@ -3026,7 +3068,8 @@ pub fn update_options_row_label_colors(
         }
     }
 
-    if let Some((hit_entity, _, _)) = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None) {
+    if let Some((hit_entity, _, _)) = options_pointcast(&cursor_pos, &ui_sprites, &computed_visibility)
+    {
         if let Some(row) = options_row_entity(hit_entity, &focus_rows, &row_members) {
             highlighted.insert(row);
         }
@@ -3258,6 +3301,7 @@ pub fn spawn_wipe_data_popup(
             Interactable::default(),
             UIElement::BackButton,
             MenuButton::WipeDataConfirm,
+            ModalFocusable { index: 1 },
             UIState::Options,
             WipeDataPopup,
             Name::new("Wipe Data Delete Button"),
@@ -3298,6 +3342,7 @@ pub fn spawn_wipe_data_popup(
             Interactable::default(),
             UIElement::BackButton,
             MenuButton::WipeDataCancel,
+            ModalFocusable { index: 0 },
             UIState::Options,
             WipeDataPopup,
             Name::new("Wipe Data Back Button"),
@@ -3365,13 +3410,14 @@ pub fn handle_sensitivity_button_click(
     cursor_pos: Res<CursorPos>,
     mouse_input: Res<Input<MouseButton>>,
     focus_input: FocusInput,
+    computed_visibility: Query<&ComputedVisibility>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     mut buttons: Query<(Entity, &mut Interactable, &SensitivityButton)>,
     mut sensitivity: ResMut<AimSensitivity>,
     mut commands: Commands,
     graphics: Res<Graphics>,
 ) {
-    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    let hit_test = options_pointcast(&cursor_pos, &ui_sprites, &computed_visibility);
     let left_mouse_released = mouse_input.just_released(MouseButton::Left);
 
     for (entity, mut interactable, sens_button) in buttons.iter_mut() {

@@ -903,7 +903,7 @@ pub fn handle_main_menu_icon_tooltips(
     }
 
     let hovered =
-        ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None).and_then(|(entity, _, _)| {
+        ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None).and_then(|(entity, _, _)| {
             tooltip_targets
                 .get(entity)
                 .ok()

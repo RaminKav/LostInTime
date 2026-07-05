@@ -37,6 +37,7 @@ use crate::{
         main_menu::GameStartFadein,
         options_ui::CheatSettings,
         ui_helpers::{spawn_full_screen_ui_overlay_tuned_colored, RADIAL_OVERLAY_DEFAULT_COLOR},
+        focus::ModalFocusable,
         Focusable, MenuButton, UIElement, UIState,
     },
     world::{dimension::EraManager, portal::UIPortal},
@@ -948,7 +949,11 @@ pub fn handle_class_selection(
     cheat_settings: Res<CheatSettings>,
     focus_input: crate::ui::focus::FocusInput,
 ) {
-    let hit_test = super::ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    if confirm_state.active {
+        return;
+    }
+
+    let hit_test = super::ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
 
     hover_state.hovered_class = None;
@@ -1301,14 +1306,8 @@ pub fn update_class_unlock_confirm_panel(
 
             commands.entity(yes_button).set_parent(panel);
             commands.entity(no_button).set_parent(panel);
-            commands.entity(yes_button).insert(Focusable {
-                group: UIState::ClassSelection,
-                index: 50,
-            });
-            commands.entity(no_button).insert(Focusable {
-                group: UIState::ClassSelection,
-                index: 51,
-            });
+            commands.entity(no_button).insert(ModalFocusable { index: 0 });
+            commands.entity(yes_button).insert(ModalFocusable { index: 1 });
 
             // Add button text
             commands
@@ -1383,10 +1382,13 @@ pub fn handle_locked_skill_selection(
     class_confirm_state: Res<ClassUnlockConfirmState>,
     mut commands: Commands,
 ) {
+    if confirm_state.active {
+        return;
+    }
     if class_confirm_state.active {
         return;
     }
-    let hit_test = super::ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    let hit_test = super::ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
 
     for (entity, mut interactable, locked, transform) in locked_slots.iter_mut() {
@@ -1519,6 +1521,8 @@ pub fn update_skill_unlock_confirm_panel(
                 .id();
             commands.entity(yes_button).set_parent(panel);
             commands.entity(no_button).set_parent(panel);
+            commands.entity(no_button).insert(ModalFocusable { index: 0 });
+            commands.entity(yes_button).insert(ModalFocusable { index: 1 });
 
             commands
                 .spawn(Text2dBundle {

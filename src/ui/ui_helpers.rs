@@ -134,6 +134,7 @@ pub fn pointcast_2d<'a>(
     cursor_pos: &Res<CursorPos>,
     ui_sprites: &'a Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     excluded_entity: Option<Entity>,
+    computed_visibility: Option<&Query<&ComputedVisibility>>,
 ) -> Option<(Entity, &'a Sprite, &'a GlobalTransform)> {
     if !cursor_pos.ui_hover_hit_allowed() {
         return None;
@@ -146,6 +147,13 @@ pub fn pointcast_2d<'a>(
             if ent == excluded {
                 continue;
             }
+        }
+
+        if computed_visibility
+            .and_then(|query| query.get(ent).ok())
+            .is_some_and(|visibility| !visibility.is_visible())
+        {
+            continue;
         }
 
         let Some(size) = sprite.custom_size else {

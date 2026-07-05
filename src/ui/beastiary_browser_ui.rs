@@ -836,7 +836,7 @@ pub fn handle_beastiary_card_click(
     mut texture_atlases: ResMut<Assets<TextureAtlas>>,
     focus_input: FocusInput,
 ) {
-    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None);
     let left_mouse_released = mouse_input.just_released(MouseButton::Left);
 
     let mut clicked: Option<Mob> = None;
@@ -949,7 +949,7 @@ pub fn handle_beastiary_pagination_clicks(
     graphics: Res<Graphics>,
     focus_input: FocusInput,
 ) {
-    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None);
     let left_mouse_released = mouse_input.just_released(MouseButton::Left);
     let total_pages = beastiary_total_pages();
 
