@@ -4,9 +4,9 @@
 //! since it needs to work before a `Player` even exists (main menu). See the controller
 //! support plan.
 //!
-//! Bindings are a fixed Xbox-style layout (no rebind UI in v1) built on
-//! `leafwing-input-manager`, which is bound alongside the existing keyboard/mouse
-//! `InputMappings` rather than replacing it.
+//! Gameplay bindings are persisted in [`crate::gamepad_bindings::GamepadMappings`] and editable
+//! from the options Controls tab when a controller is connected. UI navigation bindings
+//! ([`UiGamepadAction`]) remain fixed.
 //!
 //! ## Known macOS limitation (shelved as of Bevy 0.10.1)
 //!
@@ -34,6 +34,7 @@ use bevy::input::gamepad::{GamepadConnection, GamepadConnectionEvent, GamepadEve
 use bevy::prelude::*;
 use leafwing_input_manager::prelude::*;
 
+use crate::gamepad_bindings::GamepadMappings;
 use crate::{player::Player, GameState};
 
 /// Stick magnitude below this is treated as neutral (no input).
@@ -138,40 +139,35 @@ pub fn gamepad_hotbar_just_pressed(
     action_state.just_pressed(action)
 }
 
-fn default_gamepad_input_map() -> InputMap<GamepadAction> {
-    let mut map = InputMap::default();
-    map.insert(DualAxis::left_stick(), GamepadAction::Move);
-    map.insert(DualAxis::right_stick(), GamepadAction::Aim);
-    // Right Trigger doubles as the basic weapon attack and skill slot 1, mirroring the
-    // keyboard/mouse default (slot 1 -> Left Mouse Button, same button as basic attack).
-    map.insert(GamepadButtonType::RightTrigger2, GamepadAction::Attack);
-    map.insert(GamepadButtonType::RightTrigger2, GamepadAction::Skill1);
-    map.insert(GamepadButtonType::South, GamepadAction::Skill0);
-    map.insert(GamepadButtonType::LeftTrigger2, GamepadAction::Skill2);
-    map.insert(GamepadButtonType::LeftTrigger, GamepadAction::ToggleInventory);
-    map.insert(GamepadButtonType::RightTrigger, GamepadAction::ToggleMap);
-    map.insert(GamepadButtonType::North, GamepadAction::Interact);
-    map.insert(GamepadButtonType::West, GamepadAction::AutoTarget);
-    map.insert(GamepadButtonType::DPadUp, GamepadAction::Hotbar0);
-    map.insert(GamepadButtonType::DPadRight, GamepadAction::Hotbar1);
-    map.insert(GamepadButtonType::DPadDown, GamepadAction::Hotbar2);
-    map.insert(GamepadButtonType::DPadLeft, GamepadAction::Hotbar3);
-    map
-}
-
-/// Attaches the fixed gamepad bindings to the player as soon as it spawns (start of every run).
+/// Attaches saved gamepad bindings to the player as soon as it spawns (start of every run).
 fn insert_gamepad_input_on_player(
     mut commands: Commands,
     added_players: Query<Entity, Added<Player>>,
+    mappings: Res<GamepadMappings>,
 ) {
+    let input_map = mappings.to_input_map();
     for player_e in added_players.iter() {
         commands
             .entity(player_e)
             .insert(InputManagerBundle::<GamepadAction> {
                 action_state: ActionState::default(),
-                input_map: default_gamepad_input_map(),
+                input_map: input_map.clone(),
             });
         info!("[Gamepad] Input bindings attached to player entity {player_e:?}");
+    }
+}
+
+/// Rebuilds the player's gameplay `InputMap` after options rebinding.
+pub fn sync_player_gamepad_input_map(
+    mappings: Res<GamepadMappings>,
+    mut players: Query<&mut InputMap<GamepadAction>, With<Player>>,
+) {
+    if !mappings.is_changed() {
+        return;
+    }
+    let input_map = mappings.to_input_map();
+    for mut map in players.iter_mut() {
+        *map = input_map.clone();
     }
 }
 
@@ -454,6 +450,9 @@ impl Plugin for GamepadInputPlugin {
             // controller can be plugged in from the main menu, before a Player even exists.
             .add_system(log_gamepad_connections)
             .add_system(insert_gamepad_input_on_player)
+            .add_system(
+                sync_player_gamepad_input_map.in_set(OnUpdate(GameState::Main)),
+            )
             .add_systems(
                 (
                     update_active_input_device,

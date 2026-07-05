@@ -4,9 +4,10 @@ use crate::{
     assets::SpriteAnchor,
     colors::WHITE,
     ecs_helpers::{safe_push_children, safe_set_parent, SafeHierarchyExt},
+    gamepad_bindings::{binding_labels_dirty, format_binding_label, BindingLabel, GamepadMappings},
     inventory::{Inventory, ItemStack},
     item::{boss_shrine::BossSummonTracker, WorldObject},
-    keybinds::{get_key_display_name, InputBinding, InputMappings},
+    keybinds::InputMappings,
     player::Player,
     GameParam,
 };
@@ -23,7 +24,7 @@ const INTERACT_GUIDE_KEY_FONT_SIZE: f32 = 15.0;
 fn spawn_interact_guide_keybind_badge(
     commands: &mut Commands,
     asset_server: &AssetServer,
-    key: InputBinding,
+    label: impl Into<String>,
     transform: Transform,
     parent: Entity,
 ) -> (Entity, Entity) {
@@ -44,7 +45,7 @@ fn spawn_interact_guide_keybind_badge(
     let key_text = commands
         .spawn(Text2dBundle {
             text: Text::from_section(
-                get_key_display_name(key),
+                label.into(),
                 TextStyle {
                     font: asset_server.load("fonts/alagard.ttf"),
                     font_size: INTERACT_GUIDE_KEY_FONT_SIZE,
@@ -219,6 +220,8 @@ pub fn spawn_shrine_interact_key_guide(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     keybinds: Res<InputMappings>,
+    gamepad_mappings: Res<GamepadMappings>,
+    gamepads: Res<Gamepads>,
     player_query: Query<(Entity, &GlobalTransform), With<Player>>,
     player_inv: Query<&Inventory, With<Player>>,
     summon_tracker: Res<BossSummonTracker>,
@@ -231,7 +234,12 @@ pub fn spawn_shrine_interact_key_guide(
         Option<&WorldObject>,
     )>,
 ) {
-    let interact_key = keybinds.get_interact_key();
+    let interact_key = format_binding_label(
+        BindingLabel::Interact,
+        &keybinds,
+        &gamepad_mappings,
+        &gamepads,
+    );
     let (player_e, player_t) = player_query.single();
     let key_count = player_inv
         .single()
@@ -244,6 +252,7 @@ pub fn spawn_shrine_interact_key_guide(
             let guide_pos =
                 txfm.translation().truncate() - anchor_option.unwrap_or(&SpriteAnchor::default()).0;
             if guide_pos.distance(player_t.translation().truncate()) < guide.activation_distance {
+                let interact_label = interact_key.clone();
                 let display_text = resolve_interaction_guide_text(
                     guide,
                     world_obj.copied(),
@@ -283,7 +292,7 @@ pub fn spawn_shrine_interact_key_guide(
                         let (key_bg, key_text) = spawn_interact_guide_keybind_badge(
                             &mut commands,
                             &asset_server,
-                            interact_key,
+                            interact_label.clone(),
                             Transform::from_translation(Vec3::new(key_x_offset, 0.5, 1.)),
                             text_e,
                         );
@@ -294,7 +303,7 @@ pub fn spawn_shrine_interact_key_guide(
                         let (key_bg, key_text) = spawn_interact_guide_keybind_badge(
                             &mut commands,
                             &asset_server,
-                            interact_key,
+                            interact_label,
                             Transform::from_translation(Vec3::new(0., 0.5, 1.)),
                             parent_entity,
                         );
@@ -353,14 +362,27 @@ pub fn spawn_shrine_interact_key_guide(
 
 pub fn update_interact_guide_keybind_text(
     keybinds: Res<InputMappings>,
+    gamepad_mappings: Res<GamepadMappings>,
+    gamepads: Res<Gamepads>,
     mut texts: Query<&mut Text, With<InteractGuideKeybindText>>,
+    mut last_gamepad_connected: Local<Option<bool>>,
 ) {
-    if !keybinds.is_changed() {
+    if !binding_labels_dirty(
+        keybinds.is_changed(),
+        gamepad_mappings.is_changed(),
+        &gamepads,
+        &mut last_gamepad_connected,
+    ) {
         return;
     }
 
-    let interact_key = keybinds.get_interact_key();
+    let label = format_binding_label(
+        BindingLabel::Interact,
+        &keybinds,
+        &gamepad_mappings,
+        &gamepads,
+    );
     for mut text in texts.iter_mut() {
-        text.sections[0].value = get_key_display_name(interact_key);
+        text.sections[0].value = label.clone();
     }
 }

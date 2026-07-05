@@ -3,6 +3,7 @@ use rand::Rng;
 use std::collections::HashMap;
 
 use super::{
+    focus::{Focusable, UiFocus},
     heirloom_tooltip::{
         heirloom_hud_hover_tooltip_position, HeirloomTooltipRequest, HeirloomTooltipShow,
     },
@@ -11,7 +12,6 @@ use super::{
     hud_keybind_badge_center_y, hud_progress_bar_center_x, hud_row_below_xp_y,
     hud_timeline_arrow_local_x, hud_timeline_center_x,
     icon_hover_tooltips::ICON_HOVER_TOOLTIP_BG_COLOR,
-    focus::{Focusable, UiFocus},
     interactions::{DraggedItem, Interaction},
     spawn_inv_slot, spawn_item_stack_icon,
     tooltips::spawn_world_item_tooltip_for_stack,
@@ -23,8 +23,7 @@ use super::{
     },
     InventorySlotState, InventorySlotType, InventoryState, InventoryUI, UIElement, UIState,
     CURRENCY_BACKGROUND_SIZE, HUD_ACTION_ROW_Y_FROM_BOTTOM, HUD_ERA_TIMER_ENDLESS_WIDTH,
-    HUD_FRAME_Y_FROM_BOTTOM, HUD_HEIRLOOM_ICON_SPACING,
-    HUD_HOTBAR_SLOTS, HUD_SKILLS_CENTER_X,
+    HUD_FRAME_Y_FROM_BOTTOM, HUD_HEIRLOOM_ICON_SPACING, HUD_HOTBAR_SLOTS, HUD_SKILLS_CENTER_X,
     HUD_SKILL_SLOT_HIT_SIZE, HUD_SKILL_SPACING_X, HUD_TIMELINE_ARROWS_SIZE, HUD_TIMELINE_SIZE,
     KEYBIND_BADGE_BOTTOM_INSET, KEYBIND_BADGE_SIZE, PROGRESS_BACKGROUND_SIZE,
 };
@@ -44,11 +43,14 @@ use crate::{
         WHITE, YELLOW, YELLOW_2,
     },
     cursor::CursorPos,
+    gamepad_bindings::{
+        binding_labels_dirty, format_binding_label, format_pause_options_label, BindingLabel,
+        GamepadMappings,
+    },
     inventory::{Inventory, ItemStack},
-    item::WorldObject,
     item::item_drop_outline::{HeirloomIconOutline, HeirloomIconOutlineStyle, UiShadow},
+    item::WorldObject,
     juice::bounce::BounceOnHit,
-    keybinds::InputBinding,
     night::{EraTimer, InfiniteMode, ERA_TIMER_SECONDS},
     player::{
         combat_heirlooms::{
@@ -464,7 +466,11 @@ pub fn setup_bars_ui(
         .spawn(MaterialMesh2dBundle {
             mesh: mana_mesh,
             material: mana_material,
-            transform: Transform::from_translation(Vec3::new(HUD_MANA_FILL_LOCAL_X, HUD_MANA_FILL_LOCAL_Y, 1.0)),
+            transform: Transform::from_translation(Vec3::new(
+                HUD_MANA_FILL_LOCAL_X,
+                HUD_MANA_FILL_LOCAL_Y,
+                1.0,
+            )),
             ..default()
         })
         .insert(RenderLayers::from_layers(&[3]))
@@ -611,6 +617,8 @@ pub fn setup_currency_ui(
     chaos_tracker: Res<ChaosTracker>,
     infinite_mode: Res<InfiniteMode>,
     keybinds: Res<InputMappings>,
+    gamepad_mappings: Res<GamepadMappings>,
+    gamepads: Res<Gamepads>,
 ) {
     let row_y = hud_row_below_xp_y(res.game_height);
     let currency_style = gf::HUD_CURRENCY_COUNT.text_style(&asset_server, WHITE);
@@ -793,7 +801,12 @@ pub fn setup_currency_ui(
         .insert(Name::new("MINIMAP HUD ICON"))
         .id();
 
-    let minimap_key = keybinds.get_minimap_key();
+    let minimap_key = format_binding_label(
+        BindingLabel::Minimap,
+        &keybinds,
+        &gamepad_mappings,
+        &gamepads,
+    );
     let (map_key_bg, map_key_text) = spawn_keybind_badge(
         &mut commands,
         &asset_server,
@@ -820,7 +833,12 @@ pub fn setup_currency_ui(
         .insert(Name::new("INVENTORY HUD ICON"))
         .id();
 
-    let inventory_key = keybinds.get_inventory_key();
+    let inventory_key = format_binding_label(
+        BindingLabel::Inventory,
+        &keybinds,
+        &gamepad_mappings,
+        &gamepads,
+    );
     let (key_bg, key_text) = spawn_keybind_badge(
         &mut commands,
         &asset_server,
@@ -847,7 +865,7 @@ pub fn setup_currency_ui(
         .insert(Name::new("OPTIONS HUD ICON"))
         .id();
 
-    let options_key = InputBinding::KeyBinding(KeyCode::Escape);
+    let options_key = format_pause_options_label(&gamepads);
     let (settings_key_bg, settings_key_text) = spawn_keybind_badge(
         &mut commands,
         &asset_server,
@@ -1752,22 +1770,10 @@ pub fn active_skill_tooltip_params_from_player(
         ),
         With<Player>,
     >,
-    meteor_shower_state: &Query<
-        &crate::player::skills::MeteorShowerSkillState,
-        With<Player>,
-    >,
+    meteor_shower_state: &Query<&crate::player::skills::MeteorShowerSkillState, With<Player>>,
 ) -> ActiveSkillTooltipParams {
-    let Ok((
-        skill_power,
-        blessings,
-        max_mana,
-        max_health,
-        bonus_as,
-        attack_speed,
-        crit,
-        spd,
-        size,
-    )) = skill_power.get_single()
+    let Ok((skill_power, blessings, max_mana, max_health, bonus_as, attack_speed, crit, spd, size)) =
+        skill_power.get_single()
     else {
         return ActiveSkillTooltipParams::preview();
     };
@@ -1883,8 +1889,7 @@ pub fn handle_active_skill_hud_tooltip(
             .insert(ActiveSkillHudTooltip)
             .insert(ActiveSkillHudTooltipSkill(slot_index));
 
-        let params =
-            active_skill_tooltip_params_from_player(&skill_power, &meteor_shower_state);
+        let params = active_skill_tooltip_params_from_player(&skill_power, &meteor_shower_state);
         spawn_skill_tooltip_content(
             &mut commands,
             &graphics,
@@ -3011,7 +3016,8 @@ pub fn handle_update_player_skills(
                 })
                 .id();
             let skill_x = HUD_SKILLS_CENTER_X + (i as f32 - skill_half_span) * HUD_SKILL_SPACING_X;
-            let keybind = keybinds.get_active_skill_key(*slot_index);
+            let keybind =
+                crate::keybinds::get_key_display_name(keybinds.get_active_skill_key(*slot_index));
             let (key_bg, key_text) = spawn_keybind_badge(
                 &mut commands,
                 &asset_server,
@@ -3373,14 +3379,21 @@ pub fn spawn_hotbar_keybind_badge_for_slot(
     commands: &mut Commands,
     asset_server: &AssetServer,
     keybinds: &crate::keybinds::InputMappings,
+    gamepad_mappings: &GamepadMappings,
+    gamepads: &Gamepads,
     slot: usize,
     game_height: f32,
 ) {
-    let key = keybinds.get_hotbar_key(slot);
+    let label = format_binding_label(
+        BindingLabel::Hotbar(slot),
+        keybinds,
+        gamepad_mappings,
+        gamepads,
+    );
     let (bg_entity, text_entity) = spawn_keybind_badge(
         commands,
         asset_server,
-        key,
+        label,
         Transform::from_translation(Vec3::new(
             hud_hotbar_slot_center_x(slot),
             hud_keybind_badge_center_y(game_height),
@@ -3410,6 +3423,8 @@ pub fn setup_hotbar_hud(
     mut inv: Query<&mut Inventory>,
     inv_ui_state: Res<State<UIState>>,
     keybinds: Res<crate::keybinds::InputMappings>,
+    gamepad_mappings: Res<GamepadMappings>,
+    gamepads: Res<Gamepads>,
     resolution: Res<ScreenResolution>,
 ) {
     for (slot_index, item) in inv
@@ -3438,6 +3453,8 @@ pub fn setup_hotbar_hud(
             &mut commands,
             &asset_server,
             &keybinds,
+            &gamepad_mappings,
+            &gamepads,
             slot_index,
             resolution.game_height,
         );
@@ -4001,57 +4018,128 @@ pub fn update_pet_skill_tooltip_cooldown(
 
 pub fn update_active_skill_keybind_text(
     keybinds: Res<crate::keybinds::InputMappings>,
+    gamepad_mappings: Res<GamepadMappings>,
+    gamepads: Res<Gamepads>,
     mut texts: Query<(&ActiveSkillKeybindText, &mut Text)>,
+    mut last_gamepad_connected: Local<Option<bool>>,
 ) {
-    if !keybinds.is_changed() {
+    if !binding_labels_dirty(
+        keybinds.is_changed(),
+        gamepad_mappings.is_changed(),
+        &gamepads,
+        &mut last_gamepad_connected,
+    ) {
         return;
     }
 
     for (keybind_text, mut text) in texts.iter_mut() {
-        let key = keybinds.get_active_skill_key(keybind_text.slot);
-        text.sections[0].value = crate::keybinds::get_key_display_name(key);
+        text.sections[0].value = format_binding_label(
+            BindingLabel::ActiveSkill(keybind_text.slot),
+            &keybinds,
+            &gamepad_mappings,
+            &gamepads,
+        );
     }
 }
 
 pub fn update_hotbar_keybind_text(
     keybinds: Res<crate::keybinds::InputMappings>,
+    gamepad_mappings: Res<GamepadMappings>,
+    gamepads: Res<Gamepads>,
     mut texts: Query<(&HotbarKeybindText, &mut Text)>,
+    mut last_gamepad_connected: Local<Option<bool>>,
 ) {
-    if !keybinds.is_changed() {
+    if !binding_labels_dirty(
+        keybinds.is_changed(),
+        gamepad_mappings.is_changed(),
+        &gamepads,
+        &mut last_gamepad_connected,
+    ) {
         return;
     }
 
     for (keybind_text, mut text) in texts.iter_mut() {
-        let key = keybinds.get_hotbar_key(keybind_text.slot);
-        text.sections[0].value = crate::keybinds::get_key_display_name(key);
+        text.sections[0].value = format_binding_label(
+            BindingLabel::Hotbar(keybind_text.slot),
+            &keybinds,
+            &gamepad_mappings,
+            &gamepads,
+        );
     }
 }
 
 pub fn update_inventory_keybind_text(
     keybinds: Res<crate::keybinds::InputMappings>,
+    gamepad_mappings: Res<GamepadMappings>,
+    gamepads: Res<Gamepads>,
     mut texts: Query<&mut Text, With<InventoryKeybindText>>,
+    mut last_gamepad_connected: Local<Option<bool>>,
 ) {
-    if !keybinds.is_changed() {
+    if !binding_labels_dirty(
+        keybinds.is_changed(),
+        gamepad_mappings.is_changed(),
+        &gamepads,
+        &mut last_gamepad_connected,
+    ) {
         return;
     }
 
-    let inventory_key = keybinds.get_inventory_key();
+    let label = format_binding_label(
+        BindingLabel::Inventory,
+        &keybinds,
+        &gamepad_mappings,
+        &gamepads,
+    );
     for mut text in texts.iter_mut() {
-        text.sections[0].value = crate::keybinds::get_key_display_name(inventory_key);
+        text.sections[0].value = label.clone();
     }
 }
 
 pub fn update_minimap_keybind_text(
     keybinds: Res<crate::keybinds::InputMappings>,
+    gamepad_mappings: Res<GamepadMappings>,
+    gamepads: Res<Gamepads>,
     mut texts: Query<&mut Text, With<MinimapKeybindText>>,
+    mut last_gamepad_connected: Local<Option<bool>>,
 ) {
-    if !keybinds.is_changed() {
+    if !binding_labels_dirty(
+        keybinds.is_changed(),
+        gamepad_mappings.is_changed(),
+        &gamepads,
+        &mut last_gamepad_connected,
+    ) {
         return;
     }
 
-    let minimap_key = keybinds.get_minimap_key();
+    let label = format_binding_label(
+        BindingLabel::Minimap,
+        &keybinds,
+        &gamepad_mappings,
+        &gamepads,
+    );
     for mut text in texts.iter_mut() {
-        text.sections[0].value = crate::keybinds::get_key_display_name(minimap_key);
+        text.sections[0].value = label.clone();
+    }
+}
+
+pub fn update_options_keybind_text(
+    gamepads: Res<Gamepads>,
+    mut texts: Query<&mut Text, With<OptionsKeybindText>>,
+    mut last_gamepad_connected: Local<Option<bool>>,
+) {
+    let connected = crate::gamepad_bindings::gamepad_connected(&gamepads);
+    let device_changed = match *last_gamepad_connected {
+        None => true,
+        Some(prev) => prev != connected,
+    };
+    *last_gamepad_connected = Some(connected);
+    if !device_changed {
+        return;
+    }
+
+    let label = format_pause_options_label(&gamepads);
+    for mut text in texts.iter_mut() {
+        text.sections[0].value = label.clone();
     }
 }
 

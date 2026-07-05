@@ -17,6 +17,7 @@ mod bounce;
 mod container;
 mod cursor;
 mod datafiles;
+mod gamepad_bindings;
 mod gamepad_input;
 mod keybinds;
 mod panic_handler;
@@ -25,6 +26,7 @@ mod vectorize;
 pub use bounce::*;
 pub use display_scale::DisplayScaleSettings;
 pub use ecs_helpers::*;
+pub use gamepad_bindings::*;
 pub use keybinds::*;
 pub use pets::*;
 

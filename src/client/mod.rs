@@ -239,6 +239,8 @@ pub struct GameData {
     #[serde(default)]
     pub keybindings: Option<crate::keybinds::InputMappings>,
     #[serde(default)]
+    pub gamepad_bindings: Option<crate::gamepad_bindings::GamepadMappings>,
+    #[serde(default)]
     pub audio_volume: Option<crate::audio::AudioVolume>,
     #[serde(default)]
     pub display_scale: Option<crate::DisplayScaleSettings>,

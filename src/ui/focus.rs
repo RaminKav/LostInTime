@@ -45,6 +45,16 @@ pub struct OverlayFocusable {
     pub index: u32,
 }
 
+/// Skip this entity when [`focus_nav`] moves left/right. Used for wide options stepper row
+/// hitboxes that sit left of same-column controls and would otherwise win horizontal nav.
+#[derive(Component, Debug, Clone, Copy)]
+pub struct FocusNavHorizontalSkip;
+
+/// Options menu footer controls (Back, Wipe, etc.). Only reachable horizontally when focus is
+/// already on another bottom-row control; otherwise the player must press Down to get there.
+#[derive(Component, Debug, Clone, Copy)]
+pub struct FocusNavBottomRow;
+
 /// The single currently-focused entity (if any) plus whether Confirm was pressed this frame.
 /// Updated by [`ensure_default_focus`], [`focus_nav`], and [`poll_ui_focus_confirm`].
 #[derive(Resource, Default)]
@@ -389,6 +399,8 @@ fn focus_nav(
     overlays: Query<(Entity, &GlobalTransform, &OverlayFocusable)>,
     visibility: Query<&Visibility>,
     focus_nav_blocked: Res<FocusNavBlocked>,
+    focus_nav_horizontal_skip: Query<(), With<FocusNavHorizontalSkip>>,
+    focus_nav_bottom_row: Query<(), With<FocusNavBottomRow>>,
     mut last_stick_dir: Local<Option<NavDir>>,
 ) {
     if focus_nav_blocked.0 {
@@ -463,9 +475,19 @@ fn focus_nav(
 
     let mut best: Option<(Entity, f32)> = None;
 
+    let horizontal_nav = matches!(dir, NavDir::Left | NavDir::Right);
+    let cur_in_bottom_row = focus_nav_bottom_row.get(cur_e).is_ok();
     let mut consider = |e: Entity, pos: Vec2| {
         if e == cur_e {
             return;
+        }
+        if horizontal_nav {
+            if focus_nav_horizontal_skip.get(e).is_ok() {
+                return;
+            }
+            if cur_in_bottom_row != focus_nav_bottom_row.get(e).is_ok() {
+                return;
+            }
         }
         let delta = pos - cur_pos;
         let forward = delta.dot(axis) * sign;

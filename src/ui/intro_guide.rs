@@ -3,7 +3,8 @@ use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
 use crate::{
     client::GameData,
     colors::BLACK,
-    keybinds::{get_key_display_name, InputBinding, InputMappings},
+    gamepad_bindings::{format_binding_label, BindingLabel, GamepadMappings},
+    keybinds::InputMappings,
     GameState, ScreenResolution,
 };
 
@@ -34,8 +35,13 @@ pub struct IntroGuideVisual {
     target_alpha: f32,
 }
 
-fn key_label(binding: InputBinding) -> String {
-    get_key_display_name(binding)
+fn key_label(
+    label: BindingLabel,
+    keybinds: &InputMappings,
+    gamepad_mappings: &GamepadMappings,
+    gamepads: &Gamepads,
+) -> String {
+    format_binding_label(label, keybinds, gamepad_mappings, gamepads)
 }
 
 fn spawn_key_badge(
@@ -145,6 +151,8 @@ pub fn spawn_intro_guide(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     keybinds: Res<InputMappings>,
+    gamepad_mappings: Res<GamepadMappings>,
+    gamepads: Res<Gamepads>,
     resolution: Res<ScreenResolution>,
     game_data: Option<Res<GameData>>,
 ) {
@@ -222,9 +230,33 @@ pub fn spawn_intro_guide(
         .id();
 
     let rows = [
-        (key_label(keybinds.get_attack_auto_target_key()), "Auto Aim"),
-        (key_label(keybinds.get_inventory_key()), "Inventory"),
-        (key_label(keybinds.get_minimap_key()), "Map"),
+        (
+            key_label(
+                BindingLabel::AttackAutoTarget,
+                &keybinds,
+                &gamepad_mappings,
+                &gamepads,
+            ),
+            "Auto Aim",
+        ),
+        (
+            key_label(
+                BindingLabel::Inventory,
+                &keybinds,
+                &gamepad_mappings,
+                &gamepads,
+            ),
+            "Inventory",
+        ),
+        (
+            key_label(
+                BindingLabel::Minimap,
+                &keybinds,
+                &gamepad_mappings,
+                &gamepads,
+            ),
+            "Map",
+        ),
     ];
     let row_step = key.y + gap * 2.5;
     let total_height = row_step * (rows.len() as f32 - 1.);

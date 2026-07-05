@@ -6,8 +6,12 @@ use std::collections::HashSet;
 use std::fs::File;
 use std::io::{BufReader, BufWriter};
 
+use bevy::input::gamepad::{GamepadButton, GamepadButtonType};
 use leafwing_input_manager::prelude::ActionState;
 
+use crate::gamepad_bindings::{
+    format_binding_label, gamepad_connected, BindingLabel, GamepadBindingButton, GamepadMappings,
+};
 use crate::gamepad_input::{UiGamepadAction, UiGamepadInputMarker};
 use crate::{
     aim::AimSensitivity,
@@ -23,11 +27,12 @@ use crate::{
     player::skills::VISIBLE_CLASS_SKILL_COUNT,
     ui::{
         focus::{
-            focus_entity_visible, ui_nav_dir_just_pressed, FocusInput, FocusNavBlocked, Focusable,
-            UiFocus, UiNavDir,
+            focus_entity_visible, ui_nav_dir_just_pressed, FocusInput, FocusNavBlocked,
+            FocusNavBottomRow, FocusNavHorizontalSkip, Focusable, UiFocus, UiNavDir,
         },
         interactions::Interaction,
-        spawn_back_button, ui_helpers, Interactable, UIElement, UIState,
+        main_menu::{spawn_exit_icon_button, spawn_main_menu_wide_button, MenuButton},
+        ui_helpers, Interactable, UIElement, UIState,
     },
     DisplayScaleSettings, InputBinding, ScreenResolution,
 };
@@ -295,6 +300,7 @@ fn spawn_stepper_row_focus(
             OptionsUI,
             OptionsTabContent(tab),
             OptionsFocusRow(row_kind),
+            FocusNavHorizontalSkip,
             Interactable::default(),
             options_focus(focus_index),
             Name::new(name.to_string()),
@@ -341,7 +347,13 @@ pub struct WaitingForKeyInput {
     pub bind_type: KeyBindType,
     /// Ignore mouse presses briefly so the click that opened rebind is not captured.
     pub ignore_mouse_frames: u8,
+    /// When true, capture a gamepad button instead of keyboard/mouse.
+    pub capture_gamepad: bool,
 }
+
+/// Section headers on the Controls tab whose suffix reflects keyboard vs controller editing.
+#[derive(Component, Clone, Copy)]
+pub struct OptionsControlsSectionTitle(pub &'static str);
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum VolumeChannel {
@@ -405,6 +417,7 @@ pub fn handle_options_clicks(
     cursor_pos: Res<CursorPos>,
     mouse_input: Res<Input<MouseButton>>,
     focus_input: FocusInput,
+    gamepads: Res<Gamepads>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     mut buttons: Query<(Entity, &mut Interactable, &KeyBindButton), Without<WaitingForKeyInput>>,
     mut commands: Commands,
@@ -433,6 +446,7 @@ pub fn handle_options_clicks(
                         commands.entity(entity).insert(WaitingForKeyInput {
                             bind_type: button.bind_type,
                             ignore_mouse_frames: 2,
+                            capture_gamepad: gamepad_connected(&gamepads),
                         });
                         commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.2));
                     }
@@ -457,6 +471,8 @@ pub fn handle_key_rebind_input(
     mut key_input: ResMut<Input<KeyCode>>,
     mut mouse_input: ResMut<Input<MouseButton>>,
     mut keybinds: ResMut<InputMappings>,
+    mut gamepad_mappings: ResMut<GamepadMappings>,
+    gamepad_buttons: Res<Input<GamepadButton>>,
     mut waiting: Query<(Entity, &mut WaitingForKeyInput)>,
     graphics: Res<Graphics>,
 ) {
@@ -464,21 +480,21 @@ pub fn handle_key_rebind_input(
         return;
     }
 
-    // Collect keys to avoid borrow checker issues
     let just_pressed_key: Vec<KeyCode> = key_input.get_just_pressed().copied().collect();
     let just_pressed_mouse: Vec<MouseButton> = mouse_input.get_just_pressed().copied().collect();
+    let just_pressed_gamepad: Vec<GamepadButton> =
+        gamepad_buttons.get_just_pressed().copied().collect();
 
-    // Tick mouse-ignore grace period on active rebind prompts.
     for (_, mut waiting_for) in waiting.iter_mut() {
         if waiting_for.ignore_mouse_frames > 0 {
             waiting_for.ignore_mouse_frames -= 1;
         }
     }
 
-    // Check for any key press
-    for key in just_pressed_key {
-        // Ignore Escape (used to cancel)
-        if key == KeyCode::Escape {
+    let capture_gamepad = waiting.iter().any(|(_, w)| w.capture_gamepad);
+
+    for key in &just_pressed_key {
+        if *key == KeyCode::Escape {
             for (entity, _) in waiting.iter() {
                 commands.entity(entity).remove::<WaitingForKeyInput>();
                 commands
@@ -489,8 +505,41 @@ pub fn handle_key_rebind_input(
             key_input.clear();
             return;
         }
+    }
 
-        // Set the new key binding
+    if capture_gamepad {
+        for button in just_pressed_gamepad {
+            if button.button_type == GamepadButtonType::East {
+                for (entity, _) in waiting.iter() {
+                    commands.entity(entity).remove::<WaitingForKeyInput>();
+                    commands
+                        .entity(entity)
+                        .insert(UIElement::BackButton)
+                        .insert(graphics.get_ui_element_texture(UIElement::BackButton));
+                }
+                return;
+            }
+
+            let Some(binding) = GamepadBindingButton::from_button_type(button.button_type) else {
+                continue;
+            };
+
+            for (entity, waiting_for) in waiting.iter() {
+                apply_gamepad_rebind(&mut gamepad_mappings, waiting_for.bind_type, binding);
+                gamepad_mappings.save();
+                commands.entity(entity).remove::<WaitingForKeyInput>();
+                commands
+                    .entity(entity)
+                    .insert(UIElement::BackButton)
+                    .insert(graphics.get_ui_element_texture(UIElement::BackButton));
+                commands.spawn(SoundSpawner::new(AudioSoundEffect::UISkillSelection, 0.15));
+            }
+            return;
+        }
+        return;
+    }
+
+    for key in just_pressed_key {
         for (entity, waiting_for) in waiting.iter() {
             match waiting_for.bind_type {
                 KeyBindType::ActiveSkill(slot) => {
@@ -520,7 +569,6 @@ pub fn handle_key_rebind_input(
         break;
     }
 
-    // Check for any mouse press
     for mouse_button in just_pressed_mouse {
         for (entity, waiting_for) in waiting.iter() {
             if waiting_for.ignore_mouse_frames > 0 {
@@ -561,21 +609,67 @@ pub fn handle_key_rebind_input(
     }
 }
 
+fn apply_gamepad_rebind(
+    mappings: &mut GamepadMappings,
+    bind_type: KeyBindType,
+    button: GamepadBindingButton,
+) {
+    match bind_type {
+        KeyBindType::ActiveSkill(slot) => {
+            mappings.clear_active_skill_button_from_other_slots(button, slot);
+            mappings.set_active_skill_button(slot, button);
+        }
+        KeyBindType::Hotbar(slot) => mappings.set_hotbar_button(slot, button),
+        KeyBindType::Inventory => mappings.set_inventory_button(button),
+        KeyBindType::Minimap => mappings.set_minimap_button(button),
+        KeyBindType::Interact => mappings.set_interact_button(button),
+        KeyBindType::AttackAutoTarget => mappings.set_attack_auto_target_button(button),
+    }
+}
+
+fn options_display_binding(
+    bind_type: KeyBindType,
+    keybinds: &InputMappings,
+    gamepad_mappings: &GamepadMappings,
+    gamepads: &Gamepads,
+) -> String {
+    format_binding_label(bind_type.into(), keybinds, gamepad_mappings, gamepads)
+}
+
+impl From<KeyBindType> for BindingLabel {
+    fn from(bind_type: KeyBindType) -> Self {
+        match bind_type {
+            KeyBindType::ActiveSkill(slot) => BindingLabel::ActiveSkill(slot),
+            KeyBindType::Hotbar(slot) => BindingLabel::Hotbar(slot),
+            KeyBindType::Inventory => BindingLabel::Inventory,
+            KeyBindType::Minimap => BindingLabel::Minimap,
+            KeyBindType::Interact => BindingLabel::Interact,
+            KeyBindType::AttackAutoTarget => BindingLabel::AttackAutoTarget,
+        }
+    }
+}
+
 pub fn update_keybind_text(
     keybinds: Res<InputMappings>,
+    gamepad_mappings: Res<GamepadMappings>,
+    gamepads: Res<Gamepads>,
     waiting: Query<&WaitingForKeyInput>,
     mut texts: Query<(&KeyBindText, &mut Text)>,
     mut was_waiting: Local<bool>,
+    mut last_gamepad_connected: Local<Option<bool>>,
 ) {
-    // Collect waiting bind types to avoid borrow issues
     let waiting_binds: Vec<KeyBindType> = waiting.iter().map(|w| w.bind_type).collect();
     let is_waiting = !waiting_binds.is_empty();
+    let use_gamepad = gamepad_connected(&gamepads);
+    let device_changed = last_gamepad_connected.map_or(true, |prev| prev != use_gamepad);
+    *last_gamepad_connected = Some(use_gamepad);
 
-    // Update if:
-    // - Keybinds changed, OR
-    // - There's waiting input, OR
-    // - We just stopped waiting (to show the new key)
-    if !keybinds.is_changed() && !is_waiting && !*was_waiting {
+    if !keybinds.is_changed()
+        && !gamepad_mappings.is_changed()
+        && !is_waiting
+        && !*was_waiting
+        && !device_changed
+    {
         return;
     }
 
@@ -583,20 +677,44 @@ pub fn update_keybind_text(
 
     for (key_text, mut text) in texts.iter_mut() {
         if waiting_binds.contains(&key_text.bind_type) {
-            text.sections[0].value = "Press any key...".to_string();
-            text.sections[0].style.color = crate::colors::WHITE;
-        } else {
-            let key = match key_text.bind_type {
-                KeyBindType::ActiveSkill(slot) => keybinds.get_active_skill_key(slot),
-                KeyBindType::Hotbar(slot) => keybinds.get_hotbar_key(slot),
-                KeyBindType::Inventory => keybinds.get_inventory_key(),
-                KeyBindType::Minimap => keybinds.get_minimap_key(),
-                KeyBindType::Interact => keybinds.get_interact_key(),
-                KeyBindType::AttackAutoTarget => keybinds.get_attack_auto_target_key(),
+            let waiting_gamepad = waiting
+                .iter()
+                .find(|w| w.bind_type == key_text.bind_type)
+                .map(|w| w.capture_gamepad)
+                .unwrap_or(use_gamepad);
+            text.sections[0].value = if waiting_gamepad {
+                "Press any button...".to_string()
+            } else {
+                "Press any key...".to_string()
             };
-            text.sections[0].value = crate::keybinds::get_key_display_name(key);
-            text.sections[0].style.color = crate::colors::WHITE;
+            text.sections[0].style.color = WHITE;
+        } else {
+            text.sections[0].value = options_display_binding(
+                key_text.bind_type,
+                &keybinds,
+                &gamepad_mappings,
+                &gamepads,
+            );
+            text.sections[0].style.color = WHITE;
         }
+    }
+}
+
+pub fn update_options_controls_section_titles(
+    gamepads: Res<Gamepads>,
+    mut titles: Query<(&OptionsControlsSectionTitle, &mut Text)>,
+    mut last_gamepad_connected: Local<Option<bool>>,
+) {
+    let use_gamepad = gamepad_connected(&gamepads);
+    let device_changed = last_gamepad_connected.map_or(true, |prev| prev != use_gamepad);
+    if !device_changed {
+        return;
+    }
+    *last_gamepad_connected = Some(use_gamepad);
+
+    let suffix = if use_gamepad { " (Controller)" } else { "" };
+    for (title, mut text) in titles.iter_mut() {
+        text.sections[0].value = format!("{}{}", title.0, suffix);
     }
 }
 
@@ -724,61 +842,50 @@ pub fn setup_options_ui(
     );
 
     if game_state.0 == crate::GameState::Main {
-        let tutorial_btn = crate::ui::main_menu::spawn_menu_button(
-            Vec3::new(0., -156., z),
-            Vec3::new(-52., -1., 1.),
+        let tutorial_btn = spawn_main_menu_wide_button(
+            Vec3::new(-65., -156., z),
             "Show Tutorial",
-            crate::ui::main_menu::MenuButton::ShowTutorial,
-            Vec2::new(118., 18.),
+            MenuButton::ShowTutorial,
+            UIElement::MainMenuStartButton,
             &mut commands,
             &graphics,
             &asset_server,
-            crate::ui::UIElement::AchievementsButton,
         );
         commands
             .entity(tutorial_btn)
-            .insert((OptionsUI, options_focus(500)));
+            .insert((OptionsUI, options_focus(500), FocusNavBottomRow));
 
-        let exit_button = crate::ui::main_menu::spawn_menu_button(
-            Vec3::new(155., -156., z),
-            Vec3::new(-50., -1., 1.),
+        let exit_button = spawn_main_menu_wide_button(
+            Vec3::new(65., -156., z),
             "Exit to Menu",
-            crate::ui::main_menu::MenuButton::OptionsExit,
-            Vec2::new(118., 18.),
+            MenuButton::OptionsExit,
+            UIElement::MainMenuStartButton,
             &mut commands,
             &graphics,
             &asset_server,
-            crate::ui::UIElement::AchievementsButton,
         );
         commands
             .entity(exit_button)
-            .insert((OptionsUI, options_focus(501)));
+            .insert((OptionsUI, options_focus(501), FocusNavBottomRow));
     } else {
-        let wipe_btn = crate::ui::main_menu::spawn_menu_button(
+        let wipe_btn = spawn_main_menu_wide_button(
             Vec3::new(0., -156., z),
-            Vec3::new(-58., -1., 1.),
-            "Wipe Game Data",
-            crate::ui::main_menu::MenuButton::WipeGameData,
-            Vec2::new(130., 18.),
+            "Wipe Data",
+            MenuButton::WipeGameData,
+            UIElement::MainMenuStartButton,
             &mut commands,
             &graphics,
             &asset_server,
-            crate::ui::UIElement::AchievementsButton,
         );
         commands
             .entity(wipe_btn)
-            .insert((OptionsUI, options_focus(500)));
+            .insert((OptionsUI, options_focus(500), FocusNavBottomRow));
     }
 
-    let back_button = spawn_back_button(
-        Vec3::new(255., -156., z),
-        &mut commands,
-        &graphics,
-        &asset_server,
-    );
+    let back_button = spawn_exit_icon_button(Vec3::new(255., -156., z), &mut commands, &graphics);
     commands
         .entity(back_button)
-        .insert((OptionsUI, options_focus(502)));
+        .insert((OptionsUI, options_focus(502), FocusNavBottomRow));
 }
 
 fn spawn_options_tab_column(
@@ -841,6 +948,38 @@ fn spawn_options_tab_column(
     }
 }
 
+fn spawn_controls_section_title(
+    commands: &mut Commands,
+    asset_server: &AssetServer,
+    title: &'static str,
+    pos: Vec3,
+    tab: OptionsTab,
+    active: OptionsTab,
+) {
+    commands.spawn((
+        Text2dBundle {
+            text: Text::from_section(
+                title,
+                TextStyle {
+                    font: asset_server.load("fonts/alagard.ttf"),
+                    font_size: 15.0,
+                    color: YELLOW_2,
+                },
+            )
+            .with_alignment(TextAlignment::Left),
+            text_anchor: bevy::sprite::Anchor::CenterLeft,
+            transform: Transform::from_translation(pos),
+            visibility: tab_visibility(tab, active),
+            ..Default::default()
+        },
+        RenderLayers::from_layers(&[3]),
+        OptionsUI,
+        OptionsTabContent(tab),
+        OptionsControlsSectionTitle(title),
+        Name::new(format!("Options Controls Section: {title}")),
+    ));
+}
+
 fn spawn_options_section_title(
     commands: &mut Commands,
     asset_server: &AssetServer,
@@ -856,7 +995,7 @@ fn spawn_options_section_title(
                 TextStyle {
                     font: asset_server.load("fonts/alagard.ttf"),
                     font_size: 15.0,
-                    color: WHITE,
+                    color: YELLOW_2,
                 },
             )
             .with_alignment(TextAlignment::Left),
@@ -1100,7 +1239,7 @@ fn spawn_controls_tab_content(
     let top_y = 90. + OPTIONS_BODY_Y_OFFSET;
 
     let mut skills_y = top_y;
-    spawn_options_section_title(
+    spawn_controls_section_title(
         commands,
         asset_server,
         "Active Skill",
@@ -1128,7 +1267,7 @@ fn spawn_controls_tab_content(
     }
 
     skills_y += row_spacing * 0.5;
-    spawn_options_section_title(
+    spawn_controls_section_title(
         commands,
         asset_server,
         "Hotbar",
@@ -1156,7 +1295,7 @@ fn spawn_controls_tab_content(
     }
 
     let mut other_y = top_y;
-    spawn_options_section_title(
+    spawn_controls_section_title(
         commands,
         asset_server,
         "Other",
@@ -1752,8 +1891,8 @@ pub fn handle_cheat_checkbox_click(
             continue;
         }
 
-        let should_toggle = (is_hit && left_mouse_released)
-            || (is_focused && focus_input.confirm_just_pressed());
+        let should_toggle =
+            (is_hit && left_mouse_released) || (is_focused && focus_input.confirm_just_pressed());
         if !should_toggle {
             continue;
         }
@@ -1791,8 +1930,7 @@ pub fn handle_cheat_checkbox_click(
                 cheat_settings.show_tile_hover
             }
             OptionsCheckboxType::BypassTimeCrystalPool => {
-                cheat_settings.bypass_time_crystal_pool =
-                    !cheat_settings.bypass_time_crystal_pool;
+                cheat_settings.bypass_time_crystal_pool = !cheat_settings.bypass_time_crystal_pool;
                 cheat_settings.bypass_time_crystal_pool
             }
             OptionsCheckboxType::HideAttackAnims => {
@@ -2186,7 +2324,7 @@ fn spawn_sensitivity_row(
         Name::new("Sensitivity Label"),
     ));
 
-    let controls_x = label_pos.x + 50.;
+    let controls_x = label_pos.x + 70.;
 
     let minus_entity = commands
         .spawn(SpriteBundle {
@@ -2966,6 +3104,7 @@ pub fn handle_options_focus_row_input(
         return;
     };
     let Ok(row) = focus_rows.get(focused) else {
+        *last_stick_dir = None;
         return;
     };
 
@@ -2974,7 +3113,10 @@ pub fn handle_options_focus_row_input(
         | OptionsRowKind::Scale(_)
         | OptionsRowKind::CursorColor
         | OptionsRowKind::Sensitivity => row.0,
-        OptionsRowKind::Checkbox(_) | OptionsRowKind::Keybind(_) => return,
+        OptionsRowKind::Checkbox(_) | OptionsRowKind::Keybind(_) => {
+            *last_stick_dir = None;
+            return;
+        }
     };
 
     let Some(dir) = ui_nav_dir_just_pressed(

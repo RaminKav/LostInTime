@@ -557,6 +557,7 @@ impl Plugin for UIPlugin {
             .init_resource::<AchievementsPagination>()
             .init_resource::<MicrowaveShrineUsages>()
             .insert_resource(crate::keybinds::InputMappings::load())
+            .insert_resource(crate::gamepad_bindings::GamepadMappings::load())
             .init_resource::<CurrentNameInput>()
             .init_resource::<ActiveSkillDragState>()
             .init_resource::<CursorBlinkTimer>()
@@ -1072,6 +1073,7 @@ impl Plugin for UIPlugin {
                     update_keybind_text
                         .run_if(in_state(UIState::Options))
                         .after(handle_key_rebind_input),
+                    update_options_controls_section_titles.run_if(in_state(UIState::Options)),
                     handle_cheat_checkbox_click.run_if(in_state(UIState::Options)),
                     update_cheat_checkbox_visual
                         .run_if(in_state(UIState::Options))
@@ -1230,6 +1232,10 @@ impl Plugin for UIPlugin {
             .add_system(
                 player_hud::cancel_active_skill_drag_on_state_exit
                     .in_schedule(OnExit(GameState::Main)),
+            )
+            .add_system(
+                update_options_keybind_text
+                    .in_set(OnUpdate(GameState::Main)),
             )
             .add_system(
                 update_active_skill_keybind_text

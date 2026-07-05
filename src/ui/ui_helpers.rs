@@ -219,7 +219,7 @@ pub fn format_number(value: i64) -> String {
 pub fn spawn_keybind_badge(
     commands: &mut Commands,
     asset_server: &AssetServer,
-    key: InputBinding,
+    label: impl Into<String>,
     transform: Transform,
     parent: Option<Entity>,
     render_layer: u8,
@@ -242,7 +242,7 @@ pub fn spawn_keybind_badge(
     let key_text = commands
         .spawn(Text2dBundle {
             text: Text::from_section(
-                crate::keybinds::get_key_display_name(key),
+                label.into(),
                 TextStyle {
                     font: asset_server.load("fonts/slkscr.ttf"),
                     font_size: 8.4,
