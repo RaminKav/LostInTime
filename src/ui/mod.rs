@@ -575,6 +575,7 @@ impl Plugin for UIPlugin {
             .add_event::<GlobalTextMessageEvent>()
             .add_event::<RemoveFromSlotEvent>()
             .add_event::<ToolTipUpdateEvent>()
+            .init_resource::<crate::ui::interactions::ControllerCarry>()
             .init_resource::<BeaconGuidanceRegistry>()
             .init_resource::<BlacksmithPurchaseTracker>()
             .init_resource::<EssenceShopCache>()
@@ -851,6 +852,31 @@ impl Plugin for UIPlugin {
                     handle_spawn_inv_item_tooltip,
                     update_inventory_ui.after(CustomFlush),
                     handle_update_inv_item_entities,
+                )
+                    .in_set(OnUpdate(GameState::Main)),
+            )
+            .add_systems(
+                (
+                    crate::ui::interactions::sync_inventory_focus_hover
+                        .after(handle_interaction_clicks)
+                        .after(handle_sort_inventory_button_click)
+                        .after(handle_material_drops_toggle_button_click)
+                        .after(handle_damage_tracker_toggle_button_click)
+                        .after(handle_cursor_inventory_craft_toggle_button)
+                        .before(handle_hovering)
+                        .run_if(not(in_state(UIState::Closed))),
+                    crate::ui::interactions::handle_inventory_focus_carry
+                        .after(upgrade_drag::handle_drag_upgrade_material_on_equipment)
+                        .after(handle_interaction_clicks)
+                        .before(handle_item_drop_clicks)
+                        .run_if(not(in_state(UIState::Closed))),
+                    crate::ui::interactions::handle_inventory_focus_quick_action
+                        .after(handle_interaction_clicks)
+                        .before(handle_item_drop_clicks)
+                        .run_if(not(in_state(UIState::Closed))),
+                    crate::ui::interactions::position_controller_carried_item
+                        .after(handle_dragging)
+                        .run_if(not(in_state(UIState::Closed))),
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
@@ -1149,6 +1175,7 @@ impl Plugin for UIPlugin {
                     handle_submit_merchant_purchase
                         .run_if(resource_exists::<EssenceShopChoices>()),
                     handle_merchant_shop_interactions.run_if(in_state(UIState::Essence)),
+                    update_merchant_track_info_box_label.run_if(in_state(UIState::Essence)),
                     handle_merchant_done_button.run_if(in_state(UIState::Essence)),
                     handle_merchant_category_reroll_buttons.run_if(in_state(UIState::Essence)),
                     handle_merchant_category_reroll_event.run_if(in_state(UIState::Essence)),
@@ -1605,7 +1632,7 @@ pub fn handle_new_ui_state(
     chest_option: Option<Res<ChestContainer>>,
     scrapper_option: Option<Res<ScrapperContainer>>,
     furnace_option: Option<Res<FurnaceContainer>>,
-    mut hotbar_slots: Query<(&mut Visibility, &mut InventorySlotState), Without<Interactable>>,
+    mut hotbar_slots: Query<(Entity, &mut Visibility, &mut InventorySlotState)>,
     tip_boxes: Query<Entity, With<tips::TipBox>>,
     minimap_open: Res<minimap::IslandMapOpen>,
     mut drop_filter_menu_open: ResMut<crate::inventory::MaterialDropFilterMenuOpen>,
@@ -1692,10 +1719,14 @@ pub fn handle_new_ui_state(
         commands.remove_resource::<EssenceShopChoices>();
     }
     if let Some(next_ui) = &next_ui_state.0 {
-        for (mut hbv, mut state) in hotbar_slots.iter_mut() {
+        for (entity, mut hbv, mut state) in hotbar_slots.iter_mut() {
+            if !state.r#type.is_hotbar() {
+                continue;
+            }
             if !next_ui.is_inv_open() {
                 state.dirty = true;
             }
+            commands.entity(entity).remove::<Focusable>();
             *hbv = if next_ui.is_inv_open() {
                 Visibility::Hidden
             } else {

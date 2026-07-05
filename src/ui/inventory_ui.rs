@@ -16,6 +16,7 @@ use crate::colors::{
 };
 use crate::cursor::CursorPos;
 use crate::custom_commands::CommandsExt;
+use crate::ui::focus::Focusable;
 use crate::night::{InfiniteMode, InfiniteModeStartedEvent};
 use crate::enemy::spawner::MobSpawningPaused;
 use crate::item::active_skill_shrine::assign_shrine_skill_to_slot;
@@ -793,6 +794,10 @@ pub fn setup_inv_ui(
         .insert(Interactable::default())
         .insert(UIElement::CraftButton)
         .insert(CraftModeToggleButton)
+        .insert(Focusable {
+            group: cur_inv_state.0.clone(),
+            index: INV_FOCUS_CRAFT_TOGGLE,
+        })
         .insert(cur_inv_state.0.clone())
         .insert(Name::new("CRAFT/UPGRADE TOGGLE"))
         .id();
@@ -1141,6 +1146,7 @@ pub fn setup_inv_slots_ui(
                 &asset_server,
                 &inv_query,
                 inv_state_res.inv_size,
+                &inv_state.0,
             );
             spawn_material_drops_toggle_button(
                 &mut commands,
@@ -1148,6 +1154,7 @@ pub fn setup_inv_slots_ui(
                 &asset_server,
                 &inv_query,
                 inv_state_res.inv_size,
+                &inv_state.0,
             );
             if inv_state.0 == UIState::Inventory || inv_state.0 == UIState::InventoryCrafting {
                 spawn_damage_tracker_toggle_button(
@@ -1156,6 +1163,7 @@ pub fn setup_inv_slots_ui(
                     &asset_server,
                     &inv_query,
                     inv_state_res.inv_size,
+                    &inv_state.0,
                 );
             }
             let (panel_pos_offset, panel_inv_size) =
@@ -1202,6 +1210,7 @@ fn spawn_sort_inventory_button(
     asset_server: &AssetServer,
     inv_query: &Query<Entity, With<InventoryUI>>,
     inv_size: Vec2,
+    ui_state: &UIState,
 ) {
     let hw = inv_size.x * 0.5;
     let hh = inv_size.y * 0.5;
@@ -1232,6 +1241,10 @@ fn spawn_sort_inventory_button(
         // `handle_sort_inventory_button_click`.
         .insert(Interactable::default())
         .insert(SortInventoryButton)
+        .insert(Focusable {
+            group: ui_state.clone(),
+            index: INV_FOCUS_SORT,
+        })
         .insert(IconHoverTooltipText(&["Sort inventory"]))
         .insert(Name::new("SORT INVENTORY BUTTON"))
         .id();
@@ -1272,6 +1285,7 @@ fn spawn_material_drops_toggle_button(
     asset_server: &AssetServer,
     inv_query: &Query<Entity, With<InventoryUI>>,
     inv_size: Vec2,
+    ui_state: &UIState,
 ) {
     let hw = inv_size.x * 0.5;
     let hh = inv_size.y * 0.5;
@@ -1318,6 +1332,10 @@ fn spawn_material_drops_toggle_button(
         .insert(RenderLayers::from_layers(&[3]))
         .insert(Interactable::default())
         .insert(MaterialDropsToggleButton)
+        .insert(Focusable {
+            group: ui_state.clone(),
+            index: INV_FOCUS_MATERIAL_DROPS,
+        })
         .insert(IconHoverTooltipText(&["Open drop filter menu"]))
         .insert(Name::new("MATERIAL DROPS TOGGLE BUTTON"))
         .id();
@@ -1351,6 +1369,7 @@ fn spawn_damage_tracker_toggle_button(
     asset_server: &AssetServer,
     inv_query: &Query<Entity, With<InventoryUI>>,
     inv_size: Vec2,
+    ui_state: &UIState,
 ) {
     let hw = inv_size.x * 0.5;
     let hh = inv_size.y * 0.5;
@@ -1377,6 +1396,10 @@ fn spawn_damage_tracker_toggle_button(
         .insert(RenderLayers::from_layers(&[3]))
         .insert(Interactable::default())
         .insert(DamageTrackerToggleButton)
+        .insert(Focusable {
+            group: ui_state.clone(),
+            index: INV_FOCUS_DAMAGE_TRACKER,
+        })
         .insert(IconHoverTooltipText(&["Toggle damage tracker"]))
         .insert(Name::new("DAMAGE TRACKER TOGGLE BUTTON"))
         .id();
@@ -1801,6 +1824,35 @@ fn inv_slot_local_position(
     }
 }
 
+/// Stable [`Focusable::index`] for an inventory slot. Navigation itself is position-based, so
+/// this only drives default-focus (lowest index = main grid slot 0) and tie-breaks. Non-grid
+/// slot types get disjoint index ranges so they never collide with the main grid.
+fn inv_focus_index(slot_type: InventorySlotType, slot_index: usize) -> u32 {
+    let base = match slot_type {
+        InventorySlotType::Normal => 0,
+        InventorySlotType::Hotbar => INV_FOCUS_HOTBAR_BASE,
+        InventorySlotType::Equipment => 100,
+        InventorySlotType::Accessory => 110,
+        InventorySlotType::Weapon => 120,
+        InventorySlotType::Pet => 121,
+        InventorySlotType::Trash => 130,
+        InventorySlotType::Furnace => 140,
+        InventorySlotType::CraftingInput => 150,
+        InventorySlotType::Crafting => 160,
+        InventorySlotType::Chest => 200,
+        InventorySlotType::Scrapper => 300,
+    };
+    base + slot_index as u32
+}
+
+/// Focus index base for HUD hotbar slots (slot 0 → 90, slot 1 → 91, …).
+pub const INV_FOCUS_HOTBAR_BASE: u32 = 90;
+/// Focus indices for the left-edge sidebar controls (trash slot uses [`inv_focus_index`] → 130).
+pub const INV_FOCUS_SORT: u32 = 131;
+pub const INV_FOCUS_MATERIAL_DROPS: u32 = 132;
+pub const INV_FOCUS_DAMAGE_TRACKER: u32 = 133;
+pub const INV_FOCUS_CRAFT_TOGGLE: u32 = 134;
+
 pub fn spawn_inv_slot(
     commands: &mut Commands,
     inv_ui_state: &Res<State<UIState>>,
@@ -1987,6 +2039,17 @@ pub fn spawn_inv_slot(
     } else {
         // Hotbar slots also get Interactable for click detection when inventory is closed
         slot_entity.insert(Interactable::from_state(interactable_state));
+    }
+
+    // Controller/keyboard focus navigation (Track 4): panel slots get `Focusable` at spawn time.
+    // HUD hotbar slots are a separate row at the bottom of the screen — they stay hidden and
+    // non-focusable while the inventory panel is open; hotbar items are managed via the main
+    // bag grid (Normal slots 0..N, same backing indices).
+    if inv_ui_state.0.is_inv_open() && !slot_type.is_hotbar() {
+        slot_entity.insert(Focusable {
+            group: inv_ui_state.0.clone(),
+            index: inv_focus_index(slot_type, slot_index),
+        });
     }
 
     if let Some(icon_entity) = icon_entity_option {
@@ -2748,54 +2811,54 @@ pub fn handle_cursor_inventory_craft_toggle_button(
     mut tutorial_popup_events: EventWriter<crate::ui::tutorial_ui::TutorialPopupEvent>,
     seen_tutorial_chunks: Option<Res<crate::ui::tutorial_ui::SeenTutorialChunks>>,
     tutorial_ui: Query<(), With<crate::ui::tutorial_ui::TutorialUI>>,
+    ui_focus: Res<crate::ui::focus::UiFocus>,
+    mouseless: Res<crate::inputs::MouselessModeState>,
 ) {
     let hit_test = super::ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
+    let focus_driving = mouseless.0 || cursor_pos.suppress_ui_hover;
 
     for (e, mut interactable, _) in toggle_buttons.iter_mut() {
-        match hit_test {
-            Some((hit_ent, _, _)) if hit_ent == e => match interactable.current() {
-                Interaction::None => {
-                    interactable.change(Interaction::Hovering);
+        let is_focused = ui_focus.is_focused(e);
+        let is_hit = hit_test.map(|(ent, _, _)| ent == e).unwrap_or(false);
+
+        // Mouse hover only — focus-driven hover is handled by `sync_inventory_focus_hover`.
+        if is_hit {
+            if !matches!(interactable.current(), Interaction::Hovering) {
+                interactable.change(Interaction::Hovering);
+            }
+        } else if !is_focused && matches!(interactable.current(), Interaction::Hovering) {
+            interactable.change(Interaction::None);
+        }
+
+        if (left_mouse_pressed && is_hit)
+            || (focus_driving && is_focused && ui_focus.confirm_just_pressed)
+        {
+            let target = match curr_ui_state.0 {
+                UIState::Inventory => UIState::InventoryCrafting,
+                UIState::InventoryCrafting => UIState::Inventory,
+                _ => continue,
+            };
+            // Leaving the upgrade panel: if an equipment piece is sitting in the
+            // upgrade slot and an appropriate equipment slot is empty, auto-equip
+            // it so the player doesn't lose sight of it behind the crafting panel.
+            if curr_ui_state.0 == UIState::Inventory && target == UIState::InventoryCrafting {
+                if let Ok(mut inv) = inv.get_single_mut() {
+                    try_auto_equip_from_upgrade_slot(&mut inv, &proto, &mut inv_slots);
                 }
-                Interaction::Hovering => {
-                    if left_mouse_pressed {
-                        let target = match curr_ui_state.0 {
-                            UIState::Inventory => UIState::InventoryCrafting,
-                            UIState::InventoryCrafting => UIState::Inventory,
-                            _ => continue,
-                        };
-                        // Leaving the upgrade panel: if an equipment piece is sitting in the
-                        // upgrade slot and an appropriate equipment slot is empty, auto-equip
-                        // it so the player doesn't lose sight of it behind the crafting panel.
-                        if curr_ui_state.0 == UIState::Inventory
-                            && target == UIState::InventoryCrafting
-                        {
-                            if let Ok(mut inv) = inv.get_single_mut() {
-                                try_auto_equip_from_upgrade_slot(&mut inv, &proto, &mut inv_slots);
-                            }
-                            if let Some(seen_tutorial_chunks) = seen_tutorial_chunks.as_ref() {
-                                crate::ui::tutorial_ui::try_craft_button_tutorial(
-                                    &mut tutorial_popup_events,
-                                    seen_tutorial_chunks,
-                                    &tutorial_ui,
-                                );
-                            }
-                        }
-                        next_ui_state.set(target);
-                        commands.spawn(crate::audio::SoundSpawner::new(
-                            crate::audio::AudioSoundEffect::ButtonClick,
-                            0.2,
-                        ));
-                    }
-                }
-                _ => (),
-            },
-            _ => {
-                if matches!(interactable.current(), Interaction::Hovering) {
-                    interactable.change(Interaction::None);
+                if let Some(seen_tutorial_chunks) = seen_tutorial_chunks.as_ref() {
+                    crate::ui::tutorial_ui::try_craft_button_tutorial(
+                        &mut tutorial_popup_events,
+                        seen_tutorial_chunks,
+                        &tutorial_ui,
+                    );
                 }
             }
+            next_ui_state.set(target);
+            commands.spawn(crate::audio::SoundSpawner::new(
+                crate::audio::AudioSoundEffect::ButtonClick,
+                0.2,
+            ));
         }
     }
 }
@@ -2843,7 +2906,7 @@ pub fn handle_crafting_ingredient_tooltip_hover(
                         &proto,
                         slot.slot_index,
                         shift_key_pressed,
-                        slot_transforms.get(e).ok().map(|t| t.translation().y),
+                        slot_transforms.get(e).ok().map(|t| t.translation().truncate()),
                         &mut tooltip_update,
                     );
                 }
@@ -2856,7 +2919,7 @@ pub fn handle_crafting_ingredient_tooltip_hover(
                             &proto,
                             slot.slot_index,
                             shift_key_pressed,
-                            slot_transforms.get(e).ok().map(|t| t.translation().y),
+                            slot_transforms.get(e).ok().map(|t| t.translation().truncate()),
                             &mut tooltip_update,
                         );
                     }
@@ -2882,7 +2945,7 @@ fn send_crafting_ingredient_tooltip(
     proto: &ProtoParam,
     slot_index: usize,
     show_range: bool,
-    anchor_ui_y: Option<f32>,
+    anchor_ui: Option<Vec2>,
     tooltip_update: &mut EventWriter<crate::ui::ToolTipUpdateEvent>,
 ) {
     let Some(recipe_obj) = selected.0 else {
@@ -2899,7 +2962,7 @@ fn send_crafting_ingredient_tooltip(
             item_stack: item_data.clone(),
             is_recipe: false,
             show_range,
-            anchor_ui_y,
+            anchor_ui,
             ..Default::default()
         });
     }

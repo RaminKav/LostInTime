@@ -138,6 +138,26 @@ impl UiShadow {
     }
 }
 
+/// Yellow "valid upgrade target" highlight (Track 4 controller carry): while carrying an
+/// `UpgradeTome` / `OrbOfTransformation` via focus navigation, every inventory item icon that
+/// the material can be applied to gets a bright 1px outline so gamepad players can see where the
+/// upgrade will land (the mouse relies on hovering, which the controller can't do).
+pub const UPGRADE_TARGET_OUTLINE_COLOR: Color = Color::rgba(1.0, 0.85, 0.15, 1.0);
+
+/// Marker on an item-icon entity that currently has a spawned upgrade-target highlight child.
+#[derive(Component)]
+pub struct UpgradeTargetHighlighted;
+
+/// Marker on the spawned child mesh that draws the yellow upgrade-target outline.
+#[derive(Component)]
+pub struct UpgradeTargetHighlightChild;
+
+/// Caches yellow upgrade-highlight materials per atlas sprite index.
+#[derive(Resource, Default)]
+pub struct UpgradeHighlightState {
+    pub materials: HashMap<usize, Handle<AtlasSpriteOutlineMaterial>>,
+}
+
 /// Marks a sprite whose child shadow has already been spawned (so we don't duplicate it).
 #[derive(Component)]
 pub struct UiShadowApplied;
@@ -194,6 +214,7 @@ impl Plugin for ItemDropOutlinePlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<AtlasSpriteOutlineState>()
             .init_resource::<UiShadowState>()
+            .init_resource::<UpgradeHighlightState>()
             .init_resource::<HeirloomIconAtlasLookup>()
             .add_plugin(Material2dPlugin::<AtlasSpriteOutlineMaterial>::default())
             .add_system(init_heirloom_icon_atlas_lookup)
@@ -202,6 +223,7 @@ impl Plugin for ItemDropOutlinePlugin {
                 refresh_outlined_cursor_on_settings_change.before(apply_atlas_sprite_outlines),
             )
             .add_system(apply_atlas_sprite_outlines)
+            .add_system(update_upgrade_target_highlights)
             .add_system(spawn_ui_shadows);
     }
 }
@@ -627,6 +649,160 @@ fn apply_outline_to_entity(
         .insert((mesh, material))
         .remove::<TextureAtlasSprite>()
         .remove::<Handle<TextureAtlas>>();
+}
+
+/// Local Z of the highlight child relative to the item icon — just behind the icon so the
+/// yellow rings peek out around the art without tinting the icon itself.
+const UPGRADE_HIGHLIGHT_CHILD_Z: f32 = -0.2;
+
+/// Spawns/removes the yellow "valid upgrade target" outline on inventory item icons while an
+/// upgrade material is being carried via focus navigation.
+#[allow(clippy::too_many_arguments)]
+fn update_upgrade_target_highlights(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<AtlasSpriteOutlineMaterial>>,
+    mut state: ResMut<UpgradeHighlightState>,
+    atlases: Res<Assets<TextureAtlas>>,
+    ui_state: Res<State<crate::ui::UIState>>,
+    inv_state: Res<crate::ui::InventoryState>,
+    dragged: Query<&crate::inventory::ItemStack, With<crate::ui::DraggedItem>>,
+    slots: Query<&crate::ui::InventorySlotState>,
+    icon_sprites: Query<(
+        &TextureAtlasSprite,
+        &Handle<TextureAtlas>,
+        Option<&RenderLayers>,
+    )>,
+    highlighted: Query<Entity, With<UpgradeTargetHighlighted>>,
+    children_q: Query<&Children>,
+    highlight_children: Query<(), With<UpgradeTargetHighlightChild>>,
+) {
+    let carrying_material = ui_state.0.is_inv_open()
+        && dragged.iter().any(|s| {
+            matches!(
+                s.obj_type,
+                crate::item::WorldObject::UpgradeTome
+                    | crate::item::WorldObject::OrbOfTransformation
+            )
+        });
+
+    let clear_all = |commands: &mut Commands| {
+        for icon in highlighted.iter() {
+            despawn_upgrade_highlight_children(commands, icon, &children_q, &highlight_children);
+            commands.entity(icon).remove::<UpgradeTargetHighlighted>();
+        }
+    };
+
+    if !carrying_material {
+        clear_all(&mut commands);
+        return;
+    }
+
+    // Collect icon entities of every slot that can currently receive the material.
+    let mut valid_icons: bevy::utils::HashSet<Entity> = bevy::utils::HashSet::new();
+    for slot in slots.iter() {
+        let Some(icon) = slot.item else {
+            continue;
+        };
+        if !crate::ui::upgrade_drag::slot_type_accepts_in_place_upgrade(slot.r#type) {
+            continue;
+        }
+        if slot.r#type == crate::ui::InventorySlotType::Furnace && slot.slot_index == 0 {
+            continue;
+        }
+        let Some(obj) = slot.obj_type else {
+            continue;
+        };
+        if !crate::ui::upgrade_drag::is_upgradeable_equipment(obj, &inv_state) {
+            continue;
+        }
+        valid_icons.insert(icon);
+    }
+
+    // Remove highlights that are no longer valid.
+    for icon in highlighted.iter() {
+        if !valid_icons.contains(&icon) {
+            despawn_upgrade_highlight_children(
+                &mut commands,
+                icon,
+                &children_q,
+                &highlight_children,
+            );
+            commands.entity(icon).remove::<UpgradeTargetHighlighted>();
+        }
+    }
+
+    // Add highlights to newly valid icons.
+    for icon in valid_icons {
+        if highlighted.get(icon).is_ok() {
+            continue;
+        }
+        let Ok((sprite, atlas_handle, render_layers)) = icon_sprites.get(icon) else {
+            continue;
+        };
+        let Some(atlas) = atlases.get(atlas_handle) else {
+            continue;
+        };
+
+        let rect = atlas.textures[sprite.index];
+        let atlas_size = atlas.size;
+        let uv_bounds = Vec4::new(
+            rect.min.x / atlas_size.x,
+            rect.min.y / atlas_size.y,
+            rect.max.x / atlas_size.x,
+            rect.max.y / atlas_size.y,
+        );
+
+        let material = state
+            .materials
+            .entry(sprite.index)
+            .or_insert_with(|| {
+                materials.add(AtlasSpriteOutlineMaterial {
+                    uv_bounds,
+                    outline_color: UPGRADE_TARGET_OUTLINE_COLOR.into(),
+                    // shadow_only = 1.0 → draw only the outline rings, not the sprite itself.
+                    ring_params: Vec4::new(1.0, 0.0, 1.0, 0.0),
+                    source_texture: Some(atlas.texture.clone()),
+                })
+            })
+            .clone();
+
+        let mesh = mesh_from_atlas_sprite(&mut meshes, atlas, sprite);
+        let layers = render_layers
+            .cloned()
+            .unwrap_or_else(|| RenderLayers::layer(3));
+        let child = commands
+            .spawn((
+                mesh,
+                material,
+                SpatialBundle::from_transform(Transform::from_xyz(
+                    0.,
+                    0.,
+                    UPGRADE_HIGHLIGHT_CHILD_Z,
+                )),
+                layers,
+                UpgradeTargetHighlightChild,
+                Name::new("Upgrade Target Highlight"),
+            ))
+            .id();
+        safe_add_child(&mut commands, icon, child);
+        commands.entity(icon).insert(UpgradeTargetHighlighted);
+    }
+}
+
+fn despawn_upgrade_highlight_children(
+    commands: &mut Commands,
+    icon: Entity,
+    children_q: &Query<&Children>,
+    highlight_children: &Query<(), With<UpgradeTargetHighlightChild>>,
+) {
+    if let Ok(children) = children_q.get(icon) {
+        for child in children.iter() {
+            if highlight_children.get(*child).is_ok() {
+                commands.entity(*child).despawn_recursive();
+            }
+        }
+    }
 }
 
 fn color_cache_key(color: Color) -> u32 {

@@ -3,6 +3,7 @@ use bevy_aseprite::{anim::AsepriteAnimation, aseprite, AsepriteBundle};
 
 use crate::{
     assets::{asset_helpers::spawn_sprite, Graphics},
+    inputs::MouselessModeState,
     attributes::{
         add_item_glows,
         health_regen::{effective_regen_period_secs, HealthRegenTimer, ManaRegenTimer},
@@ -76,15 +77,13 @@ pub fn clamp_tooltip_center_y(y: f32, half_height: f32, game_height: f32, edge_p
     y.clamp(min_y, max_y)
 }
 
-/// Cursor-anchored inventory item tooltip position (defaults to the right of the cursor).
+/// Inventory item tooltip position beside an anchor point (cursor or slot center).
 ///
-/// X follows the cursor; Y tracks `anchor_y` (hovered slot center when available). The card
-/// is vertically centered on that row with a slight upward bias so the pointer sits in the
-/// upper portion of the tooltip. Top-edge placement was collapsing most rows to one Y because
-/// the large item card is taller than half the viewport.
-pub fn inventory_item_tooltip_cursor_offset(
-    cursor: Vec2,
-    anchor_y: f32,
+/// The card is vertically centered on the anchor row with a slight upward bias. Top-edge
+/// placement was collapsing most rows to one Y because the large item card is taller than
+/// half the viewport.
+pub fn inventory_item_tooltip_anchor_offset(
+    anchor: Vec2,
     tooltip_size: Vec2,
     game_width: f32,
     game_height: f32,
@@ -97,8 +96,8 @@ pub fn inventory_item_tooltip_cursor_offset(
     let half_h = tooltip_size.y * 0.5;
     let screen_half_w = game_width * 0.5;
 
-    let right_x = cursor.x + half_w + HORIZONTAL_GAP;
-    let left_x = cursor.x - half_w - HORIZONTAL_GAP;
+    let right_x = anchor.x + half_w + HORIZONTAL_GAP;
+    let left_x = anchor.x - half_w - HORIZONTAL_GAP;
     let x = if right_x + half_w <= screen_half_w - EDGE_PAD {
         right_x
     } else if left_x - half_w >= -screen_half_w + EDGE_PAD {
@@ -108,9 +107,28 @@ pub fn inventory_item_tooltip_cursor_offset(
     };
 
     let anchor_bias = tooltip_size.y * ANCHOR_FRAC_FROM_TOP - half_h;
-    let y = clamp_tooltip_center_y(anchor_y + anchor_bias, half_h, game_height, EDGE_PAD);
+    let y = clamp_tooltip_center_y(anchor.y + anchor_bias, half_h, game_height, EDGE_PAD);
 
     Vec2::new(clamp_tooltip_center_x(x, half_w, game_width, EDGE_PAD), y)
+}
+
+/// Chooses the tooltip anchor for inventory item cards.
+///
+/// Mouse hover keeps X on the cursor while Y tracks the hovered slot when known. Controller /
+/// mouseless focus uses the full slot center so the card stays beside the focused slot.
+pub fn inventory_item_tooltip_placement_anchor(
+    cursor: Vec2,
+    slot_anchor: Option<Vec2>,
+    focus_driving: bool,
+) -> Vec2 {
+    if focus_driving {
+        slot_anchor.unwrap_or(cursor)
+    } else {
+        Vec2::new(
+            cursor.x,
+            slot_anchor.map(|a| a.y).unwrap_or(cursor.y),
+        )
+    }
 }
 
 #[derive(Component)]
@@ -137,8 +155,9 @@ pub struct ToolTipUpdateEvent {
     pub item_stack: ItemStack,
     pub is_recipe: bool,
     pub show_range: bool,
-    /// Hovered inventory slot center Y in UI space; used for cursor-anchored tooltip placement.
-    pub anchor_ui_y: Option<f32>,
+    /// Hovered inventory slot center in UI space. Y is used for mouse-hover placement; the full
+    /// point anchors the card beside the slot when controller/mouseless focus is driving.
+    pub anchor_ui: Option<Vec2>,
     /// When `Some`, the tooltip card is placed at exactly this `(x, y)` offset relative to
     /// the inventory / essence / item-chest parent, bypassing the `UIState`-based default
     /// position. Also marks this event as a *secondary* tooltip: the dispatcher skips the
@@ -272,6 +291,7 @@ pub fn handle_spawn_inv_item_tooltip(
     player_inv: Query<&Inventory, With<Player>>,
     mut tooltip_manager: ResMut<TooltipsManager>,
     cursor_pos: Res<CursorPos>,
+    mouseless: Res<MouselessModeState>,
     resolution: Res<ScreenResolution>,
 ) {
     for item in updates.iter() {
@@ -302,10 +322,15 @@ pub fn handle_spawn_inv_item_tooltip(
         } else if let Some(p) = item.position_override {
             p
         } else {
+            let focus_driving = mouseless.0 || cursor_pos.suppress_ui_hover;
+            let tooltip_anchor = inventory_item_tooltip_placement_anchor(
+                cursor_pos.ui_coords.truncate(),
+                item.anchor_ui,
+                focus_driving,
+            );
             match cur_inv_state.0 {
-                UIState::Inventory => inventory_item_tooltip_cursor_offset(
-                    cursor_pos.ui_coords.truncate(),
-                    item.anchor_ui_y.unwrap_or(cursor_pos.ui_coords.y),
+                UIState::Inventory => inventory_item_tooltip_anchor_offset(
+                    tooltip_anchor,
                     ITEM_TOOLTIP_LARGE_CARD_SIZE,
                     resolution.game_width,
                     resolution.game_height,
@@ -313,6 +338,13 @@ pub fn handle_spawn_inv_item_tooltip(
                 UIState::InventoryCrafting => {
                     if item.is_recipe {
                         Vec2::new(0., INVENTORY_Y_OFFSET)
+                    } else if focus_driving && item.anchor_ui.is_some() {
+                        inventory_item_tooltip_anchor_offset(
+                            tooltip_anchor,
+                            ITEM_TOOLTIP_LARGE_CARD_SIZE,
+                            resolution.game_width,
+                            resolution.game_height,
+                        )
                     } else {
                         right_side_offset
                     }

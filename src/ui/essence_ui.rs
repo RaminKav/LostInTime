@@ -7,6 +7,8 @@ use strum::IntoEnumIterator;
 use crate::{
     animations::DoneAnimation,
     assets::Graphics,
+    gamepad_bindings::{gamepad_connected, get_gamepad_display_name, GamepadBindingButton},
+    keybinds::{get_key_display_name, InputBinding, InputMappings},
     attributes::{
         attribute_helpers::create_new_random_item_stack_with_attributes, AttributeChangeEvent,
         ItemGlow, ItemRarity, LootRateBonus,
@@ -308,6 +310,10 @@ pub struct MerchantWorldMarkerPriceText {
 #[derive(Component)]
 pub struct MerchantTrackInfoBox;
 
+/// Header line inside [`MerchantTrackInfoBox`]; updated when input device / bindings change.
+#[derive(Component)]
+pub struct MerchantTrackInfoBoxHeaderText;
+
 #[derive(Component)]
 pub struct MerchantHeirloomHover {
     pub heirloom: Heirloom,
@@ -598,6 +604,25 @@ fn spawn_price_badge(
     commands.entity(badge).set_parent(row);
 }
 
+/// First line of the merchant track info box (`"Press X:"`, `"Right click:"`, etc.).
+pub fn format_merchant_track_action_header(
+    keybinds: &InputMappings,
+    gamepads: &Gamepads,
+) -> String {
+    let action = if gamepad_connected(gamepads) {
+        format!(
+            "Press {}",
+            get_gamepad_display_name(GamepadBindingButton::West)
+        )
+    } else {
+        match keybinds.get_shop_mark_key() {
+            InputBinding::MouseBinding(MouseButton::Right) => "Right click".to_string(),
+            binding => format!("Press {}", get_key_display_name(binding)),
+        }
+    };
+    format!("{action}:")
+}
+
 /// Reuses the tooltip info-box art to explain right-click tracking, placed to the right of
 /// the shop beneath the currency counters.
 fn spawn_merchant_track_info_box(
@@ -605,6 +630,7 @@ fn spawn_merchant_track_info_box(
     graphics: &Graphics,
     asset_server: &AssetServer,
     parent: Entity,
+    header: &str,
 ) {
     // Sit fully to the right of the merchant container (no overlap) with a small gap.
     let pos = Vec2::new(
@@ -629,26 +655,64 @@ fn spawn_merchant_track_info_box(
         .set_parent(parent)
         .id();
 
-    for (line, y) in [("Right click:", 5.), ("Mark a shop item to track", -6.)] {
-        commands
-            .spawn((
-                Text2dBundle {
-                    text: Text::from_section(
-                        line.to_string(),
-                        TextStyle {
-                            font: asset_server.load("fonts/slkscr.ttf"),
-                            font_size: 8.4,
-                            color: WHITE,
-                        },
-                    )
-                    .with_alignment(TextAlignment::Center),
-                    text_anchor: bevy::sprite::Anchor::Center,
-                    transform: Transform::from_translation(Vec3::new(0., y, 2.)),
-                    ..default()
-                },
-                RenderLayers::from_layers(&[3]),
-            ))
-            .set_parent(box_e);
+    commands
+        .spawn((
+            Text2dBundle {
+                text: Text::from_section(
+                    header.to_string(),
+                    TextStyle {
+                        font: asset_server.load("fonts/slkscr.ttf"),
+                        font_size: 8.4,
+                        color: WHITE,
+                    },
+                )
+                .with_alignment(TextAlignment::Center),
+                text_anchor: bevy::sprite::Anchor::Center,
+                transform: Transform::from_translation(Vec3::new(0., 5., 2.)),
+                ..default()
+            },
+            RenderLayers::from_layers(&[3]),
+            MerchantTrackInfoBoxHeaderText,
+        ))
+        .set_parent(box_e);
+
+    commands
+        .spawn((
+            Text2dBundle {
+                text: Text::from_section(
+                    "Mark a shop item to track".to_string(),
+                    TextStyle {
+                        font: asset_server.load("fonts/slkscr.ttf"),
+                        font_size: 8.4,
+                        color: WHITE,
+                    },
+                )
+                .with_alignment(TextAlignment::Center),
+                text_anchor: bevy::sprite::Anchor::Center,
+                transform: Transform::from_translation(Vec3::new(0., -6., 2.)),
+                ..default()
+            },
+            RenderLayers::from_layers(&[3]),
+        ))
+        .set_parent(box_e);
+}
+
+/// Keeps the merchant track info-box header in sync with keyboard vs controller input.
+pub fn update_merchant_track_info_box_label(
+    keybinds: Res<InputMappings>,
+    gamepads: Res<Gamepads>,
+    mut texts: Query<&mut Text, With<MerchantTrackInfoBoxHeaderText>>,
+    mut last_label: Local<Option<String>>,
+) {
+    let header = format_merchant_track_action_header(&keybinds, &gamepads);
+    if last_label.as_deref() == Some(header.as_str()) {
+        return;
+    }
+    *last_label = Some(header.clone());
+    for mut text in texts.iter_mut() {
+        if let Some(section) = text.sections.first_mut() {
+            section.value = header.clone();
+        }
     }
 }
 
@@ -1386,7 +1450,7 @@ pub fn handle_merchant_item_tooltip(
                         item_stack: displaced,
                         is_recipe: false,
                         show_range: false,
-                        anchor_ui_y: None,
+                        anchor_ui: None,
                         info_boxes: vec![],
                         position_override: Some(Vec2::new(
                             MERCHANT_CONTAINER_UI_SIZE.x + 20.,
@@ -1582,7 +1646,13 @@ pub fn setup_essence_ui(
         },
     );
 
-    spawn_merchant_track_info_box(&mut commands, &graphics, &asset_server, essence_ui_e);
+    spawn_merchant_track_info_box(
+        &mut commands,
+        &graphics,
+        &asset_server,
+        essence_ui_e,
+        "Press X:",
+    );
 
     for category in [
         MerchantCategory::Heirlooms,

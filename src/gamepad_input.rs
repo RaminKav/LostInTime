@@ -187,7 +187,14 @@ pub enum UiGamepadAction {
     /// A button — activates whatever's currently focused (mirrors a mouse click).
     Confirm,
     /// B button — back/close (mirrors the keyboard Escape handling in `close_container`).
+    /// While carrying an item in the inventory (Track 4), B first drops the carried item back
+    /// onto its origin slot instead of closing the menu.
     Cancel,
+    /// Y button — context "quick action" on the focused inventory slot: quick-equip / transfer
+    /// the item the same way a shift-click does with the mouse.
+    QuickAction,
+    /// X button — mark / unmark the focused merchant shop item to track its price.
+    Mark,
     /// Left stick, read as a `Vec2` for continuous analog nav (see `focus_nav_should_run`'s
     /// caller for the discrete-step logic built on top of it).
     NavStick,
@@ -210,6 +217,8 @@ fn default_ui_gamepad_input_map() -> InputMap<UiGamepadAction> {
     map.insert(DualAxis::left_stick(), UiGamepadAction::NavStick);
     map.insert(GamepadButtonType::South, UiGamepadAction::Confirm);
     map.insert(GamepadButtonType::East, UiGamepadAction::Cancel);
+    map.insert(GamepadButtonType::North, UiGamepadAction::QuickAction);
+    map.insert(GamepadButtonType::West, UiGamepadAction::Mark);
     map.insert(GamepadButtonType::DPadUp, UiGamepadAction::NavUp);
     map.insert(GamepadButtonType::DPadDown, UiGamepadAction::NavDown);
     map.insert(GamepadButtonType::DPadLeft, UiGamepadAction::NavLeft);

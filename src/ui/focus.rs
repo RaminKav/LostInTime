@@ -17,17 +17,81 @@
 //!   `handle_cursor_main_menu_buttons` in `src/ui/interactions.rs` for the reference patch.
 //! - Cancel (gamepad B / keyboard Escape) needed **no** new plumbing — `close_container` in
 //!   `src/inputs.rs` already centralizes Escape handling for every screen.
+//! - Left-stick UI navigation uses a separate (stricter) deadzone/commit threshold from gameplay
+//!   sticks and only fires once per deliberate tilt — release back to neutral before the next
+//!   step. D-pad and keyboard arrows stay digital/unchanged. Tune via Options → "UI Nav
+//!   Stability" (1 = responsive, 10 = firm tilt required).
 use bevy::ecs::system::SystemParam;
 use bevy::input::gamepad::Gamepads;
 use bevy::input::mouse::MouseMotion;
 use bevy::prelude::*;
 use leafwing_input_manager::prelude::ActionState;
+use serde::{Deserialize, Serialize};
 
 use crate::cursor::CursorPos;
-use crate::gamepad_input::{UiGamepadAction, UiGamepadInputMarker, GAMEPAD_STICK_DEADZONE};
+use crate::gamepad_input::{UiGamepadAction, UiGamepadInputMarker};
 use crate::inputs::MouselessModeState;
-use crate::ui::{tips::TipBox, tutorial_ui::TutorialUI, UIState};
+use crate::ui::{tips::TipBox, tutorial_ui::TutorialUI, InventorySlotState, InventorySlotType, UIState};
 use crate::GameState;
+
+/// Options screen "UI Nav Stability" (1-10): how firmly the left stick must be tilted before
+/// UI focus moves, and how wide the neutral deadzone is. Higher = less accidental jumping.
+#[derive(Resource, Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct UiNavStickStability(pub u8);
+
+impl Default for UiNavStickStability {
+    fn default() -> Self {
+        Self(6)
+    }
+}
+
+impl UiNavStickStability {
+    pub const MIN: u8 = 1;
+    pub const MAX: u8 = 10;
+
+    fn t(&self) -> f32 {
+        (self.0.clamp(Self::MIN, Self::MAX) - Self::MIN) as f32 / (Self::MAX - Self::MIN) as f32
+    }
+
+    /// Inner deadzone — stick magnitude at or below this reads as neutral.
+    pub fn deadzone(&self) -> f32 {
+        // 1 -> 0.30, 10 -> 0.60
+        0.30 + self.t() * 0.30
+    }
+
+    /// Stick must exceed this magnitude to count as a deliberate UI nav input.
+    pub fn commit(&self) -> f32 {
+        // 1 -> 0.40, 10 -> 0.80
+        0.40 + self.t() * 0.40
+    }
+
+    pub fn load() -> Self {
+        let path = crate::datafiles::game_data();
+        if let Ok(file) = std::fs::File::open(&path) {
+            let reader = std::io::BufReader::new(file);
+            if let Ok(game_data) = crate::client::GameData::try_from_json_reader(reader) {
+                return game_data.ui_nav_stick_stability.unwrap_or_default();
+            }
+        }
+        Self::default()
+    }
+
+    pub fn save(&self) {
+        let path = crate::datafiles::game_data();
+        let mut game_data = if let Ok(file) = std::fs::File::open(&path) {
+            let reader = std::io::BufReader::new(file);
+            crate::client::GameData::try_from_json_reader(reader).unwrap_or_default()
+        } else {
+            crate::client::GameData::default()
+        };
+
+        game_data.ui_nav_stick_stability = Some(*self);
+
+        if let Ok(file) = std::fs::File::create(&path) {
+            let _ = serde_json::to_writer_pretty(file, &game_data);
+        }
+    }
+}
 
 /// Tags a clickable sprite (alongside the existing `Interactable`) as part of directional focus
 /// navigation. `group` scopes navigation to "whichever screen/panel is currently active" — see
@@ -67,12 +131,30 @@ pub struct FocusNavBottomRow;
 #[derive(Component, Debug, Clone, Copy)]
 pub struct FocusNavTabColumn;
 
+/// Logical focus target that survives inventory slot entity respawns (pickup, upgrade refresh,
+/// sort, etc. all despawn + re-spawn slot sprites, which would otherwise invalidate `Entity` ids
+/// and trip `ensure_default_focus` back to index 0 / "hotbar slot 1").
+#[derive(Clone, Debug, PartialEq)]
+pub enum FocusAnchor {
+    InvSlot {
+        group: UIState,
+        slot_type: InventorySlotType,
+        slot_index: usize,
+    },
+    /// Sidebar buttons, craft toggle, and other focusables without [`InventorySlotState`].
+    FocusIndex {
+        group: UIState,
+        index: u32,
+    },
+}
+
 /// The single currently-focused entity (if any) plus whether Confirm was pressed this frame.
 /// Updated by [`ensure_default_focus`], [`focus_nav`], and [`poll_ui_focus_confirm`].
 #[derive(Resource, Default)]
 pub struct UiFocus {
     pub focused: Option<Entity>,
     pub confirm_just_pressed: bool,
+    pub anchor: Option<FocusAnchor>,
 }
 
 impl UiFocus {
@@ -227,12 +309,120 @@ fn entity_in_active_focus(
     }
 }
 
+fn mode_matches_screen(mode: &FocusMode, group: &UIState) -> bool {
+    matches!(mode, FocusMode::Screen(g) if g == group)
+}
+
+fn focusable_inv_eligible(
+    entity: Entity,
+    ui_state: &UIState,
+    inv_slots: &Query<&InventorySlotState>,
+) -> bool {
+    if !ui_state.is_inv_open() {
+        return true;
+    }
+    // HUD hotbar slots at the bottom of the screen are hidden while the inventory panel is
+    // open. Hotbar items are still reachable via the main bag grid (Normal slots 0..N).
+    inv_slots
+        .get(entity)
+        .map(|slot| !slot.r#type.is_hotbar())
+        .unwrap_or(true)
+}
+
+fn focus_anchor_from_parts(
+    entity: Entity,
+    focusable: &Focusable,
+    inv_slots: &Query<&InventorySlotState>,
+) -> FocusAnchor {
+    if let Ok(slot) = inv_slots.get(entity) {
+        FocusAnchor::InvSlot {
+            group: focusable.group.clone(),
+            slot_type: slot.r#type,
+            slot_index: slot.slot_index,
+        }
+    } else {
+        FocusAnchor::FocusIndex {
+            group: focusable.group.clone(),
+            index: focusable.index,
+        }
+    }
+}
+
+fn compute_focus_anchor(
+    entity: Entity,
+    focusables: &Query<(Entity, &Focusable)>,
+    inv_slots: &Query<&InventorySlotState>,
+) -> Option<FocusAnchor> {
+    focusables
+        .get(entity)
+        .ok()
+        .map(|(_, focusable)| focus_anchor_from_parts(entity, focusable, inv_slots))
+}
+
+fn find_entity_for_anchor(
+    anchor: &FocusAnchor,
+    mode: &FocusMode,
+    focusables: &Query<(Entity, &Focusable)>,
+    inv_slots: &Query<&InventorySlotState>,
+    visibility: &Query<&Visibility>,
+    ui_state: &UIState,
+) -> Option<Entity> {
+    match anchor {
+        FocusAnchor::InvSlot {
+            group,
+            slot_type,
+            slot_index,
+        } => {
+            if !mode_matches_screen(mode, group) {
+                return None;
+            }
+            focusables.iter().find_map(|(entity, focusable)| {
+                if focusable.group != *group || !focus_entity_visible(entity, visibility) {
+                    return None;
+                }
+                if !focusable_inv_eligible(entity, ui_state, inv_slots) {
+                    return None;
+                }
+                inv_slots.get(entity).ok().and_then(|slot| {
+                    (slot.r#type == *slot_type && slot.slot_index == *slot_index).then_some(entity)
+                })
+            })
+        }
+        FocusAnchor::FocusIndex { group, index } => {
+            if !mode_matches_screen(mode, group) {
+                return None;
+            }
+            focusables.iter().find_map(|(entity, focusable)| {
+                (focusable.group == *group
+                    && focusable.index == *index
+                    && focus_entity_visible(entity, visibility))
+                .then_some(entity)
+            })
+        }
+    }
+}
+
+fn screen_focus_candidate(
+    entity: Entity,
+    focusable: &Focusable,
+    group: &UIState,
+    ui_state: &UIState,
+    visibility: &Query<&Visibility>,
+    inv_slots: &Query<&InventorySlotState>,
+) -> bool {
+    focusable.group == *group
+        && focus_entity_visible(entity, visibility)
+        && focusable_inv_eligible(entity, ui_state, inv_slots)
+}
+
 fn default_focus_entity(
     mode: &FocusMode,
     focusables: &Query<(Entity, &Focusable)>,
     overlays: &Query<(Entity, &OverlayFocusable)>,
     modals: &Query<(Entity, &ModalFocusable)>,
     visibility: &Query<&Visibility>,
+    inv_slots: &Query<&InventorySlotState>,
+    ui_state: &UIState,
 ) -> Option<Entity> {
     match mode {
         FocusMode::Screen(group) => {
@@ -241,7 +431,9 @@ fn default_focus_entity(
             }
             focusables
                 .iter()
-                .filter(|(e, f)| f.group == *group && focus_entity_visible(*e, visibility))
+                .filter(|(e, f)| {
+                    screen_focus_candidate(*e, f, group, ui_state, visibility, inv_slots)
+                })
                 .min_by_key(|(_, f)| f.index)
                 .map(|(e, _)| e)
         }
@@ -310,6 +502,7 @@ fn ensure_default_focus(
     overlays: Query<(Entity, &OverlayFocusable)>,
     modals: Query<(Entity, &ModalFocusable)>,
     visibility: Query<&Visibility>,
+    inv_slots: Query<&InventorySlotState>,
 ) {
     let mode = resolve_focus_mode_for_frame(
         &game_state.0,
@@ -327,9 +520,36 @@ fn ensure_default_focus(
         })
         .is_some();
     if still_valid {
+        if let Some(e) = ui_focus.focused {
+            ui_focus.anchor = compute_focus_anchor(e, &focusables, &inv_slots);
+        }
         return;
     }
-    ui_focus.focused = default_focus_entity(&mode, &focusables, &overlays, &modals, &visibility);
+    if let Some(anchor) = ui_focus.anchor.clone() {
+        if let Some(e) = find_entity_for_anchor(
+            &anchor,
+            &mode,
+            &focusables,
+            &inv_slots,
+            &visibility,
+            &ui_state.0,
+        ) {
+            ui_focus.focused = Some(e);
+            return;
+        }
+    }
+    ui_focus.focused = default_focus_entity(
+        &mode,
+        &focusables,
+        &overlays,
+        &modals,
+        &visibility,
+        &inv_slots,
+        &ui_state.0,
+    );
+    ui_focus.anchor = ui_focus
+        .focused
+        .and_then(|e| compute_focus_anchor(e, &focusables, &inv_slots));
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -365,11 +585,19 @@ pub fn reset_focus_nav_blocked(mut blocked: ResMut<FocusNavBlocked>) {
     blocked.0 = false;
 }
 
+/// Tracks whether the left stick is currently latched after firing a UI nav step. The stick must
+/// return to neutral before another stick-initiated step can fire (d-pad/keyboard unaffected).
+#[derive(Default, Clone, Copy, PartialEq, Eq, Debug)]
+pub struct UiStickNavLatch {
+    armed: bool,
+}
+
 /// Returns a direction if the player pressed a UI navigation input this frame.
 pub fn ui_nav_dir_just_pressed(
     keys: &Input<KeyCode>,
     gamepad: Option<&ActionState<UiGamepadAction>>,
-    last_stick_dir: &mut Option<UiNavDir>,
+    stick_latch: &mut UiStickNavLatch,
+    stability: UiNavStickStability,
 ) -> Option<UiNavDir> {
     if keys.just_pressed(KeyCode::Up) {
         return Some(UiNavDir::Up);
@@ -404,42 +632,49 @@ pub fn ui_nav_dir_just_pressed(
         .clamped_axis_pair(UiGamepadAction::NavStick)
         .map(|p| p.xy())
         .unwrap_or(Vec2::ZERO);
-    let dir = if stick.length_squared() <= GAMEPAD_STICK_DEADZONE.powi(2) {
-        None
-    } else if stick.x.abs() >= stick.y.abs() {
-        Some(if stick.x > 0.0 {
+    let magnitude = stick.length();
+    if magnitude <= stability.deadzone() {
+        stick_latch.armed = false;
+        return None;
+    }
+    if magnitude < stability.commit() {
+        return None;
+    }
+
+    let dir = if stick.x.abs() >= stick.y.abs() {
+        if stick.x > 0.0 {
             UiNavDir::Right
         } else {
             UiNavDir::Left
-        })
+        }
+    } else if stick.y > 0.0 {
+        UiNavDir::Up
     } else {
-        Some(if stick.y > 0.0 {
-            UiNavDir::Up
-        } else {
-            UiNavDir::Down
-        })
+        UiNavDir::Down
     };
-    if dir != *last_stick_dir {
-        *last_stick_dir = dir;
-        return dir;
+
+    if stick_latch.armed {
+        return None;
     }
-    None
+    stick_latch.armed = true;
+    Some(dir)
 }
 
 fn pressed_nav_dir(
     keys: &Input<KeyCode>,
     gamepad: Option<&ActionState<UiGamepadAction>>,
-    last_stick_dir: &mut Option<NavDir>,
+    stick_latch: &mut UiStickNavLatch,
+    stability: UiNavStickStability,
 ) -> Option<NavDir> {
-    let mut ui_stick = last_stick_dir.map(|d| match d {
-        NavDir::Up => UiNavDir::Up,
-        NavDir::Down => UiNavDir::Down,
-        NavDir::Left => UiNavDir::Left,
-        NavDir::Right => UiNavDir::Right,
-    });
-    let result = ui_nav_dir_just_pressed(keys, gamepad, &mut ui_stick);
-    *last_stick_dir = ui_stick.map(Into::into);
-    result.map(Into::into)
+    ui_nav_dir_just_pressed(keys, gamepad, stick_latch, stability).map(Into::into)
+}
+
+/// Layout markers consumed by [`focus_nav`] when choosing the next focus target.
+#[derive(SystemParam)]
+pub struct FocusNavMarkerQueries<'w, 's> {
+    pub horizontal_skip: Query<'w, 's, (), With<FocusNavHorizontalSkip>>,
+    pub bottom_row: Query<'w, 's, (), With<FocusNavBottomRow>>,
+    pub tab_column: Query<'w, 's, (), With<FocusNavTabColumn>>,
 }
 
 const NAV_LATERAL_PENALTY: f32 = 3.0;
@@ -456,11 +691,11 @@ fn focus_nav(
     overlays: Query<(Entity, &GlobalTransform, &OverlayFocusable)>,
     modals: Query<(Entity, &GlobalTransform, &ModalFocusable)>,
     visibility: Query<&Visibility>,
+    inv_slots: Query<&InventorySlotState>,
     focus_nav_blocked: Res<FocusNavBlocked>,
-    focus_nav_horizontal_skip: Query<(), With<FocusNavHorizontalSkip>>,
-    focus_nav_bottom_row: Query<(), With<FocusNavBottomRow>>,
-    focus_nav_tab_column: Query<(), With<FocusNavTabColumn>>,
-    mut last_stick_dir: Local<Option<NavDir>>,
+    nav_markers: FocusNavMarkerQueries,
+    stick_stability: Res<UiNavStickStability>,
+    mut stick_latch: Local<UiStickNavLatch>,
 ) {
     if focus_nav_blocked.0 {
         return;
@@ -481,18 +716,25 @@ fn focus_nav(
     let Some(dir) = pressed_nav_dir(
         &key_input,
         ui_gamepad_q.get_single().ok(),
-        &mut last_stick_dir,
+        &mut stick_latch,
+        *stick_stability,
     ) else {
         return;
     };
 
+    let pick_initial_screen_focus = |group: &UIState| {
+        focusables
+            .iter()
+            .filter(|(e, _, f)| {
+                screen_focus_candidate(*e, f, group, &ui_state.0, &visibility, &inv_slots)
+            })
+            .min_by_key(|(_, _, f)| f.index)
+            .map(|(e, _, _)| e)
+    };
+
     let Some(cur_e) = ui_focus.focused else {
         ui_focus.focused = match &mode {
-            FocusMode::Screen(group) => focusables
-                .iter()
-                .filter(|(e, _, f)| &f.group == group && focus_entity_visible(*e, &visibility))
-                .min_by_key(|(_, _, f)| f.index)
-                .map(|(e, _, _)| e),
+            FocusMode::Screen(group) => pick_initial_screen_focus(group),
             FocusMode::Overlay => overlays
                 .iter()
                 .filter(|(e, _, _)| focus_entity_visible(*e, &visibility))
@@ -505,18 +747,54 @@ fn focus_nav(
                 .map(|(e, _, _)| e),
             FocusMode::None => None,
         };
+        if let Some(e) = ui_focus.focused {
+            if let Ok((_, _, focusable)) = focusables.get(e) {
+                ui_focus.anchor = Some(focus_anchor_from_parts(e, focusable, &inv_slots));
+            }
+        }
         return;
     };
 
     if !focus_entity_visible(cur_e, &visibility) {
+        if let Some(anchor) = ui_focus.anchor.clone() {
+            let restored = match &anchor {
+                FocusAnchor::InvSlot {
+                    group,
+                    slot_type,
+                    slot_index,
+                } if mode_matches_screen(&mode, group) => focusables.iter().find_map(
+                    |(entity, _, focusable)| {
+                        if focusable.group != *group
+                            || !focus_entity_visible(entity, &visibility)
+                            || !focusable_inv_eligible(entity, &ui_state.0, &inv_slots)
+                        {
+                            return None;
+                        }
+                        inv_slots.get(entity).ok().and_then(|slot| {
+                            (slot.r#type == *slot_type && slot.slot_index == *slot_index)
+                                .then_some(entity)
+                        })
+                    },
+                ),
+                FocusAnchor::FocusIndex { group, index }
+                    if mode_matches_screen(&mode, group) =>
+                {
+                    focusables.iter().find_map(|(entity, _, focusable)| {
+                        (focusable.group == *group
+                            && focusable.index == *index
+                            && focus_entity_visible(entity, &visibility))
+                        .then_some(entity)
+                    })
+                }
+                _ => None,
+            };
+            if let Some(e) = restored {
+                ui_focus.focused = Some(e);
+                return;
+            }
+        }
         ui_focus.focused = match &mode {
-            FocusMode::Screen(group) => focusables
-                .iter()
-                .filter(|(entity, _, focusable)| {
-                    &focusable.group == group && focus_entity_visible(*entity, &visibility)
-                })
-                .min_by_key(|(_, _, focusable)| focusable.index)
-                .map(|(entity, _, _)| entity),
+            FocusMode::Screen(group) => pick_initial_screen_focus(group),
             FocusMode::Overlay => overlays
                 .iter()
                 .filter(|(entity, _, _)| focus_entity_visible(*entity, &visibility))
@@ -529,6 +807,11 @@ fn focus_nav(
                 .map(|(entity, _, _)| entity),
             FocusMode::None => None,
         };
+        if let Some(e) = ui_focus.focused {
+            if let Ok((_, _, focusable)) = focusables.get(e) {
+                ui_focus.anchor = Some(focus_anchor_from_parts(e, focusable, &inv_slots));
+            }
+        }
         return;
     }
 
@@ -554,17 +837,17 @@ fn focus_nav(
     let mut best: Option<(Entity, f32)> = None;
 
     let horizontal_nav = matches!(dir, NavDir::Left | NavDir::Right);
-    let cur_in_bottom_row = focus_nav_bottom_row.get(cur_e).is_ok();
-    let cur_in_tab_column = focus_nav_tab_column.get(cur_e).is_ok();
+    let cur_in_bottom_row = nav_markers.bottom_row.get(cur_e).is_ok();
+    let cur_in_tab_column = nav_markers.tab_column.get(cur_e).is_ok();
     let mut consider = |e: Entity, pos: Vec2| {
         if e == cur_e {
             return;
         }
         if horizontal_nav {
-            if focus_nav_horizontal_skip.get(e).is_ok() && !cur_in_tab_column {
+            if nav_markers.horizontal_skip.get(e).is_ok() && !cur_in_tab_column {
                 return;
             }
-            if cur_in_bottom_row != focus_nav_bottom_row.get(e).is_ok() {
+            if cur_in_bottom_row != nav_markers.bottom_row.get(e).is_ok() {
                 return;
             }
         }
@@ -586,7 +869,8 @@ fn focus_nav(
     match &mode {
         FocusMode::Screen(group) => {
             for (e, xf, focusable) in focusables.iter() {
-                if &focusable.group != group || !focus_entity_visible(e, &visibility) {
+                if !screen_focus_candidate(e, focusable, group, &ui_state.0, &visibility, &inv_slots)
+                {
                     continue;
                 }
                 consider(e, xf.translation().truncate());
@@ -613,6 +897,9 @@ fn focus_nav(
 
     if let Some((e, _)) = best {
         ui_focus.focused = Some(e);
+        if let Ok((_, _, focusable)) = focusables.get(e) {
+            ui_focus.anchor = Some(focus_anchor_from_parts(e, focusable, &inv_slots));
+        }
     }
 }
 
@@ -631,6 +918,7 @@ pub struct FocusPlugin;
 impl Plugin for FocusPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<UiFocus>()
+            .insert_resource(UiNavStickStability::load())
             .init_resource::<FocusNavBlocked>()
             .add_system(
                 update_cursor_ui_hover_suppression.in_base_set(CoreSet::PreUpdate),

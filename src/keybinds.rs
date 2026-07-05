@@ -23,6 +23,9 @@ fn default_interact() -> InputBinding {
 fn default_attack_auto_target() -> InputBinding {
     InputBinding::KeyBinding(KeyCode::E)
 }
+fn default_shop_mark() -> InputBinding {
+    InputBinding::KeyBinding(KeyCode::X)
+}
 
 /// Hidden fourth skill slot (no HUD / options row while `VISIBLE_CLASS_SKILL_COUNT` is 3).
 fn default_active_skill_slot_3() -> InputBinding {
@@ -123,6 +126,9 @@ pub struct InputMappings {
     pub hotbar_slot_3: InputBinding,
     #[serde(default = "default_attack_auto_target")]
     pub attack_auto_target: InputBinding,
+    /// Marks / unmarks a merchant shop item to track while the essence shop UI is open.
+    #[serde(default = "default_shop_mark")]
+    pub shop_mark: InputBinding,
 }
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 
@@ -147,6 +153,7 @@ impl Default for InputMappings {
             hotbar_slot_2: InputBinding::KeyBinding(KeyCode::Key3),
             hotbar_slot_3: InputBinding::KeyBinding(KeyCode::Key4),
             attack_auto_target: default_attack_auto_target(),
+            shop_mark: default_shop_mark(),
         }
     }
 }
@@ -291,6 +298,22 @@ impl InputMappings {
         mouse: &Input<MouseButton>,
     ) -> bool {
         check_binding_input(self.get_attack_auto_target_key(), keys, mouse)
+    }
+
+    pub fn get_shop_mark_key(&self) -> InputBinding {
+        self.shop_mark
+    }
+
+    pub fn set_shop_mark_key(&mut self, key: InputBinding) {
+        self.shop_mark = key;
+    }
+
+    pub fn check_shop_mark_input(
+        &self,
+        keys: &Input<KeyCode>,
+        mouse: &Input<MouseButton>,
+    ) -> bool {
+        check_binding_input(self.get_shop_mark_key(), keys, mouse)
     }
 
     pub fn load() -> Self {

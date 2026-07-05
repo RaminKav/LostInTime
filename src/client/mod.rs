@@ -258,6 +258,9 @@ pub struct GameData {
     /// or, in Mouseless Mode, arrow keys). Field name kept for save-file compatibility.
     #[serde(default)]
     pub keyboard_aim_sensitivity: Option<crate::aim::AimSensitivity>,
+    /// Options screen: "UI Nav Stability" (1-10), left-stick deadzone/commit for UI focus nav.
+    #[serde(default)]
+    pub ui_nav_stick_stability: Option<crate::ui::focus::UiNavStickStability>,
     /// Options screen: "Swap Move/Aim Keys" (`SwapMovementAimKeysState`) — swaps which key
     /// group moves vs. aims while Mouseless Mode is on.
     #[serde(default)]

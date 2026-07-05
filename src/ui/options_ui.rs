@@ -1,3 +1,4 @@
+use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 use bevy::render::view::RenderLayers;
 use bevy::sprite::Anchor;
@@ -28,6 +29,7 @@ use crate::{
     ui::{
         focus::{
             focus_entity_visible, ui_nav_dir_just_pressed, FocusInput, FocusNavBlocked,
+            UiNavStickStability, UiStickNavLatch,
             FocusNavBottomRow, FocusNavHorizontalSkip, FocusNavTabColumn, Focusable,
             ModalFocusable, UiFocus, UiNavDir,
         },
@@ -242,6 +244,7 @@ pub enum OptionsRowKind {
     Scale(ScaleChannel),
     CursorColor,
     Sensitivity,
+    NavStickStability,
 }
 
 #[derive(Component, Clone, Copy)]
@@ -418,13 +421,20 @@ pub struct CursorColorButton {
 #[derive(Component)]
 pub struct CursorColorPreview;
 
-#[derive(Component)]
-pub struct SensitivityButton {
-    pub direction: VolumeDirection,
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SensitivitySetting {
+    Aim,
+    UiNavStick,
 }
 
 #[derive(Component)]
-pub struct SensitivityValueText;
+pub struct SensitivityButton {
+    pub direction: VolumeDirection,
+    pub setting: SensitivitySetting,
+}
+
+#[derive(Component)]
+pub struct SensitivityValueText(pub SensitivitySetting);
 
 pub fn handle_options_clicks(
     cursor_pos: Res<CursorPos>,
@@ -758,24 +768,48 @@ pub fn cleanup_options_ui(
     }
 }
 
+#[derive(SystemParam)]
+pub(crate) struct SetupOptionsResources<'w, 's> {
+    graphics: Res<'w, Graphics>,
+    asset_server: Res<'w, AssetServer>,
+    resolution: Res<'w, ScreenResolution>,
+    keybinds: Res<'w, InputMappings>,
+    game_state: Res<'w, State<crate::GameState>>,
+    cheat_settings: Res<'w, CheatSettings>,
+    audio_volume: Res<'w, AudioVolume>,
+    display_scale: Res<'w, DisplayScaleSettings>,
+    cursor_color: Res<'w, CursorColorSettings>,
+    auto_attack: Res<'w, AutoAttackState>,
+    mouseless_mode: Res<'w, MouselessModeState>,
+    swap_movement_aim_keys: Res<'w, SwapMovementAimKeysState>,
+    keyboard_aim_sensitivity: Res<'w, AimSensitivity>,
+    ui_nav_stick_stability: Res<'w, UiNavStickStability>,
+    active_tab: Res<'w, ActiveOptionsTab>,
+    existing_ui: Query<'w, 's, Entity, Or<(With<OptionsUI>, With<WipeDataPopup>)>>,
+}
+
 pub fn setup_options_ui(
     mut commands: Commands,
-    graphics: Res<Graphics>,
-    asset_server: Res<AssetServer>,
-    resolution: Res<ScreenResolution>,
-    keybinds: Res<InputMappings>,
-    game_state: Res<State<crate::GameState>>,
-    cheat_settings: Res<CheatSettings>,
-    audio_volume: Res<AudioVolume>,
-    display_scale: Res<DisplayScaleSettings>,
-    cursor_color: Res<CursorColorSettings>,
-    auto_attack: Res<AutoAttackState>,
-    mouseless_mode: Res<MouselessModeState>,
-    keyboard_aim_sensitivity: Res<AimSensitivity>,
-    swap_movement_aim_keys: Res<SwapMovementAimKeysState>,
-    active_tab: Res<ActiveOptionsTab>,
-    existing_ui: Query<Entity, Or<(With<OptionsUI>, With<WipeDataPopup>)>>,
+    deps: SetupOptionsResources,
 ) {
+    let SetupOptionsResources {
+        graphics,
+        asset_server,
+        resolution,
+        keybinds,
+        game_state,
+        cheat_settings,
+        audio_volume,
+        display_scale,
+        cursor_color,
+        auto_attack,
+        mouseless_mode,
+        swap_movement_aim_keys,
+        keyboard_aim_sensitivity,
+        ui_nav_stick_stability,
+        active_tab,
+        existing_ui,
+    } = deps;
     for entity in existing_ui.iter() {
         commands.entity(entity).despawn_recursive();
     }
@@ -843,6 +877,7 @@ pub fn setup_options_ui(
         mouseless_mode.0,
         swap_movement_aim_keys.0,
         keyboard_aim_sensitivity.0,
+        ui_nav_stick_stability.0,
     );
     spawn_audio_tab_content(
         &mut commands,
@@ -1254,6 +1289,7 @@ fn spawn_controls_tab_content(
     mouseless_mode: bool,
     swap_movement_aim_keys: bool,
     aim_sensitivity: u8,
+    ui_nav_stick_stability: u8,
 ) {
     let tab = OptionsTab::Controls;
     let skills_x = options_content_column_x(resolution, 0);
@@ -1412,6 +1448,24 @@ fn spawn_controls_tab_content(
         tab,
         active,
         focus,
+        OptionsRowKind::Sensitivity,
+        SensitivitySetting::Aim,
+    );
+    focus += 1;
+    toggles_y += row_spacing;
+
+    spawn_sensitivity_row(
+        commands,
+        graphics,
+        asset_server,
+        "UI Nav Stability:",
+        ui_nav_stick_stability,
+        Vec3::new(toggles_x, toggles_y, z),
+        tab,
+        active,
+        focus,
+        OptionsRowKind::NavStickStability,
+        SensitivitySetting::UiNavStick,
     );
 }
 
@@ -2328,6 +2382,8 @@ fn spawn_sensitivity_row(
     tab: OptionsTab,
     active: OptionsTab,
     focus_index: u32,
+    row_kind: OptionsRowKind,
+    setting: SensitivitySetting,
 ) {
     let row_entity = spawn_stepper_row_focus(
         commands,
@@ -2335,7 +2391,7 @@ fn spawn_sensitivity_row(
         tab,
         active,
         focus_index,
-        OptionsRowKind::Sensitivity,
+        row_kind,
         "Sensitivity Row Focus",
     );
 
@@ -2386,6 +2442,7 @@ fn spawn_sensitivity_row(
         .insert(OptionsTabContent(tab))
         .insert(SensitivityButton {
             direction: VolumeDirection::Down,
+            setting,
         })
         .insert(OptionsRowMember { row: row_entity })
         .insert(Interactable::default())
@@ -2436,7 +2493,7 @@ fn spawn_sensitivity_row(
         RenderLayers::from_layers(&[3]),
         OptionsUI,
         OptionsTabContent(tab),
-        SensitivityValueText,
+        SensitivityValueText(setting),
         Name::new("Sensitivity Value"),
     ));
 
@@ -2462,6 +2519,7 @@ fn spawn_sensitivity_row(
         .insert(OptionsTabContent(tab))
         .insert(SensitivityButton {
             direction: VolumeDirection::Up,
+            setting,
         })
         .insert(OptionsRowMember { row: row_entity })
         .insert(Interactable::default())
@@ -3093,7 +3151,8 @@ fn nudge_options_stepper(
     audio_volume: &mut AudioVolume,
     display_scale: &mut DisplayScaleSettings,
     cursor_color: &mut CursorColorSettings,
-    sensitivity: &mut AimSensitivity,
+    aim_sensitivity: &mut AimSensitivity,
+    ui_nav_stick_stability: &mut UiNavStickStability,
 ) {
     match row_kind {
         OptionsRowKind::Volume(channel) => {
@@ -3119,11 +3178,23 @@ fn nudge_options_stepper(
         }
         OptionsRowKind::Sensitivity => {
             if up {
-                sensitivity.0 = (sensitivity.0 + 1).min(AimSensitivity::MAX);
+                aim_sensitivity.0 = (aim_sensitivity.0 + 1).min(AimSensitivity::MAX);
             } else {
-                sensitivity.0 = sensitivity.0.saturating_sub(1).max(AimSensitivity::MIN);
+                aim_sensitivity.0 = aim_sensitivity.0.saturating_sub(1).max(AimSensitivity::MIN);
             }
-            sensitivity.save();
+            aim_sensitivity.save();
+        }
+        OptionsRowKind::NavStickStability => {
+            if up {
+                ui_nav_stick_stability.0 =
+                    (ui_nav_stick_stability.0 + 1).min(UiNavStickStability::MAX);
+            } else {
+                ui_nav_stick_stability.0 = ui_nav_stick_stability
+                    .0
+                    .saturating_sub(1)
+                    .max(UiNavStickStability::MIN);
+            }
+            ui_nav_stick_stability.save();
         }
         OptionsRowKind::Checkbox(_) | OptionsRowKind::Keybind(_) => {}
     }
@@ -3139,15 +3210,16 @@ pub fn handle_options_focus_row_input(
     mut audio_volume: ResMut<AudioVolume>,
     mut display_scale: ResMut<DisplayScaleSettings>,
     mut cursor_color: ResMut<CursorColorSettings>,
-    mut sensitivity: ResMut<AimSensitivity>,
+    mut aim_sensitivity: ResMut<AimSensitivity>,
+    mut ui_nav_stick_stability: ResMut<UiNavStickStability>,
     mut commands: Commands,
-    mut last_stick_dir: Local<Option<UiNavDir>>,
+    mut stick_latch: Local<UiStickNavLatch>,
 ) {
     let Some(focused) = ui_focus.focused else {
         return;
     };
     let Ok(row) = focus_rows.get(focused) else {
-        *last_stick_dir = None;
+        *stick_latch = UiStickNavLatch::default();
         return;
     };
 
@@ -3155,9 +3227,10 @@ pub fn handle_options_focus_row_input(
         OptionsRowKind::Volume(_)
         | OptionsRowKind::Scale(_)
         | OptionsRowKind::CursorColor
-        | OptionsRowKind::Sensitivity => row.0,
+        | OptionsRowKind::Sensitivity
+        | OptionsRowKind::NavStickStability => row.0,
         OptionsRowKind::Checkbox(_) | OptionsRowKind::Keybind(_) => {
-            *last_stick_dir = None;
+            *stick_latch = UiStickNavLatch::default();
             return;
         }
     };
@@ -3165,7 +3238,8 @@ pub fn handle_options_focus_row_input(
     let Some(dir) = ui_nav_dir_just_pressed(
         &key_input,
         ui_gamepad_q.get_single().ok(),
-        &mut last_stick_dir,
+        &mut stick_latch,
+        *ui_nav_stick_stability,
     ) else {
         return;
     };
@@ -3182,7 +3256,8 @@ pub fn handle_options_focus_row_input(
         &mut audio_volume,
         &mut display_scale,
         &mut cursor_color,
-        &mut sensitivity,
+        &mut aim_sensitivity,
+        &mut ui_nav_stick_stability,
     );
     focus_nav_blocked.0 = true;
     commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.2));
@@ -3413,7 +3488,8 @@ pub fn handle_sensitivity_button_click(
     computed_visibility: Query<&ComputedVisibility>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     mut buttons: Query<(Entity, &mut Interactable, &SensitivityButton)>,
-    mut sensitivity: ResMut<AimSensitivity>,
+    mut aim_sensitivity: ResMut<AimSensitivity>,
+    mut ui_nav_stick_stability: ResMut<UiNavStickStability>,
     mut commands: Commands,
     graphics: Res<Graphics>,
 ) {
@@ -3437,16 +3513,36 @@ pub fn handle_sensitivity_button_click(
                     if (is_hit && left_mouse_released)
                         || (is_focused && focus_input.confirm_just_pressed())
                     {
-                        match sens_button.direction {
-                            VolumeDirection::Down => {
-                                sensitivity.0 =
-                                    sensitivity.0.saturating_sub(1).max(AimSensitivity::MIN);
-                            }
-                            VolumeDirection::Up => {
-                                sensitivity.0 = (sensitivity.0 + 1).min(AimSensitivity::MAX);
-                            }
+                        match sens_button.setting {
+                            SensitivitySetting::Aim => match sens_button.direction {
+                                VolumeDirection::Down => {
+                                    aim_sensitivity.0 = aim_sensitivity
+                                        .0
+                                        .saturating_sub(1)
+                                        .max(AimSensitivity::MIN);
+                                }
+                                VolumeDirection::Up => {
+                                    aim_sensitivity.0 =
+                                        (aim_sensitivity.0 + 1).min(AimSensitivity::MAX);
+                                }
+                            },
+                            SensitivitySetting::UiNavStick => match sens_button.direction {
+                                VolumeDirection::Down => {
+                                    ui_nav_stick_stability.0 = ui_nav_stick_stability
+                                        .0
+                                        .saturating_sub(1)
+                                        .max(UiNavStickStability::MIN);
+                                }
+                                VolumeDirection::Up => {
+                                    ui_nav_stick_stability.0 = (ui_nav_stick_stability.0 + 1)
+                                        .min(UiNavStickStability::MAX);
+                                }
+                            },
                         }
-                        sensitivity.save();
+                        match sens_button.setting {
+                            SensitivitySetting::Aim => aim_sensitivity.save(),
+                            SensitivitySetting::UiNavStick => ui_nav_stick_stability.save(),
+                        }
                         commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.2));
                     }
                 }
@@ -3466,16 +3562,27 @@ pub fn handle_sensitivity_button_click(
 }
 
 pub fn update_sensitivity_text(
-    sensitivity: Res<AimSensitivity>,
-    mut texts: Query<&mut Text, With<SensitivityValueText>>,
+    aim_sensitivity: Res<AimSensitivity>,
+    ui_nav_stick_stability: Res<UiNavStickStability>,
+    mut texts: Query<(&mut Text, &SensitivityValueText)>,
 ) {
-    if !sensitivity.is_changed() {
-        return;
-    }
-    let new_value = format!("{}", sensitivity.0);
-    for mut text in texts.iter_mut() {
+    for (mut text, value_for) in texts.iter_mut() {
+        let new_value = match value_for.0 {
+            SensitivitySetting::Aim => {
+                if !aim_sensitivity.is_changed() {
+                    continue;
+                }
+                format!("{}", aim_sensitivity.0)
+            }
+            SensitivitySetting::UiNavStick => {
+                if !ui_nav_stick_stability.is_changed() {
+                    continue;
+                }
+                format!("{}", ui_nav_stick_stability.0)
+            }
+        };
         if text.sections[0].value != new_value {
-            text.sections[0].value = new_value.clone();
+            text.sections[0].value = new_value;
         }
     }
 }

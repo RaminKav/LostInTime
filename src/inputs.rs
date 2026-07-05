@@ -941,12 +941,19 @@ pub fn close_container(
     mut ui_focus: ResMut<UiFocus>,
     active_options_tab: Res<ActiveOptionsTab>,
     tab_buttons: Query<(Entity, &OptionsTabButton)>,
+    controller_carry: Res<crate::ui::ControllerCarry>,
 ) {
     let gamepad_cancel_pressed = ui_gamepad_q
         .get_single()
         .map(|a| a.just_pressed(UiGamepadAction::Cancel))
         .unwrap_or(false);
     if !key_input.just_pressed(KeyCode::Escape) && !gamepad_cancel_pressed {
+        return;
+    }
+
+    // While carrying an item via controller/keyboard focus, B/Escape first drops it back onto its
+    // origin slot (handled by `handle_inventory_focus_carry`) rather than closing the menu.
+    if controller_carry.is_active() {
         return;
     }
 

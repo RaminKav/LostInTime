@@ -39,7 +39,7 @@ use crate::{
 
 /// Returns `true` when `obj` is a piece of gear that the furnace upgrade flow accepts
 /// (weapons, armor, jewelry — anything listed in `FurnaceState::slot_map[1]`).
-fn is_upgradeable_equipment(obj: WorldObject, inv_state: &InventoryState) -> bool {
+pub fn is_upgradeable_equipment(obj: WorldObject, inv_state: &InventoryState) -> bool {
     inv_state
         .furnace_state
         .slot_map
@@ -50,7 +50,7 @@ fn is_upgradeable_equipment(obj: WorldObject, inv_state: &InventoryState) -> boo
 
 /// Slot types that can hold a piece of equipment we want to upgrade in place.
 /// Trash / Crafting / CraftingInput / Chest / Scrapper are intentionally excluded.
-fn slot_type_accepts_in_place_upgrade(slot_type: InventorySlotType) -> bool {
+pub fn slot_type_accepts_in_place_upgrade(slot_type: InventorySlotType) -> bool {
     matches!(
         slot_type,
         InventorySlotType::Normal
@@ -67,6 +67,11 @@ fn slot_type_accepts_in_place_upgrade(slot_type: InventorySlotType) -> bool {
 pub struct UpgradeDragAssets<'w> {
     pub asset_server: Res<'w, AssetServer>,
     pub graphics: Res<'w, Graphics>,
+    /// Focus state so a controller/keyboard Confirm on the focused slot applies the upgrade the
+    /// same way a mouse click on the hovered slot does.
+    pub ui_focus: ResMut<'w, crate::ui::focus::UiFocus>,
+    pub mouseless: Res<'w, crate::inputs::MouselessModeState>,
+    pub carry: ResMut<'w, crate::ui::interactions::ControllerCarry>,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -83,7 +88,7 @@ pub fn handle_drag_upgrade_material_on_equipment(
     mut inv: Query<&mut Inventory>,
     inv_state: Res<InventoryState>,
     proto: ProtoParam,
-    assets: UpgradeDragAssets,
+    mut assets: UpgradeDragAssets,
     mut game_camera: Query<Entity, With<TextureCamera>>,
     player_skills: Query<&PlayerSkills, With<Player>>,
     mut legendary_rank_events: EventWriter<
@@ -94,18 +99,30 @@ pub fn handle_drag_upgrade_material_on_equipment(
     if !ui_state.0.is_inv_open() {
         return;
     }
-    if !mouse_input.just_pressed(MouseButton::Left) {
+    let mouse_activate = mouse_input.just_pressed(MouseButton::Left);
+    // Controller/keyboard: apply on Confirm over the focused slot, but only while the mouse isn't
+    // the active pointer (mirrors `focus_driving` in `interactions.rs`).
+    let focus_driving = assets.mouseless.0 || cursor_pos.suppress_ui_hover;
+    let focus_activate = focus_driving && assets.ui_focus.confirm_just_pressed;
+    if !mouse_activate && !focus_activate {
         return;
     }
     if dragged_query.iter().next().is_none() {
         return;
     }
 
-    let Some(hit) = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None) else {
-        return;
+    let target_entity = if mouse_activate {
+        match ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None) {
+            Some(hit) => hit.0,
+            None => return,
+        }
+    } else {
+        match assets.ui_focus.focused {
+            Some(e) => e,
+            None => return,
+        }
     };
-    let hit_entity = hit.0;
-    let Ok(target_slot_state) = slot_states.get(hit_entity).map(|s| s.clone()) else {
+    let Ok(target_slot_state) = slot_states.get(target_entity).map(|s| s.clone()) else {
         return;
     };
     if !slot_type_accepts_in_place_upgrade(target_slot_state.r#type) {
@@ -170,7 +187,11 @@ pub fn handle_drag_upgrade_material_on_equipment(
             FLOATING_TEXT,
             bevy::render::view::RenderLayers::from_layers(&[3]),
         );
-        mouse_input.clear();
+        if mouse_activate {
+            mouse_input.clear();
+        } else if focus_activate {
+            assets.ui_focus.confirm_just_pressed = false;
+        }
         return;
     }
 
@@ -265,5 +286,15 @@ pub fn handle_drag_upgrade_material_on_equipment(
     // will refresh the label from the mutated `ItemStack::count` next frame.
 
     // Consume the click so `handle_item_drop_clicks` doesn't also emit a drop event this frame.
-    mouse_input.clear();
+    // Clear controller Confirm too — otherwise `handle_inventory_focus_carry` can run later on
+    // the same frame after the dragged stack is despawned and treat Confirm as a fresh pickup
+    // on the focused equipment slot (notably when the last upgrade material is consumed).
+    if mouse_activate {
+        mouse_input.clear();
+    } else if focus_activate {
+        assets.ui_focus.confirm_just_pressed = false;
+        if stack_empty {
+            assets.carry.active = false;
+        }
+    }
 }
