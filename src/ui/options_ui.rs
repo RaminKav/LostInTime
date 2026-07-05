@@ -18,7 +18,7 @@ use crate::{
     aim::AimSensitivity,
     assets::Graphics,
     audio::{AudioSoundEffect, AudioVolume, SoundSpawner},
-    client::GameData,
+    client::{GameData, PersistedOptionsSettings},
     colors::{DARK_GREEN, WHITE, YELLOW_2},
     cursor::CursorColorSettings,
     cursor::CursorPos,
@@ -64,6 +64,8 @@ pub struct CheatSettings {
     pub hide_attack_anims: bool,
     pub hide_skill_anims: bool,
     pub hide_heirloom_anims: bool,
+    /// When true, inventory material drop filters are kept when a run ends.
+    pub persist_item_filters: bool,
 }
 
 impl Default for CheatSettings {
@@ -80,7 +82,43 @@ impl Default for CheatSettings {
             hide_attack_anims: false,
             hide_skill_anims: false,
             hide_heirloom_anims: false,
+            persist_item_filters: false,
         }
+    }
+}
+
+impl PersistedOptionsSettings {
+    pub fn from_cheat_settings(settings: &CheatSettings) -> Self {
+        Self {
+            color_blind_mode: settings.color_blind_mode,
+            show_enemy_damage_numbers: settings.show_enemy_damage_numbers,
+            show_player_damage_numbers: settings.show_player_damage_numbers,
+            show_tile_hover: settings.show_tile_hover,
+            small_damage_text: settings.small_damage_text,
+            hide_attack_anims: settings.hide_attack_anims,
+            hide_skill_anims: settings.hide_skill_anims,
+            hide_heirloom_anims: settings.hide_heirloom_anims,
+            persist_item_filters: settings.persist_item_filters,
+        }
+    }
+
+    pub fn apply_to(&self, settings: &mut CheatSettings) {
+        settings.color_blind_mode = self.color_blind_mode;
+        settings.show_enemy_damage_numbers = self.show_enemy_damage_numbers;
+        settings.show_player_damage_numbers = self.show_player_damage_numbers;
+        settings.show_tile_hover = self.show_tile_hover;
+        settings.small_damage_text = self.small_damage_text;
+        settings.hide_attack_anims = self.hide_attack_anims;
+        settings.hide_skill_anims = self.hide_skill_anims;
+        settings.hide_heirloom_anims = self.hide_heirloom_anims;
+        settings.persist_item_filters = self.persist_item_filters;
+    }
+
+    fn from_game_data(game_data: &GameData) -> Self {
+        game_data
+            .options_settings
+            .clone()
+            .unwrap_or_else(|| Self::from_legacy_game_data(game_data))
     }
 }
 
@@ -105,50 +143,99 @@ impl CheatSettings {
 
     /// Builds settings from defaults, then overrides persisted fields from `game_data.json`.
     pub fn load_from_game_data() -> Self {
-        let mut s = Self::default();
+        let mut settings = Self::default();
         let game_data = Self::load_game_data();
         if let Some(v) = game_data.bypass_class_unlocks {
-            s.bypass_class_unlocks = v;
+            settings.bypass_class_unlocks = v;
         }
-        if let Some(v) = game_data.color_blind_mode {
-            s.color_blind_mode = v;
-        }
-        if let Some(v) = game_data.show_enemy_damage_numbers {
-            s.show_enemy_damage_numbers = v;
-        }
-        if let Some(v) = game_data.show_player_damage_numbers {
-            s.show_player_damage_numbers = v;
-        }
-        if let Some(v) = game_data.show_tile_hover {
-            s.show_tile_hover = v;
-        }
-        if let Some(v) = game_data.small_damage_text {
-            s.small_damage_text = v;
-        }
-        if let Some(v) = game_data.hide_attack_anims {
-            s.hide_attack_anims = v;
-        }
-        if let Some(v) = game_data.hide_skill_anims {
-            s.hide_skill_anims = v;
-        }
-        if let Some(v) = game_data.hide_heirloom_anims {
-            s.hide_heirloom_anims = v;
-        }
-        s
+        PersistedOptionsSettings::from_game_data(&game_data).apply_to(&mut settings);
+        settings
     }
 
     /// Persists non-cheat accessibility/display toggles to `game_data.json`.
     pub fn persist_persisted_options(&self) {
         let mut game_data = Self::load_game_data();
-        game_data.color_blind_mode = Some(self.color_blind_mode);
-        game_data.show_enemy_damage_numbers = Some(self.show_enemy_damage_numbers);
-        game_data.show_player_damage_numbers = Some(self.show_player_damage_numbers);
-        game_data.show_tile_hover = Some(self.show_tile_hover);
-        game_data.small_damage_text = Some(self.small_damage_text);
-        game_data.hide_attack_anims = Some(self.hide_attack_anims);
-        game_data.hide_skill_anims = Some(self.hide_skill_anims);
-        game_data.hide_heirloom_anims = Some(self.hide_heirloom_anims);
+        game_data.options_settings = Some(PersistedOptionsSettings::from_cheat_settings(self));
         Self::write_game_data(&game_data);
+    }
+
+    pub fn checkbox_value(&self, kind: OptionsCheckboxType) -> bool {
+        match kind {
+            OptionsCheckboxType::UnlockAllClasses => self.bypass_class_unlocks,
+            OptionsCheckboxType::ColorBlindMode => self.color_blind_mode,
+            OptionsCheckboxType::DevMode => self.dev_mode,
+            OptionsCheckboxType::ShowEnemyDamageNumbers => self.show_enemy_damage_numbers,
+            OptionsCheckboxType::SmallDamageText => self.small_damage_text,
+            OptionsCheckboxType::ShowPlayerDamageNumbers => self.show_player_damage_numbers,
+            OptionsCheckboxType::ShowTileHover => self.show_tile_hover,
+            OptionsCheckboxType::PersistItemFilters => self.persist_item_filters,
+            OptionsCheckboxType::BypassTimeCrystalPool => self.bypass_time_crystal_pool,
+            OptionsCheckboxType::HideAttackAnims => self.hide_attack_anims,
+            OptionsCheckboxType::HideSkillAnims => self.hide_skill_anims,
+            OptionsCheckboxType::HideHeirloomAnims => self.hide_heirloom_anims,
+            _ => false,
+        }
+    }
+
+    pub fn toggle_checkbox(&mut self, kind: OptionsCheckboxType) -> bool {
+        let value = match kind {
+            OptionsCheckboxType::UnlockAllClasses => {
+                self.bypass_class_unlocks = !self.bypass_class_unlocks;
+                Self::persist_bypass_class_unlocks(self.bypass_class_unlocks);
+                self.bypass_class_unlocks
+            }
+            OptionsCheckboxType::ColorBlindMode => {
+                self.color_blind_mode = !self.color_blind_mode;
+                self.color_blind_mode
+            }
+            OptionsCheckboxType::DevMode => {
+                self.dev_mode = !self.dev_mode;
+                self.dev_mode
+            }
+            OptionsCheckboxType::ShowEnemyDamageNumbers => {
+                self.show_enemy_damage_numbers = !self.show_enemy_damage_numbers;
+                self.show_enemy_damage_numbers
+            }
+            OptionsCheckboxType::SmallDamageText => {
+                self.small_damage_text = !self.small_damage_text;
+                self.small_damage_text
+            }
+            OptionsCheckboxType::ShowPlayerDamageNumbers => {
+                self.show_player_damage_numbers = !self.show_player_damage_numbers;
+                self.show_player_damage_numbers
+            }
+            OptionsCheckboxType::ShowTileHover => {
+                self.show_tile_hover = !self.show_tile_hover;
+                self.show_tile_hover
+            }
+            OptionsCheckboxType::PersistItemFilters => {
+                self.persist_item_filters = !self.persist_item_filters;
+                self.persist_item_filters
+            }
+            OptionsCheckboxType::BypassTimeCrystalPool => {
+                self.bypass_time_crystal_pool = !self.bypass_time_crystal_pool;
+                self.bypass_time_crystal_pool
+            }
+            OptionsCheckboxType::HideAttackAnims => {
+                self.hide_attack_anims = !self.hide_attack_anims;
+                self.hide_attack_anims
+            }
+            OptionsCheckboxType::HideSkillAnims => {
+                self.hide_skill_anims = !self.hide_skill_anims;
+                self.hide_skill_anims
+            }
+            OptionsCheckboxType::HideHeirloomAnims => {
+                self.hide_heirloom_anims = !self.hide_heirloom_anims;
+                self.hide_heirloom_anims
+            }
+            _ => unreachable!("checkbox is not stored on CheatSettings: {kind:?}"),
+        };
+
+        if kind.persists_to_game_data() {
+            self.persist_persisted_options();
+        }
+
+        value
     }
 
     pub fn persist_bypass_class_unlocks(bypass_class_unlocks: bool) {
@@ -168,6 +255,7 @@ pub enum OptionsCheckboxType {
     SmallDamageText,
     ShowPlayerDamageNumbers,
     ShowTileHover,
+    PersistItemFilters,
     BypassTimeCrystalPool,
     HideAttackAnims,
     HideSkillAnims,
@@ -176,6 +264,49 @@ pub enum OptionsCheckboxType {
     AutoAttack,
     MouselessMode,
     SwapMovementAimKeys,
+}
+
+impl OptionsCheckboxType {
+    pub const fn uses_cheat_settings(self) -> bool {
+        matches!(
+            self,
+            Self::UnlockAllClasses
+                | Self::ColorBlindMode
+                | Self::DevMode
+                | Self::ShowEnemyDamageNumbers
+                | Self::SmallDamageText
+                | Self::ShowPlayerDamageNumbers
+                | Self::ShowTileHover
+                | Self::PersistItemFilters
+                | Self::BypassTimeCrystalPool
+                | Self::HideAttackAnims
+                | Self::HideSkillAnims
+                | Self::HideHeirloomAnims
+        )
+    }
+
+    pub const fn persists_to_game_data(self) -> bool {
+        matches!(
+            self,
+            Self::ColorBlindMode
+                | Self::ShowEnemyDamageNumbers
+                | Self::SmallDamageText
+                | Self::ShowPlayerDamageNumbers
+                | Self::ShowTileHover
+                | Self::PersistItemFilters
+                | Self::HideAttackAnims
+                | Self::HideSkillAnims
+                | Self::HideHeirloomAnims
+        )
+    }
+}
+
+fn options_checkbox_ui(checked: bool) -> UIElement {
+    if checked {
+        UIElement::CheckBoxSelected
+    } else {
+        UIElement::CheckBox
+    }
 }
 
 #[derive(Component)]
@@ -1184,6 +1315,22 @@ fn spawn_gameplay_tab_content(
         focus,
     );
     focus += 1;
+    y += OPTIONS_CONTENT_ROW_SPACING;
+
+    spawn_options_checkbox(
+        commands,
+        graphics,
+        asset_server,
+        "Persist Item Filters:",
+        Vec3::new(main_x, y, z),
+        Vec3::new(main_x + checkbox_x_offset, y, z),
+        OptionsCheckboxType::PersistItemFilters,
+        cheat_settings.persist_item_filters,
+        tab,
+        active,
+        focus,
+    );
+    focus += 1;
     y += OPTIONS_CONTENT_ROW_SPACING * 1.5;
 
     spawn_options_section_title(
@@ -2034,81 +2181,31 @@ pub fn handle_cheat_checkbox_click(
             continue;
         }
 
-        let setting = match options_checkbox.0 {
-            OptionsCheckboxType::UnlockAllClasses => {
-                cheat_settings.bypass_class_unlocks = !cheat_settings.bypass_class_unlocks;
-                CheatSettings::persist_bypass_class_unlocks(cheat_settings.bypass_class_unlocks);
-                cheat_settings.bypass_class_unlocks
-            }
-            OptionsCheckboxType::ColorBlindMode => {
-                cheat_settings.color_blind_mode = !cheat_settings.color_blind_mode;
-                cheat_settings.persist_persisted_options();
-                cheat_settings.color_blind_mode
-            }
-            OptionsCheckboxType::DevMode => {
-                cheat_settings.dev_mode = !cheat_settings.dev_mode;
-                cheat_settings.dev_mode
-            }
-            OptionsCheckboxType::ShowEnemyDamageNumbers => {
-                cheat_settings.show_enemy_damage_numbers =
-                    !cheat_settings.show_enemy_damage_numbers;
-                cheat_settings.persist_persisted_options();
-                cheat_settings.show_enemy_damage_numbers
-            }
-            OptionsCheckboxType::SmallDamageText => {
-                cheat_settings.small_damage_text = !cheat_settings.small_damage_text;
-                cheat_settings.persist_persisted_options();
-                cheat_settings.small_damage_text
-            }
-            OptionsCheckboxType::ShowPlayerDamageNumbers => {
-                cheat_settings.show_player_damage_numbers =
-                    !cheat_settings.show_player_damage_numbers;
-                cheat_settings.persist_persisted_options();
-                cheat_settings.show_player_damage_numbers
-            }
-            OptionsCheckboxType::ShowTileHover => {
-                cheat_settings.show_tile_hover = !cheat_settings.show_tile_hover;
-                cheat_settings.persist_persisted_options();
-                cheat_settings.show_tile_hover
-            }
-            OptionsCheckboxType::BypassTimeCrystalPool => {
-                cheat_settings.bypass_time_crystal_pool = !cheat_settings.bypass_time_crystal_pool;
-                cheat_settings.bypass_time_crystal_pool
-            }
-            OptionsCheckboxType::HideAttackAnims => {
-                cheat_settings.hide_attack_anims = !cheat_settings.hide_attack_anims;
-                cheat_settings.persist_persisted_options();
-                cheat_settings.hide_attack_anims
-            }
-            OptionsCheckboxType::HideSkillAnims => {
-                cheat_settings.hide_skill_anims = !cheat_settings.hide_skill_anims;
-                cheat_settings.persist_persisted_options();
-                cheat_settings.hide_skill_anims
-            }
-            OptionsCheckboxType::HideHeirloomAnims => {
-                cheat_settings.hide_heirloom_anims = !cheat_settings.hide_heirloom_anims;
-                cheat_settings.persist_persisted_options();
-                cheat_settings.hide_heirloom_anims
-            }
-            OptionsCheckboxType::DoubleCursorSize => {
-                cursor_color.double_size = !cursor_color.double_size;
-                cursor_color.save();
-                cursor_color.double_size
-            }
-            OptionsCheckboxType::AutoAttack => {
-                auto_attack.0 = !auto_attack.0;
-                auto_attack.save();
-                auto_attack.0
-            }
-            OptionsCheckboxType::MouselessMode => {
-                mouseless_mode.0 = !mouseless_mode.0;
-                mouseless_mode.save();
-                mouseless_mode.0
-            }
-            OptionsCheckboxType::SwapMovementAimKeys => {
-                swap_movement_aim_keys.0 = !swap_movement_aim_keys.0;
-                swap_movement_aim_keys.save();
-                swap_movement_aim_keys.0
+        let setting = if options_checkbox.0.uses_cheat_settings() {
+            cheat_settings.toggle_checkbox(options_checkbox.0)
+        } else {
+            match options_checkbox.0 {
+                OptionsCheckboxType::DoubleCursorSize => {
+                    cursor_color.double_size = !cursor_color.double_size;
+                    cursor_color.save();
+                    cursor_color.double_size
+                }
+                OptionsCheckboxType::AutoAttack => {
+                    auto_attack.0 = !auto_attack.0;
+                    auto_attack.save();
+                    auto_attack.0
+                }
+                OptionsCheckboxType::MouselessMode => {
+                    mouseless_mode.0 = !mouseless_mode.0;
+                    mouseless_mode.save();
+                    mouseless_mode.0
+                }
+                OptionsCheckboxType::SwapMovementAimKeys => {
+                    swap_movement_aim_keys.0 = !swap_movement_aim_keys.0;
+                    swap_movement_aim_keys.save();
+                    swap_movement_aim_keys.0
+                }
+                _ => unreachable!("unexpected CheatSettings checkbox: {:?}", options_checkbox.0),
             }
         };
         commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.2));
@@ -2135,114 +2232,20 @@ pub fn update_cheat_checkbox_visual(
     }
 
     for (options_checkbox, mut texture) in checkboxes.iter_mut() {
-        let checkbox_ui = match options_checkbox.0 {
-            OptionsCheckboxType::UnlockAllClasses => {
-                if cheat_settings.bypass_class_unlocks {
-                    UIElement::CheckBoxSelected
-                } else {
-                    UIElement::CheckBox
-                }
-            }
-            OptionsCheckboxType::ColorBlindMode => {
-                if cheat_settings.color_blind_mode {
-                    UIElement::CheckBoxSelected
-                } else {
-                    UIElement::CheckBox
-                }
-            }
-            OptionsCheckboxType::DevMode => {
-                if cheat_settings.dev_mode {
-                    UIElement::CheckBoxSelected
-                } else {
-                    UIElement::CheckBox
-                }
-            }
-            OptionsCheckboxType::ShowEnemyDamageNumbers => {
-                if cheat_settings.show_enemy_damage_numbers {
-                    UIElement::CheckBoxSelected
-                } else {
-                    UIElement::CheckBox
-                }
-            }
-            OptionsCheckboxType::SmallDamageText => {
-                if cheat_settings.small_damage_text {
-                    UIElement::CheckBoxSelected
-                } else {
-                    UIElement::CheckBox
-                }
-            }
-            OptionsCheckboxType::ShowPlayerDamageNumbers => {
-                if cheat_settings.show_player_damage_numbers {
-                    UIElement::CheckBoxSelected
-                } else {
-                    UIElement::CheckBox
-                }
-            }
-            OptionsCheckboxType::ShowTileHover => {
-                if cheat_settings.show_tile_hover {
-                    UIElement::CheckBoxSelected
-                } else {
-                    UIElement::CheckBox
-                }
-            }
-            OptionsCheckboxType::BypassTimeCrystalPool => {
-                if cheat_settings.bypass_time_crystal_pool {
-                    UIElement::CheckBoxSelected
-                } else {
-                    UIElement::CheckBox
-                }
-            }
-            OptionsCheckboxType::HideAttackAnims => {
-                if cheat_settings.hide_attack_anims {
-                    UIElement::CheckBoxSelected
-                } else {
-                    UIElement::CheckBox
-                }
-            }
-            OptionsCheckboxType::HideSkillAnims => {
-                if cheat_settings.hide_skill_anims {
-                    UIElement::CheckBoxSelected
-                } else {
-                    UIElement::CheckBox
-                }
-            }
-            OptionsCheckboxType::HideHeirloomAnims => {
-                if cheat_settings.hide_heirloom_anims {
-                    UIElement::CheckBoxSelected
-                } else {
-                    UIElement::CheckBox
-                }
-            }
-            OptionsCheckboxType::DoubleCursorSize => {
-                if cursor_color.double_size {
-                    UIElement::CheckBoxSelected
-                } else {
-                    UIElement::CheckBox
-                }
-            }
-            OptionsCheckboxType::AutoAttack => {
-                if auto_attack.0 {
-                    UIElement::CheckBoxSelected
-                } else {
-                    UIElement::CheckBox
-                }
-            }
-            OptionsCheckboxType::MouselessMode => {
-                if mouseless_mode.0 {
-                    UIElement::CheckBoxSelected
-                } else {
-                    UIElement::CheckBox
-                }
-            }
-            OptionsCheckboxType::SwapMovementAimKeys => {
-                if swap_movement_aim_keys.0 {
-                    UIElement::CheckBoxSelected
-                } else {
-                    UIElement::CheckBox
-                }
+        let checked = if options_checkbox.0.uses_cheat_settings() {
+            cheat_settings.checkbox_value(options_checkbox.0)
+        } else {
+            match options_checkbox.0 {
+                OptionsCheckboxType::DoubleCursorSize => cursor_color.double_size,
+                OptionsCheckboxType::AutoAttack => auto_attack.0,
+                OptionsCheckboxType::MouselessMode => mouseless_mode.0,
+                OptionsCheckboxType::SwapMovementAimKeys => swap_movement_aim_keys.0,
+                _ => false,
             }
         };
-        *texture = graphics.get_ui_element_texture(checkbox_ui).clone();
+        *texture = graphics
+            .get_ui_element_texture(options_checkbox_ui(checked))
+            .clone();
     }
 }
 

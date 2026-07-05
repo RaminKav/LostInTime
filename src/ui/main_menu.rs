@@ -1351,7 +1351,9 @@ pub fn cleanup_run_state(
     commands.remove_resource::<XpBarFadeIn>();
     commands.insert_resource(crate::player::skills::HeirloomTriggerCounts::default());
     commands.insert_resource(crate::player::skills::ManaTrackerResetTimer::default());
-    commands.insert_resource(crate::inventory::BreakDropFilter::default());
+    if !cheat_settings.persist_item_filters {
+        commands.insert_resource(crate::inventory::BreakDropFilter::default());
+    }
     commands.insert_resource(EssenceShopCache::default());
     commands.insert_resource(FogOfWarData::default());
     commands.insert_resource(MinimapTileCache::default());

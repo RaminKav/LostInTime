@@ -216,6 +216,84 @@ pub enum ClientState {
     Unpaused,
     Paused,
 }
+
+/// Non-cheat options toggles written to `game_data.json` as a single blob (`options_settings`).
+///
+/// To add a new persisted checkbox:
+/// 1. Add the field here (with `#[serde(default)]`).
+/// 2. Wire it in [`CheatSettings`] default, [`PersistedOptionsSettings::from_cheat_settings`],
+///    [`PersistedOptionsSettings::apply_to`], [`CheatSettings::checkbox_value`], and
+///    [`CheatSettings::toggle_checkbox`].
+/// 3. Add the variant to [`OptionsCheckboxType::persists_to_game_data`].
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PersistedOptionsSettings {
+    #[serde(default)]
+    pub color_blind_mode: bool,
+    #[serde(default)]
+    pub show_enemy_damage_numbers: bool,
+    #[serde(default)]
+    pub show_player_damage_numbers: bool,
+    #[serde(default)]
+    pub show_tile_hover: bool,
+    #[serde(default)]
+    pub small_damage_text: bool,
+    #[serde(default)]
+    pub hide_attack_anims: bool,
+    #[serde(default)]
+    pub hide_skill_anims: bool,
+    #[serde(default)]
+    pub hide_heirloom_anims: bool,
+    #[serde(default)]
+    pub persist_item_filters: bool,
+}
+
+impl Default for PersistedOptionsSettings {
+    fn default() -> Self {
+        Self {
+            color_blind_mode: false,
+            show_enemy_damage_numbers: true,
+            show_player_damage_numbers: true,
+            show_tile_hover: false,
+            small_damage_text: false,
+            hide_attack_anims: false,
+            hide_skill_anims: false,
+            hide_heirloom_anims: false,
+            persist_item_filters: false,
+        }
+    }
+}
+
+impl PersistedOptionsSettings {
+    pub fn from_legacy_game_data(game_data: &GameData) -> Self {
+        let mut settings = Self::default();
+        if let Some(v) = game_data.color_blind_mode {
+            settings.color_blind_mode = v;
+        }
+        if let Some(v) = game_data.show_enemy_damage_numbers {
+            settings.show_enemy_damage_numbers = v;
+        }
+        if let Some(v) = game_data.show_player_damage_numbers {
+            settings.show_player_damage_numbers = v;
+        }
+        if let Some(v) = game_data.show_tile_hover {
+            settings.show_tile_hover = v;
+        }
+        if let Some(v) = game_data.small_damage_text {
+            settings.small_damage_text = v;
+        }
+        if let Some(v) = game_data.hide_attack_anims {
+            settings.hide_attack_anims = v;
+        }
+        if let Some(v) = game_data.hide_skill_anims {
+            settings.hide_skill_anims = v;
+        }
+        if let Some(v) = game_data.hide_heirloom_anims {
+            settings.hide_heirloom_anims = v;
+        }
+        settings
+    }
+}
+
 #[derive(Resource, Clone, Serialize, Deserialize, Default)]
 pub struct GameData {
     pub num_runs: u128,
@@ -268,7 +346,10 @@ pub struct GameData {
     /// Options screen: "Unlock All Classes" cheat (`CheatSettings::bypass_class_unlocks`).
     #[serde(default)]
     pub bypass_class_unlocks: Option<bool>,
-    /// Options screen: "Color Blind Mode" (`CheatSettings::color_blind_mode`).
+    /// Persisted non-cheat options toggles from the options menu.
+    #[serde(default)]
+    pub options_settings: Option<PersistedOptionsSettings>,
+    /// Legacy top-level fields kept for save migration; prefer [`Self::options_settings`].
     #[serde(default)]
     pub color_blind_mode: Option<bool>,
     /// Options screen: "Damage Numbers" (`CheatSettings::show_enemy_damage_numbers`).

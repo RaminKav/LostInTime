@@ -125,7 +125,13 @@ pub fn reset_microwave_shrine_usages(mut usages: ResMut<MicrowaveShrineUsages>) 
     usages.0 = 0;
 }
 
-pub fn reset_break_drop_filter(mut break_drop_filter: ResMut<crate::inventory::BreakDropFilter>) {
+pub fn reset_break_drop_filter(
+    mut break_drop_filter: ResMut<crate::inventory::BreakDropFilter>,
+    cheat_settings: Res<CheatSettings>,
+) {
+    if cheat_settings.persist_item_filters {
+        return;
+    }
     break_drop_filter.0.clear();
 }
 use loading_screen::*;
