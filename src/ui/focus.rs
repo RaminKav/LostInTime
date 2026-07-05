@@ -22,14 +22,13 @@
 //!   step. D-pad and keyboard arrows stay digital/unchanged. Tune via Options → "UI Nav
 //!   Stability" (1 = responsive, 10 = firm tilt required).
 use bevy::ecs::system::SystemParam;
-use bevy::input::gamepad::Gamepads;
 use bevy::input::mouse::MouseMotion;
 use bevy::prelude::*;
 use leafwing_input_manager::prelude::ActionState;
 use serde::{Deserialize, Serialize};
 
 use crate::cursor::CursorPos;
-use crate::gamepad_input::{UiGamepadAction, UiGamepadInputMarker};
+use crate::gamepad_input::{ActiveInputDevice, InputDeviceKind, UiGamepadAction, UiGamepadInputMarker};
 use crate::inputs::MouselessModeState;
 use crate::ui::{tips::TipBox, tutorial_ui::TutorialUI, InventorySlotState, InventorySlotType, UIState};
 use crate::GameState;
@@ -451,10 +450,15 @@ fn default_focus_entity(
     }
 }
 
-/// While mouseless mode is on or a gamepad is connected, ignore a stationary cursor when a UI
-/// screen/overlay first opens. Without this, a mouse resting in the middle of the screen would
-/// immediately hover whatever it sits on (e.g. a skill-choice card) until the player nudges it.
-/// Mouse hover resumes as soon as the player actually moves the mouse.
+/// While mouseless mode is on or the gamepad is the actively-used device, ignore a stationary
+/// cursor when a UI screen/overlay first opens. Without this, a mouse resting in the middle of
+/// the screen would immediately hover whatever it sits on (e.g. a skill-choice card) until the
+/// player nudges it. Mouse hover resumes as soon as the player actually moves the mouse.
+///
+/// Deliberately keys off [`ActiveInputDevice`] (recent real gamepad button/stick input) rather
+/// than mere OS-level gamepad connection — a stray/phantom "controller" the OS reports as
+/// connected but the player never touches must not silently switch a mouse-and-keyboard session
+/// into focus-driven UI mode.
 fn update_cursor_ui_hover_suppression(
     mut cursor_pos: ResMut<CursorPos>,
     game_state: Res<State<GameState>>,
@@ -462,7 +466,7 @@ fn update_cursor_ui_hover_suppression(
     tip_boxes: Query<Entity, With<TipBox>>,
     tutorial_ui: Query<(), With<TutorialUI>>,
     mouseless_mode: Res<MouselessModeState>,
-    gamepads: Res<Gamepads>,
+    active_device: Res<ActiveInputDevice>,
     modals: Query<(Entity, &ModalFocusable)>,
     visibility: Query<&Visibility>,
     mut mouse_motion: EventReader<MouseMotion>,
@@ -484,7 +488,7 @@ fn update_cursor_ui_hover_suppression(
     let context_changed = last_context.as_ref() != Some(&context);
     if context_changed {
         *last_context = Some(context);
-        let prefer_non_mouse_ui = mouseless_mode.0 || gamepads.iter().next().is_some();
+        let prefer_non_mouse_ui = mouseless_mode.0 || active_device.0 == InputDeviceKind::Gamepad;
         if mode != FocusMode::None && prefer_non_mouse_ui {
             cursor_pos.suppress_ui_hover = true;
         }
@@ -593,23 +597,33 @@ pub struct UiStickNavLatch {
 }
 
 /// Returns a direction if the player pressed a UI navigation input this frame.
+///
+/// `keyboard_enabled` gates the plain keyboard arrow-key branch only — gamepad d-pad/stick nav
+/// always works regardless. Callers driving general on-screen focus (`focus_nav`) pass
+/// `mouseless_mode.0` here so arrow keys don't silently start moving UI focus during normal
+/// mouse-and-keyboard play (that's what caused a focused element to show a hover alongside
+/// whatever the mouse was actually pointing at). Narrower keyboard-only interactions (e.g. an
+/// options-screen slider nudge while already focused via Tab/click) can pass `true` unconditionally.
 pub fn ui_nav_dir_just_pressed(
     keys: &Input<KeyCode>,
+    keyboard_enabled: bool,
     gamepad: Option<&ActionState<UiGamepadAction>>,
     stick_latch: &mut UiStickNavLatch,
     stability: UiNavStickStability,
 ) -> Option<UiNavDir> {
-    if keys.just_pressed(KeyCode::Up) {
-        return Some(UiNavDir::Up);
-    }
-    if keys.just_pressed(KeyCode::Down) {
-        return Some(UiNavDir::Down);
-    }
-    if keys.just_pressed(KeyCode::Left) {
-        return Some(UiNavDir::Left);
-    }
-    if keys.just_pressed(KeyCode::Right) {
-        return Some(UiNavDir::Right);
+    if keyboard_enabled {
+        if keys.just_pressed(KeyCode::Up) {
+            return Some(UiNavDir::Up);
+        }
+        if keys.just_pressed(KeyCode::Down) {
+            return Some(UiNavDir::Down);
+        }
+        if keys.just_pressed(KeyCode::Left) {
+            return Some(UiNavDir::Left);
+        }
+        if keys.just_pressed(KeyCode::Right) {
+            return Some(UiNavDir::Right);
+        }
     }
 
     let Some(gamepad) = gamepad else {
@@ -662,11 +676,12 @@ pub fn ui_nav_dir_just_pressed(
 
 fn pressed_nav_dir(
     keys: &Input<KeyCode>,
+    keyboard_enabled: bool,
     gamepad: Option<&ActionState<UiGamepadAction>>,
     stick_latch: &mut UiStickNavLatch,
     stability: UiNavStickStability,
 ) -> Option<NavDir> {
-    ui_nav_dir_just_pressed(keys, gamepad, stick_latch, stability).map(Into::into)
+    ui_nav_dir_just_pressed(keys, keyboard_enabled, gamepad, stick_latch, stability).map(Into::into)
 }
 
 /// Layout markers consumed by [`focus_nav`] when choosing the next focus target.
@@ -679,24 +694,39 @@ pub struct FocusNavMarkerQueries<'w, 's> {
 
 const NAV_LATERAL_PENALTY: f32 = 3.0;
 
+/// Grouped purely to stay under Bevy's per-system parameter limit — no shared logic between them.
+#[derive(SystemParam)]
+pub struct FocusNavContext<'w, 's> {
+    pub game_state: Res<'w, State<GameState>>,
+    pub ui_state: Res<'w, State<UIState>>,
+    pub tip_boxes: Query<'w, 's, Entity, With<TipBox>>,
+    pub tutorial_ui: Query<'w, 's, (), With<TutorialUI>>,
+    pub focus_nav_blocked: Res<'w, FocusNavBlocked>,
+    pub mouseless_mode: Res<'w, MouselessModeState>,
+}
+
 fn focus_nav(
     key_input: Res<Input<KeyCode>>,
     ui_gamepad_q: Query<&ActionState<UiGamepadAction>, With<UiGamepadInputMarker>>,
-    game_state: Res<State<GameState>>,
-    ui_state: Res<State<UIState>>,
-    tip_boxes: Query<Entity, With<TipBox>>,
-    tutorial_ui: Query<(), With<TutorialUI>>,
+    ctx: FocusNavContext,
     mut ui_focus: ResMut<UiFocus>,
     focusables: Query<(Entity, &GlobalTransform, &Focusable)>,
     overlays: Query<(Entity, &GlobalTransform, &OverlayFocusable)>,
     modals: Query<(Entity, &GlobalTransform, &ModalFocusable)>,
     visibility: Query<&Visibility>,
     inv_slots: Query<&InventorySlotState>,
-    focus_nav_blocked: Res<FocusNavBlocked>,
     nav_markers: FocusNavMarkerQueries,
     stick_stability: Res<UiNavStickStability>,
     mut stick_latch: Local<UiStickNavLatch>,
 ) {
+    let FocusNavContext {
+        game_state,
+        ui_state,
+        tip_boxes,
+        tutorial_ui,
+        focus_nav_blocked,
+        mouseless_mode,
+    } = ctx;
     if focus_nav_blocked.0 {
         return;
     }
@@ -713,8 +743,13 @@ fn focus_nav(
             !tutorial_ui.is_empty(),
         )
     };
+    // Plain keyboard arrow keys only drive on-screen focus while Mouseless Mode is on — outside
+    // it, arrow keys have no special meaning here, so a resting mouse hover and a stray focused
+    // element (see `ensure_default_focus`) can never visually fight over the same screen.
+    // Gamepad d-pad/stick nav is unaffected either way.
     let Some(dir) = pressed_nav_dir(
         &key_input,
+        mouseless_mode.0,
         ui_gamepad_q.get_single().ok(),
         &mut stick_latch,
         *stick_stability,

@@ -1163,7 +1163,7 @@ fn update_fog_of_war(
 
     *last_position = Some(current_pos);
 
-    let reveal_radius = 20;
+    let reveal_radius = 28;
 
     for dy in -reveal_radius..=reveal_radius {
         for dx in -reveal_radius..=reveal_radius {

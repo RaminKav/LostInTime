@@ -15,6 +15,7 @@ use crate::{
         PlayerSpriteHandles, PlayerThiefAseprite, PlayerWizardAseprite,
     },
     attributes::{AttributeQuality, AttributeValue, ItemAttributes, ItemGlow},
+    chaos::ChaosTracker,
     colors::{
         COMMON_TOOLTIP_TITLE, LEGENDARY_TOOLTIP_TITLE, RARE_TOOLTIP_TITLE, UNCOMMON_TOOLTIP_TITLE,
     },
@@ -1634,7 +1635,7 @@ impl Heirloom {
                 "around you.".to_string(),
             ],
             Heirloom::DaggerCombo => vec![
-                "Attacks chained".to_string(),
+                "Weapon Attacks chained".to_string(),
                 "together build ".to_string(),
                 "Combo, increasing ".to_string(),
                 "your critical ".to_string(),
@@ -1697,7 +1698,7 @@ impl Heirloom {
             Heirloom::FrozenCrit => vec![
                 "Attacking frozen".to_string(),
                 "enemies gives you".to_string(),
-                "a +15% critical hit".to_string(),
+                "a +25% critical hit".to_string(),
                 "chance.".to_string(),
                 "+15% freeze chance".to_string(),
             ],
@@ -1865,7 +1866,7 @@ impl Heirloom {
                 "at 0 HP).".to_string(),
             ],
             Heirloom::ChaosStats => vec![
-                "+2 Chaos. +10 HP,".to_string(),
+                "+3 Chaos. +10 HP,".to_string(),
                 "+10 MP, +10% dmg,".to_string(),
                 "+10 def, +10% crit".to_string(),
                 "+10 spd, +10 dodge".to_string(),
@@ -1982,6 +1983,21 @@ impl Heirloom {
         match self {
             Heirloom::Chest => Some((WorldObject::ChestBlock, 1)),
             _ => None,
+        }
+    }
+
+    /// One-time chaos granted when this heirloom is newly acquired (not on duplicates).
+    pub fn acquisition_chaos_bonus(&self) -> Option<f32> {
+        match self {
+            Heirloom::ChaosBoost => Some(1.5),
+            Heirloom::ChaosStats => Some(3.0),
+            _ => None,
+        }
+    }
+
+    pub fn apply_acquisition_effects(&self, chaos_tracker: &mut ChaosTracker) {
+        if let Some(amount) = self.acquisition_chaos_bonus() {
+            chaos_tracker.add_chaos(amount);
         }
     }
 

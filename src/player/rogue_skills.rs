@@ -24,6 +24,7 @@ use bevy_aseprite::{anim::AsepriteAnimation, aseprite, AsepriteBundle};
 use bevy_rapier2d::prelude::{Collider, CollisionGroups, Group, KinematicCharacterController};
 
 use super::{
+    combat_heirlooms::hit_is_weapon_damage,
     melee_skills::{spawn_delayed_heirloom_cast, DelayedCastType, HEIRLOOM_EXTRA_CAST_DELAY},
     skills::active_skill_scaling::{attack_damage_multiplier, SPRINT_LUNGE},
     ActiveSkill, ActiveSkillUsedEvent, Heirloom, Player, PlayerSkills,
@@ -485,10 +486,13 @@ pub fn handle_add_combo_counter(
         return;
     }
 
-    // Only count direct attacks (no status/heirloom damage like poison)
+    // Only count weapon hits (melee swings or weapon projectiles).
     let mut combo_increment = 0;
     for hit in hits.iter() {
-        if hit.from_heirloom_effect.is_none() && mobs.get(hit.hit_entity).is_ok() {
+        if hit_is_weapon_damage(hit)
+            && hit.hit_by_pet.is_none()
+            && mobs.get(hit.hit_entity).is_ok()
+        {
             combo_increment += 1;
         }
     }

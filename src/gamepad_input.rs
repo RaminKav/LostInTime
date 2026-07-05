@@ -296,6 +296,15 @@ pub enum InputDeviceKind {
 #[derive(Resource, Default)]
 pub struct ActiveInputDevice(pub InputDeviceKind);
 
+/// Decides which device is "active" each frame. Keyboard/mouse takes priority whenever it has
+/// *any* signal this frame — not just a fresh press, but also keys/buttons still held down —
+/// so a stray/phantom gamepad connection (e.g. some OS misreporting a non-game peripheral as a
+/// controller, or a real pad drifting slightly above its rest position) can never silently steal
+/// input priority away from a player who is actively holding a movement key. Only when keyboard
+/// and mouse are both fully idle this frame do we look at the gamepad, and even then a stick
+/// axis only counts if it's clearly outside the deadzone (a fresh button press always counts).
+/// This mirrors the exact rule requested for Track 4: any controller button swaps to controller,
+/// any keyboard input swaps back to keyboard instantly.
 fn update_active_input_device(
     mut device: ResMut<ActiveInputDevice>,
     key_input: Res<Input<KeyCode>>,
@@ -304,10 +313,12 @@ fn update_active_input_device(
     gamepad_buttons: Res<Input<GamepadButton>>,
     action_query: Query<&ActionState<GamepadAction>, With<Player>>,
 ) {
-    if mouse_motion.iter().next().is_some()
+    let keyboard_mouse_active = mouse_motion.iter().next().is_some()
         || key_input.get_just_pressed().next().is_some()
+        || key_input.get_pressed().next().is_some()
         || mouse_button_input.get_just_pressed().next().is_some()
-    {
+        || mouse_button_input.get_pressed().next().is_some();
+    if keyboard_mouse_active {
         device.0 = InputDeviceKind::KeyboardMouse;
         return;
     }
@@ -462,13 +473,13 @@ impl Plugin for GamepadInputPlugin {
             .add_system(
                 sync_player_gamepad_input_map.in_set(OnUpdate(GameState::Main)),
             )
-            .add_systems(
-                (
-                    update_active_input_device,
-                    log_active_input_device_changes.after(update_active_input_device),
-                )
-                    .in_set(OnUpdate(GameState::Main)),
-            );
+            // Also unconditional (not gated to GameState::Main): the active device needs to stay
+            // accurate in menus/pause too, so a stray/phantom gamepad connection detected while
+            // paused doesn't leave stale state once gameplay resumes.
+            .add_systems((
+                update_active_input_device,
+                log_active_input_device_changes.after(update_active_input_device),
+            ));
 
         if *crate::DEBUG {
             app.add_system(debug_log_raw_gamepad_state)

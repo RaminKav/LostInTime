@@ -523,6 +523,16 @@ fn turn_player(
         game.player_state.direction = dir.clone();
     }
 }
+/// Groups the movement/aim scheme resources together purely to stay under Bevy's per-system
+/// parameter limit — no shared logic between them.
+#[derive(SystemParam)]
+pub struct MoveSchemeParams<'w> {
+    pub mouseless_mode: Res<'w, MouselessModeState>,
+    pub swap_keys: Res<'w, SwapMovementAimKeysState>,
+    pub aim: Res<'w, crate::aim::AimState>,
+    pub active_device: Res<'w, crate::gamepad_input::ActiveInputDevice>,
+}
+
 pub fn player_move_inputs(
     mut game: GameParam,
     mut player_query: Query<
@@ -557,10 +567,12 @@ pub fn player_move_inputs(
     mut ammo_query: Query<&mut Ammo>,
     proto_param: ProtoParam,
     gamepad_action_q: Query<&ActionState<GamepadAction>, With<Player>>,
-    mouseless_mode: Res<MouselessModeState>,
-    swap_keys: Res<SwapMovementAimKeysState>,
-    aim: Res<crate::aim::AimState>,
+    move_scheme: MoveSchemeParams,
 ) {
+    let mouseless_mode = move_scheme.mouseless_mode;
+    let swap_keys = move_scheme.swap_keys;
+    let aim = move_scheme.aim;
+    let active_device = move_scheme.active_device;
     if audio_timer.duration() == Duration::ZERO {
         *audio_timer = Timer::from_seconds(0.2, TimerMode::Once);
     }
@@ -597,13 +609,18 @@ pub fn player_move_inputs(
         * (if hunger.is_starving() { 0.7 } else { 1. })
         * movement_speed_multiplier;
 
-    // Left stick takes priority over WASD for this frame when it's outside the deadzone;
-    // otherwise fall back to keyboard so mixed keyboard/gamepad play keeps working.
-    let gamepad_move = gamepad_action_q.get_single().ok().and_then(|action_state| {
-        action_state
-            .clamped_axis_pair(GamepadAction::Move)
-            .map(|pair| pair.xy())
-    });
+    // Left stick takes priority over WASD for this frame when it's outside the deadzone —
+    // but only while the gamepad is actually the active device (see `ActiveInputDevice`). This
+    // stops a stray/phantom controller connection (or a real pad drifting slightly off-center)
+    // from silently overriding real, currently-held keyboard input.
+    let gamepad_move = (active_device.0 == crate::gamepad_input::InputDeviceKind::Gamepad)
+        .then(|| gamepad_action_q.get_single().ok())
+        .flatten()
+        .and_then(|action_state| {
+            action_state
+                .clamped_axis_pair(GamepadAction::Move)
+                .map(|pair| pair.xy())
+        });
     if let Some(stick) = gamepad_move.filter(|v| {
         v.length_squared() > crate::gamepad_input::GAMEPAD_STICK_DEADZONE.powi(2)
     }) {

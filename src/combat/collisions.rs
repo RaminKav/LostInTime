@@ -241,7 +241,7 @@ fn check_projectile_hit_mob_collisions(
             Without<ItemStack>,
             Without<MainHand>,
             Without<Projectile>,
-            Without<Pet>, // Don't hit pets
+            Without<Pet>,           // Don't hit pets
             Without<WaterCollider>, // Don't hit water tile colliders
         ),
     >,
@@ -325,11 +325,7 @@ fn check_projectile_hit_mob_collisions(
             };
 
             let crit_bonus = if is_slowed && game.has_skill(Heirloom::FrozenCrit) {
-                15
-            } else {
-                0
-            } + if state.mana_bar_full && game.has_skill(Heirloom::MPBarCrit) {
-                10
+                25
             } else {
                 0
             };
@@ -560,16 +556,11 @@ fn check_multihit_projectile_ongoing_collisions(
                         None => (false, false, 0),
                     };
 
-                    let crit_bonus =
-                        if is_slowed && game.has_skill(Heirloom::FrozenCrit) {
-                            15
-                        } else {
-                            0
-                        } + if state.mana_bar_full && game.has_skill(Heirloom::MPBarCrit) {
-                            10
-                        } else {
-                            0
-                        };
+                    let crit_bonus = if is_slowed && game.has_skill(Heirloom::FrozenCrit) {
+                        25
+                    } else {
+                        0
+                    };
 
                     // Multi-hit projectiles handled here are skill effects (FireRing /
                     // LaserBeam), so they never grant the DodgeCrit weapon-hit bonus.
@@ -1160,8 +1151,7 @@ fn check_mob_to_player_collisions(
             }
             let mut rng = rand::thread_rng();
             let already_iframed = in_i_frame.contains(e1);
-            let dodged = !already_iframed
-                && rng.gen_ratio(dodge.0.try_into().unwrap_or(0), 100);
+            let dodged = !already_iframed && rng.gen_ratio(dodge.0.try_into().unwrap_or(0), 100);
             if dodged {
                 dodge_event.send(DodgeEvent { entity: e1 });
             } else {

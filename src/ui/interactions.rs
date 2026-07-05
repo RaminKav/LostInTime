@@ -1935,15 +1935,9 @@ pub fn handle_cursor_skills_buttons(
                                 &mut commands,
                                 skills.clone(),
                             );
-
-                            // Add chaos if ChaosBoost heirloom was picked
-                            if picked_skill.heirloom == Heirloom::ChaosBoost {
-                                tips_param.p2().add_chaos(1.5);
-                            }
-                            // Add chaos if ChaosStats heirloom was picked (+2 chaos)
-                            if picked_skill.heirloom == Heirloom::ChaosStats {
-                                tips_param.p2().add_chaos(2.0);
-                            }
+                            picked_skill
+                                .heirloom
+                                .apply_acquisition_effects(&mut tips_param.p2());
 
                             for mut shrine in pick_params.shrine_query.iter_mut() {
                                 if !shrine.is_used {
@@ -2568,6 +2562,7 @@ pub struct HeirloomChestEvents<'w> {
     pub chest_event: EventWriter<'w, ItemChestAnimChangeEvent>,
     pub att_event: EventWriter<'w, AttributeChangeEvent>,
     pub ui_focus: Res<'w, crate::ui::focus::UiFocus>,
+    pub chaos_tracker: ResMut<'w, ChaosTracker>,
 }
 
 /// Handles heirloom chest button interactions (for ChestType::Heirloom).
@@ -2610,6 +2605,7 @@ pub fn handle_cursor_heirloom_chest_button(
             &proto,
             &mut proto_commands,
             &mut heirloom_chest_events.att_event,
+            &mut heirloom_chest_events.chaos_tracker,
         );
         return;
     }
@@ -2642,6 +2638,7 @@ pub fn handle_cursor_heirloom_chest_button(
                                 &proto,
                                 &mut proto_commands,
                                 &mut heirloom_chest_events.att_event,
+                                &mut heirloom_chest_events.chaos_tracker,
                             ),
                             ChestButtonKind::Take => take_heirloom_chest_reward(
                                 &mut item_chest_state,
@@ -2652,6 +2649,7 @@ pub fn handle_cursor_heirloom_chest_button(
                                 &proto,
                                 &mut proto_commands,
                                 &mut heirloom_chest_events.att_event,
+                                &mut heirloom_chest_events.chaos_tracker,
                             ),
                             ChestButtonKind::Banish => {
                                 let picked = item_chest_state.picked_heirloom.clone();
@@ -2720,6 +2718,7 @@ fn advance_heirloom_chest_state(
     proto: &ProtoParam,
     proto_commands: &mut ProtoCommands,
     att_event: &mut EventWriter<AttributeChangeEvent>,
+    chaos_tracker: &mut ChaosTracker,
 ) {
     let state = item_chest_state.state.clone();
     match state {
@@ -2742,6 +2741,7 @@ fn advance_heirloom_chest_state(
                 proto,
                 proto_commands,
                 att_event,
+                chaos_tracker,
             );
         }
     }
@@ -2756,6 +2756,7 @@ fn take_heirloom_chest_reward(
     proto: &ProtoParam,
     proto_commands: &mut ProtoCommands,
     att_event: &mut EventWriter<AttributeChangeEvent>,
+    chaos_tracker: &mut ChaosTracker,
 ) {
     if let Ok((player_entity, transform, mut skills, level)) = player_query.get_single_mut() {
         let picked_heirloom = item_chest_state.picked_heirloom.clone().unwrap();
@@ -2770,6 +2771,9 @@ fn take_heirloom_chest_reward(
         picked_heirloom
             .heirloom
             .add_heirloom_components(player_entity, commands, skills.clone());
+        picked_heirloom
+            .heirloom
+            .apply_acquisition_effects(chaos_tracker);
         att_event.send(AttributeChangeEvent);
     }
     next_ui_state.set(UIState::Closed);
@@ -3358,6 +3362,7 @@ pub fn handle_merchant_shop_interactions(
     mouse_input: Res<Input<MouseButton>>,
     key_input: Res<Input<KeyCode>>,
     keybinds: Res<crate::keybinds::InputMappings>,
+    mouseless: Res<crate::inputs::MouselessModeState>,
     ui_gamepad_q: Query<&ActionState<UiGamepadAction>, With<UiGamepadInputMarker>>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     mut shop_slots: Query<(Entity, &mut Interactable, &MerchantShopSlotIndex)>,
@@ -3377,10 +3382,15 @@ pub fn handle_merchant_shop_interactions(
         .get_single()
         .map(|a| a.just_pressed(UiGamepadAction::Mark))
         .unwrap_or(false);
+    // Only let controller/keyboard focus drive hover, confirm, or mark when it's actually the
+    // active input path (mouseless mode, or a gamepad genuinely in use) — otherwise a slot that
+    // merely happens to hold default UI focus would show its own hover alongside whatever the
+    // mouse is actually pointing at, and the info box would show two conflicting tooltips.
+    let focus_driving = focus_driving(&mouseless, &cursor_pos);
 
     for (e, mut interactable, slot_index) in shop_slots.iter_mut() {
         let is_hit = matches!(hit_test, Some(hit_ent) if hit_ent.0 == e);
-        let is_focused = focus_input.is_focused(e);
+        let is_focused = focus_driving && focus_input.is_focused(e);
         let confirm_pressed = (is_hit && left_mouse_pressed)
             || (is_focused && focus_input.confirm_just_pressed());
         let mark_pressed = (is_hit || is_focused)
@@ -3420,6 +3430,7 @@ pub fn handle_merchant_shop_interactions(
 pub fn handle_merchant_done_button(
     cursor_pos: Res<CursorPos>,
     mouse_input: Res<Input<MouseButton>>,
+    mouseless: Res<crate::inputs::MouselessModeState>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     mut done_buttons: Query<(Entity, &mut Interactable), With<MerchantDoneButton>>,
     mut next_ui_state: ResMut<NextState<UIState>>,
@@ -3430,10 +3441,11 @@ pub fn handle_merchant_done_button(
 ) {
     let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
+    let focus_driving = focus_driving(&mouseless, &cursor_pos);
 
     for (e, mut interactable) in done_buttons.iter_mut() {
         let is_hit = matches!(hit_test, Some(hit_ent) if hit_ent.0 == e);
-        let is_focused = focus_input.is_focused(e);
+        let is_focused = focus_driving && focus_input.is_focused(e);
         let confirm_pressed = (is_hit && left_mouse_pressed)
             || (is_focused && focus_input.confirm_just_pressed());
 
@@ -3473,12 +3485,14 @@ pub fn handle_merchant_category_reroll_buttons(
     shop: Res<EssenceShopChoices>,
     mut reroll_event: EventWriter<MerchantCategoryRerollEvent>,
     focus_input: crate::ui::focus::FocusInput,
+    mouseless: Res<crate::inputs::MouselessModeState>,
 ) {
     let hit_entity = {
         let ui_sprites = sprites.p0();
         ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None).map(|(e, _, _)| e)
     };
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
+    let focus_driving = focus_driving(&mouseless, &cursor_pos);
 
     let mut any_hovered = false;
 
@@ -3492,7 +3506,7 @@ pub fn handle_merchant_category_reroll_buttons(
             Color::rgb(0.45, 0.45, 0.45)
         };
         let is_hit = hit_entity == Some(e);
-        let is_focused = focus_input.is_focused(e);
+        let is_focused = focus_driving && focus_input.is_focused(e);
         let confirm_pressed = (is_hit && left_mouse_pressed)
             || (is_focused && focus_input.confirm_just_pressed());
 

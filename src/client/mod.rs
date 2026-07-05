@@ -268,6 +268,30 @@ pub struct GameData {
     /// Options screen: "Unlock All Classes" cheat (`CheatSettings::bypass_class_unlocks`).
     #[serde(default)]
     pub bypass_class_unlocks: Option<bool>,
+    /// Options screen: "Color Blind Mode" (`CheatSettings::color_blind_mode`).
+    #[serde(default)]
+    pub color_blind_mode: Option<bool>,
+    /// Options screen: "Damage Numbers" (`CheatSettings::show_enemy_damage_numbers`).
+    #[serde(default)]
+    pub show_enemy_damage_numbers: Option<bool>,
+    /// Options screen: "Player Regen Numbers" (`CheatSettings::show_player_damage_numbers`).
+    #[serde(default)]
+    pub show_player_damage_numbers: Option<bool>,
+    /// Options screen: "Tile Hover" (`CheatSettings::show_tile_hover`).
+    #[serde(default)]
+    pub show_tile_hover: Option<bool>,
+    /// Options screen: "Small damage text" (`CheatSettings::small_damage_text`).
+    #[serde(default)]
+    pub small_damage_text: Option<bool>,
+    /// Options screen: "Hide Attack Anims" (`CheatSettings::hide_attack_anims`).
+    #[serde(default)]
+    pub hide_attack_anims: Option<bool>,
+    /// Options screen: "Hide Skill Anims" (`CheatSettings::hide_skill_anims`).
+    #[serde(default)]
+    pub hide_skill_anims: Option<bool>,
+    /// Options screen: "Hide Heirloom Anims" (`CheatSettings::hide_heirloom_anims`).
+    #[serde(default)]
+    pub hide_heirloom_anims: Option<bool>,
     #[serde(default)]
     pub player_name: Option<String>,
     #[serde(default)]

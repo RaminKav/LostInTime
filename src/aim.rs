@@ -124,6 +124,7 @@ fn update_aim_state(
     mouseless_mode: Res<MouselessModeState>,
     key_input: Res<Input<KeyCode>>,
     gamepad_action_q: Query<&ActionState<GamepadAction>, With<Player>>,
+    active_device: Res<ActiveInputDevice>,
     pending: Res<PendingGroundAimSkill>,
     sensitivity: Res<AimSensitivity>,
     swap_keys: Res<SwapMovementAimKeysState>,
@@ -142,9 +143,9 @@ fn update_aim_state(
         *last_pending_slot = pending.0;
     }
 
-    let gamepad_dir = gamepad_action_q
-        .get_single()
-        .ok()
+    let gamepad_dir = (active_device.0 == InputDeviceKind::Gamepad)
+        .then(|| gamepad_action_q.get_single().ok())
+        .flatten()
         .and_then(|action_state| action_state.clamped_axis_pair(GamepadAction::Aim))
         .map(|pair| pair.xy())
         .filter(|v| v.length_squared() > GAMEPAD_STICK_DEADZONE.powi(2));

@@ -29,9 +29,8 @@ use crate::{
     ui::{
         focus::{
             focus_entity_visible, ui_nav_dir_just_pressed, FocusInput, FocusNavBlocked,
-            UiNavStickStability, UiStickNavLatch,
             FocusNavBottomRow, FocusNavHorizontalSkip, FocusNavTabColumn, Focusable,
-            ModalFocusable, UiFocus, UiNavDir,
+            ModalFocusable, UiFocus, UiNavDir, UiNavStickStability, UiStickNavLatch,
         },
         interactions::Interaction,
         main_menu::{spawn_exit_icon_button, spawn_main_menu_wide_button, MenuButton},
@@ -86,34 +85,76 @@ impl Default for CheatSettings {
 }
 
 impl CheatSettings {
-    /// Builds settings from defaults, then overrides `bypass_class_unlocks` from `game_data.json` when present.
-    pub fn load_from_game_data() -> Self {
-        let mut s = Self::default();
+    fn load_game_data() -> GameData {
         let path = datafiles::game_data();
         if let Ok(file) = File::open(&path) {
-            let reader = BufReader::new(file);
-            if let Ok(game_data) = GameData::try_from_json_reader(reader) {
-                if let Some(v) = game_data.bypass_class_unlocks {
-                    s.bypass_class_unlocks = v;
-                }
-            }
-        }
-        s
-    }
-
-    pub fn persist_bypass_class_unlocks(bypass_class_unlocks: bool) {
-        let path = datafiles::game_data();
-        let mut game_data = if let Ok(file) = File::open(&path) {
             let reader = BufReader::new(file);
             GameData::try_from_json_reader(reader).unwrap_or_default()
         } else {
             GameData::default()
-        };
-        game_data.bypass_class_unlocks = Some(bypass_class_unlocks);
+        }
+    }
+
+    fn write_game_data(game_data: &GameData) {
+        let path = datafiles::game_data();
         if let Ok(file) = File::create(&path) {
             let writer = BufWriter::new(file);
-            let _ = serde_json::to_writer_pretty(writer, &game_data);
+            let _ = serde_json::to_writer_pretty(writer, game_data);
         }
+    }
+
+    /// Builds settings from defaults, then overrides persisted fields from `game_data.json`.
+    pub fn load_from_game_data() -> Self {
+        let mut s = Self::default();
+        let game_data = Self::load_game_data();
+        if let Some(v) = game_data.bypass_class_unlocks {
+            s.bypass_class_unlocks = v;
+        }
+        if let Some(v) = game_data.color_blind_mode {
+            s.color_blind_mode = v;
+        }
+        if let Some(v) = game_data.show_enemy_damage_numbers {
+            s.show_enemy_damage_numbers = v;
+        }
+        if let Some(v) = game_data.show_player_damage_numbers {
+            s.show_player_damage_numbers = v;
+        }
+        if let Some(v) = game_data.show_tile_hover {
+            s.show_tile_hover = v;
+        }
+        if let Some(v) = game_data.small_damage_text {
+            s.small_damage_text = v;
+        }
+        if let Some(v) = game_data.hide_attack_anims {
+            s.hide_attack_anims = v;
+        }
+        if let Some(v) = game_data.hide_skill_anims {
+            s.hide_skill_anims = v;
+        }
+        if let Some(v) = game_data.hide_heirloom_anims {
+            s.hide_heirloom_anims = v;
+        }
+        s
+    }
+
+    /// Persists non-cheat accessibility/display toggles to `game_data.json`.
+    pub fn persist_persisted_options(&self) {
+        let mut game_data = Self::load_game_data();
+        game_data.color_blind_mode = Some(self.color_blind_mode);
+        game_data.show_enemy_damage_numbers = Some(self.show_enemy_damage_numbers);
+        game_data.show_player_damage_numbers = Some(self.show_player_damage_numbers);
+        game_data.show_tile_hover = Some(self.show_tile_hover);
+        game_data.small_damage_text = Some(self.small_damage_text);
+        game_data.hide_attack_anims = Some(self.hide_attack_anims);
+        game_data.hide_skill_anims = Some(self.hide_skill_anims);
+        game_data.hide_heirloom_anims = Some(self.hide_heirloom_anims);
+        Self::write_game_data(&game_data);
+    }
+
+    pub fn persist_bypass_class_unlocks(bypass_class_unlocks: bool) {
+        let mut game_data = Self::load_game_data();
+        game_data.bypass_class_unlocks = Some(bypass_class_unlocks);
+        Self::write_game_data(&game_data);
     }
 }
 
@@ -788,10 +829,7 @@ pub(crate) struct SetupOptionsResources<'w, 's> {
     existing_ui: Query<'w, 's, Entity, Or<(With<OptionsUI>, With<WipeDataPopup>)>>,
 }
 
-pub fn setup_options_ui(
-    mut commands: Commands,
-    deps: SetupOptionsResources,
-) {
+pub fn setup_options_ui(mut commands: Commands, deps: SetupOptionsResources) {
     let SetupOptionsResources {
         graphics,
         asset_server,
@@ -901,7 +939,7 @@ pub fn setup_options_ui(
 
     if game_state.0 == crate::GameState::Main {
         let tutorial_btn = spawn_main_menu_wide_button(
-            Vec3::new(-65., -156., z),
+            Vec3::new(-75., -156., z),
             "Show Tutorial",
             MenuButton::ShowTutorial,
             UIElement::MainMenuStartButton,
@@ -914,7 +952,7 @@ pub fn setup_options_ui(
             .insert((OptionsUI, options_focus(500), FocusNavBottomRow));
 
         let exit_button = spawn_main_menu_wide_button(
-            Vec3::new(65., -156., z),
+            Vec3::new(75., -156., z),
             "Exit to Menu",
             MenuButton::OptionsExit,
             UIElement::MainMenuStartButton,
@@ -1666,6 +1704,7 @@ pub fn handle_options_tab_buttons(
     mut commands: Commands,
     cursor_pos: Res<CursorPos>,
     mouse_input: Res<Input<MouseButton>>,
+    mouseless: Res<crate::inputs::MouselessModeState>,
     mut active_tab: ResMut<ActiveOptionsTab>,
     mut ui_focus: ResMut<UiFocus>,
     mut button_queries: ParamSet<(
@@ -1682,7 +1721,13 @@ pub fn handle_options_tab_buttons(
     };
     let just_clicked = mouse_input.just_released(MouseButton::Left);
     let confirm_pressed = ui_focus.confirm_just_pressed;
-    let focused_entity = ui_focus.focused;
+    // Keyboard/gamepad focus only counts as a highlight source while it's actually driving the
+    // UI (mouseless mode, or a gamepad genuinely in use) — otherwise the tab that merely holds
+    // default focus would show its own green highlight alongside both the real mouse hover *and*
+    // the currently-selected tab, giving up to 3 simultaneous highlights instead of at most 2
+    // (one hover-or-focus highlight, plus the selected tab if it isn't already the same one).
+    let focus_driving = mouseless.0 || cursor_pos.suppress_ui_hover;
+    let focused_entity = focus_driving.then_some(ui_focus.focused).flatten();
     let mut requested: Option<(OptionsTab, Entity)> = None;
 
     for (entity, mut interactable, tab_button, mut sprite) in button_queries.p1().iter_mut() {
@@ -1997,6 +2042,7 @@ pub fn handle_cheat_checkbox_click(
             }
             OptionsCheckboxType::ColorBlindMode => {
                 cheat_settings.color_blind_mode = !cheat_settings.color_blind_mode;
+                cheat_settings.persist_persisted_options();
                 cheat_settings.color_blind_mode
             }
             OptionsCheckboxType::DevMode => {
@@ -2006,19 +2052,23 @@ pub fn handle_cheat_checkbox_click(
             OptionsCheckboxType::ShowEnemyDamageNumbers => {
                 cheat_settings.show_enemy_damage_numbers =
                     !cheat_settings.show_enemy_damage_numbers;
+                cheat_settings.persist_persisted_options();
                 cheat_settings.show_enemy_damage_numbers
             }
             OptionsCheckboxType::SmallDamageText => {
                 cheat_settings.small_damage_text = !cheat_settings.small_damage_text;
+                cheat_settings.persist_persisted_options();
                 cheat_settings.small_damage_text
             }
             OptionsCheckboxType::ShowPlayerDamageNumbers => {
                 cheat_settings.show_player_damage_numbers =
                     !cheat_settings.show_player_damage_numbers;
+                cheat_settings.persist_persisted_options();
                 cheat_settings.show_player_damage_numbers
             }
             OptionsCheckboxType::ShowTileHover => {
                 cheat_settings.show_tile_hover = !cheat_settings.show_tile_hover;
+                cheat_settings.persist_persisted_options();
                 cheat_settings.show_tile_hover
             }
             OptionsCheckboxType::BypassTimeCrystalPool => {
@@ -2027,14 +2077,17 @@ pub fn handle_cheat_checkbox_click(
             }
             OptionsCheckboxType::HideAttackAnims => {
                 cheat_settings.hide_attack_anims = !cheat_settings.hide_attack_anims;
+                cheat_settings.persist_persisted_options();
                 cheat_settings.hide_attack_anims
             }
             OptionsCheckboxType::HideSkillAnims => {
                 cheat_settings.hide_skill_anims = !cheat_settings.hide_skill_anims;
+                cheat_settings.persist_persisted_options();
                 cheat_settings.hide_skill_anims
             }
             OptionsCheckboxType::HideHeirloomAnims => {
                 cheat_settings.hide_heirloom_anims = !cheat_settings.hide_heirloom_anims;
+                cheat_settings.persist_persisted_options();
                 cheat_settings.hide_heirloom_anims
             }
             OptionsCheckboxType::DoubleCursorSize => {
@@ -3126,7 +3179,8 @@ pub fn update_options_row_label_colors(
         }
     }
 
-    if let Some((hit_entity, _, _)) = options_pointcast(&cursor_pos, &ui_sprites, &computed_visibility)
+    if let Some((hit_entity, _, _)) =
+        options_pointcast(&cursor_pos, &ui_sprites, &computed_visibility)
     {
         if let Some(row) = options_row_entity(hit_entity, &focus_rows, &row_members) {
             highlighted.insert(row);
@@ -3237,6 +3291,7 @@ pub fn handle_options_focus_row_input(
 
     let Some(dir) = ui_nav_dir_just_pressed(
         &key_input,
+        true,
         ui_gamepad_q.get_single().ok(),
         &mut stick_latch,
         *ui_nav_stick_stability,

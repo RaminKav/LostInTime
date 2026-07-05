@@ -7,17 +7,18 @@ use strum::IntoEnumIterator;
 use crate::{
     animations::DoneAnimation,
     assets::Graphics,
-    gamepad_bindings::{gamepad_connected, get_gamepad_display_name, GamepadBindingButton},
-    keybinds::{get_key_display_name, InputBinding, InputMappings},
     attributes::{
         attribute_helpers::create_new_random_item_stack_with_attributes, AttributeChangeEvent,
         ItemGlow, ItemRarity, LootRateBonus,
     },
+    chaos::ChaosTracker,
     colors::{LIGHT_RED, RED, SHRINE_GREEN, WHITE},
     custom_commands::CommandsExt,
+    gamepad_bindings::{get_gamepad_display_name, GamepadBindingButton},
     inventory::{Inventory, ItemStack},
     item::WorldObject,
     juice::bounce::BounceOnHit,
+    keybinds::{get_key_display_name, InputBinding, InputMappings},
     player::{
         currency::CoinCurrency,
         levels::PlayerLevel,
@@ -120,7 +121,7 @@ use super::{
     heirloom_tooltip::{HeirloomTooltipRequest, HeirloomTooltipShow},
     spawn_item_stack_icon,
     tooltips::{ToolTipUpdateEvent, TooltipTeardownEvent},
-    Interactable, Focusable, UIElement, UIState, CURRENCY_BACKGROUND_SIZE, KEYBIND_BADGE_COLOR,
+    Focusable, Interactable, UIElement, UIState, CURRENCY_BACKGROUND_SIZE, KEYBIND_BADGE_COLOR,
     TOOLTIP_INFO_BOX_SIZE,
 };
 
@@ -607,9 +608,12 @@ fn spawn_price_badge(
 /// First line of the merchant track info box (`"Press X:"`, `"Right click:"`, etc.).
 pub fn format_merchant_track_action_header(
     keybinds: &InputMappings,
-    gamepads: &Gamepads,
+    active_device: &crate::gamepad_input::ActiveInputDevice,
 ) -> String {
-    let action = if gamepad_connected(gamepads) {
+    // Keyed off the actively-*used* device, not mere OS-level gamepad connection — otherwise a
+    // stray/phantom "connected" controller the player never touches would permanently show the
+    // gamepad hint even in a pure mouse-and-keyboard session.
+    let action = if active_device.0 == crate::gamepad_input::InputDeviceKind::Gamepad {
         format!(
             "Press {}",
             get_gamepad_display_name(GamepadBindingButton::West)
@@ -700,11 +704,11 @@ fn spawn_merchant_track_info_box(
 /// Keeps the merchant track info-box header in sync with keyboard vs controller input.
 pub fn update_merchant_track_info_box_label(
     keybinds: Res<InputMappings>,
-    gamepads: Res<Gamepads>,
+    active_device: Res<crate::gamepad_input::ActiveInputDevice>,
     mut texts: Query<&mut Text, With<MerchantTrackInfoBoxHeaderText>>,
     mut last_label: Local<Option<String>>,
 ) {
-    let header = format_merchant_track_action_header(&keybinds, &gamepads);
+    let header = format_merchant_track_action_header(&keybinds, &active_device);
     if last_label.as_deref() == Some(header.as_str()) {
         return;
     }
@@ -1248,11 +1252,10 @@ pub fn spawn_merchant_category_reroll_button(
         .insert(Name::new(format!("Merchant Reroll {:?}", category.label())));
 
     if enabled {
-        btn.insert(Interactable::default())
-            .insert(Focusable {
-                group: UIState::Essence,
-                index: category.focus_index(),
-            });
+        btn.insert(Interactable::default()).insert(Focusable {
+            group: UIState::Essence,
+            index: category.focus_index(),
+        });
     }
 
     let btn_e = btn.id();
@@ -1651,7 +1654,7 @@ pub fn setup_essence_ui(
         &graphics,
         &asset_server,
         essence_ui_e,
-        "Press X:",
+        "Right click:",
     );
 
     for category in [
@@ -1776,6 +1779,7 @@ pub fn handle_submit_merchant_purchase(
     mut cache: ResMut<EssenceShopCache>,
     mut ui_dirty: ResMut<MerchantShopUiDirty>,
     mut inv: Query<&mut Inventory, With<Player>>,
+    mut chaos_tracker: ResMut<ChaosTracker>,
 ) {
     for purchase in ev.iter() {
         let slot_index = purchase.slot_index;
@@ -1828,6 +1832,9 @@ pub fn handle_submit_merchant_purchase(
                         &mut commands,
                         player_skills.clone(),
                     );
+                    heirloom_with_rarity
+                        .heirloom
+                        .apply_acquisition_effects(&mut chaos_tracker);
                     let player_pos = player_transform.translation().truncate();
                     if let Some((drop, count)) = heirloom_with_rarity.heirloom.get_instant_drop() {
                         proto_commands.spawn_item_from_proto(

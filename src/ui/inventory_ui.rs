@@ -16,10 +16,9 @@ use crate::colors::{
 };
 use crate::cursor::CursorPos;
 use crate::custom_commands::CommandsExt;
-use crate::ui::focus::Focusable;
-use crate::night::{InfiniteMode, InfiniteModeStartedEvent};
 use crate::enemy::spawner::MobSpawningPaused;
 use crate::item::active_skill_shrine::assign_shrine_skill_to_slot;
+use crate::night::{InfiniteMode, InfiniteModeStartedEvent};
 use crate::player::skills::{
     ActiveSkill, ActiveSkillChoiceState, Heirloom, HeirloomChoiceQueue, HeirloomChoiceState,
     HeirloomRarity, PlayerSkills,
@@ -27,14 +26,15 @@ use crate::player::skills::{
 use crate::player::unlocks::RunUnlockState;
 use crate::player::ModifyCurencyEvent;
 use crate::proto::proto_param::ProtoParam;
+use crate::ui::focus::Focusable;
 use crate::ui::heirloom_browser_grid::{
     despawn_dev_heirloom_picker_grid_layers, grid_backdrop_size, heirloom_choice_from_full_pool,
     sorted_full_pool_grid_entries, spawn_heirloom_grid_overlay, DevHeirloomPickerGridLayer,
     HeirloomGridContext,
 };
 use crate::ui::skill_browser_grid::{
-    despawn_dev_skill_picker_grid_layers, sorted_dev_skill_grid_entries,
-    spawn_skill_grid_overlay, DevSkillPickerGridLayer, DevSkillPickerIcon,
+    despawn_dev_skill_picker_grid_layers, sorted_dev_skill_grid_entries, spawn_skill_grid_overlay,
+    DevSkillPickerGridLayer, DevSkillPickerIcon,
 };
 use crate::ui::time_crystal_progress_ui::CrystalUnlockIcon;
 use crate::ui::{
@@ -64,9 +64,7 @@ use crate::{
         MaterialDropFilterMenuOpen, MaterialDropFilterNoneButton, MaterialDropFilterPanel,
         MaterialDropsToggleButton, SortInventoryButton, BREAK_DROP_FILTER_ITEMS,
     },
-    item::{
-        item_drop_outline::UiShadow, CraftedItemEvent, Recipes, WorldObject,
-    },
+    item::{item_drop_outline::UiShadow, CraftedItemEvent, Recipes, WorldObject},
     ui::{FurnaceState, CHEST_INVENTORY_UI_SIZE, INVENTORY_UI_SIZE},
     ScreenResolution,
 };
@@ -262,7 +260,6 @@ pub enum DevButtonAction {
     AddGold,
     DropDungeonKey,
     AddBanishCount,
-    AddLoadedDice,
 }
 
 /// Label child of the endless dev button; text switches between "endless" and "+1 min".
@@ -835,9 +832,9 @@ pub fn setup_inv_ui(
         const DEV_BUTTON_HEIGHT: f32 = 11.;
         const DEV_BUTTON_SPACING: f32 = 14.;
         // Left of inventory panel in local space (inv center is 22, 0.5 in world; panel half-width 109)
-        let dev_x = -INVENTORY_UI_SIZE.x / 2. - DEV_BUTTON_WIDTH / 2. - 0.;
-        let start_y = 48.0f32;
-        let labels: [(DevButtonAction, &str); 14] = [
+        let dev_x = -INVENTORY_UI_SIZE.x / 2. - DEV_BUTTON_WIDTH / 2. - 28.;
+        let start_y = 108.0f32;
+        let labels: [(DevButtonAction, &str); 13] = [
             (DevButtonAction::GrantXp, "+250 xp"),
             (DevButtonAction::GrantMoreXp, "+1000 xp"),
             (DevButtonAction::SpawnChest, "chest"),
@@ -851,7 +848,6 @@ pub fn setup_inv_ui(
             (DevButtonAction::AddGold, "+50 gold"),
             (DevButtonAction::DropDungeonKey, "key"),
             (DevButtonAction::AddBanishCount, "+banish"),
-            (DevButtonAction::AddLoadedDice, "Loaded Dice"),
         ];
         let heirloom_picker_y = start_y - labels.len() as f32 * DEV_BUTTON_SPACING;
         let skill_picker_y = heirloom_picker_y - DEV_BUTTON_SPACING;
@@ -2426,19 +2422,6 @@ pub fn handle_dev_button_clicks(
                         run_unlock_state.banishes_total =
                             run_unlock_state.banishes_total.saturating_add(1);
                     }
-                    DevButtonAction::AddLoadedDice => {
-                        let choice = HeirloomChoiceQueue::with_all_unlocks()
-                            .pool
-                            .into_iter()
-                            .find(|s| s.heirloom == Heirloom::LoadedDice)
-                            .unwrap_or_else(|| {
-                                HeirloomChoiceState::new(
-                                    Heirloom::LoadedDice,
-                                    HeirloomRarity::Uncommon,
-                                )
-                            });
-                        grant_heirloom_dev.send(GrantHeirloomDevEvent(choice));
-                    }
                 }
                 commands.spawn(crate::audio::SoundSpawner::new(
                     crate::audio::AudioSoundEffect::ButtonClick,
@@ -2612,9 +2595,7 @@ pub fn handle_dev_heirloom_picker_clicks(
                     crate::audio::AudioSoundEffect::ButtonClick,
                     0.2,
                 ));
-            } else if right_mouse_pressed
-                && skills.is_some_and(|s| s.has(icon.heirloom.clone()))
-            {
+            } else if right_mouse_pressed && skills.is_some_and(|s| s.has(icon.heirloom.clone())) {
                 revoke_heirloom_dev.send(RevokeHeirloomDevEvent(icon.heirloom.clone()));
                 commands.spawn(crate::audio::SoundSpawner::new(
                     crate::audio::AudioSoundEffect::ButtonClick,
@@ -2906,7 +2887,10 @@ pub fn handle_crafting_ingredient_tooltip_hover(
                         &proto,
                         slot.slot_index,
                         shift_key_pressed,
-                        slot_transforms.get(e).ok().map(|t| t.translation().truncate()),
+                        slot_transforms
+                            .get(e)
+                            .ok()
+                            .map(|t| t.translation().truncate()),
                         &mut tooltip_update,
                     );
                 }
@@ -2919,7 +2903,10 @@ pub fn handle_crafting_ingredient_tooltip_hover(
                             &proto,
                             slot.slot_index,
                             shift_key_pressed,
-                            slot_transforms.get(e).ok().map(|t| t.translation().truncate()),
+                            slot_transforms
+                                .get(e)
+                                .ok()
+                                .map(|t| t.translation().truncate()),
                             &mut tooltip_update,
                         );
                     }
@@ -3262,12 +3249,8 @@ pub fn handle_crafting_result_slot_click(
         }
 
         let existing_drag = dragging_query.iter().next();
-        let current_drag_count = existing_drag
-            .map(|(_, stack)| stack.count)
-            .unwrap_or(0);
-        if existing_drag.is_some()
-            && existing_drag.map(|(_, s)| s.obj_type) != Some(recipe_obj)
-        {
+        let current_drag_count = existing_drag.map(|(_, stack)| stack.count).unwrap_or(0);
+        if existing_drag.is_some() && existing_drag.map(|(_, s)| s.obj_type) != Some(recipe_obj) {
             continue;
         }
 
@@ -3291,8 +3274,7 @@ pub fn handle_crafting_result_slot_click(
         // drive `Interaction::Dragging` on the result slot so that subsequent clicks on
         // other inventory slots route through the standard drop pipeline.
         let (new_stack, old_drag_entity) = if let Some((drag_e, drag_stack)) = existing_drag {
-            let new_count =
-                (drag_stack.count + total_output).min(crate::inventory::MAX_STACK_SIZE);
+            let new_count = (drag_stack.count + total_output).min(crate::inventory::MAX_STACK_SIZE);
             if new_count == drag_stack.count {
                 continue;
             }
