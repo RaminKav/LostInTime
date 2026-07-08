@@ -1136,6 +1136,7 @@ impl Plugin for UIPlugin {
             )
             .add_system(
                 handle_options_focus_row_input
+                    .after(crate::ui::focus::reset_focus_nav_blocked)
                     .before(crate::ui::focus::FocusNavSet)
                     .run_if(in_state(UIState::Options)),
             )

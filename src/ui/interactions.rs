@@ -2855,7 +2855,13 @@ pub fn handle_cursor_main_menu_buttons(
     info_check: Query<&InfoModal>,
     curr_ui_state: Res<State<UIState>>,
     focus_input: crate::ui::focus::FocusInput,
+    mouseless: Res<crate::inputs::MouselessModeState>,
 ) {
+    // Keyboard/gamepad focus only counts as a highlight/activation source while it's actually
+    // driving the UI (mouseless mode, or a gamepad genuinely in use) — otherwise the button that
+    // merely holds default focus (e.g. Enter, on the main menu) would show its own hover and get
+    // permanently stuck there, on top of whatever the mouse is actually pointing at.
+    let focus_driving = focus_driving(&mouseless, &cursor_pos);
     let menu_open = curr_ui_state.0 == UIState::ClassSelection
         || curr_ui_state.0 == UIState::Unlocks
         || curr_ui_state.0 == UIState::Options
@@ -2926,8 +2932,9 @@ pub fn handle_cursor_main_menu_buttons(
         );
         let is_hit = matches!(hit_test, Some(hit_ent) if hit_ent.0 == e);
         // Keyboard/gamepad focus (Track 3) is an alternate way to "point at" a button, alongside
-        // the mouse actually sitting over it — see `FocusInput`'s doc comment.
-        let is_focused = focus_input.is_focused(e);
+        // the mouse actually sitting over it — see `FocusInput`'s doc comment. Only counts while
+        // focus_driving (see above).
+        let is_focused = focus_driving && focus_input.is_focused(e);
         if is_hit || is_focused {
             match interactable.current() {
                 Interaction::None => {

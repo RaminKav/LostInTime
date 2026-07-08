@@ -305,6 +305,23 @@ pub struct ActiveInputDevice(pub InputDeviceKind);
 /// axis only counts if it's clearly outside the deadzone (a fresh button press always counts).
 /// This mirrors the exact rule requested for Track 4: any controller button swaps to controller,
 /// any keyboard input swaps back to keyboard instantly.
+/// Real mouse movement per frame is easily a few pixels even for a deliberate nudge; sensor/OS
+/// jitter on a perfectly still mouse is sub-pixel. This filters out that jitter so it can never
+/// masquerade as "the player is using the mouse" and drown out a genuine gamepad button press
+/// that happens to land on the same frame.
+const MOUSE_MOTION_JITTER_THRESHOLD: f32 = 1.0;
+
+/// Some setups (certain Bluetooth peripherals, USB dongles, virtual/ghost HID devices, driver
+/// quirks) make gilrs report a "gamepad" that's sending noise even though the player has no real
+/// controller — we've seen logs where `Input<GamepadButton>`/the stick axes flip on and off every
+/// single frame with zero real controller plugged in. A single frame of gamepad evidence is
+/// therefore not trustworthy on its own. Switching *to* Gamepad requires this many consecutive
+/// frames of evidence (with no competing fresh keyboard/mouse input in between) before we commit
+/// to it — a real button hold or stick tilt easily clears this in under a tenth of a second,
+/// while a one-frame glitch never does. Switching back to KeyboardMouse stays instant (any real
+/// key/click/mouse-move immediately wins) since that direction can't cause a lockout.
+const GAMEPAD_SWITCH_DEBOUNCE_FRAMES: u8 = 5;
+
 fn update_active_input_device(
     mut device: ResMut<ActiveInputDevice>,
     key_input: Res<Input<KeyCode>>,
@@ -312,35 +329,50 @@ fn update_active_input_device(
     mut mouse_motion: EventReader<bevy::input::mouse::MouseMotion>,
     gamepad_buttons: Res<Input<GamepadButton>>,
     action_query: Query<&ActionState<GamepadAction>, With<Player>>,
+    mut gamepad_evidence_streak: Local<u8>,
 ) {
-    let keyboard_mouse_active = mouse_motion.iter().next().is_some()
+    let real_mouse_motion = mouse_motion
+        .iter()
+        .any(|ev| ev.delta.length() > MOUSE_MOTION_JITTER_THRESHOLD);
+    let fresh_keyboard_mouse = real_mouse_motion
         || key_input.get_just_pressed().next().is_some()
-        || key_input.get_pressed().next().is_some()
-        || mouse_button_input.get_just_pressed().next().is_some()
-        || mouse_button_input.get_pressed().next().is_some();
-    if keyboard_mouse_active {
+        || mouse_button_input.get_just_pressed().next().is_some();
+
+    // Fresh, deliberate keyboard/mouse input always wins outright and instantly, resetting the
+    // gamepad debounce streak so a lingering noisy signal can't "carry over" its progress.
+    if fresh_keyboard_mouse {
+        *gamepad_evidence_streak = 0;
         device.0 = InputDeviceKind::KeyboardMouse;
         return;
     }
 
-    if gamepad_buttons.get_just_pressed().next().is_some() {
-        device.0 = InputDeviceKind::Gamepad;
+    let fresh_gamepad_button = gamepad_buttons.get_just_pressed().next().is_some();
+    let stick_active = action_query.get_single().is_ok_and(|action_state| {
+        [GamepadAction::Move, GamepadAction::Aim]
+            .into_iter()
+            .any(|action| {
+                action_state
+                    .clamped_axis_pair(action)
+                    .map(|pair| pair.xy().length() > GAMEPAD_STICK_DEADZONE)
+                    .unwrap_or(false)
+            })
+    });
+
+    if fresh_gamepad_button || stick_active {
+        *gamepad_evidence_streak = gamepad_evidence_streak.saturating_add(1);
+        if *gamepad_evidence_streak >= GAMEPAD_SWITCH_DEBOUNCE_FRAMES {
+            device.0 = InputDeviceKind::Gamepad;
+        }
         return;
     }
 
-    let Ok(action_state) = action_query.get_single() else {
-        return;
-    };
-    let stick_active = [GamepadAction::Move, GamepadAction::Aim]
-        .into_iter()
-        .any(|action| {
-            action_state
-                .clamped_axis_pair(action)
-                .map(|pair| pair.xy().length() > GAMEPAD_STICK_DEADZONE)
-                .unwrap_or(false)
-        });
-    if stick_active {
-        device.0 = InputDeviceKind::Gamepad;
+    // No gamepad evidence this frame — the streak must be unbroken to count, so reset it. Held
+    // (not fresh) keyboard/mouse keeps its device without needing to be re-pressed every frame.
+    *gamepad_evidence_streak = 0;
+    let held_keyboard_mouse = key_input.get_pressed().next().is_some()
+        || mouse_button_input.get_pressed().next().is_some();
+    if held_keyboard_mouse {
+        device.0 = InputDeviceKind::KeyboardMouse;
     }
 }
 

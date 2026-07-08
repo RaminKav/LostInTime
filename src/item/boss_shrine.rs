@@ -1,11 +1,13 @@
 use bevy::prelude::*;
 use bevy_proto::prelude::ProtoCommands;
+use leafwing_input_manager::prelude::ActionState;
 use rand::Rng;
 
 use crate::{
     colors::{LIGHT_RED, RED},
     custom_commands::CommandsExt,
     enemy::Mob,
+    gamepad_input::GamepadAction,
     inventory::ItemStack,
     juice::{FlashEffect, ShakeEffect},
     player::{ModifyCurencyEvent, Player},
@@ -73,6 +75,7 @@ pub fn handle_pay_shrine_cost(
     dungeon_check: Query<&Dungeon>,
     delayed_spawn: Option<Res<DelayedSpawn>>,
     mut summon_tracker: ResMut<BossSummonTracker>,
+    gamepad_action_q: Query<&ActionState<GamepadAction>, With<Player>>,
 ) {
     if dungeon_check.get_single().is_ok() {
         return;
@@ -80,7 +83,11 @@ pub fn handle_pay_shrine_cost(
     if delayed_spawn.is_some() {
         return;
     }
-    if keybinds.check_interact_input(&key_input, &mouse_input) {
+    let gamepad_pressed = gamepad_action_q
+        .get_single()
+        .map(|a| a.just_pressed(GamepadAction::Interact))
+        .unwrap_or(false);
+    if keybinds.check_interact_input(&key_input, &mouse_input) || gamepad_pressed {
         let player_t = player_query.single();
         let Some(shrine) = game
             .world_obj_cache
