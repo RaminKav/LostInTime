@@ -8,7 +8,7 @@ use bevy::sprite::TextureAtlas;
 use bevy::text::TextLayoutInfo;
 
 use crate::{ui::game_fonts as gf, ScreenResolution, UICamera, DEBUG};
-const VERSION: &str = "v0.25.2";
+const VERSION: &str = "v0.26.0";
 #[derive(Component)]
 pub struct FPSText;
 
