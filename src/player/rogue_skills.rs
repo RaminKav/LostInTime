@@ -517,6 +517,7 @@ pub fn handle_add_combo_counter(
                 Anchor::Center,
                 FLOATING_TEXT,
                 0,
+                None,
             );
             let count = old_combo_anims.iter().count() as f32;
             commands

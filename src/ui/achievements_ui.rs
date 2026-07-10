@@ -5,8 +5,8 @@ use bevy::sprite::Anchor;
 use strum::IntoEnumIterator;
 
 use super::{
-    focus::FocusInput, main_menu::spawn_exit_icon_button, ui_helpers, Focusable, Interactable,
-    Interaction, MenuButton, UIElement, UIState,
+    focus::FocusInput, game_fonts as gf, main_menu::spawn_exit_icon_button, ui_helpers, Focusable,
+    Interactable, Interaction, MenuButton, UIElement, UIState,
 };
 
 use crate::{
@@ -171,17 +171,14 @@ fn spawn_achievement_button_label(
 ) {
     commands
         .spawn(Text2dBundle {
-            text: Text::from_section(
-                label,
-                TextStyle {
-                    font: asset_server.load("fonts/alagard.ttf"),
-                    font_size: 15.0,
-                    color: WHITE,
-                },
-            )
-            .with_alignment(TextAlignment::Center),
+            text: Text::from_section(label, gf::DISPLAY.text_style(&asset_server, WHITE))
+                .with_alignment(TextAlignment::Center),
             text_anchor: Anchor::Center,
-            transform: Transform::from_translation(Vec3::new(0., -1., 1.)),
+            transform: Transform {
+                translation: Vec3::new(0., -1., 1.),
+                scale: gf::DISPLAY.transform_scale(),
+                ..Default::default()
+            },
             ..Default::default()
         })
         .insert(RenderLayers::from_layers(&[3]))
@@ -210,15 +207,15 @@ pub fn setup_achievements_ui(
         Text2dBundle {
             text: Text::from_section(
                 "Achievements",
-                TextStyle {
-                    font: asset_server.load("fonts/alagard.ttf"),
-                    font_size: 15.0,
-                    color: crate::colors::DARK_WOOD_BROWN,
-                },
+                gf::DISPLAY.text_style(&asset_server, crate::colors::DARK_WOOD_BROWN),
             )
             .with_alignment(TextAlignment::Center),
             text_anchor: bevy::sprite::Anchor::Center,
-            transform: Transform::from_translation(Vec3::new(0., ACHIEVEMENTS_TITLE_Y, 11.)),
+            transform: Transform {
+                translation: Vec3::new(0., ACHIEVEMENTS_TITLE_Y, 11.),
+                scale: gf::DISPLAY.transform_scale(),
+                ..Default::default()
+            },
             ..Default::default()
         },
         RenderLayers::from_layers(&[3]),
@@ -231,19 +228,19 @@ pub fn setup_achievements_ui(
         Text2dBundle {
             text: Text::from_section(
                 achievements_completion_label(&achievements),
-                TextStyle {
-                    font: asset_server.load("fonts/slkscr.ttf"),
-                    font_size: 8.5,
-                    color: crate::colors::LIGHT_BROWN,
-                },
+                gf::BODY.text_style(&asset_server, crate::colors::LIGHT_BROWN),
             )
             .with_alignment(TextAlignment::Right),
             text_anchor: Anchor::CenterRight,
-            transform: Transform::from_translation(Vec3::new(
-                ACHIEVEMENTS_COMPLETION_TRACKER_X,
-                ACHIEVEMENTS_COMPLETION_TRACKER_Y,
-                11.,
-            )),
+            transform: Transform {
+                translation: Vec3::new(
+                    ACHIEVEMENTS_COMPLETION_TRACKER_X,
+                    ACHIEVEMENTS_COMPLETION_TRACKER_Y,
+                    11.,
+                ),
+                scale: gf::BODY.transform_scale(),
+                ..Default::default()
+            },
             ..Default::default()
         },
         RenderLayers::from_layers(&[3]),
@@ -302,8 +299,6 @@ pub fn setup_achievements_ui(
     } else {
         (all_achievements.len() + ACHIEVEMENTS_PER_PAGE - 1) / ACHIEVEMENTS_PER_PAGE
     };
-    let font_handle = asset_server.load("fonts/4x5.ttf");
-    let name_font = asset_server.load("fonts/passage.ttf");
 
     for row_index in 0..ACHIEVEMENTS_PER_PAGE {
         let y_pos = LIST_START_Y - (row_index as f32 * ROW_SPACING);
@@ -400,21 +395,21 @@ pub fn setup_achievements_ui(
             ))
             .id();
         commands.entity(row_clickable).set_parent(achievements_bg);
-
+        let name_pos = Vec3::new(-134., y_pos, ROW_TEXT_Z);
         let name_entity = commands
             .spawn((
                 Text2dBundle {
                     text: Text::from_section(
                         name_text,
-                        TextStyle {
-                            font: name_font.clone(),
-                            font_size: 16.0,
-                            color: name_color,
-                        },
+                        gf::ACHIEVEMENT_NAME.text_style(&asset_server, name_color),
                     )
                     .with_alignment(TextAlignment::Left),
                     text_anchor: Anchor::Center,
-                    transform: Transform::from_translation(Vec3::new(-134., y_pos, ROW_TEXT_Z)),
+                    transform: Transform {
+                        translation: name_pos,
+                        scale: gf::ACHIEVEMENT_NAME.transform_scale(),
+                        ..Default::default()
+                    },
                     visibility: if row_visible {
                         Visibility::Visible
                     } else {
@@ -433,16 +428,10 @@ pub fn setup_achievements_ui(
 
         let desc_entity = commands
             .spawn(Text2dBundle {
-                text: Text::from_section(
-                    desc_text,
-                    TextStyle {
-                        font: asset_server.load("fonts/slkscr.ttf"),
-                        font_size: 8.5,
-                        color: desc_color,
-                    },
-                ),
+                text: Text::from_section(desc_text, gf::BODY.text_style(&asset_server, desc_color)),
                 transform: Transform {
                     translation: Vec3::new(-52., y_pos, ROW_TEXT_Z),
+                    scale: gf::BODY.transform_scale(),
                     ..Default::default()
                 },
                 text_anchor: Anchor::CenterLeft,
@@ -481,15 +470,15 @@ pub fn setup_achievements_ui(
                 Text2dBundle {
                     text: Text::from_section(
                         reward_text,
-                        TextStyle {
-                            font: font_handle.clone(),
-                            font_size: 5.0,
-                            color: desc_color,
-                        },
+                        gf::BODY.text_style(&asset_server, desc_color),
                     )
                     .with_alignment(TextAlignment::Center),
                     text_anchor: Anchor::Center,
-                    transform: Transform::from_translation(Vec3::new(194., y_pos - 9., ROW_TEXT_Z)),
+                    transform: Transform {
+                        translation: Vec3::new(194., y_pos - 9., ROW_TEXT_Z),
+                        scale: gf::BODY.transform_scale(),
+                        ..Default::default()
+                    },
                     visibility: if row_visible && reward_amount > 0 {
                         Visibility::Visible
                     } else {
@@ -510,17 +499,14 @@ pub fn setup_achievements_ui(
         let progress_text_entity = commands
             .spawn((
                 Text2dBundle {
-                    text: Text::from_section(
-                        "",
-                        TextStyle {
-                            font: font_handle.clone(),
-                            font_size: 5.0,
-                            color: WHITE,
-                        },
-                    )
-                    .with_alignment(TextAlignment::Right),
+                    text: Text::from_section("", gf::BODY.text_style(&asset_server, WHITE))
+                        .with_alignment(TextAlignment::Right),
                     text_anchor: Anchor::Center,
-                    transform: Transform::from_translation(Vec3::new(135., y_pos - 1., ROW_TEXT_Z)),
+                    transform: Transform {
+                        translation: Vec3::new(135., y_pos - 1., ROW_TEXT_Z),
+                        scale: gf::BODY.transform_scale(),
+                        ..Default::default()
+                    },
                     visibility: if row_visible && has_counter {
                         Visibility::Visible
                     } else {
@@ -548,7 +534,7 @@ pub fn setup_achievements_ui(
                         custom_size: Some(Vec2::new(16., 16.)),
                         ..Default::default()
                     },
-                    transform: Transform::from_translation(Vec3::new(-68.5, 0., 1.)),
+                    transform: Transform::from_translation(Vec3::new(-68.5, 0., 1.) + name_pos),
                     visibility: if row_visible {
                         Visibility::Visible
                     } else {
@@ -564,7 +550,7 @@ pub fn setup_achievements_ui(
             ))
             .id();
 
-        commands.entity(checkbox_entity).set_parent(name_entity);
+        commands.entity(checkbox_entity).set_parent(achievements_bg);
 
         if let Some(achievement) = maybe_achievement {
             let is_completed = achievements.is_completed(*achievement);

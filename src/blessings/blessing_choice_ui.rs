@@ -276,11 +276,12 @@ fn spawn_ancestor_blessing_card(
         Text2dBundle {
             text: Text::from_section(
                 choice.title.clone(),
-                gf::HEIRLOOM_CARD_TITLE.text_style(asset_server, WHITE),
+                gf::HEIRLOOM_CARD_TITLE.text_style(&asset_server, WHITE),
             ),
             text_anchor: Anchor::Center,
             transform: Transform {
                 translation: Vec3::new(0., 24. + BLESSING_CARD_TITLE_Y_OFFSET, 1.),
+                scale: gf::HEIRLOOM_CARD_TITLE.transform_scale(),
                 ..Default::default()
             },
             ..default()
@@ -320,11 +321,12 @@ fn spawn_ancestor_blessing_card(
             Text2dBundle {
                 text: Text::from_section(
                     *desc,
-                    gf::HEIRLOOM_CARD_BODY.text_style(asset_server, YELLOW_2),
+                    gf::HEIRLOOM_CARD_BODY.text_style(&asset_server, YELLOW_2),
                 ),
                 text_anchor: Anchor::Center,
                 transform: Transform {
                     translation: Vec3::new(2., y, 1.),
+                    scale: gf::HEIRLOOM_CARD_BODY.transform_scale(),
                     ..Default::default()
                 },
                 ..default()
@@ -350,11 +352,12 @@ fn spawn_ancestor_blessing_card(
                 Text2dBundle {
                     text: Text::from_section(
                         line.clone(),
-                        gf::HEIRLOOM_CARD_BODY.text_style(asset_server, LIGHT_RED),
+                        gf::HEIRLOOM_CARD_BODY.text_style(&asset_server, LIGHT_RED),
                     ),
                     text_anchor: Anchor::Center,
                     transform: Transform {
                         translation: Vec3::new(2., y, 1.),
+                        scale: gf::HEIRLOOM_CARD_BODY.transform_scale(),
                         ..Default::default()
                     },
                     ..default()
@@ -383,11 +386,12 @@ fn spawn_blessing_card_icon(
                     Text2dBundle {
                         text: Text::from_section(
                             "?",
-                            gf::GLOBAL_MESSAGE.text_style(asset_server, SHIELD_BLUE),
+                            gf::GLOBAL_MESSAGE.text_style(&asset_server, SHIELD_BLUE),
                         ),
                         text_anchor: Anchor::Center,
                         transform: Transform {
                             translation: Vec3::new(2., 52., 4.),
+                            scale: gf::GLOBAL_MESSAGE.transform_scale(),
                             ..Default::default()
                         },
                         ..default()
@@ -523,6 +527,7 @@ pub fn setup_blessing_choice_ui(
                 ),
                 transform: Transform {
                     translation: Vec3::new(0., 144., 20.),
+                    scale: gf::GLOBAL_MESSAGE.transform_scale(),
                     ..Default::default()
                 },
                 ..default()
@@ -537,14 +542,11 @@ pub fn setup_blessing_choice_ui(
             Text2dBundle {
                 text: Text::from_section(
                     "Back again...? You hear the voice of your distant ancestor...".to_string(),
-                    TextStyle {
-                        font: asset_server.load("fonts/slkscr.ttf"),
-                        font_size: 8.4,
-                        color: WHITE,
-                    },
+                    gf::BODY.text_style(&asset_server, WHITE),
                 ),
                 transform: Transform {
                     translation: Vec3::new(0., 110., 20.),
+                    scale: gf::BODY.transform_scale(),
                     ..Default::default()
                 },
                 ..default()
@@ -558,14 +560,11 @@ pub fn setup_blessing_choice_ui(
             Text2dBundle {
                 text: Text::from_section(
                     "\n\nChoose a blessing".to_string(),
-                    TextStyle {
-                        font: asset_server.load("fonts/slkscrbold.ttf"),
-                        font_size: 8.4,
-                        color: WHITE,
-                    },
+                    gf::BODY.text_style(&asset_server, WHITE),
                 ),
                 transform: Transform {
                     translation: Vec3::new(0., 90., 20.),
+                    scale: gf::BODY.transform_scale(),
                     ..Default::default()
                 },
                 ..default()

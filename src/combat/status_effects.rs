@@ -5,6 +5,7 @@ use strum_macros::{Display, EnumIter};
 
 use crate::assets::Graphics;
 use crate::ecs_helpers::SafeHierarchyExt;
+use crate::ui::game_fonts as gf;
 use crate::attributes::{BonusDamage, CritChance, CritDamage};
 use crate::enemy::red_mushking::DeathState;
 use crate::player::skills::{Heirloom, PlayerSkills};
@@ -267,14 +268,11 @@ pub fn update_status_effect_icons(
                     .spawn(Text2dBundle {
                         text: Text::from_section(
                             effect.num_stacks.to_string(),
-                            TextStyle {
-                                font: asset_server.load("fonts/slkscr.ttf"),
-                                font_size: 8.4,
-                                color: Color::WHITE,
-                            },
+                            gf::MICRO.text_style(&asset_server, Color::WHITE),
                         ),
                         transform: Transform {
                             translation: Vec3::new(3.0, 0., 1.),
+                            scale: gf::MICRO.transform_scale(),
                             ..Default::default()
                         },
                         text_anchor: bevy::sprite::Anchor::CenterLeft,

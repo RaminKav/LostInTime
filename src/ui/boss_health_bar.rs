@@ -6,6 +6,7 @@ use crate::{
     attributes::{CurrentHealth, MaxHealth},
     colors::{BLACK, RED, YELLOW},
     enemy::Mob,
+    ui::game_fonts as gf,
     GameState, ScreenResolution, GAME_HEIGHT,
 };
 
@@ -70,15 +71,12 @@ pub fn spawn_boss_health_bar(
                 Text2dBundle {
                     text: Text::from_section(
                         boss_name.clone(),
-                        TextStyle {
-                            font: asset_server.load("fonts/alagard.ttf"),
-                            font_size: 15.0,
-                            color: BLACK,
-                        },
+                        gf::DISPLAY.text_style(&asset_server, BLACK),
                     ),
                     text_anchor: Anchor::Center,
                     transform: Transform {
                         translation: Vec3::new(0., y_offset + 12.0, 10.),
+                        scale: gf::DISPLAY.transform_scale(),
                         ..Default::default()
                     },
                     ..default()

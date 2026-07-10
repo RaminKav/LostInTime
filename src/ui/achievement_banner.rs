@@ -1,3 +1,4 @@
+use crate::ui::game_fonts as gf;
 use bevy::prelude::*;
 use bevy::render::view::RenderLayers;
 use bevy::sprite::Anchor;
@@ -68,21 +69,19 @@ pub fn handle_achievement_banner_events(
             .id();
 
         let title_text = format!("{}", event.achievement.get_name());
-        let font = asset_server.load("fonts/4x5.ttf");
-        let body_font = asset_server.load("fonts/alagard.ttf");
 
         commands
             .spawn(Text2dBundle {
                 text: Text::from_section(
                     "Achievement!",
-                    TextStyle {
-                        font: body_font,
-                        font_size: 15.0,
-                        color: Color::WHITE,
-                    },
+                    gf::DISPLAY.text_style(&asset_server, Color::WHITE),
                 ),
                 text_anchor: Anchor::TopLeft,
-                transform: Transform::from_translation(Vec3::new(-74., 18., 1.0)),
+                transform: Transform {
+                    translation: Vec3::new(-74., 18., 1.0),
+                    scale: gf::DISPLAY.transform_scale(),
+                    ..Default::default()
+                },
                 ..Default::default()
             })
             .insert(RenderLayers::from_layers(&[3]))
@@ -92,14 +91,14 @@ pub fn handle_achievement_banner_events(
             .spawn(Text2dBundle {
                 text: Text::from_section(
                     title_text,
-                    TextStyle {
-                        font: font.clone(),
-                        font_size: 10.0,
-                        color: Color::WHITE,
-                    },
+                    gf::BODY.text_style(&asset_server, Color::WHITE),
                 ),
                 text_anchor: Anchor::TopLeft,
-                transform: Transform::from_translation(Vec3::new(-74., -4., 1.0)),
+                transform: Transform {
+                    translation: Vec3::new(-74., -4., 1.0),
+                    scale: gf::BODY.transform_scale(),
+                    ..Default::default()
+                },
                 ..Default::default()
             })
             .insert(RenderLayers::from_layers(&[3]))

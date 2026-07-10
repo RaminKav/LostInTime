@@ -256,10 +256,14 @@ fn spawn_main_text(
     commands
         .spawn((
             Text2dBundle {
-                text: Text::from_section(text, style.text_style(asset_server, color))
+                text: Text::from_section(text, style.text_style(&asset_server, color))
                     .with_alignment(TextAlignment::Center),
                 text_anchor: Anchor::Center,
-                transform: Transform::from_translation(center),
+                transform: Transform {
+                    translation: center,
+                    scale: style.transform_scale(),
+                    ..default()
+                },
                 ..default()
             },
             RenderLayers::from_layers(&[3]),
@@ -282,11 +286,15 @@ fn spawn_sub_text(
             Text2dBundle {
                 text: Text::from_section(
                     text,
-                    GLOBAL_MESSAGE_SUBTEXT.text_style(asset_server, color),
+                    GLOBAL_MESSAGE_SUBTEXT.text_style(&asset_server, color),
                 )
                 .with_alignment(TextAlignment::Center),
                 text_anchor: Anchor::Center,
-                transform: Transform::from_translation(center),
+                transform: Transform {
+                    translation: center,
+                    scale: GLOBAL_MESSAGE_SUBTEXT.transform_scale(),
+                    ..default()
+                },
                 ..default()
             },
             RenderLayers::from_layers(&[3]),

@@ -309,11 +309,15 @@ pub fn spawn_chest_button(
             Text2dBundle {
                 text: Text::from_section(
                     label,
-                    gf::SKILL_CHOICE_MICRO.text_style(asset_server, text_color),
+                    gf::SKILL_CHOICE_MICRO.text_style(&asset_server, text_color),
                 )
                 .with_alignment(TextAlignment::Center),
                 text_anchor: Anchor::Center,
-                transform: Transform::from_translation(pos),
+                transform: Transform {
+                    translation: pos,
+                    scale: gf::SKILL_CHOICE_MICRO.transform_scale(),
+                    ..Default::default()
+                },
                 ..Default::default()
             },
             RenderLayers::from_layers(&[3]),
@@ -685,13 +689,17 @@ fn spawn_chest_reveal_text(
 ) {
     // Parented to the chest UI root so the text inherits its world transform (the
     // container sprite renders at z=10; local z values here stack above it).
-    let title_style = gf::TOOLTIP_ITEM_TITLE.text_style(asset_server, rarity.get_color());
+    let title_style = gf::TOOLTIP_ITEM_TITLE.text_style(&asset_server, rarity.get_color());
     commands
         .spawn((
             Text2dBundle {
                 text: Text::from_section(name, title_style).with_alignment(TextAlignment::Center),
                 text_anchor: Anchor::Center,
-                transform: Transform::from_translation(Vec3::new(0., CHEST_REVEAL_TITLE_Y, 2.)),
+                transform: Transform {
+                    translation: Vec3::new(0., CHEST_REVEAL_TITLE_Y, 2.),
+                    scale: gf::TOOLTIP_ITEM_TITLE.transform_scale(),
+                    ..Default::default()
+                },
                 ..Default::default()
             },
             RenderLayers::from_layers(&[3]),
@@ -701,14 +709,18 @@ fn spawn_chest_reveal_text(
         ))
         .set_parent(parent);
 
-    let rarity_style = gf::TOOLTIP_CARD_LINE.text_style(asset_server, rarity.get_color());
+    let rarity_style = gf::TOOLTIP_CARD_LINE.text_style(&asset_server, rarity.get_color());
     commands
         .spawn((
             Text2dBundle {
                 text: Text::from_section(rarity.get_name(), rarity_style)
                     .with_alignment(TextAlignment::Center),
                 text_anchor: Anchor::Center,
-                transform: Transform::from_translation(Vec3::new(0., CHEST_REVEAL_RARITY_Y, 2.)),
+                transform: Transform {
+                    translation: Vec3::new(0., CHEST_REVEAL_RARITY_Y, 2.),
+                    scale: gf::TOOLTIP_CARD_LINE.transform_scale(),
+                    ..Default::default()
+                },
                 ..Default::default()
             },
             RenderLayers::from_layers(&[3]),
@@ -719,14 +731,18 @@ fn spawn_chest_reveal_text(
         .set_parent(parent);
 
     if !type_label.is_empty() {
-        let type_style = gf::TOOLTIP_CARD_LINE.text_style(asset_server, WHITE);
+        let type_style = gf::TOOLTIP_CARD_LINE.text_style(&asset_server, WHITE);
         commands
             .spawn((
                 Text2dBundle {
                     text: Text::from_section(type_label, type_style)
                         .with_alignment(TextAlignment::Center),
                     text_anchor: Anchor::Center,
-                    transform: Transform::from_translation(Vec3::new(0., CHEST_REVEAL_TYPE_Y, 2.)),
+                    transform: Transform {
+                        translation: Vec3::new(0., CHEST_REVEAL_TYPE_Y, 2.),
+                        scale: gf::TOOLTIP_CARD_LINE.transform_scale(),
+                        ..Default::default()
+                    },
                     ..Default::default()
                 },
                 RenderLayers::from_layers(&[3]),
@@ -994,11 +1010,15 @@ pub fn handle_anim_events(
                                     )
                                     .with_alignment(TextAlignment::Center),
                                     text_anchor: Anchor::Center,
-                                    transform: Transform::from_translation(Vec3::new(
-                                        CHEST_BUTTON_X_OFFSET,
-                                        CHEST_BANISH_COUNT_Y,
-                                        11.,
-                                    )),
+                                    transform: Transform {
+                                        translation: Vec3::new(
+                                            CHEST_BUTTON_X_OFFSET,
+                                            CHEST_BANISH_COUNT_Y,
+                                            11.,
+                                        ),
+                                        scale: gf::SKILL_CHOICE_MICRO.transform_scale(),
+                                        ..Default::default()
+                                    },
                                     ..Default::default()
                                 },
                                 RenderLayers::from_layers(&[3]),

@@ -478,24 +478,16 @@ pub fn handle_spawn_inv_item_tooltip(
                 Text2dBundle {
                     text: Text::from_section(
                         level_string,
-                        TextStyle {
-                            font: if is_item_action {
-                                gf::TOOLTIP_CARD_LINE.load_font(asset_server)
-                            } else {
-                                gf::TOOLTIP_CARD_SUBHEAD_BOLD.load_font(asset_server)
-                            },
-                            font_size: gf::TOOLTIP_CARD_LINE.size,
-                            color: if is_item_action {
-                                ORANGE
-                            } else {
-                                item.item_stack.rarity.get_color()
-                            },
+                        if is_item_action {
+                            gf::TOOLTIP_CARD_LINE.text_style(&asset_server, ORANGE)
+                        } else {
+                            gf::TOOLTIP_CARD_SUBHEAD_BOLD.text_style(&asset_server, item.item_stack.rarity.get_color())
                         },
                     ),
                     text_anchor: Anchor::CenterLeft,
                     transform: Transform {
                         translation: Vec3::new(-16., 76., 1.),
-                        scale: Vec3::new(1., 1., 1.),
+                        scale: gf::TOOLTIP_CARD_LINE.transform_scale(),
                         ..Default::default()
                     },
                     ..default()
@@ -522,16 +514,12 @@ pub fn handle_spawn_inv_item_tooltip(
                             } else {
                                 "Base Stats"
                             },
-                            TextStyle {
-                                font: gf::TOOLTIP_CARD_SUBHEAD_BOLD.load_font(asset_server),
-                                font_size: gf::TOOLTIP_CARD_SUBHEAD_BOLD.size,
-                                color: YELLOW_2,
-                            },
+                            gf::TOOLTIP_CARD_SUBHEAD_BOLD.text_style(&asset_server, YELLOW_2),
                         ),
                         text_anchor: Anchor::CenterLeft,
                         transform: Transform {
                             translation: Vec3::new(-57., 20., 1.),
-                            scale: Vec3::new(1., 1., 1.),
+                            scale: gf::TOOLTIP_CARD_SUBHEAD_BOLD.transform_scale(),
                             ..Default::default()
                         },
                         ..default()
@@ -547,16 +535,12 @@ pub fn handle_spawn_inv_item_tooltip(
                     Text2dBundle {
                         text: Text::from_section(
                             "Description",
-                            TextStyle {
-                                font: gf::TOOLTIP_CARD_SUBHEAD_BOLD.load_font(asset_server),
-                                font_size: gf::TOOLTIP_CARD_SUBHEAD_BOLD.size,
-                                color: YELLOW_2,
-                            },
+                            gf::TOOLTIP_CARD_SUBHEAD_BOLD.text_style(&asset_server, YELLOW_2),
                         ),
                         text_anchor: Anchor::CenterLeft,
                         transform: Transform {
                             translation: Vec3::new(-58., -36., 1.),
-                            scale: Vec3::new(1., 1., 1.),
+                            scale: gf::TOOLTIP_CARD_SUBHEAD_BOLD.transform_scale(),
                             ..Default::default()
                         },
                         ..default()
@@ -575,16 +559,12 @@ pub fn handle_spawn_inv_item_tooltip(
                             Text2dBundle {
                                 text: Text::from_section(
                                     text.to_string(),
-                                    TextStyle {
-                                        font: gf::TOOLTIP_CARD_SUBHEAD_BOLD.load_font(asset_server),
-                                        font_size: gf::TOOLTIP_CARD_SUBHEAD_BOLD.size,
-                                        color: YELLOW_2,
-                                    },
+                                    gf::TOOLTIP_CARD_SUBHEAD_BOLD.text_style(&asset_server, YELLOW_2),
                                 ),
                                 text_anchor: Anchor::CenterLeft,
                                 transform: Transform {
                                     translation: Vec3::new(-58., 16. - (i as f32 * 10.), 1.),
-                                    scale: Vec3::new(1., 1., 1.),
+                                    scale: gf::TOOLTIP_CARD_SUBHEAD_BOLD.transform_scale(),
                                     ..Default::default()
                                 },
                                 ..default()
@@ -603,11 +583,7 @@ pub fn handle_spawn_inv_item_tooltip(
                 Text2dBundle {
                     text: Text::from_section(
                         item.item_stack.rarity.get_name(),
-                        TextStyle {
-                            font: gf::TOOLTIP_CARD_LINE.load_font(asset_server),
-                            font_size: gf::TOOLTIP_CARD_LINE.size,
-                            color: item.item_stack.rarity.get_color(),
-                        },
+                        gf::TOOLTIP_CARD_LINE.text_style(&asset_server, item.item_stack.rarity.get_color()),
                     ),
                     text_anchor: Anchor::CenterLeft,
                     transform: Transform {
@@ -616,7 +592,7 @@ pub fn handle_spawn_inv_item_tooltip(
                             if is_upgrade_material { 68. } else { 62. },
                             1.,
                         ),
-                        scale: Vec3::new(1., 1., 1.),
+                        scale: gf::TOOLTIP_CARD_LINE.transform_scale(),
                         ..Default::default()
                     },
                     ..default()
@@ -651,16 +627,12 @@ pub fn handle_spawn_inv_item_tooltip(
                 Text2dBundle {
                     text: Text::from_section(
                         type_string.to_string(),
-                        TextStyle {
-                            font: gf::TOOLTIP_CARD_LINE.load_font(asset_server),
-                            font_size: gf::TOOLTIP_CARD_LINE.size,
-                            color: item.item_stack.rarity.get_color(),
-                        },
+                        gf::TOOLTIP_CARD_LINE.text_style(&asset_server, item.item_stack.rarity.get_color()),
                     ),
                     text_anchor: Anchor::CenterLeft,
                     transform: Transform {
                         translation: Vec3::new(-16., 52., 1.),
-                        scale: Vec3::new(1., 1., 1.),
+                        scale: gf::TOOLTIP_CARD_LINE.transform_scale(),
                         ..Default::default()
                     },
                     ..default()
@@ -681,16 +653,12 @@ pub fn handle_spawn_inv_item_tooltip(
                         Text2dBundle {
                             text: Text::from_section(
                                 "Bonus Stats".to_string(),
-                                TextStyle {
-                                    font: gf::TOOLTIP_CARD_SUBHEAD_BOLD.load_font(asset_server),
-                                    font_size: gf::TOOLTIP_CARD_SUBHEAD_BOLD.size,
-                                    color: YELLOW_2,
-                                },
+                                gf::TOOLTIP_CARD_SUBHEAD_BOLD.text_style(&asset_server, YELLOW_2),
                             ),
                             text_anchor: Anchor::CenterLeft,
                             transform: Transform {
                                 translation: Vec3::new(-58., -34., 1.),
-                                scale: Vec3::new(1., 1., 1.),
+                                scale: gf::TOOLTIP_CARD_SUBHEAD_BOLD.transform_scale(),
                                 ..Default::default()
                             },
                             ..default()
@@ -758,16 +726,12 @@ pub fn handle_spawn_inv_item_tooltip(
                         Text2dBundle {
                             text: Text::from_section(
                                 "Description".to_string(),
-                                TextStyle {
-                                    font: gf::TOOLTIP_CARD_SUBHEAD_BOLD.load_font(asset_server),
-                                    font_size: gf::TOOLTIP_CARD_SUBHEAD_BOLD.size,
-                                    color: YELLOW_2,
-                                },
+                                gf::TOOLTIP_CARD_SUBHEAD_BOLD.text_style(&asset_server, YELLOW_2),
                             ),
                             text_anchor: Anchor::CenterLeft,
                             transform: Transform {
                                 translation: Vec3::new(-58., -36., 1.),
-                                scale: Vec3::new(1., 1., 1.),
+                                scale: gf::TOOLTIP_CARD_SUBHEAD_BOLD.transform_scale(),
                                 ..Default::default()
                             },
                             ..default()
@@ -825,18 +789,14 @@ pub fn handle_spawn_inv_item_tooltip(
                         Text2dBundle {
                             text: Text::from_section(
                                 t,
-                                TextStyle {
-                                    font: asset_server.load(props.font.as_str()),
-                                    font_size: props.font_size,
-                                    color: if j == 1 {
-                                        WHITE
-                                    } else {
-                                        match props.quality {
-                                            AttributeQuality::Low => WHITE,
-                                            AttributeQuality::Average => WHITE,
-                                            AttributeQuality::High => YELLOW,
-                                        }
-                                    },
+                                if j == 1 {
+                                    gf::TOOLTIP_CARD_LINE.text_style(&asset_server, WHITE)
+                                } else {
+                                    match props.quality {
+                                        AttributeQuality::Low => gf::TOOLTIP_CARD_LINE.text_style(&asset_server, WHITE),
+                                        AttributeQuality::Average => gf::TOOLTIP_CARD_LINE.text_style(&asset_server, WHITE),
+                                        AttributeQuality::High => gf::TOOLTIP_CARD_LINE.text_style(&asset_server, YELLOW),
+                                    }
                                 },
                             ),
                             text_anchor: if j == 0 {
@@ -851,7 +811,7 @@ pub fn handle_spawn_inv_item_tooltip(
                                         0.,
                                         0.,
                                     ),
-                                scale: Vec3::new(1., 1., 1.),
+                                scale: gf::TOOLTIP_CARD_LINE.transform_scale(),
                                 ..Default::default()
                             },
                             ..default()
@@ -1017,16 +977,14 @@ pub fn handle_spawn_inv_item_tooltip(
                     Text2dBundle {
                         text: Text::from_section(
                             label,
-                            TextStyle {
-                                font: gf::TOOLTIP_CARD_LINE.load_font(asset_server),
-                                font_size: gf::TOOLTIP_CARD_LINE.size,
-                                color: if active { LIGHT_GREEN } else { LIGHT_GREY },
-                            },
+                            gf::TOOLTIP_CARD_LINE.text_style(&asset_server,
+                                if active { LIGHT_GREEN } else { LIGHT_GREY },
+                            ),
                         ),
                         text_anchor: Anchor::CenterLeft,
                         transform: Transform {
                             translation: Vec3::new(-size.x / 2. + 26., set_bonus_y, 2.),
-                            scale: Vec3::new(1., 1., 1.),
+                            scale: gf::TOOLTIP_CARD_LINE.transform_scale(),
                             ..Default::default()
                         },
                         ..default()
@@ -1057,19 +1015,19 @@ pub fn handle_spawn_inv_item_tooltip(
                     Text2dBundle {
                         text: Text::from_section(
                             header.clone(),
-                            TextStyle {
-                                font: gf::TOOLTIP_ITEM_TITLE.load_font(asset_server),
-                                font_size: gf::TOOLTIP_ITEM_TITLE.size,
-                                color: WHITE,
-                            },
+                            gf::TOOLTIP_ITEM_TITLE.text_style(&asset_server, WHITE),
                         )
                         .with_alignment(TextAlignment::Center),
                         text_anchor: Anchor::Center,
-                        transform: Transform::from_translation(Vec3::new(
+                        transform: Transform {
+                translation: Vec3::new(
                             0.,
                             size.y / 2. + 12.,
                             2.,
-                        )),
+                        ),
+                scale: gf::TOOLTIP_ITEM_TITLE.transform_scale(),
+                ..default()
+            },
                         ..default()
                     },
                     RenderLayers::from_layers(&[3]),
@@ -1402,8 +1360,8 @@ pub fn spawn_stats_tooltip_at(
         ))
         .id();
 
-    let stat_value_font_bold = gf::TOOLTIP_HEADER_BOLD.load_font(asset_server);
-    let stat_value_font_regular = gf::TOOLTIP_BODY.load_font(asset_server);
+    let stat_value_font_bold = gf::TOOLTIP_HEADER_BOLD.load_font(&asset_server);
+    let stat_value_font_regular = gf::TOOLTIP_BODY.load_font(&asset_server);
 
     // Horizontal inset from the tooltip sprite edges to the start of text.
     // The `StatTooltip.png` art has a ~14 px wooden frame on each side; text inside this inset
@@ -1431,24 +1389,20 @@ pub fn spawn_stats_tooltip_at(
                 Text2dBundle {
                     text: Text::from_section(
                         text.0.to_string(),
-                        TextStyle {
-                            font: if i == 0 {
-                                gf::STATS_TOOLTIP_TITLE_ROW.load_font(asset_server)
-                            } else {
-                                gf::STATS_TOOLTIP_ROW_NAME.load_font(asset_server)
-                            },
-                            font_size: if i == 0 {
-                                gf::STATS_TOOLTIP_TITLE_ROW.size
-                            } else {
-                                gf::STATS_TOOLTIP_ROW_NAME.size
-                            },
-                            color: if i == 0 { STATS_TITLE } else { YELLOW_2 },
+                        if i == 0 {
+                            gf::STATS_TOOLTIP_TITLE_ROW.text_style(&asset_server, STATS_TITLE)
+                        } else {
+                            gf::STATS_TOOLTIP_ROW_NAME.text_style(&asset_server, YELLOW_2)
                         },
                     ),
                     text_anchor: Anchor::CenterLeft,
                     transform: Transform {
                         translation: text_pos,
-                        scale: Vec3::new(1., 1., 1.),
+                        scale: if i == 0 {
+                            gf::STATS_TOOLTIP_TITLE_ROW.transform_scale()
+                        } else {
+                            gf::STATS_TOOLTIP_ROW_NAME.transform_scale()
+                        },
                         ..Default::default()
                     },
                     ..default()
@@ -1476,7 +1430,7 @@ pub fn spawn_stats_tooltip_at(
                                 0.,
                                 0.,
                             ),
-                        scale: Vec3::new(1., 1., 1.),
+                        scale: gf::STATS_TOOLTIP_ROW_VALUE.transform_scale(),
                         ..Default::default()
                     },
                     ..default()
@@ -1663,16 +1617,12 @@ pub fn spawn_item_tooltip_icon_name_header(
             Text2dBundle {
                 text: Text::from_section(
                     item_stack.metadata.name.clone(),
-                    TextStyle {
-                        font: gf::TOOLTIP_ITEM_TITLE.load_font(asset_server),
-                        font_size: gf::TOOLTIP_ITEM_TITLE.size,
-                        color: item_stack.rarity.get_color(),
-                    },
+                    gf::TOOLTIP_ITEM_TITLE.text_style(&asset_server, item_stack.rarity.get_color()),
                 ),
                 text_anchor: Anchor::Center,
                 transform: Transform {
                     translation: Vec3::new(-ITEM_TOOLTIP_LARGE_CARD_SIZE.x / 2. + 85., 101., 1.),
-                    scale: Vec3::new(1., 1., 1.),
+                    scale: gf::TOOLTIP_ITEM_TITLE.transform_scale(),
                     ..Default::default()
                 },
                 ..default()
@@ -1751,14 +1701,14 @@ pub fn spawn_world_item_tooltip_for_stack(
                 Text2dBundle {
                     text: Text::from_section(
                         action_or_level,
-                        TextStyle {
-                            font: gf::TOOLTIP_CARD_LINE.load_font(asset_server),
-                            font_size: gf::TOOLTIP_CARD_LINE.size,
-                            color: ORANGE,
-                        },
+                        gf::TOOLTIP_CARD_LINE.text_style(&asset_server, ORANGE),
                     ),
                     text_anchor: Anchor::CenterLeft,
-                    transform: Transform::from_translation(Vec3::new(-16., 78., 2.)),
+                    transform: Transform {
+                translation: Vec3::new(-16., 78., 2.),
+                scale: gf::TOOLTIP_CARD_LINE.transform_scale(),
+                ..default()
+            },
                     ..default()
                 },
                 RenderLayers::from_layers(&[3]),
@@ -1773,14 +1723,14 @@ pub fn spawn_world_item_tooltip_for_stack(
                 Text2dBundle {
                     text: Text::from_section(
                         line.clone(),
-                        TextStyle {
-                            font: gf::TOOLTIP_BODY.load_font(asset_server),
-                            font_size: gf::TOOLTIP_BODY.size,
-                            color: TOOLTIP_BLACK_2,
-                        },
+                        gf::TOOLTIP_BODY.text_style(&asset_server, TOOLTIP_BLACK_2),
                     ),
                     text_anchor: Anchor::CenterLeft,
-                    transform: Transform::from_translation(Vec3::new(body_text_x, y, 2.)),
+                    transform: Transform {
+                translation: Vec3::new(body_text_x, y, 2.),
+                scale: gf::TOOLTIP_BODY.transform_scale(),
+                ..default()
+            },
                     ..default()
                 },
                 RenderLayers::from_layers(&[3]),

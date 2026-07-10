@@ -13,7 +13,7 @@ use crate::{
     },
     ui::{
         damage_numbers::spawn_floating_text_with_shadow,
-        game_fonts::FLOATING_TEXT,
+        game_fonts::{self as gf, FLOATING_TEXT},
         heirloom_tooltip::{
             heirloom_hud_hover_tooltip_position, HeirloomTooltipRequest, HeirloomTooltipShow,
         },
@@ -110,14 +110,14 @@ pub fn setup_microwave_shrine_ui(
         .spawn(Text2dBundle {
             text: Text::from_section(
                 "Heirloom Swap Shrine",
-                TextStyle {
-                    font: asset_server.load("fonts/alagard.ttf"),
-                    font_size: 15.,
-                    color: WHITE,
-                },
+                gf::MENU_TITLE.text_style(&asset_server, WHITE),
             )
             .with_alignment(TextAlignment::Center),
-            transform: Transform::from_translation(Vec3::new(0., GAME_HEIGHT / 2. - 20., 2.)),
+            transform: Transform {
+                translation: Vec3::new(0., GAME_HEIGHT / 2. - 20., 2.),
+                scale: gf::MENU_TITLE.transform_scale(),
+                ..Default::default()
+            },
             ..Default::default()
         })
         .insert(RenderLayers::from_layers(&[3]))
@@ -127,14 +127,14 @@ pub fn setup_microwave_shrine_ui(
         .spawn(Text2dBundle {
             text: Text::from_section(
                 "Select heirloom rarity, then select an heirloom to gain. \nCosts coins and consumes a random heirloom of the same rarity",
-                TextStyle {
-                    font: asset_server.load("fonts/slkscr.ttf"),
-                    font_size: 8.4,
-                    color: WHITE,
-                },
+                gf::BODY.text_style(&asset_server, WHITE),
             )
             .with_alignment(TextAlignment::Center),
-            transform: Transform::from_translation(Vec3::new(0., GAME_HEIGHT / 2. - 60., 2.)),
+            transform: Transform {
+                translation: Vec3::new(0., GAME_HEIGHT / 2. - 60., 2.),
+                scale: gf::BODY.transform_scale(),
+                ..Default::default()
+            },
             ..Default::default()
         })
         .insert(RenderLayers::from_layers(&[3]))
@@ -145,14 +145,14 @@ pub fn setup_microwave_shrine_ui(
         .spawn(Text2dBundle {
             text: Text::from_section(
                 format!("Gold: {}", coins.coins),
-                TextStyle {
-                    font: asset_server.load("fonts/slkscr.ttf"),
-                    font_size: 8.4,
-                    color: YELLOW,
-                },
+                gf::BODY.text_style(&asset_server, YELLOW),
             )
             .with_alignment(TextAlignment::Center),
-            transform: Transform::from_translation(Vec3::new(0., GAME_HEIGHT / 2. - 40., 2.)),
+            transform: Transform {
+                translation: Vec3::new(0., GAME_HEIGHT / 2. - 40., 2.),
+                scale: gf::BODY.transform_scale(),
+                ..Default::default()
+            },
             ..Default::default()
         })
         .insert(RenderLayers::from_layers(&[3]))
@@ -215,14 +215,14 @@ pub fn setup_microwave_shrine_ui(
             .spawn(Text2dBundle {
                 text: Text::from_section(
                     format!("{} ({}g)", rarity_str, cost),
-                    TextStyle {
-                        font: asset_server.load("fonts/slkscr.ttf"),
-                        font_size: 8.4,
-                        color: BLACK,
-                    },
+                    gf::BODY.text_style(&asset_server, BLACK),
                 )
                 .with_alignment(TextAlignment::Center),
-                transform: Transform::from_translation(Vec3::new(0., 0., 1.)),
+                transform: Transform {
+                    translation: Vec3::new(0., 0., 1.),
+                    scale: gf::BODY.transform_scale(),
+                    ..Default::default()
+                },
                 ..Default::default()
             })
             .insert(RenderLayers::from_layers(&[3]))
@@ -368,16 +368,14 @@ pub fn handle_microwave_shrine_rarity_click(
                                     .spawn(Text2dBundle {
                                         text: Text::from_section(
                                             format!("x{}", count),
-                                            TextStyle {
-                                                font: asset_server.load("fonts/slkscr.ttf"),
-                                                font_size: 8.4,
-                                                color: WHITE,
-                                            },
+                                            gf::HUD_MICRO.text_style(&asset_server, WHITE),
                                         )
                                         .with_alignment(TextAlignment::Center),
-                                        transform: Transform::from_translation(Vec3::new(
-                                            0., -12., 1.,
-                                        )),
+                                        transform: Transform {
+                                            translation: Vec3::new(0., -12., 1.),
+                                            scale: gf::HUD_MICRO.transform_scale(),
+                                            ..Default::default()
+                                        },
                                         ..Default::default()
                                     })
                                     .insert(RenderLayers::from_layers(&[3]))
@@ -599,16 +597,14 @@ pub fn handle_microwave_shrine_heirloom_click(
                                 //     .spawn(Text2dBundle {
                                 //         text: Text::from_section(
                                 //             consumed.get_title(),
-                                //             TextStyle {
-                                //                 font: asset_server.load("fonts/slkscr.ttf"),
-                                //                 font_size: 8.4,
-                                //                 color,
-                                //             },
+                                //             gf::BODY.text_style(&asset_server, color),
                                 //         ),
                                 //         text_anchor: bevy::sprite::Anchor::CenterLeft,
-                                //         transform: Transform::from_translation(Vec3::new(
-                                //             5., 0., 4.,
-                                //         )),
+                                //         transform: Transform {
+                                //             translation: Vec3::new(5., 0., 4.),
+                                //             scale: gf::BODY.transform_scale(),
+                                //             ..default()
+                                //         },
                                 //         ..default()
                                 //     })
                                 //     .insert(RenderLayers::from_layers(&[0]))

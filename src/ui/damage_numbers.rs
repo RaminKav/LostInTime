@@ -17,18 +17,16 @@ use crate::{
 };
 
 use super::{
-    game_fonts::{FontStyle, FLOATING_TEXT, FLOATING_TEXT_SMALL},
+    game_fonts::{FontStyle, DamageTextSize},
     spawn_item_stack_icon, UIElement, UI_SLOT_SIZE,
 };
 
 /// Font used for damage, healing/regen, and item-pickup floating labels.
 #[inline]
 pub fn floating_text_font_style(settings: Option<&CheatSettings>) -> FontStyle {
-    if settings.is_some_and(|s| s.small_damage_text) {
-        FLOATING_TEXT_SMALL
-    } else {
-        FLOATING_TEXT
-    }
+    settings
+        .map(|s| s.damage_text_size.font_style())
+        .unwrap_or_else(|| DamageTextSize::default().font_style())
 }
 
 #[derive(Component, Clone, Copy)]
@@ -278,6 +276,7 @@ pub fn handle_add_dodge_text(
     mut dodge_events: EventReader<DodgeEvent>,
     txfms: Query<&GlobalTransform>,
     asset_server: Res<AssetServer>,
+    cheat_settings: Option<Res<CheatSettings>>,
 ) {
     for event in dodge_events.iter() {
         let mut rng = rand::thread_rng();
@@ -293,7 +292,7 @@ pub fn handle_add_dodge_text(
             txfms.get(event.entity).unwrap().translation() + pos_offset,
             DMG_NUM_YELLOW,
             "Dodge!".to_string(),
-            FLOATING_TEXT,
+            floating_text_font_style(cheat_settings.as_deref()),
         );
     }
 }
@@ -626,24 +625,30 @@ fn spawn_floating_text_with_shadow_inner(
     let mut shadow_e = Entity::from_raw(0);
     let mut parent_e = Entity::from_raw(0);
     for i in 0..2 {
+        let is_shadow = i == 0;
         let entity = spawn_text(
             commands,
             asset_server,
-            if i == 0 {
+            if is_shadow {
                 Vec3::new(1., -1., -1.)
             } else {
                 pos + Vec3::ZERO
             },
-            if i == 0 { BLACK } else { color },
+            if is_shadow { BLACK } else { color },
             text.clone(),
             Anchor::CenterRight,
             font_style,
             0,
+            if is_shadow {
+                Some(Vec3::ONE)
+            } else {
+                None
+            },
         );
         if let Some(layers) = render_layers {
             commands.entity(entity).insert(layers);
         }
-        if i == 0 {
+        if is_shadow {
             shadow_e = entity;
             commands.entity(entity).insert(FloatingTextShadow);
         } else {
@@ -743,12 +748,15 @@ pub fn spawn_text(
     anchor: Anchor,
     font_style: FontStyle,
     render_layer: u8,
+    scale_override: Option<Vec3>,
 ) -> Entity {
+    let scale = scale_override.unwrap_or_else(|| font_style.transform_scale());
     commands
         .spawn(Text2dBundle {
-            text: Text::from_section(text, font_style.text_style(asset_server, color)),
+            text: Text::from_section(text, font_style.text_style(&asset_server, color)),
             transform: Transform {
                 translation: pos,
+                scale,
                 ..Default::default()
             },
             text_anchor: anchor,

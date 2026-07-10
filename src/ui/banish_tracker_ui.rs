@@ -91,7 +91,7 @@ pub fn build_banish_tracker_children(
     root: Entity,
     ui_state: UIState,
 ) {
-    let title_style = gf::SKILL_CHOICE_TRACKER_TITLE.text_style(asset_server, WHITE);
+    let title_style = gf::SKILL_CHOICE_TRACKER_TITLE.text_style(&asset_server, WHITE);
 
     let mut y: f32 = 0.;
     let title = commands
@@ -100,7 +100,11 @@ pub fn build_banish_tracker_children(
                 text: Text::from_section("banishes", title_style.clone())
                     .with_alignment(TextAlignment::Left),
                 text_anchor: Anchor::TopLeft,
-                transform: Transform::from_translation(Vec3::new(0., y, 1.)),
+                transform: Transform {
+                    translation: Vec3::new(0., y, 1.),
+                    scale: gf::SKILL_CHOICE_TRACKER_TITLE.transform_scale(),
+                    ..default()
+                },
                 ..default()
             },
             RenderLayers::from_layers(&[3]),
@@ -124,14 +128,18 @@ pub fn build_banish_tracker_children(
             HeirloomRarity::Legendary => ("Legendary", LEGENDARY_TOOLTIP_TITLE),
         };
         let allowed = queue.allowed_banishes_for_rarity(time_crystals, rarity);
-        let heading_style = gf::SKILL_CHOICE_MICRO.text_style(asset_server, heading_color);
+        let heading_style = gf::SKILL_CHOICE_MICRO.text_style(&asset_server, heading_color);
         let heading_e = commands
             .spawn((
                 Text2dBundle {
                     text: Text::from_section(format!("{} ({})", heading, allowed), heading_style)
                         .with_alignment(TextAlignment::Left),
                     text_anchor: Anchor::TopLeft,
-                    transform: Transform::from_translation(Vec3::new(0., y, 1.)),
+                    transform: Transform {
+                        translation: Vec3::new(0., y, 1.),
+                        scale: gf::SKILL_CHOICE_MICRO.transform_scale(),
+                        ..default()
+                    },
                     ..default()
                 },
                 RenderLayers::from_layers(&[3]),

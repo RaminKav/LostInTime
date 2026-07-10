@@ -36,7 +36,7 @@ pub fn spawn_fps_text(
             text: Text::from_section(
                 format!("FPS: \n\n{VERSION}"),
                 TextStyle {
-                    font: gf::HUD_FPS_DEBUG.load_font(asset_server.as_ref()),
+                    font: gf::HUD_FPS_DEBUG.load_font(&asset_server.as_ref()),
                     font_size: gf::HUD_FPS_DEBUG.size,
                     color: Color::Rgba {
                         red: 75. / 255.,
@@ -49,7 +49,7 @@ pub fn spawn_fps_text(
             .with_alignment(TextAlignment::Right),
             transform: Transform {
                 translation: Vec3::new(snapped.x, snapped.y, 1.),
-                scale: Vec3::new(1., 1., 1.),
+                scale: gf::HUD_FPS_DEBUG.transform_scale(),
                 ..Default::default()
             },
             ..default()

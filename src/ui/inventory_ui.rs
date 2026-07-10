@@ -36,6 +36,7 @@ use crate::ui::skill_browser_grid::{
     despawn_dev_skill_picker_grid_layers, sorted_dev_skill_grid_entries, spawn_skill_grid_overlay,
     DevSkillPickerGridLayer, DevSkillPickerIcon,
 };
+use crate::ui::game_fonts as gf;
 use crate::ui::time_crystal_progress_ui::CrystalUnlockIcon;
 use crate::ui::{
     BLUEPRINT_PAGE_BTN_CENTER_Y, BLUEPRINT_PAGE_BTN_DOWN_X, BLUEPRINT_PAGE_BTN_SIZE,
@@ -446,16 +447,12 @@ pub fn setup_inv_ui(
         .spawn(Text2dBundle {
             text: Text::from_section(
                 "INVENTORY",
-                TextStyle {
-                    font: asset_server.load("fonts/alagard.ttf"),
-                    font_size: 15.0,
-                    color: STATS_TITLE,
-                },
+                gf::DISPLAY.text_style(&asset_server, STATS_TITLE),
             ),
             text_anchor: Anchor::Center,
             transform: Transform {
                 translation: Vec3::new(3., size.y / 2. - 10., 1.),
-                scale: Vec3::new(1., 1., 1.),
+                scale: gf::DISPLAY.transform_scale(),
                 ..Default::default()
             },
             ..default()
@@ -469,16 +466,12 @@ pub fn setup_inv_ui(
         .spawn(Text2dBundle {
             text: Text::from_section(
                 "HOTBAR",
-                TextStyle {
-                    font: asset_server.load("fonts/alagard.ttf"),
-                    font_size: 15.0,
-                    color: HOTBAR_TITLE,
-                },
+                gf::DISPLAY.text_style(&asset_server, HOTBAR_TITLE),
             ),
             text_anchor: Anchor::Center,
             transform: Transform {
                 translation: Vec3::new(3., size.y / 2. - 246., 1.),
-                scale: Vec3::new(1., 1., 1.),
+                scale: gf::DISPLAY.transform_scale(),
                 ..Default::default()
             },
             ..default()
@@ -527,16 +520,12 @@ pub fn setup_inv_ui(
             .spawn(Text2dBundle {
                 text: Text::from_section(
                     upgrade_title,
-                    TextStyle {
-                        font: asset_server.load("fonts/alagard.ttf"),
-                        font_size: 15.0,
-                        color: EQUIP_TITLE,
-                    },
+                    gf::DISPLAY.text_style(&asset_server, EQUIP_TITLE),
                 ),
                 text_anchor: Anchor::Center,
                 transform: Transform {
                     translation: Vec3::new(0., side_panel_size.y / 2. - 12., 1.),
-                    scale: Vec3::new(1., 1., 1.),
+                    scale: gf::DISPLAY.transform_scale(),
                     ..Default::default()
                 },
                 ..default()
@@ -574,16 +563,12 @@ pub fn setup_inv_ui(
             .spawn(Text2dBundle {
                 text: Text::from_section(
                     "EQUIPMENT",
-                    TextStyle {
-                        font: asset_server.load("fonts/alagard.ttf"),
-                        font_size: 15.0,
-                        color: EQUIP_TITLE,
-                    },
+                    gf::DISPLAY.text_style(&asset_server, EQUIP_TITLE),
                 ),
                 text_anchor: Anchor::Center,
                 transform: Transform {
                     translation: Vec3::new(0., INVENTORY_EQUIPMENT_UI_SIZE.y / 2. - 11., 1.),
-                    scale: Vec3::new(1., 1., 1.),
+                    scale: gf::DISPLAY.transform_scale(),
                     ..Default::default()
                 },
                 ..default()
@@ -629,16 +614,12 @@ pub fn setup_inv_ui(
             .spawn(Text2dBundle {
                 text: Text::from_section(
                     "BLUEPRINTS",
-                    TextStyle {
-                        font: asset_server.load("fonts/alagard.ttf"),
-                        font_size: 15.0,
-                        color: STATS_TITLE,
-                    },
+                    gf::DISPLAY.text_style(&asset_server, STATS_TITLE),
                 ),
                 text_anchor: Anchor::Center,
                 transform: Transform {
                     translation: Vec3::new(0., INVENTORY_BLUEPRINT_UI_SIZE.y / 2. - 11., 1.),
-                    scale: Vec3::new(1., 1., 1.),
+                    scale: gf::DISPLAY.transform_scale(),
                     ..Default::default()
                 },
                 ..default()
@@ -705,11 +686,7 @@ pub fn setup_inv_ui(
                 .spawn(Text2dBundle {
                     text: Text::from_section(
                         "",
-                        TextStyle {
-                            font: asset_server.load("fonts/4x5.ttf"),
-                            font_size: 5.0,
-                            color: Color::WHITE,
-                        },
+                        gf::BODY.text_style(&asset_server, Color::WHITE),
                     )
                     .with_alignment(TextAlignment::Center),
                     text_anchor: Anchor::Center,
@@ -719,7 +696,7 @@ pub fn setup_inv_ui(
                             INV_CRAFTING_PANEL_INGREDIENT_COUNT_Y_OFFSET,
                             2.,
                         ),
-                        scale: Vec3::new(1., 1., 1.),
+                        scale: gf::BODY.transform_scale(),
                         ..Default::default()
                     },
                     ..default()
@@ -802,16 +779,12 @@ pub fn setup_inv_ui(
         .spawn(Text2dBundle {
             text: Text::from_section(
                 toggle_label,
-                TextStyle {
-                    font: asset_server.load("fonts/alagard.ttf"),
-                    font_size: 15.0,
-                    color: CRAFT_BUTTON_TEXT,
-                },
+                gf::DISPLAY.text_style(&asset_server, CRAFT_BUTTON_TEXT),
             ),
             text_anchor: Anchor::Center,
             transform: Transform {
                 translation: Vec3::new(0., -1., 1.),
-                scale: Vec3::new(1., 1., 1.),
+                scale: gf::DISPLAY.transform_scale(),
                 ..Default::default()
             },
             ..default()
@@ -874,15 +847,15 @@ pub fn setup_inv_ui(
                     Text2dBundle {
                         text: Text::from_section(
                             *label,
-                            TextStyle {
-                                font: asset_server.load("fonts/4x5.ttf"),
-                                font_size: 5.0,
-                                color: DARK_WOOD_BROWN,
-                            },
+                            gf::BODY.text_style(&asset_server, DARK_WOOD_BROWN),
                         )
                         .with_alignment(TextAlignment::Center),
                         text_anchor: Anchor::Center,
-                        transform: Transform::from_xyz(0., 0.5, 1.),
+                        transform: Transform {
+                translation: Vec3::new(0., 0.5, 1.),
+                scale: gf::BODY.transform_scale(),
+                ..default()
+            },
                         ..Default::default()
                     },
                     RenderLayers::from_layers(&[3]),
@@ -918,15 +891,15 @@ pub fn setup_inv_ui(
                 Text2dBundle {
                     text: Text::from_section(
                         "heirlooms",
-                        TextStyle {
-                            font: asset_server.load("fonts/4x5.ttf"),
-                            font_size: 5.0,
-                            color: DARK_WOOD_BROWN,
-                        },
+                        gf::BODY.text_style(&asset_server, DARK_WOOD_BROWN),
                     )
                     .with_alignment(TextAlignment::Center),
                     text_anchor: Anchor::Center,
-                    transform: Transform::from_xyz(0., 0.5, 1.),
+                    transform: Transform {
+                translation: Vec3::new(0., 0.5, 1.),
+                scale: gf::BODY.transform_scale(),
+                ..default()
+            },
                     ..Default::default()
                 },
                 RenderLayers::from_layers(&[3]),
@@ -957,15 +930,15 @@ pub fn setup_inv_ui(
                 Text2dBundle {
                     text: Text::from_section(
                         "+skills",
-                        TextStyle {
-                            font: asset_server.load("fonts/4x5.ttf"),
-                            font_size: 5.0,
-                            color: DARK_WOOD_BROWN,
-                        },
+                        gf::BODY.text_style(&asset_server, DARK_WOOD_BROWN),
                     )
                     .with_alignment(TextAlignment::Center),
                     text_anchor: Anchor::Center,
-                    transform: Transform::from_xyz(0., 0.5, 1.),
+                    transform: Transform {
+                translation: Vec3::new(0., 0.5, 1.),
+                scale: gf::BODY.transform_scale(),
+                ..default()
+            },
                     ..Default::default()
                 },
                 RenderLayers::from_layers(&[3]),
@@ -1221,7 +1194,7 @@ fn spawn_sort_inventory_button(
             texture: graphics.get_ui_element_texture(UIElement::InventorySlot),
             transform: Transform {
                 translation,
-                scale: Vec3::new(1., 1., 1.),
+                scale: gf::BODY.transform_scale(),
                 ..Default::default()
             },
             sprite: Sprite {
@@ -1249,17 +1222,13 @@ fn spawn_sort_inventory_button(
         .spawn(Text2dBundle {
             text: Text::from_section(
                 "SORT",
-                TextStyle {
-                    font: asset_server.load("fonts/4x5.ttf"),
-                    font_size: 5.0,
-                    color: YELLOW_2,
-                },
+                gf::BODY.text_style(&asset_server, YELLOW_2),
             )
             .with_alignment(TextAlignment::Center),
             text_anchor: Anchor::Center,
             transform: Transform {
                 translation: Vec3::new(0., 0., 1.),
-                scale: Vec3::new(1., 1., 1.),
+                scale: gf::BODY.transform_scale(),
                 ..Default::default()
             },
             ..default()
@@ -1404,17 +1373,13 @@ fn spawn_damage_tracker_toggle_button(
         .spawn(Text2dBundle {
             text: Text::from_section(
                 "DMG",
-                TextStyle {
-                    font: asset_server.load("fonts/4x5.ttf"),
-                    font_size: 5.0,
-                    color: YELLOW_2,
-                },
+                gf::BODY.text_style(&asset_server, YELLOW_2),
             )
             .with_alignment(TextAlignment::Center),
             text_anchor: Anchor::Center,
             transform: Transform {
                 translation: Vec3::new(0., 0., 1.),
-                scale: Vec3::new(1., 1., 1.),
+                scale: gf::BODY.transform_scale(),
                 ..Default::default()
             },
             ..default()
@@ -1499,15 +1464,15 @@ fn spawn_material_drop_filter_panel(
             Text2dBundle {
                 text: Text::from_section(
                     "Toggle Item Drop Filters",
-                    TextStyle {
-                        font: asset_server.load("fonts/4x5.ttf"),
-                        font_size: 5.0,
-                        color: YELLOW_2,
-                    },
+                    gf::BODY.text_style(&asset_server, YELLOW_2),
                 )
                 .with_alignment(TextAlignment::Center),
                 text_anchor: Anchor::Center,
-                transform: Transform::from_translation(Vec3::new(0., title_y, 11.)),
+                transform: Transform {
+                translation: Vec3::new(0., title_y, 11.),
+                scale: gf::BODY.transform_scale(),
+                ..default()
+            },
                 ..default()
             },
             RenderLayers::from_layers(&[3]),
@@ -1553,15 +1518,15 @@ fn spawn_material_drop_filter_panel(
             .spawn(Text2dBundle {
                 text: Text::from_section(
                     label,
-                    TextStyle {
-                        font: asset_server.load("fonts/4x5.ttf"),
-                        font_size: 5.0,
-                        color: Color::WHITE,
-                    },
+                    gf::BODY.text_style(&asset_server, Color::WHITE),
                 )
                 .with_alignment(TextAlignment::Center),
                 text_anchor: Anchor::Center,
-                transform: Transform::from_translation(Vec3::new(0., 0., 1.)),
+                transform: Transform {
+                translation: Vec3::new(0., 0., 1.),
+                scale: gf::BODY.transform_scale(),
+                ..default()
+            },
                 ..default()
             })
             .insert(RenderLayers::from_layers(&[3]))
@@ -1618,16 +1583,16 @@ fn spawn_material_drop_filter_panel(
             .spawn(Text2dBundle {
                 text: Text::from_section(
                     "X",
-                    TextStyle {
-                        font: asset_server.load("fonts/alagard.ttf"),
-                        font_size: 15.0,
-                        color: RED,
-                    },
+                    gf::DISPLAY.text_style(&asset_server, RED),
                 )
                 .with_alignment(TextAlignment::Center),
                 text_anchor: Anchor::Center,
                 visibility: x_vis,
-                transform: Transform::from_translation(Vec3::new(0., 0., 3.)),
+                transform: Transform {
+                translation: Vec3::new(0., 0., 3.),
+                scale: gf::DISPLAY.transform_scale(),
+                ..default()
+            },
                 ..default()
             })
             .insert(RenderLayers::from_layers(&[3]))
@@ -2107,16 +2072,12 @@ pub fn spawn_item_stack_icon(
                 Text2dBundle {
                     text: Text::from_section(
                         item_stack.count.to_string(),
-                        TextStyle {
-                            font: asset_server.load("fonts/4x5.ttf"),
-                            font_size: 5.0,
-                            color: Color::WHITE,
-                        },
+                        gf::BODY.text_style(&asset_server, Color::WHITE),
                     )
                     .with_alignment(TextAlignment::Center),
                     transform: Transform {
                         translation: Vec3::new(7., -5.5, 3.) + text_offset.extend(0.),
-                        scale: Vec3::new(1., 1., 1.),
+                        scale: gf::BODY.transform_scale(),
                         ..Default::default()
                     },
                     ..default()
@@ -3440,11 +3401,7 @@ pub fn render_blueprint_rows_and_nav(
             .spawn(Text2dBundle {
                 text: Text::from_section(
                     label,
-                    TextStyle {
-                        font: asset_server.load("fonts/slkscrbold.ttf"),
-                        font_size: 8.4,
-                        color: YELLOW_2,
-                    },
+                    gf::BODY.text_style(&asset_server, YELLOW_2),
                 ),
                 text_anchor: Anchor::CenterLeft,
                 transform: Transform {
@@ -3453,7 +3410,7 @@ pub fn render_blueprint_rows_and_nav(
                         0.,
                         1.,
                     ),
-                    scale: Vec3::new(1., 1., 1.),
+                    scale: gf::BODY.transform_scale(),
                     ..Default::default()
                 },
                 ..default()

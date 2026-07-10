@@ -30,10 +30,8 @@ pub mod boss_health_bar;
 mod enemy_health_bar;
 mod fps_text;
 
-pub mod font_binarize;
 pub mod game_fonts;
 pub mod layout_sync;
-pub mod text_pixel_snap;
 pub mod key_input_guide;
 use key_input_guide::*;
 pub mod intro_guide;
@@ -670,16 +668,6 @@ impl Plugin for UIPlugin {
                     .run_if(not(in_state(GameState::Initializing))),
             )
             .add_system(
-                font_binarize::binarize_font_atlas_alpha
-                    .in_base_set(CoreSet::PostUpdate)
-                    .after(bevy::text::update_text2d_layout),
-            )
-            .add_system(
-                text_pixel_snap::pixel_snap_text_glyphs
-                    .in_base_set(CoreSet::PostUpdate)
-                    .after(bevy::text::update_text2d_layout),
-            )
-            .add_system(
                 init_main_menu_leaderboard_visibility
                     .in_schedule(OnEnter(GameState::MainMenu))
                     .after(load_game_data_for_ui),
@@ -1114,6 +1102,8 @@ impl Plugin for UIPlugin {
                         .after(handle_cheat_checkbox_click),
                     handle_volume_button_click.run_if(in_state(UIState::Options)),
                     update_volume_text.run_if(in_state(UIState::Options)),
+                    handle_damage_text_size_button_click.run_if(in_state(UIState::Options)),
+                    update_damage_text_size_text.run_if(in_state(UIState::Options)),
                     handle_scale_button_click
                         .run_if(in_state(UIState::Options))
                         .before(crate::update_pixel_perfect_viewport),

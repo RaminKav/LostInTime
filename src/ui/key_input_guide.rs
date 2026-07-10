@@ -13,13 +13,13 @@ use crate::{
 };
 
 use super::{
-    damage_numbers::spawn_text, game_fonts::FLOATING_TEXT, spawn_item_stack_icon, UIElement,
+    damage_numbers::spawn_text, game_fonts::{self as gf, FLOATING_TEXT}, spawn_item_stack_icon,
+    UIElement,
 };
 
 /// Interact-guide key badge — larger than the default HUD keybind badge, with darker fill.
 const INTERACT_GUIDE_KEY_BADGE_SIZE: Vec2 = Vec2::new(26., 18.);
 const INTERACT_GUIDE_KEY_BADGE_COLOR: Color = Color::rgba(18. / 255., 16. / 255., 16. / 255., 0.88);
-const INTERACT_GUIDE_KEY_FONT_SIZE: f32 = 15.0;
 
 fn spawn_interact_guide_keybind_badge(
     commands: &mut Commands,
@@ -46,15 +46,15 @@ fn spawn_interact_guide_keybind_badge(
         .spawn(Text2dBundle {
             text: Text::from_section(
                 label.into(),
-                TextStyle {
-                    font: asset_server.load("fonts/alagard.ttf"),
-                    font_size: INTERACT_GUIDE_KEY_FONT_SIZE,
-                    color: WHITE,
-                },
+                gf::DISPLAY.text_style(&asset_server, WHITE),
             )
             .with_alignment(TextAlignment::Center),
             text_anchor: Anchor::Center,
-            transform: Transform::from_translation(Vec3::new(0., -1., 1.)),
+            transform: Transform {
+                translation: Vec3::new(0., -1., 1.),
+                scale: gf::DISPLAY.transform_scale(),
+                ..default()
+            },
             ..default()
         })
         .insert(RenderLayers::from_layers(&[INTERACT_GUIDE_RENDER_LAYER]))
@@ -282,6 +282,7 @@ pub fn spawn_shrine_interact_key_guide(
                             Anchor::Center,
                             FLOATING_TEXT,
                             INTERACT_GUIDE_RENDER_LAYER,
+                            None,
                         );
                         safe_set_parent(&mut commands, text_e, parent_entity);
 

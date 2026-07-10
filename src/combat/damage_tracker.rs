@@ -7,6 +7,7 @@ use crate::colors::{LEVEL_BLUE, WHITE, YELLOW_2};
 use crate::enemy::Mob;
 use crate::item::{projectile::Projectile, WorldObject};
 use crate::player::skills::Heirloom;
+use crate::ui::game_fonts as gf;
 use crate::Player;
 use bevy::render::view::RenderLayers;
 use bevy::sprite::Anchor;
@@ -513,15 +514,15 @@ pub fn spawn_damage_tracker_ui(
             Text2dBundle {
                 text: Text::from_section(
                     "Damage Dealt",
-                    TextStyle {
-                        font: asset_server.load("fonts/4x5.ttf"),
-                        font_size: 5.0,
-                        color: YELLOW_2.with_a(base_alpha),
-                    },
+                    gf::BODY.text_style(&asset_server, YELLOW_2.with_a(base_alpha)),
                 )
                 .with_alignment(TextAlignment::Left),
                 text_anchor: Anchor::CenterLeft,
-                transform: Transform::from_translation(Vec3::new(-hw, cursor_y, 1.)),
+                transform: Transform {
+                translation: Vec3::new(-hw, cursor_y, 1.),
+                scale: gf::BODY.transform_scale(),
+                ..default()
+            },
                 ..default()
             },
             RenderLayers::from_layers(&[3]),
@@ -538,15 +539,15 @@ pub fn spawn_damage_tracker_ui(
                 Text2dBundle {
                     text: Text::from_section(
                         category.display_name(),
-                        TextStyle {
-                            font: asset_server.load("fonts/4x5.ttf"),
-                            font_size: 5.0,
-                            color: LEVEL_BLUE.with_a(base_alpha),
-                        },
+                        gf::BODY.text_style(&asset_server, LEVEL_BLUE.with_a(base_alpha)),
                     )
                     .with_alignment(TextAlignment::Left),
                     text_anchor: Anchor::CenterLeft,
-                    transform: Transform::from_translation(Vec3::new(-hw, cursor_y, 1.)),
+                    transform: Transform {
+                translation: Vec3::new(-hw, cursor_y, 1.),
+                scale: gf::BODY.transform_scale(),
+                ..default()
+            },
                     ..default()
                 },
                 RenderLayers::from_layers(&[3]),
@@ -562,15 +563,15 @@ pub fn spawn_damage_tracker_ui(
                     Text2dBundle {
                         text: Text::from_section(
                             format!(" {}", source.display_name()),
-                            TextStyle {
-                                font: asset_server.load("fonts/4x5.ttf"),
-                                font_size: 5.0,
-                                color: WHITE.with_a(base_alpha),
-                            },
+                            gf::BODY.text_style(&asset_server, WHITE.with_a(base_alpha)),
                         )
                         .with_alignment(TextAlignment::Left),
                         text_anchor: Anchor::CenterLeft,
-                        transform: Transform::from_translation(Vec3::new(-hw, cursor_y, 1.)),
+                        transform: Transform {
+                translation: Vec3::new(-hw, cursor_y, 1.),
+                scale: gf::BODY.transform_scale(),
+                ..default()
+            },
                         ..default()
                     },
                     RenderLayers::from_layers(&[3]),
@@ -584,15 +585,15 @@ pub fn spawn_damage_tracker_ui(
                     Text2dBundle {
                         text: Text::from_section(
                             format_damage(*amount),
-                            TextStyle {
-                                font: asset_server.load("fonts/4x5.ttf"),
-                                font_size: 5.0,
-                                color: WHITE.with_a(base_alpha),
-                            },
+                            gf::BODY.text_style(&asset_server, WHITE.with_a(base_alpha)),
                         )
                         .with_alignment(TextAlignment::Right),
                         text_anchor: Anchor::CenterRight,
-                        transform: Transform::from_translation(Vec3::new(hw + 10., cursor_y, 1.)),
+                        transform: Transform {
+                translation: Vec3::new(hw + 10., cursor_y, 1.),
+                scale: gf::BODY.transform_scale(),
+                ..default()
+            },
                         ..default()
                     },
                     RenderLayers::from_layers(&[3]),
@@ -613,17 +614,17 @@ pub fn spawn_damage_tracker_ui(
                             Text2dBundle {
                                 text: Text::from_section(
                                     " Shields",
-                                    TextStyle {
-                                        font: asset_server.load("fonts/4x5.ttf"),
-                                        font_size: 5.0,
-                                        color: WHITE.with_a(base_alpha),
-                                    },
+                                    gf::BODY.text_style(&asset_server, WHITE.with_a(base_alpha)),
                                 )
                                 .with_alignment(TextAlignment::Left),
                                 text_anchor: Anchor::CenterLeft,
-                                transform: Transform::from_translation(Vec3::new(
+                                transform: Transform {
+                translation: Vec3::new(
                                     -hw, cursor_y, 1.,
-                                )),
+                                ),
+                scale: gf::BODY.transform_scale(),
+                ..default()
+            },
                                 ..default()
                             },
                             RenderLayers::from_layers(&[3]),
@@ -636,19 +637,19 @@ pub fn spawn_damage_tracker_ui(
                             Text2dBundle {
                                 text: Text::from_section(
                                     format_damage(ps.shields_generated as i64),
-                                    TextStyle {
-                                        font: asset_server.load("fonts/4x5.ttf"),
-                                        font_size: 5.0,
-                                        color: WHITE.with_a(base_alpha),
-                                    },
+                                    gf::BODY.text_style(&asset_server, WHITE.with_a(base_alpha)),
                                 )
                                 .with_alignment(TextAlignment::Right),
                                 text_anchor: Anchor::CenterRight,
-                                transform: Transform::from_translation(Vec3::new(
+                                transform: Transform {
+                translation: Vec3::new(
                                     hw + 10.,
                                     cursor_y,
                                     1.,
-                                )),
+                                ),
+                scale: gf::BODY.transform_scale(),
+                ..default()
+            },
                                 ..default()
                             },
                             RenderLayers::from_layers(&[3]),
@@ -664,17 +665,17 @@ pub fn spawn_damage_tracker_ui(
                             Text2dBundle {
                                 text: Text::from_section(
                                     " Healing",
-                                    TextStyle {
-                                        font: asset_server.load("fonts/4x5.ttf"),
-                                        font_size: 5.0,
-                                        color: WHITE.with_a(base_alpha),
-                                    },
+                                    gf::BODY.text_style(&asset_server, WHITE.with_a(base_alpha)),
                                 )
                                 .with_alignment(TextAlignment::Left),
                                 text_anchor: Anchor::CenterLeft,
-                                transform: Transform::from_translation(Vec3::new(
+                                transform: Transform {
+                translation: Vec3::new(
                                     -hw, cursor_y, 1.,
-                                )),
+                                ),
+                scale: gf::BODY.transform_scale(),
+                ..default()
+            },
                                 ..default()
                             },
                             RenderLayers::from_layers(&[3]),
@@ -687,19 +688,19 @@ pub fn spawn_damage_tracker_ui(
                             Text2dBundle {
                                 text: Text::from_section(
                                     format_damage(ps.healing),
-                                    TextStyle {
-                                        font: asset_server.load("fonts/4x5.ttf"),
-                                        font_size: 5.0,
-                                        color: WHITE.with_a(base_alpha),
-                                    },
+                                    gf::BODY.text_style(&asset_server, WHITE.with_a(base_alpha)),
                                 )
                                 .with_alignment(TextAlignment::Right),
                                 text_anchor: Anchor::CenterRight,
-                                transform: Transform::from_translation(Vec3::new(
+                                transform: Transform {
+                translation: Vec3::new(
                                     hw + 10.,
                                     cursor_y,
                                     1.,
-                                )),
+                                ),
+                scale: gf::BODY.transform_scale(),
+                ..default()
+            },
                                 ..default()
                             },
                             RenderLayers::from_layers(&[3]),
@@ -715,17 +716,17 @@ pub fn spawn_damage_tracker_ui(
                             Text2dBundle {
                                 text: Text::from_section(
                                     " Coins",
-                                    TextStyle {
-                                        font: asset_server.load("fonts/4x5.ttf"),
-                                        font_size: 5.0,
-                                        color: WHITE.with_a(base_alpha),
-                                    },
+                                    gf::BODY.text_style(&asset_server, WHITE.with_a(base_alpha)),
                                 )
                                 .with_alignment(TextAlignment::Left),
                                 text_anchor: Anchor::CenterLeft,
-                                transform: Transform::from_translation(Vec3::new(
+                                transform: Transform {
+                translation: Vec3::new(
                                     -hw, cursor_y, 1.,
-                                )),
+                                ),
+                scale: gf::BODY.transform_scale(),
+                ..default()
+            },
                                 ..default()
                             },
                             RenderLayers::from_layers(&[3]),
@@ -738,19 +739,19 @@ pub fn spawn_damage_tracker_ui(
                             Text2dBundle {
                                 text: Text::from_section(
                                     format_damage(ps.coins as i64),
-                                    TextStyle {
-                                        font: asset_server.load("fonts/4x5.ttf"),
-                                        font_size: 5.0,
-                                        color: WHITE.with_a(base_alpha),
-                                    },
+                                    gf::BODY.text_style(&asset_server, WHITE.with_a(base_alpha)),
                                 )
                                 .with_alignment(TextAlignment::Right),
                                 text_anchor: Anchor::CenterRight,
-                                transform: Transform::from_translation(Vec3::new(
+                                transform: Transform {
+                translation: Vec3::new(
                                     hw + 10.,
                                     cursor_y,
                                     1.,
-                                )),
+                                ),
+                scale: gf::BODY.transform_scale(),
+                ..default()
+            },
                                 ..default()
                             },
                             RenderLayers::from_layers(&[3]),
@@ -766,17 +767,17 @@ pub fn spawn_damage_tracker_ui(
                             Text2dBundle {
                                 text: Text::from_section(
                                     " Self damage",
-                                    TextStyle {
-                                        font: asset_server.load("fonts/4x5.ttf"),
-                                        font_size: 5.0,
-                                        color: WHITE.with_a(base_alpha),
-                                    },
+                                    gf::BODY.text_style(&asset_server, WHITE.with_a(base_alpha)),
                                 )
                                 .with_alignment(TextAlignment::Left),
                                 text_anchor: Anchor::CenterLeft,
-                                transform: Transform::from_translation(Vec3::new(
+                                transform: Transform {
+                translation: Vec3::new(
                                     -hw, cursor_y, 1.,
-                                )),
+                                ),
+                scale: gf::BODY.transform_scale(),
+                ..default()
+            },
                                 ..default()
                             },
                             RenderLayers::from_layers(&[3]),
@@ -789,19 +790,19 @@ pub fn spawn_damage_tracker_ui(
                             Text2dBundle {
                                 text: Text::from_section(
                                     format_damage(ps.self_damage),
-                                    TextStyle {
-                                        font: asset_server.load("fonts/4x5.ttf"),
-                                        font_size: 5.0,
-                                        color: WHITE.with_a(base_alpha),
-                                    },
+                                    gf::BODY.text_style(&asset_server, WHITE.with_a(base_alpha)),
                                 )
                                 .with_alignment(TextAlignment::Right),
                                 text_anchor: Anchor::CenterRight,
-                                transform: Transform::from_translation(Vec3::new(
+                                transform: Transform {
+                translation: Vec3::new(
                                     hw + 10.,
                                     cursor_y,
                                     1.,
-                                )),
+                                ),
+                scale: gf::BODY.transform_scale(),
+                ..default()
+            },
                                 ..default()
                             },
                             RenderLayers::from_layers(&[3]),
@@ -860,15 +861,15 @@ pub fn spawn_mob_stat_tracker_ui(
             Text2dBundle {
                 text: Text::from_section(
                     "Mob kills",
-                    TextStyle {
-                        font: asset_server.load("fonts/4x5.ttf"),
-                        font_size: 5.0,
-                        color: YELLOW_2.with_a(base_alpha),
-                    },
+                    gf::BODY.text_style(&asset_server, YELLOW_2.with_a(base_alpha)),
                 )
                 .with_alignment(TextAlignment::Left),
                 text_anchor: Anchor::CenterLeft,
-                transform: Transform::from_translation(Vec3::new(-hw, cursor_y, 1.)),
+                transform: Transform {
+                translation: Vec3::new(-hw, cursor_y, 1.),
+                scale: gf::BODY.transform_scale(),
+                ..default()
+            },
                 ..default()
             },
             RenderLayers::from_layers(&[3]),
@@ -885,15 +886,15 @@ pub fn spawn_mob_stat_tracker_ui(
                 Text2dBundle {
                     text: Text::from_section(
                         format!(" {}", mob.stat_tracker_display_name()),
-                        TextStyle {
-                            font: asset_server.load("fonts/4x5.ttf"),
-                            font_size: 5.0,
-                            color: WHITE.with_a(base_alpha),
-                        },
+                        gf::BODY.text_style(&asset_server, WHITE.with_a(base_alpha)),
                     )
                     .with_alignment(TextAlignment::Left),
                     text_anchor: Anchor::CenterLeft,
-                    transform: Transform::from_translation(Vec3::new(-hw, cursor_y, 1.)),
+                    transform: Transform {
+                translation: Vec3::new(-hw, cursor_y, 1.),
+                scale: gf::BODY.transform_scale(),
+                ..default()
+            },
                     ..default()
                 },
                 RenderLayers::from_layers(&[3]),
@@ -907,15 +908,15 @@ pub fn spawn_mob_stat_tracker_ui(
                 Text2dBundle {
                     text: Text::from_section(
                         format_damage(stats.kills as i64),
-                        TextStyle {
-                            font: asset_server.load("fonts/4x5.ttf"),
-                            font_size: 5.0,
-                            color: WHITE.with_a(base_alpha),
-                        },
+                        gf::BODY.text_style(&asset_server, WHITE.with_a(base_alpha)),
                     )
                     .with_alignment(TextAlignment::Right),
                     text_anchor: Anchor::CenterRight,
-                    transform: Transform::from_translation(Vec3::new(hw + 10., cursor_y, 1.)),
+                    transform: Transform {
+                translation: Vec3::new(hw + 10., cursor_y, 1.),
+                scale: gf::BODY.transform_scale(),
+                ..default()
+            },
                     ..default()
                 },
                 RenderLayers::from_layers(&[3]),

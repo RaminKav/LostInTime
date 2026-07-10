@@ -1,3 +1,4 @@
+use crate::ui::game_fonts as gf;
 use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
 
 use crate::{
@@ -162,15 +163,15 @@ pub fn setup_time_crystals_browser_ui(
         Text2dBundle {
             text: Text::from_section(
                 "Time Crystals",
-                TextStyle {
-                    font: asset_server.load("fonts/alagard.ttf"),
-                    font_size: 15.0,
-                    color: WHITE,
-                },
+                gf::DISPLAY.text_style(&asset_server, WHITE),
             )
             .with_alignment(TextAlignment::Center),
             text_anchor: Anchor::Center,
-            transform: Transform::from_translation(Vec3::new(0., y, CONTENT_Z)),
+            transform: Transform {
+                translation: Vec3::new(0., y, CONTENT_Z),
+                scale: gf::DISPLAY.transform_scale(),
+                ..Default::default()
+            },
             ..Default::default()
         },
         RenderLayers::from_layers(&[3]),
@@ -184,15 +185,15 @@ pub fn setup_time_crystals_browser_ui(
         Text2dBundle {
             text: Text::from_section(
                 "View progress and unlocks for time crystals.\n\nEarn shards in runs to complete more crystals!",
-                TextStyle {
-                    font: asset_server.load("fonts/4x5.ttf"),
-                    font_size: 5.0,
-                    color: WHITE,
-                },
+                gf::BODY.text_style(&asset_server, WHITE),
             )
             .with_alignment(TextAlignment::Center),
             text_anchor: Anchor::Center,
-            transform: Transform::from_translation(Vec3::new(0., y, CONTENT_Z)),
+            transform: Transform {
+                translation: Vec3::new(0., y, CONTENT_Z),
+                scale: gf::BODY.transform_scale(),
+                ..Default::default()
+            },
             ..Default::default()
         },
         RenderLayers::from_layers(&[3]),
@@ -232,19 +233,19 @@ pub fn setup_time_crystals_browser_ui(
                 Text2dBundle {
                     text: Text::from_section(
                         line1,
-                        TextStyle {
-                            font: asset_server.load("fonts/4x5.ttf"),
-                            font_size: 5.0,
-                            color: YELLOW_2,
-                        },
+                        gf::BODY.text_style(&asset_server, YELLOW_2),
                     )
                     .with_alignment(TextAlignment::Center),
                     text_anchor: Anchor::Center,
-                    transform: Transform::from_translation(Vec3::new(
+                    transform: Transform {
+                translation: Vec3::new(
                         col_x,
                         y_row_header,
                         CONTENT_Z,
-                    )),
+                    ),
+                scale: gf::BODY.transform_scale(),
+                ..Default::default()
+            },
                     ..Default::default()
                 },
                 RenderLayers::from_layers(&[3]),
@@ -290,19 +291,19 @@ pub fn setup_time_crystals_browser_ui(
                     Text2dBundle {
                         text: Text::from_section(
                             "—",
-                            TextStyle {
-                                font: asset_server.load("fonts/4x5.ttf"),
-                                font_size: 5.0,
-                                color: WHITE,
-                            },
+                            gf::BODY.text_style(&asset_server, WHITE),
                         )
                         .with_alignment(TextAlignment::Center),
                         text_anchor: Anchor::Center,
-                        transform: Transform::from_translation(Vec3::new(
+                        transform: Transform {
+                translation: Vec3::new(
                             col_x,
                             sub_y - 4.,
                             CONTENT_Z,
-                        )),
+                        ),
+                scale: gf::BODY.transform_scale(),
+                ..Default::default()
+            },
                         ..Default::default()
                     },
                     RenderLayers::from_layers(&[3]),
@@ -323,19 +324,19 @@ pub fn setup_time_crystals_browser_ui(
                     Text2dBundle {
                         text: Text::from_section(
                             mystery,
-                            TextStyle {
-                                font: asset_server.load("fonts/alagard.ttf"),
-                                font_size: 15.0,
-                                color: WHITE,
-                            },
+                            gf::DISPLAY.text_style(&asset_server, WHITE),
                         )
                         .with_alignment(TextAlignment::Center),
                         text_anchor: Anchor::Center,
-                        transform: Transform::from_translation(Vec3::new(
+                        transform: Transform {
+                translation: Vec3::new(
                             col_x,
                             sub_y - 6.,
                             CONTENT_Z,
-                        )),
+                        ),
+                scale: gf::DISPLAY.transform_scale(),
+                ..Default::default()
+            },
                         ..Default::default()
                     },
                     RenderLayers::from_layers(&[3]),
@@ -378,15 +379,15 @@ pub fn setup_time_crystals_browser_ui(
         .spawn(Text2dBundle {
             text: Text::from_section(
                 "Done",
-                TextStyle {
-                    font: asset_server.load("fonts/4x5.ttf"),
-                    font_size: 5.0,
-                    color: crate::colors::WHITE,
-                },
+                gf::BODY.text_style(&asset_server, crate::colors::WHITE),
             )
             .with_alignment(TextAlignment::Center),
             text_anchor: Anchor::Center,
-            transform: Transform::from_translation(Vec3::new(0., 0.5, 1.)),
+            transform: Transform {
+                translation: Vec3::new(0., 0.5, 1.),
+                scale: gf::BODY.transform_scale(),
+                ..Default::default()
+            },
             ..Default::default()
         })
         .insert(RenderLayers::from_layers(&[3]))
@@ -428,15 +429,15 @@ pub fn setup_time_crystals_browser_ui(
                 // Those disagree slightly on scale_factor=1; an extra advance widens `size` and fixes
                 // collapsed pairs ("ei", etc.). Harmless visually — NBSP would also work.
                 "View heirlooms ",
-                TextStyle {
-                    font: asset_server.load("fonts/4x5.ttf"),
-                    font_size: 5.0,
-                    color: crate::colors::WHITE,
-                },
+                gf::BODY.text_style(&asset_server, crate::colors::WHITE),
             )
             .with_alignment(TextAlignment::Center),
             text_anchor: Anchor::Center,
-            transform: Transform::from_translation(Vec3::new(0., 0.5, 1.)),
+            transform: Transform {
+                translation: Vec3::new(0., 0.5, 1.),
+                scale: gf::BODY.transform_scale(),
+                ..Default::default()
+            },
             ..Default::default()
         })
         .insert(RenderLayers::from_layers(&[3]))
@@ -458,13 +459,18 @@ pub fn handle_time_crystals_view_heirlooms_button(
     graphics: Res<Graphics>,
     grid_layers: Query<Entity, With<HeirloomBrowserGridLayer>>,
     focus_input: FocusInput,
+    mouseless: Res<crate::inputs::MouselessModeState>,
 ) {
     let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None);
     let left_mouse_released = mouse_input.just_released(MouseButton::Left);
+    // Keyboard/gamepad focus only counts while it's actually driving the UI, and a mouse release
+    // only counts as a click on this button if the mouse was actually over it — otherwise a
+    // default-focused button would both show a stuck hover *and* fire on any click anywhere.
+    let focus_driving = mouseless.0 || cursor_pos.suppress_ui_hover;
 
     for (entity, mut interactable) in buttons.iter_mut() {
         let is_hit = matches!(hit_test, Some(hit) if hit.0 == entity);
-        let is_focused = focus_input.is_focused(entity);
+        let is_focused = focus_driving && focus_input.is_focused(entity);
         if is_hit || is_focused {
             match interactable.current() {
                 Interaction::None => {
@@ -472,7 +478,9 @@ pub fn handle_time_crystals_view_heirlooms_button(
                     commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonHover, 0.05));
                 }
                 Interaction::Hovering => {
-                    if left_mouse_released || focus_input.confirm_just_pressed() {
+                    if (is_hit && left_mouse_released)
+                        || (is_focused && focus_input.confirm_just_pressed())
+                    {
                         let show = !grid_open.0;
                         despawn_heirloom_browser_grid_layers(&mut commands, &grid_layers);
                         if show {
@@ -507,13 +515,15 @@ pub fn handle_time_crystals_browser_done_button(
     mut next_ui_state: ResMut<NextState<UIState>>,
     mut commands: Commands,
     focus_input: FocusInput,
+    mouseless: Res<crate::inputs::MouselessModeState>,
 ) {
     let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None);
     let left_mouse_released = mouse_input.just_released(MouseButton::Left);
+    let focus_driving = mouseless.0 || cursor_pos.suppress_ui_hover;
 
     for (entity, mut interactable) in buttons.iter_mut() {
         let is_hit = matches!(hit_test, Some(hit) if hit.0 == entity);
-        let is_focused = focus_input.is_focused(entity);
+        let is_focused = focus_driving && focus_input.is_focused(entity);
         if is_hit || is_focused {
             match interactable.current() {
                 Interaction::None => {
@@ -521,7 +531,9 @@ pub fn handle_time_crystals_browser_done_button(
                     commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonHover, 0.05));
                 }
                 Interaction::Hovering => {
-                    if left_mouse_released || focus_input.confirm_just_pressed() {
+                    if (is_hit && left_mouse_released)
+                        || (is_focused && focus_input.confirm_just_pressed())
+                    {
                         next_ui_state.set(UIState::Closed);
                         commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.2));
                     }

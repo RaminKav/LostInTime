@@ -2,4 +2,6 @@
 alwaysApply: true
 ---
 
-When using text fonts, if it is the 4x5 font, make sure the font size is always intervals of 5.0, with most of the time defaulting to 5.0. The other font type is intervals of 15.0, defaulting to 15.0 most of the time.
+When using text fonts, use the semantic roles in `src/ui/game_fonts.rs` (`DISPLAY_LARGE`, `DISPLAY`, `TITLE`, `BODY`, `MICRO`, or a feature alias of those). Do not hardcode font asset paths or sizes at call sites.
+
+Alagard logical `font_size` values use steps of **15.0**, with **30.0** for large display titles. Visual size is controlled by `FontStyle.scale` (`1.0` / `0.7` / `0.5`) via `FontStyle::transform_scale()` on the text entity `Transform`.

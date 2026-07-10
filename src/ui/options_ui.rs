@@ -34,6 +34,7 @@ use crate::{
         },
         interactions::Interaction,
         main_menu::{spawn_exit_icon_button, spawn_main_menu_wide_button, MenuButton},
+        game_fonts as gf,
         ui_helpers, Interactable, UIElement, UIState,
     },
     DisplayScaleSettings, InputBinding, ScreenResolution,
@@ -51,8 +52,8 @@ pub struct CheatSettings {
     /// When true, damage numbers are shown when enemies take damage.
     /// Player HP loss is always shown regardless of this setting.
     pub show_enemy_damage_numbers: bool,
-    /// When true, damage/healing/regen floating text and item pickup labels use compact `4x5` at 5.0
-    pub small_damage_text: bool,
+    /// Size of damage/healing/regen floating text and item pickup labels.
+    pub damage_text_size: gf::DamageTextSize,
     /// When true, player HP healing/regen and MP gain floating numbers are shown.
     /// Player HP loss is always shown regardless of this setting.
     pub show_player_damage_numbers: bool,
@@ -75,7 +76,7 @@ impl Default for CheatSettings {
             color_blind_mode: false,
             dev_mode: false,
             show_enemy_damage_numbers: true,
-            small_damage_text: false,
+            damage_text_size: gf::DamageTextSize::default(),
             show_player_damage_numbers: true,
             show_tile_hover: false,
             bypass_time_crystal_pool: false,
@@ -94,11 +95,12 @@ impl PersistedOptionsSettings {
             show_enemy_damage_numbers: settings.show_enemy_damage_numbers,
             show_player_damage_numbers: settings.show_player_damage_numbers,
             show_tile_hover: settings.show_tile_hover,
-            small_damage_text: settings.small_damage_text,
+            damage_text_size: settings.damage_text_size,
             hide_attack_anims: settings.hide_attack_anims,
             hide_skill_anims: settings.hide_skill_anims,
             hide_heirloom_anims: settings.hide_heirloom_anims,
             persist_item_filters: settings.persist_item_filters,
+            ..Default::default()
         }
     }
 
@@ -107,7 +109,7 @@ impl PersistedOptionsSettings {
         settings.show_enemy_damage_numbers = self.show_enemy_damage_numbers;
         settings.show_player_damage_numbers = self.show_player_damage_numbers;
         settings.show_tile_hover = self.show_tile_hover;
-        settings.small_damage_text = self.small_damage_text;
+        settings.damage_text_size = self.damage_text_size;
         settings.hide_attack_anims = self.hide_attack_anims;
         settings.hide_skill_anims = self.hide_skill_anims;
         settings.hide_heirloom_anims = self.hide_heirloom_anims;
@@ -115,10 +117,12 @@ impl PersistedOptionsSettings {
     }
 
     fn from_game_data(game_data: &GameData) -> Self {
-        game_data
+        let mut settings = game_data
             .options_settings
             .clone()
-            .unwrap_or_else(|| Self::from_legacy_game_data(game_data))
+            .unwrap_or_else(|| Self::from_legacy_game_data(game_data));
+        settings.normalize_legacy_fields();
+        settings
     }
 }
 
@@ -165,7 +169,6 @@ impl CheatSettings {
             OptionsCheckboxType::ColorBlindMode => self.color_blind_mode,
             OptionsCheckboxType::DevMode => self.dev_mode,
             OptionsCheckboxType::ShowEnemyDamageNumbers => self.show_enemy_damage_numbers,
-            OptionsCheckboxType::SmallDamageText => self.small_damage_text,
             OptionsCheckboxType::ShowPlayerDamageNumbers => self.show_player_damage_numbers,
             OptionsCheckboxType::ShowTileHover => self.show_tile_hover,
             OptionsCheckboxType::PersistItemFilters => self.persist_item_filters,
@@ -195,10 +198,6 @@ impl CheatSettings {
             OptionsCheckboxType::ShowEnemyDamageNumbers => {
                 self.show_enemy_damage_numbers = !self.show_enemy_damage_numbers;
                 self.show_enemy_damage_numbers
-            }
-            OptionsCheckboxType::SmallDamageText => {
-                self.small_damage_text = !self.small_damage_text;
-                self.small_damage_text
             }
             OptionsCheckboxType::ShowPlayerDamageNumbers => {
                 self.show_player_damage_numbers = !self.show_player_damage_numbers;
@@ -252,7 +251,6 @@ pub enum OptionsCheckboxType {
     ColorBlindMode,
     DevMode,
     ShowEnemyDamageNumbers,
-    SmallDamageText,
     ShowPlayerDamageNumbers,
     ShowTileHover,
     PersistItemFilters,
@@ -274,7 +272,6 @@ impl OptionsCheckboxType {
                 | Self::ColorBlindMode
                 | Self::DevMode
                 | Self::ShowEnemyDamageNumbers
-                | Self::SmallDamageText
                 | Self::ShowPlayerDamageNumbers
                 | Self::ShowTileHover
                 | Self::PersistItemFilters
@@ -290,7 +287,6 @@ impl OptionsCheckboxType {
             self,
             Self::ColorBlindMode
                 | Self::ShowEnemyDamageNumbers
-                | Self::SmallDamageText
                 | Self::ShowPlayerDamageNumbers
                 | Self::ShowTileHover
                 | Self::PersistItemFilters
@@ -417,6 +413,7 @@ pub enum OptionsRowKind {
     CursorColor,
     Sensitivity,
     NavStickStability,
+    DamageTextSize,
 }
 
 #[derive(Component, Clone, Copy)]
@@ -607,6 +604,14 @@ pub struct SensitivityButton {
 
 #[derive(Component)]
 pub struct SensitivityValueText(pub SensitivitySetting);
+
+#[derive(Component)]
+pub struct DamageTextSizeButton {
+    pub direction: VolumeDirection,
+}
+
+#[derive(Component)]
+pub struct DamageTextSizeValueText;
 
 pub fn handle_options_clicks(
     cursor_pos: Res<CursorPos>,
@@ -1002,19 +1007,19 @@ pub fn setup_options_ui(mut commands: Commands, deps: SetupOptionsResources) {
         Text2dBundle {
             text: Text::from_section(
                 "Options",
-                TextStyle {
-                    font: asset_server.load("fonts/alagard.ttf"),
-                    font_size: 30.0,
-                    color: WHITE,
-                },
+                gf::MENU_TITLE_LARGE.text_style(&asset_server, WHITE),
             )
             .with_alignment(TextAlignment::Center),
             text_anchor: bevy::sprite::Anchor::Center,
-            transform: Transform::from_translation(Vec3::new(
+            transform: Transform {
+                translation: Vec3::new(
                 0.,
                 resolution.game_height / 2. - 40.,
                 z,
-            )),
+            ),
+                scale: gf::MENU_TITLE_LARGE.transform_scale(),
+                ..default()
+            },
             ..Default::default()
         },
         RenderLayers::from_layers(&[3]),
@@ -1160,15 +1165,15 @@ fn spawn_options_tab_column(
                 Text2dBundle {
                     text: Text::from_section(
                         tab.label(),
-                        TextStyle {
-                            font: asset_server.load("fonts/alagard.ttf"),
-                            font_size: 15.0,
-                            color: WHITE,
-                        },
+                        gf::MENU_TITLE.text_style(&asset_server, WHITE),
                     )
                     .with_alignment(TextAlignment::Center),
                     text_anchor: Anchor::Center,
-                    transform: Transform::from_translation(Vec3::new(0., -1., 1.)),
+                    transform: Transform {
+                translation: Vec3::new(0., -1., 1.),
+                scale: gf::MENU_TITLE.transform_scale(),
+                ..default()
+            },
                     ..default()
                 },
                 RenderLayers::from_layers(&[3]),
@@ -1190,15 +1195,15 @@ fn spawn_controls_section_title(
         Text2dBundle {
             text: Text::from_section(
                 title,
-                TextStyle {
-                    font: asset_server.load("fonts/alagard.ttf"),
-                    font_size: 15.0,
-                    color: YELLOW_2,
-                },
+                gf::MENU_TITLE.text_style(&asset_server, YELLOW_2),
             )
             .with_alignment(TextAlignment::Left),
             text_anchor: bevy::sprite::Anchor::CenterLeft,
-            transform: Transform::from_translation(pos),
+            transform: Transform {
+                translation: pos,
+                scale: gf::MENU_TITLE.transform_scale(),
+                ..default()
+            },
             visibility: tab_visibility(tab, active),
             ..Default::default()
         },
@@ -1222,15 +1227,15 @@ fn spawn_options_section_title(
         Text2dBundle {
             text: Text::from_section(
                 title,
-                TextStyle {
-                    font: asset_server.load("fonts/alagard.ttf"),
-                    font_size: 15.0,
-                    color: YELLOW_2,
-                },
+                gf::MENU_TITLE.text_style(&asset_server, YELLOW_2),
             )
             .with_alignment(TextAlignment::Left),
             text_anchor: bevy::sprite::Anchor::CenterLeft,
-            transform: Transform::from_translation(pos),
+            transform: Transform {
+                translation: pos,
+                scale: gf::MENU_TITLE.transform_scale(),
+                ..default()
+            },
             visibility: tab_visibility(tab, active),
             ..Default::default()
         },
@@ -1375,15 +1380,13 @@ fn spawn_gameplay_tab_content(
     focus += 1;
     y += OPTIONS_CONTENT_ROW_SPACING;
 
-    spawn_options_checkbox(
+    spawn_damage_text_size_row(
         commands,
         graphics,
         asset_server,
-        "Small damage text:",
+        "Damage text size:",
+        cheat_settings.damage_text_size,
         Vec3::new(main_x, y, z),
-        Vec3::new(main_x + checkbox_x_offset, y, z),
-        OptionsCheckboxType::SmallDamageText,
-        cheat_settings.small_damage_text,
         tab,
         active,
         focus,
@@ -2014,15 +2017,15 @@ fn spawn_keybind_row(
             Text2dBundle {
                 text: Text::from_section(
                     "Rebind ",
-                    TextStyle {
-                        font: asset_server.load("fonts/4x5.ttf"),
-                        font_size: 5.0,
-                        color: WHITE,
-                    },
+                    gf::BODY.text_style(&asset_server, WHITE),
                 )
                 .with_alignment(TextAlignment::Center),
                 text_anchor: Anchor::Center,
-                transform: Transform::from_translation(Vec3::new(2., 0.5, 1.)),
+                transform: Transform {
+                    translation: Vec3::new(2., 0.5, 1.),
+                    scale: gf::BODY.transform_scale(),
+                    ..default()
+                },
                 ..Default::default()
             },
             RenderLayers::from_layers(&[3]),
@@ -2035,15 +2038,15 @@ fn spawn_keybind_row(
         Text2dBundle {
             text: Text::from_section(
                 label,
-                TextStyle {
-                    font: asset_server.load("fonts/4x5.ttf"),
-                    font_size: 5.0,
-                    color: WHITE,
-                },
+                gf::BODY.text_style(&asset_server, WHITE),
             )
             .with_alignment(TextAlignment::Left),
             text_anchor: bevy::sprite::Anchor::CenterLeft,
-            transform: Transform::from_translation(label_pos),
+            transform: Transform {
+                translation: label_pos,
+                scale: gf::BODY.transform_scale(),
+                ..default()
+            },
             visibility: tab_visibility(tab, active),
             ..Default::default()
         },
@@ -2059,15 +2062,15 @@ fn spawn_keybind_row(
         Text2dBundle {
             text: Text::from_section(
                 crate::keybinds::get_key_display_name(current_key),
-                TextStyle {
-                    font: asset_server.load("fonts/4x5.ttf"),
-                    font_size: 5.0,
-                    color: WHITE,
-                },
+                gf::BODY.text_style(&asset_server, WHITE),
             )
             .with_alignment(TextAlignment::Left),
             text_anchor: bevy::sprite::Anchor::CenterLeft,
-            transform: Transform::from_translation(current_key_pos),
+            transform: Transform {
+                translation: current_key_pos,
+                scale: gf::BODY.transform_scale(),
+                ..default()
+            },
             visibility: tab_visibility(tab, active),
             ..Default::default()
         },
@@ -2123,15 +2126,15 @@ fn spawn_options_checkbox(
         Text2dBundle {
             text: Text::from_section(
                 label,
-                TextStyle {
-                    font: asset_server.load("fonts/4x5.ttf"),
-                    font_size: 5.0,
-                    color: WHITE,
-                },
+                gf::BODY.text_style(&asset_server, WHITE),
             )
             .with_alignment(TextAlignment::Left),
             text_anchor: bevy::sprite::Anchor::CenterLeft,
-            transform: Transform::from_translation(label_pos),
+            transform: Transform {
+                translation: label_pos,
+                scale: gf::BODY.transform_scale(),
+                ..default()
+            },
             visibility: tab_visibility(tab, active),
             ..Default::default()
         },
@@ -2275,15 +2278,15 @@ fn spawn_volume_row(
         Text2dBundle {
             text: Text::from_section(
                 label,
-                TextStyle {
-                    font: asset_server.load("fonts/4x5.ttf"),
-                    font_size: 5.0,
-                    color: WHITE,
-                },
+                gf::BODY.text_style(&asset_server, WHITE),
             )
             .with_alignment(TextAlignment::Left),
             text_anchor: bevy::sprite::Anchor::CenterLeft,
-            transform: Transform::from_translation(label_pos),
+            transform: Transform {
+                translation: label_pos,
+                scale: gf::BODY.transform_scale(),
+                ..default()
+            },
             visibility: tab_visibility(tab, active),
             ..Default::default()
         },
@@ -2330,15 +2333,15 @@ fn spawn_volume_row(
             Text2dBundle {
                 text: Text::from_section(
                     "<",
-                    TextStyle {
-                        font: asset_server.load("fonts/4x5.ttf"),
-                        font_size: 5.0,
-                        color: crate::colors::WHITE,
-                    },
+                    gf::BODY.text_style(&asset_server, crate::colors::WHITE),
                 )
                 .with_alignment(TextAlignment::Center),
                 text_anchor: bevy::sprite::Anchor::Center,
-                transform: Transform::from_translation(Vec3::new(0., 0.5, 1.)),
+                transform: Transform {
+                    translation: Vec3::new(0., 0.5, 1.),
+                    scale: gf::BODY.transform_scale(),
+                    ..default()
+                },
                 ..Default::default()
             },
             RenderLayers::from_layers(&[3]),
@@ -2351,19 +2354,19 @@ fn spawn_volume_row(
         Text2dBundle {
             text: Text::from_section(
                 format!("{}", current_value),
-                TextStyle {
-                    font: asset_server.load("fonts/4x5.ttf"),
-                    font_size: 5.0,
-                    color: crate::colors::WHITE,
-                },
+                gf::BODY.text_style(&asset_server, crate::colors::WHITE),
             )
             .with_alignment(TextAlignment::Center),
             text_anchor: bevy::sprite::Anchor::Center,
-            transform: Transform::from_translation(Vec3::new(
+            transform: Transform {
+                translation: Vec3::new(
                 controls_x + 18.,
                 label_pos.y - 3.,
                 label_pos.z,
-            )),
+            ),
+                scale: gf::BODY.transform_scale(),
+                ..default()
+            },
             visibility: tab_visibility(tab, active),
             ..Default::default()
         },
@@ -2409,15 +2412,180 @@ fn spawn_volume_row(
             Text2dBundle {
                 text: Text::from_section(
                     ">",
-                    TextStyle {
-                        font: asset_server.load("fonts/4x5.ttf"),
-                        font_size: 5.0,
-                        color: crate::colors::WHITE,
-                    },
+                    gf::BODY.text_style(&asset_server, crate::colors::WHITE),
                 )
                 .with_alignment(TextAlignment::Center),
                 text_anchor: bevy::sprite::Anchor::Center,
-                transform: Transform::from_translation(Vec3::new(0., 0.5, 1.)),
+                transform: Transform {
+                    translation: Vec3::new(0., 0.5, 1.),
+                    scale: gf::BODY.transform_scale(),
+                    ..default()
+                },
+                ..Default::default()
+            },
+            RenderLayers::from_layers(&[3]),
+            UIState::Options,
+        ))
+        .set_parent(plus_entity);
+}
+
+fn spawn_damage_text_size_row(
+    commands: &mut Commands,
+    graphics: &Graphics,
+    asset_server: &AssetServer,
+    label: &str,
+    current: gf::DamageTextSize,
+    label_pos: Vec3,
+    tab: OptionsTab,
+    active: OptionsTab,
+    focus_index: u32,
+) {
+    let row_entity = spawn_stepper_row_focus(
+        commands,
+        label_pos,
+        tab,
+        active,
+        focus_index,
+        OptionsRowKind::DamageTextSize,
+        "Damage Text Size Row Focus",
+    );
+
+    commands.spawn((
+        Text2dBundle {
+            text: Text::from_section(label, gf::BODY.text_style(&asset_server, WHITE))
+                .with_alignment(TextAlignment::Left),
+            text_anchor: Anchor::CenterLeft,
+            transform: Transform {
+                translation: label_pos,
+                scale: gf::BODY.transform_scale(),
+                ..default()
+            },
+            visibility: tab_visibility(tab, active),
+            ..Default::default()
+        },
+        RenderLayers::from_layers(&[3]),
+        OptionsUI,
+        OptionsTabContent(tab),
+        OptionsRowLabel { row: row_entity },
+        Name::new("Damage Text Size Label"),
+    ));
+
+    let controls_x = label_pos.x + 70.;
+
+    let minus_entity = commands
+        .spawn(SpriteBundle {
+            texture: graphics.get_ui_element_texture(UIElement::XLKey).clone(),
+            sprite: Sprite {
+                custom_size: Some(Vec2::new(14., 12.)),
+                ..Default::default()
+            },
+            transform: Transform::from_translation(Vec3::new(
+                controls_x,
+                label_pos.y - 3.5,
+                label_pos.z,
+            )),
+            visibility: tab_visibility(tab, active),
+            ..Default::default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(UIState::Options)
+        .insert(UIElement::XLKey)
+        .insert(OptionsUI)
+        .insert(OptionsTabContent(tab))
+        .insert(DamageTextSizeButton {
+            direction: VolumeDirection::Down,
+        })
+        .insert(OptionsRowMember { row: row_entity })
+        .insert(Interactable::default())
+        .insert(Name::new("Damage Text Size Down"))
+        .id();
+
+    commands
+        .spawn((
+            Text2dBundle {
+                text: Text::from_section(
+                    "<",
+                    gf::BODY.text_style(&asset_server, crate::colors::WHITE),
+                )
+                .with_alignment(TextAlignment::Center),
+                text_anchor: Anchor::Center,
+                transform: Transform {
+                    translation: Vec3::new(0., 0.5, 1.),
+                    scale: gf::BODY.transform_scale(),
+                    ..default()
+                },
+                ..Default::default()
+            },
+            RenderLayers::from_layers(&[3]),
+            UIState::Options,
+        ))
+        .set_parent(minus_entity);
+
+    commands.spawn((
+        Text2dBundle {
+            text: Text::from_section(
+                current.label(),
+                gf::BODY.text_style(&asset_server, crate::colors::WHITE),
+            )
+            .with_alignment(TextAlignment::Center),
+            text_anchor: Anchor::Center,
+            transform: Transform {
+                translation: Vec3::new(controls_x + 18., label_pos.y - 3., label_pos.z),
+                scale: gf::BODY.transform_scale(),
+                ..default()
+            },
+            visibility: tab_visibility(tab, active),
+            ..Default::default()
+        },
+        RenderLayers::from_layers(&[3]),
+        OptionsUI,
+        OptionsTabContent(tab),
+        DamageTextSizeValueText,
+        Name::new("Damage Text Size Value"),
+    ));
+
+    let plus_entity = commands
+        .spawn(SpriteBundle {
+            texture: graphics.get_ui_element_texture(UIElement::XLKey).clone(),
+            sprite: Sprite {
+                custom_size: Some(Vec2::new(14., 12.)),
+                ..Default::default()
+            },
+            transform: Transform::from_translation(Vec3::new(
+                controls_x + 36.,
+                label_pos.y - 3.5,
+                label_pos.z,
+            )),
+            visibility: tab_visibility(tab, active),
+            ..Default::default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(UIState::Options)
+        .insert(UIElement::XLKey)
+        .insert(OptionsUI)
+        .insert(OptionsTabContent(tab))
+        .insert(DamageTextSizeButton {
+            direction: VolumeDirection::Up,
+        })
+        .insert(OptionsRowMember { row: row_entity })
+        .insert(Interactable::default())
+        .insert(Name::new("Damage Text Size Up"))
+        .id();
+
+    commands
+        .spawn((
+            Text2dBundle {
+                text: Text::from_section(
+                    ">",
+                    gf::BODY.text_style(&asset_server, crate::colors::WHITE),
+                )
+                .with_alignment(TextAlignment::Center),
+                text_anchor: Anchor::Center,
+                transform: Transform {
+                    translation: Vec3::new(0., 0.5, 1.),
+                    scale: gf::BODY.transform_scale(),
+                    ..default()
+                },
                 ..Default::default()
             },
             RenderLayers::from_layers(&[3]),
@@ -2455,15 +2623,15 @@ fn spawn_sensitivity_row(
         Text2dBundle {
             text: Text::from_section(
                 label,
-                TextStyle {
-                    font: asset_server.load("fonts/4x5.ttf"),
-                    font_size: 5.0,
-                    color: WHITE,
-                },
+                gf::BODY.text_style(&asset_server, WHITE),
             )
             .with_alignment(TextAlignment::Left),
             text_anchor: bevy::sprite::Anchor::CenterLeft,
-            transform: Transform::from_translation(label_pos),
+            transform: Transform {
+                translation: label_pos,
+                scale: gf::BODY.transform_scale(),
+                ..default()
+            },
             visibility: tab_visibility(tab, active),
             ..Default::default()
         },
@@ -2510,15 +2678,15 @@ fn spawn_sensitivity_row(
             Text2dBundle {
                 text: Text::from_section(
                     "<",
-                    TextStyle {
-                        font: asset_server.load("fonts/4x5.ttf"),
-                        font_size: 5.0,
-                        color: crate::colors::WHITE,
-                    },
+                    gf::BODY.text_style(&asset_server, crate::colors::WHITE),
                 )
                 .with_alignment(TextAlignment::Center),
                 text_anchor: bevy::sprite::Anchor::Center,
-                transform: Transform::from_translation(Vec3::new(0., 0.5, 1.)),
+                transform: Transform {
+                    translation: Vec3::new(0., 0.5, 1.),
+                    scale: gf::BODY.transform_scale(),
+                    ..default()
+                },
                 ..Default::default()
             },
             RenderLayers::from_layers(&[3]),
@@ -2530,19 +2698,19 @@ fn spawn_sensitivity_row(
         Text2dBundle {
             text: Text::from_section(
                 format!("{}", current_value),
-                TextStyle {
-                    font: asset_server.load("fonts/4x5.ttf"),
-                    font_size: 5.0,
-                    color: crate::colors::WHITE,
-                },
+                gf::BODY.text_style(&asset_server, crate::colors::WHITE),
             )
             .with_alignment(TextAlignment::Center),
             text_anchor: bevy::sprite::Anchor::Center,
-            transform: Transform::from_translation(Vec3::new(
+            transform: Transform {
+                translation: Vec3::new(
                 controls_x + 18.,
                 label_pos.y - 3.,
                 label_pos.z,
-            )),
+            ),
+                scale: gf::BODY.transform_scale(),
+                ..default()
+            },
             visibility: tab_visibility(tab, active),
             ..Default::default()
         },
@@ -2587,15 +2755,15 @@ fn spawn_sensitivity_row(
             Text2dBundle {
                 text: Text::from_section(
                     ">",
-                    TextStyle {
-                        font: asset_server.load("fonts/4x5.ttf"),
-                        font_size: 5.0,
-                        color: crate::colors::WHITE,
-                    },
+                    gf::BODY.text_style(&asset_server, crate::colors::WHITE),
                 )
                 .with_alignment(TextAlignment::Center),
                 text_anchor: bevy::sprite::Anchor::Center,
-                transform: Transform::from_translation(Vec3::new(0., 0.5, 1.)),
+                transform: Transform {
+                    translation: Vec3::new(0., 0.5, 1.),
+                    scale: gf::BODY.transform_scale(),
+                    ..default()
+                },
                 ..Default::default()
             },
             RenderLayers::from_layers(&[3]),
@@ -2630,15 +2798,15 @@ fn spawn_scale_row(
         Text2dBundle {
             text: Text::from_section(
                 label,
-                TextStyle {
-                    font: asset_server.load("fonts/4x5.ttf"),
-                    font_size: 5.0,
-                    color: WHITE,
-                },
+                gf::BODY.text_style(&asset_server, WHITE),
             )
             .with_alignment(TextAlignment::Left),
             text_anchor: bevy::sprite::Anchor::CenterLeft,
-            transform: Transform::from_translation(label_pos),
+            transform: Transform {
+                translation: label_pos,
+                scale: gf::BODY.transform_scale(),
+                ..default()
+            },
             visibility: tab_visibility(tab, active),
             ..Default::default()
         },
@@ -2685,15 +2853,15 @@ fn spawn_scale_row(
             Text2dBundle {
                 text: Text::from_section(
                     "<",
-                    TextStyle {
-                        font: asset_server.load("fonts/4x5.ttf"),
-                        font_size: 5.0,
-                        color: crate::colors::WHITE,
-                    },
+                    gf::BODY.text_style(&asset_server, crate::colors::WHITE),
                 )
                 .with_alignment(TextAlignment::Center),
                 text_anchor: bevy::sprite::Anchor::Center,
-                transform: Transform::from_translation(Vec3::new(0., 0.5, 1.)),
+                transform: Transform {
+                    translation: Vec3::new(0., 0.5, 1.),
+                    scale: gf::BODY.transform_scale(),
+                    ..default()
+                },
                 ..Default::default()
             },
             RenderLayers::from_layers(&[3]),
@@ -2705,19 +2873,19 @@ fn spawn_scale_row(
         Text2dBundle {
             text: Text::from_section(
                 current_value.to_string(),
-                TextStyle {
-                    font: asset_server.load("fonts/4x5.ttf"),
-                    font_size: 5.0,
-                    color: crate::colors::WHITE,
-                },
+                gf::BODY.text_style(&asset_server, crate::colors::WHITE),
             )
             .with_alignment(TextAlignment::Center),
             text_anchor: bevy::sprite::Anchor::Center,
-            transform: Transform::from_translation(Vec3::new(
+            transform: Transform {
+                translation: Vec3::new(
                 controls_x + 18.,
                 label_pos.y - 3.,
                 label_pos.z,
-            )),
+            ),
+                scale: gf::BODY.transform_scale(),
+                ..default()
+            },
             visibility: tab_visibility(tab, active),
             ..Default::default()
         },
@@ -2762,15 +2930,15 @@ fn spawn_scale_row(
             Text2dBundle {
                 text: Text::from_section(
                     ">",
-                    TextStyle {
-                        font: asset_server.load("fonts/4x5.ttf"),
-                        font_size: 5.0,
-                        color: crate::colors::WHITE,
-                    },
+                    gf::BODY.text_style(&asset_server, crate::colors::WHITE),
                 )
                 .with_alignment(TextAlignment::Center),
                 text_anchor: bevy::sprite::Anchor::Center,
-                transform: Transform::from_translation(Vec3::new(0., 0.5, 1.)),
+                transform: Transform {
+                    translation: Vec3::new(0., 0.5, 1.),
+                    scale: gf::BODY.transform_scale(),
+                    ..default()
+                },
                 ..Default::default()
             },
             RenderLayers::from_layers(&[3]),
@@ -2806,15 +2974,15 @@ fn spawn_cursor_color_row(
         Text2dBundle {
             text: Text::from_section(
                 label,
-                TextStyle {
-                    font: asset_server.load("fonts/4x5.ttf"),
-                    font_size: 5.0,
-                    color: WHITE,
-                },
+                gf::BODY.text_style(&asset_server, WHITE),
             )
             .with_alignment(TextAlignment::Left),
             text_anchor: bevy::sprite::Anchor::CenterLeft,
-            transform: Transform::from_translation(label_pos),
+            transform: Transform {
+                translation: label_pos,
+                scale: gf::BODY.transform_scale(),
+                ..default()
+            },
             visibility: tab_visibility(tab, active),
             ..Default::default()
         },
@@ -2860,15 +3028,15 @@ fn spawn_cursor_color_row(
             Text2dBundle {
                 text: Text::from_section(
                     "<",
-                    TextStyle {
-                        font: asset_server.load("fonts/4x5.ttf"),
-                        font_size: 5.0,
-                        color: crate::colors::WHITE,
-                    },
+                    gf::BODY.text_style(&asset_server, crate::colors::WHITE),
                 )
                 .with_alignment(TextAlignment::Center),
                 text_anchor: bevy::sprite::Anchor::Center,
-                transform: Transform::from_translation(Vec3::new(0., 0.5, 1.)),
+                transform: Transform {
+                    translation: Vec3::new(0., 0.5, 1.),
+                    scale: gf::BODY.transform_scale(),
+                    ..default()
+                },
                 ..Default::default()
             },
             RenderLayers::from_layers(&[3]),
@@ -2935,15 +3103,15 @@ fn spawn_cursor_color_row(
             Text2dBundle {
                 text: Text::from_section(
                     ">",
-                    TextStyle {
-                        font: asset_server.load("fonts/4x5.ttf"),
-                        font_size: 5.0,
-                        color: crate::colors::WHITE,
-                    },
+                    gf::BODY.text_style(&asset_server, crate::colors::WHITE),
                 )
                 .with_alignment(TextAlignment::Center),
                 text_anchor: bevy::sprite::Anchor::Center,
-                transform: Transform::from_translation(Vec3::new(0., 0.5, 1.)),
+                transform: Transform {
+                    translation: Vec3::new(0., 0.5, 1.),
+                    scale: gf::BODY.transform_scale(),
+                    ..default()
+                },
                 ..Default::default()
             },
             RenderLayers::from_layers(&[3]),
@@ -3210,6 +3378,7 @@ fn nudge_options_stepper(
     cursor_color: &mut CursorColorSettings,
     aim_sensitivity: &mut AimSensitivity,
     ui_nav_stick_stability: &mut UiNavStickStability,
+    cheat_settings: &mut CheatSettings,
 ) {
     match row_kind {
         OptionsRowKind::Volume(channel) => {
@@ -3253,6 +3422,10 @@ fn nudge_options_stepper(
             }
             ui_nav_stick_stability.save();
         }
+        OptionsRowKind::DamageTextSize => {
+            cheat_settings.damage_text_size = cheat_settings.damage_text_size.nudge(up);
+            cheat_settings.persist_persisted_options();
+        }
         OptionsRowKind::Checkbox(_) | OptionsRowKind::Keybind(_) => {}
     }
 }
@@ -3269,6 +3442,7 @@ pub fn handle_options_focus_row_input(
     mut cursor_color: ResMut<CursorColorSettings>,
     mut aim_sensitivity: ResMut<AimSensitivity>,
     mut ui_nav_stick_stability: ResMut<UiNavStickStability>,
+    mut cheat_settings: ResMut<CheatSettings>,
     mut commands: Commands,
     mut stick_latch: Local<UiStickNavLatch>,
 ) {
@@ -3285,7 +3459,8 @@ pub fn handle_options_focus_row_input(
         | OptionsRowKind::Scale(_)
         | OptionsRowKind::CursorColor
         | OptionsRowKind::Sensitivity
-        | OptionsRowKind::NavStickStability => row.0,
+        | OptionsRowKind::NavStickStability
+        | OptionsRowKind::DamageTextSize => row.0,
         OptionsRowKind::Checkbox(_) | OptionsRowKind::Keybind(_) => {
             *stick_latch = UiStickNavLatch::default();
             return;
@@ -3316,6 +3491,7 @@ pub fn handle_options_focus_row_input(
         &mut cursor_color,
         &mut aim_sensitivity,
         &mut ui_nav_stick_stability,
+        &mut cheat_settings,
     );
     focus_nav_blocked.0 = true;
     commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.2));
@@ -3376,15 +3552,15 @@ pub fn spawn_wipe_data_popup(
             Text2dBundle {
                 text: Text::from_section(
                     "Wipe Game Data?",
-                    TextStyle {
-                        font: asset_server.load("fonts/alagard.ttf"),
-                        font_size: 30.0,
-                        color: crate::colors::YELLOW_2,
-                    },
+                    gf::MENU_TITLE_LARGE.text_style(&asset_server, crate::colors::YELLOW_2),
                 )
                 .with_alignment(TextAlignment::Center),
                 text_anchor: Anchor::Center,
-                transform: Transform::from_translation(Vec3::new(0., 36., 1.)),
+                transform: Transform {
+                    translation: Vec3::new(0., 36., 1.),
+                    scale: gf::MENU_TITLE_LARGE.transform_scale(),
+                    ..default()
+                },
                 ..Default::default()
             },
             RenderLayers::from_layers(&[3]),
@@ -3400,15 +3576,15 @@ pub fn spawn_wipe_data_popup(
             Text2dBundle {
                 text: Text::from_section(
                     "This will reset all game progress\n\nto a fresh account.\n\nThis cannot be undone.",
-                    TextStyle {
-                        font: asset_server.load("fonts/4x5.ttf"),
-                        font_size: 5.0,
-                        color: crate::colors::WHITE,
-                    },
+                    gf::BODY.text_style(&asset_server, crate::colors::WHITE),
                 )
                 .with_alignment(TextAlignment::Center),
                 text_anchor: Anchor::Center,
-                transform: Transform::from_translation(Vec3::new(0., 4., 1.)),
+                transform: Transform {
+                    translation: Vec3::new(0., 4., 1.),
+                    scale: gf::BODY.transform_scale(),
+                    ..default()
+                },
                 ..Default::default()
             },
             RenderLayers::from_layers(&[3]),
@@ -3445,15 +3621,15 @@ pub fn spawn_wipe_data_popup(
         .spawn(Text2dBundle {
             text: Text::from_section(
                 "Delete",
-                TextStyle {
-                    font: asset_server.load("fonts/alagard.ttf"),
-                    font_size: 15.0,
-                    color: crate::colors::WHITE,
-                },
+                gf::MENU_TITLE.text_style(&asset_server, crate::colors::WHITE),
             )
             .with_alignment(TextAlignment::Center),
             text_anchor: Anchor::Center,
-            transform: Transform::from_translation(Vec3::new(0., -1., 1.)),
+            transform: Transform {
+                translation: Vec3::new(0., -1., 1.),
+                scale: gf::MENU_TITLE.transform_scale(),
+                ..default()
+            },
             ..Default::default()
         })
         .insert(RenderLayers::from_layers(&[3]))
@@ -3486,15 +3662,15 @@ pub fn spawn_wipe_data_popup(
         .spawn(Text2dBundle {
             text: Text::from_section(
                 "Back",
-                TextStyle {
-                    font: asset_server.load("fonts/alagard.ttf"),
-                    font_size: 15.0,
-                    color: crate::colors::WHITE,
-                },
+                gf::MENU_TITLE.text_style(&asset_server, crate::colors::WHITE),
             )
             .with_alignment(TextAlignment::Center),
             text_anchor: Anchor::Center,
-            transform: Transform::from_translation(Vec3::new(0., -1., 1.)),
+            transform: Transform {
+                translation: Vec3::new(0., -1., 1.),
+                scale: gf::MENU_TITLE.transform_scale(),
+                ..default()
+            },
             ..Default::default()
         })
         .insert(RenderLayers::from_layers(&[3]))
@@ -3615,6 +3791,77 @@ pub fn handle_sensitivity_button_click(
                 .entity(entity)
                 .insert(UIElement::XLKey)
                 .insert(graphics.get_ui_element_texture(UIElement::XLKey));
+        }
+    }
+}
+
+pub fn handle_damage_text_size_button_click(
+    cursor_pos: Res<CursorPos>,
+    mouse_input: Res<Input<MouseButton>>,
+    focus_input: FocusInput,
+    computed_visibility: Query<&ComputedVisibility>,
+    ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
+    mut buttons: Query<(Entity, &mut Interactable, &DamageTextSizeButton)>,
+    mut cheat_settings: ResMut<CheatSettings>,
+    mut commands: Commands,
+    graphics: Res<Graphics>,
+) {
+    let hit_test = options_pointcast(&cursor_pos, &ui_sprites, &computed_visibility);
+    let left_mouse_released = mouse_input.just_released(MouseButton::Left);
+
+    for (entity, mut interactable, size_button) in buttons.iter_mut() {
+        let is_hit = matches!(hit_test, Some(hit) if hit.0 == entity);
+        let is_focused = focus_input.is_focused(entity);
+        if is_hit || is_focused {
+            match interactable.current() {
+                Interaction::None => {
+                    interactable.change(Interaction::Hovering);
+                    commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonHover, 0.05));
+                    commands
+                        .entity(entity)
+                        .insert(UIElement::XLKeyHover)
+                        .insert(graphics.get_ui_element_texture(UIElement::XLKeyHover));
+                }
+                Interaction::Hovering => {
+                    if (is_hit && left_mouse_released)
+                        || (is_focused && focus_input.confirm_just_pressed())
+                    {
+                        let up = size_button.direction == VolumeDirection::Up;
+                        cheat_settings.damage_text_size =
+                            cheat_settings.damage_text_size.nudge(up);
+                        cheat_settings.persist_persisted_options();
+                        commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.2));
+                    }
+                }
+                _ => {}
+            }
+        } else {
+            let Interaction::Hovering = interactable.current() else {
+                continue;
+            };
+            interactable.change(Interaction::None);
+            commands
+                .entity(entity)
+                .insert(UIElement::XLKey)
+                .insert(graphics.get_ui_element_texture(UIElement::XLKey));
+        }
+    }
+}
+
+pub fn update_damage_text_size_text(
+    cheat_settings: Res<CheatSettings>,
+    mut texts: Query<&mut Text, With<DamageTextSizeValueText>>,
+) {
+    if !cheat_settings.is_changed() {
+        return;
+    }
+    let label = cheat_settings.damage_text_size.label();
+    for mut text in texts.iter_mut() {
+        if text.sections.is_empty() {
+            continue;
+        }
+        if text.sections[0].value != label {
+            text.sections[0].value = label.to_string();
         }
     }
 }

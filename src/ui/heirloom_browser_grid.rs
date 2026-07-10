@@ -9,6 +9,7 @@ use crate::{
         time_crystals::TimeCrystals,
     },
     ui::{
+        game_fonts as gf,
         interactions::Interactable,
         inventory_ui::UIState,
         time_crystal_progress_ui::CrystalUnlockIcon,
@@ -218,14 +219,14 @@ pub fn spawn_heirloom_grid_overlay(
                     Text2dBundle {
                         text: Text::from_section(
                             "?",
-                            TextStyle {
-                                font: asset_server.load("fonts/alagard.ttf"),
-                                font_size: 15.0,
-                                color: crate::colors::WHITE,
-                            },
+                            gf::DISPLAY.text_style(&asset_server, crate::colors::WHITE),
                         ),
                         text_anchor: Anchor::Center,
-                        transform: Transform::from_translation(Vec3::new(0., 0., 1.)),
+                        transform: Transform {
+                            translation: Vec3::new(0., 0., 1.),
+                            scale: gf::DISPLAY.transform_scale(),
+                            ..Default::default()
+                        },
                         ..Default::default()
                     },
                     RenderLayers::from_layers(&[3]),

@@ -1,3 +1,4 @@
+use crate::ui::game_fonts as gf;
 use bevy::{ecs::system::ParamSet, prelude::*, render::view::RenderLayers};
 use bevy_aseprite::{anim::AsepriteAnimation, aseprite, AsepriteBundle};
 use bevy_proto::prelude::ProtoCommands;
@@ -489,15 +490,15 @@ fn spawn_currency_counter(
             Text2dBundle {
                 text: Text::from_section(
                     count.to_string(),
-                    TextStyle {
-                        font: asset_server.load("fonts/alagard.ttf"),
-                        font_size: 15.0,
-                        color: WHITE,
-                    },
+                    gf::DISPLAY.text_style(&asset_server, WHITE),
                 )
                 .with_alignment(TextAlignment::Center),
                 text_anchor: bevy::sprite::Anchor::CenterLeft,
-                transform: Transform::from_translation(Vec3::new(-4., 0., 2.)),
+                transform: Transform {
+                translation: Vec3::new(-4., 0., 2.),
+                scale: gf::DISPLAY.transform_scale(),
+                ..Default::default()
+            },
                 ..default()
             },
             RenderLayers::from_layers(&[3]),
@@ -586,15 +587,15 @@ fn spawn_price_badge(
             Text2dBundle {
                 text: Text::from_section(
                     count_str,
-                    TextStyle {
-                        font: asset_server.load("fonts/slkscr.ttf"),
-                        font_size: 8.4,
-                        color: WHITE,
-                    },
+                    gf::BODY.text_style(&asset_server, WHITE),
                 )
                 .with_alignment(TextAlignment::Center),
                 text_anchor: bevy::sprite::Anchor::Center,
-                transform: Transform::from_translation(Vec3::new(5., 0., 2.)),
+                transform: Transform {
+                translation: Vec3::new(5., 0., 2.),
+                scale: gf::BODY.transform_scale(),
+                ..Default::default()
+            },
                 ..default()
             },
             RenderLayers::from_layers(&[3]),
@@ -664,15 +665,15 @@ fn spawn_merchant_track_info_box(
             Text2dBundle {
                 text: Text::from_section(
                     header.to_string(),
-                    TextStyle {
-                        font: asset_server.load("fonts/slkscr.ttf"),
-                        font_size: 8.4,
-                        color: WHITE,
-                    },
+                    gf::BODY.text_style(&asset_server, WHITE),
                 )
                 .with_alignment(TextAlignment::Center),
                 text_anchor: bevy::sprite::Anchor::Center,
-                transform: Transform::from_translation(Vec3::new(0., 5., 2.)),
+                transform: Transform {
+                translation: Vec3::new(0., 5., 2.),
+                scale: gf::BODY.transform_scale(),
+                ..Default::default()
+            },
                 ..default()
             },
             RenderLayers::from_layers(&[3]),
@@ -685,15 +686,15 @@ fn spawn_merchant_track_info_box(
             Text2dBundle {
                 text: Text::from_section(
                     "Mark a shop item to track".to_string(),
-                    TextStyle {
-                        font: asset_server.load("fonts/slkscr.ttf"),
-                        font_size: 8.4,
-                        color: WHITE,
-                    },
+                    gf::BODY.text_style(&asset_server, WHITE),
                 )
                 .with_alignment(TextAlignment::Center),
                 text_anchor: bevy::sprite::Anchor::Center,
-                transform: Transform::from_translation(Vec3::new(0., -6., 2.)),
+                transform: Transform {
+                translation: Vec3::new(0., -6., 2.),
+                scale: gf::BODY.transform_scale(),
+                ..Default::default()
+            },
                 ..default()
             },
             RenderLayers::from_layers(&[3]),
@@ -732,15 +733,15 @@ fn spawn_section_label(
             Text2dBundle {
                 text: Text::from_section(
                     label.to_string(),
-                    TextStyle {
-                        font: asset_server.load("fonts/slkscr.ttf"),
-                        font_size: 8.4,
-                        color: WHITE,
-                    },
+                    gf::BODY.text_style(&asset_server, WHITE),
                 )
                 .with_alignment(TextAlignment::Center),
                 text_anchor: bevy::sprite::Anchor::Center,
-                transform: Transform::from_translation(Vec3::new(pos.x, pos.y, 2.)),
+                transform: Transform {
+                translation: Vec3::new(pos.x, pos.y, 2.),
+                scale: gf::BODY.transform_scale(),
+                ..Default::default()
+            },
                 ..default()
             },
             RenderLayers::from_layers(&[3]),
@@ -1134,15 +1135,15 @@ fn spawn_merchant_world_marker_display(
             Text2dBundle {
                 text: Text::from_section(
                     count_str,
-                    TextStyle {
-                        font: asset_server.load("fonts/slkscr.ttf"),
-                        font_size: 8.4,
-                        color: price_color,
-                    },
+                    gf::BODY.text_style(&asset_server, price_color),
                 )
                 .with_alignment(TextAlignment::Center),
                 text_anchor: bevy::sprite::Anchor::Center,
-                transform: Transform::from_translation(Vec3::new(5., 0., 2.)),
+                transform: Transform {
+                translation: Vec3::new(5., 0., 2.),
+                scale: gf::BODY.transform_scale(),
+                ..Default::default()
+            },
                 ..default()
             },
             MerchantWorldMarkerPriceText {
@@ -1597,15 +1598,15 @@ pub fn setup_essence_ui(
             Text2dBundle {
                 text: Text::from_section(
                     "Merchant".to_string(),
-                    TextStyle {
-                        font: asset_server.load("fonts/alagard.ttf"),
-                        font_size: 15.0,
-                        color: WHITE,
-                    },
+                    gf::DISPLAY.text_style(&asset_server, WHITE),
                 )
                 .with_alignment(TextAlignment::Center),
                 text_anchor: bevy::sprite::Anchor::Center,
-                transform: Transform::from_translation(Vec3::new(0., MERCHANT_TITLE_Y, 3.)),
+                transform: Transform {
+                translation: Vec3::new(0., MERCHANT_TITLE_Y, 3.),
+                scale: gf::DISPLAY.transform_scale(),
+                ..Default::default()
+            },
                 ..default()
             },
             RenderLayers::from_layers(&[3]),

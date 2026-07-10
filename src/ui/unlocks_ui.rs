@@ -1,3 +1,4 @@
+use crate::ui::game_fonts as gf;
 use bevy::prelude::*;
 use bevy::render::view::RenderLayers;
 use bevy::sprite::Anchor;
@@ -349,19 +350,15 @@ pub fn setup_unlocks_ui(
         Text2dBundle {
             text: Text::from_section(
                 "Unlocks",
-                TextStyle {
-                    font: asset_server.load("fonts/alagard.ttf"),
-                    font_size: 30.0,
-                    color: crate::colors::WHITE,
-                },
+                gf::DISPLAY_LARGE.text_style(&asset_server, crate::colors::WHITE),
             )
             .with_alignment(TextAlignment::Center),
             text_anchor: bevy::sprite::Anchor::Center,
-            transform: Transform::from_translation(Vec3::new(
-                0.,
-                104. + UNLOCKS_CONTENT_Y_OFFSET,
-                11.,
-            )),
+            transform: Transform {
+                translation: Vec3::new(0., 104. + UNLOCKS_CONTENT_Y_OFFSET, 11.),
+                scale: gf::DISPLAY_LARGE.transform_scale(),
+                ..Default::default()
+            },
             ..Default::default()
         },
         RenderLayers::from_layers(&[3]),
@@ -375,19 +372,15 @@ pub fn setup_unlocks_ui(
             Text2dBundle {
                 text: Text::from_section(
                     format!("{}", currency.time_fragments.max(0)),
-                    TextStyle {
-                        font: asset_server.load("fonts/4x5.ttf"),
-                        font_size: 10.0,
-                        color: crate::colors::WHITE,
-                    },
+                    gf::DISPLAY.text_style(&asset_server, crate::colors::WHITE),
                 )
                 .with_alignment(TextAlignment::Left),
                 text_anchor: bevy::sprite::Anchor::CenterLeft,
-                transform: Transform::from_translation(Vec3::new(
-                    -160.,
-                    104.5 + UNLOCKS_CONTENT_Y_OFFSET,
-                    11.,
-                )),
+                transform: Transform {
+                    translation: Vec3::new(-160., 104.5 + UNLOCKS_CONTENT_Y_OFFSET, 11.),
+                    scale: gf::DISPLAY.transform_scale(),
+                    ..Default::default()
+                },
                 ..Default::default()
             },
             RenderLayers::from_layers(&[3]),
@@ -431,10 +424,13 @@ pub fn setup_unlocks_ui(
 
     // Exit button
     let exit_button = spawn_exit_icon_button(Vec3::new(0., -158., 11.), &mut commands, &graphics);
-    commands.entity(exit_button).insert(UnlocksUI).insert(Focusable {
-        group: UIState::Unlocks,
-        index: 100,
-    });
+    commands
+        .entity(exit_button)
+        .insert(UnlocksUI)
+        .insert(Focusable {
+            group: UIState::Unlocks,
+            index: 100,
+        });
 }
 
 fn spawn_unlock_row(
@@ -453,15 +449,15 @@ fn spawn_unlock_row(
         Text2dBundle {
             text: Text::from_section(
                 kind.display_name(),
-                TextStyle {
-                    font: asset_server.load("fonts/alagard.ttf"),
-                    font_size: 15.0,
-                    color: crate::colors::WHITE,
-                },
+                gf::DISPLAY.text_style(&asset_server, crate::colors::WHITE),
             )
             .with_alignment(TextAlignment::Left),
             text_anchor: bevy::sprite::Anchor::CenterLeft,
-            transform: Transform::from_translation(info_pos),
+            transform: Transform {
+                translation: info_pos,
+                scale: gf::DISPLAY.transform_scale(),
+                ..Default::default()
+            },
             ..Default::default()
         },
         RenderLayers::from_layers(&[3]),
@@ -475,15 +471,15 @@ fn spawn_unlock_row(
         Text2dBundle {
             text: Text::from_section(
                 unlock_effect_summary(kind, upgrades),
-                TextStyle {
-                    font: asset_server.load("fonts/4x5.ttf"),
-                    font_size: 5.,
-                    color: crate::colors::YELLOW_2,
-                },
+                gf::BODY.text_style(&asset_server, crate::colors::YELLOW_2),
             )
             .with_alignment(TextAlignment::Left),
             text_anchor: bevy::sprite::Anchor::CenterLeft,
-            transform: Transform::from_translation(info_text_pos),
+            transform: Transform {
+                translation: info_text_pos,
+                scale: gf::BODY.transform_scale(),
+                ..Default::default()
+            },
             ..Default::default()
         },
         RenderLayers::from_layers(&[3]),
@@ -498,15 +494,15 @@ fn spawn_unlock_row(
         Text2dBundle {
             text: Text::from_section(
                 unlock_cost_label(kind, upgrades),
-                TextStyle {
-                    font: asset_server.load("fonts/4x5.ttf"),
-                    font_size: 5.0,
-                    color: crate::colors::WHITE,
-                },
+                gf::BODY.text_style(&asset_server, crate::colors::WHITE),
             )
             .with_alignment(TextAlignment::Left),
             text_anchor: bevy::sprite::Anchor::CenterLeft,
-            transform: Transform::from_translation(cost_pos),
+            transform: Transform {
+                translation: cost_pos,
+                scale: gf::BODY.transform_scale(),
+                ..Default::default()
+            },
             ..Default::default()
         },
         RenderLayers::from_layers(&[3]),
@@ -555,10 +551,12 @@ fn spawn_unlock_row(
         )));
 
     if enabled {
-        button_cmd.insert(Interactable::default()).insert(Focusable {
-            group: UIState::Unlocks,
-            index: focus_index,
-        });
+        button_cmd
+            .insert(Interactable::default())
+            .insert(Focusable {
+                group: UIState::Unlocks,
+                index: focus_index,
+            });
     }
 
     let button_entity = button_cmd.id();
@@ -568,15 +566,15 @@ fn spawn_unlock_row(
             Text2dBundle {
                 text: Text::from_section(
                     unlock_purchase_button_label(is_maxed),
-                    TextStyle {
-                        font: asset_server.load("fonts/4x5.ttf"),
-                        font_size: 5.0,
-                        color: label_color,
-                    },
+                    gf::BODY.text_style(&asset_server, label_color),
                 )
                 .with_alignment(TextAlignment::Center),
                 text_anchor: Anchor::Center,
-                transform: Transform::from_translation(Vec3::new(0.5, 0.5, 1.)),
+                transform: Transform {
+                    translation: Vec3::new(0.5, 0.5, 1.),
+                    scale: gf::BODY.transform_scale(),
+                    ..Default::default()
+                },
                 ..Default::default()
             },
             RenderLayers::from_layers(&[3]),

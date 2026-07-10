@@ -1,3 +1,4 @@
+use crate::ui::game_fonts as gf;
 use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
 
 use crate::{
@@ -302,14 +303,14 @@ fn spawn_grid_cell(
             .spawn(Text2dBundle {
                 text: Text::from_section(
                     "?",
-                    TextStyle {
-                        font: asset_server.load("fonts/alagard.ttf"),
-                        font_size: 30.0,
-                        color: Color::rgba(0.85, 0.85, 0.85, 1.),
-                    },
+                    gf::DISPLAY_LARGE.text_style(&asset_server, Color::rgba(0.85, 0.85, 0.85, 1.)),
                 ),
                 text_anchor: Anchor::Center,
-                transform: Transform::from_translation(Vec3::new(0., 0., 1.)),
+                transform: Transform {
+                translation: Vec3::new(0., 0., 1.),
+                scale: gf::DISPLAY_LARGE.transform_scale(),
+                ..Default::default()
+            },
                 ..Default::default()
             })
             .insert(RenderLayers::from_layers(&[3]))
@@ -367,18 +368,18 @@ fn spawn_grid_cell(
             .spawn(Text2dBundle {
                 text: Text::from_section(
                     format!("x{cards_collected}"),
-                    TextStyle {
-                        font: asset_server.load("fonts/alagard.ttf"),
-                        font_size: 15.0,
-                        color: WHITE,
-                    },
+                    gf::DISPLAY.text_style(&asset_server, WHITE),
                 ),
                 text_anchor: Anchor::Center,
-                transform: Transform::from_translation(Vec3::new(
+                transform: Transform {
+                translation: Vec3::new(
                     CARD_W * 0.5 - 4.,
                     -CARD_H * 0.5,
                     2.,
-                )),
+                ),
+                scale: gf::DISPLAY.transform_scale(),
+                ..Default::default()
+            },
                 ..Default::default()
             })
             .insert(RenderLayers::from_layers(&[3]))
@@ -427,19 +428,19 @@ fn spawn_detail_panel(
             Text2dBundle {
                 text: Text::from_section(
                     "Select a card to view details.",
-                    TextStyle {
-                        font: asset_server.load("fonts/4x5.ttf"),
-                        font_size: 5.0,
-                        color: WHITE,
-                    },
+                    gf::BODY.text_style(&asset_server, WHITE),
                 )
                 .with_alignment(TextAlignment::Center),
                 text_anchor: Anchor::Center,
-                transform: Transform::from_translation(Vec3::new(
+                transform: Transform {
+                translation: Vec3::new(
                     center_x,
                     top_y - panel_width * 0.4,
                     CONTENT_Z,
-                )),
+                ),
+                scale: gf::BODY.transform_scale(),
+                ..Default::default()
+            },
                 ..Default::default()
             },
             RenderLayers::from_layers(&[3]),
@@ -458,19 +459,19 @@ fn spawn_detail_panel(
             Text2dBundle {
                 text: Text::from_section(
                     "Collect a card to learn more.",
-                    TextStyle {
-                        font: asset_server.load("fonts/4x5.ttf"),
-                        font_size: 5.0,
-                        color: WHITE,
-                    },
+                    gf::BODY.text_style(&asset_server, WHITE),
                 )
                 .with_alignment(TextAlignment::Center),
                 text_anchor: Anchor::Center,
-                transform: Transform::from_translation(Vec3::new(
+                transform: Transform {
+                translation: Vec3::new(
                     center_x,
                     top_y - panel_width * 0.4,
                     CONTENT_Z,
-                )),
+                ),
+                scale: gf::BODY.transform_scale(),
+                ..Default::default()
+            },
                 ..Default::default()
             },
             RenderLayers::from_layers(&[3]),
@@ -499,15 +500,15 @@ fn spawn_detail_panel(
         Text2dBundle {
             text: Text::from_section(
                 mob_display_name(mob),
-                TextStyle {
-                    font: asset_server.load("fonts/alagard.ttf"),
-                    font_size: 15.0,
-                    color: DARK_WOOD_BROWN,
-                },
+                gf::DISPLAY.text_style(&asset_server, DARK_WOOD_BROWN),
             )
             .with_alignment(TextAlignment::Center),
             text_anchor: Anchor::Center,
-            transform: Transform::from_translation(Vec3::new(center_x, 140., CONTENT_Z)),
+            transform: Transform {
+                translation: Vec3::new(center_x, 140., CONTENT_Z),
+                scale: gf::DISPLAY.transform_scale(),
+                ..Default::default()
+            },
             ..Default::default()
         },
         RenderLayers::from_layers(&[3]),
@@ -524,15 +525,15 @@ fn spawn_detail_panel(
                 Text2dBundle {
                     text: Text::from_section(
                         format!("HP {hp}     ATK {atk}"),
-                        TextStyle {
-                            font: asset_server.load("fonts/4x5.ttf"),
-                            font_size: 5.0,
-                            color: RED,
-                        },
+                        gf::BODY.text_style(&asset_server, RED),
                     )
                     .with_alignment(TextAlignment::Center),
                     text_anchor: Anchor::Center,
-                    transform: Transform::from_translation(Vec3::new(center_x, y, CONTENT_Z)),
+                    transform: Transform {
+                translation: Vec3::new(center_x, y, CONTENT_Z),
+                scale: gf::BODY.transform_scale(),
+                ..Default::default()
+            },
                     ..Default::default()
                 },
                 RenderLayers::from_layers(&[3]),
@@ -565,15 +566,15 @@ fn spawn_locked_line(
         Text2dBundle {
             text: Text::from_section(
                 text,
-                TextStyle {
-                    font: asset_server.load("fonts/4x5.ttf"),
-                    font_size: 5.0,
-                    color: GREY,
-                },
+                gf::BODY.text_style(&asset_server, GREY),
             )
             .with_alignment(TextAlignment::Center),
             text_anchor: Anchor::Center,
-            transform: Transform::from_translation(Vec3::new(x, y, CONTENT_Z)),
+            transform: Transform {
+                translation: Vec3::new(x, y, CONTENT_Z),
+                scale: gf::BODY.transform_scale(),
+                ..Default::default()
+            },
             ..Default::default()
         },
         RenderLayers::from_layers(&[3]),
@@ -602,19 +603,19 @@ fn spawn_run_stats(
             Text2dBundle {
                 text: Text::from_section(
                     line.clone(),
-                    TextStyle {
-                        font: asset_server.load("fonts/4x5.ttf"),
-                        font_size: 5.0,
-                        color: DARK_WOOD_BROWN,
-                    },
+                    gf::BODY.text_style(&asset_server, DARK_WOOD_BROWN),
                 )
                 .with_alignment(TextAlignment::Center),
                 text_anchor: Anchor::Center,
-                transform: Transform::from_translation(Vec3::new(
+                transform: Transform {
+                translation: Vec3::new(
                     x,
                     start_y - i as f32 * 10.,
                     CONTENT_Z,
-                )),
+                ),
+                scale: gf::BODY.transform_scale(),
+                ..Default::default()
+            },
                 ..Default::default()
             },
             RenderLayers::from_layers(&[3]),

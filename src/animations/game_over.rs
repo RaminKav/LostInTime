@@ -1,3 +1,4 @@
+use crate::ui::game_fonts as gf;
 use std::{fs::File, io::BufReader};
 
 use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
@@ -162,15 +163,11 @@ pub fn handle_game_over_fadeout(
             Text2dBundle {
                 text: Text::from_section(
                     "Game Over",
-                    TextStyle {
-                        font: asset_server.load("fonts/alagard.ttf"),
-                        font_size: 30.0,
-                        color: WHITE.with_a(0.),
-                    },
+                    gf::DISPLAY_LARGE.text_style(&asset_server, WHITE.with_a(0.)),
                 ),
                 transform: Transform {
                     translation: Vec3::new(0., 100., Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND),
-                    scale: Vec3::new(1., 1., 1.),
+                    scale: gf::DISPLAY_LARGE.transform_scale(),
                     ..Default::default()
                 },
                 ..default()
@@ -190,15 +187,11 @@ pub fn handle_game_over_fadeout(
             Text2dBundle {
                 text: Text::from_section(
                     rank_text,
-                    TextStyle {
-                        font: asset_server.load("fonts/alagard.ttf"),
-                        font_size: 15.0,
-                        color: WHITE.with_a(0.),
-                    },
+                    gf::DISPLAY.text_style(&asset_server, WHITE.with_a(0.)),
                 ),
                 transform: Transform {
                     translation: Vec3::new(0., 64., Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND), // Moved 30px higher
-                    scale: Vec3::new(1., 1., 1.),
+                    scale: gf::DISPLAY.transform_scale(),
                     ..Default::default()
                 },
                 ..default()
@@ -211,27 +204,18 @@ pub fn handle_game_over_fadeout(
 
         // Left panel position (same as damage tracker)
         let panel_x = -resolution.game_width / 2. + 10.;
-        let damage_font = asset_server.load("fonts/4x5.ttf");
-        let stat_text_style = TextStyle {
-            font: damage_font.clone(),
-            font_size: 5.0,
-            color: WHITE.with_a(0.),
-        };
+        let stat_text_style = gf::BODY.text_style(&asset_server, WHITE.with_a(0.));
 
         // SCORE TEXT - same style and alignment as damage display
         commands.spawn((
             Text2dBundle {
                 text: Text::from_section(
                     format!("Score: {}", run_score.score),
-                    TextStyle {
-                        font: asset_server.load("fonts/alagard.ttf"),
-                        font_size: 15.0,
-                        color: WHITE.with_a(0.),
-                    },
+                    gf::DISPLAY.text_style(&asset_server, WHITE.with_a(0.)),
                 ),
                 transform: Transform {
                     translation: Vec3::new(0., 48., Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND), // Moved 30px higher
-                    scale: Vec3::new(1., 1., 1.),
+                    scale: gf::DISPLAY.transform_scale(),
                     ..Default::default()
                 },
                 ..default()
@@ -298,11 +282,15 @@ pub fn handle_game_over_fadeout(
                 )
                 .with_alignment(TextAlignment::Left),
                 text_anchor: Anchor::CenterLeft,
-                transform: Transform::from_translation(Vec3::new(
-                    right_stats_x,
-                    line_y,
-                    Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND,
-                )),
+                transform: Transform {
+                    translation: Vec3::new(
+                        right_stats_x,
+                        line_y,
+                        Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND,
+                    ),
+                    scale: gf::BODY.transform_scale(),
+                    ..Default::default()
+                },
                 ..default()
             },
             GameOverText,
@@ -320,11 +308,15 @@ pub fn handle_game_over_fadeout(
                 )
                 .with_alignment(TextAlignment::Left),
                 text_anchor: Anchor::CenterLeft,
-                transform: Transform::from_translation(Vec3::new(
-                    right_stats_x,
-                    line_y,
-                    Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND,
-                )),
+                transform: Transform {
+                    translation: Vec3::new(
+                        right_stats_x,
+                        line_y,
+                        Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND,
+                    ),
+                    scale: gf::BODY.transform_scale(),
+                    ..Default::default()
+                },
                 ..default()
             },
             GameOverText,
@@ -344,11 +336,15 @@ pub fn handle_game_over_fadeout(
                 )
                 .with_alignment(TextAlignment::Left),
                 text_anchor: Anchor::CenterLeft,
-                transform: Transform::from_translation(Vec3::new(
-                    right_stats_x,
-                    line_y,
-                    Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND,
-                )),
+                transform: Transform {
+                    translation: Vec3::new(
+                        right_stats_x,
+                        line_y,
+                        Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND,
+                    ),
+                    scale: gf::BODY.transform_scale(),
+                    ..Default::default()
+                },
                 ..default()
             },
             GameOverText,
@@ -368,11 +364,15 @@ pub fn handle_game_over_fadeout(
                         )
                         .with_alignment(TextAlignment::Left),
                         text_anchor: Anchor::CenterLeft,
-                        transform: Transform::from_translation(Vec3::new(
-                            right_stats_x,
-                            line_y,
-                            Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND,
-                        )),
+                        transform: Transform {
+                            translation: Vec3::new(
+                                right_stats_x,
+                                line_y,
+                                Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND,
+                            ),
+                            scale: gf::BODY.transform_scale(),
+                            ..Default::default()
+                        },
                         ..default()
                     },
                     GameOverText,
@@ -391,11 +391,15 @@ pub fn handle_game_over_fadeout(
                 )
                 .with_alignment(TextAlignment::Left),
                 text_anchor: Anchor::CenterLeft,
-                transform: Transform::from_translation(Vec3::new(
-                    right_stats_x,
-                    line_y,
-                    Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND,
-                )),
+                transform: Transform {
+                    translation: Vec3::new(
+                        right_stats_x,
+                        line_y,
+                        Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND,
+                    ),
+                    scale: gf::BODY.transform_scale(),
+                    ..Default::default()
+                },
                 ..default()
             },
             GameOverText,
@@ -434,15 +438,15 @@ pub fn handle_game_over_fadeout(
                 Text2dBundle {
                     text: Text::from_section(
                         "View Final Stats",
-                        TextStyle {
-                            font: asset_server.load("fonts/4x5.ttf"),
-                            font_size: 5.0,
-                            color: YELLOW_2.with_a(0.),
-                        },
+                        gf::BODY.text_style(&asset_server, YELLOW_2.with_a(0.)),
                     )
                     .with_alignment(TextAlignment::Center),
                     text_anchor: Anchor::Center,
-                    transform: Transform::from_translation(Vec3::new(0., 0., 1.)),
+                    transform: Transform {
+                        translation: Vec3::new(0., 0., 1.),
+                        scale: gf::BODY.transform_scale(),
+                        ..Default::default()
+                    },
                     ..default()
                 },
                 GameOverText,
@@ -484,13 +488,13 @@ pub fn handle_game_over_fadeout(
                 Text2dBundle {
                     text: Text::from_section(
                         "Try Again",
-                        TextStyle {
-                            font: asset_server.load("fonts/alagard.ttf"),
-                            font_size: 15.0,
-                            color: WHITE.with_a(0.),
-                        },
+                        gf::DISPLAY.text_style(&asset_server, WHITE.with_a(0.)),
                     ),
-                    transform: Transform::from_translation(Vec3::new(0., 0., 1.)),
+                    transform: Transform {
+                        translation: Vec3::new(0., 0., 1.),
+                        scale: gf::DISPLAY.transform_scale(),
+                        ..Default::default()
+                    },
                     ..default()
                 },
                 GameOverText,
@@ -617,11 +621,7 @@ pub fn tick_game_over_overlay(
                 .spawn(Text2dBundle {
                     text: Text::from_section(
                         format!("Tip: {}", picked_tip).to_string(),
-                        TextStyle {
-                            font: asset_server.load("fonts/slkscr.ttf"),
-                            font_size: 8.5,
-                            color: WHITE,
-                        },
+                        gf::BODY.text_style(&asset_server, WHITE),
                     ),
                     transform: Transform {
                         translation: Vec3::new(
@@ -629,6 +629,7 @@ pub fn tick_game_over_overlay(
                             -res.game_height / 2. + 56.5,
                             Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND,
                         ),
+                        scale: gf::BODY.transform_scale(),
                         ..Default::default()
                     },
                     text_anchor: Anchor::Center,
@@ -667,6 +668,7 @@ pub fn tick_game_over_overlay(
                 Anchor::CenterLeft,
                 FLOATING_TEXT,
                 3,
+                None,
             );
             commands.entity(text).insert(CurrencyText);
 

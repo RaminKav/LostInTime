@@ -4,7 +4,7 @@ use bevy::sprite::Anchor;
 use crate::{
     blessings::PendingRunStartBlessing,
     colors::DARK_WOOD_BROWN, enemy::spawner::GlobalSpawners, player::Player,
-    ui::ui_helpers,
+    ui::{game_fonts as gf, ui_helpers},
     world::chunk::DoneCreateChunkEvent, GameState, RenderLayers, ScreenResolution,
 };
 
@@ -42,15 +42,12 @@ pub fn spawn_loading_overlay(
         .spawn(Text2dBundle {
             text: Text::from_section(
                 message,
-                TextStyle {
-                    font: asset_server.load("fonts/alagard.ttf"),
-                    font_size: 30.0,
-                    color: DARK_WOOD_BROWN,
-                },
+                gf::MENU_TITLE_LARGE.text_style(&asset_server, DARK_WOOD_BROWN),
             ),
             text_anchor: Anchor::Center,
             transform: Transform {
                 translation: Vec3::new(0., 0., LOADING_SCREEN_TEXT_Z),
+                scale: gf::MENU_TITLE_LARGE.transform_scale(),
                 ..default()
             },
             ..default()

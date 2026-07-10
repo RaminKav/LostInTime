@@ -10,6 +10,7 @@ use crate::{
         time_crystals::LastRunCrystalProgress,
     },
     ui::{
+        game_fonts as gf,
         heirloom_tooltip::{HeirloomTooltipRequest, HeirloomTooltipShow},
         interactions::{Interactable, Interaction},
         ui_helpers, UIElement, UIState,
@@ -172,15 +173,15 @@ pub fn setup_time_crystal_progress_ui(
         Text2dBundle {
             text: Text::from_section(
                 "Time Crystal Progress",
-                TextStyle {
-                    font: asset_server.load("fonts/alagard.ttf"),
-                    font_size: 15.0,
-                    color: WHITE,
-                },
+                gf::MENU_TITLE.text_style(&asset_server, WHITE),
             )
             .with_alignment(TextAlignment::Center),
             text_anchor: Anchor::Center,
-            transform: Transform::from_translation(Vec3::new(0., cursor_y, PANEL_CONTENT_Z)),
+            transform: Transform {
+                translation: Vec3::new(0., cursor_y, PANEL_CONTENT_Z),
+                scale: gf::MENU_TITLE.transform_scale(),
+                ..default()
+            },
             ..Default::default()
         },
         RenderLayers::from_layers(&[3]),
@@ -236,15 +237,15 @@ pub fn setup_time_crystal_progress_ui(
         Text2dBundle {
             text: Text::from_section(
                 focus_label,
-                TextStyle {
-                    font: asset_server.load("fonts/alagard.ttf"),
-                    font_size: 15.0,
-                    color: YELLOW_2,
-                },
+                gf::DISPLAY.text_style(&asset_server, YELLOW_2),
             )
             .with_alignment(TextAlignment::Center),
             text_anchor: Anchor::Center,
-            transform: Transform::from_translation(Vec3::new(0., cursor_y, PANEL_CONTENT_Z)),
+            transform: Transform {
+                translation: Vec3::new(0., cursor_y, PANEL_CONTENT_Z),
+                scale: gf::DISPLAY.transform_scale(),
+                ..default()
+            },
             ..Default::default()
         },
         RenderLayers::from_layers(&[3]),
@@ -258,15 +259,15 @@ pub fn setup_time_crystal_progress_ui(
         Text2dBundle {
             text: Text::from_section(
                 shards_line,
-                TextStyle {
-                    font: asset_server.load("fonts/4x5.ttf"),
-                    font_size: 5.0,
-                    color: WHITE,
-                },
+                gf::BODY.text_style(&asset_server, WHITE),
             )
             .with_alignment(TextAlignment::Center),
             text_anchor: Anchor::Center,
-            transform: Transform::from_translation(Vec3::new(0., cursor_y, PANEL_CONTENT_Z)),
+            transform: Transform {
+                translation: Vec3::new(0., cursor_y, PANEL_CONTENT_Z),
+                scale: gf::BODY.transform_scale(),
+                ..default()
+            },
             ..Default::default()
         },
         RenderLayers::from_layers(&[3]),
@@ -282,15 +283,15 @@ pub fn setup_time_crystal_progress_ui(
             Text2dBundle {
                 text: Text::from_section(
                     format!("Crystal #{} Completed!", crystal_idx + 1),
-                    TextStyle {
-                        font: asset_server.load("fonts/4x5.ttf"),
-                        font_size: 5.0,
-                        color: LIGHT_GREEN,
-                    },
+                    gf::BODY.text_style(&asset_server, LIGHT_GREEN),
                 )
                 .with_alignment(TextAlignment::Center),
                 text_anchor: Anchor::Center,
-                transform: Transform::from_translation(Vec3::new(0., cursor_y, PANEL_CONTENT_Z)),
+                transform: Transform {
+                    translation: Vec3::new(0., cursor_y, PANEL_CONTENT_Z),
+                    scale: gf::BODY.transform_scale(),
+                    ..default()
+                },
                 ..Default::default()
             },
             RenderLayers::from_layers(&[3]),
@@ -368,15 +369,15 @@ pub fn setup_time_crystal_progress_ui(
         .spawn(Text2dBundle {
             text: Text::from_section(
                 "OK",
-                TextStyle {
-                    font: asset_server.load("fonts/4x5.ttf"),
-                    font_size: 5.0,
-                    color: crate::colors::DARK_WOOD_BROWN,
-                },
+                gf::BODY.text_style(&asset_server, crate::colors::DARK_WOOD_BROWN),
             )
             .with_alignment(TextAlignment::Center),
             text_anchor: Anchor::Center,
-            transform: Transform::from_translation(Vec3::new(0., 0.5, 1.)),
+            transform: Transform {
+                translation: Vec3::new(0., 0.5, 1.),
+                scale: gf::BODY.transform_scale(),
+                ..default()
+            },
             ..Default::default()
         })
         .insert(RenderLayers::from_layers(&[3]))

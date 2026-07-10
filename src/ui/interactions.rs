@@ -10,7 +10,7 @@ use crate::{
         damage_numbers::{
             spawn_floating_text_with_shadow, spawn_floating_text_with_shadow_on_layer,
         },
-        game_fonts::FLOATING_TEXT,
+        game_fonts::{self as gf, FLOATING_TEXT},
         tips::{SeenTips, TipEvent},
     },
 };
@@ -668,14 +668,14 @@ pub fn update_dragged_item_stack_count_text(
                         Text2dBundle {
                             text: Text::from_section(
                                 new_str,
-                                TextStyle {
-                                    font: asset_server.load("fonts/4x5.ttf"),
-                                    font_size: 5.0,
-                                    color: Color::WHITE,
-                                },
+                                gf::TOOLTIP_RECIPE_COUNT.text_style(&asset_server, Color::WHITE),
                             )
                             .with_alignment(TextAlignment::Center),
-                            transform: Transform::from_translation(Vec3::new(7., -5.5, 3.)),
+                            transform: Transform {
+                                translation: Vec3::new(7., -5.5, 3.),
+                                scale: gf::TOOLTIP_RECIPE_COUNT.transform_scale(),
+                                ..default()
+                            },
                             ..default()
                         },
                         Name::new("ITEM STACK TEXT"),

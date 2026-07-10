@@ -234,8 +234,8 @@ pub fn spawn_tooltip_info_boxes(
         ))
         .id();
 
-    let text_style = gf::TOOLTIP_INFO_BOX.text_style(asset_server, WHITE);
-    let text_style_trigger = gf::TOOLTIP_INFO_BOX.text_style(asset_server, YELLOW_2);
+    let text_style = gf::TOOLTIP_INFO_BOX.text_style(&asset_server, WHITE);
+    let text_style_trigger = gf::TOOLTIP_INFO_BOX.text_style(&asset_server, YELLOW_2);
 
     for (i, spec) in specs.iter().enumerate() {
         let local_y = start_local_y - i as f32 * (box_h + INFO_BOX_STACK_GAP);
@@ -269,11 +269,15 @@ pub fn spawn_tooltip_info_boxes(
                     text: Text::from_section(lines[0].clone(), style)
                         .with_alignment(TextAlignment::Center),
                     text_anchor: Anchor::Center,
-                    transform: Transform::from_translation(Vec3::new(
-                        0.,
-                        INFO_BOX_LINE1_Y + y_bonus,
-                        2.,
-                    )),
+                    transform: Transform {
+                        translation: Vec3::new(
+                            0.,
+                            INFO_BOX_LINE1_Y + y_bonus,
+                            2.,
+                        ),
+                        scale: gf::TOOLTIP_INFO_BOX.transform_scale(),
+                        ..default()
+                    },
                     ..default()
                 })
                 .insert(RenderLayers::from_layers(&[3]))
@@ -285,7 +289,11 @@ pub fn spawn_tooltip_info_boxes(
                     text: Text::from_section(lines[1].clone(), text_style.clone())
                         .with_alignment(TextAlignment::Center),
                     text_anchor: Anchor::Center,
-                    transform: Transform::from_translation(Vec3::new(0., INFO_BOX_LINE2_Y, 2.)),
+                    transform: Transform {
+                        translation: Vec3::new(0., INFO_BOX_LINE2_Y, 2.),
+                        scale: gf::TOOLTIP_INFO_BOX.transform_scale(),
+                        ..default()
+                    },
                     ..default()
                 })
                 .insert(RenderLayers::from_layers(&[3]))

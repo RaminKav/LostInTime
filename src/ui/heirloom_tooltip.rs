@@ -163,12 +163,12 @@ pub fn spawn_heirloom_tooltip_card(
         Text2dBundle {
             text: Text::from_section(
                 heirloom.get_title(),
-                gf::HEIRLOOM_CARD_TITLE.text_style(asset_server, WHITE),
+                gf::HEIRLOOM_CARD_TITLE.text_style(&asset_server, WHITE),
             ),
             text_anchor: Anchor::Center,
             transform: Transform {
-                translation: Vec3::new(0., 20., 1.),
-                scale: Vec3::new(1., 1., 1.),
+                translation: Vec3::new(2., 20., 1.),
+                scale: gf::HEIRLOOM_CARD_TITLE.transform_scale(),
                 ..Default::default()
             },
             ..default()
@@ -216,12 +216,12 @@ pub fn spawn_heirloom_tooltip_card(
             Text2dBundle {
                 text: Text::from_section(
                     line.text.as_str(),
-                    gf::HEIRLOOM_CARD_BODY.text_style(asset_server, color),
+                    gf::HEIRLOOM_CARD_BODY.text_style(&asset_server, color),
                 ),
                 text_anchor: Anchor::Center,
                 transform: Transform {
                     translation: Vec3::new(2., y, 1.),
-                    scale: Vec3::new(1., 1., 1.),
+                    scale: gf::HEIRLOOM_CARD_BODY.transform_scale(),
                     ..Default::default()
                 },
                 ..default()
@@ -242,12 +242,12 @@ pub fn spawn_heirloom_tooltip_card(
             Text2dBundle {
                 text: Text::from_section(
                     scaling_text,
-                    gf::HEIRLOOM_CARD_META.text_style(asset_server, LIGHT_GREY),
+                    gf::HEIRLOOM_CARD_META.text_style(&asset_server, LIGHT_GREY),
                 ),
                 text_anchor: Anchor::Center,
                 transform: Transform {
                     translation: Vec3::new(0.5, scaling_y, 1.),
-                    scale: Vec3::new(1., 1., 1.),
+                    scale: gf::HEIRLOOM_CARD_META.transform_scale(),
                     ..Default::default()
                 },
                 ..default()

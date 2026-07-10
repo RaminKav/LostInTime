@@ -671,27 +671,27 @@ impl ActiveSkill {
 
         match self {
             ActiveSkill::Roll => vec![
-                "Roll to dodge attacks. You".to_string(),
-                "are invulnerable while ".to_string(),
-                "rolling.".to_string(),
+                "Roll to dodge attacks. You are ".to_string(),
+                "invulnerable while rolling.".to_string(),
             ],
             ActiveSkill::SpinAttack => vec![
-                "Dash forwards and spin".to_string(),
-                format!("your sword, dealing {:.1}%", skill_power * SPIN_ATTACK),
-                "damage around you.".to_string(),
+                "Dash forwards and spin your sword,".to_string(),
+                format!(
+                    "dealing {:.1}% damage around you.",
+                    skill_power * SPIN_ATTACK
+                ),
             ],
             ActiveSkill::Shout => vec![
-                "SCREAM, releasing a".to_string(),
-                "shockwave around you,".to_string(),
-                format!("dealing {:.1}% damage.", skill_power * SHOUT),
+                "SCREAM, releasing a shockwave".to_string(),
+                format!("around you, dealing {:.1}% damage.", skill_power * SHOUT),
                 "Knocks back enemies hit.".to_string(),
             ],
             ActiveSkill::Heal => vec![
                 format!(
-                    "Heal yourself for {:.1}% of",
+                    "Heal yourself for {:.1}% of your max",
                     skill_power * HEAL_MAX_HEALTH_PERCENT
                 ),
-                "your max health.".to_string(),
+                "health.".to_string(),
             ],
             ActiveSkill::Parry => vec![
                 "Active: Time successfully".to_string(),
@@ -701,10 +701,15 @@ impl ActiveSkill {
             ActiveSkill::ParrySpear => {
                 let pull_px = parry_spear_pull_radius_px(size);
                 vec![
-                    format!("Pulls enemies from {} tiles", (pull_px / 16.).round()),
-                    format!("towards you, dealing {:.1}%", skill_power * PARRY_SPEAR),
-                    "damage. Pull distance scales".to_string(),
-                    "with Size.".to_string(),
+                    format!(
+                        "Pulls enemies from up to {} tiles away",
+                        (pull_px / 16.).round()
+                    ),
+                    format!(
+                        "towards you, dealing {:.1}% damage.",
+                        skill_power * PARRY_SPEAR
+                    ),
+                    "Pull distance scales with Size.".to_string(),
                 ]
             }
             ActiveSkill::Sprint => vec![
@@ -712,10 +717,12 @@ impl ActiveSkill {
                 "Gain 60% speed temporarily.".to_string(),
             ],
             ActiveSkill::SprintLunge => vec![
-                "Lunge through enemies in a".to_string(),
-                format!("line dealing {:.1}% damage.", skill_power * SPRINT_LUNGE),
-                "You are invulnerable during".to_string(),
-                "the attack.".to_string(),
+                "Lunge through enemies in a line dealing".to_string(),
+                format!(
+                    "{:.1}% damage. You are invulnerable",
+                    skill_power * SPRINT_LUNGE
+                ),
+                "during the attack.".to_string(),
             ],
             ActiveSkill::DaggerThrow => vec![
                 "Throw a dagger at a nearby enemy".to_string(),
@@ -728,9 +735,12 @@ impl ActiveSkill {
             ActiveSkill::DaggerSlash => {
                 let slashes = dagger_slash_total_slashes(speed);
                 vec![
-                    format!("Rapidly slash {} times, each", slashes),
-                    format!("dealing {:.1}% damage. Number", skill_power * DAGGER_SLASH),
-                    "of slashes scales with speed.".to_string(),
+                    format!("Rapidly slash {} times, each dealing", slashes),
+                    format!(
+                        "{:.1}% damage. The number of slashes",
+                        skill_power * DAGGER_SLASH
+                    ),
+                    "scales with speed.".to_string(),
                 ]
             }
             ActiveSkill::Stealth => vec![
@@ -739,12 +749,13 @@ impl ActiveSkill {
                 "always crit but end Stealth early.".to_string(),
             ],
             ActiveSkill::Teleport => vec![
-                "Teleport forwards, dealing".to_string(),
                 format!(
-                    "{:.1}% damage to enemies",
+                    "Teleport forwards, dealing {:.1}%",
                     skill_power * TELEPORT_SHOCK_ATTACK_PERCENT
                 ),
-                "you pass through.".to_string(),
+                "damage to enemies you pass through.".to_string(),
+                "Can pass through objects or cross".to_string(),
+                "water.".to_string(),
                 // "through.".to_string(),
             ],
             ActiveSkill::Lightning => vec![
@@ -757,37 +768,43 @@ impl ActiveSkill {
             ActiveSkill::FirePillar => {
                 let ring_secs = fire_ring_duration_seconds(max_mana);
                 vec![
-                    "Scorch the earth at target".to_string(),
-                    format!("area, dealing {:.1}% damage", skill_power * FIRE_PILLAR),
-                    format!("continuously for {:.1}s", ring_secs),
-                    "(scales with max mana).".to_string(),
+                    "Scorch the earth at target area,".to_string(),
+                    format!(
+                        " dealing {:.1}% damage continuously",
+                        skill_power * FIRE_PILLAR
+                    ),
+                    format!("for {:.1}s. Duration scales with", ring_secs),
+                    "Max Mana.".to_string(),
                 ]
             }
             ActiveSkill::IceWall => {
                 vec![
-                    "Summon an ice pillar at".to_string(),
-                    format!("target area dealing {:.1}%", skill_power * ICE_WALL),
-                    "damage.".to_string(),
+                    "Summon an ice pillar at target area".to_string(),
+                    format!("dealing {:.1}% damage.", skill_power * ICE_WALL),
                 ]
             }
             ActiveSkill::MeteorShower => {
                 vec![
-                    format!("Summon {} meteors, each", meteor_count),
-                    format!("dealing {:.1}% damage. Gain", skill_power * METEOR_SHOWER),
-                    "+1 meteor every 5 casts.".to_string(),
+                    format!("Summon {} meteors, each dealing", meteor_count),
+                    format!(
+                        "{:.1}% damage. Grows by +1 more",
+                        skill_power * METEOR_SHOWER
+                    ),
+                    "Meteor every 5 casts.".to_string(),
                 ]
             }
             ActiveSkill::Buckshot => vec![
-                "Fire a shotgun dealing".to_string(),
-                format!("5x {:.1}% damage spread in", skill_power * BUCKSHOT_PELLET),
-                "a cone. Knocks you back".to_string(),
-                "a moderate amount.".to_string(),
+                format!(
+                    "Fire a shotgun dealing 5x {:.1}%",
+                    skill_power * BUCKSHOT_PELLET
+                ),
+                " damage spread in a cone. Knocks".to_string(),
+                "you back a moderate amount.".to_string(),
             ],
             ActiveSkill::Bomb => vec![
-                "Throw a bomb at target area".to_string(),
-                "that explodes on impact,".to_string(),
-                format!("dealing {:.1}% damage and", skill_power * BOMB),
-                "applying frail.".to_string(),
+                "Throw a bomb at target area that".to_string(),
+                "explodes on impact, dealing".to_string(),
+                format!("{:.1}% damage and applying Frail.", skill_power * BOMB),
             ],
             ActiveSkill::DruidTree => vec![
                 "Place a tree at target area ".to_string(),
@@ -795,19 +812,19 @@ impl ActiveSkill {
                 "it for a short duration.".to_string(),
             ],
             ActiveSkill::Rapidfire => vec![
-                "Concentrate deeply. Enemies ".to_string(),
-                "around you move 50% slower".to_string(),
+                "Concentrate deeply. Enemies around".to_string(),
+                "you move 50% slower briefly.".to_string(),
                 format!(
-                    "briefly. Gain {:.1}% attack",
+                    "Gain {:.1}% attack speed for the",
                     skill_power * RAPIDFIRE_ATTACK_SPEED_BONUS_PERCENT
                 ),
-                "speed".to_string(),
+                "duration.".to_string(),
             ],
             ActiveSkill::PiercingStar => vec![
-                "Throw a large, piercing ".to_string(),
-                "throwing star that travels in".to_string(),
+                "Throw a large throwing star that".to_string(),
+                "travels in a line then returns".to_string(),
                 format!(
-                    "a line, dealing {:.1}% damage.",
+                    "back to you, dealing {:.1}% damage.",
                     skill_power * PIERCING_STAR
                 ),
             ],
@@ -819,28 +836,27 @@ impl ActiveSkill {
             ActiveSkill::Fury => {
                 let kunai_n = fury_estimated_kunai_per_cast(bonus_attack_speed_mult);
                 vec![
-                    format!("Throw {:.0} kunai rapidly at", kunai_n),
-                    "enemies around you, dealing".to_string(),
-                    format!("{:.1}% damage. Kunai count", skill_power * FURY),
-                    "scales with attack speed.".to_string(),
+                    format!("Throw {:.0} kunai rapidly at enemies", kunai_n),
+                    format!("around you, dealing {:.1}% damage.", skill_power * FURY),
+                    "Kunai count scales with attack speed.".to_string(),
                 ]
             }
             ActiveSkill::LaserBeam => vec![
-                "Channel a powerful laser".to_string(),
-                format!(" beam that deals {:.1}% damage", skill_power * LASER_BEAM),
-                "rapidly to enemies in front.".to_string(),
+                "Channel a powerful laser beam that".to_string(),
+                format!("deals {:.1}% damage rapidly to", skill_power * LASER_BEAM),
+                "enemies in front.".to_string(),
             ],
             ActiveSkill::ArrowVolley => {
                 let total = arrow_volley_total_arrows();
                 vec![
-                    "Send out waves of arrows,".to_string(),
+                    "Send out waves of arrows, dealing".to_string(),
                     format!(
-                        "dealing {}x {:.1}% damage.",
+                        "{}x {:.1}% damage. Gains +{}% Crit ",
                         total,
                         skill_power * ARROW_VOLLEY,
+                        crit_chance
                     ),
-                    format!("Gains +{}% crit dmg per arrow,", crit_chance),
-                    "scaling with crit chance.".to_string(),
+                    "Damage, scaling with Crit Chance.".to_string(),
                 ]
             }
             ActiveSkill::PossessedBlade => vec![
@@ -852,9 +868,14 @@ impl ActiveSkill {
                 "lifesteal on kill, up to 3 times.".to_string(),
             ],
             ActiveSkill::Recall => vec![
-                "Retrace your steps from the".to_string(),
-                format!("last {:.1}s, slicing enemies", RECALL_REWIND_SECONDS),
-                format!("for {:.1}% damage. Gain", skill_power * RECALL),
+                format!(
+                    "Retrace your steps from the last {:.1}s, ",
+                    RECALL_REWIND_SECONDS
+                ),
+                format!(
+                    "slicing enemies for {:.1}% damage. Gain",
+                    skill_power * RECALL
+                ),
                 "stealth briefly afterwards.".to_string(),
             ],
         }

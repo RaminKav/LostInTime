@@ -438,7 +438,11 @@ pub fn setup_bars_ui(
         .spawn(Text2dBundle {
             text: Text::from_section(format!("{hp_amount}"), bar_label_style.clone()),
             text_anchor: Anchor::Center,
-            transform: Transform::from_translation(Vec3::new(0., 0., 2.)),
+            transform: Transform {
+                translation: Vec3::new(0., 0., 2.),
+                scale: gf::HUD_CURRENCY_COUNT.transform_scale(),
+                ..default()
+            },
             ..default()
         })
         .insert(RenderLayers::from_layers(&[3]))
@@ -489,7 +493,11 @@ pub fn setup_bars_ui(
         .spawn(Text2dBundle {
             text: Text::from_section(format!("{mana_amount}"), bar_label_style),
             text_anchor: Anchor::Center,
-            transform: Transform::from_translation(Vec3::new(1., 0., 2.)),
+            transform: Transform {
+                translation: Vec3::new(1., 0., 2.),
+                scale: gf::HUD_CURRENCY_COUNT.transform_scale(),
+                ..default()
+            },
             ..default()
         })
         .insert(RenderLayers::from_layers(&[3]))
@@ -589,17 +597,13 @@ pub fn setup_xp_bar_ui(
             Text2dBundle {
                 text: Text::from_section(
                     "Level 1",
-                    TextStyle {
-                        font: asset_server.load("fonts/slkscr.ttf"),
-                        font_size: 8.4,
-                        color: overwrite_alpha(WHITE, 0.),
-                    },
+                    gf::HUD_MICRO.text_style(&asset_server, overwrite_alpha(WHITE, 0.)),
                 ),
                 text_anchor: Anchor::Center,
                 transform: Transform {
                     translation: Vec3::new(0., res.game_height / 2. - 3., 12.),
-                    scale: Vec3::new(1., 1., 1.),
-                    ..Default::default()
+                    scale: gf::HUD_MICRO.transform_scale(),
+                    ..default()
                 },
                 ..default()
             },
@@ -664,7 +668,11 @@ pub fn setup_currency_ui(
                     )
                     .with_alignment(TextAlignment::Center),
                     text_anchor: Anchor::CenterLeft,
-                    transform: Transform::from_translation(Vec3::new(-12., 0., 2.)),
+                    transform: Transform {
+                        translation: Vec3::new(-12., 0., 2.),
+                        scale: gf::HUD_CURRENCY_COUNT.transform_scale(),
+                        ..default()
+                    },
                     ..default()
                 },
                 Name::new("TIME FRAGMENTS TEXT"),
@@ -714,7 +722,11 @@ pub fn setup_currency_ui(
                     text: Text::from_section(format!("{}", coins.coins), currency_style)
                         .with_alignment(TextAlignment::Center),
                     text_anchor: Anchor::CenterLeft,
-                    transform: Transform::from_translation(Vec3::new(-12., 0., 2.)),
+                    transform: Transform {
+                        translation: Vec3::new(-12., 0., 2.),
+                        scale: gf::HUD_CURRENCY_COUNT.transform_scale(),
+                        ..default()
+                    },
                     ..default()
                 },
                 Name::new("COIN TEXT"),
@@ -764,7 +776,11 @@ pub fn setup_currency_ui(
                 text: Text::from_section("Score: 0", progress_stat_style.clone())
                     .with_alignment(TextAlignment::Center),
                 text_anchor: Anchor::Center,
-                transform: Transform::from_translation(Vec3::new(0., 4., 2.)),
+                transform: Transform {
+                    translation: Vec3::new(0., 4., 2.),
+                    scale: gf::HUD_PROGRESS_STAT.transform_scale(),
+                    ..default()
+                },
                 ..default()
             },
             Name::new("SCORE TEXT"),
@@ -779,7 +795,11 @@ pub fn setup_currency_ui(
                 text: Text::from_section(format!("Chaos: {:.1}", chaos_value), progress_stat_style)
                     .with_alignment(TextAlignment::Center),
                 text_anchor: Anchor::Center,
-                transform: Transform::from_translation(Vec3::new(0., -5., 2.)),
+                transform: Transform {
+                    translation: Vec3::new(0., -5., 2.),
+                    scale: gf::HUD_PROGRESS_STAT.transform_scale(),
+                    ..default()
+                },
                 ..default()
             },
             ChaosText,
@@ -1590,7 +1610,7 @@ pub fn spawn_skill_tooltip_layout(
     const COOLDOWN_TEXT_X: f32 = 158.;
     const TITLE_Y: f32 = TEXT_Y_OFFSET + 10.;
 
-    let desc_body_style = gf::SKILL_PANEL_BODY.text_style(asset_server, content.body_color);
+    let desc_body_style = gf::SKILL_PANEL_BODY.text_style(&asset_server, content.body_color);
 
     commands
         .spawn(SpriteBundle {
@@ -1614,17 +1634,14 @@ pub fn spawn_skill_tooltip_layout(
         .spawn(Text2dBundle {
             text: Text::from_section(
                 content.title.as_str(),
-                TextStyle {
-                    font: gf::SKILL_PANEL_TITLE_BOLD.load_font(asset_server),
-                    font_size: gf::SKILL_PANEL_TITLE_BOLD.size,
-                    color: content.title_color,
-                },
+                gf::SKILL_PANEL_TITLE_BOLD.text_style(&asset_server, content.title_color),
             )
             .with_alignment(TextAlignment::Left),
             text_anchor: Anchor::TopLeft,
             transform: Transform {
                 translation: Vec3::new(DESC_TEXT_X, TITLE_Y, 2.),
-                ..Default::default()
+                scale: gf::SKILL_PANEL_TITLE_BOLD.transform_scale(),
+                ..default()
             },
             ..default()
         })
@@ -1637,17 +1654,14 @@ pub fn spawn_skill_tooltip_layout(
             Text2dBundle {
                 text: Text::from_section(
                     "",
-                    TextStyle {
-                        font: gf::SKILL_PANEL_BODY.load_font(asset_server),
-                        font_size: gf::SKILL_PANEL_BODY.size,
-                        color: LIGHT_GREY,
-                    },
+                    gf::SKILL_PANEL_BODY.text_style(&asset_server, LIGHT_GREY),
                 )
                 .with_alignment(TextAlignment::Right),
                 text_anchor: Anchor::TopRight,
                 transform: Transform {
                     translation: Vec3::new(COOLDOWN_TEXT_X, TITLE_Y, 2.),
-                    ..Default::default()
+                    scale: gf::SKILL_PANEL_BODY.transform_scale(),
+                    ..default()
                 },
                 ..default()
             },
@@ -1677,7 +1691,8 @@ pub fn spawn_skill_tooltip_layout(
                         (TEXT_Y_OFFSET - 2.) - j as f32 * gf::SKILL_TOOLTIP_DESC_LINE_STEP,
                         2.,
                     ),
-                    ..Default::default()
+                    scale: gf::SKILL_PANEL_BODY.transform_scale(),
+                    ..default()
                 },
                 ..default()
             })
@@ -1979,11 +1994,15 @@ fn spawn_orb_tracker_rate_line_at(
         .spawn(Text2dBundle {
             text: Text::from_section(
                 format!("{label}: {rate:.1}/s"),
-                gf::HUD_MICRO.text_style(asset_server, LIGHT_GREY),
+                gf::HUD_MICRO.text_style(&asset_server, LIGHT_GREY),
             )
             .with_alignment(TextAlignment::Center),
             text_anchor: Anchor::Center,
-            transform: Transform::from_translation(Vec3::new(0., y, 1.)),
+            transform: Transform {
+                translation: Vec3::new(0., y, 1.),
+                scale: gf::HUD_MICRO.transform_scale(),
+                ..default()
+            },
             ..default()
         })
         .insert(RenderLayers::from_layers(&[3]))
@@ -2049,15 +2068,19 @@ fn spawn_mana_gain_entry(
             .spawn(Text2dBundle {
                 text: Text::from_section(
                     source.label(),
-                    gf::HUD_MICRO.text_style(asset_server, WHITE),
+                    gf::HUD_MICRO.text_style(&asset_server, WHITE),
                 )
                 .with_alignment(TextAlignment::Center),
                 text_anchor: Anchor::CenterLeft,
-                transform: Transform::from_translation(Vec3::new(
-                    -ORB_TRACKER_COL_WIDTH * 0.5 + 2.,
-                    0.,
-                    1.,
-                )),
+                transform: Transform {
+                    translation: Vec3::new(
+                        -ORB_TRACKER_COL_WIDTH * 0.5 + 2.,
+                        0.,
+                        1.,
+                    ),
+                    scale: gf::HUD_MICRO.transform_scale(),
+                    ..default()
+                },
                 ..default()
             })
             .insert(RenderLayers::from_layers(&[3]))
@@ -2073,15 +2096,19 @@ fn spawn_mana_gain_entry(
         .spawn(Text2dBundle {
             text: Text::from_section(
                 format!("{pct}%"),
-                gf::HUD_MICRO.text_style(asset_server, WHITE),
+                gf::HUD_MICRO.text_style(&asset_server, WHITE),
             )
             .with_alignment(TextAlignment::Center),
             text_anchor: Anchor::CenterLeft,
-            transform: Transform::from_translation(Vec3::new(
-                -ORB_TRACKER_COL_WIDTH * 0.5 + ORB_TRACKER_ICON_SIZE + 6. + x_offset,
-                0.,
-                2.,
-            )),
+            transform: Transform {
+                translation: Vec3::new(
+                    -ORB_TRACKER_COL_WIDTH * 0.5 + ORB_TRACKER_ICON_SIZE + 6. + x_offset,
+                    0.,
+                    2.,
+                ),
+                scale: gf::HUD_MICRO.transform_scale(),
+                ..default()
+            },
             ..default()
         })
         .insert(RenderLayers::from_layers(&[3]))
@@ -2133,11 +2160,15 @@ fn spawn_mana_tracker_tooltip(
         .spawn(Text2dBundle {
             text: Text::from_section(
                 "Mana Tracker",
-                gf::ICON_HOVER_TOOLTIP.text_style(asset_server, LIGHT_BLUE),
+                gf::ICON_HOVER_TOOLTIP.text_style(&asset_server, LIGHT_BLUE),
             )
             .with_alignment(TextAlignment::Center),
             text_anchor: Anchor::Center,
-            transform: Transform::from_translation(Vec3::new(0., title_y, 1.)),
+            transform: Transform {
+                translation: Vec3::new(0., title_y, 1.),
+                scale: gf::ICON_HOVER_TOOLTIP.transform_scale(),
+                ..default()
+            },
             ..default()
         })
         .insert(RenderLayers::from_layers(&[3]))
@@ -2156,11 +2187,15 @@ fn spawn_mana_tracker_tooltip(
             .spawn(Text2dBundle {
                 text: Text::from_section(
                     "No mana spent yet",
-                    gf::HUD_MICRO.text_style(asset_server, LIGHT_GREY),
+                    gf::HUD_MICRO.text_style(&asset_server, LIGHT_GREY),
                 )
                 .with_alignment(TextAlignment::Center),
                 text_anchor: Anchor::Center,
-                transform: Transform::from_translation(Vec3::new(0., consume_grid_top, 1.)),
+                transform: Transform {
+                    translation: Vec3::new(0., consume_grid_top, 1.),
+                    scale: gf::HUD_MICRO.transform_scale(),
+                    ..default()
+                },
                 ..default()
             })
             .insert(RenderLayers::from_layers(&[3]))
@@ -2204,15 +2239,19 @@ fn spawn_mana_tracker_tooltip(
                 .spawn(Text2dBundle {
                     text: Text::from_section(
                         format!("{pct}%"),
-                        gf::HUD_MICRO.text_style(asset_server, WHITE),
+                        gf::HUD_MICRO.text_style(&asset_server, WHITE),
                     )
                     .with_alignment(TextAlignment::Center),
                     text_anchor: Anchor::CenterLeft,
-                    transform: Transform::from_translation(Vec3::new(
-                        -ORB_TRACKER_COL_WIDTH * 0.5 + ORB_TRACKER_ICON_SIZE + 6.,
-                        0.,
-                        2.,
-                    )),
+                    transform: Transform {
+                        translation: Vec3::new(
+                            -ORB_TRACKER_COL_WIDTH * 0.5 + ORB_TRACKER_ICON_SIZE + 6.,
+                            0.,
+                            2.,
+                        ),
+                        scale: gf::HUD_MICRO.transform_scale(),
+                        ..default()
+                    },
                     ..default()
                 })
                 .insert(RenderLayers::from_layers(&[3]))
@@ -2262,15 +2301,19 @@ fn spawn_mana_tracker_tooltip(
                 .spawn(Text2dBundle {
                     text: Text::from_section(
                         format!("{pct}%"),
-                        gf::HUD_MICRO.text_style(asset_server, WHITE),
+                        gf::HUD_MICRO.text_style(&asset_server, WHITE),
                     )
                     .with_alignment(TextAlignment::Center),
                     text_anchor: Anchor::CenterLeft,
-                    transform: Transform::from_translation(Vec3::new(
-                        -ORB_TRACKER_COL_WIDTH * 0.5 + ORB_TRACKER_ICON_SIZE + 6.,
-                        0.,
-                        2.,
-                    )),
+                    transform: Transform {
+                        translation: Vec3::new(
+                            -ORB_TRACKER_COL_WIDTH * 0.5 + ORB_TRACKER_ICON_SIZE + 6.,
+                            0.,
+                            2.,
+                        ),
+                        scale: gf::HUD_MICRO.transform_scale(),
+                        ..default()
+                    },
                     ..default()
                 })
                 .insert(RenderLayers::from_layers(&[3]))
@@ -2299,11 +2342,15 @@ fn spawn_mana_tracker_tooltip(
             .spawn(Text2dBundle {
                 text: Text::from_section(
                     "No mana gained yet",
-                    gf::HUD_MICRO.text_style(asset_server, LIGHT_GREY),
+                    gf::HUD_MICRO.text_style(&asset_server, LIGHT_GREY),
                 )
                 .with_alignment(TextAlignment::Center),
                 text_anchor: Anchor::Center,
-                transform: Transform::from_translation(Vec3::new(0., gain_grid_top, 1.)),
+                transform: Transform {
+                    translation: Vec3::new(0., gain_grid_top, 1.),
+                    scale: gf::HUD_MICRO.transform_scale(),
+                    ..default()
+                },
                 ..default()
             })
             .insert(RenderLayers::from_layers(&[3]))
@@ -2386,11 +2433,15 @@ fn spawn_health_tracker_tooltip(
         .spawn(Text2dBundle {
             text: Text::from_section(
                 "Health Tracker",
-                gf::ICON_HOVER_TOOLTIP.text_style(asset_server, LIGHT_RED),
+                gf::ICON_HOVER_TOOLTIP.text_style(&asset_server, LIGHT_RED),
             )
             .with_alignment(TextAlignment::Center),
             text_anchor: Anchor::Center,
-            transform: Transform::from_translation(Vec3::new(0., title_y, 1.)),
+            transform: Transform {
+                translation: Vec3::new(0., title_y, 1.),
+                scale: gf::ICON_HOVER_TOOLTIP.transform_scale(),
+                ..default()
+            },
             ..default()
         })
         .insert(RenderLayers::from_layers(&[3]))
@@ -2404,11 +2455,15 @@ fn spawn_health_tracker_tooltip(
             .spawn(Text2dBundle {
                 text: Text::from_section(
                     "No health gained yet",
-                    gf::HUD_MICRO.text_style(asset_server, LIGHT_GREY),
+                    gf::HUD_MICRO.text_style(&asset_server, LIGHT_GREY),
                 )
                 .with_alignment(TextAlignment::Center),
                 text_anchor: Anchor::Center,
-                transform: Transform::from_translation(Vec3::new(0., grid_top, 1.)),
+                transform: Transform {
+                    translation: Vec3::new(0., grid_top, 1.),
+                    scale: gf::HUD_MICRO.transform_scale(),
+                    ..default()
+                },
                 ..default()
             })
             .insert(RenderLayers::from_layers(&[3]))
@@ -2454,15 +2509,19 @@ fn spawn_health_tracker_tooltip(
                     .spawn(Text2dBundle {
                         text: Text::from_section(
                             source.label(),
-                            gf::HUD_MICRO.text_style(asset_server, WHITE),
+                            gf::HUD_MICRO.text_style(&asset_server, WHITE),
                         )
                         .with_alignment(TextAlignment::Center),
                         text_anchor: Anchor::CenterLeft,
-                        transform: Transform::from_translation(Vec3::new(
-                            -ORB_TRACKER_COL_WIDTH * 0.5 + 2.,
-                            0.,
-                            1.,
-                        )),
+                        transform: Transform {
+                            translation: Vec3::new(
+                                -ORB_TRACKER_COL_WIDTH * 0.5 + 2.,
+                                0.,
+                                1.,
+                            ),
+                            scale: gf::HUD_MICRO.transform_scale(),
+                            ..default()
+                        },
                         ..default()
                     })
                     .insert(RenderLayers::from_layers(&[3]))
@@ -2477,15 +2536,19 @@ fn spawn_health_tracker_tooltip(
                 .spawn(Text2dBundle {
                     text: Text::from_section(
                         format!("{pct}%"),
-                        gf::HUD_MICRO.text_style(asset_server, WHITE),
+                        gf::HUD_MICRO.text_style(&asset_server, WHITE),
                     )
                     .with_alignment(TextAlignment::Center),
                     text_anchor: Anchor::CenterLeft,
-                    transform: Transform::from_translation(Vec3::new(
-                        -ORB_TRACKER_COL_WIDTH * 0.5 + ORB_TRACKER_ICON_SIZE + 6. + x_offset,
-                        0.,
-                        2.,
-                    )),
+                    transform: Transform {
+                        translation: Vec3::new(
+                            -ORB_TRACKER_COL_WIDTH * 0.5 + ORB_TRACKER_ICON_SIZE + 6. + x_offset,
+                            0.,
+                            2.,
+                        ),
+                        scale: gf::HUD_MICRO.transform_scale(),
+                        ..default()
+                    },
                     ..default()
                 })
                 .insert(RenderLayers::from_layers(&[3]))
@@ -2896,17 +2959,13 @@ pub fn handle_update_player_skills(
                         .spawn(Text2dBundle {
                             text: Text::from_section(
                                 count.to_string(),
-                                TextStyle {
-                                    font: asset_server.load("fonts/slkscr.ttf"),
-                                    font_size: 8.4,
-                                    color: WHITE,
-                                },
+                                gf::HUD_MICRO.text_style(&asset_server, WHITE),
                             ),
                             text_anchor: Anchor::BottomRight,
                             transform: Transform {
                                 translation: Vec3::new(8., -8., 2.), // Bottom right of icon
-                                scale: Vec3::new(1., 1., 1.),
-                                ..Default::default()
+                                scale: gf::HUD_MICRO.transform_scale(),
+                                ..default()
                             },
                             ..default()
                         })
@@ -3143,17 +3202,13 @@ pub fn handle_update_player_skills(
                     .spawn(Text2dBundle {
                         text: Text::from_section(
                             "",
-                            TextStyle {
-                                font: asset_server.load("fonts/slkscr.ttf"),
-                                font_size: 8.4,
-                                color: WHITE,
-                            },
+                            gf::HUD_MICRO.text_style(&asset_server, WHITE),
                         ),
                         text_anchor: Anchor::Center,
                         transform: Transform {
                             translation: Vec3::new(1., 10., 4.), // Center bottom of icon
-                            scale: Vec3::new(1., 1., 1.),
-                            ..Default::default()
+                            scale: gf::HUD_MICRO.transform_scale(),
+                            ..default()
                         },
                         ..default()
                     })
@@ -3590,15 +3645,12 @@ pub fn setup_era_timer_hud(
             Text2dBundle {
                 text: Text::from_section(
                     "ENDLESS",
-                    TextStyle {
-                        font: asset_server.load("fonts/alagard.ttf"),
-                        font_size: 15.0,
-                        color: RED,
-                    },
+                    gf::HUD_OBJECTIVE.text_style(&asset_server, RED),
                 ),
                 transform: Transform {
                     translation: Vec3::new(0., -2., 1.),
-                    ..Default::default()
+                    scale: gf::HUD_OBJECTIVE.transform_scale(),
+                    ..default()
                 },
                 ..default()
             },
@@ -3613,16 +3665,12 @@ pub fn setup_era_timer_hud(
             Text2dBundle {
                 text: Text::from_section(
                     "00:00",
-                    TextStyle {
-                        font: asset_server.load("fonts/slkscr.ttf"),
-                        font_size: 8.4,
-                        color: WHITE.with_a(0.), // Hidden initially
-                    },
+                    gf::HUD_MICRO.text_style(&asset_server, WHITE.with_a(0.)), // Hidden initially
                 ),
                 transform: Transform {
                     translation: Vec3::new(0., -10., 1.), // Below the ENDLESS text
-                    scale: Vec3::new(1., 1., 1.),
-                    ..Default::default()
+                    scale: gf::HUD_MICRO.transform_scale(),
+                    ..default()
                 },
                 ..default()
             },

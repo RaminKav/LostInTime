@@ -213,6 +213,7 @@ pub fn handle_ui_time_fragments(
                 Anchor::CenterLeft,
                 FLOATING_TEXT,
                 3,
+                None,
             );
             commands.entity(text).set_parent(icon_e);
         }

@@ -25,6 +25,7 @@ use crate::{
         Player,
     },
     ui::{
+        game_fonts as gf,
         essence_ui::{MERCHANT_REROLL_ICON_PATH, MERCHANT_REROLL_ICON_SIZE},
         ui_helpers::spawn_full_screen_ui_overlay_tuned,
         SKILL_TOOLTIP_SIZE,
@@ -361,14 +362,14 @@ fn spawn_empty_shrine_slot_tooltip(
         .spawn(Text2dBundle {
             text: Text::from_section(
                 "Empty Slot",
-                TextStyle {
-                    font: asset_server.load("fonts/alagard.ttf"),
-                    font_size: 15.0,
-                    color: WHITE,
-                },
+                gf::MENU_TITLE.text_style(&asset_server, WHITE),
             ),
             text_anchor: Anchor::CenterLeft,
-            transform: Transform::from_translation(Vec3::new(-24., 14., 2.)),
+            transform: Transform {
+                translation: Vec3::new(-24., 14., 2.),
+                scale: gf::MENU_TITLE.transform_scale(),
+                ..default()
+            },
             ..default()
         })
         .insert(RenderLayers::from_layers(&[3]))
@@ -510,15 +511,15 @@ fn spawn_active_skill_shrine_reroll_info_box(
             Text2dBundle {
                 text: Text::from_section(
                     "Rerolls left:".to_string(),
-                    TextStyle {
-                        font: asset_server.load("fonts/slkscr.ttf"),
-                        font_size: 8.4,
-                        color: WHITE,
-                    },
+                    gf::BODY.text_style(&asset_server, WHITE),
                 )
                 .with_alignment(TextAlignment::Center),
                 text_anchor: Anchor::Center,
-                transform: Transform::from_translation(Vec3::new(0., 5., 2.)),
+                transform: Transform {
+                    translation: Vec3::new(0., 5., 2.),
+                    scale: gf::BODY.transform_scale(),
+                    ..default()
+                },
                 ..default()
             },
             RenderLayers::from_layers(&[3]),
@@ -530,15 +531,15 @@ fn spawn_active_skill_shrine_reroll_info_box(
             Text2dBundle {
                 text: Text::from_section(
                     rerolls_remaining.to_string(),
-                    TextStyle {
-                        font: asset_server.load("fonts/slkscr.ttf"),
-                        font_size: 8.4,
-                        color: WHITE,
-                    },
+                    gf::BODY.text_style(&asset_server, WHITE),
                 )
                 .with_alignment(TextAlignment::Center),
                 text_anchor: Anchor::Center,
-                transform: Transform::from_translation(Vec3::new(0., -6., 2.)),
+                transform: Transform {
+                    translation: Vec3::new(0., -6., 2.),
+                    scale: gf::BODY.transform_scale(),
+                    ..default()
+                },
                 ..default()
             },
             RenderLayers::from_layers(&[3]),
@@ -584,15 +585,11 @@ pub fn setup_active_skill_shrine_ui(
             Text2dBundle {
                 text: Text::from_section(
                     "Choose a New Skill".to_string(),
-                    TextStyle {
-                        font: asset_server.load("fonts/alagard.ttf"),
-                        font_size: 30.0,
-                        color: WHITE,
-                    },
+                    gf::MENU_TITLE_LARGE.text_style(&asset_server, WHITE),
                 ),
                 transform: Transform {
                     translation: Vec3::new(0., res.game_height / 2. - 40., 21.),
-                    scale: Vec3::new(1., 1., 1.),
+                    scale: gf::MENU_TITLE_LARGE.transform_scale(),
                     ..Default::default()
                 },
                 ..default()
@@ -606,15 +603,11 @@ pub fn setup_active_skill_shrine_ui(
             Text2dBundle {
                 text: Text::from_section(
                     "(Assign to an active skill slot)".to_string(),
-                    TextStyle {
-                        font: asset_server.load("fonts/alagard.ttf"),
-                        font_size: 15.0,
-                        color: WHITE,
-                    },
+                    gf::MENU_TITLE.text_style(&asset_server, WHITE),
                 ),
                 transform: Transform {
                     translation: Vec3::new(0., res.game_height / 2. - 62., 21.),
-                    scale: Vec3::new(1., 1., 1.),
+                    scale: gf::MENU_TITLE.transform_scale(),
                     ..Default::default()
                 },
                 ..default()
@@ -1099,15 +1092,11 @@ pub fn setup_active_skill_shrine_overwrite_ui(
             Text2dBundle {
                 text: Text::from_section(
                     title.to_string(),
-                    TextStyle {
-                        font: asset_server.load("fonts/alagard.ttf"),
-                        font_size: 30.0,
-                        color: WHITE,
-                    },
+                    gf::MENU_TITLE_LARGE.text_style(&asset_server, WHITE),
                 ),
                 transform: Transform {
                     translation: Vec3::new(0., res.game_height / 2. - 30., 21.),
-                    scale: Vec3::new(1., 1., 1.),
+                    scale: gf::MENU_TITLE_LARGE.transform_scale(),
                     ..Default::default()
                 },
                 ..default()

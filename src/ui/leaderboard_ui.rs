@@ -1,3 +1,4 @@
+use crate::ui::game_fonts as gf;
 use bevy::prelude::*;
 use bevy::render::view::RenderLayers;
 
@@ -80,19 +81,19 @@ fn spawn_leaderboard_panel(
         Text2dBundle {
             text: Text::from_section(
                 "Leaderboard",
-                TextStyle {
-                    font: asset_server.load("fonts/4x5.ttf"),
-                    font_size: 5.0,
-                    color: YELLOW_2,
-                },
+                gf::BODY.text_style(&asset_server, YELLOW_2),
             )
             .with_alignment(TextAlignment::Center),
             text_anchor: bevy::sprite::Anchor::Center,
-            transform: Transform::from_translation(Vec3::new(
+            transform: Transform {
+                translation: Vec3::new(
                 panel_x + 0.5,
                 panel_y + LEADERBOARD_PANEL_HEIGHT / 2. - 8.5,
                 12.,
-            )),
+            ),
+                scale: gf::BODY.transform_scale(),
+                ..Default::default()
+            },
             ..Default::default()
         },
         RenderLayers::from_layers(&[3]),
@@ -141,15 +142,15 @@ fn spawn_leaderboard_entries(
             Text2dBundle {
                 text: Text::from_section(
                     "Loading...",
-                    TextStyle {
-                        font: asset_server.load("fonts/4x5.ttf"),
-                        font_size: 5.0,
-                        color: YELLOW_2,
-                    },
+                    gf::BODY.text_style(&asset_server, YELLOW_2),
                 )
                 .with_alignment(TextAlignment::Left),
                 text_anchor: bevy::sprite::Anchor::CenterLeft,
-                transform: Transform::from_translation(Vec3::new(text_x, start_y, 11.)),
+                transform: Transform {
+                translation: Vec3::new(text_x, start_y, 11.),
+                scale: gf::BODY.transform_scale(),
+                ..Default::default()
+            },
                 ..Default::default()
             },
             RenderLayers::from_layers(&[3]),
@@ -164,15 +165,15 @@ fn spawn_leaderboard_entries(
             Text2dBundle {
                 text: Text::from_section(
                     "Server offline",
-                    TextStyle {
-                        font: asset_server.load("fonts/4x5.ttf"),
-                        font_size: 5.0,
-                        color: RED,
-                    },
+                    gf::BODY.text_style(&asset_server, RED),
                 )
                 .with_alignment(TextAlignment::Left),
                 text_anchor: bevy::sprite::Anchor::CenterLeft,
-                transform: Transform::from_translation(Vec3::new(text_x, start_y, 11.)),
+                transform: Transform {
+                translation: Vec3::new(text_x, start_y, 11.),
+                scale: gf::BODY.transform_scale(),
+                ..Default::default()
+            },
                 ..Default::default()
             },
             RenderLayers::from_layers(&[3]),
@@ -187,15 +188,15 @@ fn spawn_leaderboard_entries(
             Text2dBundle {
                 text: Text::from_section(
                     "No scores!",
-                    TextStyle {
-                        font: asset_server.load("fonts/4x5.ttf"),
-                        font_size: 5.0,
-                        color: DARK_WOOD_BROWN,
-                    },
+                    gf::BODY.text_style(&asset_server, DARK_WOOD_BROWN),
                 )
                 .with_alignment(TextAlignment::Left),
                 text_anchor: bevy::sprite::Anchor::CenterLeft,
-                transform: Transform::from_translation(Vec3::new(text_x, start_y, 11.)),
+                transform: Transform {
+                translation: Vec3::new(text_x, start_y, 11.),
+                scale: gf::BODY.transform_scale(),
+                ..Default::default()
+            },
                 ..Default::default()
             },
             RenderLayers::from_layers(&[3]),
@@ -218,15 +219,15 @@ fn spawn_leaderboard_entries(
                 Text2dBundle {
                     text: Text::from_section(
                         format!("{}.", entry.rank.unwrap_or(0)),
-                        TextStyle {
-                            font: asset_server.load("fonts/4x5.ttf"),
-                            font_size: 5.0,
-                            color: YELLOW,
-                        },
+                        gf::BODY.text_style(&asset_server, YELLOW),
                     )
                     .with_alignment(TextAlignment::Left),
                     text_anchor: bevy::sprite::Anchor::CenterRight,
-                    transform: Transform::from_translation(Vec3::new(text_x + 9., y, 15.)),
+                    transform: Transform {
+                translation: Vec3::new(text_x + 9., y, 15.),
+                scale: gf::BODY.transform_scale(),
+                ..Default::default()
+            },
                     ..Default::default()
                 },
                 RenderLayers::from_layers(&[3]),
@@ -243,15 +244,15 @@ fn spawn_leaderboard_entries(
                 Text2dBundle {
                     text: Text::from_section(
                         &name,
-                        TextStyle {
-                            font: asset_server.load("fonts/4x5.ttf"),
-                            font_size: 5.0,
-                            color: WHITE,
-                        },
+                        gf::BODY.text_style(&asset_server, WHITE),
                     )
                     .with_alignment(TextAlignment::Left),
                     text_anchor: bevy::sprite::Anchor::CenterLeft,
-                    transform: Transform::from_translation(Vec3::new(text_x + 12., y, 15.)),
+                    transform: Transform {
+                translation: Vec3::new(text_x + 12., y, 15.),
+                scale: gf::BODY.transform_scale(),
+                ..Default::default()
+            },
                     ..Default::default()
                 },
                 RenderLayers::from_layers(&[3]),
@@ -265,15 +266,15 @@ fn spawn_leaderboard_entries(
                 Text2dBundle {
                     text: Text::from_section(
                         format_score(entry.score),
-                        TextStyle {
-                            font: asset_server.load("fonts/4x5.ttf"),
-                            font_size: 5.0,
-                            color: YELLOW_2,
-                        },
+                        gf::BODY.text_style(&asset_server, YELLOW_2),
                     )
                     .with_alignment(TextAlignment::Left),
                     text_anchor: bevy::sprite::Anchor::CenterLeft,
-                    transform: Transform::from_translation(Vec3::new(text_x + 94., y, 15.)),
+                    transform: Transform {
+                translation: Vec3::new(text_x + 94., y, 15.),
+                scale: gf::BODY.transform_scale(),
+                ..Default::default()
+            },
                     ..Default::default()
                 },
                 RenderLayers::from_layers(&[3]),
@@ -286,15 +287,15 @@ fn spawn_leaderboard_entries(
                 Text2dBundle {
                     text: Text::from_section(
                         &entry.class,
-                        TextStyle {
-                            font: asset_server.load("fonts/4x5.ttf"),
-                            font_size: 5.0,
-                            color: LIGHT_BLUE,
-                        },
+                        gf::BODY.text_style(&asset_server, LIGHT_BLUE),
                     )
                     .with_alignment(TextAlignment::Left),
                     text_anchor: bevy::sprite::Anchor::CenterLeft,
-                    transform: Transform::from_translation(Vec3::new(text_x + 122., y, 15.)),
+                    transform: Transform {
+                translation: Vec3::new(text_x + 122., y, 15.),
+                scale: gf::BODY.transform_scale(),
+                ..Default::default()
+            },
                     ..Default::default()
                 },
                 RenderLayers::from_layers(&[3]),

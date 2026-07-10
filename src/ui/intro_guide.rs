@@ -5,6 +5,7 @@ use crate::{
     colors::BLACK,
     gamepad_bindings::{format_binding_label, BindingLabel, GamepadMappings},
     keybinds::InputMappings,
+    ui::game_fonts as gf,
     GameState, ScreenResolution,
 };
 
@@ -13,8 +14,6 @@ const INTRO_GUIDE_RENDER_LAYER: u8 = 3;
 
 /// Square key-cap badge size — at least double the HUD keybind badge (19x9).
 const INTRO_KEY_BADGE_SIZE: Vec2 = Vec2::new(24., 24.);
-/// Alagard text size (rule: alagard uses intervals of 15.0, defaulting to 15.0).
-const INTRO_FONT_SIZE: f32 = 15.0;
 
 const FADE_IN_SECS: f32 = 0.6;
 const HOLD_SECS: f32 = 12.0;
@@ -73,15 +72,15 @@ fn spawn_key_badge(
         .spawn(Text2dBundle {
             text: Text::from_section(
                 label,
-                TextStyle {
-                    font: asset_server.load("fonts/alagard.ttf"),
-                    font_size: INTRO_FONT_SIZE,
-                    color: crate::colors::WHITE.with_a(0.),
-                },
+                gf::DISPLAY.text_style(&asset_server, crate::colors::WHITE.with_a(0.)),
             )
             .with_alignment(TextAlignment::Center),
             text_anchor: Anchor::Center,
-            transform: Transform::from_translation(Vec3::new(0., 0., 1.)),
+            transform: Transform {
+                translation: Vec3::new(0., 0., 1.),
+                scale: gf::DISPLAY.transform_scale(),
+                ..default()
+            },
             ..default()
         })
         .insert(RenderLayers::from_layers(&[INTRO_GUIDE_RENDER_LAYER]))
@@ -100,21 +99,18 @@ fn spawn_caption(
     parent: Entity,
 ) {
     let render_layers = RenderLayers::from_layers(&[INTRO_GUIDE_RENDER_LAYER]);
-    let font = asset_server.load("fonts/alagard.ttf");
+    let caption_style = gf::DISPLAY.text_style(&asset_server, crate::colors::WHITE.with_a(0.));
+    let shadow_style = gf::DISPLAY.text_style(&asset_server, BLACK.with_a(0.));
 
     let caption = commands
         .spawn(Text2dBundle {
-            text: Text::from_section(
-                text.clone(),
-                TextStyle {
-                    font: font.clone(),
-                    font_size: INTRO_FONT_SIZE,
-                    color: crate::colors::WHITE.with_a(0.),
-                },
-            )
-            .with_alignment(TextAlignment::Center),
+            text: Text::from_section(text.clone(), caption_style)
+                .with_alignment(TextAlignment::Center),
             text_anchor: anchor.clone(),
-            transform,
+            transform: Transform {
+                scale: gf::DISPLAY.transform_scale(),
+                ..transform
+            },
             ..default()
         })
         .insert(render_layers.clone())
@@ -127,17 +123,14 @@ fn spawn_caption(
     // Shadow copy — same pattern as `spawn_floating_text_with_shadow` in damage_numbers.rs.
     commands
         .spawn(Text2dBundle {
-            text: Text::from_section(
-                text,
-                TextStyle {
-                    font,
-                    font_size: INTRO_FONT_SIZE,
-                    color: BLACK.with_a(0.),
-                },
-            )
-            .with_alignment(TextAlignment::Center),
+            text: Text::from_section(text, shadow_style)
+                .with_alignment(TextAlignment::Center),
             text_anchor: anchor.clone(),
-            transform: Transform::from_translation(Vec3::new(1., -1., -1.)),
+            transform: Transform {
+                translation: Vec3::new(1., -1., -1.),
+                scale: gf::DISPLAY.transform_scale(),
+                ..default()
+            },
             ..default()
         })
         .insert(render_layers)

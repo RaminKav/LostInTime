@@ -665,16 +665,12 @@ pub fn spawn_menu_button(
         .spawn(Text2dBundle {
             text: Text::from_section(
                 text,
-                TextStyle {
-                    font: asset_server.load("fonts/alagard.ttf"),
-                    font_size: 15.0,
-                    color: WHITE,
-                },
+                gf::MENU_TITLE.text_style(&asset_server, WHITE),
             ),
             text_anchor: Anchor::CenterLeft,
             transform: Transform {
                 translation: text_offset,
-                scale: Vec3::new(1., 1., 1.),
+                scale: gf::MENU_TITLE.transform_scale(),
                 ..Default::default()
             },
             ..default()
@@ -796,16 +792,13 @@ pub fn spawn_main_menu_wide_button(
         .spawn(Text2dBundle {
             text: Text::from_section(
                 text,
-                TextStyle {
-                    font: asset_server.load("fonts/alagard.ttf"),
-                    font_size: 15.0,
-                    color: WHITE,
-                },
+                gf::MENU_TITLE.text_style(&asset_server, WHITE),
             )
             .with_alignment(TextAlignment::Center),
             text_anchor: Anchor::Center,
             transform: Transform {
                 translation: Vec3::new(0., -1., 1.),
+                scale: gf::MENU_TITLE.transform_scale(),
                 ..Default::default()
             },
             ..default()
@@ -870,11 +863,15 @@ pub fn spawn_main_menu_icon_tooltip(
         .spawn(Text2dBundle {
             text: Text::from_section(
                 label,
-                gf::ICON_HOVER_TOOLTIP.text_style(asset_server, WHITE),
+                gf::ICON_HOVER_TOOLTIP.text_style(&asset_server, WHITE),
             )
             .with_alignment(TextAlignment::Center),
             text_anchor: Anchor::Center,
-            transform: Transform::from_translation(Vec3::new(0., 0., 1.)),
+            transform: Transform {
+                translation: Vec3::new(0., 0., 1.),
+                scale: gf::ICON_HOVER_TOOLTIP.transform_scale(),
+                ..default()
+            },
             ..default()
         })
         .insert(RenderLayers::from_layers(&[3]))
@@ -1230,16 +1227,12 @@ pub fn spawn_back_button(
         .spawn(Text2dBundle {
             text: Text::from_section(
                 "BACK",
-                TextStyle {
-                    font: asset_server.load("fonts/alagard.ttf"),
-                    font_size: 15.0,
-                    color: WHITE,
-                },
+                gf::MENU_TITLE.text_style(&asset_server, WHITE),
             ),
             text_anchor: Anchor::Center,
             transform: Transform {
                 translation: Vec3::new(0., -1., 1.),
-                scale: Vec3::new(1., 1., 1.),
+                scale: gf::MENU_TITLE.transform_scale(),
                 ..Default::default()
             },
             ..default()

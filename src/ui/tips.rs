@@ -6,8 +6,8 @@ use crate::{
     cursor::CursorPos,
     datafiles,
     ui::{
-        interactions::Interaction, minimap::IslandMapOpen, ui_helpers, Interactable, UIElement,
-        UIState,
+        interactions::Interaction, minimap::IslandMapOpen, ui_helpers, game_fonts as gf,
+        Interactable, UIElement, UIState,
     },
     GameState,
 };
@@ -161,16 +161,13 @@ pub fn spawn_tip_handler(
             .spawn(Text2dBundle {
                 text: Text::from_section(
                     "Tip!",
-                    TextStyle {
-                        font: asset_server.load("fonts/slkscrbold.ttf"),
-                        font_size: 8.4,
-                        color: DARK_WOOD_BROWN,
-                    },
+                    gf::TOOLTIP_HEADER_BOLD.text_style(&asset_server, DARK_WOOD_BROWN),
                 )
                 .with_alignment(TextAlignment::Left),
                 text_anchor: Anchor::CenterLeft,
                 transform: Transform {
                     translation: Vec3::new(-14., 31., 1.),
+                    scale: gf::TOOLTIP_HEADER_BOLD.transform_scale(),
                     ..Default::default()
                 },
                 ..Default::default()
@@ -182,16 +179,13 @@ pub fn spawn_tip_handler(
             .spawn(Text2dBundle {
                 text: Text::from_section(
                     tip_text,
-                    TextStyle {
-                        font: asset_server.load("fonts/slkscr.ttf"),
-                        font_size: 8.4,
-                        color: DARK_WOOD_BROWN,
-                    },
+                    gf::TOOLTIP_BODY.text_style(&asset_server, DARK_WOOD_BROWN),
                 )
                 .with_alignment(TextAlignment::Left),
                 text_anchor: Anchor::CenterLeft,
                 transform: Transform {
                     translation: Vec3::new(-78., -4., 1.),
+                    scale: gf::TOOLTIP_BODY.transform_scale(),
                     ..Default::default()
                 },
                 ..Default::default()
@@ -225,14 +219,14 @@ pub fn spawn_tip_handler(
             .spawn(Text2dBundle {
                 text: Text::from_section(
                     "OK",
-                    TextStyle {
-                        font: asset_server.load("fonts/alagard.ttf"),
-                        font_size: 15.0,
-                        color: WHITE,
-                    },
+                    gf::MENU_TITLE.text_style(&asset_server, WHITE),
                 ),
                 text_anchor: Anchor::Center,
-                transform: Transform::from_translation(Vec3::new(0., 0., 1.)),
+                transform: Transform {
+                    translation: Vec3::new(0., 0., 1.),
+                    scale: gf::MENU_TITLE.transform_scale(),
+                    ..default()
+                },
                 ..Default::default()
             })
             .insert(RenderLayers::from_layers(&[3]))

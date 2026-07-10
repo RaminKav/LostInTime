@@ -236,7 +236,10 @@ pub struct PersistedOptionsSettings {
     #[serde(default)]
     pub show_tile_hover: bool,
     #[serde(default)]
-    pub small_damage_text: bool,
+    pub damage_text_size: crate::ui::game_fonts::DamageTextSize,
+    /// Legacy checkbox value; migrated to [`Self::damage_text_size`] on load.
+    #[serde(default, rename = "small_damage_text", skip_serializing)]
+    pub(crate) legacy_small_damage_text: Option<bool>,
     #[serde(default)]
     pub hide_attack_anims: bool,
     #[serde(default)]
@@ -254,7 +257,8 @@ impl Default for PersistedOptionsSettings {
             show_enemy_damage_numbers: true,
             show_player_damage_numbers: true,
             show_tile_hover: false,
-            small_damage_text: false,
+            damage_text_size: crate::ui::game_fonts::DamageTextSize::default(),
+            legacy_small_damage_text: None,
             hide_attack_anims: false,
             hide_skill_anims: false,
             hide_heirloom_anims: false,
@@ -264,6 +268,16 @@ impl Default for PersistedOptionsSettings {
 }
 
 impl PersistedOptionsSettings {
+    pub fn normalize_legacy_fields(&mut self) {
+        if let Some(small) = self.legacy_small_damage_text.take() {
+            self.damage_text_size = if small {
+                crate::ui::game_fonts::DamageTextSize::Small
+            } else {
+                crate::ui::game_fonts::DamageTextSize::Medium
+            };
+        }
+    }
+
     pub fn from_legacy_game_data(game_data: &GameData) -> Self {
         let mut settings = Self::default();
         if let Some(v) = game_data.color_blind_mode {
@@ -278,8 +292,10 @@ impl PersistedOptionsSettings {
         if let Some(v) = game_data.show_tile_hover {
             settings.show_tile_hover = v;
         }
-        if let Some(v) = game_data.small_damage_text {
-            settings.small_damage_text = v;
+        if let Some(true) = game_data.small_damage_text {
+            settings.damage_text_size = crate::ui::game_fonts::DamageTextSize::Small;
+        } else if game_data.small_damage_text == Some(false) {
+            settings.damage_text_size = crate::ui::game_fonts::DamageTextSize::Medium;
         }
         if let Some(v) = game_data.hide_attack_anims {
             settings.hide_attack_anims = v;
@@ -361,7 +377,7 @@ pub struct GameData {
     /// Options screen: "Tile Hover" (`CheatSettings::show_tile_hover`).
     #[serde(default)]
     pub show_tile_hover: Option<bool>,
-    /// Options screen: "Small damage text" (`CheatSettings::small_damage_text`).
+    /// Legacy options screen: "Small damage text" checkbox (migrated to `damage_text_size`).
     #[serde(default)]
     pub small_damage_text: Option<bool>,
     /// Options screen: "Hide Attack Anims" (`CheatSettings::hide_attack_anims`).

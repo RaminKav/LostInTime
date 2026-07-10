@@ -15,6 +15,7 @@ use crate::{
 };
 
 use super::{
+    game_fonts as gf,
     interactions::Interaction, spawn_inv_slot, Interactable, InventorySlotState, InventorySlotType,
     InventoryState, InventoryUI, MenuButton, UIElement, UIState,
 };
@@ -84,15 +85,11 @@ pub fn setup_scrapper_slots_ui(
             Text2dBundle {
                 text: Text::from_section(
                     "Scrap",
-                    TextStyle {
-                        font: asset_server.load("fonts/alagard.ttf"),
-                        font_size: 15.0,
-                        color: WHITE,
-                    },
+                    gf::MENU_TITLE.text_style(&asset_server, WHITE),
                 ),
                 transform: Transform {
                     translation: Vec3::new(90., 34.5, 1.),
-                    scale: Vec3::new(1., 1., 1.),
+                    scale: gf::MENU_TITLE.transform_scale(),
                     ..Default::default()
                 },
                 ..default()

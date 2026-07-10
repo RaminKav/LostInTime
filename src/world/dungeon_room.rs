@@ -783,6 +783,7 @@ fn update_exit_reward_preview(
             Anchor::Center,
             FLOATING_TEXT,
             0,
+            None,
         );
         commands.entity(text).set_parent(root);
     }

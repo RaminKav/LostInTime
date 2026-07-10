@@ -17,7 +17,7 @@ use bevy::sprite::MaterialMesh2dBundle;
 use bevy::utils::{HashMap, HashSet};
 use bevy_ecs_tilemap::prelude::*;
 
-use super::{layout_sync::UiLayoutKey, ui_helpers, UIElement};
+use super::{game_fonts as gf, layout_sync::UiLayoutKey, ui_helpers, UIElement};
 
 pub struct MinimapPlugin;
 
@@ -823,15 +823,15 @@ fn spawn_island_map_legend(
                 Text2dBundle {
                     text: Text::from_section(
                         row.label,
-                        TextStyle {
-                            font: asset_server.load("fonts/4x5.ttf"),
-                            font_size: 5.0,
-                            color: WHITE,
-                        },
+                        gf::BODY.text_style(&asset_server, WHITE),
                     )
                     .with_alignment(TextAlignment::Left),
                     text_anchor: Anchor::CenterLeft,
-                    transform: Transform::from_translation(Vec3::new(-2., 0., 1.)),
+                    transform: Transform {
+                        translation: Vec3::new(-2., 0., 1.),
+                        scale: gf::BODY.transform_scale(),
+                        ..default()
+                    },
                     ..default()
                 },
                 RenderLayers::from_layers(&[3]),

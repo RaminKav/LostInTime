@@ -27,11 +27,26 @@ use crate::ui::tip_highlight::{
     spawn_tip_highlight_overlay, TipHighlightMaterial, TipHighlightRect,
 };
 use crate::ui::{
-    global_text_message::GlobalTextMessageEvent, hud_heirloom_first_icon_x, hud_heirloom_row_y,
-    hud_progress_bar_center_x, hud_row_below_xp_y, hud_timeline_center_x, Interactable,
-    Interaction, HUD_ACTION_ROW_Y_FROM_BOTTOM, HUD_HEIRLOOM_ICON_HALF, HUD_HEIRLOOM_ICON_SPACING,
-    HUD_HOTBAR_CENTER_X, HUD_HOTBAR_SLOTS, HUD_SKILLS_CENTER_X, HUD_SKILL_SLOT_HIT_SIZE,
-    HUD_SKILL_SPACING_X, HUD_TIMELINE_SIZE, INV_SLOT_SPACING_X, PROGRESS_BACKGROUND_SIZE,
+    global_text_message::GlobalTextMessageEvent,
+    game_fonts as gf,
+    hud_heirloom_first_icon_x,
+    hud_heirloom_row_y,
+    hud_progress_bar_center_x,
+    hud_row_below_xp_y,
+    hud_timeline_center_x,
+    Interactable,
+    Interaction,
+    HUD_ACTION_ROW_Y_FROM_BOTTOM,
+    HUD_HEIRLOOM_ICON_HALF,
+    HUD_HEIRLOOM_ICON_SPACING,
+    HUD_HOTBAR_CENTER_X,
+    HUD_HOTBAR_SLOTS,
+    HUD_SKILLS_CENTER_X,
+    HUD_SKILL_SLOT_HIT_SIZE,
+    HUD_SKILL_SPACING_X,
+    HUD_TIMELINE_SIZE,
+    INV_SLOT_SPACING_X,
+    PROGRESS_BACKGROUND_SIZE,
     UI_SLOT_SIZE,
 };
 use crate::{inventory::Inventory, GameState, ScreenResolution};
@@ -1166,19 +1181,19 @@ fn spawn_tutorial_root(
         Text2dBundle {
             text: Text::from_section(
                 "Tutorial",
-                TextStyle {
-                    font: asset_server.load("fonts/alagard.ttf"),
-                    font_size: 30.0,
-                    color: YELLOW_2,
-                },
+                gf::DISPLAY_LARGE.text_style(&asset_server, YELLOW_2),
             )
             .with_alignment(TextAlignment::Center),
             text_anchor: Anchor::Center,
-            transform: Transform::from_translation(Vec3::new(
+            transform: Transform {
+                translation: Vec3::new(
                 panel_offset_x,
                 panel_height * 0.5 - 24.0,
                 Z_TUTORIAL_TEXT,
-            )),
+            ),
+                scale: gf::DISPLAY_LARGE.transform_scale(),
+                ..Default::default()
+            },
             ..default()
         },
         RenderLayers::from_layers(&[3]),
@@ -1258,19 +1273,19 @@ fn spawn_compact_tutorial(
         Text2dBundle {
             text: Text::from_section(
                 content.title(),
-                TextStyle {
-                    font: asset_server.load("fonts/alagard.ttf"),
-                    font_size: 15.0,
-                    color: YELLOW_2,
-                },
+                gf::DISPLAY.text_style(&asset_server, YELLOW_2),
             )
             .with_alignment(TextAlignment::Center),
             text_anchor: Anchor::Center,
-            transform: Transform::from_translation(Vec3::new(
+            transform: Transform {
+                translation: Vec3::new(
                 panel_center.x,
                 panel_center.y + PANEL_HEIGHT_COMPACT * 0.5 - 14.0,
                 Z_TUTORIAL_TEXT,
-            )),
+            ),
+                scale: gf::DISPLAY.transform_scale(),
+                ..Default::default()
+            },
             ..default()
         },
         RenderLayers::from_layers(&[3]),
@@ -1282,19 +1297,19 @@ fn spawn_compact_tutorial(
         Text2dBundle {
             text: Text::from_section(
                 content.body(),
-                TextStyle {
-                    font: asset_server.load("fonts/4x5.ttf"),
-                    font_size: 5.0,
-                    color: WHITE,
-                },
+                gf::BODY.text_style(&asset_server, WHITE),
             )
             .with_alignment(TextAlignment::Center),
             text_anchor: Anchor::Center,
-            transform: Transform::from_translation(Vec3::new(
+            transform: Transform {
+                translation: Vec3::new(
                 panel_center.x,
                 panel_center.y + 2.0,
                 Z_TUTORIAL_TEXT,
-            )),
+            ),
+                scale: gf::BODY.transform_scale(),
+                ..Default::default()
+            },
             ..default()
         },
         RenderLayers::from_layers(&[3]),
@@ -1355,15 +1370,15 @@ fn spawn_button(
             Text2dBundle {
                 text: Text::from_section(
                     label,
-                    TextStyle {
-                        font: asset_server.load("fonts/alagard.ttf"),
-                        font_size: 15.0,
-                        color: WHITE,
-                    },
+                    gf::DISPLAY.text_style(&asset_server, WHITE),
                 )
                 .with_alignment(TextAlignment::Center),
                 text_anchor: Anchor::Center,
-                transform: Transform::from_translation(Vec3::new(0., -1., 1.)),
+                transform: Transform {
+                translation: Vec3::new(0., -1., 1.),
+                scale: gf::DISPLAY.transform_scale(),
+                ..Default::default()
+            },
                 ..default()
             },
             RenderLayers::from_layers(&[3]),
@@ -1450,19 +1465,19 @@ fn spawn_entry_text(
         Text2dBundle {
             text: Text::from_section(
                 content.title(),
-                TextStyle {
-                    font: asset_server.load("fonts/alagard.ttf"),
-                    font_size: 15.0,
-                    color: YELLOW_2,
-                },
+                gf::DISPLAY.text_style(&asset_server, YELLOW_2),
             )
             .with_alignment(TextAlignment::Center),
             text_anchor: Anchor::Center,
-            transform: Transform::from_translation(Vec3::new(
+            transform: Transform {
+                translation: Vec3::new(
                 column_center_x,
                 title_y,
                 Z_TUTORIAL_TEXT,
-            )),
+            ),
+                scale: gf::DISPLAY.transform_scale(),
+                ..Default::default()
+            },
             ..default()
         },
         RenderLayers::from_layers(&[3]),
@@ -1476,19 +1491,19 @@ fn spawn_entry_text(
         Text2dBundle {
             text: Text::from_section(
                 content.body(),
-                TextStyle {
-                    font: asset_server.load("fonts/4x5.ttf"),
-                    font_size: 5.0,
-                    color: WHITE,
-                },
+                gf::BODY.text_style(&asset_server, WHITE),
             )
             .with_alignment(TextAlignment::Center),
             text_anchor: Anchor::Center,
-            transform: Transform::from_translation(Vec3::new(
+            transform: Transform {
+                translation: Vec3::new(
                 column_center_x,
                 body_y,
                 Z_TUTORIAL_TEXT,
-            )),
+            ),
+                scale: gf::BODY.transform_scale(),
+                ..Default::default()
+            },
             ..default()
         },
         RenderLayers::from_layers(&[3]),

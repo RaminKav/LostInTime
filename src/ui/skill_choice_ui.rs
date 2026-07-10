@@ -144,11 +144,11 @@ pub fn setup_skill_choice_ui(
             Text2dBundle {
                 text: Text::from_section(
                     "Choose an Heirloom".to_string(),
-                    gf::MENU_TITLE.text_style(asset_server, WHITE),
+                    gf::MENU_TITLE.text_style(&asset_server, WHITE),
                 ),
                 transform: Transform {
                     translation: Vec3::new(0., 115., Z_DEPTH_HEIRLOOM_SKILL_CHOICE_CONTENT),
-                    scale: Vec3::new(1., 1., 1.),
+                    scale: gf::MENU_TITLE.transform_scale(),
                     ..Default::default()
                 },
                 ..default()
@@ -272,8 +272,7 @@ pub fn setup_skill_choice_ui(
                 Text2dBundle {
                     text: Text::from_section(
                         "Banish ",
-                        gf::SKILL_CHOICE_MICRO.text_style(
-                            asset_server,
+                        gf::SKILL_CHOICE_MICRO.text_style(&asset_server,
                             if banish_enabled {
                                 WHITE
                             } else {
@@ -283,7 +282,11 @@ pub fn setup_skill_choice_ui(
                     )
                     .with_alignment(TextAlignment::Center),
                     text_anchor: Anchor::Center,
-                    transform: Transform::from_translation(Vec3::new(2., 0., 1.)),
+                    transform: Transform {
+                        translation: Vec3::new(2., 0., 1.),
+                        scale: gf::SKILL_CHOICE_MICRO.transform_scale(),
+                        ..Default::default()
+                    },
                     ..Default::default()
                 },
                 RenderLayers::from_layers(&[3]),
@@ -308,15 +311,19 @@ pub fn setup_skill_choice_ui(
         Text2dBundle {
             text: Text::from_section(
                 format!("Rerolls: {}", run_unlocks.rerolls_remaining),
-                gf::SKILL_CHOICE_MICRO.text_style(asset_server, WHITE),
+                gf::SKILL_CHOICE_MICRO.text_style(&asset_server, WHITE),
             )
             .with_alignment(TextAlignment::Center),
             text_anchor: Anchor::Center,
-            transform: Transform::from_translation(Vec3::new(
-                -80.5,
-                -140.,
-                Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND,
-            )),
+            transform: Transform {
+                translation: Vec3::new(
+                    -80.5,
+                    -140.,
+                    Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND,
+                ),
+                scale: gf::SKILL_CHOICE_MICRO.transform_scale(),
+                ..Default::default()
+            },
             ..Default::default()
         },
         RenderLayers::from_layers(&[3]),
@@ -329,15 +336,19 @@ pub fn setup_skill_choice_ui(
         Text2dBundle {
             text: Text::from_section(
                 format!("Banishes: {}", run_unlocks.banishes_remaining),
-                gf::SKILL_CHOICE_MICRO.text_style(asset_server, WHITE),
+                gf::SKILL_CHOICE_MICRO.text_style(&asset_server, WHITE),
             )
             .with_alignment(TextAlignment::Center),
             text_anchor: Anchor::Center,
-            transform: Transform::from_translation(Vec3::new(
-                80.,
-                -140.,
-                Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND,
-            )),
+            transform: Transform {
+                translation: Vec3::new(
+                    80.,
+                    -140.,
+                    Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND,
+                ),
+                scale: gf::SKILL_CHOICE_MICRO.transform_scale(),
+                ..Default::default()
+            },
             ..Default::default()
         },
         RenderLayers::from_layers(&[3]),

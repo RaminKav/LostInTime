@@ -32,10 +32,7 @@ use crate::Player;
 /// Radius (UI space) around an existing marker within which a click removes it instead of adding.
 const MARKER_REMOVE_RADIUS: f32 = 5.0;
 /// Marker "x" draw size on the island map.
-const MAP_MARKER_FONT: gf::FontStyle = gf::FontStyle {
-    path: gf::paths::SLKSCR_BOLD,
-    size: 8.5,
-};
+const MAP_MARKER_FONT: gf::FontStyle = gf::BODY;
 
 pub struct MapMarkerPlugin;
 
@@ -259,7 +256,11 @@ fn sync_map_marker_icons(
                     )
                     .with_alignment(TextAlignment::Center),
                     text_anchor: Anchor::Center,
-                    transform: Transform::from_translation(Vec3::new(pos.x, pos.y, 6.0)),
+                    transform: Transform {
+                        translation: Vec3::new(pos.x, pos.y, 6.0),
+                        scale: MAP_MARKER_FONT.transform_scale(),
+                        ..default()
+                    },
                     ..default()
                 },
                 RenderLayers::from_layers(&[3]),
@@ -353,7 +354,11 @@ fn sync_hud_minimap_markers(
                         )
                         .with_alignment(TextAlignment::Center),
                         text_anchor: Anchor::Center,
-                        transform: Transform::from_translation(Vec3::new(pos.x, pos.y, 3.0)),
+                        transform: Transform {
+                            translation: Vec3::new(pos.x, pos.y, 3.0),
+                            scale: MAP_MARKER_FONT.transform_scale(),
+                            ..default()
+                        },
                         visibility: if visible {
                             Visibility::Inherited
                         } else {
@@ -443,7 +448,11 @@ fn sync_map_marker_info_box(
                     )
                     .with_alignment(TextAlignment::Center),
                     text_anchor: Anchor::Center,
-                    transform: Transform::from_translation(Vec3::new(0., y, 2.)),
+                    transform: Transform {
+                        translation: Vec3::new(0., y, 2.),
+                        scale: gf::TOOLTIP_INFO_BOX.transform_scale(),
+                        ..default()
+                    },
                     ..default()
                 },
                 RenderLayers::from_layers(&[3]),

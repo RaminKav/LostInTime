@@ -33,11 +33,12 @@ use crate::{
         ClassUnlockData, UnlockedClasses,
     },
     ui::{
+        focus::ModalFocusable,
+        game_fonts as gf,
         global_text_message::PendingEraAnnouncement,
         main_menu::GameStartFadein,
         options_ui::CheatSettings,
         ui_helpers::{spawn_full_screen_ui_overlay_tuned_colored, RADIAL_OVERLAY_DEFAULT_COLOR},
-        focus::ModalFocusable,
         Focusable, MenuButton, UIElement, UIState,
     },
     world::{dimension::EraManager, portal::UIPortal},
@@ -51,9 +52,6 @@ use super::{
     ui_helpers::full_screen_overlay_size,
 };
 
-const BODY_FONT: &str = "fonts/slkscr.ttf";
-const TITLE_FONT: &str = "fonts/slkscrbold.ttf";
-const BODY_FONT_SIZE: f32 = 8.4;
 const CLASS_PREVIEW_ICON_SIZE: Vec2 = Vec2::new(22., 22.);
 const CLASS_SELECTION_PANEL_Y: f32 = 16.;
 
@@ -250,15 +248,15 @@ pub fn setup_class_selection_ui(
                             .map(|c| c.time_fragments.max(0))
                             .unwrap_or(0)
                     ),
-                    TextStyle {
-                        font: asset_server.load(BODY_FONT),
-                        font_size: BODY_FONT_SIZE,
-                        color: Color::WHITE,
-                    },
+                    gf::DISPLAY.text_style(&asset_server, Color::WHITE),
                 )
                 .with_alignment(TextAlignment::Left),
                 text_anchor: Anchor::CenterLeft,
-                transform: Transform::from_translation(Vec3::new(270., 166., 11.)),
+                transform: Transform {
+                    translation: Vec3::new(270., 166., 11.),
+                    scale: gf::DISPLAY.transform_scale(),
+                    ..Default::default()
+                },
                 ..Default::default()
             },
             RenderLayers::from_layers(&[3]),
@@ -308,18 +306,11 @@ pub fn setup_class_selection_ui(
     // Title
     commands.spawn((
         Text2dBundle {
-            text: Text::from_section(
-                "",
-                TextStyle {
-                    font: asset_server.load("fonts/alagard.ttf"),
-                    font_size: 30.0,
-                    color: WHITE,
-                },
-            ),
+            text: Text::from_section("", gf::DISPLAY_LARGE.text_style(&asset_server, WHITE)),
             text_anchor: Anchor::Center,
             transform: Transform {
                 translation: Vec3::new(0., res.game_height / 2. - 20., 10.),
-                scale: Vec3::new(1., 1., 1.),
+                scale: gf::DISPLAY_LARGE.transform_scale(),
                 ..Default::default()
             },
             ..default()
@@ -333,16 +324,12 @@ pub fn setup_class_selection_ui(
         Text2dBundle {
             text: Text::from_section(
                 "Pets",
-                TextStyle {
-                    font: asset_server.load("fonts/alagard.ttf"),
-                    font_size: 15.0,
-                    color: DARK_WOOD_BROWN,
-                },
+                gf::DISPLAY.text_style(&asset_server, DARK_WOOD_BROWN),
             ),
             text_anchor: Anchor::Center,
             transform: Transform {
                 translation: Vec3::new(8., 70. + CLASS_SELECTION_PANEL_Y, 12.),
-                scale: Vec3::new(1., 1., 1.),
+                scale: gf::DISPLAY.transform_scale(),
                 ..Default::default()
             },
             ..default()
@@ -762,57 +749,49 @@ fn spawn_class_unlock_info_ui(commands: &mut Commands, asset_server: &AssetServe
         ))
         .id();
 
-    let title_font = asset_server.load("fonts/alagard.ttf");
-    let body_font = asset_server.load(BODY_FONT);
-
     let text_entries = [
         (
             ClassUnlockInfoTextKind::Title,
             Vec3::new(-48., 40., 1.),
-            15.0,
-            title_font.clone(),
+            gf::DISPLAY,
         ),
         (
             ClassUnlockInfoTextKind::Achievement(0),
             Vec3::new(-48., 16., 1.),
-            BODY_FONT_SIZE,
-            body_font.clone(),
+            gf::BODY,
         ),
         (
             ClassUnlockInfoTextKind::Achievement(1),
             Vec3::new(-48., 0., 1.),
-            BODY_FONT_SIZE,
-            body_font.clone(),
+            gf::BODY,
         ),
         (
             ClassUnlockInfoTextKind::Achievement(2),
             Vec3::new(-48., -16., 1.),
-            BODY_FONT_SIZE,
-            body_font.clone(),
+            gf::BODY,
         ),
         (
             ClassUnlockInfoTextKind::Cost,
             Vec3::new(-48., -38., 1.),
-            BODY_FONT_SIZE,
-            body_font.clone(),
+            gf::BODY,
         ),
     ];
 
-    for (kind, offset, size, font) in text_entries.into_iter() {
+    for (kind, offset, font_style) in text_entries.into_iter() {
         commands
             .spawn((
                 Text2dBundle {
                     text: Text::from_section(
                         "",
-                        TextStyle {
-                            font,
-                            font_size: size,
-                            color: Color::WHITE,
-                        },
+                        font_style.text_style(&asset_server, Color::WHITE),
                     )
                     .with_alignment(TextAlignment::Left),
                     text_anchor: Anchor::CenterLeft,
-                    transform: Transform::from_translation(offset),
+                    transform: Transform {
+                        translation: offset,
+                        scale: font_style.transform_scale(),
+                        ..Default::default()
+                    },
                     ..Default::default()
                 },
                 RenderLayers::from_layers(&[3]),
@@ -851,17 +830,14 @@ fn spawn_class_unlock_confirm_ui(commands: &mut Commands, asset_server: &AssetSe
     let text_entity = commands
         .spawn((
             Text2dBundle {
-                text: Text::from_section(
-                    "",
-                    TextStyle {
-                        font: asset_server.load(BODY_FONT),
-                        font_size: BODY_FONT_SIZE,
-                        color: Color::WHITE,
-                    },
-                )
-                .with_alignment(TextAlignment::Center),
+                text: Text::from_section("", gf::BODY.text_style(&asset_server, Color::WHITE))
+                    .with_alignment(TextAlignment::Center),
                 text_anchor: Anchor::Center,
-                transform: Transform::from_translation(Vec3::new(0., 10., 1.)),
+                transform: Transform {
+                    translation: Vec3::new(0., 10., 1.),
+                    scale: gf::BODY.transform_scale(),
+                    ..Default::default()
+                },
                 ..Default::default()
             },
             RenderLayers::from_layers(&[3]),
@@ -903,17 +879,14 @@ fn spawn_skill_unlock_confirm_ui(commands: &mut Commands, asset_server: &AssetSe
     let text_entity = commands
         .spawn((
             Text2dBundle {
-                text: Text::from_section(
-                    "",
-                    TextStyle {
-                        font: asset_server.load(BODY_FONT),
-                        font_size: BODY_FONT_SIZE,
-                        color: Color::WHITE,
-                    },
-                )
-                .with_alignment(TextAlignment::Center),
+                text: Text::from_section("", gf::BODY.text_style(&asset_server, Color::WHITE))
+                    .with_alignment(TextAlignment::Center),
                 text_anchor: Anchor::Center,
-                transform: Transform::from_translation(Vec3::new(0., 10., 1.)),
+                transform: Transform {
+                    translation: Vec3::new(0., 10., 1.),
+                    scale: gf::BODY.transform_scale(),
+                    ..Default::default()
+                },
                 ..Default::default()
             },
             RenderLayers::from_layers(&[3]),
@@ -974,8 +947,8 @@ pub fn handle_class_selection(
         if is_hit || is_focused {
             if let Some(slot) = class_option.as_mut() {
                 let class_id = slot.class.clone();
-                let is_locked = !cheat_settings.bypass_class_unlocks
-                    && !unlocked_classes.contains(&class_id);
+                let is_locked =
+                    !cheat_settings.bypass_class_unlocks && !unlocked_classes.contains(&class_id);
                 slot.is_locked = is_locked;
                 let slot_pos = global_transform
                     .map(|t| t.translation())
@@ -994,8 +967,7 @@ pub fn handle_class_selection(
                         interactable.change(Interaction::Hovering);
                         slot.is_hovered = true;
                         if !is_locked {
-                            commands
-                                .spawn(SoundSpawner::new(AudioSoundEffect::ButtonHover, 0.05));
+                            commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonHover, 0.05));
                         }
                     }
                     Interaction::Hovering => {
@@ -1024,10 +996,8 @@ pub fn handle_class_selection(
                             } else {
                                 selection_state.selected_class = Some(class_id.clone());
                                 slot.is_selected = true;
-                                commands.spawn(SoundSpawner::new(
-                                    AudioSoundEffect::ButtonClick,
-                                    0.2,
-                                ));
+                                commands
+                                    .spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.2));
                             }
                         }
                     }
@@ -1044,8 +1014,7 @@ pub fn handle_class_selection(
                         if confirm_pressed {
                             selection_state.selected_pet = Some(pet_state.pet.clone());
                             pet_state.is_selected = true;
-                            commands
-                                .spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.2));
+                            commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.2));
                         }
                     }
                     _ => {}
@@ -1258,8 +1227,6 @@ pub fn update_class_unlock_confirm_panel(
     // Spawn buttons if they don't exist
     if button_count == 0 {
         if let Some(panel) = panel_entity {
-            let button_font = asset_server.load("fonts/alagard.ttf");
-
             let yes_button = commands
                 .spawn((
                     SpriteBundle {
@@ -1306,23 +1273,24 @@ pub fn update_class_unlock_confirm_panel(
 
             commands.entity(yes_button).set_parent(panel);
             commands.entity(no_button).set_parent(panel);
-            commands.entity(no_button).insert(ModalFocusable { index: 0 });
-            commands.entity(yes_button).insert(ModalFocusable { index: 1 });
+            commands
+                .entity(no_button)
+                .insert(ModalFocusable { index: 0 });
+            commands
+                .entity(yes_button)
+                .insert(ModalFocusable { index: 1 });
 
             // Add button text
             commands
                 .spawn(Text2dBundle {
-                    text: Text::from_section(
-                        "Yes",
-                        TextStyle {
-                            font: button_font.clone(),
-                            font_size: 15.0,
-                            color: WHITE,
-                        },
-                    )
-                    .with_alignment(TextAlignment::Center),
+                    text: Text::from_section("Yes", gf::DISPLAY.text_style(&asset_server, WHITE))
+                        .with_alignment(TextAlignment::Center),
                     text_anchor: Anchor::Center,
-                    transform: Transform::from_translation(Vec3::new(0., -1., 1.)),
+                    transform: Transform {
+                        translation: Vec3::new(0., -1., 1.),
+                        scale: gf::DISPLAY.transform_scale(),
+                        ..Default::default()
+                    },
                     ..Default::default()
                 })
                 .insert(RenderLayers::from_layers(&[3]))
@@ -1330,17 +1298,14 @@ pub fn update_class_unlock_confirm_panel(
 
             commands
                 .spawn(Text2dBundle {
-                    text: Text::from_section(
-                        "No",
-                        TextStyle {
-                            font: button_font,
-                            font_size: 15.0,
-                            color: WHITE,
-                        },
-                    )
-                    .with_alignment(TextAlignment::Center),
+                    text: Text::from_section("No", gf::DISPLAY.text_style(&asset_server, WHITE))
+                        .with_alignment(TextAlignment::Center),
                     text_anchor: Anchor::Center,
-                    transform: Transform::from_translation(Vec3::new(0., -1., 1.)),
+                    transform: Transform {
+                        translation: Vec3::new(0., -1., 1.),
+                        scale: gf::DISPLAY.transform_scale(),
+                        ..Default::default()
+                    },
                     ..Default::default()
                 })
                 .insert(RenderLayers::from_layers(&[3]))
@@ -1475,8 +1440,6 @@ pub fn update_skill_unlock_confirm_panel(
     let button_count = button_query.iter().count();
     if button_count == 0 {
         if let Some(panel) = panel_entity {
-            let button_font = asset_server.load("fonts/alagard.ttf");
-
             let yes_button = commands
                 .spawn((
                     SpriteBundle {
@@ -1521,39 +1484,37 @@ pub fn update_skill_unlock_confirm_panel(
                 .id();
             commands.entity(yes_button).set_parent(panel);
             commands.entity(no_button).set_parent(panel);
-            commands.entity(no_button).insert(ModalFocusable { index: 0 });
-            commands.entity(yes_button).insert(ModalFocusable { index: 1 });
+            commands
+                .entity(no_button)
+                .insert(ModalFocusable { index: 0 });
+            commands
+                .entity(yes_button)
+                .insert(ModalFocusable { index: 1 });
 
             commands
                 .spawn(Text2dBundle {
-                    text: Text::from_section(
-                        "Yes",
-                        TextStyle {
-                            font: button_font.clone(),
-                            font_size: 15.0,
-                            color: WHITE,
-                        },
-                    )
-                    .with_alignment(TextAlignment::Center),
+                    text: Text::from_section("Yes", gf::DISPLAY.text_style(&asset_server, WHITE))
+                        .with_alignment(TextAlignment::Center),
                     text_anchor: Anchor::Center,
-                    transform: Transform::from_translation(Vec3::new(0., -1., 1.)),
+                    transform: Transform {
+                        translation: Vec3::new(0., -1., 1.),
+                        scale: gf::DISPLAY.transform_scale(),
+                        ..Default::default()
+                    },
                     ..Default::default()
                 })
                 .insert(RenderLayers::from_layers(&[3]))
                 .set_parent(yes_button);
             commands
                 .spawn(Text2dBundle {
-                    text: Text::from_section(
-                        "No",
-                        TextStyle {
-                            font: button_font,
-                            font_size: 15.0,
-                            color: WHITE,
-                        },
-                    )
-                    .with_alignment(TextAlignment::Center),
+                    text: Text::from_section("No", gf::DISPLAY.text_style(&asset_server, WHITE))
+                        .with_alignment(TextAlignment::Center),
                     text_anchor: Anchor::Center,
-                    transform: Transform::from_translation(Vec3::new(0., -1., 1.)),
+                    transform: Transform {
+                        translation: Vec3::new(0., -1., 1.),
+                        scale: gf::DISPLAY.transform_scale(),
+                        ..Default::default()
+                    },
                     ..Default::default()
                 })
                 .insert(RenderLayers::from_layers(&[3]))
@@ -1645,16 +1606,12 @@ fn spawn_player_preview(
         .spawn(Text2dBundle {
             text: Text::from_section(
                 class_name,
-                TextStyle {
-                    font: asset_server.load("fonts/alagard.ttf"),
-                    font_size: 15.0,
-                    color: DARK_WOOD_BROWN,
-                },
+                gf::DISPLAY.text_style(&asset_server, DARK_WOOD_BROWN),
             ),
             text_anchor: Anchor::Center,
             transform: Transform {
                 translation: Vec3::new(TITLE_X_OFFSET, TITLE_Y_OFFSET, 1.),
-                scale: Vec3::new(1., 1., 1.),
+                scale: gf::DISPLAY.transform_scale(),
                 ..Default::default()
             },
             ..default()
@@ -1667,18 +1624,11 @@ fn spawn_player_preview(
     // Spawn rank information
     let _rank_text = commands
         .spawn(Text2dBundle {
-            text: Text::from_section(
-                rank_text,
-                TextStyle {
-                    font: asset_server.load(BODY_FONT),
-                    font_size: BODY_FONT_SIZE,
-                    color: WHITE,
-                },
-            ),
+            text: Text::from_section(rank_text, gf::BODY.text_style(&asset_server, WHITE)),
             text_anchor: Anchor::CenterLeft,
             transform: Transform {
                 translation: Vec3::new(-42., TITLE_Y_OFFSET - 14., 1.),
-                scale: Vec3::new(1., 1., 1.),
+                scale: gf::BODY.transform_scale(),
                 ..Default::default()
             },
             ..default()
@@ -1695,18 +1645,11 @@ fn spawn_player_preview(
     let high_score_text = format!("Best: {}", class_high_score);
     let _high_score = commands
         .spawn(Text2dBundle {
-            text: Text::from_section(
-                high_score_text,
-                TextStyle {
-                    font: asset_server.load(BODY_FONT),
-                    font_size: BODY_FONT_SIZE,
-                    color: WHITE,
-                },
-            ),
+            text: Text::from_section(high_score_text, gf::BODY.text_style(&asset_server, WHITE)),
             text_anchor: Anchor::CenterLeft,
             transform: Transform {
                 translation: Vec3::new(112., TITLE_Y_OFFSET - 14., 1.),
-                scale: Vec3::new(1., 1., 1.),
+                scale: gf::BODY.transform_scale(),
                 ..Default::default()
             },
             ..default()
@@ -1788,17 +1731,13 @@ fn spawn_player_preview(
         .spawn(Text2dBundle {
             text: Text::from_section(
                 "Starting Weapon",
-                TextStyle {
-                    font: asset_server.load(TITLE_FONT),
-                    font_size: BODY_FONT_SIZE,
-                    color: YELLOW_2,
-                },
+                gf::BODY.text_style(&asset_server, YELLOW_2),
             )
             .with_alignment(TextAlignment::Left),
             text_anchor: Anchor::TopLeft,
             transform: Transform {
                 translation: Vec3::new(DESC_TEXT_X, ICONS_Y_OFFSET + TEXT_Y_OFFSET + 2., 1.),
-                scale: Vec3::new(1., 1., 1.),
+                scale: gf::BODY.transform_scale(),
                 ..Default::default()
             },
             ..default()
@@ -1812,21 +1751,20 @@ fn spawn_player_preview(
         .spawn(Text2dBundle {
             text: Text::from_section(
                 format!("{} {}", weapon_rarity, weapon_description),
-                TextStyle {
-                    font: asset_server.load(BODY_FONT),
-                    font_size: BODY_FONT_SIZE,
-                    color: if weapon_rarity == ItemRarity::Common {
+                gf::BODY.text_style(
+                    &asset_server,
+                    if weapon_rarity == ItemRarity::Common {
                         WHITE
                     } else {
                         weapon_rarity.get_color()
                     },
-                },
+                ),
             )
             .with_alignment(TextAlignment::Left),
             text_anchor: Anchor::TopLeft,
             transform: Transform {
                 translation: Vec3::new(DESC_TEXT_X, ICONS_Y_OFFSET + TEXT_Y_OFFSET - 8., 1.),
-                scale: Vec3::new(1., 1., 1.),
+                scale: gf::BODY.transform_scale(),
                 ..Default::default()
             },
             ..default()
@@ -1860,11 +1798,7 @@ fn spawn_player_preview(
         .spawn(Text2dBundle {
             text: Text::from_section(
                 "Class Passive",
-                TextStyle {
-                    font: asset_server.load(TITLE_FONT),
-                    font_size: BODY_FONT_SIZE,
-                    color: YELLOW_2,
-                },
+                gf::BODY.text_style(&asset_server, YELLOW_2),
             )
             .with_alignment(TextAlignment::Left),
             text_anchor: Anchor::TopLeft,
@@ -1874,7 +1808,7 @@ fn spawn_player_preview(
                     ICONS_Y_OFFSET + ICON_Y_SPACING + TEXT_Y_OFFSET + 11.,
                     1.,
                 ),
-                scale: Vec3::new(1., 1., 1.),
+                scale: gf::BODY.transform_scale(),
                 ..Default::default()
             },
             ..default()
@@ -1886,15 +1820,8 @@ fn spawn_player_preview(
     // Spawn stat description text
     let _power_description_text = commands
         .spawn(Text2dBundle {
-            text: Text::from_section(
-                stat_description,
-                TextStyle {
-                    font: asset_server.load(BODY_FONT),
-                    font_size: BODY_FONT_SIZE,
-                    color: WHITE,
-                },
-            )
-            .with_alignment(TextAlignment::Left),
+            text: Text::from_section(stat_description, gf::BODY.text_style(&asset_server, WHITE))
+                .with_alignment(TextAlignment::Left),
             text_anchor: Anchor::TopLeft,
             transform: Transform {
                 translation: Vec3::new(
@@ -1902,7 +1829,7 @@ fn spawn_player_preview(
                     ICONS_Y_OFFSET + ICON_Y_SPACING + TEXT_Y_OFFSET,
                     1.,
                 ),
-                scale: Vec3::new(1., 1., 1.),
+                scale: gf::BODY.transform_scale(),
                 ..Default::default()
             },
             ..default()
@@ -1995,16 +1922,12 @@ fn spawn_pet_preview(
         .spawn(Text2dBundle {
             text: Text::from_section(
                 pet_name,
-                TextStyle {
-                    font: asset_server.load("fonts/alagard.ttf"),
-                    font_size: 15.0,
-                    color: DARK_WOOD_BROWN,
-                },
+                gf::DISPLAY.text_style(&asset_server, DARK_WOOD_BROWN),
             ),
             text_anchor: Anchor::Center,
             transform: Transform {
                 translation: Vec3::new(69., 41., 1.),
-                scale: Vec3::new(1., 1., 1.),
+                scale: gf::DISPLAY.transform_scale(),
                 ..Default::default()
             },
             ..default()
@@ -2056,19 +1979,12 @@ fn spawn_pet_preview(
     // Spawn pet description text to the right
     let _power_title_text = commands
         .spawn(Text2dBundle {
-            text: Text::from_section(
-                pet_skill_name,
-                TextStyle {
-                    font: asset_server.load(TITLE_FONT),
-                    font_size: BODY_FONT_SIZE,
-                    color: YELLOW_2,
-                },
-            )
-            .with_alignment(TextAlignment::Left),
+            text: Text::from_section(pet_skill_name, gf::BODY.text_style(&asset_server, YELLOW_2))
+                .with_alignment(TextAlignment::Left),
             text_anchor: Anchor::TopLeft,
             transform: Transform {
                 translation: Vec3::new(TEXT_X_OFFSET, ICON_Y + Y_OFFSET + TEXT_Y_OFFSET, 1.),
-                scale: Vec3::new(1., 1., 1.),
+                scale: gf::BODY.transform_scale(),
                 ..Default::default()
             },
             ..default()
@@ -2079,19 +1995,12 @@ fn spawn_pet_preview(
         .id();
     let _skill_description_text = commands
         .spawn(Text2dBundle {
-            text: Text::from_section(
-                pet_skill_desc,
-                TextStyle {
-                    font: asset_server.load(BODY_FONT),
-                    font_size: BODY_FONT_SIZE,
-                    color: WHITE,
-                },
-            )
-            .with_alignment(TextAlignment::Left),
+            text: Text::from_section(pet_skill_desc, gf::BODY.text_style(&asset_server, WHITE))
+                .with_alignment(TextAlignment::Left),
             text_anchor: Anchor::TopLeft,
             transform: Transform {
                 translation: Vec3::new(TEXT_X_OFFSET, -9. + Y_OFFSET + TEXT_Y_OFFSET + ICON_Y, 1.),
-                scale: Vec3::new(1., 1., 1.),
+                scale: gf::BODY.transform_scale(),
                 ..Default::default()
             },
             ..default()
@@ -2122,19 +2031,12 @@ fn spawn_pet_preview(
         .id();
     let _passive_title_text = commands
         .spawn(Text2dBundle {
-            text: Text::from_section(
-                "Passive Buff",
-                TextStyle {
-                    font: asset_server.load(TITLE_FONT),
-                    font_size: BODY_FONT_SIZE,
-                    color: YELLOW_2,
-                },
-            )
-            .with_alignment(TextAlignment::Left),
+            text: Text::from_section("Passive Buff", gf::BODY.text_style(&asset_server, YELLOW_2))
+                .with_alignment(TextAlignment::Left),
             text_anchor: Anchor::TopLeft,
             transform: Transform {
                 translation: Vec3::new(TEXT_X_OFFSET, -40. + Y_OFFSET, 1.),
-                scale: Vec3::new(1., 1., 1.),
+                scale: gf::BODY.transform_scale(),
                 ..Default::default()
             },
             ..default()
@@ -2145,19 +2047,12 @@ fn spawn_pet_preview(
         .id();
     let _passive_text = commands
         .spawn(Text2dBundle {
-            text: Text::from_section(
-                pet_passive,
-                TextStyle {
-                    font: asset_server.load(BODY_FONT),
-                    font_size: BODY_FONT_SIZE,
-                    color: WHITE,
-                },
-            )
-            .with_alignment(TextAlignment::Left),
+            text: Text::from_section(pet_passive, gf::BODY.text_style(&asset_server, WHITE))
+                .with_alignment(TextAlignment::Left),
             text_anchor: Anchor::TopLeft,
             transform: Transform {
                 translation: Vec3::new(TEXT_X_OFFSET, -50. + Y_OFFSET, 1.),
-                scale: Vec3::new(1., 1., 1.),
+                scale: gf::BODY.transform_scale(),
                 ..Default::default()
             },
             ..default()

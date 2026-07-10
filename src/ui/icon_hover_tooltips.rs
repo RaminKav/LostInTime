@@ -107,11 +107,15 @@ pub fn spawn_icon_hover_tooltip(
             .spawn(Text2dBundle {
                 text: Text::from_section(
                     *line,
-                    gf::ICON_HOVER_TOOLTIP.text_style(asset_server, WHITE),
+                    gf::ICON_HOVER_TOOLTIP.text_style(&asset_server, WHITE),
                 )
                 .with_alignment(TextAlignment::Center),
                 text_anchor: Anchor::Center,
-                transform: Transform::from_translation(Vec3::new(0., y, 1.)),
+                transform: Transform {
+                    translation: Vec3::new(0., y, 1.),
+                    scale: gf::ICON_HOVER_TOOLTIP.transform_scale(),
+                    ..default()
+                },
                 ..default()
             })
             .insert(RenderLayers::from_layers(&[3]))

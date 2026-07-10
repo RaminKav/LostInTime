@@ -10,6 +10,7 @@ use crate::{
     datafiles,
     cursor::CursorPos,
     ui::{
+        game_fonts as gf,
         interactions::{Interactable, Interaction, UIElement},
         inventory_ui::UIState,
         ui_helpers,
@@ -110,15 +111,15 @@ pub fn setup_name_entry_ui(
         Text2dBundle {
             text: Text::from_section(
                 "Enter Your Name",
-                TextStyle {
-                    font: asset_server.load("fonts/alagard.ttf"),
-                    font_size: 15.0,
-                    color: WHITE,
-                },
+                gf::MENU_TITLE.text_style(&asset_server, WHITE),
             )
             .with_alignment(TextAlignment::Center),
             text_anchor: Anchor::Center,
-            transform: Transform::from_translation(Vec3::new(0., 35., 102.)),
+            transform: Transform {
+                translation: Vec3::new(0., 35., 102.),
+                scale: gf::MENU_TITLE.transform_scale(),
+                ..default()
+            },
             ..Default::default()
         },
         RenderLayers::from_layers(&[3]),
@@ -162,33 +163,29 @@ pub fn setup_name_entry_ui(
     ));
 
     // Input text with cursor (using two sections so cursor follows text)
-    let font_handle = asset_server.load("fonts/4x5.ttf");
+    let input_style = gf::BODY.text_style(&asset_server, DARK_WOOD_BROWN);
     commands.spawn((
         Text2dBundle {
             text: Text {
                 sections: vec![
                     TextSection {
                         value: "".to_string(),
-                        style: TextStyle {
-                            font: font_handle.clone(),
-                            font_size: 5.0,
-                            color: DARK_WOOD_BROWN,
-                        },
+                        style: input_style.clone(),
                     },
                     TextSection {
                         value: "|".to_string(),
-                        style: TextStyle {
-                            font: font_handle,
-                            font_size: 5.0,
-                            color: DARK_WOOD_BROWN,
-                        },
+                        style: input_style,
                     },
                 ],
                 alignment: TextAlignment::Left,
                 ..Default::default()
             },
             text_anchor: Anchor::CenterLeft,
-            transform: Transform::from_translation(Vec3::new(-65., 5.5, 104.)),
+            transform: Transform {
+                translation: Vec3::new(-65., 5.5, 104.),
+                scale: gf::BODY.transform_scale(),
+                ..default()
+            },
             ..Default::default()
         },
         RenderLayers::from_layers(&[3]),
@@ -226,15 +223,15 @@ pub fn setup_name_entry_ui(
         .spawn(Text2dBundle {
             text: Text::from_section(
                 "OK",
-                TextStyle {
-                    font: asset_server.load("fonts/4x5.ttf"),
-                    font_size: 5.0,
-                    color: DARK_WOOD_BROWN,
-                },
+                gf::BODY.text_style(&asset_server, DARK_WOOD_BROWN),
             )
             .with_alignment(TextAlignment::Center),
             text_anchor: Anchor::Center,
-            transform: Transform::from_translation(Vec3::new(0., 0.5, 1.)),
+            transform: Transform {
+                translation: Vec3::new(0., 0.5, 1.),
+                scale: gf::BODY.transform_scale(),
+                ..default()
+            },
             ..Default::default()
         })
         .insert(RenderLayers::from_layers(&[3]))
@@ -284,30 +281,22 @@ pub fn update_name_entry_text(
         // Only update if different to avoid unnecessary work
         if text.sections[0].value != new_value {
             // Rebuild the entire Text to force change detection
-            let font_handle = asset_server.load("fonts/4x5.ttf");
             let cursor_value = text
                 .sections
                 .get(1)
                 .map(|s| s.value.clone())
                 .unwrap_or_else(|| "|".to_string());
 
+            let style = gf::BODY.text_style(&asset_server, DARK_WOOD_BROWN);
             *text = Text {
                 sections: vec![
                     TextSection {
                         value: new_value,
-                        style: TextStyle {
-                            font: font_handle.clone(),
-                            font_size: 5.0,
-                            color: DARK_WOOD_BROWN,
-                        },
+                        style: style.clone(),
                     },
                     TextSection {
                         value: cursor_value,
-                        style: TextStyle {
-                            font: font_handle,
-                            font_size: 5.0,
-                            color: DARK_WOOD_BROWN,
-                        },
+                        style,
                     },
                 ],
                 alignment: TextAlignment::Left,
@@ -444,24 +433,16 @@ pub fn update_cursor_blink(
                 };
 
                 // Rebuild the entire Text to force change detection
-                let font_handle = asset_server.load("fonts/4x5.ttf");
+                let style = gf::BODY.text_style(&asset_server, DARK_WOOD_BROWN);
                 *text = Text {
                     sections: vec![
                         TextSection {
                             value: user_text,
-                            style: TextStyle {
-                                font: font_handle.clone(),
-                                font_size: 5.0,
-                                color: DARK_WOOD_BROWN,
-                            },
+                            style: style.clone(),
                         },
                         TextSection {
                             value: new_cursor,
-                            style: TextStyle {
-                                font: font_handle,
-                                font_size: 5.0,
-                                color: DARK_WOOD_BROWN,
-                            },
+                            style,
                         },
                     ],
                     alignment: TextAlignment::Left,

@@ -14,7 +14,7 @@ use bevy::{
 };
 use bevy_ecs_tilemap::tiles::TilePos;
 
-use super::{Interactable, UIState};
+use super::{Interactable, UIState, game_fonts as gf};
 
 /// How much more transparent the centre of a radial overlay is vs. its edge.
 /// Kept small for a very subtle vignette-like effect.
@@ -251,15 +251,15 @@ pub fn spawn_keybind_badge(
         .spawn(Text2dBundle {
             text: Text::from_section(
                 label.into(),
-                TextStyle {
-                    font: asset_server.load("fonts/slkscr.ttf"),
-                    font_size: 8.4,
-                    color: crate::colors::WHITE,
-                },
+                gf::BODY.text_style(&asset_server, crate::colors::WHITE),
             )
             .with_alignment(TextAlignment::Center),
             text_anchor: bevy::sprite::Anchor::Center,
-            transform: Transform::from_translation(Vec3::new(0., 0., 1.)),
+            transform: Transform {
+                translation: Vec3::new(0., 0., 1.),
+                scale: gf::BODY.transform_scale(),
+                ..Default::default()
+            },
             ..Default::default()
         })
         .insert(RenderLayers::from_layers(&[render_layer]))
@@ -297,15 +297,15 @@ pub fn spawn_hud_label_badge(
         .spawn(Text2dBundle {
             text: Text::from_section(
                 label.to_string(),
-                TextStyle {
-                    font: asset_server.load("fonts/slkscr.ttf"),
-                    font_size: 8.4,
-                    color: crate::colors::WHITE,
-                },
+                gf::BODY.text_style(&asset_server, crate::colors::WHITE),
             )
             .with_alignment(TextAlignment::Center),
             text_anchor: bevy::sprite::Anchor::Center,
-            transform: Transform::from_translation(Vec3::new(0., 0., 1.)),
+            transform: Transform {
+                translation: Vec3::new(0., 0., 1.),
+                scale: gf::BODY.transform_scale(),
+                ..Default::default()
+            },
             ..Default::default()
         })
         .insert(RenderLayers::from_layers(&[render_layer]))
