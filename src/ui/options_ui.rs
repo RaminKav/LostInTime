@@ -32,9 +32,9 @@ use crate::{
             FocusNavBottomRow, FocusNavHorizontalSkip, FocusNavTabColumn, Focusable,
             ModalFocusable, UiFocus, UiNavDir, UiNavStickStability, UiStickNavLatch,
         },
+        game_fonts as gf,
         interactions::Interaction,
         main_menu::{spawn_exit_icon_button, spawn_main_menu_wide_button, MenuButton},
-        game_fonts as gf,
         ui_helpers, Interactable, UIElement, UIState,
     },
     DisplayScaleSettings, InputBinding, ScreenResolution,
@@ -1012,11 +1012,7 @@ pub fn setup_options_ui(mut commands: Commands, deps: SetupOptionsResources) {
             .with_alignment(TextAlignment::Center),
             text_anchor: bevy::sprite::Anchor::Center,
             transform: Transform {
-                translation: Vec3::new(
-                0.,
-                resolution.game_height / 2. - 40.,
-                z,
-            ),
+                translation: Vec3::new(0., resolution.game_height / 2. - 40., z),
                 scale: gf::MENU_TITLE_LARGE.transform_scale(),
                 ..default()
             },
@@ -1170,10 +1166,10 @@ fn spawn_options_tab_column(
                     .with_alignment(TextAlignment::Center),
                     text_anchor: Anchor::Center,
                     transform: Transform {
-                translation: Vec3::new(0., -1., 1.),
-                scale: gf::MENU_TITLE.transform_scale(),
-                ..default()
-            },
+                        translation: Vec3::new(0., -1., 1.),
+                        scale: gf::MENU_TITLE.transform_scale(),
+                        ..default()
+                    },
                     ..default()
                 },
                 RenderLayers::from_layers(&[3]),
@@ -1193,11 +1189,8 @@ fn spawn_controls_section_title(
 ) {
     commands.spawn((
         Text2dBundle {
-            text: Text::from_section(
-                title,
-                gf::MENU_TITLE.text_style(&asset_server, YELLOW_2),
-            )
-            .with_alignment(TextAlignment::Left),
+            text: Text::from_section(title, gf::MENU_TITLE.text_style(&asset_server, YELLOW_2))
+                .with_alignment(TextAlignment::Left),
             text_anchor: bevy::sprite::Anchor::CenterLeft,
             transform: Transform {
                 translation: pos,
@@ -1225,11 +1218,8 @@ fn spawn_options_section_title(
 ) {
     commands.spawn((
         Text2dBundle {
-            text: Text::from_section(
-                title,
-                gf::MENU_TITLE.text_style(&asset_server, YELLOW_2),
-            )
-            .with_alignment(TextAlignment::Left),
+            text: Text::from_section(title, gf::MENU_TITLE.text_style(&asset_server, YELLOW_2))
+                .with_alignment(TextAlignment::Left),
             text_anchor: bevy::sprite::Anchor::CenterLeft,
             transform: Transform {
                 translation: pos,
@@ -2015,11 +2005,8 @@ fn spawn_keybind_row(
     commands
         .spawn((
             Text2dBundle {
-                text: Text::from_section(
-                    "Rebind ",
-                    gf::BODY.text_style(&asset_server, WHITE),
-                )
-                .with_alignment(TextAlignment::Center),
+                text: Text::from_section("Rebind ", gf::BODY.text_style(&asset_server, WHITE))
+                    .with_alignment(TextAlignment::Center),
                 text_anchor: Anchor::Center,
                 transform: Transform {
                     translation: Vec3::new(2., 0.5, 1.),
@@ -2036,11 +2023,8 @@ fn spawn_keybind_row(
 
     commands.spawn((
         Text2dBundle {
-            text: Text::from_section(
-                label,
-                gf::BODY.text_style(&asset_server, WHITE),
-            )
-            .with_alignment(TextAlignment::Left),
+            text: Text::from_section(label, gf::BODY.text_style(&asset_server, WHITE))
+                .with_alignment(TextAlignment::Left),
             text_anchor: bevy::sprite::Anchor::CenterLeft,
             transform: Transform {
                 translation: label_pos,
@@ -2124,11 +2108,8 @@ fn spawn_options_checkbox(
 
     commands.spawn((
         Text2dBundle {
-            text: Text::from_section(
-                label,
-                gf::BODY.text_style(&asset_server, WHITE),
-            )
-            .with_alignment(TextAlignment::Left),
+            text: Text::from_section(label, gf::BODY.text_style(&asset_server, WHITE))
+                .with_alignment(TextAlignment::Left),
             text_anchor: bevy::sprite::Anchor::CenterLeft,
             transform: Transform {
                 translation: label_pos,
@@ -2208,7 +2189,10 @@ pub fn handle_cheat_checkbox_click(
                     swap_movement_aim_keys.save();
                     swap_movement_aim_keys.0
                 }
-                _ => unreachable!("unexpected CheatSettings checkbox: {:?}", options_checkbox.0),
+                _ => unreachable!(
+                    "unexpected CheatSettings checkbox: {:?}",
+                    options_checkbox.0
+                ),
             }
         };
         commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.2));
@@ -2276,11 +2260,8 @@ fn spawn_volume_row(
 
     commands.spawn((
         Text2dBundle {
-            text: Text::from_section(
-                label,
-                gf::BODY.text_style(&asset_server, WHITE),
-            )
-            .with_alignment(TextAlignment::Left),
+            text: Text::from_section(label, gf::BODY.text_style(&asset_server, WHITE))
+                .with_alignment(TextAlignment::Left),
             text_anchor: bevy::sprite::Anchor::CenterLeft,
             transform: Transform {
                 translation: label_pos,
@@ -2359,11 +2340,7 @@ fn spawn_volume_row(
             .with_alignment(TextAlignment::Center),
             text_anchor: bevy::sprite::Anchor::Center,
             transform: Transform {
-                translation: Vec3::new(
-                controls_x + 18.,
-                label_pos.y - 3.,
-                label_pos.z,
-            ),
+                translation: Vec3::new(controls_x + 18., label_pos.y - 3., label_pos.z),
                 scale: gf::BODY.transform_scale(),
                 ..default()
             },
@@ -2470,7 +2447,7 @@ fn spawn_damage_text_size_row(
         Name::new("Damage Text Size Label"),
     ));
 
-    let controls_x = label_pos.x + 70.;
+    let controls_x = label_pos.x + 90.;
 
     let minus_entity = commands
         .spawn(SpriteBundle {
@@ -2621,11 +2598,8 @@ fn spawn_sensitivity_row(
 
     commands.spawn((
         Text2dBundle {
-            text: Text::from_section(
-                label,
-                gf::BODY.text_style(&asset_server, WHITE),
-            )
-            .with_alignment(TextAlignment::Left),
+            text: Text::from_section(label, gf::BODY.text_style(&asset_server, WHITE))
+                .with_alignment(TextAlignment::Left),
             text_anchor: bevy::sprite::Anchor::CenterLeft,
             transform: Transform {
                 translation: label_pos,
@@ -2703,11 +2677,7 @@ fn spawn_sensitivity_row(
             .with_alignment(TextAlignment::Center),
             text_anchor: bevy::sprite::Anchor::Center,
             transform: Transform {
-                translation: Vec3::new(
-                controls_x + 18.,
-                label_pos.y - 3.,
-                label_pos.z,
-            ),
+                translation: Vec3::new(controls_x + 18., label_pos.y - 3., label_pos.z),
                 scale: gf::BODY.transform_scale(),
                 ..default()
             },
@@ -2796,11 +2766,8 @@ fn spawn_scale_row(
 
     commands.spawn((
         Text2dBundle {
-            text: Text::from_section(
-                label,
-                gf::BODY.text_style(&asset_server, WHITE),
-            )
-            .with_alignment(TextAlignment::Left),
+            text: Text::from_section(label, gf::BODY.text_style(&asset_server, WHITE))
+                .with_alignment(TextAlignment::Left),
             text_anchor: bevy::sprite::Anchor::CenterLeft,
             transform: Transform {
                 translation: label_pos,
@@ -2878,11 +2845,7 @@ fn spawn_scale_row(
             .with_alignment(TextAlignment::Center),
             text_anchor: bevy::sprite::Anchor::Center,
             transform: Transform {
-                translation: Vec3::new(
-                controls_x + 18.,
-                label_pos.y - 3.,
-                label_pos.z,
-            ),
+                translation: Vec3::new(controls_x + 18., label_pos.y - 3., label_pos.z),
                 scale: gf::BODY.transform_scale(),
                 ..default()
             },
@@ -2972,11 +2935,8 @@ fn spawn_cursor_color_row(
 
     commands.spawn((
         Text2dBundle {
-            text: Text::from_section(
-                label,
-                gf::BODY.text_style(&asset_server, WHITE),
-            )
-            .with_alignment(TextAlignment::Left),
+            text: Text::from_section(label, gf::BODY.text_style(&asset_server, WHITE))
+                .with_alignment(TextAlignment::Left),
             text_anchor: bevy::sprite::Anchor::CenterLeft,
             transform: Transform {
                 translation: label_pos,
@@ -3827,8 +3787,7 @@ pub fn handle_damage_text_size_button_click(
                         || (is_focused && focus_input.confirm_just_pressed())
                     {
                         let up = size_button.direction == VolumeDirection::Up;
-                        cheat_settings.damage_text_size =
-                            cheat_settings.damage_text_size.nudge(up);
+                        cheat_settings.damage_text_size = cheat_settings.damage_text_size.nudge(up);
                         cheat_settings.persist_persisted_options();
                         commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.2));
                     }

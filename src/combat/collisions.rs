@@ -5,6 +5,7 @@ use crate::combat::LifestealEvent;
 use crate::player::combat_heirlooms::ThornsOnDamageTracker;
 use crate::player::skill_heirlooms::{handle_fire_pillar_hit_clear, handle_laser_beam_hit_clear};
 use crate::player::skills::{Heirloom, ManaGainSource, PlayerSkills};
+use crate::world::portal::{XP_SHARD_LARGE_VALUE, XP_SHARD_MEDIUM_VALUE, XP_SHARD_SMALL_VALUE};
 use crate::NO_XP;
 use crate::{
     animations::{player_sprite::PlayerAnimation, ui_animaitons::UIIconMover},
@@ -903,9 +904,9 @@ pub fn check_item_drop_collisions(
             || obj == WorldObject::XPShardLarge
         {
             let mut xp_amount = match obj {
-                WorldObject::XPShard => 7,
-                WorldObject::XPShardMedium => 23,
-                WorldObject::XPShardLarge => 500,
+                WorldObject::XPShard => XP_SHARD_SMALL_VALUE,
+                WorldObject::XPShardMedium => XP_SHARD_MEDIUM_VALUE,
+                WorldObject::XPShardLarge => XP_SHARD_LARGE_VALUE,
                 _ => 0,
             };
             if *NO_XP {

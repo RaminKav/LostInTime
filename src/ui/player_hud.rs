@@ -31,7 +31,7 @@ use crate::{
     assets::Graphics,
     attributes::{
         attribute_helpers::skill_power_multiplier, ActiveConsumableBuffs, AttackSpeed,
-        BonusAttackSpeed, CritChance, CurrentHealth, CurrentMana, MaxHealth, MaxMana,
+        BonusAttackSpeed, CritChance, CurrentHealth, CurrentMana, Defence, MaxHealth, MaxMana,
         ProjectileSize, SkillPower, Speed,
     },
     audio::{AudioSoundEffect, SoundSpawner},
@@ -1420,6 +1420,7 @@ pub fn handle_heirloom_hud_tooltip(
         (
             &PlayerSkills,
             &crate::attributes::MaxHealth,
+            &Defence,
             Option<&crate::player::combat_heirlooms::MaxHPHuntTracker>,
             Option<&crate::player::combat_heirlooms::CrateBreakDamageTracker>,
             Option<&crate::player::combat_heirlooms::ThornsOnDamageTracker>,
@@ -1437,7 +1438,8 @@ pub fn handle_heirloom_hud_tooltip(
     use super::interactions::Interaction;
 
     // First, do hit detection and update interactable states
-    let hit_entity = super::ui_helpers::pointcast_2d(&cursor_pos, &hit_detection_sprites, None, None);
+    let hit_entity =
+        super::ui_helpers::pointcast_2d(&cursor_pos, &hit_detection_sprites, None, None);
 
     // Update all heirloom hud icons' interactable state based on cursor position, or — while
     // the gamepad pause overlay (`UIState::Pause`) is active — whichever icon has d-pad/stick
@@ -1478,6 +1480,7 @@ pub fn handle_heirloom_hud_tooltip(
             let Ok((
                 skills,
                 max_health,
+                defence,
                 hunt_tracker,
                 crate_tracker,
                 thorns_tracker,
@@ -1502,6 +1505,7 @@ pub fn handle_heirloom_hud_tooltip(
                 skills,
                 coins.coins,
                 max_health.0,
+                defence.0,
                 hunt_tracker,
                 crate_tracker,
                 thorns_tracker,
@@ -1854,7 +1858,8 @@ pub fn handle_active_skill_hud_tooltip(
     ui_focus: Res<UiFocus>,
 ) {
     // First, do hit detection and update interactable states
-    let hit_entity = super::ui_helpers::pointcast_2d(&cursor_pos, &hit_detection_sprites, None, None);
+    let hit_entity =
+        super::ui_helpers::pointcast_2d(&cursor_pos, &hit_detection_sprites, None, None);
 
     // Update all skill icons' interactable state based on cursor position, or — while the
     // gamepad pause overlay is active — whichever icon has d-pad/stick focus (see
@@ -2073,11 +2078,7 @@ fn spawn_mana_gain_entry(
                 .with_alignment(TextAlignment::Center),
                 text_anchor: Anchor::CenterLeft,
                 transform: Transform {
-                    translation: Vec3::new(
-                        -ORB_TRACKER_COL_WIDTH * 0.5 + 2.,
-                        0.,
-                        1.,
-                    ),
+                    translation: Vec3::new(-ORB_TRACKER_COL_WIDTH * 0.5 + 2., 0., 1.),
                     scale: gf::HUD_MICRO.transform_scale(),
                     ..default()
                 },
@@ -2514,11 +2515,7 @@ fn spawn_health_tracker_tooltip(
                         .with_alignment(TextAlignment::Center),
                         text_anchor: Anchor::CenterLeft,
                         transform: Transform {
-                            translation: Vec3::new(
-                                -ORB_TRACKER_COL_WIDTH * 0.5 + 2.,
-                                0.,
-                                1.,
-                            ),
+                            translation: Vec3::new(-ORB_TRACKER_COL_WIDTH * 0.5 + 2., 0., 1.),
                             scale: gf::HUD_MICRO.transform_scale(),
                             ..default()
                         },
@@ -2589,7 +2586,8 @@ pub fn handle_mana_tracker_hud_tooltip(
 ) {
     use Interaction;
 
-    let hit_entity = super::ui_helpers::pointcast_2d(&cursor_pos, &hit_detection_sprites, None, None);
+    let hit_entity =
+        super::ui_helpers::pointcast_2d(&cursor_pos, &hit_detection_sprites, None, None);
 
     for (entity, _, mut interactable) in hover_targets.iter_mut() {
         let is_hit = hit_entity
@@ -2664,7 +2662,8 @@ pub fn handle_health_tracker_hud_tooltip(
 ) {
     use Interaction;
 
-    let hit_entity = super::ui_helpers::pointcast_2d(&cursor_pos, &hit_detection_sprites, None, None);
+    let hit_entity =
+        super::ui_helpers::pointcast_2d(&cursor_pos, &hit_detection_sprites, None, None);
 
     for (entity, _, mut interactable) in hover_targets.iter_mut() {
         let is_hit = hit_entity
@@ -2720,6 +2719,7 @@ fn get_heirloom_scaling_text(
     skills: &PlayerSkills,
     coins: u32,
     max_health: i32,
+    defence: i32,
     hunt_tracker: Option<&MaxHPHuntTracker>,
     crate_tracker: Option<&CrateBreakDamageTracker>,
     thorns_tracker: Option<&crate::player::combat_heirlooms::ThornsOnDamageTracker>,
@@ -2742,6 +2742,27 @@ fn get_heirloom_scaling_text(
             if stacks > 0 {
                 let hp_bonus_percent = (max_health as f32 / 100.0) * 10.0 * stacks as f32;
                 Some(format!("(+{}% damage)", hp_bonus_percent as i32))
+            } else {
+                None
+            }
+        }
+        Heirloom::ThornArmor => {
+            // Mirror attributes::AttributeCalculator ThornArmor bonus:
+            // +10 thorns per 10 defence, per stack.
+            let stacks = skills.get_count(Heirloom::ThornArmor);
+            if stacks > 0 {
+                let thorns_bonus = (defence / 10) * 10 * stacks;
+                Some(format!("(+{} Thorns)", thorns_bonus))
+            } else {
+                None
+            }
+        }
+        Heirloom::ManaOrbs => {
+            let stacks = skills.get_count(Heirloom::ManaOrbs);
+            if stacks > 0 {
+                // Base 10 mana + 5 per Mana Dust stack (see mana orb pickup collision).
+                let mana_from_orb = 10 + stacks as i32 * 5;
+                Some(format!("(Mana Orbs give {} Mana)", mana_from_orb))
             } else {
                 None
             }
@@ -4385,7 +4406,8 @@ pub fn handle_consumable_buff_hud_tooltip(
 ) {
     use super::interactions::Interaction;
 
-    let hit_entity = super::ui_helpers::pointcast_2d(&cursor_pos, &hit_detection_sprites, None, None);
+    let hit_entity =
+        super::ui_helpers::pointcast_2d(&cursor_pos, &hit_detection_sprites, None, None);
 
     for (entity, _, mut interactable, _) in hud_icons.iter_mut() {
         let is_hit = hit_entity
@@ -4613,7 +4635,8 @@ pub fn handle_pet_skill_hud_tooltip(
     mut last_hovered: Local<Option<Pet>>,
     res: Res<ScreenResolution>,
 ) {
-    let hit_entity = super::ui_helpers::pointcast_2d(&cursor_pos, &hit_detection_sprites, None, None);
+    let hit_entity =
+        super::ui_helpers::pointcast_2d(&cursor_pos, &hit_detection_sprites, None, None);
     for (entity, _, mut interactable, _) in pet_icons.iter_mut() {
         let is_hit = hit_entity
             .as_ref()

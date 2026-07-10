@@ -1,14 +1,152 @@
 use crate::combat::EnemyDeathEvent;
+use crate::custom_commands::CommandsExt;
 use crate::enemy::{spawner::MobSpawningPaused, Mob};
+use crate::item::WorldObject;
 use crate::night::EraTimer;
+use crate::player::levels::PlayerLevel;
 use crate::player::score::RunTimer;
 use crate::player::Player;
+use crate::proto::proto_param::ProtoParam;
 use crate::ui::tips::{SeenTips, Tip, TipEvent};
 use crate::world::dimension::{Era, EraManager};
 use bevy::prelude::*;
 use bevy_aseprite::anim::AsepriteAnimation;
 use bevy_aseprite::aseprite;
+use rand::Rng;
 use std::collections::HashSet;
+
+/// Multiplier on remaining-time farm conversion. `1.0` ≈ break-even with average farm;
+/// `> 1.0` slightly rewards finishing early.
+pub const TIME_BONUS_K: f32 = 1.15;
+/// Coin pickups are spawned in stacks of this size (final stack may be smaller).
+pub const TIME_BONUS_COIN_STACK_SIZE: usize = 50;
+pub const XP_SHARD_LARGE_VALUE: u32 = 500;
+pub const XP_SHARD_MEDIUM_VALUE: u32 = 23;
+pub const XP_SHARD_SMALL_VALUE: u32 = 7;
+
+/// Sustained XP/s from a full-era farm (level-curve derived; includes shrine vacuums).
+pub fn era_time_bonus_xp_per_sec(era: &Era) -> f32 {
+    match era {
+        Era::Main => 18.0,
+        Era::Second => 40.0,
+        Era::Third => 65.0,
+        Era::DungeonMain => 0.0,
+    }
+}
+
+/// Sustained coins/s from kill drop expectations at era average kill rates.
+pub fn era_time_bonus_coins_per_sec(era: &Era) -> f32 {
+    match era {
+        Era::Main => 0.43,
+        Era::Second => 1.70,
+        Era::Third => 1.85,
+        Era::DungeonMain => 0.0,
+    }
+}
+
+/// Convert remaining era time into bonus XP + coins (before packing into drops).
+pub fn calculate_era_time_bonus_amounts(era: &Era, remaining_seconds: f32) -> (u32, u32) {
+    let t = remaining_seconds.max(0.0);
+    let xp = (era_time_bonus_xp_per_sec(era) * t * TIME_BONUS_K).floor() as u32;
+    let coins = (era_time_bonus_coins_per_sec(era) * t * TIME_BONUS_K).floor() as u32;
+    (xp, coins)
+}
+
+/// Pack raw XP into largest shard denominations (large → medium → small).
+pub fn pack_xp_into_shards(mut xp: u32) -> (u32, u32, u32) {
+    let large = xp / XP_SHARD_LARGE_VALUE;
+    xp %= XP_SHARD_LARGE_VALUE;
+    let medium = xp / XP_SHARD_MEDIUM_VALUE;
+    xp %= XP_SHARD_MEDIUM_VALUE;
+    let small = xp / XP_SHARD_SMALL_VALUE;
+    (large, medium, small)
+}
+
+/// Pack coins into stacks of [`TIME_BONUS_COIN_STACK_SIZE`] (last stack may be smaller).
+pub fn pack_coins_into_stacks(coins: u32) -> Vec<usize> {
+    if coins == 0 {
+        return Vec::new();
+    }
+    let full = (coins as usize) / TIME_BONUS_COIN_STACK_SIZE;
+    let rem = (coins as usize) % TIME_BONUS_COIN_STACK_SIZE;
+    let mut stacks = vec![TIME_BONUS_COIN_STACK_SIZE; full];
+    if rem > 0 {
+        stacks.push(rem);
+    }
+    stacks
+}
+
+fn spawn_time_bonus_drop(
+    proto_param: &mut ProtoParam,
+    obj: WorldObject,
+    pos: Vec2,
+    count: usize,
+    player_level: Option<u8>,
+) {
+    let mut rng = rand::thread_rng();
+    let drop_offset = Vec2::new(rng.gen_range(-30.0..30.0), rng.gen_range(-30.0..30.0));
+    // `spawn_item_from_proto` needs &mut ProtoCommands and &ProtoParam; same split as chaos shrine.
+    let proto_ref: &ProtoParam = unsafe { &*(proto_param as *mut ProtoParam as *const ProtoParam) };
+    // `spawn_item_from_proto` already attaches ItemDropDespawnTimer.
+    let _ = proto_param.proto_commands.spawn_item_from_proto(
+        obj,
+        proto_ref,
+        pos + drop_offset,
+        count,
+        player_level,
+    );
+}
+
+/// Extra loot for clearing the era boss with time remaining — does not replace boss loot table drops.
+fn drop_era_time_bonus_loot(
+    proto_param: &mut ProtoParam,
+    era: &Era,
+    remaining_seconds: f32,
+    drop_pos: Vec2,
+    player_level: Option<u8>,
+) {
+    let (xp, coins) = calculate_era_time_bonus_amounts(era, remaining_seconds);
+    if xp == 0 && coins == 0 {
+        return;
+    }
+
+    let (large, medium, small) = pack_xp_into_shards(xp);
+    info!(
+        "Era time bonus ({:?}, {:.0}s left): {} XP → {}L/{}M/{}S shards, {} coins",
+        era, remaining_seconds, xp, large, medium, small, coins
+    );
+
+    for _ in 0..large {
+        spawn_time_bonus_drop(
+            proto_param,
+            WorldObject::XPShardLarge,
+            drop_pos,
+            1,
+            player_level,
+        );
+    }
+    for _ in 0..medium {
+        spawn_time_bonus_drop(
+            proto_param,
+            WorldObject::XPShardMedium,
+            drop_pos,
+            1,
+            player_level,
+        );
+    }
+    for _ in 0..small {
+        spawn_time_bonus_drop(proto_param, WorldObject::XPShard, drop_pos, 1, player_level);
+    }
+    for stack_count in pack_coins_into_stacks(coins) {
+        spawn_time_bonus_drop(
+            proto_param,
+            WorldObject::Coin,
+            drop_pos,
+            stack_count,
+            player_level,
+        );
+    }
+}
 
 aseprite!(pub Portal, "textures/portal/portal.ase");
 aseprite!(pub UIPortal, "textures/portal/portal_large.aseprite");
@@ -72,47 +210,45 @@ pub fn track_boss_kills(
     mut mob_spawning_paused: ResMut<MobSpawningPaused>,
     mut tip_event: EventWriter<TipEvent>,
     seen_tips: Res<SeenTips>,
+    mut proto_param: ProtoParam,
+    player_level: Query<&PlayerLevel, With<Player>>,
 ) {
     for death_event in death_events.iter() {
         if let Ok(mob) = mob_query.get(death_event.entity) {
-            // Only RedMushking counts for Era::Main (Act1 achievement)
             // StoneGolem is a boss but doesn't count for era completion
-            if mob == &Mob::RedMushking {
-                if era_manager.current_era == Era::Main {
-                    boss_kill_tracker.mark_era1_boss_killed(run_timer.elapsed_seconds);
-                } else {
-                    boss_kill_tracker.mark_boss_killed(era_manager.current_era.clone());
-                }
-                info!("Boss killed in era {:?}", era_manager.current_era);
+            if !mob.is_boss() || mob == &Mob::StoneGolem {
+                continue;
+            }
 
-                if (era_manager.current_era == Era::Main || era_manager.current_era == Era::Second)
-                    && era_timer.remaining_seconds > 0.0
-                {
-                    mob_spawning_paused.paused = true;
+            let era = era_manager.current_era.clone();
+            let first_clear = !boss_kill_tracker.is_boss_killed(&era);
 
-                    if !seen_tips.has_seen(&Tip::PeacefulPeriod) {
-                        tip_event.send(TipEvent {
-                            tip: Tip::PeacefulPeriod,
-                            pos: Vec3::new(-184., -116., 95.),
-                        });
-                    }
-                }
-            } else if mob.is_boss() && mob != &Mob::StoneGolem {
-                // Other bosses (for future eras) still count
-                boss_kill_tracker.mark_boss_killed(era_manager.current_era.clone());
-                info!("Boss killed in era {:?}", era_manager.current_era);
+            if mob == &Mob::RedMushking && era == Era::Main {
+                boss_kill_tracker.mark_era1_boss_killed(run_timer.elapsed_seconds);
+            } else {
+                boss_kill_tracker.mark_boss_killed(era.clone());
+            }
+            info!("Boss killed in era {:?}", era);
 
-                if (era_manager.current_era == Era::Main || era_manager.current_era == Era::Second)
-                    && era_timer.remaining_seconds > 0.0
-                {
-                    mob_spawning_paused.paused = true;
+            if first_clear {
+                let level = player_level.get_single().ok().map(|l| l.level);
+                drop_era_time_bonus_loot(
+                    &mut proto_param,
+                    &era,
+                    era_timer.remaining_seconds,
+                    death_event.enemy_pos,
+                    level,
+                );
+            }
 
-                    if !seen_tips.has_seen(&Tip::PeacefulPeriod) {
-                        tip_event.send(TipEvent {
-                            tip: Tip::PeacefulPeriod,
-                            pos: Vec3::new(-184., -116., 90.),
-                        });
-                    }
+            if (era == Era::Main || era == Era::Second) && era_timer.remaining_seconds > 0.0 {
+                mob_spawning_paused.paused = true;
+
+                if !seen_tips.has_seen(&Tip::PeacefulPeriod) {
+                    tip_event.send(TipEvent {
+                        tip: Tip::PeacefulPeriod,
+                        pos: Vec3::new(-184., -116., 95.),
+                    });
                 }
             }
         }

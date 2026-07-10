@@ -27,6 +27,7 @@ use crate::player::unlocks::RunUnlockState;
 use crate::player::ModifyCurencyEvent;
 use crate::proto::proto_param::ProtoParam;
 use crate::ui::focus::Focusable;
+use crate::ui::game_fonts as gf;
 use crate::ui::heirloom_browser_grid::{
     despawn_dev_heirloom_picker_grid_layers, grid_backdrop_size, heirloom_choice_from_full_pool,
     sorted_full_pool_grid_entries, spawn_heirloom_grid_overlay, DevHeirloomPickerGridLayer,
@@ -36,7 +37,6 @@ use crate::ui::skill_browser_grid::{
     despawn_dev_skill_picker_grid_layers, sorted_dev_skill_grid_entries, spawn_skill_grid_overlay,
     DevSkillPickerGridLayer, DevSkillPickerIcon,
 };
-use crate::ui::game_fonts as gf;
 use crate::ui::time_crystal_progress_ui::CrystalUnlockIcon;
 use crate::ui::{
     BLUEPRINT_PAGE_BTN_CENTER_Y, BLUEPRINT_PAGE_BTN_DOWN_X, BLUEPRINT_PAGE_BTN_SIZE,
@@ -684,11 +684,8 @@ pub fn setup_inv_ui(
             // "owned/needed" label (4x5 font, size 5). Starts blank.
             let count_text = commands
                 .spawn(Text2dBundle {
-                    text: Text::from_section(
-                        "",
-                        gf::BODY.text_style(&asset_server, Color::WHITE),
-                    )
-                    .with_alignment(TextAlignment::Center),
+                    text: Text::from_section("", gf::BODY.text_style(&asset_server, Color::WHITE))
+                        .with_alignment(TextAlignment::Center),
                     text_anchor: Anchor::Center,
                     transform: Transform {
                         translation: Vec3::new(
@@ -852,10 +849,10 @@ pub fn setup_inv_ui(
                         .with_alignment(TextAlignment::Center),
                         text_anchor: Anchor::Center,
                         transform: Transform {
-                translation: Vec3::new(0., 0.5, 1.),
-                scale: gf::BODY.transform_scale(),
-                ..default()
-            },
+                            translation: Vec3::new(0., 0.5, 1.),
+                            scale: gf::BODY.transform_scale(),
+                            ..default()
+                        },
                         ..Default::default()
                     },
                     RenderLayers::from_layers(&[3]),
@@ -896,10 +893,10 @@ pub fn setup_inv_ui(
                     .with_alignment(TextAlignment::Center),
                     text_anchor: Anchor::Center,
                     transform: Transform {
-                translation: Vec3::new(0., 0.5, 1.),
-                scale: gf::BODY.transform_scale(),
-                ..default()
-            },
+                        translation: Vec3::new(0., 0.5, 1.),
+                        scale: gf::BODY.transform_scale(),
+                        ..default()
+                    },
                     ..Default::default()
                 },
                 RenderLayers::from_layers(&[3]),
@@ -935,10 +932,10 @@ pub fn setup_inv_ui(
                     .with_alignment(TextAlignment::Center),
                     text_anchor: Anchor::Center,
                     transform: Transform {
-                translation: Vec3::new(0., 0.5, 1.),
-                scale: gf::BODY.transform_scale(),
-                ..default()
-            },
+                        translation: Vec3::new(0., 0.5, 1.),
+                        scale: gf::BODY.transform_scale(),
+                        ..default()
+                    },
                     ..Default::default()
                 },
                 RenderLayers::from_layers(&[3]),
@@ -1194,7 +1191,6 @@ fn spawn_sort_inventory_button(
             texture: graphics.get_ui_element_texture(UIElement::InventorySlot),
             transform: Transform {
                 translation,
-                scale: gf::BODY.transform_scale(),
                 ..Default::default()
             },
             sprite: Sprite {
@@ -1220,11 +1216,8 @@ fn spawn_sort_inventory_button(
 
     let label = commands
         .spawn(Text2dBundle {
-            text: Text::from_section(
-                "SORT",
-                gf::BODY.text_style(&asset_server, YELLOW_2),
-            )
-            .with_alignment(TextAlignment::Center),
+            text: Text::from_section("SORT", gf::BODY.text_style(&asset_server, YELLOW_2))
+                .with_alignment(TextAlignment::Center),
             text_anchor: Anchor::Center,
             transform: Transform {
                 translation: Vec3::new(0., 0., 1.),
@@ -1371,11 +1364,8 @@ fn spawn_damage_tracker_toggle_button(
 
     let label = commands
         .spawn(Text2dBundle {
-            text: Text::from_section(
-                "DMG",
-                gf::BODY.text_style(&asset_server, YELLOW_2),
-            )
-            .with_alignment(TextAlignment::Center),
+            text: Text::from_section("DMG", gf::BODY.text_style(&asset_server, YELLOW_2))
+                .with_alignment(TextAlignment::Center),
             text_anchor: Anchor::Center,
             transform: Transform {
                 translation: Vec3::new(0., 0., 1.),
@@ -1469,10 +1459,10 @@ fn spawn_material_drop_filter_panel(
                 .with_alignment(TextAlignment::Center),
                 text_anchor: Anchor::Center,
                 transform: Transform {
-                translation: Vec3::new(0., title_y, 11.),
-                scale: gf::BODY.transform_scale(),
-                ..default()
-            },
+                    translation: Vec3::new(0., title_y, 11.),
+                    scale: gf::BODY.transform_scale(),
+                    ..default()
+                },
                 ..default()
             },
             RenderLayers::from_layers(&[3]),
@@ -1516,17 +1506,14 @@ fn spawn_material_drop_filter_panel(
         let btn = btn_ec.id();
         let text = commands
             .spawn(Text2dBundle {
-                text: Text::from_section(
-                    label,
-                    gf::BODY.text_style(&asset_server, Color::WHITE),
-                )
-                .with_alignment(TextAlignment::Center),
+                text: Text::from_section(label, gf::BODY.text_style(&asset_server, Color::WHITE))
+                    .with_alignment(TextAlignment::Center),
                 text_anchor: Anchor::Center,
                 transform: Transform {
-                translation: Vec3::new(0., 0., 1.),
-                scale: gf::BODY.transform_scale(),
-                ..default()
-            },
+                    translation: Vec3::new(0., 0., 1.),
+                    scale: gf::BODY.transform_scale(),
+                    ..default()
+                },
                 ..default()
             })
             .insert(RenderLayers::from_layers(&[3]))
@@ -1581,18 +1568,15 @@ fn spawn_material_drop_filter_panel(
         };
         let x_overlay = commands
             .spawn(Text2dBundle {
-                text: Text::from_section(
-                    "X",
-                    gf::DISPLAY.text_style(&asset_server, RED),
-                )
-                .with_alignment(TextAlignment::Center),
+                text: Text::from_section("X", gf::DISPLAY.text_style(&asset_server, RED))
+                    .with_alignment(TextAlignment::Center),
                 text_anchor: Anchor::Center,
                 visibility: x_vis,
                 transform: Transform {
-                translation: Vec3::new(0., 0., 3.),
-                scale: gf::DISPLAY.transform_scale(),
-                ..default()
-            },
+                    translation: Vec3::new(0., 0., 3.),
+                    scale: gf::DISPLAY.transform_scale(),
+                    ..default()
+                },
                 ..default()
             })
             .insert(RenderLayers::from_layers(&[3]))
@@ -3399,10 +3383,7 @@ pub fn render_blueprint_rows_and_nav(
             .unwrap_or_else(|| format!("{:?}", recipe_obj));
         commands
             .spawn(Text2dBundle {
-                text: Text::from_section(
-                    label,
-                    gf::BODY.text_style(&asset_server, YELLOW_2),
-                ),
+                text: Text::from_section(label, gf::BODY.text_style(&asset_server, YELLOW_2)),
                 text_anchor: Anchor::CenterLeft,
                 transform: Transform {
                     translation: Vec3::new(
