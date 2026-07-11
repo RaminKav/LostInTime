@@ -5,7 +5,9 @@
 //! and apply visual size with **[`FontStyle::transform_scale`]** on the text entity `Transform`.
 //!
 //! **Workspace rules:** Alagard logical sizes use steps of **15.0** (or **30.0** for large
-//! display). Visual size is controlled by **`scale`** (`1.0` / `0.7` / `0.5`).
+//! display). Visual size is controlled by **`scale`** (`1.0` / `0.7` / `0.5`). Scaled-down
+//! roles use [`ALAGARD_SCALED_ATLAS_SIZE`] so they do not share Bevy font atlases with
+//! scale-1.0 display text (keeps titles nearest-crisp while body text can use linear).
 
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -95,6 +97,13 @@ pub mod paths {
 
 // --- Semantic roles (prefer these; feature aliases below point here) ----------
 
+/// Logical Alagard size for scale-1.0 display text (crisp nearest sampling).
+pub const ALAGARD_DISPLAY_SIZE: f32 = 15.0;
+/// Bevy keys font atlases by `font_size`. Scaled-down roles use a nudged size so they get a
+/// **separate** atlas that can use linear filtering without blurring scale-1.0 titles
+/// (e.g. main-menu "Enter") that share the same font file.
+pub const ALAGARD_SCALED_ATLAS_SIZE: f32 = ALAGARD_DISPLAY_SIZE + 1.0 / 32.0;
+
 /// Big menu / screen titles.
 pub const DISPLAY_LARGE: FontStyle = FontStyle {
     path: paths::ALAGARD,
@@ -105,41 +114,41 @@ pub const DISPLAY_LARGE: FontStyle = FontStyle {
 /// Standard titles, HUD currency, floating combat text.
 pub const DISPLAY: FontStyle = FontStyle {
     path: paths::ALAGARD,
-    size: 15.0,
+    size: ALAGARD_DISPLAY_SIZE,
     scale: 1.0,
 };
 
 /// Mid titles (e.g. heirloom card title).
 pub const TITLE: FontStyle = FontStyle {
     path: paths::ALAGARD,
-    size: 15.0,
+    size: ALAGARD_SCALED_ATLAS_SIZE,
     scale: 0.7,
 };
 
 /// Descriptions and all former `4x5` / `slkscr` / `slkscrbold` body text.
 pub const BODY: FontStyle = FontStyle {
     path: paths::ALAGARD,
-    size: 15.0,
+    size: ALAGARD_SCALED_ATLAS_SIZE,
     scale: 0.5,
 };
 
 pub const HEIRLOOM_BODY: FontStyle = FontStyle {
     path: paths::ALAGARD,
-    size: 15.0,
+    size: ALAGARD_SCALED_ATLAS_SIZE,
     scale: 0.56,
 };
 
 /// Tiny labels / counts. Same as [`BODY`] for now; kept separate so it can diverge later.
 pub const MICRO: FontStyle = FontStyle {
     path: paths::ALAGARD,
-    size: 15.0,
+    size: ALAGARD_SCALED_ATLAS_SIZE,
     scale: 0.5,
 };
 
 /// Specialty display font used for achievement names.
 pub const ACHIEVEMENT_NAME: FontStyle = FontStyle {
     path: paths::ALAGARD,
-    size: 15.0,
+    size: ALAGARD_SCALED_ATLAS_SIZE,
     scale: 0.7,
 };
 
@@ -240,19 +249,19 @@ pub const MENU_TITLE_LARGE: FontStyle = DISPLAY_LARGE;
 /// Default floating combat and pickup labels (Alagard @ 0.75).
 pub const FLOATING_TEXT: FontStyle = FontStyle {
     path: paths::ALAGARD,
-    size: 15.0,
+    size: ALAGARD_SCALED_ATLAS_SIZE,
     scale: 0.75,
 };
 /// Compact floating text (Alagard @ 0.5).
 pub const FLOATING_TEXT_SMALL: FontStyle = FontStyle {
     path: paths::ALAGARD,
-    size: 15.0,
+    size: ALAGARD_SCALED_ATLAS_SIZE,
     scale: 0.5,
 };
 /// Large floating text (Alagard @ 1.0).
 pub const FLOATING_TEXT_LARGE: FontStyle = FontStyle {
     path: paths::ALAGARD,
-    size: 15.0,
+    size: ALAGARD_DISPLAY_SIZE,
     scale: 1.0,
 };
 /// Top-center transient announcements.
