@@ -8,7 +8,8 @@ use crate::{
     player::Player,
     proto::proto_param::ProtoParam,
     ui::{
-        key_input_guide::InteractionGuideTrigger, minimap::UpdateMiniMapEvent,
+        key_input_guide::{InteractionGuideTrigger, SHRINE_INTERACT_GUIDE_DISTANCE},
+        minimap::UpdateMiniMapEvent,
     },
     world::TileMapPosition,
     GameParam,
@@ -68,8 +69,8 @@ pub fn handle_gamble_shrine_rewards(
                 .remove::<GambleShrine>()
                 .insert(InteractionGuideTrigger {
                     text: Some("Interact".to_string()),
-                    activation_distance: 32.,
-                    icon_stack: Some(ItemStack::crate_icon_stack(WorldObject::Coin)),
+                    activation_distance: SHRINE_INTERACT_GUIDE_DISTANCE,
+                    icon_stack: None,
                 })
                 .insert(obj_action.clone());
         }

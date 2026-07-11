@@ -12,7 +12,10 @@ use crate::{
     juice::{FlashEffect, ShakeEffect},
     player::{ModifyCurencyEvent, Player},
     proto::proto_param::ProtoParam,
-    ui::{global_text_message::GlobalTextMessageEvent, key_input_guide::InteractionGuideTrigger},
+    ui::{
+        global_text_message::GlobalTextMessageEvent,
+        key_input_guide::{InteractionGuideTrigger, SHRINE_INTERACT_GUIDE_DISTANCE},
+    },
     world::{dimension::Era, dungeon::Dungeon, world_helpers::tile_pos_to_world_pos},
     GameParam, InputMappings, TextureCamera,
 };
@@ -99,7 +102,7 @@ pub fn handle_pay_shrine_cost(
         let shrine_pos = tile_pos_to_world_pos(*shrine, false);
         let cost = summon_tracker.current_cost();
 
-        if shrine_pos.distance(player_t.translation().truncate()) < 32.
+        if shrine_pos.distance(player_t.translation().truncate()) < SHRINE_INTERACT_GUIDE_DISTANCE
             && game.get_coins() as i32 >= cost
         {
             currency_event.send(ModifyCurencyEvent {

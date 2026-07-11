@@ -45,7 +45,6 @@
         Crate: 0.0022,
         Crate2: 0.0018,
         DeadSapling: 0.004,
-        ChaosTotem: 0.0004,
         Bush: 0.0015,
         Bush2: 0.0015,
         LargeStump: 0.001,
@@ -70,8 +69,8 @@
         HeirloomShrine: (min: 5, max: 5),
         BlacksmithMerchant: (min: 2, max: 3),
         ActiveSkillShrine: (min: 2, max: 2),
-        CauldronShrine: (min: 3, max: 3),
-        WellShrine: (min: 3, max: 3),
+        CauldronShrine: (min: 1, max: 1),
+        ChaosTotem: (min: 3, max: 3),
       },
       obj_allowed_tiles_map: {
         SmallGreenTree: [GrassTile],

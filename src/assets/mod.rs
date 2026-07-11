@@ -22,6 +22,7 @@ use crate::item::dungeon_shrine::AccessoryShrineAnim;
 use crate::item::dungeon_shrine::ArmorShrineAnim;
 use crate::item::dungeon_shrine::WeaponShrineAnim;
 use crate::item::shrine_visuals::ShrineEye;
+use crate::item::shrine_repair::ShrineRepairRingAnim;
 use crate::item::{
     FurnaceRecipeList, RecipeList, RecipeListProto, Recipes, WorldObject, WorldObjectResource,
 };
@@ -150,6 +151,7 @@ impl Plugin for GameAssetsPlugin {
                 item_glows: None,
                 combat_shrine_anim: None,
                 shrine_eye: None,
+                shrine_repair_ring: None,
                 weapon_shrine_anim: None,
                 armor_shrine_anim: None,
                 accessory_shrine_anim: None,
@@ -233,6 +235,7 @@ pub struct Graphics {
     pub armor_shrine_anim: Option<Handle<Aseprite>>,
     pub accessory_shrine_anim: Option<Handle<Aseprite>>,
     pub shrine_eye: Option<Handle<Aseprite>>,
+    pub shrine_repair_ring: Option<Handle<Aseprite>>,
     pub portal_ase: Option<Handle<Aseprite>>,
     pub ui_portal_ase: Option<Handle<Aseprite>>,
     pub class_pet_data: Option<ClassPetData>,
@@ -649,6 +652,7 @@ impl GameAssetsPlugin {
             item_glows: Some(item_glow_handles),
             combat_shrine_anim: Some(asset_server.load(CombatShrineAnim::PATH)),
             shrine_eye: Some(asset_server.load(ShrineEye::PATH)),
+            shrine_repair_ring: Some(asset_server.load(ShrineRepairRingAnim::PATH)),
             weapon_shrine_anim: Some(asset_server.load(WeaponShrineAnim::PATH)),
             armor_shrine_anim: Some(asset_server.load(ArmorShrineAnim::PATH)),
             accessory_shrine_anim: Some(asset_server.load(AccessoryShrineAnim::PATH)),

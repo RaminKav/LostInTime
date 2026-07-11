@@ -83,8 +83,6 @@
         SnowCrystalSml4: 0.0003,
         SnowCrystalMed1: 0.0002,
         SnowCrystalMed2: 0.0002,
-
-        ChaosTotem: 0.0004,
       },
        shrine_counts: {
         CombatShrine: (min: 2, max: 4),
@@ -92,9 +90,10 @@
         MicrowaveShrine: (min: 1, max: 2),
         HeirloomShrine: (min: 5, max: 5),
         BlacksmithMerchant: (min: 1, max: 3),
-        ActiveSkillShrine: (min: 1, max: 2),
+        ActiveSkillShrine: (min: 1, max: 1),
         CauldronShrine: (min: 1, max: 1),
         WellShrine: (min: 1, max: 1),
+        ChaosTotem: (min: 3, max: 3),
       },
       obj_allowed_tiles_map: {
         IcePatch: [GrassTile],

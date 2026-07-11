@@ -9,7 +9,11 @@ use crate::{
         },
         unlocks::{UnlockUpgrades, UnlockedSkills},
     },
-    ui::{key_input_guide::InteractionGuideTrigger, minimap::UpdateMiniMapEvent, UIState},
+    ui::{
+        key_input_guide::{InteractionGuideTrigger, SHRINE_INTERACT_GUIDE_DISTANCE},
+        minimap::UpdateMiniMapEvent,
+        UIState,
+    },
     world::TileMapPosition,
     GameParam,
 };
@@ -222,7 +226,7 @@ fn restore_active_skill_shrine_interactivity(commands: &mut Commands, shrine_ent
         .insert(ObjectAction::ActiveSkillShrine)
         .insert(InteractionGuideTrigger {
             text: Some("Get Skill".to_string()),
-            activation_distance: 32.,
+            activation_distance: SHRINE_INTERACT_GUIDE_DISTANCE,
             icon_stack: None,
         });
 }

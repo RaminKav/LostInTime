@@ -114,7 +114,7 @@ pub fn setup_microwave_shrine_ui(
             )
             .with_alignment(TextAlignment::Center),
             transform: Transform {
-                translation: Vec3::new(0., GAME_HEIGHT / 2. - 20., 2.),
+                translation: Vec3::new(0., GAME_HEIGHT / 2. - 60., 2.),
                 scale: gf::MENU_TITLE.transform_scale(),
                 ..Default::default()
             },
@@ -131,7 +131,7 @@ pub fn setup_microwave_shrine_ui(
             )
             .with_alignment(TextAlignment::Center),
             transform: Transform {
-                translation: Vec3::new(0., GAME_HEIGHT / 2. - 60., 2.),
+                translation: Vec3::new(0., GAME_HEIGHT / 2. - 100., 2.),
                 scale: gf::BODY.transform_scale(),
                 ..Default::default()
             },
@@ -149,7 +149,7 @@ pub fn setup_microwave_shrine_ui(
             )
             .with_alignment(TextAlignment::Center),
             transform: Transform {
-                translation: Vec3::new(0., GAME_HEIGHT / 2. - 40., 2.),
+                translation: Vec3::new(0., GAME_HEIGHT / 2. - 80., 2.),
                 scale: gf::BODY.transform_scale(),
                 ..Default::default()
             },
@@ -281,13 +281,13 @@ pub fn handle_microwave_shrine_rarity_click(
 
     for (e, sprite, global_transform, btn, mut interactable) in buttons.iter_mut() {
         let size = sprite.custom_size.unwrap_or(Vec2::ZERO);
-        let hit = cursor_pos.ui_hover_hit_allowed()
-            && point_in_sprite(&cursor, size, global_transform);
+        let hit =
+            cursor_pos.ui_hover_hit_allowed() && point_in_sprite(&cursor, size, global_transform);
 
         let enabled = btn.can_afford && btn.has_enough_heirlooms;
         let is_focused = ui_focus.is_focused(e);
-        let confirm_pressed = (hit && left_mouse_pressed)
-            || (is_focused && ui_focus.confirm_just_pressed);
+        let confirm_pressed =
+            (hit && left_mouse_pressed) || (is_focused && ui_focus.confirm_just_pressed);
 
         if hit || is_focused {
             match interactable.current() {
@@ -486,8 +486,8 @@ pub fn handle_microwave_shrine_heirloom_click(
         let hit = cursor_pos.ui_hover_hit_allowed()
             && point_in_sprite(&cursor, hit_size, global_transform);
         let is_focused = ui_focus.is_focused(e);
-        let confirm_pressed = (hit && left_mouse_pressed)
-            || (is_focused && ui_focus.confirm_just_pressed);
+        let confirm_pressed =
+            (hit && left_mouse_pressed) || (is_focused && ui_focus.confirm_just_pressed);
 
         if hit || is_focused {
             match interactable.current() {

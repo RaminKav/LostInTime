@@ -22,7 +22,7 @@ use crate::player::skills::{
     ActiveSkill, ActiveSkillUsedEvent, ClassSkillSlots, Heirloom, PhasingThroughEnemies,
     PlayerSkills,
 };
-use crate::ui::key_input_guide::InteractionGuideTrigger;
+use crate::ui::key_input_guide::{InteractionGuideTrigger, SHRINE_INTERACT_GUIDE_DISTANCE};
 use crate::world::dimension::{DimensionSpawnEvent, Era};
 use bevy::prelude::*;
 use bevy::ecs::system::SystemParam;
@@ -1495,6 +1495,7 @@ pub fn handle_interact_objects(
             &ObjectAction,
             &WorldObject,
             &SpriteAnchor,
+            &InteractionGuideTrigger,
         ),
         (With<InteractionGuideTrigger>, Without<crate::item::shrine_visuals::ShrineNeedsRepair>),
     >,
@@ -1515,10 +1516,10 @@ pub fn handle_interact_objects(
     if !keybinds.check_interact_input(&key_input, &mouse_input) && !gamepad_pressed {
         return;
     }
-    for (obj_e, t, obj_action, obj, anchor) in objs.iter() {
+    for (obj_e, t, obj_action, obj, anchor, guide) in objs.iter() {
         let obj_t = t.translation().truncate() - anchor.0;
         let (player_t, mut inv) = player_query.single_mut();
-        if obj_t.distance(player_t.translation().truncate()) <= 32. {
+        if obj_t.distance(player_t.translation().truncate()) <= guide.activation_distance {
             obj_action.run_action(
                 obj_e,
                 world_pos_to_tile_pos(obj_t),
@@ -1562,7 +1563,7 @@ pub fn handle_open_essence_ui(
     }
     let player_t = player_query.single().translation().truncate();
     for (_entity, transform, choices) in nearby_merchant_query.iter() {
-        if player_t.distance(transform.translation().truncate()) < 32. {
+        if player_t.distance(transform.translation().truncate()) < SHRINE_INTERACT_GUIDE_DISTANCE {
             commands.insert_resource(choices.clone());
             commands.insert_resource(crate::ui::MerchantShopOpenLock(Timer::from_seconds(
                 0.45,

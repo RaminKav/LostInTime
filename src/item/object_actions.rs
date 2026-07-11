@@ -75,6 +75,8 @@ pub enum ObjectAction {
     ActiveSkillShrine,
     HeirloomShrine,
     MicrowaveShrine,
+    WellShrine,
+    CauldronShrine,
     WeaponShrine,
     ArmorShrine,
     AccessoryShrine,
@@ -369,8 +371,16 @@ impl ObjectAction {
                         num_mobs_left: num_spawns_left,
                         tile_pos: obj_pos,
                     })
+                    // Persist Done immediately so chunk despawn/reload cannot re-apply
+                    // the CombatShrine proto ObjectAction and allow a second activation.
+                    .insert(WorldObject::CombatShrineDone)
                     .remove::<InteractionGuideTrigger>()
                     .remove::<ObjectAction>();
+                crate::item::combat_shrine::persist_combat_shrine_done(
+                    game,
+                    obj_pos,
+                    &mut item_action_param.minimap_event,
+                );
             }
             ObjectAction::GambleShrine => {
                 // Screen Shake
@@ -473,6 +483,14 @@ impl ObjectAction {
                 item_action_param
                     .next_inv_state
                     .set(UIState::MicrowaveShrine);
+            }
+            ObjectAction::WellShrine => {
+                item_action_param.next_inv_state.set(UIState::WellShrine);
+            }
+            ObjectAction::CauldronShrine => {
+                item_action_param
+                    .next_inv_state
+                    .set(UIState::InventoryCrafting);
             }
             ObjectAction::WeaponShrine => {
                 // Screen Shake

@@ -3,12 +3,10 @@ use bevy::prelude::*;
 use crate::{
     assets::Graphics,
     cursor::CursorPos,
-    inventory::Inventory,
     item::{
         item_actions::{ItemAction, ItemActions},
-        EquipmentType, MainHand, RequiredEquipmentType, WorldObject,
+        MainHand, WorldObject,
     },
-    player::Player,
     proto::proto_param::ProtoParam,
     ui::CheatSettings,
     world::{
@@ -35,8 +33,6 @@ pub fn spawn_tile_hover_on_cursor_move(
     proto_param: ProtoParam,
     mut game: GameParam,
     main_hand: Query<&WorldObject, With<MainHand>>,
-    player_inv: Query<&Inventory, With<Player>>,
-    tool_req_query: Query<&RequiredEquipmentType>,
 ) {
     if !cheat_settings.show_tile_hover {
         if let Ok((e, _)) = tile_hover_check.get_single() {
@@ -69,24 +65,6 @@ pub fn spawn_tile_hover_on_cursor_move(
                     }
                     _ => UIElement::TileHover,
                 };
-            }
-        }
-    }
-
-    // Tool requirement: match combat — any inventory slot with the tool, or main hand item type.
-    if let Some((obj_e, _)) = game.get_obj_entity_at_tile(tile_pos, &proto_param) {
-        if let Ok(req) = tool_req_query.get(obj_e) {
-            let inv_ok = player_inv
-                .get_single()
-                .map(|inv| inv.has_equipment_type(&req.0, &proto_param))
-                .unwrap_or(false);
-            let main_ok = main_hand_obj
-                .ok()
-                .and_then(|mh| proto_param.get_component::<EquipmentType, _>(*mh))
-                .map(|et| et == &req.0)
-                .unwrap_or(false);
-            if !inv_ok && !main_ok {
-                hover = UIElement::BlockedTileHover;
             }
         }
     }

@@ -887,8 +887,71 @@ pub fn can_auto_equip_weapon_on_pickup(
             .map_or(true, |s| s.is_none())
 }
 
-/// Whether [`check_item_drop_collisions`] would accept this stack (currency / XP / mana bypass
-/// inventory; otherwise same empty-slot / merge / weapon-auto-equip rules).
+/// Adds `stack` to the player's bag (merge into an existing stack or an empty slot).
+/// When `allow_hotbar_band` is false, skips the quickbar band (`0..INVENTORY_HOTBAR_BAND_SLOTS`)
+/// for both merge and empty-slot placement (same rule as pickup / `add_to_inventory`).
+/// Returns `Ok(())` on success. Returns `Err(stack)` if there is no room (caller should drop it).
+pub fn try_add_item_stack_to_inventory(
+    stack: ItemStack,
+    inventory: &mut Inventory,
+    inv_slots: &mut Query<&mut InventorySlotState>,
+    allow_hotbar_band: bool,
+) -> Result<(), ItemStack> {
+    let container = &mut inventory.items;
+    if let Some((_, stack_cell)) = container.items.iter().enumerate().find(|(slot_idx, i)| {
+        if !allow_hotbar_band
+            && container.items.len() == INVENTORY_SIZE
+            && *slot_idx < INVENTORY_HOTBAR_BAND_SLOTS
+        {
+            return false;
+        }
+        match i {
+            Some(ii) if ii.item_stack.count < MAX_STACK_SIZE => stack.is_stackable(&ii.item_stack),
+            _ => false,
+        }
+    }) {
+        let slot = stack_cell.as_ref().unwrap().slot;
+        let inv_item_stack = container.items[slot].clone().unwrap();
+        let pre_stack_size = inv_item_stack.item_stack.count;
+        let merged_count = min(stack.count + pre_stack_size, MAX_STACK_SIZE);
+        container.items[slot] = Some(InventoryItemStack {
+            item_stack: stack.copy_with_count(merged_count),
+            slot,
+        });
+        mark_slot_dirty(slot, InventorySlotType::Normal, inv_slots);
+
+        if pre_stack_size + stack.count > MAX_STACK_SIZE {
+            let overflow = stack.copy_with_count(pre_stack_size + stack.count - MAX_STACK_SIZE);
+            return try_add_item_stack_to_inventory(
+                overflow,
+                inventory,
+                inv_slots,
+                allow_hotbar_band,
+            );
+        }
+        return Ok(());
+    }
+
+    let empty_slot = if allow_hotbar_band {
+        container.get_first_empty_slot()
+    } else if container.items.len() == INVENTORY_SIZE {
+        container.get_first_empty_non_hotbar_slot()
+    } else {
+        container.get_first_empty_slot()
+    };
+
+    if let Some(slot) = empty_slot {
+        InventoryItemStack {
+            item_stack: stack,
+            slot,
+        }
+        .add_to_container(container, InventorySlotType::Normal, inv_slots);
+        Ok(())
+    } else {
+        Err(stack)
+    }
+}
+
 pub fn player_can_accept_ground_item_pickup(
     item_stack: &ItemStack,
     inventory: &Inventory,

@@ -72,6 +72,8 @@ mod tooltips;
 pub use icon_hover_tooltips::*;
 pub mod microwave_shrine_ui;
 pub use microwave_shrine_ui::*;
+pub mod well_shrine_ui;
+pub use well_shrine_ui::*;
 pub mod ui_helpers;
 pub use chest_ui::*;
 pub use enemy_health_bar::*;
@@ -560,6 +562,7 @@ impl Plugin for UIPlugin {
             .insert_resource(RunUnlockState::default())
             .init_resource::<AchievementsPagination>()
             .init_resource::<MicrowaveShrineUsages>()
+            .init_resource::<crate::ui::well_shrine_ui::WellSalvageSelection>()
             .insert_resource(crate::keybinds::InputMappings::load())
             .insert_resource(crate::gamepad_bindings::GamepadMappings::load())
             .init_resource::<CurrentNameInput>()
@@ -1338,6 +1341,30 @@ impl Plugin for UIPlugin {
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
+            .add_systems(
+                (
+                    setup_well_shrine_ui.before(CustomFlush).run_if(
+                        state_changed::<UIState>().and_then(in_state(UIState::WellShrine)),
+                    ),
+                    handle_well_equipment_click.run_if(in_state(UIState::WellShrine)),
+                    handle_well_salvage_slot_click.run_if(in_state(UIState::WellShrine)),
+                    handle_well_equipment_tooltip
+                        .after(handle_well_equipment_click)
+                        .run_if(in_state(UIState::WellShrine)),
+                    handle_well_salvage_tooltip
+                        .after(handle_well_salvage_slot_click)
+                        .run_if(in_state(UIState::WellShrine)),
+                    handle_well_salvage_button.run_if(in_state(UIState::WellShrine)),
+                    handle_well_reward_ok.run_if(in_state(UIState::WellShrine)),
+                    refresh_well_ui_displays
+                        .after(handle_well_equipment_click)
+                        .after(handle_well_salvage_slot_click)
+                        .after(handle_well_salvage_button)
+                        .run_if(in_state(UIState::WellShrine)),
+                    cleanup_well_shrine_selection,
+                )
+                    .in_set(OnUpdate(GameState::Main)),
+            )
             .add_system(
                 active_skill_shrine_ui::setup_active_skill_shrine_overwrite_ui
                     .before(CustomFlush)
@@ -1377,7 +1404,6 @@ impl Plugin for UIPlugin {
                         .after(handle_flash_bars)
                         .after(player_hud::drain_pending_xp),
                     handle_clamp_screen_locked_icons_worldpos,
-                    spawn_shrine_interact_key_guide,
                     add_guide_to_unique_objs,
                     toggle_skills_visibility,
                     toggle_item_chest_visibility.run_if(resource_exists::<ItemChestState>()),
@@ -1392,6 +1418,14 @@ impl Plugin for UIPlugin {
             )
             .add_systems(
                 (
+                    refresh_interact_guide_on_shrine_repair
+                        .before(spawn_shrine_interact_key_guide),
+                    spawn_shrine_interact_key_guide,
+                )
+                    .in_set(OnUpdate(GameState::Main)),
+            )
+            .add_systems(
+                (
                     shuffle_items.run_if(in_state(UIState::ItemChest)),
                     handle_skill_reroll_after_flash.run_if(in_state(UIState::Skills)),
                     handle_cursor_reroll_dice_buttons.run_if(in_state(UIState::Skills)),
@@ -1399,10 +1433,8 @@ impl Plugin for UIPlugin {
                     update_skill_choice_button_states.run_if(in_state(UIState::Skills)),
                     update_skill_choice_count_text.run_if(in_state(UIState::Skills)),
                     handle_cursor_inventory_upgrade_button.run_if(in_state(UIState::Inventory)),
-                    handle_cursor_inventory_craft_toggle_button.run_if(
-                        in_state(UIState::Inventory)
-                            .or_else(in_state(UIState::InventoryCrafting)),
-                    ),
+                    handle_cursor_inventory_craft_toggle_button
+                        .run_if(in_state(UIState::InventoryCrafting)),
                     update_upgrade_material_prompt_text.run_if(in_state(UIState::Inventory)),
                     sync_dev_endless_button_label.run_if(in_state(UIState::Inventory)),
                     handle_dev_button_clicks.run_if(in_state(UIState::Inventory)),

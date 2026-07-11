@@ -158,7 +158,7 @@ pub struct ArchivesUI;
 
 pub const MAIN_MENU_BG_SIZE: Vec2 = Vec2::new(714., 400.);
 pub const MAIN_MENU_ICON_BUTTON_SIZE: Vec2 = Vec2::new(28., 28.);
-const MAIN_MENU_WIDE_BUTTON_SIZE: Vec2 = Vec2::new(126., 22.);
+pub const MAIN_MENU_WIDE_BUTTON_SIZE: Vec2 = Vec2::new(126., 22.);
 /// Distance from the bottom screen edge to the bottom of the icon button row.
 const MAIN_MENU_BOTTOM_INSET: f32 = 12.;
 const MAIN_MENU_EDGE_PADDING: f32 = 22.;

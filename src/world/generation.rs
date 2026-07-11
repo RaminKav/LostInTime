@@ -52,6 +52,10 @@ const UNIQUE_OBJECTS_DATA: [(WorldObject, Vec2, i32); 2] = [
 /// pre-rolled shrine so the shrine isn't buried in the forest.
 const SHRINE_CLEAR_RADIUS: i8 = 3;
 
+/// Preferred minimum Chebyshev distance between shrine tiles (a 3-tile gap).
+/// Placement falls back to ignoring this if no spaced spot can be found.
+const SHRINE_MIN_GAP_TILES: i8 = 3;
+
 /// Shrines stay inside this radius (world pixels from `(0, 0)`) so they avoid the outer ring
 /// of island chunks where tiles are often water.
 const SHRINE_MAX_DIST_FROM_WORLD_ORIGIN: f32 = 5. * CHUNK_SIZE as f32 * TILE_SIZE.x;
@@ -321,6 +325,154 @@ impl GenerationPlugin {
         }
     }
 
+    /// Chebyshev distance in tiles between two map positions (chunk-aware).
+    fn chebyshev_tile_dist(a: TileMapPosition, b: TileMapPosition) -> i32 {
+        let aw = tile_pos_to_world_pos(a, false);
+        let bw = tile_pos_to_world_pos(b, false);
+        let dx = ((aw.x - bw.x) / TILE_SIZE.x).round().abs() as i32;
+        let dy = ((aw.y - bw.y) / TILE_SIZE.y).round().abs() as i32;
+        dx.max(dy)
+    }
+
+    /// True when `pos` is within the shrine origin distance limit, has no water
+    /// on itself or any adjacent tile (Chebyshev radius 1), and optionally keeps
+    /// a gap from already-placed shrines.
+    ///
+    /// Uses [`WorldObjectCache::tile_data_cache`] (noise-baked for the whole island),
+    /// not live chunk entities — `pre_roll_shrines` runs before most chunks are loaded,
+    /// so `GameParam::get_tile_data` would reject every candidate.
+    fn is_valid_shrine_tile(
+        game: &GameParam,
+        pos: TileMapPosition,
+        max_dist_sq: f32,
+        placed: &[TileMapPosition],
+        enforce_gap: bool,
+    ) -> bool {
+        let world_pos = tile_pos_to_world_pos(pos, false);
+        if !world_pos.length_squared().is_finite() || world_pos.length_squared() > max_dist_sq {
+            return false;
+        }
+        for dy in -1i8..=1 {
+            for dx in -1i8..=1 {
+                let tp = get_neighbour_tile(pos, (dx, dy));
+                let Some(tile_data) = game.world_obj_cache.tile_data_cache.get(&tp) else {
+                    return false;
+                };
+                if tile_data.block_type.contains(&WorldObject::WaterTile) {
+                    return false;
+                }
+            }
+        }
+        if enforce_gap
+            && placed
+                .iter()
+                .any(|other| Self::chebyshev_tile_dist(pos, *other) <= SHRINE_MIN_GAP_TILES as i32)
+        {
+            return false;
+        }
+        true
+    }
+
+    /// Spiral-search outward from `seed` within the same chunk for a valid shrine tile.
+    /// Returns `None` if nothing works (never panics).
+    fn find_nearest_valid_shrine_tile(
+        game: &GameParam,
+        seed: TileMapPosition,
+        max_dist_sq: f32,
+        placed: &[TileMapPosition],
+        enforce_gap: bool,
+    ) -> Option<TileMapPosition> {
+        if Self::is_valid_shrine_tile(game, seed, max_dist_sq, placed, enforce_gap) {
+            return Some(seed);
+        }
+        // Prefer the usual inner placement band, then fall back to the full chunk.
+        for &(min_t, max_t) in &[(4u32, 13u32), (0u32, 16u32)] {
+            for radius in 1..=CHUNK_SIZE as i8 {
+                for dy in -radius..=radius {
+                    for dx in -radius..=radius {
+                        if dx.abs() != radius && dy.abs() != radius {
+                            continue;
+                        }
+                        let candidate = get_neighbour_tile(seed, (dx, dy));
+                        if candidate.chunk_pos != seed.chunk_pos {
+                            continue;
+                        }
+                        let tx = candidate.tile_pos.x;
+                        let ty = candidate.tile_pos.y;
+                        if tx < min_t || tx >= max_t || ty < min_t || ty >= max_t {
+                            continue;
+                        }
+                        if Self::is_valid_shrine_tile(
+                            game,
+                            candidate,
+                            max_dist_sq,
+                            placed,
+                            enforce_gap,
+                        ) {
+                            return Some(candidate);
+                        }
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    /// Try to pick a tile for one shrine across the chunk pool.
+    fn pick_shrine_tile(
+        game: &GameParam,
+        chunk_pool: &[IVec2],
+        max_dist_sq: f32,
+        placed: &[TileMapPosition],
+        enforce_gap: bool,
+        rng: &mut impl Rng,
+    ) -> Option<(usize, TileMapPosition)> {
+        const TILE_RETRIES: u32 = 8;
+        let max_chunk_pick_attempts = (chunk_pool.len().saturating_mul(32)).max(64);
+
+        for _ in 0..max_chunk_pick_attempts {
+            if chunk_pool.is_empty() {
+                break;
+            }
+            let chunk_idx = rng.gen_range(0..chunk_pool.len());
+            let chunk_pos = chunk_pool[chunk_idx];
+
+            let mut chosen = None;
+            for _ in 0..TILE_RETRIES {
+                let tx = rng.gen_range(4..13);
+                let ty = rng.gen_range(4..13);
+                let candidate = TileMapPosition::new(chunk_pos, TilePos::new(tx, ty));
+                if !Self::is_valid_shrine_tile(game, candidate, max_dist_sq, placed, enforce_gap)
+                {
+                    continue;
+                }
+                chosen = Some((chunk_idx, candidate));
+                break;
+            }
+
+            if chosen.is_none() {
+                let seed = TileMapPosition::new(
+                    chunk_pos,
+                    TilePos::new(rng.gen_range(4..13), rng.gen_range(4..13)),
+                );
+                if let Some(pos) = Self::find_nearest_valid_shrine_tile(
+                    game,
+                    seed,
+                    max_dist_sq,
+                    placed,
+                    enforce_gap,
+                ) {
+                    chosen = Some((chunk_idx, pos));
+                }
+            }
+
+            if chosen.is_some() {
+                return chosen;
+            }
+        }
+        None
+    }
+
     fn pre_roll_shrines(game: &mut GameParam) {
         let mut rng = rand::thread_rng();
 
@@ -369,40 +521,43 @@ impl GenerationPlugin {
         chunk_pool.shuffle(&mut rng);
 
         let max_dist_sq = SHRINE_MAX_DIST_FROM_WORLD_ORIGIN * SHRINE_MAX_DIST_FROM_WORLD_ORIGIN;
-        let max_chunk_pick_attempts = (chunk_pool.len().saturating_mul(32)).max(64);
+
+        // Seed with unique landmarks already placed (BossShrine, DungeonEntrance, …)
+        // and any shrines already in the cache so the 3-tile gap covers them too.
+        let mut placed_positions: Vec<TileMapPosition> =
+            game.world_obj_cache.shrines.keys().copied().collect();
+        for (obj, _, _) in UNIQUE_OBJECTS_DATA {
+            if let Some(pos) = game.world_obj_cache.unique_objs.get(&obj) {
+                placed_positions.push(*pos);
+            }
+        }
 
         let mut placed = 0_usize;
         for shrine_obj in shrines_to_place.iter() {
-            const TILE_RETRIES: u32 = 8;
-            let mut chosen: Option<(usize, TileMapPosition)> = None;
-
-            for _ in 0..max_chunk_pick_attempts {
-                if chunk_pool.is_empty() {
-                    break;
-                }
-                let chunk_idx = rng.gen_range(0..chunk_pool.len());
-                let chunk_pos = chunk_pool[chunk_idx];
-
-                for _ in 0..TILE_RETRIES {
-                    let tx = rng.gen_range(4..13);
-                    let ty = rng.gen_range(4..13);
-                    let candidate = TileMapPosition::new(chunk_pos, TilePos::new(tx, ty));
-                    let world_pos = tile_pos_to_world_pos(candidate, false);
-                    if world_pos.length_squared() > max_dist_sq {
-                        continue;
-                    }
-                    chosen = Some((chunk_idx, candidate));
-                    break;
-                }
-
-                if chosen.is_some() {
-                    break;
-                }
-            }
+            // Prefer a 3-tile gap from existing shrines; fall back without the gap
+            // rather than skipping the shrine entirely.
+            let chosen = Self::pick_shrine_tile(
+                game,
+                &chunk_pool,
+                max_dist_sq,
+                &placed_positions,
+                true,
+                &mut rng,
+            )
+            .or_else(|| {
+                Self::pick_shrine_tile(
+                    game,
+                    &chunk_pool,
+                    max_dist_sq,
+                    &placed_positions,
+                    false,
+                    &mut rng,
+                )
+            });
 
             let Some((chunk_idx, pos)) = chosen else {
                 warn!(
-                    "Could not place shrine {:?} within {:.0}px of world origin (non-water); skipping",
+                    "Could not place shrine {:?} within {:.0}px of world origin with a 1-tile water buffer; skipping",
                     shrine_obj, SHRINE_MAX_DIST_FROM_WORLD_ORIGIN,
                 );
                 continue;
@@ -410,10 +565,12 @@ impl GenerationPlugin {
 
             chunk_pool.swap_remove(chunk_idx);
             game.world_obj_cache.shrines.insert(pos, *shrine_obj);
+            placed_positions.push(pos);
             crate::item::shrine_repair::maybe_mark_shrine_broken(
                 &mut game.world_obj_cache,
                 pos,
                 *shrine_obj,
+                &game.era.current_era,
                 &mut rng,
             );
 

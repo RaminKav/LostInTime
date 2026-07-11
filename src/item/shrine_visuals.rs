@@ -42,31 +42,31 @@ fn shrine_texture_info(obj: &WorldObject) -> Option<(&'static str, Vec2, f32)> {
     // (path, custom_size, eye local Y offset above shrine center)
     match obj {
         WorldObject::GambleShrine | WorldObject::GambleShrineDone => {
-            Some(("textures/shrines/WatchtowerShrine.png", Vec2::new(37., 77.), 40.))
+            Some(("textures/shrines/WatchtowerShrine.png", Vec2::new(37., 77.), 56.))
         }
         WorldObject::MicrowaveShrine | WorldObject::MicrowaveShrineDone => {
-            Some(("textures/shrines/SwapShrine.png", Vec2::new(45., 45.), 28.))
+            Some(("textures/shrines/SwapShrine.png", Vec2::new(45., 45.), 44.))
         }
         WorldObject::ActiveSkillShrine | WorldObject::ActiveSkillShrineDone => {
-            Some(("textures/shrines/SkillShrine.png", Vec2::new(35., 45.), 28.))
+            Some(("textures/shrines/SkillShrine.png", Vec2::new(35., 45.), 44.))
         }
         WorldObject::BlacksmithMerchant | WorldObject::BlacksmithMerchantDone => {
-            Some(("textures/shrines/MerchantShrine.png", Vec2::new(32., 30.), 24.))
+            Some(("textures/shrines/MerchantShrine.png", Vec2::new(32., 30.), 40.))
         }
         WorldObject::HeirloomShrine | WorldObject::HeirloomShrineDone => {
-            Some(("textures/shrines/HeirloomShrine.png", Vec2::new(64., 41.), 26.))
+            Some(("textures/shrines/HeirloomShrine.png", Vec2::new(64., 41.), 42.))
         }
         WorldObject::CombatShrine | WorldObject::CombatShrineDone => {
-            Some(("textures/shrines/CombatShrine.png", Vec2::new(35., 60.), 34.))
+            Some(("textures/shrines/CombatShrine.png", Vec2::new(35., 60.), 50.))
         }
         WorldObject::ChaosTotem | WorldObject::ChaosTotemDone => {
-            Some(("textures/shrines/ChaosShrine.png", Vec2::new(31., 35.), 24.))
+            Some(("textures/shrines/ChaosShrine.png", Vec2::new(31., 35.), 40.))
         }
         WorldObject::CauldronShrine | WorldObject::CauldronShrineDone => {
-            Some(("textures/shrines/CauldronShrine.png", Vec2::new(28., 29.), 22.))
+            Some(("textures/shrines/CauldronShrine.png", Vec2::new(28., 29.), 38.))
         }
         WorldObject::WellShrine | WorldObject::WellShrineDone => {
-            Some(("textures/shrines/WellShrine.png", Vec2::new(38., 56.), 32.))
+            Some(("textures/shrines/WellShrine.png", Vec2::new(38., 56.), 48.))
         }
         _ => None,
     }
@@ -86,6 +86,16 @@ fn is_consumed_shrine(obj: &WorldObject) -> bool {
             | WorldObject::WellShrineDone
     )
 }
+
+/// True when this shrine has been used up (`*Done` world object).
+pub fn shrine_is_consumed(obj: &WorldObject) -> bool {
+    is_consumed_shrine(obj)
+}
+
+/// Present on the shrine_eye child while it plays the Done tag (including the brief
+/// post-repair Done pose before the world object flips to `*Done`).
+#[derive(Component)]
+pub struct ShrineEyeDoneVisual;
 
 fn eye_state_for(obj: &WorldObject, needs_repair: bool) -> ShrineEyeState {
     if is_consumed_shrine(obj) {
@@ -119,10 +129,15 @@ fn apply_eye_state(
     if let Some(eye_entity) = existing_eye {
         if let Some(mut eye_commands) = commands.get_entity(eye_entity) {
             eye_commands.insert(AsepriteAnimation::from(eye_state.tag()));
+            if eye_state == ShrineEyeState::Done {
+                eye_commands.insert(ShrineEyeDoneVisual);
+            } else {
+                eye_commands.remove::<ShrineEyeDoneVisual>();
+            }
         }
     } else if let Some(mut entity_commands) = commands.get_entity(shrine_entity) {
         entity_commands.with_children(|parent| {
-            parent.spawn((
+            let mut eye = parent.spawn((
                 ShrineEyeMarker,
                 AsepriteBundle {
                     aseprite: eye_handle.clone(),
@@ -132,6 +147,9 @@ fn apply_eye_state(
                 },
                 Name::new("ShrineEye"),
             ));
+            if eye_state == ShrineEyeState::Done {
+                eye.insert(ShrineEyeDoneVisual);
+            }
         });
     }
 }
@@ -147,6 +165,8 @@ pub fn apply_shrine_visuals_on_spawn(
             &WorldObject,
             Option<&Children>,
             Option<&ShrineNeedsRepair>,
+            Option<&crate::item::shrine_repair::ShrineRepairChannel>,
+            Option<&crate::item::shrine_repair::PendingShrineRepairFinish>,
         ),
         Or<(
             Added<WorldObject>,
@@ -155,12 +175,13 @@ pub fn apply_shrine_visuals_on_spawn(
         )>,
     >,
     eye_markers: Query<(), With<ShrineEyeMarker>>,
+    eye_one_shots: Query<(), With<crate::item::shrine_repair::ShrineEyeOneShot>>,
 ) {
     let Some(eye_handle) = graphics.shrine_eye.as_ref() else {
         return;
     };
 
-    for (entity, obj, children, needs_repair) in shrines.iter() {
+    for (entity, obj, children, needs_repair, repair_channel, pending_finish) in shrines.iter() {
         let Some((path, size, eye_y)) = shrine_texture_info(obj) else {
             continue;
         };
@@ -184,6 +205,14 @@ pub fn apply_shrine_visuals_on_spawn(
             .remove::<TextureAtlasSprite>()
             .remove::<Handle<TextureAtlas>>();
 
+        // Don't clobber Startup / FlashGreen / FlashRed / Done-wait while repair runs.
+        let eye_busy = repair_channel.is_some()
+            || pending_finish.is_some()
+            || children.map_or(false, |c| c.iter().any(|child| eye_one_shots.get(*child).is_ok()));
+        if eye_busy {
+            continue;
+        }
+
         let eye_state = eye_state_for(obj, needs_repair.is_some());
         apply_eye_state(
             &mut commands,
@@ -198,11 +227,17 @@ pub fn apply_shrine_visuals_on_spawn(
 }
 
 /// When `ShrineNeedsRepair` is removed, refresh the eye back to Idle (unless consumed).
+/// Skips when FlashGreen/FlashRed is playing or Done-wait is pending.
 pub fn sync_shrine_eye_after_repair(
     mut commands: Commands,
     mut removed: RemovedComponents<ShrineNeedsRepair>,
-    shrines: Query<(&WorldObject, Option<&Children>)>,
+    shrines: Query<(
+        &WorldObject,
+        Option<&Children>,
+        Option<&crate::item::shrine_repair::PendingShrineRepairFinish>,
+    )>,
     eye_markers: Query<(), With<ShrineEyeMarker>>,
+    eye_one_shots: Query<(), With<crate::item::shrine_repair::ShrineEyeOneShot>>,
     graphics: Res<Graphics>,
 ) {
     let Some(eye_handle) = graphics.shrine_eye.as_ref() else {
@@ -210,9 +245,18 @@ pub fn sync_shrine_eye_after_repair(
     };
 
     for entity in removed.iter() {
-        let Ok((obj, children)) = shrines.get(entity) else {
+        let Ok((obj, children, pending_finish)) = shrines.get(entity) else {
             continue;
         };
+        // Channelled repair already set FlashGreen → Done; don't overwrite mid-sequence.
+        if pending_finish.is_some() {
+            continue;
+        }
+        if let Some(children) = children {
+            if children.iter().any(|c| eye_one_shots.get(*c).is_ok()) {
+                continue;
+            }
+        }
         let Some((_, _, eye_y)) = shrine_texture_info(obj) else {
             continue;
         };

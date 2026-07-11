@@ -107,10 +107,11 @@ pub enum UIState {
     ActiveSkills,
     ActiveSkillShrine,
     MicrowaveShrine,
+    WellShrine,
     Crafting,
     /// Alternate inventory mode that swaps the equipment panel for the blueprints panel
     /// and the upgrade slots for three normal crafting material slots.
-    /// Toggled via the CRAFT / UPGRADE button on the upgrade / crafting side panel.
+    /// Opened from the Cauldron shrine; Brew crafts the selected recipe into inventory.
     InventoryCrafting,
     Furnace,
     Essence,
@@ -181,9 +182,8 @@ pub struct InventoryUI;
 #[derive(Component, Default, Clone)]
 pub struct UpgradeMaterialPromptText;
 
-/// Clickable hit area on the bottom of the upgrade / crafting side panel that toggles the UI
-/// between `UIState::Inventory` (CRAFT label → switch to crafting) and
-/// `UIState::InventoryCrafting` (UPGRADE label → switch back).
+/// Brew button on the crafting side panel (`UIState::InventoryCrafting` / Cauldron).
+/// Crafts the selected blueprint into the player's inventory (or drops it if full).
 #[derive(Component, Default, Clone)]
 pub struct CraftModeToggleButton;
 
@@ -483,43 +483,42 @@ pub fn setup_inv_ui(
         .id();
 
     let is_crafting_mode = cur_inv_state.0 == UIState::InventoryCrafting;
-    let (side_panel_size, side_panel_element) = if is_crafting_mode {
-        (INVENTORY_CRAFTING_PANEL_UI_SIZE, UIElement::CraftingPanel)
-    } else {
-        (INVENTORY_UPGRADE_UI_SIZE, UIElement::CraftButtonContainer)
-    };
-    let upgrade_panel_y_local = if is_crafting_mode {
-        INV_UPGRADE_PANEL_OFFSET_Y_CRAFTING
-    } else {
-        -35.0
-    };
-    let upgrade_panel = commands
-        .spawn(SpriteBundle {
-            texture: graphics.get_ui_element_texture(side_panel_element.clone()),
-            sprite: Sprite {
-                custom_size: Some(side_panel_size),
+
+    // Side panel: CraftingPanel + Brew only in Cauldron blueprints mode.
+    // Normal Inventory no longer shows the old CraftButtonContainer under equipment.
+    let upgrade_panel = if is_crafting_mode {
+        let side_panel_size = INVENTORY_CRAFTING_PANEL_UI_SIZE;
+        let side_panel_element = UIElement::CraftingPanel;
+        let upgrade_panel = commands
+            .spawn(SpriteBundle {
+                texture: graphics.get_ui_element_texture(side_panel_element.clone()),
+                sprite: Sprite {
+                    custom_size: Some(side_panel_size),
+                    ..Default::default()
+                },
+                transform: Transform {
+                    translation: Vec3::new(
+                        INV_EQUIP_PANEL_OFFSET_X + 3.,
+                        INV_UPGRADE_PANEL_OFFSET_Y_CRAFTING,
+                        0.,
+                    ),
+                    scale: Vec3::new(1., 1., 1.),
+                    ..Default::default()
+                },
                 ..Default::default()
-            },
-            transform: Transform {
-                translation: Vec3::new(INV_EQUIP_PANEL_OFFSET_X + 3., upgrade_panel_y_local, 0.),
-                scale: Vec3::new(1., 1., 1.),
-                ..Default::default()
-            },
-            ..Default::default()
-        })
-        .insert(cur_inv_state.0.clone())
-        .insert(Name::new("CRAFTING PANEL"))
-        .insert(side_panel_element)
-        .insert(RenderLayers::from_layers(&[3]))
-        .insert(UiShadow::container())
-        .id();
-    commands.entity(inv).add_child(upgrade_panel);
-    if is_crafting_mode {
-        let upgrade_title = "CRAFTING";
+            })
+            .insert(cur_inv_state.0.clone())
+            .insert(Name::new("CRAFTING PANEL"))
+            .insert(side_panel_element)
+            .insert(RenderLayers::from_layers(&[3]))
+            .insert(UiShadow::container())
+            .id();
+        commands.entity(inv).add_child(upgrade_panel);
+
         let _upgrade_text = commands
             .spawn(Text2dBundle {
                 text: Text::from_section(
-                    upgrade_title,
+                    "CRAFTING",
                     gf::DISPLAY.text_style(&asset_server, EQUIP_TITLE),
                 ),
                 text_anchor: Anchor::Center,
@@ -535,7 +534,10 @@ pub fn setup_inv_ui(
             .insert(cur_inv_state.0.clone())
             .set_parent(upgrade_panel)
             .id();
-    }
+        Some((upgrade_panel, side_panel_size))
+    } else {
+        None
+    };
 
     // Equipment panel (only in standard Inventory mode — crafting mode hides equipment).
     if cur_inv_state.0 == UIState::Inventory {
@@ -581,7 +583,7 @@ pub fn setup_inv_ui(
     }
 
     // Blueprint panel (only in `InventoryCrafting` — replaces the stats tooltip column).
-    if is_crafting_mode {
+    if let Some((upgrade_panel, side_panel_size)) = upgrade_panel {
         // Mirror the stats tooltip positioning from `handle_spawn_inv_player_stats` so this sits
         // in exactly the same on-screen location as the stats panel it replaces.
         let blueprint_x_local = (INVENTORY_UI_SIZE.x
@@ -738,62 +740,58 @@ pub fn setup_inv_ui(
             .insert(RenderLayers::from_layers(&[3]))
             .id();
         commands.entity(upgrade_panel).push_children(&[result_slot]);
+
+        // Brew button on the Cauldron blueprints crafting panel.
+        let toggle_button = commands
+            .spawn(SpriteBundle {
+                texture: graphics.get_ui_element_texture(UIElement::CraftButton),
+                sprite: Sprite {
+                    custom_size: Some(Vec2::new(60., 18.)),
+                    ..Default::default()
+                },
+                transform: Transform {
+                    translation: Vec3::new(0., -side_panel_size.y / 2. + 36., 2.),
+                    scale: Vec3::new(1., 1., 1.),
+                    ..Default::default()
+                },
+                ..Default::default()
+            })
+            .insert(RenderLayers::from_layers(&[3]))
+            .insert(Interactable::default())
+            .insert(UIElement::CraftButton)
+            .insert(CraftModeToggleButton)
+            .insert(Focusable {
+                group: cur_inv_state.0.clone(),
+                index: INV_FOCUS_CRAFT_TOGGLE,
+            })
+            .insert(cur_inv_state.0.clone())
+            .insert(Name::new("BREW BUTTON"))
+            .id();
+        let _toggle_text = commands
+            .spawn(Text2dBundle {
+                text: Text::from_section(
+                    "Brew",
+                    gf::DISPLAY.text_style(&asset_server, CRAFT_BUTTON_TEXT),
+                ),
+                text_anchor: Anchor::Center,
+                transform: Transform {
+                    translation: Vec3::new(0., -1., 1.),
+                    scale: gf::DISPLAY.transform_scale(),
+                    ..Default::default()
+                },
+                ..default()
+            })
+            .insert(RenderLayers::from_layers(&[3]))
+            .insert(Name::new("BREW LABEL"))
+            .insert(cur_inv_state.0.clone())
+            .set_parent(toggle_button)
+            .id();
+        commands
+            .entity(upgrade_panel)
+            .push_children(&[toggle_button]);
     }
 
     inv_state.inv_size = size;
-
-    // CRAFT / UPGRADE toggle button — shown on both `Inventory` and `InventoryCrafting`
-    // so the player can flip between the two side-panel layouts.  The visual is the
-    // `CraftButton` sprite (which has a matching `CraftButtonHover` variant handled by the
-    // hover highlight system), and the label text sits as a child of that sprite.
-    let toggle_label = if is_crafting_mode { "Back" } else { "Craft" };
-    let toggle_button = commands
-        .spawn(SpriteBundle {
-            texture: graphics.get_ui_element_texture(UIElement::CraftButton),
-            sprite: Sprite {
-                custom_size: Some(Vec2::new(60., 18.)),
-                ..Default::default()
-            },
-            transform: Transform {
-                translation: Vec3::new(0., -side_panel_size.y / 2. + 36., 2.),
-                scale: Vec3::new(1., 1., 1.),
-                ..Default::default()
-            },
-            ..Default::default()
-        })
-        .insert(RenderLayers::from_layers(&[3]))
-        .insert(Interactable::default())
-        .insert(UIElement::CraftButton)
-        .insert(CraftModeToggleButton)
-        .insert(Focusable {
-            group: cur_inv_state.0.clone(),
-            index: INV_FOCUS_CRAFT_TOGGLE,
-        })
-        .insert(cur_inv_state.0.clone())
-        .insert(Name::new("CRAFT/UPGRADE TOGGLE"))
-        .id();
-    let _toggle_text = commands
-        .spawn(Text2dBundle {
-            text: Text::from_section(
-                toggle_label,
-                gf::DISPLAY.text_style(&asset_server, CRAFT_BUTTON_TEXT),
-            ),
-            text_anchor: Anchor::Center,
-            transform: Transform {
-                translation: Vec3::new(0., -1., 1.),
-                scale: gf::DISPLAY.transform_scale(),
-                ..Default::default()
-            },
-            ..default()
-        })
-        .insert(RenderLayers::from_layers(&[3]))
-        .insert(Name::new("CRAFT/UPGRADE LABEL"))
-        .insert(cur_inv_state.0.clone())
-        .set_parent(toggle_button)
-        .id();
-    commands
-        .entity(upgrade_panel)
-        .push_children(&[toggle_button]);
 
     // Dev mode buttons (far left of inventory, only when Options > Dev Mode is on)
     let dev_mode = *DEBUG || cheat_settings.map(|c| c.dev_mode).unwrap_or(false);
@@ -1114,15 +1112,16 @@ pub fn setup_inv_slots_ui(
                 inv_state_res.inv_size,
                 &inv_state.0,
             );
-            spawn_material_drops_toggle_button(
-                &mut commands,
-                &graphics,
-                &asset_server,
-                &inv_query,
-                inv_state_res.inv_size,
-                &inv_state.0,
-            );
-            if inv_state.0 == UIState::Inventory || inv_state.0 == UIState::InventoryCrafting {
+            // Drop-filter + damage-tracker toggles are inventory-only (hidden on Cauldron blueprints).
+            if inv_state.0 == UIState::Inventory {
+                spawn_material_drops_toggle_button(
+                    &mut commands,
+                    &graphics,
+                    &asset_server,
+                    &inv_query,
+                    inv_state_res.inv_size,
+                    &inv_state.0,
+                );
                 spawn_damage_tracker_toggle_button(
                     &mut commands,
                     &graphics,
@@ -1143,7 +1142,7 @@ pub fn setup_inv_slots_ui(
                 panel_pos_offset,
                 panel_inv_size,
                 &break_drop_filter,
-                menu_open.0,
+                menu_open.0 && inv_state.0 == UIState::Inventory,
             );
         }
     }
@@ -2718,11 +2717,12 @@ pub fn update_upgrade_material_prompt_text(
     }
 }
 
-/// Handles hover + click on the CRAFT / UPGRADE toggle button that flips the inventory side
-/// panels between the standard equipment/upgrade layout and the crafting/blueprints layout.
+/// Handles hover + click on the Brew button in `UIState::InventoryCrafting` (Cauldron).
+/// Crafts the selected recipe into the player's inventory, or drops it at the player if full.
 pub fn handle_cursor_inventory_craft_toggle_button(
     cursor_pos: Res<CursorPos>,
     mouse_input: Res<Input<MouseButton>>,
+    key_input: Res<Input<KeyCode>>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     mut toggle_buttons: Query<
         (Entity, &mut Interactable, &CraftModeToggleButton),
@@ -2730,63 +2730,136 @@ pub fn handle_cursor_inventory_craft_toggle_button(
     >,
     mut commands: Commands,
     curr_ui_state: Res<State<UIState>>,
-    mut next_ui_state: ResMut<NextState<UIState>>,
-    mut inv: Query<&mut Inventory>,
-    mut inv_slots: Query<&mut InventorySlotState>,
-    proto: ProtoParam,
-    mut tutorial_popup_events: EventWriter<crate::ui::tutorial_ui::TutorialPopupEvent>,
-    seen_tutorial_chunks: Option<Res<crate::ui::tutorial_ui::SeenTutorialChunks>>,
-    tutorial_ui: Query<(), With<crate::ui::tutorial_ui::TutorialUI>>,
+    mut brew: BrewCraftParams,
     ui_focus: Res<crate::ui::focus::UiFocus>,
     mouseless: Res<crate::inputs::MouselessModeState>,
 ) {
+    if curr_ui_state.0 != UIState::InventoryCrafting {
+        return;
+    }
     let hit_test = super::ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
     let focus_driving = mouseless.0 || cursor_pos.suppress_ui_hover;
+    let shift_key_pressed = key_input.pressed(KeyCode::LShift);
 
     for (e, mut interactable, _) in toggle_buttons.iter_mut() {
         let is_focused = ui_focus.is_focused(e);
         let is_hit = hit_test.map(|(ent, _, _)| ent == e).unwrap_or(false);
 
         // Mouse hover only — focus-driven hover is handled by `sync_inventory_focus_hover`.
+        // Clear on mouse leave unless focus is actively driving hover for this button
+        // (otherwise mouseless focus can leave the button stuck in Hovering forever).
         if is_hit {
             if !matches!(interactable.current(), Interaction::Hovering) {
                 interactable.change(Interaction::Hovering);
             }
-        } else if !is_focused && matches!(interactable.current(), Interaction::Hovering) {
+        } else if matches!(interactable.current(), Interaction::Hovering)
+            && !(focus_driving && is_focused)
+        {
             interactable.change(Interaction::None);
         }
 
-        if (left_mouse_pressed && is_hit)
-            || (focus_driving && is_focused && ui_focus.confirm_just_pressed)
+        if !((left_mouse_pressed && is_hit)
+            || (focus_driving && is_focused && ui_focus.confirm_just_pressed))
         {
-            let target = match curr_ui_state.0 {
-                UIState::Inventory => UIState::InventoryCrafting,
-                UIState::InventoryCrafting => UIState::Inventory,
-                _ => continue,
-            };
-            // Leaving the upgrade panel: if an equipment piece is sitting in the
-            // upgrade slot and an appropriate equipment slot is empty, auto-equip
-            // it so the player doesn't lose sight of it behind the crafting panel.
-            if curr_ui_state.0 == UIState::Inventory && target == UIState::InventoryCrafting {
-                if let Ok(mut inv) = inv.get_single_mut() {
-                    try_auto_equip_from_upgrade_slot(&mut inv, &proto, &mut inv_slots);
-                }
-                if let Some(seen_tutorial_chunks) = seen_tutorial_chunks.as_ref() {
-                    crate::ui::tutorial_ui::try_craft_button_tutorial(
-                        &mut tutorial_popup_events,
-                        seen_tutorial_chunks,
-                        &tutorial_ui,
-                    );
-                }
-            }
-            next_ui_state.set(target);
-            commands.spawn(crate::audio::SoundSpawner::new(
-                crate::audio::AudioSoundEffect::ButtonClick,
-                0.2,
-            ));
+            continue;
         }
+
+        let Some(recipe_obj) = brew.selected.0 else {
+            continue;
+        };
+        let Some(recipe) = brew.recipes.crafting_list.get(&recipe_obj).cloned() else {
+            continue;
+        };
+        let Ok(mut inventory) = brew.inv.get_single_mut() else {
+            continue;
+        };
+        let can_craft = recipe
+            .0
+            .iter()
+            .all(|ing| inventory.items.get_item_count_in_container(ing.item) >= ing.count);
+        if !can_craft {
+            continue;
+        }
+
+        let stack_count = recipe.2.max(1);
+        let max_batches = recipe
+            .0
+            .iter()
+            .map(|ing| inventory.items.get_item_count_in_container(ing.item) / ing.count)
+            .min()
+            .unwrap_or(0);
+        if max_batches == 0 {
+            continue;
+        }
+        let craft_batches = if shift_key_pressed { max_batches } else { 1 };
+        let total_output = craft_batches * stack_count;
+
+        let player_pos = brew
+            .player_tf
+            .get_single()
+            .map(|t| t.translation().truncate())
+            .unwrap_or(Vec2::ZERO);
+        let loot_bonus = brew.player_atts.get_single().map(|a| a.0).unwrap_or(0);
+
+        let (rolled, allow_hotbar_band) = {
+            let proto = brew.params.p0();
+            let Some(base_stack) = proto.get_item_data(recipe_obj).cloned() else {
+                continue;
+            };
+            let allow_hotbar = proto
+                .get_component::<crate::item::item_actions::ConsumableItem, _>(recipe_obj)
+                .is_some();
+            let rolled = create_new_random_item_stack_with_attributes(
+                &base_stack.copy_with_count(total_output),
+                &proto,
+                &mut commands,
+                loot_bonus,
+                false,
+            );
+            (rolled, allow_hotbar)
+        };
+
+        for _ in 0..craft_batches {
+            brew.crafted_event
+                .send(CraftedItemEvent { obj: recipe_obj });
+        }
+
+        let add_result = {
+            let mut game = brew.params.p1();
+            crate::inventory::try_add_item_stack_to_inventory(
+                rolled,
+                &mut inventory,
+                &mut game.inv_slot_query,
+                allow_hotbar_band,
+            )
+        };
+        if let Err(stack) = add_result {
+            let mut game = brew.params.p1();
+            stack.spawn_as_drop(&mut commands, &mut game, player_pos);
+        }
+
+        commands.spawn(crate::audio::SoundSpawner::new(
+            crate::audio::AudioSoundEffect::ButtonClick,
+            0.2,
+        ));
     }
+}
+
+#[derive(SystemParam)]
+pub struct BrewCraftParams<'w, 's> {
+    pub selected: Res<'w, SelectedCraftingRecipe>,
+    pub recipes: Res<'w, Recipes>,
+    pub inv: Query<'w, 's, &'static mut Inventory>,
+    pub crafted_event: EventWriter<'w, CraftedItemEvent>,
+    pub player_atts: Query<
+        'w,
+        's,
+        &'static crate::attributes::LootRateBonus,
+        With<crate::player::Player>,
+    >,
+    pub player_tf: Query<'w, 's, &'static GlobalTransform, With<crate::player::Player>>,
+    pub params: ParamSet<'w, 's, (ProtoParam<'w, 's>, crate::GameParam<'w, 's>)>,
 }
 
 /// Hover handler for the three ingredient display slots on the crafting side panel.

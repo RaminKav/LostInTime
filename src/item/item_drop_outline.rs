@@ -7,19 +7,24 @@ use bevy::utils::{HashMap, HashSet};
 use bevy_aseprite::anim::AsepriteAnimation;
 
 use crate::assets::Graphics;
+use crate::assets::SpriteAnchor;
 use crate::blessings::BlessingChoiceUI;
-use crate::colors::overwrite_alpha;
+use crate::colors::{overwrite_alpha, RED, YELLOW_2};
 use crate::cursor::{CursorColorSettings, CustomCursor};
 use crate::ecs_helpers::safe_add_child;
-use crate::item::ItemDrop;
+use crate::item::shrine_visuals::{
+    shrine_is_consumed, uses_standalone_shrine_texture, ShrineEyeDoneVisual, ShrineNeedsRepair,
+};
+use crate::item::{ItemDrop, WorldObject};
 use crate::player::skills::{Heirloom, HeirloomChoiceQueue, HeirloomRarity, PlayerSkills};
+use crate::player::Player;
 use crate::ui::item_chest::{ItemChestFinalHeirloom, ItemChestState};
+use crate::ui::key_input_guide::InteractionGuideTrigger;
 use crate::ui::player_hud::SkillHudIcon;
 use crate::ui::{
     BanishTrackerIcon, CrystalUnlockIcon, MerchantHeirloomHover, MicrowaveHeirloomButton,
     SkillChoiceUI,
 };
-use crate::Player;
 
 /// Alpha used by item-drop and cursor outlines (#cdceee at 0.22).
 pub const DEFAULT_OUTLINE_ALPHA: f32 = 0.22;
@@ -215,6 +220,7 @@ impl Plugin for ItemDropOutlinePlugin {
         app.init_resource::<AtlasSpriteOutlineState>()
             .init_resource::<UiShadowState>()
             .init_resource::<UpgradeHighlightState>()
+            .init_resource::<ShrineProximityOutlineState>()
             .init_resource::<HeirloomIconAtlasLookup>()
             .add_plugin(Material2dPlugin::<AtlasSpriteOutlineMaterial>::default())
             .add_system(init_heirloom_icon_atlas_lookup)
@@ -224,6 +230,7 @@ impl Plugin for ItemDropOutlinePlugin {
             )
             .add_system(apply_atlas_sprite_outlines)
             .add_system(update_upgrade_target_highlights)
+            .add_system(update_shrine_proximity_outlines)
             .add_system(spawn_ui_shadows);
     }
 }
@@ -649,6 +656,176 @@ fn apply_outline_to_entity(
         .insert((mesh, material))
         .remove::<TextureAtlasSprite>()
         .remove::<Handle<TextureAtlas>>();
+}
+
+/// Proximity outline for overworld shrine body art (not eye / ring children).
+/// Yellow when healthy; font [`RED`] when the shrine needs repair.
+pub const SHRINE_PROXIMITY_OUTLINE_ALPHA: f32 = 0.85;
+/// Inner ring at full outline alpha; outer ring at `falloff` of that (0.5 => 50%).
+pub const SHRINE_PROXIMITY_OUTLINE_FALLOFF: f32 = 0.4;
+pub const SHRINE_PROXIMITY_OUTLINE_RINGS: u32 = 3;
+const SHRINE_PROXIMITY_OUTLINE_CHILD_Z: f32 = -0.0;
+const DEFAULT_SHRINE_INTERACT_DISTANCE: f32 = 32.;
+
+fn shrine_proximity_outline_color(needs_repair: bool) -> Color {
+    let base = if needs_repair { RED } else { YELLOW_2 };
+    let a = if needs_repair {
+        1.0
+    } else {
+        SHRINE_PROXIMITY_OUTLINE_ALPHA
+    };
+    overwrite_alpha(base, a)
+}
+
+/// Marker on a shrine that currently has a proximity outline child.
+#[derive(Component)]
+pub struct ShrineProximityOutlined {
+    pub needs_repair: bool,
+}
+
+/// Marker on the outline mesh child (silhouette rings only).
+#[derive(Component)]
+pub struct ShrineProximityOutlineChild;
+
+/// Caches outline materials per shrine body texture.
+#[derive(Resource, Default)]
+pub struct ShrineProximityOutlineState {
+    pub materials: HashMap<(Handle<Image>, u32), Handle<AtlasSpriteOutlineMaterial>>,
+}
+
+fn update_shrine_proximity_outlines(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<AtlasSpriteOutlineMaterial>>,
+    mut state: ResMut<ShrineProximityOutlineState>,
+    images: Res<Assets<Image>>,
+    player_query: Query<&GlobalTransform, With<Player>>,
+    shrines: Query<(
+        Entity,
+        &WorldObject,
+        &GlobalTransform,
+        &Sprite,
+        &Handle<Image>,
+        Option<&SpriteAnchor>,
+        Option<&InteractionGuideTrigger>,
+        Option<&ShrineNeedsRepair>,
+        Option<&Children>,
+    )>,
+    outlined: Query<&ShrineProximityOutlined>,
+    outline_children: Query<(), With<ShrineProximityOutlineChild>>,
+    changed_images: Query<Entity, (With<ShrineProximityOutlined>, Changed<Handle<Image>>)>,
+    done_eyes: Query<(), With<ShrineEyeDoneVisual>>,
+) {
+    let Ok(player_t) = player_query.get_single() else {
+        return;
+    };
+    let player_pos = player_t.translation().truncate();
+
+    for (entity, obj, gtf, sprite, image_handle, anchor, guide, needs_repair, children) in &shrines
+    {
+        if !uses_standalone_shrine_texture(obj) {
+            continue;
+        }
+
+        let eye_done = children.map_or(false, |c| {
+            c.iter().any(|child| done_eyes.get(*child).is_ok())
+        });
+        let shrine_done = shrine_is_consumed(obj) || eye_done;
+        let needs_repair = needs_repair.is_some();
+        let outline_color = shrine_proximity_outline_color(needs_repair);
+        let color_key = color_cache_key(outline_color);
+
+        let feet = gtf.translation().truncate() - anchor.map(|a| a.0).unwrap_or(Vec2::ZERO);
+        let range = guide
+            .map(|g| g.activation_distance)
+            .unwrap_or(DEFAULT_SHRINE_INTERACT_DISTANCE);
+        let in_range = feet.distance(player_pos) < range;
+        let already = outlined.get(entity).ok();
+        let texture_changed = changed_images.get(entity).is_ok();
+        let repair_state_changed = already.map_or(false, |o| o.needs_repair != needs_repair);
+
+        if already.is_some()
+            && (!in_range || texture_changed || shrine_done || repair_state_changed)
+        {
+            despawn_shrine_proximity_outline_children(
+                &mut commands,
+                entity,
+                children,
+                &outline_children,
+            );
+            commands.entity(entity).remove::<ShrineProximityOutlined>();
+            if !in_range || shrine_done {
+                continue;
+            }
+            // Fall through to respawn (new texture and/or repair color).
+        } else if !in_range || shrine_done {
+            continue;
+        } else if already.is_some() {
+            continue;
+        }
+
+        let Some(image) = images.get(image_handle) else {
+            continue;
+        };
+
+        let material = state
+            .materials
+            .entry((image_handle.clone(), color_key))
+            .or_insert_with(|| {
+                materials.add(AtlasSpriteOutlineMaterial {
+                    uv_bounds: Vec4::new(0., 0., 1., 1.),
+                    outline_color: outline_color.into(),
+                    ring_params: Vec4::new(
+                        SHRINE_PROXIMITY_OUTLINE_RINGS as f32,
+                        SHRINE_PROXIMITY_OUTLINE_FALLOFF,
+                        1.0, // shadow_only — rings only; shrine Sprite stays on the parent
+                        0.0,
+                    ),
+                    source_texture: Some(image_handle.clone()),
+                })
+            })
+            .clone();
+
+        let mesh = mesh_from_standalone_image(
+            &mut meshes,
+            image,
+            sprite,
+            SHRINE_PROXIMITY_OUTLINE_RINGS as f32,
+        );
+        let child = commands
+            .spawn((
+                mesh,
+                material,
+                SpatialBundle::from_transform(Transform::from_xyz(
+                    0.,
+                    0.,
+                    SHRINE_PROXIMITY_OUTLINE_CHILD_Z,
+                )),
+                ShrineProximityOutlineChild,
+                Name::new("Shrine Proximity Outline"),
+            ))
+            .id();
+        safe_add_child(&mut commands, entity, child);
+        commands
+            .entity(entity)
+            .insert(ShrineProximityOutlined { needs_repair });
+    }
+}
+
+fn despawn_shrine_proximity_outline_children(
+    commands: &mut Commands,
+    shrine: Entity,
+    children: Option<&Children>,
+    outline_children: &Query<(), With<ShrineProximityOutlineChild>>,
+) {
+    let Some(children) = children else {
+        return;
+    };
+    for child in children.iter() {
+        if outline_children.get(*child).is_ok() {
+            commands.entity(*child).despawn_recursive();
+        }
+    }
 }
 
 /// Local Z of the highlight child relative to the item icon — just behind the icon so the

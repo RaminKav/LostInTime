@@ -363,6 +363,12 @@ pub fn handle_spawn_inv_item_tooltip(
                     -CHEST_INVENTORY_UI_SIZE.x - 20.,
                     -CHEST_INVENTORY_UI_SIZE.y / 2. + 40.,
                 ),
+                UIState::WellShrine => inventory_item_tooltip_anchor_offset(
+                    tooltip_anchor,
+                    ITEM_TOOLTIP_LARGE_CARD_SIZE,
+                    resolution.game_width,
+                    resolution.game_height,
+                ),
                 _ => continue,
             }
         };
@@ -373,6 +379,9 @@ pub fn handle_spawn_inv_item_tooltip(
             world.z
         } else if use_absolute_inventory_tooltip {
             INVENTORY_CURSOR_TOOLTIP_Z
+        } else if cur_inv_state.0 == UIState::WellShrine {
+            // Above the well shrine full-screen overlay (container z ≈ 50).
+            70.
         } else {
             10.
         };

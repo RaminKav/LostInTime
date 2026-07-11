@@ -153,7 +153,7 @@ fn complete_combat_shrine(
             t.translation().truncate() + Vec2::new(0., -26.)
         } else {
             crate::world::world_helpers::tile_pos_to_world_pos(tile_pos, false)
-                + Vec2::new(0., -26.)
+                + Vec2::new(0., -18.)
         }
     } else {
         crate::world::world_helpers::tile_pos_to_world_pos(tile_pos, false) + Vec2::new(0., -26.)
@@ -177,7 +177,22 @@ fn complete_combat_shrine(
         }
     }
 
+    persist_combat_shrine_done(game, tile_pos, minimap_event);
+}
+
+/// Write Done into the object cache and pre-rolled shrine map so chunk reloads
+/// spawn [`WorldObject::CombatShrineDone`] (no `ObjectAction`) instead of a fresh shrine.
+pub fn persist_combat_shrine_done(
+    game: &mut GameParam,
+    tile_pos: TileMapPosition,
+    minimap_event: &mut EventWriter<UpdateMiniMapEvent>,
+) {
     game.add_object_to_chunk_cache(tile_pos, WorldObject::CombatShrineDone);
+    if game.world_obj_cache.shrines.contains_key(&tile_pos) {
+        game.world_obj_cache
+            .shrines
+            .insert(tile_pos, WorldObject::CombatShrineDone);
+    }
     minimap_event.send(UpdateMiniMapEvent {
         pos: Some(tile_pos),
         new_tile: Some(WorldObject::CombatShrineDone),

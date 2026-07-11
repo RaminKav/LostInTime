@@ -61,7 +61,11 @@ use heirloom_shrine::handle_heirloom_shrine_completion;
 use microwave_shrine::{handle_microwave_shrine_completion, handle_microwave_shrine_esc};
 use projectile::handle_reset_proj_hit_enemies_state;
 use rand::Rng;
-use shrine_repair::apply_broken_shrine_state_on_spawn;
+use shrine_repair::{
+    activate_pending_shrine_after_repair, apply_broken_shrine_state_on_spawn,
+    finish_shrine_eye_one_shots, open_merchant_after_repair, sync_shrine_repair_anim_pause,
+    tick_shrine_repair_channel,
+};
 use shrine_visuals::{apply_shrine_visuals_on_spawn, sync_shrine_eye_after_repair};
 
 mod crafting;
@@ -1612,6 +1616,22 @@ impl Plugin for ItemsPlugin {
                     handle_frozen_ticks.run_if(is_not_paused),
                     check_freeze_on_slow_stacks.run_if(is_not_paused),
                     handle_combat_shrine_activate_animation,
+                )
+                    .in_set(OnUpdate(GameState::Main)),
+            )
+            .add_systems(
+                (
+                    sync_shrine_repair_anim_pause,
+                    tick_shrine_repair_channel.run_if(is_not_paused),
+                    finish_shrine_eye_one_shots
+                        .after(tick_shrine_repair_channel)
+                        .run_if(is_not_paused),
+                    activate_pending_shrine_after_repair
+                        .after(finish_shrine_eye_one_shots)
+                        .run_if(is_not_paused),
+                    open_merchant_after_repair
+                        .after(activate_pending_shrine_after_repair)
+                        .run_if(is_not_paused),
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
