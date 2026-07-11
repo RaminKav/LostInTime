@@ -1,13 +1,13 @@
 use bevy::{prelude::*, utils::HashMap};
-use bevy_aseprite::{anim::AsepriteAnimation, aseprite, AsepriteBundle};
+use bevy_aseprite::aseprite;
 use bevy_proto::prelude::ProtoCommands;
 use rand::{seq::IteratorRandom, Rng};
 
 use crate::{
-    assets::Graphics,
     custom_commands::CommandsExt,
     enemy::{CombatAlignment, EliteMob, FollowSpeed, Mob, PendingTint},
-    item::{object_actions::ObjectAction, LootTable},
+    item::object_actions::ObjectAction,
+    item::LootTable,
     proto::proto_param::ProtoParam,
     ui::minimap::UpdateMiniMapEvent,
     world::{TileMapPosition, TILE_SIZE},
@@ -15,6 +15,9 @@ use crate::{
 };
 
 use super::{Loot, WorldObject};
+
+// Kept for dungeon shrine activate/done animation tags.
+aseprite!(pub CombatShrineAnim, "textures/combat_shrine/combat_shrine.ase");
 
 #[derive(Component)]
 pub struct CombatShrineMob {
@@ -40,25 +43,14 @@ pub struct CombatShrineMobDeathEvent {
     pub tile_pos: TileMapPosition,
 }
 
+/// Spawn combat-shrine mobs as soon as the shrine is activated.
 pub fn handle_combat_shrine_activate_animation(
-    mut shrines: Query<
-        (
-            Entity,
-            &GlobalTransform,
-            &mut CombatShrine,
-            &mut AsepriteAnimation,
-        ),
-    >,
+    mut shrines: Query<(Entity, &GlobalTransform, &mut CombatShrine), Added<CombatShrine>>,
     mut proto_param: ProtoParam,
     mut commands: Commands,
     mut mob_counts: ResMut<CombatShrineMobCounts>,
 ) {
-    for (e, t, mut shrine, mut anim) in shrines.iter_mut() {
-        if anim.current_frame() != 55 {
-            continue;
-        }
-        *anim = AsepriteAnimation::from(CombatShrineAnim::tags::DONE);
-
+    for (e, t, mut shrine) in shrines.iter_mut() {
         let target = shrine.num_mobs_left;
         let possible_spawns = [Mob::Bushling, Mob::StingFly, Mob::SpikeSlime];
         let mut rng = rand::thread_rng();
@@ -107,9 +99,7 @@ pub fn handle_combat_shrine_activate_animation(
             }
         }
         shrine.num_mobs_left = spawned;
-        mob_counts
-            .remaining
-            .insert(shrine.tile_pos, spawned);
+        mob_counts.remaining.insert(shrine.tile_pos, spawned);
     }
 }
 
@@ -139,14 +129,7 @@ pub fn enhance_combat_shrine_mobs(
 fn complete_combat_shrine(
     tile_pos: TileMapPosition,
     shrine_entity: Option<Entity>,
-    shrines: &mut Query<
-        (
-            Entity,
-            &GlobalTransform,
-            &mut CombatShrine,
-            &mut AsepriteAnimation,
-        ),
-    >,
+    shrines: &mut Query<(Entity, &GlobalTransform, &CombatShrine)>,
     proto_commands: &mut ProtoCommands,
     proto: &ProtoParam,
     commands: &mut Commands,
@@ -166,15 +149,14 @@ fn complete_combat_shrine(
     };
 
     let reward_pos = if let Some(shrine_e) = shrine_entity {
-        if let Ok((_, t, _, _)) = shrines.get(shrine_e) {
+        if let Ok((_, t, _)) = shrines.get(shrine_e) {
             t.translation().truncate() + Vec2::new(0., -26.)
         } else {
             crate::world::world_helpers::tile_pos_to_world_pos(tile_pos, false)
                 + Vec2::new(0., -26.)
         }
     } else {
-        crate::world::world_helpers::tile_pos_to_world_pos(tile_pos, false)
-            + Vec2::new(0., -26.)
+        crate::world::world_helpers::tile_pos_to_world_pos(tile_pos, false) + Vec2::new(0., -26.)
     };
 
     proto_commands.spawn_item_from_proto(
@@ -186,12 +168,12 @@ fn complete_combat_shrine(
     );
 
     if let Some(shrine_e) = shrine_entity {
-        if let Ok((_, _, _, mut anim)) = shrines.get_mut(shrine_e) {
+        if shrines.get(shrine_e).is_ok() {
             commands
                 .entity(shrine_e)
                 .insert(WorldObject::CombatShrineDone)
-                .remove::<ObjectAction>();
-            *anim = AsepriteAnimation::from(CombatShrineAnim::tags::DONE);
+                .remove::<ObjectAction>()
+                .remove::<CombatShrine>();
         }
     }
 
@@ -204,14 +186,7 @@ fn complete_combat_shrine(
 
 pub fn handle_shrine_rewards(
     mut shrine_mob_event: EventReader<CombatShrineMobDeathEvent>,
-    mut shrines: Query<
-        (
-            Entity,
-            &GlobalTransform,
-            &mut CombatShrine,
-            &mut AsepriteAnimation,
-        ),
-    >,
+    mut shrines: Query<(Entity, &GlobalTransform, &CombatShrine)>,
     mut proto_commands: ProtoCommands,
     proto: ProtoParam,
     mut commands: Commands,
@@ -229,7 +204,7 @@ pub fn handle_shrine_rewards(
         }
         mob_counts.remaining.remove(&event.tile_pos);
 
-        let shrine_entity = shrines.get(event.shrine).ok().map(|(e, _, _, _)| e);
+        let shrine_entity = shrines.get(event.shrine).ok().map(|(e, _, _)| e);
         complete_combat_shrine(
             event.tile_pos,
             shrine_entity,
@@ -240,39 +215,5 @@ pub fn handle_shrine_rewards(
             &mut game,
             &mut minimap_event,
         );
-    }
-}
-
-aseprite!(pub CombatShrineAnim, "textures/combat_shrine/combat_shrine.ase");
-
-pub fn add_shrine_visuals_on_spawn(
-    mut commands: Commands,
-    new_shrines: Query<(Entity, &WorldObject, &Transform), Added<WorldObject>>,
-    graphics: Res<Graphics>,
-) {
-    for (e, obj, t) in new_shrines.iter() {
-        let Some(mut entity_commands) = commands.get_entity(e) else {
-            continue;
-        };
-
-        if obj == &WorldObject::CombatShrine {
-            entity_commands
-                .insert(AsepriteBundle {
-                    transform: *t,
-                    animation: AsepriteAnimation::from(CombatShrineAnim::tags::IDLE),
-                    aseprite: graphics.combat_shrine_anim.as_ref().unwrap().clone(),
-                    ..default()
-                })
-                .insert(Name::new("COMBAT"));
-        } else if obj == &WorldObject::CombatShrineDone {
-            entity_commands
-                .insert(AsepriteBundle {
-                    transform: *t,
-                    animation: AsepriteAnimation::from(CombatShrineAnim::tags::DONE),
-                    aseprite: graphics.combat_shrine_anim.as_ref().unwrap().clone(),
-                    ..default()
-                })
-                .insert(Name::new("COMBAT_DONE"));
-        }
     }
 }

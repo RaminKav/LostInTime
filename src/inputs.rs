@@ -53,6 +53,7 @@ use crate::item::bridge_placement::{
 use crate::item::item_actions::{ItemActionParam, ItemActions, ManaCost};
 use crate::item::object_actions::ObjectAction;
 use crate::item::projectile::{RangedAttack, RangedAttackEvent};
+use crate::item::shrine_repair::handle_broken_shrine_interact;
 use crate::item::{Equipment, WorldObject};
 use crate::proto::proto_param::ProtoParam;
 use crate::ui::{
@@ -126,9 +127,12 @@ impl Plugin for InputsPlugin {
                         .before(dispatch_active_skill_events),
                     tick_dash_timer.run_if(is_not_paused),
                     manage_ability_phasing.run_if(is_not_paused),
-                    handle_open_essence_ui,
+                    handle_broken_shrine_interact.run_if(is_not_paused),
+                    handle_open_essence_ui.after(handle_broken_shrine_interact),
                     diagnostics,
-                    handle_interact_objects.run_if(is_not_paused),
+                    handle_interact_objects
+                        .run_if(is_not_paused)
+                        .after(handle_broken_shrine_interact),
                     toggle_attack_auto_target.run_if(is_not_paused),
                 )
                     .in_set(OnUpdate(GameState::Main)),
@@ -1492,7 +1496,7 @@ pub fn handle_interact_objects(
             &WorldObject,
             &SpriteAnchor,
         ),
-        With<InteractionGuideTrigger>,
+        (With<InteractionGuideTrigger>, Without<crate::item::shrine_visuals::ShrineNeedsRepair>),
     >,
     mut player_query: Query<(&GlobalTransform, &mut Inventory), With<Player>>,
     mut game: GameParam,
@@ -1535,7 +1539,10 @@ pub fn handle_open_essence_ui(
     mouse_input: Res<Input<MouseButton>>,
     keybinds: Res<InputMappings>,
     player_query: Query<&GlobalTransform, With<Player>>,
-    nearby_merchant_query: Query<(&GlobalTransform, &EssenceShopChoices)>,
+    nearby_merchant_query: Query<
+        (Entity, &GlobalTransform, &EssenceShopChoices),
+        Without<crate::item::shrine_visuals::ShrineNeedsRepair>,
+    >,
     mut next_inv_state: ResMut<NextState<UIState>>,
     curr_ui_state: Res<State<UIState>>,
     open_lock: Option<Res<crate::ui::MerchantShopOpenLock>>,
@@ -1554,7 +1561,7 @@ pub fn handle_open_essence_ui(
         return;
     }
     let player_t = player_query.single().translation().truncate();
-    for (transform, choices) in nearby_merchant_query.iter() {
+    for (_entity, transform, choices) in nearby_merchant_query.iter() {
         if player_t.distance(transform.translation().truncate()) < 32. {
             commands.insert_resource(choices.clone());
             commands.insert_resource(crate::ui::MerchantShopOpenLock(Timer::from_seconds(

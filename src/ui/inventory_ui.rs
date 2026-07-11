@@ -50,7 +50,6 @@ use crate::ui::{
     INV_UPGRADE_PANEL_OFFSET_Y_CRAFTING, MAX_BLUEPRINT_ROWS, UI_UPGRADE_SLOT_SIZE,
 };
 use crate::world::dimension::{DimensionSpawnEvent, Era};
-use crate::GameParam;
 use crate::Player;
 use crate::{
     assets::Graphics,
@@ -69,6 +68,7 @@ use crate::{
     ui::{FurnaceState, CHEST_INVENTORY_UI_SIZE, INVENTORY_UI_SIZE},
     ScreenResolution,
 };
+use crate::{GameParam, DEBUG};
 
 use super::{
     crafting_ui::CraftingContainer,
@@ -796,7 +796,7 @@ pub fn setup_inv_ui(
         .push_children(&[toggle_button]);
 
     // Dev mode buttons (far left of inventory, only when Options > Dev Mode is on)
-    let dev_mode = cheat_settings.map(|c| c.dev_mode).unwrap_or(false);
+    let dev_mode = *DEBUG || cheat_settings.map(|c| c.dev_mode).unwrap_or(false);
     if cur_inv_state.0 == UIState::Inventory && dev_mode {
         const DEV_BUTTON_WIDTH: f32 = 38.;
         const DEV_BUTTON_HEIGHT: f32 = 11.;

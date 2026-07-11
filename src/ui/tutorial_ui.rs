@@ -27,27 +27,12 @@ use crate::ui::tip_highlight::{
     spawn_tip_highlight_overlay, TipHighlightMaterial, TipHighlightRect,
 };
 use crate::ui::{
-    global_text_message::GlobalTextMessageEvent,
-    game_fonts as gf,
-    hud_heirloom_first_icon_x,
-    hud_heirloom_row_y,
-    hud_progress_bar_center_x,
-    hud_row_below_xp_y,
-    hud_timeline_center_x,
-    Interactable,
-    Interaction,
-    HUD_ACTION_ROW_Y_FROM_BOTTOM,
-    HUD_HEIRLOOM_ICON_HALF,
-    HUD_HEIRLOOM_ICON_SPACING,
-    HUD_HOTBAR_CENTER_X,
-    HUD_HOTBAR_SLOTS,
-    HUD_SKILLS_CENTER_X,
-    HUD_SKILL_SLOT_HIT_SIZE,
-    HUD_SKILL_SPACING_X,
-    HUD_TIMELINE_SIZE,
-    INV_SLOT_SPACING_X,
-    PROGRESS_BACKGROUND_SIZE,
-    UI_SLOT_SIZE,
+    game_fonts as gf, global_text_message::GlobalTextMessageEvent, hud_heirloom_first_icon_x,
+    hud_heirloom_row_y, hud_progress_bar_center_x, hud_row_below_xp_y, hud_timeline_center_x,
+    Interactable, Interaction, HUD_ACTION_ROW_Y_FROM_BOTTOM, HUD_HEIRLOOM_ICON_HALF,
+    HUD_HEIRLOOM_ICON_SPACING, HUD_HOTBAR_CENTER_X, HUD_HOTBAR_SLOTS, HUD_SKILLS_CENTER_X,
+    HUD_SKILL_SLOT_HIT_SIZE, HUD_SKILL_SPACING_X, HUD_TIMELINE_SIZE, INV_SLOT_SPACING_X,
+    PROGRESS_BACKGROUND_SIZE, UI_SLOT_SIZE,
 };
 use crate::{inventory::Inventory, GameState, ScreenResolution};
 
@@ -405,46 +390,46 @@ impl TutorialContent {
     fn body(self) -> &'static str {
         match self {
             TutorialContent::Attacking => {
-                "Weapons attack automatically,\n\nuse your mouse to aim them."
+                "Weapons attack automatically,\nuse your mouse to aim them."
             }
             TutorialContent::Skills => {
-                "Skills are powerful, don't forget\n\nto use them! Drag to rearrange them."
+                "Skills are powerful, don't forget\nto use them! Drag to rearrange them."
             }
             TutorialContent::Heirlooms => {
-                "Hover here to view your heirlooms.\n\nHeirlooms boost stats or trigger\n\nstrong effects. They are the key\n\nto getting stronger!"
+                "Hover here to view your heirlooms.\nHeirlooms boost stats or trigger\nstrong effects. They are the key\nto getting stronger!"
             }
             TutorialContent::Equipment => {
-                "Equipment can be equipped to boost\n\nyour stats. Upgrade them to make\n\nthem stronger!"
+                "Equipment can be equipped to boost\nyour stats. Upgrade them to make\nthem stronger!"
             }
             TutorialContent::UpgradeTomes => {
-                "Drag and Drop Tomes & Orbs onto\n\nEquipment to improve their bonus\n\nstats and rarity!"
+                "Drag and Drop Tomes & Orbs onto\nEquipment to improve their bonus\nstats and rarity!"
             }
             TutorialContent::InventoryStats => {
-                "Place Extra gear in your inventory.\n\nYou will still gain the highlighted\n\nstat, shown here in purple!"
+                "Place Extra gear in your inventory.\nYou will still gain the highlighted\nstat, shown here in purple!"
             }
             TutorialContent::ShrinesExplore => {
-                "Explore the island and interact\n\nwith shrines, which offer various\n\nchoices or challenges. Find the\n\nBoss Shrine..."
+                "Explore the island and interact\nwith shrines, which offer various\nchoices or challenges. Find the\nBoss Shrine..."
             }
             TutorialContent::PinkFlowers => {
-                "Biomes have different environmental\n\ninteractions, like these bouncing flowers\n\nfound in the forest"
+                "Biomes have different environmental\ninteractions, like these bouncing flowers\nfound in the forest"
             }
             TutorialContent::Crafting => {
-                "Craft different foods and tools\n\nto help you on your journey.\n\nBiomes unlock different blueprints."
+                "Craft different foods and tools\nto help you on your journey.\nBiomes unlock different blueprints."
             }
             TutorialContent::MapNavigation => {
-                "Check your map to navigate\n\nthe island and find shrines,\n\nincluding the Boss Shrine!\n\nYou can even mark locations!"
+                "Check your map to navigate\nthe island and find shrines,\nincluding the Boss Shrine!\nYou can even mark locations!"
             }
             TutorialContent::Timeline => {
-                "Night time is dangerous! Keep\n\ntrack of time here, and find the\n\nboss shrine before its too late"
+                "Night time is dangerous! Keep\ntrack of time here, and find the\nboss shrine before its too late"
             }
             TutorialContent::Chaos => {
-                "Chaos makes enemies tougher but\n\ngrant more score. It rises over time,\n\nand through some player actions."
+                "Chaos makes enemies tougher but\ngrant more score. It rises over time,\nand through some player actions."
             }
             TutorialContent::HotbarFood => {
-                "Place food in the hotbar for\n\nquick access when you need it!"
+                "Place food in the hotbar for\nquick access when you need it!"
             }
             TutorialContent::Mana => {
-                "Some heirloom triggers cost\n\nmana. Hover your mana orb for\n\ninfo on mana efficiency."
+                "Some heirloom triggers cost\nmana. Hover your mana orb for\ninfo on mana efficiency."
             }
         }
     }
@@ -1186,11 +1171,7 @@ fn spawn_tutorial_root(
             .with_alignment(TextAlignment::Center),
             text_anchor: Anchor::Center,
             transform: Transform {
-                translation: Vec3::new(
-                panel_offset_x,
-                panel_height * 0.5 - 24.0,
-                Z_TUTORIAL_TEXT,
-            ),
+                translation: Vec3::new(panel_offset_x, panel_height * 0.5 - 24.0, Z_TUTORIAL_TEXT),
                 scale: gf::DISPLAY_LARGE.transform_scale(),
                 ..Default::default()
             },
@@ -1279,10 +1260,10 @@ fn spawn_compact_tutorial(
             text_anchor: Anchor::Center,
             transform: Transform {
                 translation: Vec3::new(
-                panel_center.x,
-                panel_center.y + PANEL_HEIGHT_COMPACT * 0.5 - 14.0,
-                Z_TUTORIAL_TEXT,
-            ),
+                    panel_center.x,
+                    panel_center.y + PANEL_HEIGHT_COMPACT * 0.5 - 14.0,
+                    Z_TUTORIAL_TEXT,
+                ),
                 scale: gf::DISPLAY.transform_scale(),
                 ..Default::default()
             },
@@ -1295,18 +1276,11 @@ fn spawn_compact_tutorial(
 
     commands.spawn((
         Text2dBundle {
-            text: Text::from_section(
-                content.body(),
-                gf::BODY.text_style(&asset_server, WHITE),
-            )
-            .with_alignment(TextAlignment::Center),
+            text: Text::from_section(content.body(), gf::BODY.text_style(&asset_server, WHITE))
+                .with_alignment(TextAlignment::Center),
             text_anchor: Anchor::Center,
             transform: Transform {
-                translation: Vec3::new(
-                panel_center.x,
-                panel_center.y + 2.0,
-                Z_TUTORIAL_TEXT,
-            ),
+                translation: Vec3::new(panel_center.x, panel_center.y + 2.0, Z_TUTORIAL_TEXT),
                 scale: gf::BODY.transform_scale(),
                 ..Default::default()
             },
@@ -1358,9 +1332,7 @@ fn spawn_button(
             RenderLayers::from_layers(&[3]),
             TutorialUI,
             TutorialButton(kind),
-            crate::ui::focus::OverlayFocusable {
-                index: focus_index,
-            },
+            crate::ui::focus::OverlayFocusable { index: focus_index },
             Name::new(format!("Tutorial Button: {}", label)),
         ))
         .id();
@@ -1368,17 +1340,14 @@ fn spawn_button(
     commands
         .spawn((
             Text2dBundle {
-                text: Text::from_section(
-                    label,
-                    gf::DISPLAY.text_style(&asset_server, WHITE),
-                )
-                .with_alignment(TextAlignment::Center),
+                text: Text::from_section(label, gf::DISPLAY.text_style(&asset_server, WHITE))
+                    .with_alignment(TextAlignment::Center),
                 text_anchor: Anchor::Center,
                 transform: Transform {
-                translation: Vec3::new(0., -1., 1.),
-                scale: gf::DISPLAY.transform_scale(),
-                ..Default::default()
-            },
+                    translation: Vec3::new(0., -1., 1.),
+                    scale: gf::DISPLAY.transform_scale(),
+                    ..Default::default()
+                },
                 ..default()
             },
             RenderLayers::from_layers(&[3]),
@@ -1470,11 +1439,7 @@ fn spawn_entry_text(
             .with_alignment(TextAlignment::Center),
             text_anchor: Anchor::Center,
             transform: Transform {
-                translation: Vec3::new(
-                column_center_x,
-                title_y,
-                Z_TUTORIAL_TEXT,
-            ),
+                translation: Vec3::new(column_center_x, title_y, Z_TUTORIAL_TEXT),
                 scale: gf::DISPLAY.transform_scale(),
                 ..Default::default()
             },
@@ -1489,18 +1454,11 @@ fn spawn_entry_text(
 
     commands.spawn((
         Text2dBundle {
-            text: Text::from_section(
-                content.body(),
-                gf::BODY.text_style(&asset_server, WHITE),
-            )
-            .with_alignment(TextAlignment::Center),
+            text: Text::from_section(content.body(), gf::BODY.text_style(&asset_server, WHITE))
+                .with_alignment(TextAlignment::Center),
             text_anchor: Anchor::Center,
             transform: Transform {
-                translation: Vec3::new(
-                column_center_x,
-                body_y,
-                Z_TUTORIAL_TEXT,
-            ),
+                translation: Vec3::new(column_center_x, body_y, Z_TUTORIAL_TEXT),
                 scale: gf::BODY.transform_scale(),
                 ..Default::default()
             },

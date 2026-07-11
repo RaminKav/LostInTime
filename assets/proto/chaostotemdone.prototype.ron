@@ -1,9 +1,11 @@
 (
   name: "ChaosTotemDone",
-  templates: ["world_object.prototype.ron"],
+  templates: [],
   schematics: {
   "survival_rogue_like::item::WorldObject": ChaosTotemDone,
-  "survival_rogue_like::proto::ColliderProto": (x: 6., y: 6.),
+  "survival_rogue_like::assets::SpriteSize": Small,
+  "survival_rogue_like::assets::SpriteAnchor": ((x: 0., y: 12.)),
+  "survival_rogue_like::world::y_sort::YSort": (0.),
+  "survival_rogue_like::proto::ColliderCapsulProto": (x1: -6., y1: -12., x2: 6., y2: -12., r: 4.5),
   }
 )
-

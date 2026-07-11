@@ -70,6 +70,8 @@
         HeirloomShrine: (min: 5, max: 5),
         BlacksmithMerchant: (min: 2, max: 3),
         ActiveSkillShrine: (min: 2, max: 2),
+        CauldronShrine: (min: 3, max: 3),
+        WellShrine: (min: 3, max: 3),
       },
       obj_allowed_tiles_map: {
         SmallGreenTree: [GrassTile],

@@ -2,19 +2,20 @@ use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
 
 use crate::{
     assets::SpriteAnchor,
-    colors::WHITE,
+    colors::{RED, WHITE},
     ecs_helpers::{safe_push_children, safe_set_parent, SafeHierarchyExt},
     gamepad_bindings::{binding_labels_dirty, format_binding_label, BindingLabel, GamepadMappings},
     inventory::{Inventory, ItemStack},
-    item::{boss_shrine::BossSummonTracker, WorldObject},
+    item::{boss_shrine::BossSummonTracker, shrine_repair::ShrineRepairCosts, WorldObject},
     keybinds::InputMappings,
     player::Player,
     GameParam,
 };
 
 use super::{
-    damage_numbers::spawn_text, game_fonts::{self as gf, FLOATING_TEXT}, spawn_item_stack_icon,
-    UIElement,
+    damage_numbers::spawn_text,
+    game_fonts::{self as gf, FLOATING_TEXT},
+    spawn_item_stack_icon, UIElement, UI_SLOT_SIZE,
 };
 
 /// Interact-guide key badge — larger than the default HUD keybind badge, with darker fill.
@@ -44,11 +45,8 @@ fn spawn_interact_guide_keybind_badge(
 
     let key_text = commands
         .spawn(Text2dBundle {
-            text: Text::from_section(
-                label.into(),
-                gf::DISPLAY.text_style(&asset_server, WHITE),
-            )
-            .with_alignment(TextAlignment::Center),
+            text: Text::from_section(label.into(), gf::DISPLAY.text_style(&asset_server, WHITE))
+                .with_alignment(TextAlignment::Center),
             text_anchor: Anchor::Center,
             transform: Transform {
                 translation: Vec3::new(0., -1., 1.),
@@ -84,9 +82,28 @@ pub struct InteractionGuideTrigger {
 
 pub fn add_guide_to_unique_objs(
     mut commands: Commands,
-    new_objs: Query<(Entity, &WorldObject), Added<WorldObject>>,
+    new_objs: Query<(Entity, &WorldObject, &Transform, Option<&SpriteAnchor>), Added<WorldObject>>,
+    cache: Res<crate::world::generation::WorldObjectCache>,
 ) {
-    for (e, obj) in new_objs.iter() {
+    for (e, obj, transform, anchor) in new_objs.iter() {
+        if crate::item::shrine_repair::can_be_broken(*obj) {
+            let world_pos =
+                transform.translation.truncate() - anchor.map(|a| a.0).unwrap_or(Vec2::ZERO);
+            let tile_pos = crate::world::world_helpers::world_pos_to_tile_pos(world_pos);
+            if let Some(costs) = cache.broken_shrine_costs.get(&tile_pos) {
+                if !costs.is_empty() {
+                    let icon = costs.first().map(|(item, amount)| {
+                        ItemStack::crate_icon_stack(*item).copy_with_count(*amount as usize)
+                    });
+                    commands.entity(e).insert(InteractionGuideTrigger {
+                        text: Some("Repair".to_string()),
+                        activation_distance: 32.,
+                        icon_stack: icon,
+                    });
+                    continue;
+                }
+            }
+        }
         match obj {
             WorldObject::BossShrine => {
                 commands.entity(e).insert(InteractionGuideTrigger {
@@ -113,70 +130,70 @@ pub fn add_guide_to_unique_objs(
             }
             WorldObject::CombatShrine => {
                 commands.entity(e).insert(InteractionGuideTrigger {
-                    text: Some("Fight".to_string()),
+                    text: Some("Activate Shrine".to_string()),
                     activation_distance: 32.,
                     icon_stack: Some(ItemStack::crate_icon_stack(WorldObject::ChestBlock)),
                 });
             }
             WorldObject::WeaponShrine => {
                 commands.entity(e).insert(InteractionGuideTrigger {
-                    text: Some("Fight".to_string()),
+                    text: Some("Activate Shrine".to_string()),
                     activation_distance: 32.,
                     icon_stack: None,
                 });
             }
             WorldObject::ArmorShrine => {
                 commands.entity(e).insert(InteractionGuideTrigger {
-                    text: Some("Fight".to_string()),
+                    text: Some("Activate Shrine".to_string()),
                     activation_distance: 32.,
                     icon_stack: None,
                 });
             }
             WorldObject::AccessoryShrine => {
                 commands.entity(e).insert(InteractionGuideTrigger {
-                    text: Some("Fight".to_string()),
+                    text: Some("Activate Shrine".to_string()),
                     activation_distance: 32.,
                     icon_stack: None,
                 });
             }
             WorldObject::GambleShrine => {
                 commands.entity(e).insert(InteractionGuideTrigger {
-                    text: Some("Pay Offering".to_string()),
+                    text: Some("Activate Shrine".to_string()),
                     activation_distance: 32.,
                     icon_stack: Some(ItemStack::crate_icon_stack(WorldObject::Coin)),
                 });
             }
             WorldObject::BlacksmithMerchant => {
                 commands.entity(e).insert(InteractionGuideTrigger {
-                    text: Some("Purchase".to_string()),
+                    text: Some("Activate Shrine".to_string()),
                     activation_distance: 32.,
                     icon_stack: Some(ItemStack::crate_icon_stack(WorldObject::Coin)),
                 });
             }
             WorldObject::ActiveSkillShrine => {
                 commands.entity(e).insert(InteractionGuideTrigger {
-                    text: Some("Get Skill".to_string()),
+                    text: Some("Activate Shrine".to_string()),
                     activation_distance: 32.,
                     icon_stack: None,
                 });
             }
             WorldObject::HeirloomShrine => {
                 commands.entity(e).insert(InteractionGuideTrigger {
-                    text: Some("Talk ".to_string()),
+                    text: Some("Activate Shrine".to_string()),
                     activation_distance: 32.,
                     icon_stack: None,
                 });
             }
             WorldObject::MicrowaveShrine => {
                 commands.entity(e).insert(InteractionGuideTrigger {
-                    text: Some("Swap Heirlooms".to_string()),
+                    text: Some("Activate Shrine".to_string()),
                     activation_distance: 32.,
                     icon_stack: None,
                 });
             }
             WorldObject::ChaosTotem => {
                 commands.entity(e).insert(InteractionGuideTrigger {
-                    text: Some("Activate".to_string()),
+                    text: Some("Activate Shrine".to_string()),
                     activation_distance: 32.,
                     icon_stack: None,
                 });
@@ -224,6 +241,7 @@ pub fn spawn_shrine_interact_key_guide(
     gamepads: Res<Gamepads>,
     player_query: Query<(Entity, &GlobalTransform), With<Player>>,
     player_inv: Query<&Inventory, With<Player>>,
+    inv_changed: Query<Entity, (With<Player>, With<Inventory>, Changed<Inventory>)>,
     summon_tracker: Res<BossSummonTracker>,
     game: GameParam,
     already_exists: Query<Entity, With<InteractGuide>>,
@@ -232,6 +250,7 @@ pub fn spawn_shrine_interact_key_guide(
         &InteractionGuideTrigger,
         Option<&SpriteAnchor>,
         Option<&WorldObject>,
+        Option<&ShrineRepairCosts>,
     )>,
 ) {
     let interact_key = format_binding_label(
@@ -241,14 +260,13 @@ pub fn spawn_shrine_interact_key_guide(
         &gamepads,
     );
     let (player_e, player_t) = player_query.single();
-    let key_count = player_inv
-        .single()
-        .items
-        .get_item_count_in_container(WorldObject::Key);
+    let inv = player_inv.single();
+    let key_count = inv.items.get_item_count_in_container(WorldObject::Key);
     let summon_cost = summon_tracker.current_cost();
+    let inventory_changed = !inv_changed.is_empty();
 
     if already_exists.iter().count() == 0 {
-        for (txfm, guide, anchor_option, world_obj) in guides.iter() {
+        for (txfm, guide, anchor_option, world_obj, repair_costs) in guides.iter() {
             let guide_pos =
                 txfm.translation().truncate() - anchor_option.unwrap_or(&SpriteAnchor::default()).0;
             if guide_pos.distance(player_t.translation().truncate()) < guide.activation_distance {
@@ -263,7 +281,7 @@ pub fn spawn_shrine_interact_key_guide(
                 );
                 let parent_entity = commands
                     .spawn(SpatialBundle::from_transform(Transform::from_translation(
-                        Vec3::new(0., 25.5, 1.),
+                        Vec3::new(0., 57.5, 1.),
                     )))
                     .insert(InteractGuide)
                     .insert(Name::new("Interact Guide"))
@@ -312,7 +330,17 @@ pub fn spawn_shrine_interact_key_guide(
                         commands.entity(key_text).insert(InteractGuideKeybindText);
                     }
                 }
-                if let Some(mut icon_stack) = guide.icon_stack.clone() {
+
+                if let Some(repair) = repair_costs {
+                    spawn_repair_cost_icons(
+                        &mut commands,
+                        &game,
+                        &asset_server,
+                        inv,
+                        parent_entity,
+                        &repair.materials,
+                    );
+                } else if let Some(mut icon_stack) = guide.icon_stack.clone() {
                     // Boss shrine summon cost scales with each summon, so reflect the
                     // current cost on the coin icon instead of the static initial value.
                     if world_obj.copied() == Some(WorldObject::BossShrine) {
@@ -348,16 +376,106 @@ pub fn spawn_shrine_interact_key_guide(
             }
         }
     } else {
-        for (txfm, guide, anchor_option, _world_obj) in guides.iter() {
+        for (txfm, guide, anchor_option, _world_obj, repair_costs) in guides.iter() {
             let guide_pos =
                 txfm.translation().truncate() - anchor_option.unwrap_or(&SpriteAnchor::default()).0;
             if guide_pos.distance(player_t.translation().truncate()) < guide.activation_distance {
+                // Rebuild when inventory changes so repair owned/cost counts stay live.
+                if inventory_changed && repair_costs.is_some() {
+                    for t in already_exists.iter() {
+                        commands.entity(t).despawn_recursive();
+                    }
+                }
                 return;
             }
         }
         for t in already_exists.iter() {
             commands.entity(t).despawn_recursive();
         }
+    }
+}
+
+const REPAIR_ICON_SPACING: f32 = 28.;
+
+fn spawn_repair_cost_icons(
+    commands: &mut Commands,
+    game: &GameParam,
+    asset_server: &AssetServer,
+    inv: &Inventory,
+    parent_entity: Entity,
+    materials: &[(WorldObject, u32)],
+) {
+    if materials.is_empty() {
+        return;
+    }
+    let count = materials.len() as f32;
+    let start_x = -((count - 1.) * REPAIR_ICON_SPACING) * 0.5;
+
+    for (i, (item, cost)) in materials.iter().enumerate() {
+        let owned = inv.items.get_item_count_in_container(*item);
+        let has_enough = owned >= *cost as usize;
+        let alpha = if has_enough { 1.0 } else { 0.7 };
+        let x = start_x + i as f32 * REPAIR_ICON_SPACING;
+
+        let icon_stack = ItemStack::crate_icon_stack(*item).copy_with_count(1);
+        let icon = spawn_item_stack_icon(
+            commands,
+            &game.graphics,
+            &icon_stack,
+            asset_server,
+            Vec2::ZERO,
+            Vec2::ZERO,
+            INTERACT_GUIDE_RENDER_LAYER,
+        );
+        // Grey out when the player cannot afford this material.
+        commands.add(move |world: &mut World| {
+            if let Some(mut entity) = world.get_entity_mut(icon) {
+                if let Some(mut sprite) = entity.get_mut::<TextureAtlasSprite>() {
+                    sprite.color.set_a(alpha);
+                }
+            }
+        });
+
+        let count_color = if has_enough { WHITE } else { RED };
+        let count_text = commands
+            .spawn(Text2dBundle {
+                text: Text::from_section(
+                    format!("{owned}/{cost}"),
+                    gf::TITLE.text_style(asset_server, count_color),
+                )
+                .with_alignment(TextAlignment::Center),
+                transform: Transform {
+                    translation: Vec3::new(0., -18., 3.),
+                    scale: gf::TITLE.transform_scale(),
+                    ..default()
+                },
+                ..default()
+            })
+            .insert(RenderLayers::from_layers(&[INTERACT_GUIDE_RENDER_LAYER]))
+            .insert(Name::new("REPAIR COST TEXT"))
+            .id();
+
+        let slot_entity = commands
+            .spawn(SpriteBundle {
+                texture: game
+                    .graphics
+                    .get_ui_element_texture(UIElement::InventorySlot),
+                transform: Transform::from_translation(Vec3::new(x, 28., 1.)),
+                sprite: Sprite {
+                    custom_size: Some(UI_SLOT_SIZE),
+                    color: if has_enough {
+                        Color::WHITE
+                    } else {
+                        Color::rgba(1., 1., 1., 0.7)
+                    },
+                    ..Default::default()
+                },
+                ..Default::default()
+            })
+            .insert(RenderLayers::from_layers(&[INTERACT_GUIDE_RENDER_LAYER]))
+            .safe_set_parent(parent_entity)
+            .id();
+        safe_push_children(commands, slot_entity, &[icon, count_text]);
     }
 }
 

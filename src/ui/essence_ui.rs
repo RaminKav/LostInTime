@@ -322,8 +322,6 @@ pub struct MerchantHeirloomHover {
     pub rarity: HeirloomRarity,
 }
 
-aseprite!(pub BlacksmithMerchant, "textures/blacksmith.ase");
-
 fn merchant_slot_position(slot_index: usize) -> Vec2 {
     match slot_index {
         0 => Vec2::new(-38., 42. + MERCHANT_CATEGORY_Y_OFFSET),

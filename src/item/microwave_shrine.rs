@@ -1,8 +1,6 @@
 use bevy::prelude::*;
-use bevy_aseprite::{anim::AsepriteAnimation, aseprite, AsepriteBundle};
 
 use crate::{
-    assets::Graphics,
     item::object_actions::ObjectAction,
     ui::{key_input_guide::InteractionGuideTrigger, minimap::UpdateMiniMapEvent},
     world::TileMapPosition,
@@ -19,40 +17,6 @@ use super::WorldObject;
 pub struct MicrowaveShrineState {
     pub is_used: bool,
     pub tile_pos: TileMapPosition,
-}
-aseprite!(pub MicrowaveShrineAnim, "textures/gamble_shrine/gamble_shrine_purple.ase");
-
-pub fn add_microwave_shrine_visuals_on_spawn(
-    mut commands: Commands,
-    new_shrines: Query<
-        (Entity, &WorldObject, &Transform),
-        Or<(Added<WorldObject>, Changed<WorldObject>)>,
-    >,
-    graphics: Res<Graphics>,
-) {
-    for (e, obj, t) in new_shrines.iter() {
-        if obj == &WorldObject::MicrowaveShrine {
-            commands
-                .entity(e)
-                .insert(AsepriteBundle {
-                    transform: *t,
-                    animation: AsepriteAnimation::from(MicrowaveShrineAnim::tags::IDLE),
-                    aseprite: graphics.microwave_anim.as_ref().unwrap().clone(), // reuse gamble sprite for now
-                    ..default()
-                })
-                .insert(Name::new("MICROWAVE_SHRINE"));
-        } else if obj == &WorldObject::MicrowaveShrineDone {
-            commands
-                .entity(e)
-                .insert(AsepriteBundle {
-                    transform: *t,
-                    animation: AsepriteAnimation::from(MicrowaveShrineAnim::tags::DONE),
-                    aseprite: graphics.microwave_anim.as_ref().unwrap().clone(),
-                    ..default()
-                })
-                .insert(Name::new("MICROWAVE_SHRINE_DONE"));
-        }
-    }
 }
 
 pub fn handle_microwave_shrine_completion(

@@ -1,8 +1,8 @@
 (
-  name: "BlacksmithMerchantDone",
+  name: "CauldronShrineDone",
   templates: [],
   schematics: {
-  "survival_rogue_like::item::WorldObject": BlacksmithMerchantDone,
+  "survival_rogue_like::item::WorldObject": CauldronShrineDone,
   "survival_rogue_like::assets::SpriteSize": Small,
   "survival_rogue_like::assets::SpriteAnchor": ((x: 0., y: 10.)),
   "survival_rogue_like::world::y_sort::YSort": (0.),

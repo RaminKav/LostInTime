@@ -1,0 +1,11 @@
+(
+  name: "WellShrineDone",
+  templates: [],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": WellShrineDone,
+  "survival_rogue_like::assets::SpriteSize": Small,
+  "survival_rogue_like::assets::SpriteAnchor": ((x: 0., y: 22.)),
+  "survival_rogue_like::world::y_sort::YSort": (0.),
+  "survival_rogue_like::proto::ColliderCapsulProto": (x1: -8., y1: -20., x2: 8., y2: -20., r: 5.5),
+  }
+)

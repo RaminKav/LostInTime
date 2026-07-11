@@ -17,14 +17,11 @@ use crate::attributes::ItemGlow;
 use crate::bounce::PinkFlowerAseprite;
 use crate::client::GameData;
 use crate::enemy::Mob;
-use crate::item::active_skill_shrine::ActiveSkillSprite;
 use crate::item::combat_shrine::CombatShrineAnim;
 use crate::item::dungeon_shrine::AccessoryShrineAnim;
 use crate::item::dungeon_shrine::ArmorShrineAnim;
 use crate::item::dungeon_shrine::WeaponShrineAnim;
-use crate::item::gamble_shrine::GambleShrineAnim;
-use crate::item::heirloom_shrine::HeirloomMerchantSprite;
-use crate::item::microwave_shrine::MicrowaveShrineAnim;
+use crate::item::shrine_visuals::ShrineEye;
 use crate::item::{
     FurnaceRecipeList, RecipeList, RecipeListProto, Recipes, WorldObject, WorldObjectResource,
 };
@@ -39,7 +36,7 @@ use crate::player::{
 use crate::status_effects::StatusEffect;
 use crate::ui::tips::SeenTips;
 use crate::ui::tutorial_ui::{seen_tutorial_chunks_from_game_data, SeenTutorialChunks};
-use crate::ui::{BlacksmithMerchant, UIElement};
+use crate::ui::UIElement;
 
 use self::skill_icons::{load_skill_icons, SkillIcon};
 use crate::world::portal::{Portal, UIPortal};
@@ -152,14 +149,10 @@ impl Plugin for GameAssetsPlugin {
                 heirloom_sprites: None,
                 item_glows: None,
                 combat_shrine_anim: None,
-                microwave_anim: None,
-                gamble_shrine_anim: None,
+                shrine_eye: None,
                 weapon_shrine_anim: None,
                 armor_shrine_anim: None,
                 accessory_shrine_anim: None,
-                blacksmith_merchant: None,
-                active_skill_shrine: None,
-                heirloom_shrine_anim: None,
                 portal_ase: None,
                 ui_portal_ase: None,
                 class_pet_data: None,
@@ -239,11 +232,7 @@ pub struct Graphics {
     pub weapon_shrine_anim: Option<Handle<Aseprite>>,
     pub armor_shrine_anim: Option<Handle<Aseprite>>,
     pub accessory_shrine_anim: Option<Handle<Aseprite>>,
-    pub gamble_shrine_anim: Option<Handle<Aseprite>>,
-    pub microwave_anim: Option<Handle<Aseprite>>,
-    pub blacksmith_merchant: Option<Handle<Aseprite>>,
-    pub active_skill_shrine: Option<Handle<Aseprite>>,
-    pub heirloom_shrine_anim: Option<Handle<Aseprite>>,
+    pub shrine_eye: Option<Handle<Aseprite>>,
     pub portal_ase: Option<Handle<Aseprite>>,
     pub ui_portal_ase: Option<Handle<Aseprite>>,
     pub class_pet_data: Option<ClassPetData>,
@@ -659,14 +648,10 @@ impl GameAssetsPlugin {
             heirloom_sprites: Some(heirloom_sprites),
             item_glows: Some(item_glow_handles),
             combat_shrine_anim: Some(asset_server.load(CombatShrineAnim::PATH)),
-            gamble_shrine_anim: Some(asset_server.load(GambleShrineAnim::PATH)),
-            microwave_anim: Some(asset_server.load(MicrowaveShrineAnim::PATH)),
+            shrine_eye: Some(asset_server.load(ShrineEye::PATH)),
             weapon_shrine_anim: Some(asset_server.load(WeaponShrineAnim::PATH)),
             armor_shrine_anim: Some(asset_server.load(ArmorShrineAnim::PATH)),
             accessory_shrine_anim: Some(asset_server.load(AccessoryShrineAnim::PATH)),
-            blacksmith_merchant: Some(asset_server.load(BlacksmithMerchant::PATH)),
-            active_skill_shrine: Some(asset_server.load(ActiveSkillSprite::PATH)),
-            heirloom_shrine_anim: Some(asset_server.load(HeirloomMerchantSprite::PATH)),
             ice_explosion_ase: Some(asset_server.load(IceExplosion::PATH)),
             small_explosion_ase: Some(asset_server.load(SmallExplosion::PATH)),
             cherry_bomb_ase: Some(

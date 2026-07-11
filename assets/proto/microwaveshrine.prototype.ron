@@ -5,8 +5,8 @@
     "survival_rogue_like::item::WorldObject": MicrowaveShrine,
     "survival_rogue_like::item::object_actions::ObjectAction": MicrowaveShrine,
     "survival_rogue_like::assets::SpriteSize": Small,
-  "survival_rogue_like::assets::SpriteAnchor": ((x: 0., y: 60.)),
-  "survival_rogue_like::world::y_sort::YSort": (0.02),
-  "survival_rogue_like::proto::ColliderCapsulProto": (x1: -10., y1: -55., x2: 10., y2: -55., r: 7.5),
+  "survival_rogue_like::assets::SpriteAnchor": ((x: 0., y: 16.)),
+  "survival_rogue_like::world::y_sort::YSort": (-0.02),
+  "survival_rogue_like::proto::ColliderCapsulProto": (x1: -9., y1: -12., x2: 9., y2: -12., r: 7.),
   }
 )

@@ -1,0 +1,11 @@
+(
+  name: "CauldronShrine",
+  templates: [],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": CauldronShrine,
+  "survival_rogue_like::assets::SpriteSize": Small,
+  "survival_rogue_like::assets::SpriteAnchor": ((x: 0., y: 0.)),
+  "survival_rogue_like::world::y_sort::YSort": (0.),
+  "survival_rogue_like::proto::ColliderCapsulProto": (x1: -6., y1: -5., x2: 6., y2: -5., r: 7.),
+  }
+)

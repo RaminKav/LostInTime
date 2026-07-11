@@ -42,29 +42,27 @@ use crate::world::TileMapPosition;
 use crate::{custom_commands::CommandsExt, player::Limb, CustomFlush, GameParam, GameState};
 use crate::{handle_pink_flower_animation_loop, spawn_pink_flower_aseprite};
 use active_skill_shrine::{
-    add_active_skill_shrine_visuals_on_spawn, handle_active_skill_shrine_completion,
-    handle_active_skill_shrine_esc,
+    handle_active_skill_shrine_completion, handle_active_skill_shrine_esc,
 };
 use bevy::prelude::*;
 use bevy::reflect::TypeUuid;
 use bevy::utils::HashMap;
 use bevy_proto::prelude::{ProtoCommands, Prototypes, ReflectSchematic, Schematic};
 use combat_shrine::{
-    add_shrine_visuals_on_spawn, enhance_combat_shrine_mobs, handle_combat_shrine_activate_animation,
-    handle_shrine_rewards, CombatShrineMobCounts, CombatShrineMobDeathEvent,
+    enhance_combat_shrine_mobs, handle_combat_shrine_activate_animation, handle_shrine_rewards,
+    CombatShrineMobCounts, CombatShrineMobDeathEvent,
 };
 use dungeon_shrine::{
     add_dungeon_shrine_visuals_on_spawn, handle_dungeon_shrine_activation,
     handle_dungeon_shrine_rewards, DungeonShrineMobDeathEvent,
 };
-use gamble_shrine::{add_gamble_visuals_on_spawn, handle_gamble_shrine_rewards, GambleShrineEvent};
-use heirloom_shrine::{add_heirloom_shrine_visuals_on_spawn, handle_heirloom_shrine_completion};
-use microwave_shrine::{
-    add_microwave_shrine_visuals_on_spawn, handle_microwave_shrine_completion,
-    handle_microwave_shrine_esc,
-};
+use gamble_shrine::{handle_gamble_shrine_rewards, GambleShrineEvent};
+use heirloom_shrine::handle_heirloom_shrine_completion;
+use microwave_shrine::{handle_microwave_shrine_completion, handle_microwave_shrine_esc};
 use projectile::handle_reset_proj_hit_enemies_state;
 use rand::Rng;
+use shrine_repair::apply_broken_shrine_state_on_spawn;
+use shrine_visuals::{apply_shrine_visuals_on_spawn, sync_shrine_eye_after_repair};
 
 mod crafting;
 pub mod food_recipes;
@@ -80,6 +78,8 @@ pub mod gamble_shrine;
 pub mod heirloom_shrine;
 pub mod item_drop_outline;
 pub mod microwave_shrine;
+pub mod shrine_repair;
+pub mod shrine_visuals;
 use boss_shrine::*;
 pub mod item_upgrades;
 mod loot_table;
@@ -562,6 +562,10 @@ pub enum WorldObject {
     MicrowaveShrineDone,
     ChaosTotem,
     ChaosTotemDone,
+    CauldronShrine,
+    CauldronShrineDone,
+    WellShrine,
+    WellShrineDone,
     Coin,
     DaggerThrow,
     Bomb,
@@ -984,6 +988,12 @@ impl WorldObject {
                 | WorldObject::HeirloomShrineDone
                 | WorldObject::MicrowaveShrine
                 | WorldObject::MicrowaveShrineDone
+                | WorldObject::CauldronShrine
+                | WorldObject::CauldronShrineDone
+                | WorldObject::WellShrine
+                | WorldObject::WellShrineDone
+                | WorldObject::ChaosTotem
+                | WorldObject::ChaosTotemDone
                 | WorldObject::BossShrine
         )
     }
@@ -1372,6 +1382,12 @@ impl WorldObject {
             WorldObject::MicrowaveShrineDone => GREY,
             WorldObject::BlacksmithMerchant => GREY,
             WorldObject::BlacksmithMerchantDone => GREY,
+            WorldObject::CauldronShrine => GREY,
+            WorldObject::CauldronShrineDone => GREY,
+            WorldObject::WellShrine => GREY,
+            WorldObject::WellShrineDone => GREY,
+            WorldObject::ChaosTotem => GREY,
+            WorldObject::ChaosTotemDone => GREY,
             WorldObject::BossShrine => RED,
             WorldObject::DungeonEntrance => DARK_GREEN,
             WorldObject::TimeGate => BLUE,
@@ -1588,15 +1604,21 @@ impl Plugin for ItemsPlugin {
                         .run_if(is_not_paused),
                     handle_burning_ticks.run_if(is_not_paused),
                     handle_shrine_rewards,
-                    add_shrine_visuals_on_spawn,
+                    apply_shrine_visuals_on_spawn,
+                    sync_shrine_eye_after_repair,
                     handle_gamble_shrine_rewards,
-                    add_gamble_visuals_on_spawn,
                     handle_frail_stack_ticks.run_if(is_not_paused),
                     handle_slow_stack_ticks.run_if(is_not_paused),
                     handle_frozen_ticks.run_if(is_not_paused),
                     check_freeze_on_slow_stacks.run_if(is_not_paused),
                     handle_combat_shrine_activate_animation,
                 )
+                    .in_set(OnUpdate(GameState::Main)),
+            )
+            .add_system(
+                apply_broken_shrine_state_on_spawn
+                    .after(apply_shrine_visuals_on_spawn)
+                    .after(crate::ui::key_input_guide::add_guide_to_unique_objs)
                     .in_set(OnUpdate(GameState::Main)),
             )
             .add_system(
@@ -1641,15 +1663,12 @@ impl Plugin for ItemsPlugin {
             )
             .add_systems(
                 (
-                    add_active_skill_shrine_visuals_on_spawn,
                     handle_active_skill_shrine_completion,
                     handle_active_skill_shrine_esc,
                     handle_dungeon_shrine_rewards,
                     add_dungeon_shrine_visuals_on_spawn,
                     handle_dungeon_shrine_activation,
-                    add_heirloom_shrine_visuals_on_spawn,
                     handle_heirloom_shrine_completion,
-                    add_microwave_shrine_visuals_on_spawn,
                     handle_microwave_shrine_completion,
                     handle_microwave_shrine_esc,
                 )

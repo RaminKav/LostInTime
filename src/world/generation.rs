@@ -68,6 +68,9 @@ pub struct WorldObjectCache {
     pub tile_data_cache: HashMap<TileMapPosition, TileSpriteData>,
     /// Rolled once per active skill shrine tile (world-unique spawn or first interact). Survives chunk despawn.
     pub active_skill_shrine_offers: HashMap<TileMapPosition, Vec<ActiveSkill>>,
+    /// Per-tile shrine repair rolls. Empty vec = healthy; non-empty = broken with rolled material costs.
+    /// Survives chunk despawn so broken state and costs stay stable.
+    pub broken_shrine_costs: HashMap<TileMapPosition, Vec<(crate::item::WorldObject, u32)>>,
 }
 pub struct GenerationPlugin;
 
@@ -407,6 +410,12 @@ impl GenerationPlugin {
 
             chunk_pool.swap_remove(chunk_idx);
             game.world_obj_cache.shrines.insert(pos, *shrine_obj);
+            crate::item::shrine_repair::maybe_mark_shrine_broken(
+                &mut game.world_obj_cache,
+                pos,
+                *shrine_obj,
+                &mut rng,
+            );
 
             // Pre-roll and cache the skill offer for active skill shrines so the
             // selection is stable from world-gen. The offer is still re-validated

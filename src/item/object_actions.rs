@@ -4,7 +4,7 @@ use super::active_skill_shrine::{
 };
 use super::combat_shrine::{CombatShrine, CombatShrineAnim};
 use super::dungeon_shrine::{DungeonShrine, DungeonShrineType};
-use super::gamble_shrine::{GambleShrine, GambleShrineAnim};
+use super::gamble_shrine::GambleShrine;
 use super::heirloom_shrine::HeirloomShrineState;
 use super::item_actions::ItemActionParam;
 use super::microwave_shrine::MicrowaveShrineState;
@@ -369,7 +369,6 @@ impl ObjectAction {
                         num_mobs_left: num_spawns_left,
                         tile_pos: obj_pos,
                     })
-                    .insert(AsepriteAnimation::from(CombatShrineAnim::tags::ACTIVATE))
                     .remove::<InteractionGuideTrigger>()
                     .remove::<ObjectAction>();
             }
@@ -392,7 +391,6 @@ impl ObjectAction {
                     });
                 }
 
-                // Instantly go to ACTIVATE_SUCCESS animation
                 commands
                     .entity(e)
                     .remove::<InteractionGuideTrigger>()
@@ -400,10 +398,7 @@ impl ObjectAction {
                     .insert(GambleShrine {
                         success: true,
                         tile_pos: obj_pos,
-                    })
-                    .insert(AsepriteAnimation::from(
-                        GambleShrineAnim::tags::ACTIVATE_SUCCESS,
-                    ));
+                    });
             }
             ObjectAction::ActiveSkillShrine => {
                 // Always re-validate the cached offer against the player's current
@@ -578,20 +573,9 @@ impl ObjectAction {
                 let pos = tile_pos_to_world_pos(obj_pos, true);
                 info!("{pos:?} {obj_pos:?}");
 
-                // Update sprite to the "Done" variant
-                let done_sprite = game
-                    .graphics
-                    .spritesheet_map
-                    .as_ref()
-                    .unwrap()
-                    .get(&WorldObject::ChaosTotemDone)
-                    .unwrap()
-                    .clone();
-
                 commands
                     .entity(e)
                     .insert(WorldObject::ChaosTotemDone)
-                    .insert(done_sprite)
                     .remove::<InteractionGuideTrigger>()
                     .remove::<ObjectAction>();
 

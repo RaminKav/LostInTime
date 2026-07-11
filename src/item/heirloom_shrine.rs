@@ -1,12 +1,10 @@
 use bevy::prelude::*;
-use bevy_aseprite::{anim::AsepriteAnimation, aseprite, AsepriteBundle};
 
 use crate::{
-    assets::Graphics,
     item::object_actions::ObjectAction,
     player::skills::HeirloomChoiceQueue,
     ui::{key_input_guide::InteractionGuideTrigger, minimap::UpdateMiniMapEvent},
-    world::{world_helpers::world_pos_to_tile_pos, TileMapPosition},
+    world::TileMapPosition,
     GameParam,
 };
 
@@ -20,43 +18,6 @@ use super::WorldObject;
 pub struct HeirloomShrineState {
     pub is_used: bool,
     pub tile_pos: TileMapPosition,
-}
-
-// TODO: Create proper aseprite asset for heirloom shrine
-// For now, using CombatShrine sprite as a placeholder
-aseprite!(pub HeirloomMerchantSprite, "textures/heirloom.ase");
-
-pub fn add_heirloom_shrine_visuals_on_spawn(
-    mut commands: Commands,
-    new_shrines: Query<
-        (Entity, &WorldObject, &Transform),
-        Or<(Added<WorldObject>, Changed<WorldObject>)>,
-    >,
-    graphics: Res<Graphics>,
-) {
-    for (e, obj, t) in new_shrines.iter() {
-        if obj == &WorldObject::HeirloomShrine {
-            commands
-                .entity(e)
-                .insert(AsepriteBundle {
-                    transform: *t,
-                    animation: AsepriteAnimation::from(HeirloomMerchantSprite::tags::IDLE),
-                    aseprite: graphics.heirloom_shrine_anim.as_ref().unwrap().clone(),
-                    ..default()
-                })
-                .insert(Name::new("HEIRLOOM_SHRINE"));
-        } else if obj == &WorldObject::HeirloomShrineDone {
-            commands
-                .entity(e)
-                .insert(AsepriteBundle {
-                    transform: *t,
-                    animation: AsepriteAnimation::from(HeirloomMerchantSprite::tags::DONE),
-                    aseprite: graphics.heirloom_shrine_anim.as_ref().unwrap().clone(),
-                    ..default()
-                })
-                .insert(Name::new("HEIRLOOM_SHRINE_DONE"));
-        }
-    }
 }
 
 pub fn handle_heirloom_shrine_completion(
@@ -74,11 +35,8 @@ pub fn handle_heirloom_shrine_completion(
                 .remove::<InteractionGuideTrigger>()
                 .remove::<HeirloomShrineState>();
 
-            // Update the world object cache using the stored tile position
-            // This ensures we update the exact same tile that was originally cached
             game.add_object_to_chunk_cache(shrine.tile_pos, WorldObject::HeirloomShrineDone);
 
-            // Update minimap to reflect the shrine is now "Done"
             minimap_event.send(UpdateMiniMapEvent {
                 pos: Some(shrine.tile_pos),
                 new_tile: Some(WorldObject::HeirloomShrineDone),
@@ -99,11 +57,9 @@ pub fn handle_heirloom_shrine_ui_setup(
         With<crate::player::Player>,
     >,
 ) {
-    // Check if there are any shrines that just got activated (is_used = false)
     let shrine_just_activated = shrine_query.iter().any(|shrine| !shrine.is_used);
 
     if shrine_just_activated {
-        // Generate 3 random heirlooms (only if queue is empty per add_new_skills_after_levelup logic)
         let mut rng = rand::thread_rng();
         let (loot_bonus, player_level) = player_atts
             .get_single()
