@@ -31,6 +31,7 @@ mod enemy_health_bar;
 mod fps_text;
 
 pub mod game_fonts;
+pub mod font_atlas_sampler;
 pub mod layout_sync;
 pub mod key_input_guide;
 use key_input_guide::*;
@@ -669,6 +670,11 @@ impl Plugin for UIPlugin {
                 snap_layer3_visuals_to_pixel_grid
                     .in_base_set(CoreSet::PostUpdate)
                     .run_if(not(in_state(GameState::Initializing))),
+            )
+            .add_system(
+                font_atlas_sampler::ensure_font_atlas_linear_sampling
+                    .in_base_set(CoreSet::PostUpdate)
+                    .after(bevy::text::update_text2d_layout),
             )
             .add_system(
                 init_main_menu_leaderboard_visibility
