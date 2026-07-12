@@ -323,7 +323,8 @@ fn get_icon_for_object(obj: &WorldObject) -> Option<UIElement> {
         | WorldObject::MicrowaveShrine
         | WorldObject::BlacksmithMerchant
         | WorldObject::CauldronShrine
-        | WorldObject::WellShrine => Some(UIElement::MinimapStarIcon),
+        | WorldObject::WellShrine
+        | WorldObject::ChaosTotem => Some(UIElement::MinimapStarIcon),
         WorldObject::CombatShrineDone
         | WorldObject::HeirloomShrineDone
         | WorldObject::GambleShrineDone
@@ -334,7 +335,8 @@ fn get_icon_for_object(obj: &WorldObject) -> Option<UIElement> {
         | WorldObject::MicrowaveShrineDone
         | WorldObject::BlacksmithMerchantDone
         | WorldObject::CauldronShrineDone
-        | WorldObject::WellShrineDone => None,
+        | WorldObject::WellShrineDone
+        | WorldObject::ChaosTotemDone => None,
         _ => None,
     }
 }
@@ -651,6 +653,8 @@ fn setup_island_map(
                                     | WorldObject::CauldronShrineDone
                                     | WorldObject::WellShrine
                                     | WorldObject::WellShrineDone
+                                    | WorldObject::ChaosTotem
+                                    | WorldObject::ChaosTotemDone
                                     | WorldObject::DungeonEntrance
                                     | WorldObject::MicrowaveShrine
                                     | WorldObject::MicrowaveShrineDone

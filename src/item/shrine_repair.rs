@@ -21,7 +21,6 @@ use crate::{
         dimension::{Era, EraManager},
         generation::WorldObjectCache,
         world_helpers::world_pos_to_tile_pos,
-        y_sort::YSort,
         TileMapPosition,
     },
     GameParam,
@@ -135,8 +134,9 @@ fn eye_tag_after_successful_repair(obj: WorldObject) -> &'static str {
 /// Diameter of the repair ring (player must stay inside this circle).
 pub const SHRINE_REPAIR_RING_DIAMETER: f32 = 96.;
 const SHRINE_REPAIR_RING_RADIUS: f32 = SHRINE_REPAIR_RING_DIAMETER * 0.5;
-/// YSort bias: below shrine sprites (~0) but above ground dirt patches (~-0.99).
-const SHRINE_REPAIR_RING_YSORT: f32 = -0.5;
+/// Parent-local Z: under the shrine sprite (local 0) / eye (+1), above grass patches (~-12).
+/// Do not use [`YSort`] on the child — absolute depth stacked on the parent's Z draws above the shrine.
+const SHRINE_REPAIR_RING_LOCAL_Z: f32 = -1.0;
 
 pub const SHRINE_BROKEN_CHANCE: f64 = 0.30;
 const REPAIR_COST_VARIANCE: f32 = 0.25;
@@ -522,10 +522,13 @@ pub fn handle_broken_shrine_interact(
                 AsepriteBundle {
                     aseprite: ring_handle.clone(),
                     animation: AsepriteAnimation::from(ShrineRepairRingAnim::tags::RING),
-                    transform: Transform::from_translation(Vec3::new(-anchor.0.x, -anchor.0.y, 0.)),
+                    transform: Transform::from_translation(Vec3::new(
+                        -anchor.0.x,
+                        -anchor.0.y,
+                        SHRINE_REPAIR_RING_LOCAL_Z,
+                    )),
                     ..default()
                 },
-                YSort(SHRINE_REPAIR_RING_YSORT),
                 Name::new("ShrineRepairRing"),
             ))
             .id();

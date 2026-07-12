@@ -335,7 +335,7 @@ fn apply_ancestor_blessing(
                     blessing_transition_state,
                 );
             }
-            apply_chaos_tradeoff(choice.blessing, player_entity, commands);
+            apply_chaos_tradeoff(choice.blessing, player_entity, selected_class.clone(), commands);
         }
         AncestorBlessing::TwoOfSpecificCommon => {
             if let Some(heirloom) = choice.resolved_heirloom.clone() {
@@ -440,7 +440,7 @@ fn apply_ancestor_blessing(
         }
         AncestorBlessing::PlasmaWeapon => {
             blessing_item_rewards.queue_item(WorldObject::PlasmaStaff);
-            apply_chaos_tradeoff(choice.blessing, player_entity, commands);
+            apply_chaos_tradeoff(choice.blessing, player_entity, selected_class.clone(), commands);
         }
         AncestorBlessing::LaserBeam => {
             let laser_beam_skill =
@@ -450,7 +450,7 @@ fn apply_ancestor_blessing(
                 first_open_combat_skill_slot(player_skills),
             );
             ActiveSkill::LaserBeam.add_skill_components(player_entity, commands);
-            apply_chaos_tradeoff(choice.blessing, player_entity, commands);
+            apply_chaos_tradeoff(choice.blessing, player_entity, selected_class.clone(), commands);
         }
         AncestorBlessing::TwoRandomRareHeirlooms => {
             grant_random_heirlooms(
@@ -465,7 +465,7 @@ fn apply_ancestor_blessing(
                 blessing_item_rewards,
                 blessing_transition_state,
             );
-            apply_chaos_tradeoff(choice.blessing, player_entity, commands);
+            apply_chaos_tradeoff(choice.blessing, player_entity, selected_class.clone(), commands);
         }
         AncestorBlessing::FiveOfRandomCommon => {
             if let Some(heirloom) = choice.resolved_heirloom.clone() {
@@ -479,13 +479,13 @@ fn apply_ancestor_blessing(
                     blessing_transition_state,
                 );
             }
-            apply_chaos_tradeoff(choice.blessing, player_entity, commands);
+            apply_chaos_tradeoff(choice.blessing, player_entity, selected_class.clone(), commands);
         }
         AncestorBlessing::RandomRareEquipment => {
             if let Some(equipment) = choice.resolved_item {
                 blessing_item_rewards.queue_item_with_rarity(equipment, ItemRarity::Rare);
             }
-            apply_chaos_tradeoff(choice.blessing, player_entity, commands);
+            apply_chaos_tradeoff(choice.blessing, player_entity, selected_class.clone(), commands);
         }
         AncestorBlessing::ThreeOfRandomUncommon => {
             if let Some(heirloom) = choice.resolved_heirloom.clone() {
@@ -499,7 +499,7 @@ fn apply_ancestor_blessing(
                     blessing_transition_state,
                 );
             }
-            apply_chaos_tradeoff(choice.blessing, player_entity, commands);
+            apply_chaos_tradeoff(choice.blessing, player_entity, selected_class.clone(), commands);
         }
     }
 }
@@ -507,14 +507,17 @@ fn apply_ancestor_blessing(
 fn apply_chaos_tradeoff(
     blessing: AncestorBlessing,
     player_entity: Entity,
+    selected_class: SkillClass,
     commands: &mut Commands,
 ) {
-    let penalty = blessing.max_hp_penalty_pct();
+    let penalty_pct = blessing.max_hp_penalty_pct();
     let chaos = blessing.starting_chaos();
-    if penalty > 0.0 {
+    if penalty_pct > 0.0 {
+        let starting_hp = crate::player::get_max_health_for_class(selected_class);
+        let flat_penalty = (starting_hp as f32 * penalty_pct) as i32;
         commands
             .entity(player_entity)
-            .insert(BlessingMaxHpPenalty(penalty));
+            .insert(BlessingMaxHpPenalty(flat_penalty));
         commands.insert_resource(PendingRunStartChaos { amount: chaos });
     }
 }

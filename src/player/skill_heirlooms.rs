@@ -2336,6 +2336,7 @@ pub fn reduce_skill_cooldown_on_crit(
                 commands.entity(player_e).insert(HeirloomTriggerCooldowns {
                     chalice_echo: None,
                     bobs_bell: Some(bobs_bell_timer),
+                    heal_summons: None,
                 });
             }
         }

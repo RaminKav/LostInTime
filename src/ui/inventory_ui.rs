@@ -45,8 +45,10 @@ use crate::ui::{
     INV_BLUEPRINT_SLOT_CENTER_X, INV_BLUEPRINT_SLOT_ICON_X_OFFSET,
     INV_BLUEPRINT_SLOT_LABEL_X_OFFSET, INV_BLUEPRINT_SLOT_ROW_GAP, INV_BLUEPRINT_SLOT_SIZE,
     INV_BLUEPRINT_SLOT_TOP_Y, INV_CRAFTING_INPUT_SLOTS_Y_LOCAL, INV_CRAFTING_INPUT_SLOT_SPACING_X,
-    INV_CRAFTING_PANEL_INGREDIENT_COUNT_Y_OFFSET, INV_CRAFTING_PANEL_INGREDIENT_ROW_Y,
+    INV_CRAFTING_PANEL_INGREDIENT_COUNT_Y_OFFSET, INV_CRAFTING_PANEL_INGREDIENT_ICON_Y_OFFSET,
+    INV_CRAFTING_PANEL_INGREDIENT_ROW_Y,
     INV_CRAFTING_PANEL_INGREDIENT_SPACING_X, INV_CRAFTING_PANEL_RESULT_Y,
+    INV_CRAFTING_INGREDIENT_SLOT_SIZE,
     INV_UPGRADE_PANEL_OFFSET_Y_CRAFTING, MAX_BLUEPRINT_ROWS, UI_UPGRADE_SLOT_SIZE,
 };
 use crate::world::dimension::{DimensionSpawnEvent, Era};
@@ -648,22 +650,15 @@ pub fn setup_inv_ui(
             &cur_inv_state,
         );
 
-        // Ingredient display slots on the crafting side panel (x3). Purely visual; the
-        // icon + "owned/needed" text are populated by `refresh_crafting_ingredient_display`
-        // when the player clicks a blueprint row.
+        // Ingredient display slots on the crafting side panel (x3). Icon + "owned/needed"
+        // text are populated by `refresh_crafting_ingredient_display` when a blueprint is picked.
         for i in 0..3 {
             let local_x = 1. + (i as f32 - 1.0) * INV_CRAFTING_PANEL_INGREDIENT_SPACING_X;
             let slot_entity = commands
                 .spawn(SpriteBundle {
-                    texture: graphics.get_ui_element_texture(UIElement::InventorySlot),
+                    texture: graphics.get_ui_element_texture(UIElement::CraftingIngredientSlot),
                     sprite: Sprite {
-                        custom_size: Some(UI_SLOT_SIZE),
-                        color: Color::Rgba {
-                            red: 0.,
-                            green: 0.,
-                            blue: 0.,
-                            alpha: 0.,
-                        },
+                        custom_size: Some(INV_CRAFTING_INGREDIENT_SLOT_SIZE),
                         ..Default::default()
                     },
                     transform: Transform {
@@ -674,11 +669,15 @@ pub fn setup_inv_ui(
                     ..Default::default()
                 })
                 .insert(Name::new(format!("CRAFTING INGREDIENT SLOT {}", i)))
-                // No `UIElement::InventorySlot` — `handle_hovering` requires `InventorySlotState`
-                // on that tag. Hover + tooltip are handled in
-                // `handle_crafting_ingredient_tooltip_hover`.
+                // Hover + tooltip via `handle_crafting_ingredient_tooltip_hover` (not
+                // `handle_hovering`, which requires `InventorySlotState`).
+                .insert(UIElement::CraftingIngredientSlot)
                 .insert(Interactable::default())
                 .insert(CraftingIngredientDisplaySlot { slot_index: i })
+                .insert(Focusable {
+                    group: cur_inv_state.0.clone(),
+                    index: INV_FOCUS_CRAFT_INGREDIENT_BASE + i as u32,
+                })
                 .insert(cur_inv_state.0.clone())
                 .insert(RenderLayers::from_layers(&[3]))
                 .id();
@@ -736,6 +735,7 @@ pub fn setup_inv_ui(
             .insert(UIElement::InventorySlotHotbar)
             .insert(Interactable::default())
             .insert(CraftingResultSlot)
+            // Mouse-only: controllers craft via the Brew button, so this slot is not focusable.
             .insert(cur_inv_state.0.clone())
             .insert(RenderLayers::from_layers(&[3]))
             .id();
@@ -1796,6 +1796,12 @@ pub const INV_FOCUS_SORT: u32 = 131;
 pub const INV_FOCUS_MATERIAL_DROPS: u32 = 132;
 pub const INV_FOCUS_DAMAGE_TRACKER: u32 = 133;
 pub const INV_FOCUS_CRAFT_TOGGLE: u32 = 134;
+/// Ingredient display slots on the Cauldron crafting panel (0..2 → 170..172).
+pub const INV_FOCUS_CRAFT_INGREDIENT_BASE: u32 = 170;
+/// Blueprint rows on the blueprints panel (row i → 180 + i).
+pub const INV_FOCUS_BLUEPRINT_ROW_BASE: u32 = 180;
+pub const INV_FOCUS_BLUEPRINT_PREV: u32 = 190;
+pub const INV_FOCUS_BLUEPRINT_NEXT: u32 = 191;
 
 pub fn spawn_inv_slot(
     commands: &mut Commands,
@@ -2878,6 +2884,7 @@ pub fn handle_crafting_ingredient_tooltip_hover(
     mut tooltip_update: EventWriter<crate::ui::ToolTipUpdateEvent>,
     mut tooltip_teardown: EventWriter<crate::ui::TooltipTeardownEvent>,
     cur_ui_state: Res<State<UIState>>,
+    ui_focus: Res<crate::ui::focus::UiFocus>,
 ) {
     if cur_ui_state.0 != UIState::InventoryCrafting {
         return;
@@ -2888,17 +2895,36 @@ pub fn handle_crafting_ingredient_tooltip_hover(
     let shift_key_just_released = key_input.just_released(KeyCode::LShift);
 
     for (e, mut interactable, slot) in ingredient_slots.iter_mut() {
-        match hit_test {
-            Some((hit_ent, _, _)) if hit_ent == e => match interactable.current() {
-                Interaction::None => {
-                    interactable.change(Interaction::Hovering);
-                    commands
-                        .entity(e)
-                        .insert(graphics.get_ui_element_texture(UIElement::InventorySlotHover));
-                    commands.spawn(crate::audio::SoundSpawner::new(
-                        crate::audio::AudioSoundEffect::UISlotHover,
-                        0.2,
-                    ));
+        let is_hit = hit_test.map(|(ent, _, _)| ent == e).unwrap_or(false);
+        let is_focused = ui_focus.is_focused(e);
+        let hovering = is_hit || is_focused;
+        match (hovering, interactable.current()) {
+            (true, Interaction::None) => {
+                interactable.change(Interaction::Hovering);
+                commands
+                    .entity(e)
+                    .insert(UIElement::CraftingIngredientSlotHover)
+                    .insert(graphics.get_ui_element_texture(UIElement::CraftingIngredientSlotHover));
+                commands.spawn(crate::audio::SoundSpawner::new(
+                    crate::audio::AudioSoundEffect::UISlotHover,
+                    0.2,
+                ));
+                send_crafting_ingredient_tooltip(
+                    &selected,
+                    &recipes,
+                    &proto,
+                    slot.slot_index,
+                    shift_key_pressed,
+                    slot_transforms
+                        .get(e)
+                        .ok()
+                        .map(|t| t.translation().truncate()),
+                    &mut tooltip_update,
+                );
+            }
+            (true, Interaction::Hovering) => {
+                if shift_key_just_pressed || shift_key_just_released {
+                    tooltip_teardown.send_default();
                     send_crafting_ingredient_tooltip(
                         &selected,
                         &recipes,
@@ -2912,34 +2938,16 @@ pub fn handle_crafting_ingredient_tooltip_hover(
                         &mut tooltip_update,
                     );
                 }
-                Interaction::Hovering => {
-                    if shift_key_just_pressed || shift_key_just_released {
-                        tooltip_teardown.send_default();
-                        send_crafting_ingredient_tooltip(
-                            &selected,
-                            &recipes,
-                            &proto,
-                            slot.slot_index,
-                            shift_key_pressed,
-                            slot_transforms
-                                .get(e)
-                                .ok()
-                                .map(|t| t.translation().truncate()),
-                            &mut tooltip_update,
-                        );
-                    }
-                }
-                _ => (),
-            },
-            _ => {
-                if matches!(interactable.current(), Interaction::Hovering) {
-                    interactable.change(Interaction::None);
-                    tooltip_teardown.send_default();
-                    commands
-                        .entity(e)
-                        .insert(graphics.get_ui_element_texture(UIElement::InventorySlot));
-                }
             }
+            (false, Interaction::Hovering) => {
+                interactable.change(Interaction::None);
+                tooltip_teardown.send_default();
+                commands
+                    .entity(e)
+                    .insert(UIElement::CraftingIngredientSlot)
+                    .insert(graphics.get_ui_element_texture(UIElement::CraftingIngredientSlot));
+            }
+            _ => {}
         }
     }
 }
@@ -2968,6 +2976,7 @@ fn send_crafting_ingredient_tooltip(
             is_recipe: false,
             show_range,
             anchor_ui,
+            pin_right: true,
             ..Default::default()
         });
     }
@@ -2976,7 +2985,7 @@ fn send_crafting_ingredient_tooltip(
 /// Hover + click handler for blueprint row slots on the BlueprintsPanel (InventoryCrafting).
 /// - Hover enters transition -> emit a recipe tooltip (`is_recipe = true`).
 /// - Hover exits -> despawn the tooltip.
-/// - Click -> set `SelectedCraftingRecipe`.
+/// - Click / Confirm -> set `SelectedCraftingRecipe`.
 pub fn handle_blueprint_slot_interaction(
     mut commands: Commands,
     cursor_pos: Res<CursorPos>,
@@ -2988,6 +2997,7 @@ pub fn handle_blueprint_slot_interaction(
     mut tooltip_teardown: EventWriter<crate::ui::TooltipTeardownEvent>,
     cur_ui_state: Res<State<UIState>>,
     proto: ProtoParam,
+    ui_focus: Res<crate::ui::focus::UiFocus>,
 ) {
     if cur_ui_state.0 != UIState::InventoryCrafting {
         return;
@@ -2996,38 +3006,38 @@ pub fn handle_blueprint_slot_interaction(
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
 
     for (e, mut interactable, bp) in blueprint_slots.iter_mut() {
-        match hit_test {
-            Some((hit_ent, _, _)) if hit_ent == e => match interactable.current() {
-                Interaction::None => {
-                    interactable.change(Interaction::Hovering);
-                    // Build an `ItemStack` for the recipe result so the tooltip renders its
-                    // ingredients + name via the existing `is_recipe` pipeline.
-                    if let Some(item_data) = proto.get_item_data(bp.recipe_obj) {
-                        tooltip_update.send(crate::ui::ToolTipUpdateEvent {
-                            item_stack: item_data.clone(),
-                            is_recipe: true,
-                            show_range: false,
-                            ..Default::default()
-                        });
-                    }
-                }
-                Interaction::Hovering => {
-                    if left_mouse_pressed {
-                        selected.0 = Some(bp.recipe_obj);
-                        commands.spawn(crate::audio::SoundSpawner::new(
-                            crate::audio::AudioSoundEffect::ButtonClick,
-                            0.2,
-                        ));
-                    }
-                }
-                _ => (),
-            },
-            _ => {
-                if matches!(interactable.current(), Interaction::Hovering) {
-                    interactable.change(Interaction::None);
-                    tooltip_teardown.send_default();
+        let is_hit = hit_test.map(|(ent, _, _)| ent == e).unwrap_or(false);
+        let is_focused = ui_focus.is_focused(e);
+        let hovering = is_hit || is_focused;
+        let confirm_pressed =
+            (is_hit && left_mouse_pressed) || (is_focused && ui_focus.confirm_just_pressed);
+
+        match (hovering, interactable.current()) {
+            (true, Interaction::None) => {
+                interactable.change(Interaction::Hovering);
+                if let Some(item_data) = proto.get_item_data(bp.recipe_obj) {
+                    tooltip_update.send(crate::ui::ToolTipUpdateEvent {
+                        item_stack: item_data.clone(),
+                        is_recipe: true,
+                        show_range: false,
+                        ..Default::default()
+                    });
                 }
             }
+            (true, Interaction::Hovering) => {
+                if confirm_pressed {
+                    selected.0 = Some(bp.recipe_obj);
+                    commands.spawn(crate::audio::SoundSpawner::new(
+                        crate::audio::AudioSoundEffect::ButtonClick,
+                        0.2,
+                    ));
+                }
+            }
+            (false, Interaction::Hovering) => {
+                interactable.change(Interaction::None);
+                tooltip_teardown.send_default();
+            }
+            _ => {}
         }
     }
 }
@@ -3109,7 +3119,7 @@ pub fn refresh_crafting_ingredient_display(
                     &graphics,
                     &base_stack.copy_with_count(1),
                     &asset_server,
-                    Vec2::ZERO,
+                    Vec2::new(0., INV_CRAFTING_PANEL_INGREDIENT_ICON_Y_OFFSET),
                     Vec2::ZERO,
                     3,
                 );
@@ -3192,9 +3202,23 @@ pub fn refresh_crafting_ingredient_display(
     }
 }
 
-/// Hover + click handler for the craft result slot on the CraftingPanel. Clicking crafts a
-/// single instance of the selected recipe and places it onto the player's dragged cursor
-/// stack. Repeated clicks accumulate count (up to `MAX_STACK_SIZE`).
+#[derive(SystemParam)]
+pub struct CraftingResultClickParams<'w, 's> {
+    pub selected: Res<'w, SelectedCraftingRecipe>,
+    pub recipes: Res<'w, Recipes>,
+    pub inv_q: Query<'w, 's, &'static Inventory>,
+    pub proto: ProtoParam<'w, 's>,
+    pub graphics: Res<'w, Graphics>,
+    pub asset_server: Res<'w, AssetServer>,
+    pub dragging_query: Query<'w, 's, (Entity, &'static ItemStack), With<crate::ui::DraggedItem>>,
+    pub crafted_event: EventWriter<'w, CraftedItemEvent>,
+    pub player_atts:
+        Query<'w, 's, &'static crate::attributes::LootRateBonus, With<crate::player::Player>>,
+}
+
+/// Hover + click handler for the craft result slot on the CraftingPanel. Mouse-only — controllers
+/// use the Brew button. Clicking crafts a single instance of the selected recipe onto the
+/// dragged cursor stack. Repeated clicks accumulate count (up to `MAX_STACK_SIZE`).
 pub fn handle_crafting_result_slot_click(
     mut commands: Commands,
     cursor_pos: Res<CursorPos>,
@@ -3203,15 +3227,7 @@ pub fn handle_crafting_result_slot_click(
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     mut result_slots: Query<(Entity, &mut Interactable), With<CraftingResultSlot>>,
     cur_ui_state: Res<State<UIState>>,
-    selected: Res<SelectedCraftingRecipe>,
-    recipes: Res<Recipes>,
-    inv_q: Query<&Inventory>,
-    proto: ProtoParam,
-    graphics: Res<Graphics>,
-    asset_server: Res<AssetServer>,
-    dragging_query: Query<(Entity, &ItemStack), With<crate::ui::DraggedItem>>,
-    mut crafted_event: EventWriter<CraftedItemEvent>,
-    player_atts: Query<&crate::attributes::LootRateBonus, With<crate::player::Player>>,
+    mut params: CraftingResultClickParams,
 ) {
     if cur_ui_state.0 != UIState::InventoryCrafting {
         return;
@@ -3221,10 +3237,11 @@ pub fn handle_crafting_result_slot_click(
     let shift_key_pressed = key_input.pressed(KeyCode::LShift);
 
     for (result_entity, mut interactable) in result_slots.iter_mut() {
-        // 1. Hover-enter / hover-exit bookkeeping.
-        let hovering_this_frame =
-            matches!(hit_test, Some((hit_ent, _, _)) if hit_ent == result_entity);
-        if !hovering_this_frame {
+        let is_hit = matches!(hit_test, Some((hit_ent, _, _)) if hit_ent == result_entity);
+        let hovering = is_hit;
+        let confirm_pressed = is_hit && left_mouse_pressed;
+
+        if !hovering {
             if matches!(interactable.current(), Interaction::Hovering) {
                 interactable.change(Interaction::None);
             }
@@ -3233,18 +3250,18 @@ pub fn handle_crafting_result_slot_click(
         if matches!(interactable.current(), Interaction::None) {
             interactable.change(Interaction::Hovering);
         }
-        if !left_mouse_pressed {
+        if !confirm_pressed {
             continue;
         }
 
         // 2. Craftability check.
-        let Some(recipe_obj) = selected.0 else {
+        let Some(recipe_obj) = params.selected.0 else {
             continue;
         };
-        let Some(recipe) = recipes.crafting_list.get(&recipe_obj) else {
+        let Some(recipe) = params.recipes.crafting_list.get(&recipe_obj) else {
             continue;
         };
-        let Ok(inv) = inv_q.get_single() else {
+        let Ok(inv) = params.inv_q.get_single() else {
             continue;
         };
         let can_craft = recipe
@@ -3266,7 +3283,7 @@ pub fn handle_crafting_result_slot_click(
             continue;
         }
 
-        let existing_drag = dragging_query.iter().next();
+        let existing_drag = params.dragging_query.iter().next();
         let current_drag_count = existing_drag.map(|(_, stack)| stack.count).unwrap_or(0);
         if existing_drag.is_some() && existing_drag.map(|(_, s)| s.obj_type) != Some(recipe_obj) {
             continue;
@@ -3298,13 +3315,13 @@ pub fn handle_crafting_result_slot_click(
             }
             (drag_stack.copy_with_count(new_count), Some(drag_e))
         } else {
-            let Some(base_stack) = proto.get_item_data(recipe_obj).cloned() else {
+            let Some(base_stack) = params.proto.get_item_data(recipe_obj).cloned() else {
                 continue;
             };
-            let loot_bonus = player_atts.get_single().map(|a| a.0).unwrap_or(0);
+            let loot_bonus = params.player_atts.get_single().map(|a| a.0).unwrap_or(0);
             let rolled = create_new_random_item_stack_with_attributes(
                 &base_stack.copy_with_count(total_output),
-                &proto,
+                &params.proto,
                 &mut commands,
                 loot_bonus,
                 false,
@@ -3313,7 +3330,7 @@ pub fn handle_crafting_result_slot_click(
         };
 
         for _ in 0..craft_batches {
-            crafted_event.send(CraftedItemEvent { obj: recipe_obj });
+            params.crafted_event.send(CraftedItemEvent { obj: recipe_obj });
         }
 
         if let Some(old) = old_drag_entity {
@@ -3322,9 +3339,9 @@ pub fn handle_crafting_result_slot_click(
 
         let icon = spawn_item_stack_icon(
             &mut commands,
-            &graphics,
+            &params.graphics,
             &new_stack,
-            &asset_server,
+            &params.asset_server,
             Vec2::ZERO,
             Vec2::ZERO,
             3,
@@ -3428,6 +3445,10 @@ pub fn render_blueprint_rows_and_nav(
             .insert(BlueprintSlot {
                 recipe_obj: *recipe_obj,
             })
+            .insert(Focusable {
+                group: cur_inv_state.0.clone(),
+                index: INV_FOCUS_BLUEPRINT_ROW_BASE + i as u32,
+            })
             .insert(cur_inv_state.0.clone())
             .insert(RenderLayers::from_layers(&[3]))
             .id();
@@ -3498,6 +3519,10 @@ pub fn render_blueprint_rows_and_nav(
         .insert(UIElement::ButtonPageUp)
         .insert(Interactable::default())
         .insert(BlueprintsPrevButton)
+        .insert(Focusable {
+            group: cur_inv_state.0.clone(),
+            index: INV_FOCUS_BLUEPRINT_PREV,
+        })
         .insert(cur_inv_state.0.clone())
         .insert(RenderLayers::from_layers(&[3]))
         .insert(Name::new("BLUEPRINTS PREV"))
@@ -3521,6 +3546,10 @@ pub fn render_blueprint_rows_and_nav(
         .insert(UIElement::ButtonPageDown)
         .insert(Interactable::default())
         .insert(BlueprintsNextButton)
+        .insert(Focusable {
+            group: cur_inv_state.0.clone(),
+            index: INV_FOCUS_BLUEPRINT_NEXT,
+        })
         .insert(cur_inv_state.0.clone())
         .insert(RenderLayers::from_layers(&[3]))
         .insert(Name::new("BLUEPRINTS NEXT"))
@@ -3618,6 +3647,7 @@ pub fn handle_blueprint_pagination_clicks(
     era_manager: Res<crate::world::dimension::EraManager>,
     mut commands: Commands,
     graphics: Res<Graphics>,
+    ui_focus: Res<crate::ui::focus::UiFocus>,
 ) {
     let hit = super::ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None);
     let left_pressed = mouse_input.just_pressed(MouseButton::Left);
@@ -3635,24 +3665,14 @@ pub fn handle_blueprint_pagination_clicks(
         (total_unlocked + MAX_BLUEPRINT_ROWS - 1) / MAX_BLUEPRINT_ROWS
     };
 
-    let Some(hit) = hit else {
-        for (e, mut interactable) in prev_buttons.iter_mut() {
-            if matches!(interactable.current(), Interaction::Hovering) {
-                interactable.change(Interaction::None);
-                blueprint_prev_normal_sprite(&mut commands, &graphics, e);
-            }
-        }
-        for (e, mut interactable) in next_buttons.iter_mut() {
-            if matches!(interactable.current(), Interaction::Hovering) {
-                interactable.change(Interaction::None);
-                blueprint_next_normal_sprite(&mut commands, &graphics, e);
-            }
-        }
-        return;
-    };
-
     for (e, mut interactable) in prev_buttons.iter_mut() {
-        if hit.0 == e {
+        let is_hit = hit.map(|(ent, _, _)| ent == e).unwrap_or(false);
+        let is_focused = ui_focus.is_focused(e);
+        let hovering = is_hit || is_focused;
+        let confirm_pressed =
+            (is_hit && left_pressed) || (is_focused && ui_focus.confirm_just_pressed);
+
+        if hovering {
             match interactable.current() {
                 Interaction::None => {
                     interactable.change(Interaction::Hovering);
@@ -3666,7 +3686,7 @@ pub fn handle_blueprint_pagination_clicks(
                     ));
                 }
                 Interaction::Hovering => {
-                    if left_pressed && pagination.page > 0 {
+                    if confirm_pressed && pagination.page > 0 {
                         pagination.page -= 1;
                         commands.spawn(crate::audio::SoundSpawner::new(
                             crate::audio::AudioSoundEffect::ButtonClick,
@@ -3682,7 +3702,13 @@ pub fn handle_blueprint_pagination_clicks(
         }
     }
     for (e, mut interactable) in next_buttons.iter_mut() {
-        if hit.0 == e {
+        let is_hit = hit.map(|(ent, _, _)| ent == e).unwrap_or(false);
+        let is_focused = ui_focus.is_focused(e);
+        let hovering = is_hit || is_focused;
+        let confirm_pressed =
+            (is_hit && left_pressed) || (is_focused && ui_focus.confirm_just_pressed);
+
+        if hovering {
             match interactable.current() {
                 Interaction::None => {
                     interactable.change(Interaction::Hovering);
@@ -3696,7 +3722,7 @@ pub fn handle_blueprint_pagination_clicks(
                     ));
                 }
                 Interaction::Hovering => {
-                    if left_pressed && pagination.page + 1 < total_pages {
+                    if confirm_pressed && pagination.page + 1 < total_pages {
                         pagination.page += 1;
                         commands.spawn(crate::audio::SoundSpawner::new(
                             crate::audio::AudioSoundEffect::ButtonClick,

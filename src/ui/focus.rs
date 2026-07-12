@@ -275,7 +275,7 @@ fn poll_ui_focus_confirm(
 fn group_defers_default_focus(group: &UIState) -> bool {
     matches!(
         group,
-        UIState::Pause | UIState::Skills | UIState::BlessingChoice
+        UIState::Pause | UIState::Skills | UIState::BlessingChoice | UIState::WellShrine
     )
 }
 

@@ -503,13 +503,17 @@ pub const INV_BLUEPRINT_SLOT_ICON_X_OFFSET: f32 = 12.0;
 pub const INV_BLUEPRINT_SLOT_LABEL_X_OFFSET: f32 = 36.0;
 
 /// Panel-local Y (crafting panel) of the three ingredient display slots.
-pub const INV_CRAFTING_PANEL_INGREDIENT_ROW_Y: f32 = -6.0;
+pub const INV_CRAFTING_PANEL_INGREDIENT_ROW_Y: f32 = -10.0;
+/// Size of cauldron crafting-ingredient slot backgrounds (`CraftingIngredientSlot.png`).
+pub const INV_CRAFTING_INGREDIENT_SLOT_SIZE: Vec2 = Vec2::new(28., 28.);
 /// Horizontal center-to-center spacing of the three ingredient display slots on the crafting panel.
 pub const INV_CRAFTING_PANEL_INGREDIENT_SPACING_X: f32 = 32.;
 /// Panel-local Y (crafting panel) of the result slot (sits above the ingredient row).
 pub const INV_CRAFTING_PANEL_RESULT_Y: f32 = 41.0;
 /// Amount text offset beneath each ingredient icon (e.g. "2/3").
-pub const INV_CRAFTING_PANEL_INGREDIENT_COUNT_Y_OFFSET: f32 = -11.0;
+pub const INV_CRAFTING_PANEL_INGREDIENT_COUNT_Y_OFFSET: f32 = -9.0;
+/// Local Y nudge for ingredient item icons inside the slot (slot background stays put).
+pub const INV_CRAFTING_PANEL_INGREDIENT_ICON_Y_OFFSET: f32 = 4.0;
 
 pub const SKILL_TOOLTIP_SIZE: Vec2 = Vec2::new(242., 94.);
 /// Reset the blueprints panel page to 0 whenever the player (re-)opens the inventory in
@@ -1166,6 +1170,7 @@ impl Plugin for UIPlugin {
                     handle_cursor_item_chest_button.run_if(in_state(UIState::ItemChest)),
                     interactions::handle_cursor_heirloom_chest_button
                         .run_if(in_state(UIState::ItemChest)),
+                    handle_heirloom_chest_reroll_button.run_if(in_state(UIState::ItemChest)),
                     setup_essence_ui
                         .before(CustomFlush)
                         .run_if(
@@ -1359,6 +1364,10 @@ impl Plugin for UIPlugin {
                         .run_if(in_state(UIState::WellShrine)),
                     handle_well_salvage_tooltip
                         .after(handle_well_salvage_slot_click)
+                        .run_if(in_state(UIState::WellShrine)),
+                    finalize_well_tooltip_hover
+                        .after(handle_well_equipment_tooltip)
+                        .after(handle_well_salvage_tooltip)
                         .run_if(in_state(UIState::WellShrine)),
                     handle_well_salvage_button.run_if(in_state(UIState::WellShrine)),
                     handle_well_reward_ok.run_if(in_state(UIState::WellShrine)),

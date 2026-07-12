@@ -1,3 +1,4 @@
+use bevy::ecs::system::SystemParam;
 use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
 use bevy_aseprite::aseprite;
 use itertools::Itertools;
@@ -26,11 +27,12 @@ use crate::{
 
 use super::{
     banish_tracker_ui::spawn_banish_tracker,
+    essence_ui::{MERCHANT_REROLL_ICON_PATH, MERCHANT_REROLL_ICON_SIZE},
     game_fonts as gf,
     heirloom_tooltip::{HeirloomTooltipRequest, HeirloomTooltipShow},
     interactions::Interaction,
     ui_helpers, Focusable, Interactable, ToolTipUpdateEvent, TooltipTeardownEvent, UIElement,
-    UIState,
+    UIState, CURRENCY_BACKGROUND_SIZE, KEYBIND_BADGE_COLOR,
 };
 
 /// Background container art size (`assets/ui/ChestContainer.png`).
@@ -48,6 +50,11 @@ const CHEST_BUTTON_Y: f32 = -64.;
 const CHEST_BUTTON_X_OFFSET: f32 = 22.;
 /// Y for the heirloom banishes-remaining counter text (sits above the buttons).
 const CHEST_BANISH_COUNT_Y: f32 = -57.;
+/// Y for the heirloom-chest reroll badge (above Take/Banish).
+const CHEST_REROLL_BUTTON_Y: f32 = -46.;
+const CHEST_REROLL_BADGE_SIZE: Vec2 = Vec2::new(14., 12.);
+/// Right-side rerolls-remaining counter (CurrencyBackground), relative to chest root.
+const CHEST_REROLL_COUNTER_POS: Vec2 = Vec2::new(116., 20.);
 // Reveal text stack (top → bottom). Sits above the chest icon once it shifts down to
 // `CHEST_ICON_Y` after opening — the chest UI lives in render-layer 3 world space.
 const CHEST_REVEAL_TITLE_Y: f32 = 48.;
@@ -206,6 +213,17 @@ pub struct ChestButtonLabel;
 #[derive(Component)]
 pub struct ChestBanishCountText;
 
+/// Clickable reroll badge shown after a heirloom chest finishes revealing its prize.
+#[derive(Component)]
+pub struct HeirloomChestRerollButton;
+
+#[derive(Component)]
+pub struct HeirloomChestRerollIcon;
+
+/// Marker for the rerolls-remaining number in the chest-side currency counter.
+#[derive(Component)]
+pub struct HeirloomChestRerollsText;
+
 /// Marker for any text/sprite spawned by the chest reveal stack (title / rarity / type /
 /// currently-equipped tooltip + header). Kept distinct from the chest UI root so the
 /// reveal can be re-spawned without rebuilding the container.
@@ -285,12 +303,10 @@ pub fn spawn_chest_button(
         .insert(RenderLayers::from_layers(&[3]))
         .insert(Name::new(format!("ITEM CHEST BUTTON {label}")));
     if enabled {
-        button
-            .insert(Interactable::default())
-            .insert(Focusable {
-                group: ui_state.clone(),
-                index: kind.focus_index(),
-            });
+        button.insert(Interactable::default()).insert(Focusable {
+            group: ui_state.clone(),
+            index: kind.focus_index(),
+        });
     }
     let button_entity = button.id();
 
@@ -754,6 +770,210 @@ fn spawn_chest_reveal_text(
     }
 }
 
+fn spawn_heirloom_chest_reroll_button(
+    commands: &mut Commands,
+    asset_server: &AssetServer,
+    parent: Entity,
+    enabled: bool,
+) {
+    let color = if enabled {
+        Color::WHITE
+    } else {
+        Color::rgb(0.45, 0.45, 0.45)
+    };
+
+    let mut btn = commands.spawn(SpriteBundle {
+        sprite: Sprite {
+            color: KEYBIND_BADGE_COLOR,
+            custom_size: Some(CHEST_REROLL_BADGE_SIZE),
+            ..default()
+        },
+        transform: Transform::from_translation(Vec3::new(0., CHEST_REROLL_BUTTON_Y, 3.)),
+        ..default()
+    });
+    btn.insert(RenderLayers::from_layers(&[3]))
+        .insert(UIState::ItemChest)
+        .insert(HeirloomChestRerollButton)
+        .insert(Name::new("Heirloom Chest Reroll"));
+
+    if enabled {
+        btn.insert(Interactable::default()).insert(Focusable {
+            group: UIState::ItemChest,
+            index: 5,
+        });
+    }
+
+    let btn_e = btn.id();
+
+    commands
+        .spawn(SpriteBundle {
+            texture: asset_server.load(MERCHANT_REROLL_ICON_PATH),
+            sprite: Sprite {
+                custom_size: Some(MERCHANT_REROLL_ICON_SIZE),
+                color,
+                ..default()
+            },
+            transform: Transform::from_translation(Vec3::new(0., 0., 1.)),
+            ..default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(HeirloomChestRerollIcon)
+        .set_parent(btn_e);
+
+    commands.entity(btn_e).set_parent(parent);
+}
+
+fn spawn_heirloom_chest_reroll_counter(
+    commands: &mut Commands,
+    graphics: &Graphics,
+    asset_server: &AssetServer,
+    parent: Entity,
+    rerolls_remaining: u32,
+) {
+    let bg = commands
+        .spawn(SpriteBundle {
+            texture: graphics.get_ui_element_texture(UIElement::CurrencyBackground),
+            sprite: Sprite {
+                custom_size: Some(CURRENCY_BACKGROUND_SIZE),
+                ..default()
+            },
+            transform: Transform::from_translation(Vec3::new(
+                CHEST_REROLL_COUNTER_POS.x,
+                CHEST_REROLL_COUNTER_POS.y,
+                2.,
+            )),
+            ..default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(UIState::ItemChest)
+        .insert(Name::new("Heirloom Chest Rerolls Counter"))
+        .id();
+
+    let text = commands
+        .spawn((
+            Text2dBundle {
+                text: Text::from_section(
+                    rerolls_remaining.to_string(),
+                    gf::DISPLAY.text_style(&asset_server, WHITE),
+                )
+                .with_alignment(TextAlignment::Center),
+                text_anchor: Anchor::CenterLeft,
+                transform: Transform {
+                    translation: Vec3::new(-4., 0., 2.),
+                    scale: gf::DISPLAY.transform_scale(),
+                    ..Default::default()
+                },
+                ..default()
+            },
+            RenderLayers::from_layers(&[3]),
+            HeirloomChestRerollsText,
+            Name::new("Heirloom Chest Rerolls Text"),
+        ))
+        .id();
+
+    commands
+        .spawn(SpriteBundle {
+            texture: asset_server.load(MERCHANT_REROLL_ICON_PATH),
+            sprite: Sprite {
+                custom_size: Some(MERCHANT_REROLL_ICON_SIZE),
+                ..default()
+            },
+            transform: Transform::from_translation(Vec3::new(-12., 0., 2.)),
+            ..default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .set_parent(text);
+
+    commands.entity(text).set_parent(bg);
+    commands.entity(bg).set_parent(parent);
+}
+
+/// Re-roll the revealed heirloom prize in place (same rarity), refreshing icon + reveal text.
+pub fn reroll_heirloom_chest_reward(
+    commands: &mut Commands,
+    item_chest_state: &mut ItemChestState,
+    choices_queue: &HeirloomChoiceQueue,
+    graphics: &Graphics,
+    asset_server: &AssetServer,
+    player_level: u8,
+    chest_root: Entity,
+    final_items: &Query<Entity, With<ItemChestFinalItem>>,
+    reveal_ui: &Query<Entity, With<ChestRevealUI>>,
+    tooltip_teardown: &mut EventWriter<TooltipTeardownEvent>,
+    heirloom_tooltip_clear: &mut EventWriter<HeirloomTooltipRequest>,
+) {
+    let Some(current) = item_chest_state.picked_heirloom.clone() else {
+        return;
+    };
+    let target_rarity = item_chest_state
+        .target_heirloom_rarity
+        .clone()
+        .unwrap_or(current.rarity.clone());
+
+    let mut rng = rand::thread_rng();
+    let exclude = current.heirloom.clone();
+    let picked = choices_queue
+        .get_skill_of_rarity(target_rarity.clone(), &mut rng, player_level, &|h| {
+            h.heirloom != exclude
+        })
+        .or_else(|| {
+            choices_queue.get_skill_of_rarity(target_rarity, &mut rng, player_level, &|_| true)
+        });
+
+    let Some(picked) = picked else {
+        return;
+    };
+    if picked.heirloom == Heirloom::None {
+        return;
+    }
+
+    item_chest_state.picked_heirloom = Some(picked.clone());
+    item_chest_state.current_heirloom = Some(picked.heirloom.clone());
+
+    for e in final_items.iter() {
+        commands.entity(e).despawn_recursive();
+    }
+    for e in reveal_ui.iter() {
+        commands.entity(e).despawn_recursive();
+    }
+    tooltip_teardown.send_default();
+    heirloom_tooltip_clear.send(HeirloomTooltipRequest::Clear);
+
+    commands
+        .spawn(SpriteBundle {
+            sprite: Sprite {
+                color: Color::NONE,
+                custom_size: Some(Vec2::new(32., 32.)),
+                ..default()
+            },
+            transform: Transform {
+                translation: Vec3::new(-1., CHEST_ICON_Y, 15.),
+                scale: Vec3::new(1., 1., 1.),
+                ..Default::default()
+            },
+            ..Default::default()
+        })
+        .insert(graphics.get_heirloom_icon(picked.heirloom.clone()))
+        .insert(graphics.texture_atlas.as_ref().unwrap().clone())
+        .insert(UIState::ItemChest)
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(ItemChestFinalItem)
+        .insert(ItemChestFinalHeirloom {
+            heirloom: picked.clone(),
+        })
+        .insert(Interactable::default())
+        .insert(Name::new("Chest Final Heirloom"));
+
+    spawn_chest_reveal_text(
+        commands,
+        asset_server,
+        chest_root,
+        picked.heirloom.get_title(),
+        heirloom_rarity_to_item_rarity(&picked.rarity),
+        "Heirloom",
+    );
+}
+
 /// Return the item that would be displaced if `picked` were equipped right now, or `None`
 /// if there is at least one empty valid slot. Mirrors [`equip_item_chest_reward`]'s slot
 /// resolution so the UI preview matches the action's behavior 1:1.
@@ -980,10 +1200,8 @@ pub fn handle_anim_events(
                             run_unlocks.banishes_remaining > 0
                                 && picked
                                     .map(|h| {
-                                        choices_queue.banish_allowed_for_heirloom(
-                                            time_crystals.as_ref(),
-                                            h,
-                                        )
+                                        choices_queue
+                                            .banish_allowed_for_heirloom(time_crystals.as_ref(), h)
                                     })
                                     .unwrap_or(false)
                         }
@@ -1027,6 +1245,21 @@ pub fn handle_anim_events(
                                 Name::new("CHEST BANISH COUNT TEXT"),
                             ))
                             .set_parent(root);
+
+                        let reroll_enabled = run_unlocks.rerolls_remaining > 0;
+                        spawn_heirloom_chest_reroll_button(
+                            &mut commands,
+                            &asset_server,
+                            root,
+                            reroll_enabled,
+                        );
+                        spawn_heirloom_chest_reroll_counter(
+                            &mut commands,
+                            &graphics,
+                            &asset_server,
+                            root,
+                            run_unlocks.rerolls_remaining,
+                        );
                     }
                 }
 
@@ -1193,6 +1426,7 @@ pub fn handle_item_chest_final_item_hover(
                                     header_text: Some("Currently Equipped".to_string()),
                                     world_anchor: None,
                                     ui_state_tag: None,
+                                    pin_right: false,
                                 });
                             }
                         }
@@ -1255,6 +1489,142 @@ pub fn handle_heirloom_chest_final_item_hover(
                 if matches!(interactable.current(), Interaction::Hovering) {
                     interactable.change(Interaction::None);
                     tooltip_requests.send(HeirloomTooltipRequest::Clear);
+                }
+            }
+        }
+    }
+}
+
+#[derive(SystemParam)]
+pub struct HeirloomChestRerollParams<'w, 's> {
+    pub item_chest_state: ResMut<'w, ItemChestState>,
+    pub run_unlocks: ResMut<'w, RunUnlockState>,
+    pub choices_queue: Res<'w, HeirloomChoiceQueue>,
+    pub graphics: Res<'w, Graphics>,
+    pub asset_server: Res<'w, AssetServer>,
+    pub chest_ui_root: Query<'w, 's, Entity, With<ItemChestUI>>,
+    pub final_items: Query<'w, 's, Entity, With<ItemChestFinalItem>>,
+    pub reveal_ui: Query<'w, 's, Entity, With<ChestRevealUI>>,
+    pub player_level:
+        Query<'w, 's, &'static crate::player::levels::PlayerLevel, With<crate::player::Player>>,
+    pub tooltip_teardown: EventWriter<'w, TooltipTeardownEvent>,
+    pub heirloom_tooltip_clear: EventWriter<'w, HeirloomTooltipRequest>,
+    pub focus_input: crate::ui::focus::FocusInput<'w>,
+}
+
+pub fn handle_heirloom_chest_reroll_button(
+    cursor_pos: Res<CursorPos>,
+    mouse_input: Res<Input<MouseButton>>,
+    mut sprites: ParamSet<(
+        Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
+        Query<&mut Sprite, With<HeirloomChestRerollIcon>>,
+    )>,
+    mut reroll_buttons: Query<
+        (Entity, &mut Interactable, &Children),
+        With<HeirloomChestRerollButton>,
+    >,
+    mut reroll_text: Query<&mut Text, With<HeirloomChestRerollsText>>,
+    mut commands: Commands,
+    mut params: HeirloomChestRerollParams,
+) {
+    if params.item_chest_state.chest_type != ChestType::Heirloom
+        || params.item_chest_state.state != ItemChestAnimState::Done
+    {
+        return;
+    }
+
+    let hit_entity = {
+        let ui_sprites = sprites.p0();
+        ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None).map(|(e, _, _)| e)
+    };
+    let left_pressed = mouse_input.just_pressed(MouseButton::Left);
+
+    for (e, mut interactable, children) in reroll_buttons.iter_mut() {
+        let enabled = params.run_unlocks.rerolls_remaining > 0;
+        let is_hit = hit_entity == Some(e);
+        let is_focused = params.focus_input.is_focused(e);
+        let confirm_pressed =
+            (is_hit && left_pressed) || (is_focused && params.focus_input.confirm_just_pressed());
+
+        if is_hit || is_focused {
+            match interactable.current() {
+                Interaction::None if enabled => {
+                    interactable.change(Interaction::Hovering);
+                    for child in children.iter() {
+                        if let Ok(mut sprite) = sprites.p1().get_mut(*child) {
+                            sprite.color = YELLOW;
+                        }
+                    }
+                }
+                Interaction::Hovering => {
+                    if confirm_pressed && enabled {
+                        let Ok(root) = params.chest_ui_root.get_single() else {
+                            return;
+                        };
+                        let level = params
+                            .player_level
+                            .get_single()
+                            .map(|l| l.level)
+                            .unwrap_or(1);
+
+                        params.run_unlocks.rerolls_remaining =
+                            params.run_unlocks.rerolls_remaining.saturating_sub(1);
+                        commands.spawn(crate::audio::SoundSpawner::new(
+                            crate::audio::AudioSoundEffect::UISkillReRoll,
+                            0.4,
+                        ));
+
+                        reroll_heirloom_chest_reward(
+                            &mut commands,
+                            &mut params.item_chest_state,
+                            &params.choices_queue,
+                            &params.graphics,
+                            &params.asset_server,
+                            level,
+                            root,
+                            &params.final_items,
+                            &params.reveal_ui,
+                            &mut params.tooltip_teardown,
+                            &mut params.heirloom_tooltip_clear,
+                        );
+
+                        for mut text in reroll_text.iter_mut() {
+                            if let Some(section) = text.sections.first_mut() {
+                                section.value = params.run_unlocks.rerolls_remaining.to_string();
+                            }
+                        }
+
+                        interactable.change(Interaction::None);
+                        let icon_color = if params.run_unlocks.rerolls_remaining > 0 {
+                            Color::WHITE
+                        } else {
+                            Color::rgb(0.45, 0.45, 0.45)
+                        };
+                        for child in children.iter() {
+                            if let Ok(mut sprite) = sprites.p1().get_mut(*child) {
+                                sprite.color = icon_color;
+                            }
+                        }
+                        if params.run_unlocks.rerolls_remaining == 0 {
+                            commands
+                                .entity(e)
+                                .remove::<Interactable>()
+                                .remove::<Focusable>();
+                        }
+                    }
+                }
+                _ => {}
+            }
+        } else if matches!(interactable.current(), Interaction::Hovering) {
+            interactable.change(Interaction::None);
+            let icon_color = if enabled {
+                Color::WHITE
+            } else {
+                Color::rgb(0.45, 0.45, 0.45)
+            };
+            for child in children.iter() {
+                if let Ok(mut sprite) = sprites.p1().get_mut(*child) {
+                    sprite.color = icon_color;
                 }
             }
         }

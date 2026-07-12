@@ -14,6 +14,7 @@ use crate::{
     player::Player,
     proto::proto_param::ProtoParam,
     ui::{
+        focus::ModalFocusable,
         game_fonts as gf,
         interactions::{Interactable, Interaction},
         inventory_ui::{mark_slot_dirty, spawn_item_stack_icon},
@@ -27,6 +28,25 @@ use crate::{
 const WELL_GRID_COLS: usize = 6;
 const WELL_SLOT_GAP: f32 = 6.;
 const WELL_SALVAGE_SLOT_SIZE: Vec2 = Vec2::new(36., 40.);
+/// Panel-local Y of the top equipment row (row 0 centers).
+const WELL_EQUIPMENT_ROW_Y: f32 = 70.;
+/// Extra left nudge for the fixed well tooltip relative to left-of-first-slot placement.
+const WELL_TOOLTIP_EXTRA_LEFT: f32 = 10.;
+const WELL_TOOLTIP_GAP: f32 = 12.;
+
+/// Fixed UI-space center for all well shrine item tooltips: left of the first (top-left)
+/// equipment slot, plus [`WELL_TOOLTIP_EXTRA_LEFT`] further left.
+pub fn well_shrine_fixed_tooltip_position() -> Vec2 {
+    let slot_stride = UI_SLOT_SIZE.x + WELL_SLOT_GAP;
+    let grid_width = WELL_GRID_COLS as f32 * slot_stride - WELL_SLOT_GAP;
+    let start_x = -grid_width * 0.5 + UI_SLOT_SIZE.x * 0.5;
+    let half_w = crate::ui::tooltips::ITEM_TOOLTIP_LARGE_CARD_SIZE.x * 0.5;
+    let half_h = crate::ui::tooltips::ITEM_TOOLTIP_LARGE_CARD_SIZE.y * 0.5;
+    let x = start_x - half_w - WELL_TOOLTIP_GAP - WELL_TOOLTIP_EXTRA_LEFT;
+    let anchor_bias =
+        crate::ui::tooltips::ITEM_TOOLTIP_LARGE_CARD_SIZE.y * 0.22 - half_h;
+    Vec2::new(x, WELL_EQUIPMENT_ROW_Y + anchor_bias)
+}
 
 #[derive(Component)]
 pub struct WellShrineUI;
@@ -237,7 +257,7 @@ fn spawn_well_equipment_grid(
     let slot_stride = UI_SLOT_SIZE.x + WELL_SLOT_GAP;
     let grid_width = WELL_GRID_COLS as f32 * slot_stride - WELL_SLOT_GAP;
     let start_x = -grid_width * 0.5 + UI_SLOT_SIZE.x * 0.5;
-    let start_y = 70.;
+    let start_y = WELL_EQUIPMENT_ROW_Y;
 
     for (i, (inv_slot, stack)) in items.iter().enumerate() {
         let col = i % WELL_GRID_COLS;
@@ -447,6 +467,13 @@ pub fn refresh_well_ui_displays(
     );
 }
 
+fn well_focus_driving(
+    mouseless: &crate::inputs::MouselessModeState,
+    cursor_pos: &CursorPos,
+) -> bool {
+    mouseless.0 || cursor_pos.suppress_ui_hover
+}
+
 pub fn handle_well_equipment_click(
     mut commands: Commands,
     cursor_pos: Res<CursorPos>,
@@ -456,6 +483,7 @@ pub fn handle_well_equipment_click(
     mut selection: ResMut<WellSalvageSelection>,
     reward_modal: Query<(), With<WellRewardModal>>,
     ui_focus: Res<crate::ui::focus::UiFocus>,
+    mouseless: Res<crate::inputs::MouselessModeState>,
     mut tooltip_teardown: EventWriter<TooltipTeardownEvent>,
 ) {
     if !reward_modal.is_empty() {
@@ -464,10 +492,11 @@ pub fn handle_well_equipment_click(
 
     let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None);
     let left_pressed = mouse_input.just_pressed(MouseButton::Left);
+    let focus_driving = well_focus_driving(&mouseless, &cursor_pos);
 
     for (e, slot) in slots.iter() {
         let is_hit = hit_test.map(|(ent, _, _)| ent == e).unwrap_or(false);
-        let is_focused = ui_focus.is_focused(e);
+        let is_focused = focus_driving && ui_focus.is_focused(e);
 
         if (left_pressed && is_hit) || (is_focused && ui_focus.confirm_just_pressed) {
             selection.0 = Some(slot.inv_slot);
@@ -491,6 +520,7 @@ pub fn handle_well_salvage_slot_click(
     mut selection: ResMut<WellSalvageSelection>,
     reward_modal: Query<(), With<WellRewardModal>>,
     ui_focus: Res<crate::ui::focus::UiFocus>,
+    mouseless: Res<crate::inputs::MouselessModeState>,
     mut tooltip_teardown: EventWriter<TooltipTeardownEvent>,
 ) {
     if !reward_modal.is_empty() || selection.0.is_none() {
@@ -499,10 +529,11 @@ pub fn handle_well_salvage_slot_click(
 
     let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None);
     let left_pressed = mouse_input.just_pressed(MouseButton::Left);
+    let focus_driving = well_focus_driving(&mouseless, &cursor_pos);
 
     for e in slots.iter() {
         let is_hit = hit_test.map(|(ent, _, _)| ent == e).unwrap_or(false);
-        let is_focused = ui_focus.is_focused(e);
+        let is_focused = focus_driving && ui_focus.is_focused(e);
 
         if (left_pressed && is_hit) || (is_focused && ui_focus.confirm_just_pressed) {
             selection.0 = None;
@@ -527,8 +558,9 @@ pub fn handle_well_equipment_tooltip(
     inventory: Query<&Inventory>,
     graphics: Res<Graphics>,
     mut tooltip_update: EventWriter<ToolTipUpdateEvent>,
-    mut tooltip_teardown: EventWriter<TooltipTeardownEvent>,
     reward_modal: Query<(), With<WellRewardModal>>,
+    ui_focus: Res<crate::ui::focus::UiFocus>,
+    mouseless: Res<crate::inputs::MouselessModeState>,
 ) {
     if !reward_modal.is_empty() {
         return;
@@ -538,10 +570,15 @@ pub fn handle_well_equipment_tooltip(
     };
     let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None);
     let shift = key_input.pressed(KeyCode::LShift);
+    let focus_driving = well_focus_driving(&mouseless, &cursor_pos);
 
+    // Teardown is deferred to [`finalize_well_tooltip_hover`] so equipment↔salvage
+    // (and slot→slot) moves don't flash-despawn the replacement card.
     for (e, mut interactable, slot) in slots.iter_mut() {
         let is_hit = hit_test.map(|(ent, _, _)| ent == e).unwrap_or(false);
-        match (is_hit, interactable.current()) {
+        let is_focused = focus_driving && ui_focus.is_focused(e);
+        let hovering = is_hit || is_focused;
+        match (hovering, interactable.current()) {
             (true, Interaction::None) => {
                 interactable.change(Interaction::Hovering);
                 commands
@@ -566,7 +603,6 @@ pub fn handle_well_equipment_tooltip(
                 commands
                     .entity(e)
                     .insert(graphics.get_ui_element_texture(UIElement::InventorySlot));
-                tooltip_teardown.send_default();
             }
             _ => {}
         }
@@ -584,8 +620,9 @@ pub fn handle_well_salvage_tooltip(
     inventory: Query<&Inventory>,
     graphics: Res<Graphics>,
     mut tooltip_update: EventWriter<ToolTipUpdateEvent>,
-    mut tooltip_teardown: EventWriter<TooltipTeardownEvent>,
     reward_modal: Query<(), With<WellRewardModal>>,
+    ui_focus: Res<crate::ui::focus::UiFocus>,
+    mouseless: Res<crate::inputs::MouselessModeState>,
 ) {
     if !reward_modal.is_empty() {
         return;
@@ -601,10 +638,13 @@ pub fn handle_well_salvage_tooltip(
     };
     let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None);
     let shift = key_input.pressed(KeyCode::LShift);
+    let focus_driving = well_focus_driving(&mouseless, &cursor_pos);
 
     for (e, mut interactable) in slots.iter_mut() {
         let is_hit = hit_test.map(|(ent, _, _)| ent == e).unwrap_or(false);
-        match (is_hit, interactable.current()) {
+        let is_focused = focus_driving && ui_focus.is_focused(e);
+        let hovering = is_hit || is_focused;
+        match (hovering, interactable.current()) {
             (true, Interaction::None) => {
                 interactable.change(Interaction::Hovering);
                 commands
@@ -627,11 +667,50 @@ pub fn handle_well_salvage_tooltip(
                 commands
                     .entity(e)
                     .insert(graphics.get_ui_element_texture(UIElement::PetSelectSlot));
-                tooltip_teardown.send_default();
             }
             _ => {}
         }
     }
+}
+
+/// Tears down the well item tooltip only when *no* equipment/salvage slot still wants one.
+/// Runs after both hover handlers so cross-region focus moves (equipment ↔ salvage) keep a
+/// continuous card instead of update+teardown racing in the same frame.
+pub fn finalize_well_tooltip_hover(
+    equipment: Query<(&Interactable, &WellEquipmentSlot)>,
+    salvage: Query<&Interactable, With<WellSalvageSlot>>,
+    inventory: Query<&Inventory>,
+    selection: Res<WellSalvageSelection>,
+    reward_modal: Query<(), With<WellRewardModal>>,
+    mut tooltip_teardown: EventWriter<TooltipTeardownEvent>,
+    mut had_tooltip_hover: Local<bool>,
+) {
+    if !reward_modal.is_empty() {
+        if *had_tooltip_hover {
+            tooltip_teardown.send_default();
+            *had_tooltip_hover = false;
+        }
+        return;
+    }
+
+    let Ok(inv) = inventory.get_single() else {
+        return;
+    };
+
+    let equipment_item_hover = equipment.iter().any(|(interactable, slot)| {
+        matches!(interactable.current(), Interaction::Hovering)
+            && matches!(inv.items.items.get(slot.inv_slot), Some(Some(_)))
+    });
+    let salvage_item_hover = selection.0.is_some()
+        && salvage
+            .iter()
+            .any(|interactable| matches!(interactable.current(), Interaction::Hovering));
+
+    let any_tooltip_hover = equipment_item_hover || salvage_item_hover;
+    if *had_tooltip_hover && !any_tooltip_hover {
+        tooltip_teardown.send_default();
+    }
+    *had_tooltip_hover = any_tooltip_hover;
 }
 
 pub fn handle_well_salvage_button(
@@ -651,6 +730,7 @@ pub fn handle_well_salvage_button(
     reward_modal: Query<(), With<WellRewardModal>>,
     player_tf: Query<&GlobalTransform, With<Player>>,
     ui_focus: Res<crate::ui::focus::UiFocus>,
+    mouseless: Res<crate::inputs::MouselessModeState>,
 ) {
     if !reward_modal.is_empty() {
         return;
@@ -661,13 +741,14 @@ pub fn handle_well_salvage_button(
 
     let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None);
     let left_pressed = mouse_input.just_pressed(MouseButton::Left);
+    let focus_driving = well_focus_driving(&mouseless, &cursor_pos);
 
     for (e, mut interactable, btn, mut texture) in buttons.iter_mut() {
         if !btn.active {
             continue;
         }
         let is_hit = hit_test.map(|(ent, _, _)| ent == e).unwrap_or(false);
-        let is_focused = ui_focus.is_focused(e);
+        let is_focused = focus_driving && ui_focus.is_focused(e);
 
         if is_hit || is_focused {
             if !matches!(interactable.current(), Interaction::Hovering) {
@@ -838,6 +919,7 @@ fn spawn_well_reward_modal(
                 group: UIState::WellShrine,
                 index: 250,
             },
+            ModalFocusable { index: 0 },
             RenderLayers::from_layers(&[3]),
             Name::new("Well Reward OK"),
         ))
@@ -870,6 +952,7 @@ pub fn handle_well_reward_ok(
     )>,
     modals: Query<Entity, With<WellRewardModal>>,
     ui_focus: Res<crate::ui::focus::UiFocus>,
+    mouseless: Res<crate::inputs::MouselessModeState>,
 ) {
     if button_queries.p1().is_empty() {
         return;
@@ -898,10 +981,11 @@ pub fn handle_well_reward_ok(
         }
     };
     let left_pressed = mouse_input.just_pressed(MouseButton::Left);
+    let focus_driving = well_focus_driving(&mouseless, &cursor_pos);
 
     for (e, mut interactable, mut sprite) in button_queries.p1().iter_mut() {
         let is_hit = matches!(hit, Some(ent) if ent == e);
-        let is_focused = ui_focus.is_focused(e);
+        let is_focused = focus_driving && ui_focus.is_focused(e);
         let hovering = is_hit || is_focused;
 
         if hovering {

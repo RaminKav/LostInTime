@@ -517,7 +517,7 @@ impl ItemAttributes {
         old_shield: i32,
         skills: &PlayerSkills,
         blessings: &OwnedBlessings,
-        blessing_max_hp_penalty_pct: f32,
+        blessing_max_hp_penalty: i32,
         dodge_crit_buff_active: bool,
         coins: u32,
         max_hp_hunt_bonus: i32,      // Max HP gained from MaxHPHunt heirloom
@@ -555,9 +555,8 @@ impl ItemAttributes {
         } else {
             0
         };
-        if blessing_max_hp_penalty_pct > 0.0 {
-            computed_health.value -=
-                (computed_health.value as f32 * blessing_max_hp_penalty_pct) as i32;
+        if blessing_max_hp_penalty > 0 {
+            computed_health.value -= blessing_max_hp_penalty;
         }
         let computed_speed = self.speed.value
             + chaos_speed_bonus
@@ -1693,7 +1692,7 @@ fn handle_player_item_attribute_change_events(
             food_bonuses,
             blessing_max_hp_penalty,
         ) = player_atts.single();
-        let blessing_max_hp_penalty_pct = blessing_max_hp_penalty.map(|p| p.0).unwrap_or(0.0);
+        let blessing_max_hp_penalty_flat = blessing_max_hp_penalty.map(|p| p.0).unwrap_or(0);
         let mut new_att = att.clone();
         let (player, inv) = player.single();
         let equips: Vec<ItemAttributes> = inv
@@ -1766,7 +1765,7 @@ fn handle_player_item_attribute_change_events(
             old_shield.0,
             skills,
             blessings,
-            blessing_max_hp_penalty_pct,
+            blessing_max_hp_penalty_flat,
             dodge_crit_buff_active,
             coins.coins,
             max_hp_hunt_bonus,

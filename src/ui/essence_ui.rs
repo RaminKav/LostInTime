@@ -1461,6 +1461,7 @@ pub fn handle_merchant_item_tooltip(
                         header_text: Some("Currently Equipped".to_string()),
                         world_anchor: None,
                         ui_state_tag: None,
+                        pin_right: false,
                     });
                 }
             }

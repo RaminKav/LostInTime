@@ -44,6 +44,7 @@ impl Default for FurnaceState {
                     WorldObject::Hammer,
                     WorldObject::Blowdart,
                     WorldObject::FireStaff,
+                    WorldObject::PlasmaStaff,
                     WorldObject::WoodBow,
                     WorldObject::IceStaff,
                     WorldObject::BasicStaff,

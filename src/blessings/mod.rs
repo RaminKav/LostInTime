@@ -101,9 +101,10 @@ pub struct StartingWeaponOverride {
     pub upgrade_starting_weapon: bool,
 }
 
-/// Percentage max HP penalty from a chaos ancestor blessing (e.g. 0.25 = -25%).
+/// Flat max HP reduction from a chaos ancestor blessing, computed once from starting class HP.
+/// Applied as a fixed subtraction so later HP gains (heirlooms, equipment, etc.) are not reduced.
 #[derive(Component, Clone, Debug)]
-pub struct BlessingMaxHpPenalty(pub f32);
+pub struct BlessingMaxHpPenalty(pub i32);
 
 #[derive(
     Debug,

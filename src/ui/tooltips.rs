@@ -44,8 +44,8 @@ use super::{
         spawn_tooltip_info_boxes_with_resolution, TooltipInfoBoxAnchor, TooltipInfoBoxSpec,
     },
     EssenceUI, InventoryUI, ScreenResolution, UIElement, UIState, CHEST_INVENTORY_UI_SIZE,
-    CRAFTING_INVENTORY_UI_SIZE, FURNACE_INVENTORY_UI_SIZE, INVENTORY_UI_SIZE, INVENTORY_Y_OFFSET,
-    INV_SIDE_STATS_BG_ALPHA, INV_SIDE_STATS_BG_PADDING,
+    CRAFTING_INVENTORY_UI_SIZE, FURNACE_INVENTORY_UI_SIZE, INVENTORY_UI_SIZE,
+    INV_EQUIP_PANEL_OFFSET_X, INV_SIDE_STATS_BG_ALPHA, INV_SIDE_STATS_BG_PADDING,
 };
 
 aseprite!(pub InventoryStatHighlightCommon, "textures/effects/InventoryStatHighlightCommon.ase");
@@ -79,6 +79,7 @@ pub fn clamp_tooltip_center_y(y: f32, half_height: f32, game_height: f32, edge_p
 
 /// Inventory item tooltip position beside an anchor point (cursor or slot center).
 ///
+/// Prefers the **right** side of the anchor when there is room; falls back to the left.
 /// The card is vertically centered on the anchor row with a slight upward bias. Top-edge
 /// placement was collapsing most rows to one Y because the large item card is taller than
 /// half the viewport.
@@ -88,7 +89,26 @@ pub fn inventory_item_tooltip_anchor_offset(
     game_width: f32,
     game_height: f32,
 ) -> Vec2 {
-    const HORIZONTAL_GAP: f32 = 12.;
+    inventory_item_tooltip_anchor_offset_sided(
+        anchor,
+        tooltip_size,
+        game_width,
+        game_height,
+        false,
+        12.,
+    )
+}
+
+/// Like [`inventory_item_tooltip_anchor_offset`], but can prefer the left side and use a
+/// custom horizontal gap (e.g. well shrine salvage slot).
+pub fn inventory_item_tooltip_anchor_offset_sided(
+    anchor: Vec2,
+    tooltip_size: Vec2,
+    game_width: f32,
+    game_height: f32,
+    prefer_left: bool,
+    horizontal_gap: f32,
+) -> Vec2 {
     const EDGE_PAD: f32 = 8.;
     /// Anchor sits this fraction below the tooltip top (upper third of the card).
     const ANCHOR_FRAC_FROM_TOP: f32 = 0.22;
@@ -96,9 +116,17 @@ pub fn inventory_item_tooltip_anchor_offset(
     let half_h = tooltip_size.y * 0.5;
     let screen_half_w = game_width * 0.5;
 
-    let right_x = anchor.x + half_w + HORIZONTAL_GAP;
-    let left_x = anchor.x - half_w - HORIZONTAL_GAP;
-    let x = if right_x + half_w <= screen_half_w - EDGE_PAD {
+    let right_x = anchor.x + half_w + horizontal_gap;
+    let left_x = anchor.x - half_w - horizontal_gap;
+    let x = if prefer_left {
+        if left_x - half_w >= -screen_half_w + EDGE_PAD {
+            left_x
+        } else if right_x + half_w <= screen_half_w - EDGE_PAD {
+            right_x
+        } else {
+            left_x
+        }
+    } else if right_x + half_w <= screen_half_w - EDGE_PAD {
         right_x
     } else if left_x - half_w >= -screen_half_w + EDGE_PAD {
         left_x
@@ -178,6 +206,10 @@ pub struct ToolTipUpdateEvent {
     /// When `Some`, this `UIState` component is inserted on the spawned tooltip so the standard
     /// UI-state-exit cleanup (`handle_new_ui_state`) despawns it on leaving that state.
     pub ui_state_tag: Option<UIState>,
+    /// Cauldron (`InventoryCrafting`) only: pin the card to the right of the crafting column
+    /// (ingredient slots). Inventory slots use the middle crafting-column pin; blueprint
+    /// recipes (`is_recipe`) use the left inventory-column pin.
+    pub pin_right: bool,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -322,31 +354,30 @@ pub fn handle_spawn_inv_item_tooltip(
         } else if let Some(p) = item.position_override {
             p
         } else {
-            let focus_driving = mouseless.0 || cursor_pos.suppress_ui_hover;
-            let tooltip_anchor = inventory_item_tooltip_placement_anchor(
-                cursor_pos.ui_coords.truncate(),
-                item.anchor_ui,
-                focus_driving,
-            );
             match cur_inv_state.0 {
-                UIState::Inventory => inventory_item_tooltip_anchor_offset(
-                    tooltip_anchor,
-                    ITEM_TOOLTIP_LARGE_CARD_SIZE,
-                    resolution.game_width,
-                    resolution.game_height,
-                ),
+                UIState::Inventory => {
+                    let focus_driving = mouseless.0 || cursor_pos.suppress_ui_hover;
+                    let tooltip_anchor = inventory_item_tooltip_placement_anchor(
+                        cursor_pos.ui_coords.truncate(),
+                        item.anchor_ui,
+                        focus_driving,
+                    );
+                    inventory_item_tooltip_anchor_offset(
+                        tooltip_anchor,
+                        ITEM_TOOLTIP_LARGE_CARD_SIZE,
+                        resolution.game_width,
+                        resolution.game_height,
+                    )
+                }
                 UIState::InventoryCrafting => {
-                    if item.is_recipe {
-                        Vec2::new(0., INVENTORY_Y_OFFSET)
-                    } else if focus_driving && item.anchor_ui.is_some() {
-                        inventory_item_tooltip_anchor_offset(
-                            tooltip_anchor,
-                            ITEM_TOOLTIP_LARGE_CARD_SIZE,
-                            resolution.game_width,
-                            resolution.game_height,
-                        )
-                    } else {
+                    // Blueprints → left (inventory column). Inventory → middle crafting column.
+                    // Ingredients → right column (`pin_right`).
+                    if item.pin_right {
                         right_side_offset
+                    } else if item.is_recipe {
+                        Vec2::ZERO
+                    } else {
+                        Vec2::new(INV_EQUIP_PANEL_OFFSET_X, 0.)
                     }
                 }
                 UIState::Chest => Vec2::new(
@@ -363,12 +394,7 @@ pub fn handle_spawn_inv_item_tooltip(
                     -CHEST_INVENTORY_UI_SIZE.x - 20.,
                     -CHEST_INVENTORY_UI_SIZE.y / 2. + 40.,
                 ),
-                UIState::WellShrine => inventory_item_tooltip_anchor_offset(
-                    tooltip_anchor,
-                    ITEM_TOOLTIP_LARGE_CARD_SIZE,
-                    resolution.game_width,
-                    resolution.game_height,
-                ),
+                UIState::WellShrine => crate::ui::well_shrine_ui::well_shrine_fixed_tooltip_position(),
                 _ => continue,
             }
         };

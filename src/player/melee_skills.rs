@@ -103,15 +103,19 @@ pub fn handle_second_split_attack(
     }
 }
 
-/// Per-heirloom trigger rate limits (e.g. Chalice echo, Bob's Bell) so they can only trigger once per 0.1s.
+/// Per-heirloom trigger rate limits (e.g. Chalice echo, Bob's Bell, Summoning Wand).
 #[derive(Component)]
 pub struct HeirloomTriggerCooldowns {
     pub chalice_echo: Option<Timer>,
     pub bobs_bell: Option<Timer>,
+    pub heal_summons: Option<Timer>,
 }
 
 /// Shared cooldown duration for heirloom trigger effects (Chalice, Bob's Bell).
 pub const HEIRLOOM_TRIGGER_COOLDOWN_SECS: f32 = 0.1;
+
+/// Internal cooldown for Summoning Wand (HealSummons) triggers.
+pub const HEAL_SUMMONS_TRIGGER_COOLDOWN_SECS: f32 = 0.2;
 
 /// Ticks all heirloom trigger cooldowns so they can trigger again after their duration.
 pub fn tick_heirloom_trigger_cooldowns(
@@ -125,11 +129,18 @@ pub fn tick_heirloom_trigger_cooldowns(
         if let Some(ref mut t) = cooldowns.bobs_bell {
             t.tick(time.delta());
         }
+        if let Some(ref mut t) = cooldowns.heal_summons {
+            t.tick(time.delta());
+        }
     }
 }
 
 fn new_heirloom_trigger_timer() -> Timer {
     Timer::from_seconds(HEIRLOOM_TRIGGER_COOLDOWN_SECS, TimerMode::Once)
+}
+
+fn new_heal_summons_trigger_timer() -> Timer {
+    Timer::from_seconds(HEAL_SUMMONS_TRIGGER_COOLDOWN_SECS, TimerMode::Once)
 }
 
 pub fn handle_echo_after_heal(
@@ -169,45 +180,57 @@ pub fn handle_echo_after_heal(
         let rng = &mut rand::thread_rng();
         let count = skills.get_count(Heirloom::HealEcho);
         if count > 0 && rng.gen_bool((count as f64 * 0.1).clamp(0.0, 1.0)) {
-            if let Some(ref cooldowns) = cooldowns {
-                if cooldowns
-                    .chalice_echo
-                    .as_ref()
-                    .map_or(false, |t| !t.finished())
-                {
-                    continue;
-                }
-            }
-            let mana_cost = Heirloom::HealEcho.get_mana_cost();
-            if current_mana.0 >= mana_cost {
-                current_mana.0 -= mana_cost;
-                trigger_counts.record_mana(Heirloom::HealEcho, mana_cost);
-                spawn_echo_hitbox(
-                    &mut commands,
-                    &asset_server,
-                    e,
-                    attack.0,
-                    projectile_size.get_multiplier(),
-                );
-                trigger_counts.increment(Heirloom::HealEcho);
-                if let Some(ref mut cooldowns) = cooldowns {
-                    cooldowns.chalice_echo = Some(new_heirloom_trigger_timer());
-                } else {
-                    commands.entity(e).insert(HeirloomTriggerCooldowns {
-                        chalice_echo: Some(new_heirloom_trigger_timer()),
-                        bobs_bell: None,
-                    });
+            let chalice_ready = cooldowns.as_ref().map_or(true, |c| {
+                c.chalice_echo.as_ref().map_or(true, |t| t.finished())
+            });
+            if chalice_ready {
+                let mana_cost = Heirloom::HealEcho.get_mana_cost();
+                if current_mana.0 >= mana_cost {
+                    current_mana.0 -= mana_cost;
+                    trigger_counts.record_mana(Heirloom::HealEcho, mana_cost);
+                    spawn_echo_hitbox(
+                        &mut commands,
+                        &asset_server,
+                        e,
+                        attack.0,
+                        projectile_size.get_multiplier(),
+                    );
+                    trigger_counts.increment(Heirloom::HealEcho);
+                    if let Some(ref mut cooldowns) = cooldowns {
+                        cooldowns.chalice_echo = Some(new_heirloom_trigger_timer());
+                    } else {
+                        commands.entity(e).insert(HeirloomTriggerCooldowns {
+                            chalice_echo: Some(new_heirloom_trigger_timer()),
+                            bobs_bell: None,
+                            heal_summons: None,
+                        });
+                    }
                 }
             }
         }
-        // HealSummons: 10% chance to trigger all summons once (Ant Farm, Boulder, Piercing Ring). Trigger costs mana; summons are free.
+        // HealSummons: 10% chance to trigger all summons once (Ant Farm, Boulder, Piercing Ring).
+        // Trigger costs mana; summons are free. Rate-limited to once per 0.2s.
         let count = skills.get_count(Heirloom::HealSummons);
         if count > 0 && rng.gen_bool((0.1 * count as f64).clamp(0.0, 1.0)) {
-            let mana_cost = Heirloom::HealSummons.get_mana_cost();
-            if current_mana.0 >= mana_cost {
-                current_mana.0 -= mana_cost;
-                trigger_counts.record_mana(Heirloom::HealSummons, mana_cost);
-                trigger_summons_events.send(TriggerSummonsEvent(e));
+            let summons_ready = cooldowns.as_ref().map_or(true, |c| {
+                c.heal_summons.as_ref().map_or(true, |t| t.finished())
+            });
+            if summons_ready {
+                let mana_cost = Heirloom::HealSummons.get_mana_cost();
+                if current_mana.0 >= mana_cost {
+                    current_mana.0 -= mana_cost;
+                    trigger_counts.record_mana(Heirloom::HealSummons, mana_cost);
+                    trigger_summons_events.send(TriggerSummonsEvent(e));
+                    if let Some(ref mut cooldowns) = cooldowns {
+                        cooldowns.heal_summons = Some(new_heal_summons_trigger_timer());
+                    } else {
+                        commands.entity(e).insert(HeirloomTriggerCooldowns {
+                            chalice_echo: None,
+                            bobs_bell: None,
+                            heal_summons: Some(new_heal_summons_trigger_timer()),
+                        });
+                    }
+                }
             }
         }
     }
