@@ -20,7 +20,8 @@ use crate::{
         inventory_ui::{mark_slot_dirty, spawn_item_stack_icon},
         main_menu::{spawn_back_button, MAIN_MENU_WIDE_BUTTON_SIZE},
         tooltips::{ToolTipUpdateEvent, TooltipTeardownEvent},
-        ui_helpers, Focusable, InventorySlotType, UIElement, UIState, UI_SLOT_SIZE,
+        ui_helpers, Focusable, InventorySlotType, SkipFocusSelectedIndicator, UIElement, UIState,
+        UI_SLOT_SIZE,
     },
     GameParam, ScreenResolution, GAME_HEIGHT,
 };
@@ -43,8 +44,7 @@ pub fn well_shrine_fixed_tooltip_position() -> Vec2 {
     let half_w = crate::ui::tooltips::ITEM_TOOLTIP_LARGE_CARD_SIZE.x * 0.5;
     let half_h = crate::ui::tooltips::ITEM_TOOLTIP_LARGE_CARD_SIZE.y * 0.5;
     let x = start_x - half_w - WELL_TOOLTIP_GAP - WELL_TOOLTIP_EXTRA_LEFT;
-    let anchor_bias =
-        crate::ui::tooltips::ITEM_TOOLTIP_LARGE_CARD_SIZE.y * 0.22 - half_h;
+    let anchor_bias = crate::ui::tooltips::ITEM_TOOLTIP_LARGE_CARD_SIZE.y * 0.22 - half_h;
     Vec2::new(x, WELL_EQUIPMENT_ROW_Y + anchor_bias)
 }
 
@@ -225,11 +225,7 @@ pub fn setup_well_shrine_ui(
     spawn_well_salvage_button(&mut commands, &graphics, &asset_server, container, false);
 
     let back_button = spawn_back_button(
-        Vec3::new(
-            res.game_width / 2. - 55.,
-            -res.game_height / 2. + 38.,
-            60.,
-        ),
+        Vec3::new(res.game_width / 2. - 55., -res.game_height / 2. + 38., 60.),
         &mut commands,
         &graphics,
         &asset_server,
@@ -241,7 +237,8 @@ pub fn setup_well_shrine_ui(
         .insert(Focusable {
             group: UIState::WellShrine,
             index: 200,
-        });
+        })
+        .insert(SkipFocusSelectedIndicator);
 }
 
 fn spawn_well_equipment_grid(
@@ -325,13 +322,17 @@ fn spawn_well_salvage_area(
         .insert(UIElement::PetSelectSlot)
         .insert(Interactable::default())
         .insert(WellSalvageSlot)
-        .insert(Focusable {
-            group: UIState::WellShrine,
-            index: 100,
-        })
         .insert(Name::new("Well Salvage Slot"))
         .set_parent(container)
         .id();
+
+    // Empty selected slot isn't a focus target — nothing to clear/confirm.
+    if selected_stack.is_some() {
+        commands.entity(salvage_e).insert(Focusable {
+            group: UIState::WellShrine,
+            index: 100,
+        });
+    }
 
     if let Some(stack) = selected_stack {
         let icon = spawn_item_stack_icon(
@@ -339,7 +340,7 @@ fn spawn_well_salvage_area(
             graphics,
             stack,
             asset_server,
-            Vec2::ZERO,
+            Vec2::new(0., -2.),
             Vec2::ZERO,
             3,
         );
@@ -369,15 +370,20 @@ fn spawn_well_salvage_button(
             Interactable::default(),
             UIElement::MainMenuStartButton,
             WellSalvageButton { active },
-            Focusable {
-                group: UIState::WellShrine,
-                index: 101,
-            },
+            SkipFocusSelectedIndicator,
             RenderLayers::from_layers(&[3]),
             Name::new("Well Salvage Button"),
         ))
         .set_parent(container)
         .id();
+
+    // Disabled Salvage isn't focus-navigable — Confirm would do nothing.
+    if active {
+        commands.entity(button_e).insert(Focusable {
+            group: UIState::WellShrine,
+            index: 101,
+        });
+    }
 
     let label_color = if active { WHITE } else { GREY };
     commands
@@ -802,9 +808,7 @@ pub fn handle_well_salvage_button(
             let allow_hotbar = {
                 let proto = params.p0();
                 proto
-                    .get_component::<crate::item::item_actions::ConsumableItem, _>(
-                        reward.obj_type,
-                    )
+                    .get_component::<crate::item::item_actions::ConsumableItem, _>(reward.obj_type)
                     .is_some()
             };
             let add_result = {
@@ -915,6 +919,7 @@ fn spawn_well_reward_modal(
             },
             Interactable::default(),
             WellRewardOkButton,
+            SkipFocusSelectedIndicator,
             Focusable {
                 group: UIState::WellShrine,
                 index: 250,

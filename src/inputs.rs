@@ -24,8 +24,8 @@ use crate::player::skills::{
 };
 use crate::ui::key_input_guide::{InteractionGuideTrigger, SHRINE_INTERACT_GUIDE_DISTANCE};
 use crate::world::dimension::{DimensionSpawnEvent, Era};
-use bevy::prelude::*;
 use bevy::ecs::system::SystemParam;
+use bevy::prelude::*;
 use bevy::transform::TransformSystem;
 use bevy::window::PrimaryWindow;
 
@@ -53,7 +53,9 @@ use crate::item::bridge_placement::{
 use crate::item::item_actions::{ItemActionParam, ItemActions, ManaCost};
 use crate::item::object_actions::ObjectAction;
 use crate::item::projectile::{RangedAttack, RangedAttackEvent};
-use crate::item::shrine_repair::handle_broken_shrine_interact;
+use crate::item::shrine_repair::{
+    handle_broken_shrine_interact, PendingShrineRepairFinish, ShrineRepairChannel,
+};
 use crate::item::{Equipment, WorldObject};
 use crate::proto::proto_param::ProtoParam;
 use crate::ui::{
@@ -625,9 +627,9 @@ pub fn player_move_inputs(
                 .clamped_axis_pair(GamepadAction::Move)
                 .map(|pair| pair.xy())
         });
-    if let Some(stick) = gamepad_move.filter(|v| {
-        v.length_squared() > crate::gamepad_input::GAMEPAD_STICK_DEADZONE.powi(2)
-    }) {
+    if let Some(stick) = gamepad_move
+        .filter(|v| v.length_squared() > crate::gamepad_input::GAMEPAD_STICK_DEADZONE.powi(2))
+    {
         d_raw = stick;
         player.is_moving = true;
     } else {
@@ -1157,7 +1159,7 @@ pub fn toggle_inventory(
             // proto_commands.spawn_from_proto(Mob::StingFly, &proto.prototypes, pos);
             // proto_commands.spawn_from_proto(Mob::FurDevil, &proto.prototypes, pos);
             // proto_commands.spawn_from_proto(Mob::VoidWorm, &proto.prototypes, pos);
-            proto_commands.spawn_from_proto(Mob::StoneGolem, &proto.prototypes, pos);
+            proto_commands.spawn_from_proto(Mob::RedMushking, &proto.prototypes, pos);
             // proto_commands.spawn_from_proto(Mob::FurDevil, &proto.prototypes, pos);
             // proto_commands.spawn_from_proto(Mob::BigCactus, &proto.prototypes, pos);
             // proto_commands.spawn_from_proto(Mob::SmallCactus, &proto.prototypes, pos);
@@ -1329,8 +1331,14 @@ pub fn mouse_click_system(
 
     let cursor_tile_pos = world_pos_to_tile_pos(cursor_pos.world_coords.truncate());
     let player_pos = game.player().position;
-    let (player_e, attack_timer_option, player_anim, blessings, mut current_mana, gamepad_action_state) =
-        player_query.single_mut();
+    let (
+        player_e,
+        attack_timer_option,
+        player_anim,
+        blessings,
+        mut current_mana,
+        gamepad_action_state,
+    ) = player_query.single_mut();
     let gamepad_attack_pressed = gamepad_action_state
         .map(|a| a.pressed(GamepadAction::Attack))
         .unwrap_or(false);
@@ -1362,10 +1370,8 @@ pub fn mouse_click_system(
         if let Some(tool) = &game.player().main_hand_slot {
             main_hand_option = Some(tool.get_obj());
         }
-        let direction = aim_params.direction(
-            player_pos.truncate(),
-            cursor_pos.world_coords.truncate(),
-        );
+        let direction =
+            aim_params.direction(player_pos.truncate(), cursor_pos.world_coords.truncate());
         if let Ok((obj, ranged_tool)) = ranged_query.get_single() {
             // Gate ranged attacks on ammo availability for non-magic ranged weapons
             if obj.is_ranged_weapon() && !obj.is_magic_weapon() {
@@ -1497,7 +1503,14 @@ pub fn handle_interact_objects(
             &SpriteAnchor,
             &InteractionGuideTrigger,
         ),
-        (With<InteractionGuideTrigger>, Without<crate::item::shrine_visuals::ShrineNeedsRepair>),
+        (
+            With<InteractionGuideTrigger>,
+            Without<crate::item::shrine_visuals::ShrineNeedsRepair>,
+            // Repair pays / clears ShrineNeedsRepair before FlashGreen finishes; block
+            // interact until activate_pending_shrine_after_repair runs (avoids double chaos).
+            Without<PendingShrineRepairFinish>,
+            Without<ShrineRepairChannel>,
+        ),
     >,
     mut player_query: Query<(&GlobalTransform, &mut Inventory), With<Player>>,
     mut game: GameParam,
@@ -1542,7 +1555,11 @@ pub fn handle_open_essence_ui(
     player_query: Query<&GlobalTransform, With<Player>>,
     nearby_merchant_query: Query<
         (Entity, &GlobalTransform, &EssenceShopChoices),
-        Without<crate::item::shrine_visuals::ShrineNeedsRepair>,
+        (
+            Without<crate::item::shrine_visuals::ShrineNeedsRepair>,
+            Without<PendingShrineRepairFinish>,
+            Without<ShrineRepairChannel>,
+        ),
     >,
     mut next_inv_state: ResMut<NextState<UIState>>,
     curr_ui_state: Res<State<UIState>>,

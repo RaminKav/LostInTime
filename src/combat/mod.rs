@@ -430,12 +430,12 @@ fn handle_enemy_death(
 
         // On-kill heirloom effects (skip when kill was from another heirloom to prevent chaining)
         let (_, attack, mut current_mana) = player_query.single_mut();
-        // KillLightning: 15% chance per stack to spawn lightning on a random nearby enemy; over 100% = guaranteed 1 + (chance-100)% for a second strike on a different enemy
+        // KillLightning: 7% chance per stack to spawn lightning on a random nearby enemy; over 100% = guaranteed 1 + (chance-100)% for a second strike on a different enemy
         let kill_lightning_stacks =
             player_skills.get_count(crate::player::skills::Heirloom::KillLightning);
         if kill_lightning_stacks > 0 {
             let mut rng = rand::thread_rng();
-            let chance_pct = (kill_lightning_stacks as u32 * 10).min(200); // cap at 200% (1 guaranteed + 100% second)
+            let chance_pct = (kill_lightning_stacks as u32 * 7).min(200); // cap at 200% (1 guaranteed + 100% second)
             let death_pos = death_event.enemy_pos;
             let nearby_enemies: Vec<(Entity, Vec2)> = enemies
                 .iter()
@@ -811,8 +811,7 @@ pub fn handle_hits(
                     0.
                 };
 
-                let is_poison_dot =
-                    hit.from_heirloom_effect == Some(Heirloom::PoisonStacks);
+                let is_poison_dot = hit.from_heirloom_effect == Some(Heirloom::PoisonStacks);
 
                 commands.entity(hit.hit_entity).insert(HitAnimationTracker {
                     is_active: true,
@@ -974,7 +973,7 @@ pub fn cleanup_marked_for_death_entities(
     // of `neaby_mobs` from inside the loop.
     let mut nearby_venom_targets: Vec<(Entity, Vec2, crate::combat::status_effects::Burning)> =
         Vec::new();
-
+    let mut poison_sceptor_count = 0;
     for (e, mob, status_option, mob_pos, killed_by_heirloom) in dead_query.iter() {
         if mob.is_boss() {
             // Clean up preview entities before removing attack states
@@ -1084,6 +1083,7 @@ pub fn cleanup_marked_for_death_entities(
             // can still spread stacks to nearby enemies.
             if let Some(p) = status_option.and_then(|s| s.burning.as_ref()) {
                 if skills.has(Heirloom::ViralVenum) {
+                    poison_sceptor_count = skills.get_count(Heirloom::ViralVenum);
                     let mana_cost = Heirloom::ViralVenum.get_mana_cost();
                     if current_mana.0 >= mana_cost {
                         current_mana.0 -= mana_cost;
@@ -1109,7 +1109,9 @@ pub fn cleanup_marked_for_death_entities(
         for (_source_e, source_pos, source_burning) in nearby_venom_targets.into_iter() {
             for (mob_e, txfm, mut status) in neaby_mobs.iter_mut() {
                 if source_pos.distance(txfm.translation().truncate()) < 3. * TILE_SIZE.x {
-                    let stacks_to_add = source_burning.stacks;
+                    let stacks_to_add = source_burning
+                        .stacks
+                        .min(500 * poison_sceptor_count as u128);
                     if let Some(existing) = status.burning.as_mut() {
                         existing.stacks = existing.stacks.saturating_add(stacks_to_add);
                         existing.duration_timer.reset();

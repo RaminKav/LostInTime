@@ -374,7 +374,10 @@ impl DimensionPlugin {
 
             if !sent_dungeon_spawn {
                 if let Ok((e, cached_pos)) = player_cache_pos.get_single() {
-                    move_player_event.send(MovePlayerEvent { pos: cached_pos.0 });
+                    move_player_event.send(MovePlayerEvent {
+                        pos: cached_pos.0,
+                        clear_recall_history: true,
+                    });
                     commands.entity(e).remove::<CachedPlayerPos>();
                 }
             }

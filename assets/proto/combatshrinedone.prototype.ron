@@ -6,6 +6,6 @@
   "survival_rogue_like::assets::SpriteSize": Small,
   "survival_rogue_like::assets::SpriteAnchor": ((x: 0., y: 24.)),
   "survival_rogue_like::world::y_sort::YSort": (0.),
-  "survival_rogue_like::proto::ColliderCapsulProto": (x1: -8., y1: -22., x2: 8., y2: -22., r: 5.5),
+  "survival_rogue_like::proto::ColliderCapsulProto": (x1: -8., y1: -22., x2: 8., y2: -22., r: 5.),
   }
 )

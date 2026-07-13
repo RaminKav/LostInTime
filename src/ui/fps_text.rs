@@ -276,7 +276,7 @@ pub fn text_update_system(
         if let Some(fps) = diagnostics.get(FrameTimeDiagnosticsPlugin::FPS) {
             if let Some(value) = fps.smoothed() {
                 // Update the value of the second section
-                text.sections[0].value = format!("FPS: {value:.0}\n\n{VERSION}");
+                text.sections[0].value = format!("FPS: {value:.0}\n{VERSION}");
             }
         }
     }

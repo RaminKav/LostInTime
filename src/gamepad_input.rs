@@ -193,7 +193,8 @@ pub enum UiGamepadAction {
     /// Y button — context "quick action" on the focused inventory slot: quick-equip / transfer
     /// the item the same way a shift-click does with the mouse.
     QuickAction,
-    /// X button — mark / unmark the focused merchant shop item to track its price.
+    /// X button — mark / unmark the focused merchant shop item to track its price. While the
+    /// inventory is open, the same button consumes the focused consumable (mirrors right-click).
     Mark,
     /// Left stick, read as a `Vec2` for continuous analog nav (see `focus_nav_should_run`'s
     /// caller for the discrete-step logic built on top of it).
@@ -322,6 +323,11 @@ const MOUSE_MOTION_JITTER_THRESHOLD: f32 = 1.0;
 /// key/click/mouse-move immediately wins) since that direction can't cause a lockout.
 const GAMEPAD_SWITCH_DEBOUNCE_FRAMES: u8 = 5;
 
+/// After keyboard/mouse wins, ignore stick-only gamepad evidence for this many frames so a
+/// noisy/phantom stick cannot flip `ActiveInputDevice` back to Gamepad the moment the mouse
+/// stops moving (which was leaving the essence mark prompt stuck on "Press X").
+const KEYBOARD_MOUSE_HOLD_FRAMES: u8 = 45;
+
 fn update_active_input_device(
     mut device: ResMut<ActiveInputDevice>,
     key_input: Res<Input<KeyCode>>,
@@ -330,6 +336,7 @@ fn update_active_input_device(
     gamepad_buttons: Res<Input<GamepadButton>>,
     action_query: Query<&ActionState<GamepadAction>, With<Player>>,
     mut gamepad_evidence_streak: Local<u8>,
+    mut keyboard_mouse_hold: Local<u8>,
 ) {
     let real_mouse_motion = mouse_motion
         .iter()
@@ -342,6 +349,7 @@ fn update_active_input_device(
     // gamepad debounce streak so a lingering noisy signal can't "carry over" its progress.
     if fresh_keyboard_mouse {
         *gamepad_evidence_streak = 0;
+        *keyboard_mouse_hold = KEYBOARD_MOUSE_HOLD_FRAMES;
         device.0 = InputDeviceKind::KeyboardMouse;
         return;
     }
@@ -357,6 +365,17 @@ fn update_active_input_device(
                     .unwrap_or(false)
             })
     });
+
+    // During the post-mouse hold, stick drift alone cannot reclaim Gamepad — a real button
+    // press still can, so deliberate controller use switches immediately.
+    if *keyboard_mouse_hold > 0 {
+        *keyboard_mouse_hold = keyboard_mouse_hold.saturating_sub(1);
+        if !fresh_gamepad_button {
+            device.0 = InputDeviceKind::KeyboardMouse;
+            *gamepad_evidence_streak = 0;
+            return;
+        }
+    }
 
     if fresh_gamepad_button || stick_active {
         *gamepad_evidence_streak = gamepad_evidence_streak.saturating_add(1);

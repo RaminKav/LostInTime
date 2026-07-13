@@ -24,6 +24,8 @@
 use bevy::ecs::system::SystemParam;
 use bevy::input::mouse::MouseMotion;
 use bevy::prelude::*;
+use bevy::render::view::RenderLayers;
+use bevy_aseprite::{anim::AsepriteAnimation, aseprite, AsepriteBundle};
 use leafwing_input_manager::prelude::ActionState;
 use serde::{Deserialize, Serialize};
 
@@ -275,7 +277,13 @@ fn poll_ui_focus_confirm(
 fn group_defers_default_focus(group: &UIState) -> bool {
     matches!(
         group,
-        UIState::Pause | UIState::Skills | UIState::BlessingChoice | UIState::WellShrine
+        UIState::Pause
+            | UIState::Skills
+            | UIState::BlessingChoice
+            | UIState::WellShrine
+            | UIState::Essence
+            | UIState::Inventory
+            | UIState::InventoryCrafting
     )
 }
 
@@ -472,7 +480,13 @@ fn update_cursor_ui_hover_suppression(
     mut mouse_motion: EventReader<MouseMotion>,
     mut last_context: Local<Option<FocusContextKey>>,
 ) {
-    if mouse_motion.iter().next().is_some() {
+    // Clear on real mouse motion *or* whenever keyboard/mouse is the active device.
+    // Relying on MouseMotion alone failed in practice (Prompt stayed on "Press X" while
+    // moving the mouse) because ActiveInputDevice can already be KeyboardMouse while
+    // suppress was left true from a prior gamepad UI open.
+    if mouse_motion.iter().next().is_some()
+        || active_device.0 == InputDeviceKind::KeyboardMouse
+    {
         cursor_pos.suppress_ui_hover = false;
     }
 
@@ -529,18 +543,25 @@ fn ensure_default_focus(
         }
         return;
     }
-    if let Some(anchor) = ui_focus.anchor.clone() {
-        if let Some(e) = find_entity_for_anchor(
-            &anchor,
-            &mode,
-            &focusables,
-            &inv_slots,
-            &visibility,
-            &ui_state.0,
-        ) {
-            ui_focus.focused = Some(e);
-            return;
+    // Deferred groups must stay unfocused until the player presses a nav direction — restoring
+    // a stale anchor from a previous visit would immediately highlight something on open.
+    let defer_default = matches!(&mode, FocusMode::Screen(g) if group_defers_default_focus(g));
+    if !defer_default {
+        if let Some(anchor) = ui_focus.anchor.clone() {
+            if let Some(e) = find_entity_for_anchor(
+                &anchor,
+                &mode,
+                &focusables,
+                &inv_slots,
+                &visibility,
+                &ui_state.0,
+            ) {
+                ui_focus.focused = Some(e);
+                return;
+            }
         }
+    } else {
+        ui_focus.anchor = None;
     }
     ui_focus.focused = default_focus_entity(
         &mode,
@@ -950,6 +971,78 @@ pub struct FocusConfirmSet;
 
 pub struct FocusPlugin;
 
+aseprite!(pub SelectedIndicator, "textures/effects/SelectedIndicator.aseprite");
+
+/// Child overlay spawned on the focused UI icon so controller/mouseless players can see where
+/// focus is. Only used on the merchant shop, microwave shrine, well shrine, and pause HUD —
+/// other screens already convey focus via hover art / bounce.
+#[derive(Component)]
+struct UiFocusSelectedIndicator;
+
+/// Opt out of [`UiFocusSelectedIndicator`] — for text/menu buttons that already swap hover art.
+#[derive(Component, Debug, Clone, Copy)]
+pub struct SkipFocusSelectedIndicator;
+
+fn ui_state_shows_focus_selected_indicator(ui_state: &UIState) -> bool {
+    matches!(
+        ui_state,
+        UIState::Essence | UIState::MicrowaveShrine | UIState::Pause | UIState::WellShrine
+    )
+}
+
+fn sync_ui_focus_selected_indicator(
+    mut commands: Commands,
+    ui_focus: Res<UiFocus>,
+    ui_state: Res<State<UIState>>,
+    mouseless_mode: Res<MouselessModeState>,
+    cursor_pos: Res<CursorPos>,
+    asset_server: Res<AssetServer>,
+    existing: Query<(Entity, &Parent), With<UiFocusSelectedIndicator>>,
+    skip: Query<(), With<SkipFocusSelectedIndicator>>,
+) {
+    let focus_driving = mouseless_mode.0 || cursor_pos.suppress_ui_hover;
+    let show = focus_driving && ui_state_shows_focus_selected_indicator(&ui_state.0);
+    let target = if show {
+        ui_focus
+            .focused
+            .filter(|entity| skip.get(*entity).is_err())
+    } else {
+        None
+    };
+
+    let mut keep = false;
+    for (entity, parent) in existing.iter() {
+        if Some(parent.get()) == target {
+            keep = true;
+        } else {
+            commands.entity(entity).despawn_recursive();
+        }
+    }
+
+    let Some(parent) = target else {
+        return;
+    };
+    if keep {
+        return;
+    }
+
+    let mut animation = AsepriteAnimation::from(SelectedIndicator::tags::SELECT);
+    animation.play();
+    commands
+        .spawn((
+            AsepriteBundle {
+                aseprite: asset_server.load(SelectedIndicator::PATH),
+                animation,
+                transform: Transform::from_translation(Vec3::new(0., 0., 8.)),
+                ..Default::default()
+            },
+            RenderLayers::from_layers(&[3]),
+            UiFocusSelectedIndicator,
+            Name::new("Ui Focus Selected Indicator"),
+        ))
+        .set_parent(parent);
+}
+
 impl Plugin for FocusPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<UiFocus>()
@@ -968,6 +1061,7 @@ impl Plugin for FocusPlugin {
                     .chain()
                     .after(ensure_default_focus)
                     .distributive_run_if(focus_should_run),
-            );
+            )
+            .add_system(sync_ui_focus_selected_indicator.after(FocusNavSet));
     }
 }

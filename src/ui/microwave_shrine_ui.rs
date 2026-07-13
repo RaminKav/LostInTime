@@ -1,7 +1,7 @@
 use crate::{
     assets::Graphics,
     attributes::AttributeChangeEvent,
-    colors::{BLACK, WHITE, YELLOW},
+    colors::{WHITE, YELLOW},
     cursor::CursorPos,
     item::microwave_shrine::MicrowaveShrineState,
     item::WorldObject,
@@ -18,8 +18,8 @@ use crate::{
             heirloom_hud_hover_tooltip_position, HeirloomTooltipRequest, HeirloomTooltipShow,
         },
         interactions::{Interactable, Interaction},
-        main_menu::spawn_back_button,
-        Focusable, UIElement, UIState,
+        main_menu::{spawn_back_button, MAIN_MENU_WIDE_BUTTON_SIZE},
+        Focusable, SkipFocusSelectedIndicator, UIElement, UIState,
     },
     ScreenResolution, GAME_HEIGHT,
 };
@@ -176,11 +176,11 @@ pub fn setup_microwave_shrine_ui(
         }
         let has_enough_heirlooms = types_of_rarity.len() >= 2;
 
-        let btn_size = Vec2::new(100., 30.);
+        let btn_size = MAIN_MENU_WIDE_BUTTON_SIZE;
 
         let btn = commands
             .spawn(SpriteBundle {
-                texture: graphics.get_ui_element_texture(UIElement::MenuButton),
+                texture: graphics.get_ui_element_texture(UIElement::MainMenuStartButton),
                 sprite: Sprite {
                     custom_size: Some(btn_size),
                     ..default()
@@ -189,12 +189,13 @@ pub fn setup_microwave_shrine_ui(
                 ..default()
             })
             .insert(RenderLayers::from_layers(&[3]))
-            .insert(UIElement::MenuButton)
+            .insert(UIElement::MainMenuStartButton)
             .insert(Interactable::default())
             .insert(Focusable {
                 group: UIState::MicrowaveShrine,
                 index: i as u32,
             })
+            .insert(SkipFocusSelectedIndicator)
             .insert(MicrowaveRarityButton {
                 rarity: rarity.clone(),
                 cost,
@@ -215,12 +216,12 @@ pub fn setup_microwave_shrine_ui(
             .spawn(Text2dBundle {
                 text: Text::from_section(
                     format!("{} ({}g)", rarity_str, cost),
-                    gf::BODY.text_style(&asset_server, BLACK),
+                    gf::TITLE.text_style(&asset_server, WHITE),
                 )
                 .with_alignment(TextAlignment::Center),
                 transform: Transform {
-                    translation: Vec3::new(0., 0., 1.),
-                    scale: gf::BODY.transform_scale(),
+                    translation: Vec3::new(0., -1., 1.),
+                    scale: gf::TITLE.transform_scale(),
                     ..Default::default()
                 },
                 ..Default::default()
@@ -247,7 +248,8 @@ pub fn setup_microwave_shrine_ui(
         .insert(Focusable {
             group: UIState::MicrowaveShrine,
             index: 100,
-        });
+        })
+        .insert(SkipFocusSelectedIndicator);
 }
 
 fn point_in_sprite(cursor: &Vec3, size: Vec2, xform: &GlobalTransform) -> bool {
@@ -296,8 +298,10 @@ pub fn handle_microwave_shrine_rarity_click(
                         interactable.change(Interaction::Hovering);
                         commands
                             .entity(e)
-                            .insert(UIElement::MenuButtonHover)
-                            .insert(graphics.get_ui_element_texture(UIElement::MenuButtonHover));
+                            .insert(UIElement::MainMenuStartButtonHover)
+                            .insert(
+                                graphics.get_ui_element_texture(UIElement::MainMenuStartButtonHover),
+                            );
                     }
                 }
                 Interaction::Hovering => {
@@ -306,8 +310,10 @@ pub fn handle_microwave_shrine_rarity_click(
                         interactable.change(Interaction::None);
                         commands
                             .entity(e)
-                            .insert(UIElement::MenuButton)
-                            .insert(graphics.get_ui_element_texture(UIElement::MenuButton));
+                            .insert(UIElement::MainMenuStartButton)
+                            .insert(
+                                graphics.get_ui_element_texture(UIElement::MainMenuStartButton),
+                            );
                     } else if confirm_pressed {
                         if let Ok(root) = ui_root.get_single() {
                             // Remove only the three rarity buttons; keep overlay (bg, title, gold)
@@ -390,8 +396,8 @@ pub fn handle_microwave_shrine_rarity_click(
             interactable.change(Interaction::None);
             commands
                 .entity(e)
-                .insert(UIElement::MenuButton)
-                .insert(graphics.get_ui_element_texture(UIElement::MenuButton));
+                .insert(UIElement::MainMenuStartButton)
+                .insert(graphics.get_ui_element_texture(UIElement::MainMenuStartButton));
         }
     }
 }
@@ -433,11 +439,12 @@ pub fn handle_microwave_shrine_heirloom_tooltip(
                 .unwrap_or(HeirloomRarity::Common);
 
             let (_, tooltip_size) = heirloom.get_ui_element(rarity);
-            let tooltip_pos = heirloom_hud_hover_tooltip_position(
+            let mut tooltip_pos = heirloom_hud_hover_tooltip_position(
                 *icon_pos,
                 tooltip_size.x * 0.5,
                 res.game_width,
             );
+            tooltip_pos.y -= 10.;
 
             tooltip_requests.send(HeirloomTooltipRequest::Show(HeirloomTooltipShow {
                 heirloom: heirloom.clone(),

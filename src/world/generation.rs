@@ -21,7 +21,7 @@ use itertools::Itertools;
 use crate::world::world_helpers::{get_neighbour_tile, world_pos_to_tile_pos};
 use crate::world::{noise_helpers, world_helpers, TileMapPosition, CHUNK_SIZE, TILE_SIZE};
 use crate::{run_once_per_run, CustomFlush, GameParam, GameState, DEBUG_AI};
-use crate::{DEBUG, NO_GEN};
+use crate::{DEBUG, NO_GEN, TEST_SHRINES};
 
 use bevy::prelude::*;
 use bevy::sprite::MaterialMesh2dBundle;
@@ -106,6 +106,10 @@ impl Plugin for GenerationPlugin {
             .add_system(
                 update_wall
                     .in_base_set(CoreSet::PostUpdate)
+                    .run_if(in_state(GameState::Main).or_else(in_state(GameState::Initializing))),
+            )
+            .add_system(
+                Self::spawn_test_shrine_grid
                     .run_if(in_state(GameState::Main).or_else(in_state(GameState::Initializing))),
             )
             .add_system(
@@ -618,6 +622,10 @@ impl GenerationPlugin {
         if done_chunks_event.len() == 0 {
             return;
         }
+        // Debug shrine grid owns placement — skip unique objs / portal / shrine pre-roll.
+        if *TEST_SHRINES {
+            return;
+        }
         let max_obj_spawn_radius = ((ISLAND_SIZE / CHUNK_SIZE as f32) - 3.) as i32;
 
         // Spawn pet spawners if conditions are met
@@ -811,7 +819,7 @@ impl GenerationPlugin {
         mut done_event: EventWriter<DoneGeneratingEvent>,
         mut place_item_event: EventWriter<PlaceItemEvent>,
     ) {
-        if *NO_GEN {
+        if *NO_GEN || *TEST_SHRINES {
             return;
         }
         let mut total_coal = 0;
@@ -1101,6 +1109,92 @@ impl GenerationPlugin {
             }
 
             done_event.send(DoneGeneratingEvent { chunk_pos });
+        }
+    }
+
+    /// Done-state counterpart for a shrine listed in `shrine_counts`, if one exists.
+    fn shrine_done_variant(obj: WorldObject) -> Option<WorldObject> {
+        match obj {
+            WorldObject::CombatShrine => Some(WorldObject::CombatShrineDone),
+            WorldObject::GambleShrine => Some(WorldObject::GambleShrineDone),
+            WorldObject::MicrowaveShrine => Some(WorldObject::MicrowaveShrineDone),
+            WorldObject::HeirloomShrine => Some(WorldObject::HeirloomShrineDone),
+            WorldObject::BlacksmithMerchant => Some(WorldObject::BlacksmithMerchantDone),
+            WorldObject::ActiveSkillShrine => Some(WorldObject::ActiveSkillShrineDone),
+            WorldObject::CauldronShrine => Some(WorldObject::CauldronShrineDone),
+            WorldObject::ChaosTotem => Some(WorldObject::ChaosTotemDone),
+            WorldObject::WellShrine => Some(WorldObject::WellShrineDone),
+            WorldObject::WeaponShrine => Some(WorldObject::WeaponShrineDone),
+            WorldObject::ArmorShrine => Some(WorldObject::ArmorShrineDone),
+            WorldObject::AccessoryShrine => Some(WorldObject::AccessoryShrineDone),
+            _ => None,
+        }
+    }
+
+    /// `TEST_SHRINES=1`: once chunks around origin exist, place every Era1 `shrine_counts`
+    /// shrine (active + done) in a 5-row grid for visual / interaction debugging.
+    pub fn spawn_test_shrine_grid(
+        mut place_item_event: EventWriter<PlaceItemEvent>,
+        game: GameParam,
+        mut spawned: Local<bool>,
+    ) {
+        if !*TEST_SHRINES || *spawned {
+            return;
+        }
+        if game.get_chunk_entity(IVec2::ZERO).is_none() {
+            return;
+        }
+        if game.world_generation_params.shrine_counts.is_empty() {
+            return;
+        }
+
+        let mut shrines: Vec<WorldObject> = game
+            .world_generation_params
+            .shrine_counts
+            .keys()
+            .copied()
+            .collect();
+        // Stable left-to-right order (HashMap iteration order is otherwise arbitrary).
+        shrines.sort_by(|a, b| format!("{a:?}").cmp(&format!("{b:?}")));
+
+        const ROWS: usize = 5;
+        const SPACING_X: f32 = 64.;
+        const SPACING_Y: f32 = 96.;
+        // Start about one chunk west of origin so the row reads near the player spawn.
+        let start_x = -(CHUNK_SIZE as f32) * TILE_SIZE.x;
+        let start_y = ((ROWS - 1) as f32) * SPACING_Y * 0.5;
+
+        *spawned = true;
+        info!(
+            "[TEST_SHRINES] Spawning {} shrine types × {} rows (active+done pairs)",
+            shrines.len(),
+            ROWS
+        );
+
+        for row in 0..ROWS {
+            let y = start_y - row as f32 * SPACING_Y;
+            let mut col: usize = 0;
+            for shrine in &shrines {
+                let active_x = start_x + col as f32 * SPACING_X;
+                place_item_event.send(PlaceItemEvent {
+                    obj: *shrine,
+                    pos: Vec2::new(active_x, y),
+                    placed_by_player: false,
+                    override_existing_obj: true,
+                });
+                col += 1;
+
+                if let Some(done) = Self::shrine_done_variant(*shrine) {
+                    let done_x = start_x + col as f32 * SPACING_X;
+                    place_item_event.send(PlaceItemEvent {
+                        obj: done,
+                        pos: Vec2::new(done_x, y),
+                        placed_by_player: false,
+                        override_existing_obj: true,
+                    });
+                    col += 1;
+                }
+            }
         }
     }
 

@@ -6,6 +6,7 @@ use crate::{
     chaos::{ChaosTracker, EraTransitionState},
     client::is_not_paused,
     custom_commands::CommandsExt,
+    item::combat_shrine::CombatShrineMob,
     night::{InfiniteMode, InfiniteModeMob, NightTracker},
     player::Player,
     proto::proto_param::ProtoParam,
@@ -738,7 +739,7 @@ fn tick_enemy_despawn_timer(
     time: Res<Time>,
     mut despawn_timer: ResMut<EnemyDespawnTimer>,
     mut commands: Commands,
-    mobs: Query<(Entity, &GlobalTransform, &Mob)>,
+    mobs: Query<(Entity, &GlobalTransform, &Mob, Option<&CombatShrineMob>)>,
     player_t: Query<&GlobalTransform, With<Player>>,
     night_tracker: Res<NightTracker>,
     infinite_mode: Res<InfiniteMode>,
@@ -762,20 +763,25 @@ fn tick_enemy_despawn_timer(
         Ok(t) => t.translation().truncate(),
         Err(_) => return,
     };
+    let is_cap_mob = |m: &Mob| {
+        m != &Mob::RedMushling && m != &Mob::Hog && m != &Mob::Fairy && !m.is_boss()
+    };
+    // Combat-shrine elites still count toward the cap, but must never be culled mid-wave.
+    let count = mobs
+        .iter()
+        .filter(|(_, _, m, _)| is_cap_mob(m))
+        .count() as i32;
+    if count < max_mobs {
+        return;
+    }
     let mut eligible: Vec<(Entity, f32)> = mobs
         .iter()
-        .filter(|(_, _, m)| {
-            m != &&Mob::RedMushling && m != &&Mob::Hog && m != &&Mob::Fairy && !m.is_boss()
-        })
-        .map(|(e, t, _)| {
+        .filter(|(_, _, m, shrine)| is_cap_mob(m) && shrine.is_none())
+        .map(|(e, t, _, _)| {
             let dist = t.translation().truncate().distance(player_pos);
             (e, dist)
         })
         .collect();
-    let count = eligible.len() as i32;
-    if count < max_mobs {
-        return;
-    }
     eligible.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
     for (entity, _) in eligible.into_iter().skip(NUM_TO_SKIP).take(NUM_TO_DESPAWN) {
         commands.entity(entity).despawn_recursive();

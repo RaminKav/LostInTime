@@ -366,6 +366,7 @@ impl ItemActions {
                 ItemAction::TeleportHome => {
                     item_action_param.move_player_event.send(MovePlayerEvent {
                         pos: TileMapPosition::new(IVec2::new(0, 0), TilePos::new(0, 0)),
+                        clear_recall_history: true,
                     });
                     item_action_param.use_item_event.send(UseItemEvent(obj));
                 }

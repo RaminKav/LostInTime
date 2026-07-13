@@ -12,8 +12,11 @@ use super::{
 use crate::{
     animations::enemy_sprites::spawn_attack_warning_aseprite,
     assets::Graphics,
+    audio::{AudioSoundEffect, SoundSpawner},
     colors::{LIGHT_GREEN, WHITE},
     combat::damage_tracker::format_damage,
+    cursor::CursorPos,
+    inputs::MouselessModeState,
     player::achievements::{Achievement, Achievements},
     ScreenResolution,
 };
@@ -36,7 +39,6 @@ const ACHIEVEMENTS_COMPLETION_TRACKER_Y: f32 = 145.0;
 const ACHIEVEMENTS_COMPLETION_TRACKER_X: f32 = 225.0;
 const CONTAINER_Z: f32 = 0.0;
 const ROW_BG_Z: f32 = 1.0;
-const ROW_HITBOX_Z: f32 = 1.5;
 const ROW_TEXT_Z: f32 = 2.0;
 const BUTTON_Z: f32 = 3.0;
 
@@ -99,24 +101,6 @@ fn get_row_ui_element(row_index: usize, has_counter: bool) -> UIElement {
         (false, true) => UIElement::AchievementsRow1,
         (false, false) => UIElement::AchievementsRow2,
     }
-}
-
-fn row_texture_path(row_index: usize, has_counter: bool) -> &'static str {
-    let use_variant_one = row_index % 2 == 0;
-    match (has_counter, use_variant_one) {
-        (true, true) => "ui/AchievementsRowWithCounter1.png",
-        (true, false) => "ui/AchievementsRowWithCounter2.png",
-        (false, true) => "ui/AchievementsRow1.png",
-        (false, false) => "ui/AchievementsRow2.png",
-    }
-}
-
-fn load_row_texture(
-    asset_server: &AssetServer,
-    row_index: usize,
-    has_counter: bool,
-) -> Handle<Image> {
-    asset_server.load(row_texture_path(row_index, has_counter))
 }
 
 fn achievement_has_counter(achievement: Achievement) -> bool {
@@ -342,7 +326,7 @@ pub fn setup_achievements_ui(
         let row_bg = commands
             .spawn((
                 SpriteBundle {
-                    texture: load_row_texture(&asset_server, row_index, has_counter),
+                    texture: graphics.get_ui_element_texture(row_ui_element.clone()),
                     sprite: Sprite {
                         custom_size: Some(Vec2::new(434., ROW_HEIGHT)),
                         ..Default::default()
@@ -361,40 +345,16 @@ pub fn setup_achievements_ui(
                 row_ui_element,
                 AchievementRow { index: row_index },
                 AchievementRowBg,
-                Name::new("Achievement Row Background"),
-            ))
-            .id();
-        commands.entity(row_bg).set_parent(achievements_bg);
-
-        let row_clickable = commands
-            .spawn((
-                SpriteBundle {
-                    sprite: Sprite {
-                        custom_size: Some(Vec2::new(434., ROW_HEIGHT)),
-                        color: Color::rgba(0., 0., 0., 0.0),
-                        ..Default::default()
-                    },
-                    transform: Transform::from_translation(Vec3::new(0., y_pos, ROW_HITBOX_Z)),
-                    visibility: if row_visible {
-                        Visibility::Visible
-                    } else {
-                        Visibility::Hidden
-                    },
-                    ..Default::default()
-                },
-                RenderLayers::from_layers(&[3]),
-                AchievementsUI,
-                UIState::Achievements,
-                AchievementRow { index: row_index },
                 Interactable::default(),
                 Focusable {
                     group: UIState::Achievements,
                     index: row_index as u32,
                 },
-                Name::new("Achievement Row Clickable"),
+                Name::new("Achievement Row Background"),
             ))
             .id();
-        commands.entity(row_clickable).set_parent(achievements_bg);
+        commands.entity(row_bg).set_parent(achievements_bg);
+
         let name_pos = Vec3::new(-134., y_pos, ROW_TEXT_Z);
         let name_entity = commands
             .spawn((
@@ -687,21 +647,9 @@ pub fn update_achievements_page_display(
                 &mut Handle<Image>,
                 &mut UIElement,
                 &mut Visibility,
+                &Interactable,
             ),
             With<AchievementRowBg>,
-        >,
-        Query<
-            (&AchievementRow, &mut Visibility),
-            (
-                With<Interactable>,
-                Without<AchievementRowBg>,
-                Without<AchievementNameText>,
-                Without<AchievementDescText>,
-                Without<AchievementCheckbox>,
-                Without<AchievementCrossout>,
-                Without<AchievementRewardText>,
-                Without<AchievementProgressText>,
-            ),
         >,
     )>,
 ) {
@@ -880,31 +828,29 @@ pub fn update_achievements_page_display(
 
     {
         let mut row_bg_query = param_set.p6();
-        for (row, mut texture, mut ui_element, mut visibility) in row_bg_query.iter_mut() {
+        for (row, mut texture, mut ui_element, mut visibility, interactable) in
+            row_bg_query.iter_mut()
+        {
             match row_states.get(row.index).and_then(|state| *state) {
                 Some((achievement, _, _, _)) => {
                     let has_counter = achievement_has_counter(achievement);
-                    *ui_element = get_row_ui_element(row.index, has_counter);
-                    *texture = load_row_texture(&asset_server, row.index, has_counter);
+                    let base = get_row_ui_element(row.index, has_counter);
+                    let element = if matches!(interactable.current(), Interaction::Hovering) {
+                        base.get_hover_state().unwrap_or(base)
+                    } else {
+                        base
+                    };
+                    *texture = graphics.get_ui_element_texture(element.clone());
+                    *ui_element = element;
                     *visibility = Visibility::Visible;
                 }
                 None => {
-                    *ui_element = get_row_ui_element(row.index, false);
-                    *texture = load_row_texture(&asset_server, row.index, false);
+                    let base = get_row_ui_element(row.index, false);
+                    *texture = graphics.get_ui_element_texture(base.clone());
+                    *ui_element = base;
                     *visibility = Visibility::Hidden;
                 }
             }
-        }
-    }
-
-    {
-        let mut row_clickable_query = param_set.p7();
-        for (row, mut visibility) in row_clickable_query.iter_mut() {
-            *visibility = if row_states.get(row.index).and_then(|state| *state).is_some() {
-                Visibility::Visible
-            } else {
-                Visibility::Hidden
-            };
         }
     }
 
@@ -1003,6 +949,69 @@ pub fn update_achievements_navigation_buttons(
                 if matches!(interactable.current(), Interaction::Hovering) {
                     interactable.change(Interaction::None);
                 }
+            }
+        }
+    }
+}
+
+pub fn handle_achievement_row_hover(
+    cursor_pos: Res<CursorPos>,
+    mouseless: Res<MouselessModeState>,
+    focus_input: FocusInput,
+    graphics: Res<Graphics>,
+    computed_visibility: Query<&ComputedVisibility>,
+    mut row_queries: ParamSet<(
+        Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
+        Query<
+            (
+                Entity,
+                &mut Interactable,
+                &mut UIElement,
+                &mut Handle<Image>,
+            ),
+            With<AchievementRowBg>,
+        >,
+    )>,
+    mut commands: Commands,
+) {
+    let hit_entity = {
+        let q = row_queries.p0();
+        ui_helpers::pointcast_2d(&cursor_pos, &q, None, Some(&computed_visibility)).map(|h| h.0)
+    };
+    let focus_driving = mouseless.0 || cursor_pos.suppress_ui_hover;
+
+    for (entity, mut interactable, mut ui_element, mut texture) in row_queries.p1().iter_mut() {
+        if computed_visibility
+            .get(entity)
+            .ok()
+            .is_some_and(|visibility| !visibility.is_visible())
+        {
+            if matches!(interactable.current(), Interaction::Hovering) {
+                interactable.change(Interaction::None);
+                if let Some(normal) = ui_element.get_normal_state() {
+                    *texture = graphics.get_ui_element_texture(normal.clone());
+                    *ui_element = normal;
+                }
+            }
+            continue;
+        }
+
+        let is_hit = hit_entity == Some(entity);
+        let is_focused = focus_driving && focus_input.is_focused(entity);
+        if is_hit || is_focused {
+            if matches!(interactable.current(), Interaction::None) {
+                interactable.change(Interaction::Hovering);
+                if let Some(hover) = ui_element.get_hover_state() {
+                    *texture = graphics.get_ui_element_texture(hover.clone());
+                    *ui_element = hover;
+                    commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonHover, 0.05));
+                }
+            }
+        } else if matches!(interactable.current(), Interaction::Hovering) {
+            interactable.change(Interaction::None);
+            if let Some(normal) = ui_element.get_normal_state() {
+                *texture = graphics.get_ui_element_texture(normal.clone());
+                *ui_element = normal;
             }
         }
     }

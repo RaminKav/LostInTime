@@ -214,9 +214,13 @@ pub enum UIElement {
     UnknownUnlockIcon,
     AchievementsContainer,
     AchievementsRow1,
+    AchievementsRow1Hover,
     AchievementsRow2,
+    AchievementsRow2Hover,
     AchievementsRowWithCounter1,
+    AchievementsRowWithCounter1Hover,
     AchievementsRowWithCounter2,
+    AchievementsRowWithCounter2Hover,
     AchievementButton,
     AchievementButtonHover,
     CheckBox,
@@ -302,6 +306,14 @@ impl UIElement {
             UIElement::BestiaryPrevButton => Some(UIElement::BestiaryPrevButtonHover),
             UIElement::BestiaryNextButton => Some(UIElement::BestiaryNextButtonHover),
             UIElement::AchievementButton => Some(UIElement::AchievementButtonHover),
+            UIElement::AchievementsRow1 => Some(UIElement::AchievementsRow1Hover),
+            UIElement::AchievementsRow2 => Some(UIElement::AchievementsRow2Hover),
+            UIElement::AchievementsRowWithCounter1 => {
+                Some(UIElement::AchievementsRowWithCounter1Hover)
+            }
+            UIElement::AchievementsRowWithCounter2 => {
+                Some(UIElement::AchievementsRowWithCounter2Hover)
+            }
             _ => None,
         }
     }
@@ -340,6 +352,14 @@ impl UIElement {
             UIElement::BestiaryPrevButtonHover => Some(UIElement::BestiaryPrevButton),
             UIElement::BestiaryNextButtonHover => Some(UIElement::BestiaryNextButton),
             UIElement::AchievementButtonHover => Some(UIElement::AchievementButton),
+            UIElement::AchievementsRow1Hover => Some(UIElement::AchievementsRow1),
+            UIElement::AchievementsRow2Hover => Some(UIElement::AchievementsRow2),
+            UIElement::AchievementsRowWithCounter1Hover => {
+                Some(UIElement::AchievementsRowWithCounter1)
+            }
+            UIElement::AchievementsRowWithCounter2Hover => {
+                Some(UIElement::AchievementsRowWithCounter2)
+            }
             _ => None,
         }
     }
@@ -1499,6 +1519,105 @@ pub fn handle_inventory_consumable_right_click(
         }
     }
     mouse_input.clear_just_pressed(MouseButton::Right);
+}
+
+/// Controller X (`UiGamepadAction::Mark`) on a focused consumable — same as right-click consume.
+pub fn handle_inventory_focus_consume(
+    ui_gamepad_q: Query<&ActionState<UiGamepadAction>, With<UiGamepadInputMarker>>,
+    ui_focus: Res<crate::ui::focus::UiFocus>,
+    mouseless: Res<crate::inputs::MouselessModeState>,
+    cursor_pos: Res<CursorPos>,
+    mut params: ParamSet<(
+        GameParam,
+        Query<(Entity, &mut Interactable, &InventorySlotState)>,
+    )>,
+    inv: Query<&Inventory>,
+    inv_item_icons: Query<&ItemStack>,
+    dragging_query: Query<&DraggedItem>,
+    ui_state: Res<State<UIState>>,
+    proto: ProtoParam,
+    mut item_action_param: ItemActionParam,
+    mut commands: Commands,
+    carry: Res<ControllerCarry>,
+) {
+    if !ui_state.0.is_inv_open() || carry.active {
+        return;
+    }
+    if !focus_driving(&mouseless, &cursor_pos) {
+        return;
+    }
+    if dragging_query.iter().next().is_some() {
+        return;
+    }
+    let mark_pressed = ui_gamepad_q
+        .get_single()
+        .map(|a| a.just_pressed(UiGamepadAction::Mark))
+        .unwrap_or(false);
+    if !mark_pressed {
+        return;
+    }
+
+    let Some(target_e) = ui_focus.focused else {
+        return;
+    };
+
+    let consume_target = {
+        let inv_slots = params.p1();
+        let Ok((_, _, state)) = inv_slots.get(target_e) else {
+            return;
+        };
+        if !(state.r#type.is_inventory() || state.r#type.is_hotbar()) {
+            return;
+        }
+        let Some(item_entity) = state.item else {
+            return;
+        };
+        let Ok(item_stack) = inv_item_icons.get(item_entity) else {
+            return;
+        };
+        let Some(inv_item) = inv
+            .single()
+            .get_items_from_slot_type(state.r#type)
+            .items
+            .get(state.slot_index)
+            .and_then(|slot| slot.clone())
+        else {
+            return;
+        };
+        if inv_item.item_stack.obj_type != item_stack.obj_type {
+            return;
+        }
+        let Some(item_actions) =
+            proto.get_component::<ItemActions, _>(inv_item.item_stack.obj_type)
+        else {
+            return;
+        };
+        if !item_actions.allows_hotbar_band_placement() {
+            return;
+        }
+        Some((
+            inv_item.item_stack.obj_type,
+            inv_item.slot,
+            inv_item.item_stack.clone(),
+        ))
+    };
+
+    let Some((obj, slot, stack)) = consume_target else {
+        return;
+    };
+
+    let Some(item_actions) = proto.get_component::<ItemActions, _>(obj) else {
+        return;
+    };
+    item_actions.run_action(
+        obj,
+        slot,
+        Some(&stack),
+        &mut item_action_param,
+        &mut params.p0(),
+        &proto,
+        &mut commands,
+    );
 }
 
 pub fn handle_interaction_clicks(

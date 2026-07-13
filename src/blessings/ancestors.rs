@@ -175,10 +175,10 @@ impl AncestorBlessing {
 
     pub fn starting_chaos(&self) -> f32 {
         match self {
-            AncestorBlessing::PlasmaWeapon | AncestorBlessing::LaserBeam => 3.0,
+            AncestorBlessing::PlasmaWeapon | AncestorBlessing::LaserBeam => 1.0,
             AncestorBlessing::TwoRandomRareHeirlooms
             | AncestorBlessing::ThreeOfRandomUncommon
-            | AncestorBlessing::RandomRareEquipment => 2.0,
+            | AncestorBlessing::RandomRareEquipment => 1.0,
             AncestorBlessing::SpecificRareHeirloom | AncestorBlessing::FiveOfRandomCommon => 1.0,
             _ => 0.0,
         }

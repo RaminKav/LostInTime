@@ -19,7 +19,6 @@ use crate::{
     inventory::{Inventory, ItemStack},
     item::WorldObject,
     juice::bounce::BounceOnHit,
-    keybinds::{get_key_display_name, InputBinding, InputMappings},
     player::{
         currency::CoinCurrency,
         levels::PlayerLevel,
@@ -606,24 +605,48 @@ fn spawn_price_badge(
 
 /// First line of the merchant track info box (`"Press X:"`, `"Right click:"`, etc.).
 pub fn format_merchant_track_action_header(
-    keybinds: &InputMappings,
+    mouseless: &crate::inputs::MouselessModeState,
     active_device: &crate::gamepad_input::ActiveInputDevice,
 ) -> String {
-    // Keyed off the actively-*used* device, not mere OS-level gamepad connection — otherwise a
-    // stray/phantom "connected" controller the player never touches would permanently show the
-    // gamepad hint even in a pure mouse-and-keyboard session.
-    let action = if active_device.0 == crate::gamepad_input::InputDeviceKind::Gamepad {
+    // Mouse mark is always RMB in `handle_merchant_shop_interactions` (hardcoded). Do not use
+    // `shop_mark` here — it defaults to keyboard `KeyCode::X`, which produced a fake "Press X:"
+    // while `active_device` was already KeyboardMouse.
+    let use_controller_prompt = mouseless.0
+        || active_device.0 == crate::gamepad_input::InputDeviceKind::Gamepad;
+    let action = if use_controller_prompt {
         format!(
             "Press {}",
             get_gamepad_display_name(GamepadBindingButton::West)
         )
     } else {
-        match keybinds.get_shop_mark_key() {
-            InputBinding::MouseBinding(MouseButton::Right) => "Right click".to_string(),
-            binding => format!("Press {}", get_key_display_name(binding)),
-        }
+        "Right click".to_string()
     };
     format!("{action}:")
+}
+
+/// Keeps the merchant track info-box header in sync with keyboard vs controller input.
+pub fn update_merchant_track_info_box_label(
+    mouseless: Res<crate::inputs::MouselessModeState>,
+    active_device: Res<crate::gamepad_input::ActiveInputDevice>,
+    mut texts: Query<&mut Text, With<MerchantTrackInfoBoxHeaderText>>,
+    mut last_logged: Local<Option<(bool, crate::gamepad_input::InputDeviceKind, String)>>,
+) {
+    let header = format_merchant_track_action_header(&mouseless, &active_device);
+    let snapshot = (mouseless.0, active_device.0, header.clone());
+    if last_logged.as_ref() != Some(&snapshot) {
+        info!(
+            "[EssenceMarkPrompt] mouseless={} active_device={:?} → \"{}\"",
+            snapshot.0, snapshot.1, snapshot.2
+        );
+        *last_logged = Some(snapshot);
+    }
+    for mut text in texts.iter_mut() {
+        if let Some(section) = text.sections.first_mut() {
+            if section.value != header {
+                section.value = header.clone();
+            }
+        }
+    }
 }
 
 /// Reuses the tooltip info-box art to explain right-click tracking, placed to the right of
@@ -698,25 +721,6 @@ fn spawn_merchant_track_info_box(
             RenderLayers::from_layers(&[3]),
         ))
         .set_parent(box_e);
-}
-
-/// Keeps the merchant track info-box header in sync with keyboard vs controller input.
-pub fn update_merchant_track_info_box_label(
-    keybinds: Res<InputMappings>,
-    active_device: Res<crate::gamepad_input::ActiveInputDevice>,
-    mut texts: Query<&mut Text, With<MerchantTrackInfoBoxHeaderText>>,
-    mut last_label: Local<Option<String>>,
-) {
-    let header = format_merchant_track_action_header(&keybinds, &active_device);
-    if last_label.as_deref() == Some(header.as_str()) {
-        return;
-    }
-    *last_label = Some(header.clone());
-    for mut text in texts.iter_mut() {
-        if let Some(section) = text.sections.first_mut() {
-            section.value = header.clone();
-        }
-    }
 }
 
 fn spawn_section_label(
@@ -1391,7 +1395,7 @@ pub fn handle_essence_heirloom_tooltip(
                     tooltip_requests.send(HeirloomTooltipRequest::Show(HeirloomTooltipShow {
                         heirloom: hover.heirloom.clone(),
                         rarity: hover.rarity.clone(),
-                        position: Vec3::new(-130., 0., 15.),
+                        position: Vec3::new(-170., 0., 15.),
                         scaling_text: None,
                         trigger_count: 0,
                         ui_state: Some(UIState::Essence),
@@ -1558,6 +1562,8 @@ pub fn setup_essence_ui(
     resolution: Res<ScreenResolution>,
     coins: Res<CoinCurrency>,
     run_unlocks: Res<RunUnlockState>,
+    mouseless: Res<crate::inputs::MouselessModeState>,
+    active_device: Res<crate::gamepad_input::ActiveInputDevice>,
     orphan_reroll_flashes: Query<Entity, (With<MerchantCategoryReroll>, Without<UIState>)>,
     existing_ui: Query<Entity, With<EssenceUI>>,
 ) {
@@ -1654,7 +1660,7 @@ pub fn setup_essence_ui(
         &graphics,
         &asset_server,
         essence_ui_e,
-        "Right click:",
+        &format_merchant_track_action_header(&mouseless, &active_device),
     );
 
     for category in [
@@ -1780,6 +1786,7 @@ pub fn handle_submit_merchant_purchase(
     mut ui_dirty: ResMut<MerchantShopUiDirty>,
     mut inv: Query<&mut Inventory, With<Player>>,
     mut chaos_tracker: ResMut<ChaosTracker>,
+    mut analytics: EventWriter<crate::client::analytics::AnalyticsUpdateEvent>,
 ) {
     for purchase in ev.iter() {
         let slot_index = purchase.slot_index;
@@ -1849,6 +1856,7 @@ pub fn handle_submit_merchant_purchase(
                 }
             }
             MerchantItemKind::Equipment(stack) | MerchantItemKind::Material(stack) => {
+                let collected_obj = stack.obj_type;
                 let has_room = inv
                     .get_single()
                     .ok()
@@ -1867,6 +1875,12 @@ pub fn handle_submit_merchant_purchase(
                             &proto,
                         );
                     }
+                    // Direct inventory grant skips ground pickup — still credit Find* achievements.
+                    analytics.send(crate::client::analytics::AnalyticsUpdateEvent {
+                        update_type: crate::client::analytics::AnalyticsTrigger::ItemCollected(
+                            collected_obj,
+                        ),
+                    });
                 } else if let Ok((_, _, player_transform)) = params.p1().get_single() {
                     let player_pos = player_transform.translation().truncate();
                     let mut game = params.p0();

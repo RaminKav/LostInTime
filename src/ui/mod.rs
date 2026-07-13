@@ -511,7 +511,7 @@ pub const INV_CRAFTING_PANEL_INGREDIENT_SPACING_X: f32 = 32.;
 /// Panel-local Y (crafting panel) of the result slot (sits above the ingredient row).
 pub const INV_CRAFTING_PANEL_RESULT_Y: f32 = 41.0;
 /// Amount text offset beneath each ingredient icon (e.g. "2/3").
-pub const INV_CRAFTING_PANEL_INGREDIENT_COUNT_Y_OFFSET: f32 = -9.0;
+pub const INV_CRAFTING_PANEL_INGREDIENT_COUNT_Y_OFFSET: f32 = -7.0;
 /// Local Y nudge for ingredient item icons inside the slot (slot background stays put).
 pub const INV_CRAFTING_PANEL_INGREDIENT_ICON_Y_OFFSET: f32 = 4.0;
 
@@ -523,7 +523,7 @@ pub fn reset_blueprints_pagination_on_open(
 ) {
     pagination.page = 0;
 }
-
+    
 pub(crate) fn snap_world_to_pixel_grid(value: f32, scale: u32) -> f32 {
     let s = scale as f32;
     (value * s).round() / s
@@ -881,6 +881,10 @@ impl Plugin for UIPlugin {
                         .after(handle_interaction_clicks)
                         .before(handle_item_drop_clicks)
                         .run_if(not(in_state(UIState::Closed))),
+                    crate::ui::interactions::handle_inventory_focus_consume
+                        .after(handle_interaction_clicks)
+                        .before(handle_item_drop_clicks)
+                        .run_if(not(in_state(UIState::Closed))),
                     crate::ui::interactions::position_controller_carried_item
                         .after(handle_dragging)
                         .run_if(not(in_state(UIState::Closed))),
@@ -1123,6 +1127,12 @@ impl Plugin for UIPlugin {
                     update_scale_text.run_if(in_state(UIState::Options)),
                     handle_cursor_color_button_click.run_if(in_state(UIState::Options)),
                     update_cursor_color_preview.run_if(in_state(UIState::Options)),
+                )
+                    .after(crate::ui::focus::FocusConfirmSet),
+            )
+            .add_systems(
+                (
+                    handle_achievement_row_hover.run_if(in_state(UIState::Achievements)),
                     handle_achievement_row_clicks.run_if(in_state(UIState::Achievements)),
                 )
                     .after(crate::ui::focus::FocusConfirmSet),
@@ -1132,6 +1142,7 @@ impl Plugin for UIPlugin {
                     handle_options_tab_buttons.run_if(in_state(UIState::Options)),
                     sync_options_tab_visibility.run_if(in_state(UIState::Options)),
                     update_options_row_label_colors.run_if(in_state(UIState::Options)),
+                    sync_options_row_cursor.run_if(in_state(UIState::Options)),
                     handle_sensitivity_button_click.run_if(in_state(UIState::Options)),
                     update_sensitivity_text.run_if(in_state(UIState::Options)),
                 )
@@ -1678,7 +1689,7 @@ pub fn handle_new_ui_state(
     furnace_option: Option<Res<FurnaceContainer>>,
     mut hotbar_slots: Query<(Entity, &mut Visibility, &mut InventorySlotState)>,
     tip_boxes: Query<Entity, With<tips::TipBox>>,
-    minimap_open: Res<minimap::IslandMapOpen>,
+    mut minimap_open: ResMut<minimap::IslandMapOpen>,
     mut drop_filter_menu_open: ResMut<crate::inventory::MaterialDropFilterMenuOpen>,
     item_tooltips: Query<Entity, With<crate::ui::ItemOrRecipeTooltip>>,
     shop: Option<Res<EssenceShopChoices>>,
@@ -1701,6 +1712,12 @@ pub fn handle_new_ui_state(
     if next_ui == curr_ui_state.0 {
         next_ui_state.set(UIState::Closed);
         should_close_self = true;
+    }
+
+    // Opening any menu dismisses the island map — same mutual exclusion as inventory/options.
+    // (The map is a separate overlay resource, not a `UIState`, so it otherwise stacks.)
+    if !should_close_self && next_ui != UIState::Closed {
+        minimap_open.0 = false;
     }
 
     // Close the drop-filter side menu whenever the player leaves the standard Inventory state

@@ -105,6 +105,23 @@ pub enum TouchTriggerObjectAction {
     HeirloomChest,
 }
 
+/// Prevents immediately triggering a freshly-dropped chest (e.g. boss kill loot) for a short
+/// window so the player doesn't accidentally open it while still colliding with the drop.
+#[derive(Component)]
+pub struct ChestPickupDelay(pub Timer);
+
+impl Default for ChestPickupDelay {
+    fn default() -> Self {
+        Self(Timer::from_seconds(2.0, TimerMode::Once))
+    }
+}
+
+impl ChestPickupDelay {
+    pub fn finished(&self) -> bool {
+        self.0.finished()
+    }
+}
+
 impl ObjectAction {
     pub fn run_action(
         &self,
@@ -167,7 +184,10 @@ impl ObjectAction {
                 let pos = world_pos_to_tile_pos(*pos);
                 item_action_param
                     .move_player_event
-                    .send(MovePlayerEvent { pos });
+                    .send(MovePlayerEvent {
+                        pos,
+                        clear_recall_history: true,
+                    });
             }
             ObjectAction::DungeonTeleport => {
                 // Prevent dungeon entry if endless mode is active
@@ -616,7 +636,7 @@ impl ObjectAction {
                     WorldObject::Coin,
                     proto_ref,
                     spawn_pos,
-                    10,
+                    20,
                     None,
                 );
 

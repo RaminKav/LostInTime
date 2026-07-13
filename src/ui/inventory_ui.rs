@@ -1769,11 +1769,17 @@ fn inv_slot_local_position(
 }
 
 /// Stable [`Focusable::index`] for an inventory slot. Navigation itself is position-based, so
-/// this only drives default-focus (lowest index = main grid slot 0) and tie-breaks. Non-grid
-/// slot types get disjoint index ranges so they never collide with the main grid.
+/// this only drives default-focus (lowest index = visual top-left bag slot) and tie-breaks.
+/// Non-grid slot types get disjoint index ranges so they never collide with the main grid.
+///
+/// Main-grid memory layout is bottom-up (row 0 = hotbar band at the bottom of the panel), so
+/// Normal indices are remapped to visual top-to-bottom order — otherwise first focus lands on
+/// the bottom-left hotbar cell instead of the top-left bag cell.
 fn inv_focus_index(slot_type: InventorySlotType, slot_index: usize) -> u32 {
     let base = match slot_type {
-        InventorySlotType::Normal => 0,
+        InventorySlotType::Normal => {
+            return normal_slot_visual_focus_index(slot_index);
+        }
         InventorySlotType::Hotbar => INV_FOCUS_HOTBAR_BASE,
         InventorySlotType::Equipment => 100,
         InventorySlotType::Accessory => 110,
@@ -1787,6 +1793,16 @@ fn inv_focus_index(slot_type: InventorySlotType, slot_index: usize) -> u32 {
         InventorySlotType::Scrapper => 300,
     };
     base + slot_index as u32
+}
+
+/// Remap a main-grid slot index so visual top-left is focus index 0.
+fn normal_slot_visual_focus_index(slot_index: usize) -> u32 {
+    let cols = INVENTORY_GRID_COLS;
+    let rows = crate::inventory::INVENTORY_SIZE / cols;
+    let col = slot_index % cols;
+    let row_from_bottom = slot_index / cols;
+    let row_from_top = rows.saturating_sub(1).saturating_sub(row_from_bottom);
+    (row_from_top * cols + col) as u32
 }
 
 /// Focus index base for HUD hotbar slots (slot 0 → 90, slot 1 → 91, …).

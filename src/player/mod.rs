@@ -99,6 +99,10 @@ pub struct PlayerPlugin;
 
 pub struct MovePlayerEvent {
     pub pos: TileMapPosition,
+    /// When true, wipe Shadow Step [`rogue_skills::PositionHistory`] so recall
+    /// cannot rewind across dimension changes or scripted moves. Combat Teleport
+    /// sets this false so the pre-teleport trail stays available for Recall.
+    pub clear_recall_history: bool,
 }
 #[derive(Component, Debug)]
 pub struct Player;

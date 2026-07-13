@@ -22,7 +22,7 @@ use crate::{
     },
     item::{
         item_actions::ItemActionParam,
-        object_actions::TouchTriggerObjectAction,
+        object_actions::{ChestPickupDelay, TouchTriggerObjectAction},
         projectile::{
             AnimVisualCategory, EnemyProjectile, FromActiveSkill, PetProjectileMarker, Projectile,
             ProjectileState, RangedAttackEvent, ARROW_MAX_WORLD_OBJECT_PIERCES,
@@ -72,6 +72,8 @@ impl Plugin for CollisionPlugion {
                     .run_if(is_not_paused)
                     .after(CustomFlush)
                     .before(check_item_drop_collisions),
+                attach_chest_pickup_delay,
+                tick_chest_pickup_delay.run_if(is_not_paused),
             )
                 .in_set(OnUpdate(GameState::Main)),
         )
@@ -226,6 +228,24 @@ fn is_touch_trigger_chest(action: &TouchTriggerObjectAction) -> bool {
         action,
         TouchTriggerObjectAction::ItemChest | TouchTriggerObjectAction::HeirloomChest
     )
+}
+
+/// Fresh chest drops get a short delay before touch-open so boss loot isn't grabbed instantly.
+pub fn attach_chest_pickup_delay(
+    mut commands: Commands,
+    chests: Query<(Entity, &TouchTriggerObjectAction), Added<TouchTriggerObjectAction>>,
+) {
+    for (entity, action) in chests.iter() {
+        if is_touch_trigger_chest(action) {
+            commands.entity(entity).insert(ChestPickupDelay::default());
+        }
+    }
+}
+
+pub fn tick_chest_pickup_delay(time: Res<Time>, mut delays: Query<&mut ChestPickupDelay>) {
+    for mut delay in delays.iter_mut() {
+        delay.0.tick(time.delta());
+    }
 }
 
 fn check_projectile_hit_mob_collisions(
@@ -995,6 +1015,7 @@ pub fn check_object_trigger_collisions(
     >,
     rapier_context: Res<RapierContext>,
     items_query: Query<&TouchTriggerObjectAction>,
+    chest_delays: Query<&ChestPickupDelay>,
     item_chest_state: Option<Res<ItemChestState>>,
     game: GameParam,
     mut item_action_param: ItemActionParam,
@@ -1014,6 +1035,13 @@ pub fn check_object_trigger_collisions(
     let player_pos = player_txfm.single().translation.truncate();
     let mut opened_chest = false;
 
+    let chest_ready = |entity: Entity| -> bool {
+        chest_delays
+            .get(entity)
+            .map(|d| d.finished())
+            .unwrap_or(true)
+    };
+
     // Collider-backed triggers (chest drops, PinkFlower, etc.): Rapier overlap matches sensor position.
     'collider_triggers: for (e1, e2, _) in rapier_context.intersections_with(player_e) {
         for (e1, e2) in [(e1, e2), (e2, e1)] {
@@ -1023,7 +1051,7 @@ pub fn check_object_trigger_collisions(
             }
             let action = items_query.get(e2).unwrap();
 
-            if is_touch_trigger_chest(action) && opened_chest {
+            if is_touch_trigger_chest(action) && (opened_chest || !chest_ready(e2)) {
                 continue;
             }
 
@@ -1050,6 +1078,10 @@ pub fn check_object_trigger_collisions(
     for (entity, obj_txfm, action) in trigger_objects_no_collider.iter() {
         let obj_pos = obj_txfm.translation.truncate();
         if player_pos.distance_squared(obj_pos) > ITEM_PICKUP_DISTANCE * ITEM_PICKUP_DISTANCE {
+            continue;
+        }
+
+        if is_touch_trigger_chest(action) && !chest_ready(entity) {
             continue;
         }
 

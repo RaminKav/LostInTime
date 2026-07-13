@@ -117,9 +117,7 @@ pub fn is_shrine_repairing(
 fn is_repeatable_shrine(obj: WorldObject) -> bool {
     matches!(
         obj,
-        WorldObject::BlacksmithMerchant
-            | WorldObject::CauldronShrine
-            | WorldObject::WellShrine
+        WorldObject::BlacksmithMerchant | WorldObject::CauldronShrine | WorldObject::WellShrine
     )
 }
 
@@ -132,7 +130,7 @@ fn eye_tag_after_successful_repair(obj: WorldObject) -> &'static str {
 }
 
 /// Diameter of the repair ring (player must stay inside this circle).
-pub const SHRINE_REPAIR_RING_DIAMETER: f32 = 96.;
+pub const SHRINE_REPAIR_RING_DIAMETER: f32 = 128.;
 const SHRINE_REPAIR_RING_RADIUS: f32 = SHRINE_REPAIR_RING_DIAMETER * 0.5;
 /// Parent-local Z: under the shrine sprite (local 0) / eye (+1), above grass patches (~-12).
 /// Do not use [`YSort`] on the child — absolute depth stacked on the parent's Z draws above the shrine.
@@ -631,6 +629,7 @@ pub fn tick_shrine_repair_channel(
             Some(eye_tag_after_successful_repair(*obj)),
         );
         // Activate only after FlashGreen completes (Done for one-shots, Idle for repeatables).
+        // Interact is blocked while this component is present (see handle_interact_objects).
         commands.entity(shrine_e).insert(PendingShrineRepairFinish {
             feet_pos: channel.shrine_feet_pos,
             obj: *obj,

@@ -1183,7 +1183,7 @@ impl Heirloom {
             Heirloom::IceStaffAoE => 7,
             Heirloom::FrozenAoE => 7,
             Heirloom::IceStaffFloor => 5,
-            Heirloom::ViralVenum => 5,
+            Heirloom::ViralVenum => 2,
             Heirloom::HealEcho => 7,
             Heirloom::HealSummons => 7,
             Heirloom::SkillEcho => 3,
@@ -1945,7 +1945,7 @@ impl Heirloom {
             ],
             Heirloom::KillLightning => vec![
                 "Killing an enemy".to_string(),
-                "has a 10% chance".to_string(),
+                "has a 7% chance".to_string(),
                 "to spawn a lightning".to_string(),
                 "strike.".to_string(),
                 format!("Costs {} mana", Heirloom::KillLightning.get_mana_cost()),

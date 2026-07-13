@@ -238,7 +238,12 @@ pub fn handle_teleport(
             commands.entity(e).insert(JustTeleported);
         }
 
-        move_player.send(MovePlayerEvent { pos: dest_tile });
+        // Keep Shadow Step trail: clearing would wipe the pre-teleport samples
+        // and make immediate Recall only retrace the landing tile.
+        move_player.send(MovePlayerEvent {
+            pos: dest_tile,
+            clear_recall_history: false,
+        });
     }
 
     if teleport_state.timer.percent() != 0. {

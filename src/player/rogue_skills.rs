@@ -630,16 +630,18 @@ pub fn tick_position_history(
     hist.samples.push(pos);
 }
 
-/// Clears the recall history after any forced player teleport so we don't
-/// rewind across dimension changes or scripted moves.
+/// Clears the recall history after forced player teleports that opt in via
+/// [`MovePlayerEvent::clear_recall_history`] (dimension changes, scripted moves,
+/// home teleports). Combat Teleport leaves history intact so Shadow Step can
+/// rewind through the jump.
 pub fn clear_position_history_on_move(
     mut move_events: bevy::ecs::event::EventReader<super::MovePlayerEvent>,
     mut q: Query<&mut PositionHistory, With<Player>>,
 ) {
-    if move_events.is_empty() {
+    let should_clear = move_events.iter().any(|ev| ev.clear_recall_history);
+    if !should_clear {
         return;
     }
-    move_events.clear();
     if let Ok(mut hist) = q.get_single_mut() {
         hist.clear();
     }

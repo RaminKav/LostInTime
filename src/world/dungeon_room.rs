@@ -278,6 +278,7 @@ fn spawn_dungeon_room(
     // Move the player to the room's spawn point.
     move_player_event.send(crate::player::MovePlayerEvent {
         pos: world_pos_to_tile_pos(PLAYER_SPAWN),
+        clear_recall_history: true,
     });
 
     // Room art.

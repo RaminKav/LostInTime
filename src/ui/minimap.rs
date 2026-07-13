@@ -363,6 +363,8 @@ fn toggle_island_map(
     mouse_input: Res<Input<MouseButton>>,
     mut map_open: ResMut<IslandMapOpen>,
     keybinds: Res<InputMappings>,
+    curr_ui_state: Res<State<super::UIState>>,
+    mut next_ui_state: ResMut<NextState<super::UIState>>,
     gamepad_action_q: Query<
         &leafwing_input_manager::prelude::ActionState<crate::gamepad_input::GamepadAction>,
         With<Player>,
@@ -373,7 +375,13 @@ fn toggle_island_map(
         crate::gamepad_input::GamepadAction::ToggleMap,
     );
     if keybinds.check_map_input(&key_input, &mouse_input) || gamepad_pressed {
+        let opening = !map_open.0;
         map_open.0 = !map_open.0;
+        // Opening the map should dismiss other menus the same way inventory/options do —
+        // otherwise the island map stacks on top of whatever UI was already open.
+        if opening && curr_ui_state.0 != super::UIState::Closed {
+            next_ui_state.set(super::UIState::Closed);
+        }
     }
 }
 

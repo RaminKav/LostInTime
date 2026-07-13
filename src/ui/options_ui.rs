@@ -2,6 +2,7 @@ use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 use bevy::render::view::RenderLayers;
 use bevy::sprite::Anchor;
+use bevy_aseprite::{anim::AsepriteAnimation, aseprite, AsepriteBundle};
 
 use std::collections::HashSet;
 use std::fs::File;
@@ -424,6 +425,19 @@ pub struct OptionsFocusRow(pub OptionsRowKind);
 pub struct OptionsRowLabel {
     pub row: Entity,
 }
+
+aseprite!(pub OptionsCursor, "textures/effects/OptionsCursor.aseprite");
+
+/// 8×8 cursor shown left of a focused/hovered options row label.
+#[derive(Component)]
+pub(crate) struct OptionsRowCursor {
+    label: Entity,
+}
+
+const OPTIONS_CURSOR_SIZE: f32 = 8.;
+const OPTIONS_CURSOR_GAP: f32 = 4.;
+/// Offset from the label's left edge (CenterLeft) to the cursor center.
+const OPTIONS_CURSOR_OFFSET_X: f32 = -(OPTIONS_CURSOR_SIZE * 0.5 + OPTIONS_CURSOR_GAP);
 
 /// Child control (e.g. stepper arrow) belonging to a row focus target.
 #[derive(Component, Clone, Copy)]
@@ -1496,7 +1510,7 @@ fn spawn_controls_tab_content(
             asset_server,
             KeyBindType::ActiveSkill(slot),
             Vec3::new(skills_x, skills_y, z),
-            Vec3::new(skills_x + 148., skills_y - 3.5, z),
+            Vec3::new(skills_x + 130., skills_y - 3.5, z),
             keybinds,
             tab,
             active,
@@ -1524,7 +1538,7 @@ fn spawn_controls_tab_content(
             asset_server,
             KeyBindType::Hotbar(slot),
             Vec3::new(skills_x, skills_y, z),
-            Vec3::new(skills_x + 148., skills_y - 3.5, z),
+            Vec3::new(skills_x + 130., skills_y - 3.5, z),
             keybinds,
             tab,
             active,
@@ -1557,7 +1571,7 @@ fn spawn_controls_tab_content(
             asset_server,
             bind_type,
             Vec3::new(other_x, other_y, z),
-            Vec3::new(other_x + 148., other_y - 3.5, z),
+            Vec3::new(other_x + 130., other_y - 3.5, z),
             keybinds,
             tab,
             active,
@@ -1975,7 +1989,7 @@ fn spawn_keybind_row(
         KeyBindType::Minimap => ("Map:", keybinds.get_minimap_key()),
         KeyBindType::Interact => ("Interact:", keybinds.get_interact_key()),
         KeyBindType::AttackAutoTarget => {
-            ("Attack Auto Target:", keybinds.get_attack_auto_target_key())
+            ("Attack Auto Aim:", keybinds.get_attack_auto_target_key())
         }
     };
 
@@ -2041,7 +2055,7 @@ fn spawn_keybind_row(
         Name::new(format!("Keybind Row Label {:?}", bind_type)),
     ));
 
-    let current_key_pos = Vec3::new(label_pos.x + 90., label_pos.y, label_pos.z);
+    let current_key_pos = Vec3::new(label_pos.x + 72., label_pos.y, label_pos.z);
     commands.spawn((
         Text2dBundle {
             text: Text::from_section(
@@ -3289,6 +3303,80 @@ fn options_row_entity(
     }
 }
 
+/// Hover hit for a content row label. Matches [`spawn_stepper_row_focus`] bounds so checkbox /
+/// keybind rows highlight when the pointer is over the text, not only the tiny control sprite.
+fn options_row_under_label_cursor(
+    cursor_pos: &CursorPos,
+    labels: &Query<(Entity, &OptionsRowLabel, &GlobalTransform)>,
+    computed_visibility: &Query<&ComputedVisibility>,
+) -> Option<Entity> {
+    if !cursor_pos.ui_hover_hit_allowed() {
+        return None;
+    }
+
+    const ROW_SIZE: Vec2 = Vec2::new(150., 16.);
+    const ROW_CENTER_OFFSET_X: f32 = 65.;
+
+    let mut hit = None;
+    for (label_entity, label, gt) in labels.iter() {
+        if computed_visibility
+            .get(label_entity)
+            .ok()
+            .is_some_and(|visibility| !visibility.is_visible())
+        {
+            continue;
+        }
+
+        let pos = gt.translation();
+        let center_x = pos.x + ROW_CENTER_OFFSET_X;
+        let center_y = pos.y;
+        let left = center_x - ROW_SIZE.x * 0.5;
+        let right = center_x + ROW_SIZE.x * 0.5;
+        let bottom = center_y - ROW_SIZE.y * 0.5;
+        let top = center_y + ROW_SIZE.y * 0.5;
+        if (left..=right).contains(&cursor_pos.ui_coords.x)
+            && (bottom..=top).contains(&cursor_pos.ui_coords.y)
+        {
+            hit = Some(label.row);
+        }
+    }
+    hit
+}
+
+fn highlighted_options_rows(
+    ui_focus: &UiFocus,
+    cursor_pos: &Res<CursorPos>,
+    computed_visibility: &Query<&ComputedVisibility>,
+    ui_sprites: &Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
+    focus_rows: &Query<Entity, With<OptionsFocusRow>>,
+    row_members: &Query<&OptionsRowMember>,
+    visibility: &Query<&Visibility>,
+    row_labels: &Query<(Entity, &OptionsRowLabel, &GlobalTransform)>,
+) -> HashSet<Entity> {
+    let mut highlighted: HashSet<Entity> = HashSet::new();
+
+    if let Some(focused) = ui_focus.focused {
+        if focus_entity_visible(focused, visibility) {
+            if let Some(row) = options_row_entity(focused, focus_rows, row_members) {
+                highlighted.insert(row);
+            }
+        }
+    }
+
+    if let Some((hit_entity, _, _)) = options_pointcast(cursor_pos, ui_sprites, computed_visibility)
+    {
+        if let Some(row) = options_row_entity(hit_entity, focus_rows, row_members) {
+            highlighted.insert(row);
+        }
+    }
+
+    if let Some(row) = options_row_under_label_cursor(cursor_pos, row_labels, computed_visibility) {
+        highlighted.insert(row);
+    }
+
+    highlighted
+}
+
 /// Highlights the label of whichever options row is focused or mouse-hovered.
 pub fn update_options_row_label_colors(
     ui_focus: Res<UiFocus>,
@@ -3296,27 +3384,21 @@ pub fn update_options_row_label_colors(
     computed_visibility: Query<&ComputedVisibility>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     mut row_labels: Query<(&OptionsRowLabel, &mut Text), With<OptionsRowLabel>>,
+    label_transforms: Query<(Entity, &OptionsRowLabel, &GlobalTransform)>,
     focus_rows: Query<Entity, With<OptionsFocusRow>>,
     row_members: Query<&OptionsRowMember>,
     visibility: Query<&Visibility>,
 ) {
-    let mut highlighted: HashSet<Entity> = HashSet::new();
-
-    if let Some(focused) = ui_focus.focused {
-        if focus_entity_visible(focused, &visibility) {
-            if let Some(row) = options_row_entity(focused, &focus_rows, &row_members) {
-                highlighted.insert(row);
-            }
-        }
-    }
-
-    if let Some((hit_entity, _, _)) =
-        options_pointcast(&cursor_pos, &ui_sprites, &computed_visibility)
-    {
-        if let Some(row) = options_row_entity(hit_entity, &focus_rows, &row_members) {
-            highlighted.insert(row);
-        }
-    }
+    let highlighted = highlighted_options_rows(
+        &ui_focus,
+        &cursor_pos,
+        &computed_visibility,
+        &ui_sprites,
+        &focus_rows,
+        &row_members,
+        &visibility,
+        &label_transforms,
+    );
 
     for (label, mut text) in row_labels.iter_mut() {
         if text.sections.is_empty() {
@@ -3327,6 +3409,85 @@ pub fn update_options_row_label_colors(
         } else {
             WHITE
         };
+    }
+}
+
+/// Spawns/moves `OptionsCursor` to the left of focused or hovered option row labels.
+pub fn sync_options_row_cursor(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    ui_focus: Res<UiFocus>,
+    cursor_pos: Res<CursorPos>,
+    computed_visibility: Query<&ComputedVisibility>,
+    ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
+    focus_rows: Query<Entity, With<OptionsFocusRow>>,
+    row_members: Query<&OptionsRowMember>,
+    visibility: Query<&Visibility>,
+    row_labels: Query<(Entity, &OptionsRowLabel, &GlobalTransform)>,
+    mut existing: Query<(Entity, &OptionsRowCursor, &mut Transform)>,
+) {
+    let highlighted = highlighted_options_rows(
+        &ui_focus,
+        &cursor_pos,
+        &computed_visibility,
+        &ui_sprites,
+        &focus_rows,
+        &row_members,
+        &visibility,
+        &row_labels,
+    );
+
+    let mut desired_labels: HashSet<Entity> = HashSet::new();
+    let mut label_pos: Vec<(Entity, Vec3)> = Vec::new();
+    for (label_entity, label, gt) in row_labels.iter() {
+        if !highlighted.contains(&label.row) {
+            continue;
+        }
+        desired_labels.insert(label_entity);
+        label_pos.push((label_entity, gt.translation()));
+    }
+
+    let mut kept: HashSet<Entity> = HashSet::new();
+    for (cursor_entity, cursor, mut transform) in existing.iter_mut() {
+        if !desired_labels.contains(&cursor.label) {
+            commands.entity(cursor_entity).despawn_recursive();
+            continue;
+        }
+        kept.insert(cursor.label);
+        if let Some((_, pos)) = label_pos.iter().find(|(e, _)| *e == cursor.label) {
+            *transform = Transform::from_translation(Vec3::new(
+                pos.x + OPTIONS_CURSOR_OFFSET_X,
+                pos.y,
+                pos.z + 1.,
+            ));
+        }
+    }
+
+    for (label_entity, pos) in label_pos {
+        if kept.contains(&label_entity) {
+            continue;
+        }
+        let mut animation = AsepriteAnimation::from(OptionsCursor::tags::SELECT);
+        animation.play();
+        commands.spawn((
+            AsepriteBundle {
+                aseprite: asset_server.load(OptionsCursor::PATH),
+                animation,
+                transform: Transform::from_translation(Vec3::new(
+                    pos.x + OPTIONS_CURSOR_OFFSET_X,
+                    pos.y,
+                    pos.z + 1.,
+                )),
+                ..Default::default()
+            },
+            RenderLayers::from_layers(&[3]),
+            OptionsUI,
+            UIState::Options,
+            OptionsRowCursor {
+                label: label_entity,
+            },
+            Name::new("Options Row Cursor"),
+        ));
     }
 }
 

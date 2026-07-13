@@ -144,6 +144,11 @@ lazy_static! {
     pub static ref NO_GEN: bool = env::var("NO_GEN").is_ok();
 }
 lazy_static! {
+    /// Skip normal overworld object generation and spawn a debug grid of every Era1 shrine
+    /// (active + done) for visual / interaction testing. See `spawn_test_shrine_grid`.
+    pub static ref TEST_SHRINES: bool = env::var("TEST_SHRINES").is_ok();
+}
+lazy_static! {
     pub static ref MINIMAP: bool = true;
     // pub static ref MINIMAP: bool = env::var("MINIMAP").is_ok();
 }

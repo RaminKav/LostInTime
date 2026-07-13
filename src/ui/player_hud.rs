@@ -1434,6 +1434,7 @@ pub fn handle_heirloom_hud_tooltip(
     trigger_counts: Res<crate::player::skills::HeirloomTriggerCounts>,
     res: Res<ScreenResolution>,
     ui_focus: Res<UiFocus>,
+    ui_state: Res<State<UIState>>,
 ) {
     use super::interactions::Interaction;
 
@@ -1517,11 +1518,16 @@ pub fn handle_heirloom_hud_tooltip(
             let trigger_count = trigger_counts.get(heirloom);
 
             let (_, tooltip_size) = heirloom.get_ui_element(rarity);
-            let tooltip_pos = heirloom_hud_hover_tooltip_position(
+            let mut tooltip_pos = heirloom_hud_hover_tooltip_position(
                 *icon_pos,
                 tooltip_size.x * 0.5,
                 res.game_width,
             );
+            // Controller/mouseless pause focus sits the card slightly lower so it clears the
+            // HUD focus indicator and reads as "under" the selected icon.
+            if ui_state.0 == UIState::Pause {
+                tooltip_pos.y -= 10.;
+            }
             tooltip_requests.send(HeirloomTooltipRequest::Show(HeirloomTooltipShow {
                 heirloom: heirloom.clone(),
                 rarity,
@@ -1560,10 +1566,17 @@ fn set_interactable_hover(is_hit: bool, interactable: &mut Interactable) {
 /// Z is a fixed depth above [`Z_DEPTH_HUD_ORB_TRACKERS_FOREGROUND`] (rather than
 /// `icon_pos.z + HUD_SKILL_TOOLTIP_Z_BUMP`) so this tooltip always renders on top of the HP/MP
 /// tracker breakdown panels — both can be visible at once in the gamepad pause overlay.
-fn hud_skill_tooltip_world_position(icon_pos: Vec3, ui_scale: u32) -> Vec3 {
+///
+/// When `pause_menu` is true (gamepad pause overlay), the card is nudged up so it clears the
+/// selected-indicator and sits cleanly above the skill row.
+fn hud_skill_tooltip_world_position(icon_pos: Vec3, ui_scale: u32, pause_menu: bool) -> Vec3 {
+    let pause_y_nudge = if pause_menu { 32. } else { 0. };
     Vec3::new(
         super::snap_world_to_pixel_grid(icon_pos.x + HUD_SKILL_TOOLTIP_OFFSET_X, ui_scale),
-        super::snap_world_to_pixel_grid(icon_pos.y + HUD_SKILL_TOOLTIP_OFFSET_Y, ui_scale),
+        super::snap_world_to_pixel_grid(
+            icon_pos.y + HUD_SKILL_TOOLTIP_OFFSET_Y + pause_y_nudge,
+            ui_scale,
+        ),
         Z_DEPTH_HUD_ORB_TRACKERS_FOREGROUND + HUD_SKILL_TOOLTIP_Z_BUMP,
     )
 }
@@ -1856,6 +1869,7 @@ pub fn handle_active_skill_hud_tooltip(
     >,
     meteor_shower_state: Query<&crate::player::skills::MeteorShowerSkillState, With<Player>>,
     ui_focus: Res<UiFocus>,
+    ui_state: Res<State<UIState>>,
 ) {
     // First, do hit detection and update interactable states
     let hit_entity =
@@ -1909,7 +1923,11 @@ pub fn handle_active_skill_hud_tooltip(
         let (container, _) = spawn_skill_tooltip_shell(
             &mut commands,
             &graphics,
-            hud_skill_tooltip_world_position(icon_pos, res.scale),
+            hud_skill_tooltip_world_position(
+                icon_pos,
+                res.scale,
+                ui_state.0 == UIState::Pause,
+            ),
             "ACTIVE SKILL TOOLTIP",
         );
         commands
@@ -4634,6 +4652,8 @@ pub fn handle_pet_skill_hud_tooltip(
     existing_tooltips: Query<Entity, With<PetSkillHudTooltip>>,
     mut last_hovered: Local<Option<Pet>>,
     res: Res<ScreenResolution>,
+    ui_focus: Res<UiFocus>,
+    ui_state: Res<State<UIState>>,
 ) {
     let hit_entity =
         super::ui_helpers::pointcast_2d(&cursor_pos, &hit_detection_sprites, None, None);
@@ -4641,7 +4661,8 @@ pub fn handle_pet_skill_hud_tooltip(
         let is_hit = hit_entity
             .as_ref()
             .map(|(e, _, _)| *e == entity)
-            .unwrap_or(false);
+            .unwrap_or(false)
+            || ui_focus.is_focused(entity);
         set_interactable_hover(is_hit, &mut interactable);
     }
 
@@ -4673,7 +4694,7 @@ pub fn handle_pet_skill_hud_tooltip(
         let (container, _) = spawn_skill_tooltip_shell(
             &mut commands,
             &graphics,
-            hud_skill_tooltip_world_position(pos, res.scale),
+            hud_skill_tooltip_world_position(pos, res.scale, ui_state.0 == UIState::Pause),
             "PET SKILL TOOLTIP",
         );
         commands.entity(container).insert(PetSkillHudTooltip);
