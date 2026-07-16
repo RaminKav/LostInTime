@@ -1,5 +1,4 @@
 use bevy::prelude::*;
-use bevy_proto::prelude::{ReflectSchematic, Schematic};
 
 use crate::assets::SpriteAnchor;
 
@@ -11,8 +10,8 @@ impl Plugin for YSortPlugin {
     }
 }
 
-#[derive(Component, Reflect, Schematic, FromReflect, Default)]
-#[reflect(Component, Schematic)]
+#[derive(Component, Reflect, FromReflect, Default, Clone, Debug)]
+#[reflect(Component)]
 pub struct YSort(pub f32);
 
 /// Depth used by [`Transparent2d`] for Y-sorted world sprites and Hanabi FX.

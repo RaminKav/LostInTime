@@ -1,5 +1,4 @@
 use bevy::prelude::*;
-use bevy_proto::prelude::{ReflectSchematic, Schematic};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -29,8 +28,8 @@ pub struct PlayerLevel {
     pub xp: u32,
     pub next_level_xp: u32,
 }
-#[derive(Component, Reflect, FromReflect, Schematic, Default)]
-#[reflect(Component, Schematic)]
+#[derive(Component, Reflect, FromReflect, Default, Clone, Debug)]
+#[reflect(Component)]
 pub struct ExperienceReward(pub u32);
 
 #[derive(Component)]

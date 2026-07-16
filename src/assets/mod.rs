@@ -9,7 +9,6 @@ use bevy::render::render_resource::{AsBindGroup, Extent3d, TextureDimension, Tex
 use bevy::sprite::{Material2d, Material2dPlugin};
 use bevy::utils::HashMap;
 use bevy_aseprite::Aseprite;
-use bevy_proto::prelude::{ReflectSchematic, Schematic};
 use serde::Deserialize;
 use strum::IntoEnumIterator;
 
@@ -107,8 +106,8 @@ pub struct ClassPetData {
     pub pets: HashMap<Pet, PetData>,
 }
 
-#[derive(Component, Reflect, FromReflect, Schematic, Default)]
-#[reflect(Component, Schematic)]
+#[derive(Component, Reflect, FromReflect, Default, Clone, Debug)]
+#[reflect(Component)]
 pub enum SpriteSize {
     #[default]
     Small,
@@ -121,8 +120,8 @@ impl SpriteSize {
     }
 }
 
-#[derive(Component, Reflect, FromReflect, Schematic, Default)]
-#[reflect(Component, Schematic)]
+#[derive(Component, Reflect, FromReflect, Default, Clone, Debug)]
+#[reflect(Component)]
 pub struct SpriteAnchor(pub Vec2);
 
 /// Loaded from sprites_desc.ron and contains the description of every sprite in the game

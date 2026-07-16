@@ -11,11 +11,6 @@ bevy_asset_loader = "0.16.0"
 bevy_rapier2d = { version = "0.21.0", features = ["simd-stable", "parallel"] }
 bevy_ecs_tilemap = "0.10.0"
 bevy-inspector-egui = "0.18"
-bevy_proto = { version = "0.10.0", features = [
-    "bevy_sprite",
-    "ron",
-    "bevy_render",
-] }
 seldom_state = "0.6.3"
 ron = "0.8.0"
 serde = "1.0.136"

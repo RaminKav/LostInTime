@@ -1,7 +1,6 @@
 use bevy::{ecs::system::SystemParam, prelude::*, render::view::RenderLayers, sprite::Anchor};
 
 use bevy_aseprite::{anim::AsepriteAnimation, aseprite, Aseprite, AsepriteBundle};
-use bevy_proto::prelude::ProtoCommands;
 
 aseprite!(pub CraftingArrowAse, "textures/effects/CraftingArrow.aseprite");
 
@@ -2262,7 +2261,6 @@ pub fn handle_dev_button_clicks(
     mut commands: Commands,
     mut flash_event: EventWriter<FlashExpBarEvent>,
     mut game: GameParam,
-    mut proto_commands: ProtoCommands,
     proto: ProtoParam,
     mut dimension_spawn: EventWriter<DimensionSpawnEvent>,
     mut endless_params: DevEndlessButtonParams,
@@ -2307,7 +2305,7 @@ pub fn handle_dev_button_clicks(
                         });
                     }
                     DevButtonAction::SpawnChest => {
-                        let _ = proto_commands.spawn_item_from_proto(
+                        let _ = commands.spawn_item_from_proto(
                             WorldObject::ChestBlock,
                             &proto,
                             spawn_pos,
@@ -2316,7 +2314,7 @@ pub fn handle_dev_button_clicks(
                         );
                     }
                     DevButtonAction::SpawnChestHeirloom => {
-                        let _ = proto_commands.spawn_item_from_proto(
+                        let _ = commands.spawn_item_from_proto(
                             WorldObject::HeirloomChest,
                             &proto,
                             spawn_pos,
@@ -2325,7 +2323,7 @@ pub fn handle_dev_button_clicks(
                         );
                     }
                     DevButtonAction::SpawnTome => {
-                        let _ = proto_commands.spawn_item_from_proto(
+                        let _ = commands.spawn_item_from_proto(
                             WorldObject::UpgradeTome,
                             &proto,
                             spawn_pos,
@@ -2334,7 +2332,7 @@ pub fn handle_dev_button_clicks(
                         );
                     }
                     DevButtonAction::SpawnOrb => {
-                        let _ = proto_commands.spawn_item_from_proto(
+                        let _ = commands.spawn_item_from_proto(
                             WorldObject::OrbOfTransformation,
                             &proto,
                             spawn_pos,
@@ -2374,7 +2372,7 @@ pub fn handle_dev_button_clicks(
                         });
                     }
                     DevButtonAction::DropDungeonKey => {
-                        let _ = proto_commands.spawn_item_from_proto(
+                        let _ = commands.spawn_item_from_proto(
                             WorldObject::Key,
                             &proto,
                             spawn_pos,
@@ -2410,14 +2408,13 @@ pub fn apply_grant_heirloom_dev(
     mut skill_queue: ResMut<HeirloomChoiceQueue>,
     mut commands: Commands,
     mut att_event: EventWriter<AttributeChangeEvent>,
-    mut proto_commands: ProtoCommands,
     proto: ProtoParam,
 ) {
     for GrantHeirloomDevEvent(choice) in grant_events.iter() {
         if let Ok((player_entity, transform, mut skills, level)) = player_query.get_single_mut() {
             skill_queue.grant_heirloom_from_pool(
                 choice.clone(),
-                &mut proto_commands,
+                &mut commands,
                 &proto,
                 transform.translation.truncate(),
                 &mut skills,
@@ -2881,7 +2878,7 @@ pub struct BrewCraftParams<'w, 's> {
         With<crate::player::Player>,
     >,
     pub player_tf: Query<'w, 's, &'static GlobalTransform, With<crate::player::Player>>,
-    pub params: ParamSet<'w, 's, (ProtoParam<'w, 's>, crate::GameParam<'w, 's>)>,
+    pub params: ParamSet<'w, 's, (ProtoParam<'w>, crate::GameParam<'w, 's>)>,
 }
 
 /// Hover handler for the three ingredient display slots on the crafting side panel.
@@ -3223,7 +3220,7 @@ pub struct CraftingResultClickParams<'w, 's> {
     pub selected: Res<'w, SelectedCraftingRecipe>,
     pub recipes: Res<'w, Recipes>,
     pub inv_q: Query<'w, 's, &'static Inventory>,
-    pub proto: ProtoParam<'w, 's>,
+    pub proto: ProtoParam<'w>,
     pub graphics: Res<'w, Graphics>,
     pub asset_server: Res<'w, AssetServer>,
     pub dragging_query: Query<'w, 's, (Entity, &'static ItemStack), With<crate::ui::DraggedItem>>,

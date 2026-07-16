@@ -10,7 +10,6 @@ use bevy::render::render_resource::ShaderRef;
 use bevy::sprite::{Material2d, Material2dPlugin};
 use bevy::{prelude::*, render::render_resource::AsBindGroup};
 use bevy_aseprite::anim::AsepriteAnimation;
-use bevy_proto::prelude::{ReflectSchematic, Schematic};
 use bevy_rapier2d::prelude::KinematicCharacterController;
 use game_over::{
     handle_game_over_fadeout, handle_game_over_final_stats_tooltip,
@@ -46,16 +45,13 @@ use self::enemy_sprites::{
 
 pub struct AnimationsPlugin;
 
-#[derive(Component, Reflect, FromReflect, Schematic, Default)]
-#[reflect(Schematic)]
+#[derive(Component, Reflect, FromReflect, Default, Clone, Debug)]
 pub struct AnimationPosTracker(pub f32, pub f32, pub f32);
 
-#[derive(Component, Schematic, Reflect, FromReflect, Default)]
-#[reflect(Schematic)]
+#[derive(Component, Reflect, FromReflect, Default, Clone, Copy, Debug, Deserialize)]
 pub struct AnimationFrameTracker(pub i32, pub i32);
 
-#[derive(Component, Clone, Deref, DerefMut, Schematic, Reflect, FromReflect)]
-#[reflect(Schematic)]
+#[derive(Component, Clone, Deref, DerefMut, Reflect, FromReflect)]
 pub struct AnimationTimer(pub Timer);
 /// Per-entity hit-reaction state.
 ///
@@ -90,8 +86,7 @@ impl Default for HitAnimationTracker {
 /// tear them down after the animation finishes. Highly transient — stored
 /// `SparseSet` so attaching/detaching doesn't move the animation entity
 /// through extra archetypes every time an effect plays.
-#[derive(Component, Reflect, FromReflect, Schematic, Debug)]
-#[reflect(Schematic)]
+#[derive(Component, Reflect, FromReflect, Debug)]
 #[component(storage = "SparseSet")]
 pub struct DoneAnimation;
 
@@ -451,8 +446,8 @@ fn animate_spritesheet_animations(
     }
 }
 
-#[derive(FromReflect, Default, Reflect, Clone, Serialize, Deserialize, Component, Schematic)]
-#[reflect(Component, Schematic)]
+#[derive(FromReflect, Default, Reflect, Clone, Serialize, Deserialize, Component, Debug)]
+#[reflect(Component)]
 pub struct FadeOpacity;
 
 /// Smoothly fades foliage (trees) translucent when the player walks behind them by lerping the

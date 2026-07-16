@@ -1,7 +1,7 @@
 pub use bevy::prelude::*;
 use bevy::{render::view::RenderLayers, utils::HashMap};
-use bevy_proto::prelude::{ReflectSchematic, Schematic};
 use rand::Rng;
+use serde::Deserialize;
 
 use crate::{
     assets::Graphics,
@@ -27,8 +27,7 @@ pub struct ScrapperContainer {
     pub items: Container,
     pub parent: Entity,
 }
-#[derive(Component, Clone, Schematic, Reflect, FromReflect)]
-#[reflect(Schematic)]
+#[derive(Component, Clone, Reflect, FromReflect, Debug, Deserialize)]
 pub struct Scrap {
     pub obj: WorldObject,
     pub chance: f32,
@@ -38,8 +37,7 @@ impl Scrap {
         Self { obj, chance }
     }
 }
-#[derive(Component, Clone, Schematic, Reflect, FromReflect)]
-#[reflect(Schematic)]
+#[derive(Component, Clone, Reflect, FromReflect, Debug, Deserialize)]
 pub struct ScrapsInto(pub Vec<Scrap>);
 
 #[derive(Default)]

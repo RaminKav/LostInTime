@@ -1,7 +1,6 @@
 use crate::inventory::ItemStack;
 use crate::proto::proto_param::ProtoParam;
 use bevy::prelude::*;
-use bevy_proto::prelude::{ReflectSchematic, Schematic};
 use rand::Rng;
 use serde::Deserialize;
 
@@ -16,8 +15,7 @@ impl Plugin for LootTablePlugin {
     }
 }
 
-#[derive(Default, Schematic, Reflect, FromReflect, Clone, Debug, Component, Deserialize)]
-#[reflect(Schematic)]
+#[derive(Default, Reflect, FromReflect, Clone, Debug, Component, Deserialize)]
 pub struct LootTable {
     pub drops: Vec<Loot>,
 }

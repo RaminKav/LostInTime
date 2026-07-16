@@ -106,21 +106,7 @@ pub struct StartingWeaponOverride {
 #[derive(Component, Clone, Debug)]
 pub struct BlessingMaxHpPenalty(pub i32);
 
-#[derive(
-    Debug,
-    FromReflect,
-    Reflect,
-    PartialEq,
-    Eq,
-    Clone,
-    Copy,
-    Hash,
-    Component,
-    IntoStaticStr,
-    Ord,
-    PartialOrd,
-    EnumIter,
-)]
+#[derive(Debug, FromReflect, Reflect, PartialEq, Eq, Clone, Copy, Hash, Component, IntoStaticStr, Ord, PartialOrd, EnumIter)]
 pub enum Blessing {
     SkillAttackSpeed,
     OrbsAndTomes,

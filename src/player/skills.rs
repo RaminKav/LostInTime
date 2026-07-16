@@ -3,7 +3,6 @@ use std::time::Duration;
 
 use bevy::prelude::*;
 use bevy_aseprite::Aseprite;
-use bevy_proto::prelude::ProtoCommands;
 use rand::{seq::SliceRandom, Rng};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -37,20 +36,7 @@ use crate::{
 
 use super::{mage_skills::TeleportState, rogue_skills::ComboCounter};
 
-#[derive(
-    Component,
-    Debug,
-    Copy,
-    Clone,
-    Eq,
-    PartialEq,
-    Serialize,
-    Deserialize,
-    Hash,
-    EnumIter,
-    Default,
-    Display,
-)]
+#[derive(Component, Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize, Hash, EnumIter, Default, Display)]
 pub enum SkillClass {
     #[default]
     None,
@@ -157,9 +143,7 @@ impl SkillClass {
     }
 }
 
-#[derive(
-    Copy, Clone, Eq, PartialEq, Hash, Debug, Serialize, EnumIter, Display, Deserialize, Default,
-)]
+#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, Serialize, EnumIter, Display, Deserialize, Default)]
 pub enum ActiveSkill {
     #[default]
     Roll,
@@ -2255,9 +2239,7 @@ pub fn grant_skill_charge_after_cooldown_complete(
     }
 }
 
-#[derive(
-    Copy, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Default, Debug, Serialize, Deserialize,
-)]
+#[derive(Copy, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Default, Debug, Serialize, Deserialize)]
 pub enum HeirloomRarity {
     #[default]
     Common,
@@ -2807,7 +2789,7 @@ impl HeirloomChoiceQueue {
     pub fn handle_pick_skill(
         &mut self,
         skill: HeirloomChoiceState,
-        proto_commands: &mut ProtoCommands,
+        commands: &mut Commands,
         proto: &ProtoParam,
         player_pos: Vec2,
         player_skills: &mut PlayerSkills,
@@ -2841,7 +2823,7 @@ impl HeirloomChoiceQueue {
 
         // handle drops
         if let Some((drop, count)) = skill.heirloom.get_instant_drop() {
-            proto_commands.spawn_item_from_proto(
+            commands.spawn_item_from_proto(
                 drop,
                 proto,
                 player_pos + Vec2::new(0., -18.), // offset so it doesn't spawn on the player
@@ -2856,7 +2838,7 @@ impl HeirloomChoiceQueue {
     pub fn grant_heirloom_from_pool(
         &mut self,
         skill: HeirloomChoiceState,
-        proto_commands: &mut ProtoCommands,
+        commands: &mut Commands,
         proto: &ProtoParam,
         player_pos: Vec2,
         player_skills: &mut PlayerSkills,
@@ -2891,7 +2873,7 @@ impl HeirloomChoiceQueue {
 
         // Handle drops
         if let Some((drop, count)) = skill.heirloom.get_instant_drop() {
-            proto_commands.spawn_item_from_proto(
+            commands.spawn_item_from_proto(
                 drop,
                 proto,
                 player_pos + Vec2::new(0., -18.),

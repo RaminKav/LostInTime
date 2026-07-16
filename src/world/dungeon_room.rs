@@ -1,7 +1,6 @@
 use bevy::prelude::*;
 use bevy::render::view::RenderLayers;
 use bevy::sprite::Anchor;
-use bevy_proto::prelude::{ProtoCommands, Prototypes};
 use bevy_rapier2d::prelude::Collider;
 use rand::Rng;
 
@@ -260,8 +259,7 @@ impl Plugin for DungeonRoomPlugin {
 fn spawn_dungeon_room(
     new_dungeon: Query<Entity, (Added<ActiveDimension>, With<Dungeon>)>,
     mut commands: Commands,
-    mut proto_commands: ProtoCommands,
-    prototypes: Prototypes,
+    defs: Res<crate::defs::GameDefs>,
     asset_server: Res<AssetServer>,
     mut move_player_event: EventWriter<crate::player::MovePlayerEvent>,
     mut wave_state: ResMut<DungeonWaveState>,
@@ -311,11 +309,13 @@ fn spawn_dungeon_room(
 
     // Central wave shrine (reuse the weapon shrine art/animation).
     if let Some(shrine_e) =
-        proto_commands.spawn_from_proto(WorldObject::WeaponShrine, &prototypes, SHRINE_POS)
+        commands.spawn_from_proto(WorldObject::WeaponShrine, &defs, SHRINE_POS)
     {
         commands
             .entity(shrine_e)
-            .insert(Transform::from_translation(SHRINE_POS.extend(0.)))
+            .insert(TransformBundle::from_transform(Transform::from_translation(
+                SHRINE_POS.extend(0.),
+            )))
             .insert(DungeonRoomEntity)
             .insert(DungeonWaveShrine);
         wave_state.shrine = Some(shrine_e);
@@ -324,11 +324,13 @@ fn spawn_dungeon_room(
     // Exit door. The art is part of the room asset, so hide the proto sprite and
     // keep only the interaction trigger + collider.
     if let Some(door_e) =
-        proto_commands.spawn_from_proto(WorldObject::DungeonExit, &prototypes, DOOR_POS)
+        commands.spawn_from_proto(WorldObject::DungeonExit, &defs, DOOR_POS)
     {
         commands
             .entity(door_e)
-            .insert(Transform::from_translation(DOOR_POS.extend(0.)))
+            .insert(TransformBundle::from_transform(Transform::from_translation(
+                DOOR_POS.extend(0.),
+            )))
             .insert(Visibility::Hidden)
             .insert(DungeonRoomEntity);
     }
@@ -338,7 +340,6 @@ fn spawn_dungeon_room(
 fn handle_start_dungeon_wave(
     mut events: EventReader<StartNextDungeonWaveEvent>,
     mut wave_state: ResMut<DungeonWaveState>,
-    mut proto_commands: ProtoCommands,
     proto: ProtoParam,
     mut commands: Commands,
     game: GameParam,
@@ -365,9 +366,8 @@ fn handle_start_dungeon_wave(
             0,
             event.0,
             false,
-            &mut proto_commands,
-            &proto,
             &mut commands,
+            &proto,
             &game,
         );
         wave_state.mobs_alive += count as i32;
@@ -384,7 +384,6 @@ fn handle_start_dungeon_wave(
 fn tick_dungeon_waves(
     time: Res<Time>,
     mut wave_state: ResMut<DungeonWaveState>,
-    mut proto_commands: ProtoCommands,
     proto: ProtoParam,
     mut commands: Commands,
     game: GameParam,
@@ -413,9 +412,8 @@ fn tick_dungeon_waves(
                     wave_state.mini_wave,
                     shrine_e,
                     false,
-                    &mut proto_commands,
-                    &proto,
                     &mut commands,
+                    &proto,
                     &game,
                 );
                 wave_state.mobs_alive += count as i32;
@@ -442,9 +440,8 @@ fn tick_dungeon_waves(
                 wave_state.cycle_mini_wave,
                 shrine_e,
                 true,
-                &mut proto_commands,
-                &proto,
                 &mut commands,
+                &proto,
                 &game,
             );
             wave_state.mobs_alive += count as i32;
@@ -519,9 +516,8 @@ fn spawn_mini_wave(
     mini_wave: u8,
     shrine_e: Entity,
     skip_golem: bool,
-    proto_commands: &mut ProtoCommands,
-    proto: &ProtoParam,
     commands: &mut Commands,
+    proto: &ProtoParam,
     _game: &GameParam,
 ) -> u32 {
     let wave_idx = (wave.saturating_sub(1)).min(2) as usize;
@@ -538,7 +534,7 @@ fn spawn_mini_wave(
             let offset = Vec2::new(rng.gen_range(-170. ..=170.), rng.gen_range(-140. ..=110.));
             let spawn_pos = offset;
             if let Some(mob_e) =
-                proto_commands.spawn_from_proto(mob.clone(), &proto.prototypes, spawn_pos)
+                commands.spawn_from_proto(mob.clone(), &proto.defs, spawn_pos)
             {
                 if roll_dungeon_elite(mob, proto, &mut rng) {
                     commands.entity(mob_e).insert(EliteMob);
@@ -603,7 +599,7 @@ fn drop_dungeon_rewards_on_return(
     mut drop: ResMut<DungeonRewardDrop>,
     mut rewards: ResMut<DungeonRewards>,
     player_query: Query<(&GlobalTransform, &FacingDirection), With<Player>>,
-    mut proto_commands: ProtoCommands,
+    mut commands: Commands,
     proto: ProtoParam,
     game: GameParam,
 ) {
@@ -633,7 +629,7 @@ fn drop_dungeon_rewards_on_return(
     if rewards.coin_max > 0 {
         let coins = rng.gen_range(rewards.coin_min..=rewards.coin_max);
         let offset = Vec2::new(rng.gen_range(-20. ..=20.), rng.gen_range(-20. ..=20.));
-        proto_commands.spawn_item_from_proto(
+        commands.spawn_item_from_proto(
             WorldObject::Coin,
             &proto,
             base + offset,
@@ -644,7 +640,7 @@ fn drop_dungeon_rewards_on_return(
 
     for (obj, count) in rewards.items.drain(..) {
         let offset = Vec2::new(rng.gen_range(-20. ..=20.), rng.gen_range(-20. ..=20.));
-        proto_commands.spawn_item_from_proto(obj, &proto, base + offset, count, Some(level));
+        commands.spawn_item_from_proto(obj, &proto, base + offset, count, Some(level));
     }
     rewards.clear();
 }

@@ -945,51 +945,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "bevy_proto"
-version = "0.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0218a688dff27fd11376e199703933160a0549178e2ce7076055469c21f20fae"
-dependencies = [
- "anyhow",
- "bevy",
- "bevy_proto_backend",
- "path-clean",
- "ron",
- "serde",
- "thiserror",
-]
-
-[[package]]
-name = "bevy_proto_backend"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e02da1d226e32c9fccfec4fc3dc83313b056b812daedac4b1f23d3cbf849c769"
-dependencies = [
- "anyhow",
- "bevy",
- "bevy_proto_derive",
- "indexmap 1.9.3",
- "parking_lot 0.12.1",
- "path-clean",
- "serde",
- "thiserror",
-]
-
-[[package]]
-name = "bevy_proto_derive"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b6b62af4c578e0d87259d241306cf92e87022e402eec8cf8e5ae34406251932f"
-dependencies = [
- "optional-error",
- "proc-macro-crate",
- "proc-macro2 1.0.86",
- "quote 1.0.36",
- "syn 2.0.72",
- "to_phantom",
-]
-
-[[package]]
 name = "bevy_ptr"
 version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4079,15 +4034,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "04744f49eae99ab78e0d5c0b603ab218f515ea8cfe5a456d7629ad883a3b6e7d"
 
 [[package]]
-name = "optional-error"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bc7918366ef0125b2d6a3d0f6ea28e437cbecddfea36804f1e7a27ace25e7a32"
-dependencies = [
- "syn 1.0.109",
-]
-
-[[package]]
 name = "orbclient"
 version = "0.3.47"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4191,12 +4137,6 @@ name = "paste"
 version = "1.0.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "de3145af08024dea9fa9914f381a17b8fc6034dfb00f3a84013f7ff43f29ed4c"
-
-[[package]]
-name = "path-clean"
-version = "1.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "17359afc20d7ab31fdb42bb844c8b3bb1dabd7dcf7e68428492da7f16966fcef"
 
 [[package]]
 name = "pathfinding"
@@ -5225,7 +5165,6 @@ dependencies = [
  "bevy_embedded_assets",
  "bevy_hanabi",
  "bevy_pkv",
- "bevy_proto",
  "bevy_rapier2d",
  "bevy_save",
  "chrono",
@@ -5459,17 +5398,6 @@ name = "tinyvec_macros"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
-
-[[package]]
-name = "to_phantom"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4d1a5f35ab1d1b595b5cdb39e4dd358a8e2cd15ecf0d9df736e959381927e5de"
-dependencies = [
- "proc-macro2 1.0.86",
- "quote 1.0.36",
- "syn 2.0.72",
-]
 
 [[package]]
 name = "tokio"

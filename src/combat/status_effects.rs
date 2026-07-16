@@ -1,5 +1,4 @@
 use bevy::prelude::*;
-use bevy_proto::prelude::{ReflectSchematic, Schematic};
 use serde::Deserialize;
 use strum_macros::{Display, EnumIter};
 
@@ -14,9 +13,7 @@ use rand::Rng;
 
 use super::{HitEvent, MarkedForDeath};
 
-#[derive(
-    Deserialize, Debug, EnumIter, Display, Hash, Clone, Reflect, FromReflect, Eq, PartialEq,
-)]
+#[derive(Deserialize, Debug, EnumIter, Display, Hash, Clone, Reflect, FromReflect, Eq, PartialEq)]
 pub enum StatusEffect {
     Slow,
     Frail,
@@ -31,8 +28,7 @@ pub struct StatusEffectState {
     pub index: usize,
 }
 
-#[derive(Component, Deserialize, Debug, Clone, Schematic, Reflect, FromReflect)]
-#[reflect(Schematic)]
+#[derive(Component, Deserialize, Debug, Clone, Reflect, FromReflect)]
 pub struct StatusEffectTracker {
     pub effects: Vec<StatusEffectState>,
 }

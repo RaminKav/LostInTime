@@ -1,5 +1,4 @@
 use bevy::prelude::*;
-use bevy_proto::prelude::ProtoCommands;
 use rand::Rng;
 
 use crate::attributes::CurrentHealth;
@@ -133,7 +132,7 @@ pub fn porkipine_damage_ability(
 pub fn golden_pig_coin_ability(
     time: Res<Time>,
     mut golden_pig_pets: Query<(&GlobalTransform, &mut GoldenPigCoinTimer), With<Pet>>,
-    mut proto_commands: ProtoCommands,
+    mut commands: Commands,
     proto: ProtoParam,
     mut pet_stats: ResMut<PetAbilityStats>,
 ) {
@@ -154,7 +153,7 @@ pub fn golden_pig_coin_ability(
             for _ in 0..count {
                 let drop_offset = Vec2::new(rng.gen_range(-d..d), rng.gen_range(-d..d));
 
-                proto_commands.spawn_item_from_proto(
+                commands.spawn_item_from_proto(
                     WorldObject::Coin,
                     &proto,
                     pet_txfm.translation().truncate() + drop_offset,

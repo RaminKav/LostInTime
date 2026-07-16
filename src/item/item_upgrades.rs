@@ -29,23 +29,22 @@ use crate::{
     GameParam,
 };
 use bevy::prelude::*;
-use bevy_proto::prelude::{ProtoCommands, ReflectSchematic, Schematic};
 
 use super::{
     projectile::{Projectile, RangedAttack, RangedAttackEvent},
     MainHand,
 };
 
-#[derive(Component, Reflect, Schematic, FromReflect, Default, Clone)]
-#[reflect(Component, Schematic)]
+#[derive(Component, Reflect, FromReflect, Default, Clone)]
+#[reflect(Component)]
 pub struct ClawUpgradeMultiThrow(pub Timer, pub u8);
 
-#[derive(Component, Reflect, Schematic, FromReflect, Default, Clone)]
-#[reflect(Component, Schematic)]
+#[derive(Component, Reflect, FromReflect, Default, Clone)]
+#[reflect(Component)]
 pub struct BowUpgradeSpread(pub u8);
 
-#[derive(Component, Reflect, Schematic, FromReflect, Default, Clone)]
-#[reflect(Component, Schematic)]
+#[derive(Component, Reflect, FromReflect, Default, Clone)]
+#[reflect(Component)]
 pub struct ArrowSpeedUpgrade(pub f32);
 
 // Local state for throttling ice explosions per frame
@@ -216,7 +215,6 @@ pub fn handle_on_hit_upgrades(
     >,
     proto: ProtoParam,
     mut commands: Commands,
-    mut proto_commands: ProtoCommands,
     game: Res<Game>,
     mobs: Query<(Entity, &GlobalTransform), With<Mob>>,
     mut burn_or_venom_mobs: Query<&mut MobStatusEffects>,
@@ -273,7 +271,7 @@ pub fn handle_on_hit_upgrades(
                 continue;
             };
             *elec_count += 1;
-            proto_commands.spawn_projectile_from_proto(
+            commands.spawn_projectile_from_proto(
                 Projectile::Electricity,
                 &proto,
                 hit_entity_txfm.translation().truncate(),

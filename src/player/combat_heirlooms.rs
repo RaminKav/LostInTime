@@ -2,7 +2,6 @@ use std::{collections::HashSet, f32::consts::TAU};
 
 use bevy::prelude::*;
 use bevy_aseprite::{anim::AsepriteAnimation, aseprite, AsepriteBundle};
-use bevy_proto::prelude::ProtoCommands;
 use bevy_rapier2d::prelude::{Collider, RapierContext, RigidBody, Sensor};
 use rand::{seq::SliceRandom, Rng};
 
@@ -1248,7 +1247,7 @@ pub fn handle_reaper_soul_spawns(
 }
 
 pub fn handle_mana_orb_drops(
-    mut proto_commands: ProtoCommands,
+    mut commands: Commands,
     proto: ProtoParam,
     mut death_events: EventReader<EnemyDeathEvent>,
     mut trigger_counts: ResMut<HeirloomTriggerCounts>,
@@ -1267,7 +1266,7 @@ pub fn handle_mana_orb_drops(
             continue;
         }
         let offset = Vec2::new(rng.gen_range(-10.0..10.0), rng.gen_range(-10.0..10.0));
-        proto_commands.spawn_item_from_proto(
+        commands.spawn_item_from_proto(
             WorldObject::ManaOrb,
             &proto,
             event.enemy_pos + offset,
@@ -1280,7 +1279,7 @@ pub fn handle_mana_orb_drops(
 
 /// Drop mana orbs on boss/elite hits at the same flat rate as on kills.
 pub fn handle_boss_hit_mana_orb_drops(
-    mut proto_commands: ProtoCommands,
+    mut commands: Commands,
     proto: ProtoParam,
     mut hit_events: EventReader<HitEvent>,
     mobs: Query<(&Mob, &GlobalTransform, Option<&EliteMob>)>,
@@ -1316,7 +1315,7 @@ pub fn handle_boss_hit_mana_orb_drops(
         let distance = rng.gen_range(0.0..32.0);
         let offset = Vec2::new(angle.cos(), angle.sin()) * distance;
 
-        proto_commands.spawn_item_from_proto(
+        commands.spawn_item_from_proto(
             WorldObject::ManaOrb,
             &proto,
             boss_pos + offset,

@@ -7,7 +7,6 @@
 //! **F9** toggles this and any other enabled load tests (starts off).
 
 use bevy::prelude::*;
-use bevy_proto::prelude::{ProtoCommands, Prototypes};
 use rand::Rng;
 
 use crate::{
@@ -99,8 +98,7 @@ fn collider_load_test_spawn_wave(
     mut state: ResMut<ColliderLoadTestState>,
     active: Res<ColliderLoadTestActive>,
     player: Query<&GlobalTransform, With<Player>>,
-    mut proto_commands: ProtoCommands,
-    prototypes: Prototypes,
+    defs: Res<crate::defs::GameDefs>,
     proto_param: ProtoParam,
     dungeon: Query<&Dungeon, With<ActiveDimension>>,
 ) {
@@ -145,7 +143,7 @@ fn collider_load_test_spawn_wave(
             + Vec2::new(rng.gen_range(-6.0..6.0), rng.gen_range(-6.0..6.0));
 
         let mob = non_boss_mobs[rng.gen_range(0..non_boss_mobs.len())].clone();
-        if let Some(e) = proto_commands.spawn_from_proto(mob, &prototypes, pos) {
+        if let Some(e) = commands.spawn_from_proto(mob, &defs, pos) {
             commands.entity(e).insert((
                 ColliderLoadTestMarker,
                 ColliderLoadTestKillTimer {
@@ -163,7 +161,7 @@ fn collider_load_test_spawn_wave(
             + Vec2::new(rng.gen_range(-6.0..6.0), rng.gen_range(-6.0..6.0));
 
         if let Some(e) =
-            proto_commands.spawn_item_from_proto(WorldObject::XPShard, &proto_param, pos, 1, None)
+            commands.spawn_item_from_proto(WorldObject::XPShard, &proto_param, pos, 1, None)
         {
             commands.entity(e).insert((
                 ColliderLoadTestMarker,

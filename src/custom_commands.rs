@@ -2,6 +2,10 @@ use crate::{
     animations::AnimationTimer,
     assets::{SpriteAnchor, SpriteSize},
     attributes::{add_item_glows, ItemLevel, RawItemBaseAttributes},
+    defs::{
+        registry::GameDefs,
+        spawn::{spawn_from_def, PendingSpriteSheet, PendingSpriteTexture},
+    },
     inventory::ItemStack,
     item::{
         projectile::{ArcProjectileData, Projectile},
@@ -17,12 +21,12 @@ use crate::{
 };
 use bevy::prelude::*;
 use bevy_aseprite::{anim::AsepriteAnimation, Aseprite};
-use bevy_proto::prelude::{ProtoCommands, Prototypes, Schematic};
 use bevy_rapier2d::prelude::{ActiveCollisionTypes, ActiveEvents, Collider, Sensor};
 use core::fmt::Display;
 use std::f32::consts::PI;
-pub trait CommandsExt<'w, 's> {
-    fn spawn_item_from_proto<'a, T: Display + Schematic + Clone + Into<&'a str>>(
+
+pub trait CommandsExt {
+    fn spawn_item_from_proto<'a, T: Display + Clone + Into<&'a str>>(
         &mut self,
         obj: T,
         params: &ProtoParam,
@@ -30,7 +34,7 @@ pub trait CommandsExt<'w, 's> {
         count: usize,
         level: Option<u8>,
     ) -> Option<Entity>;
-    fn spawn_projectile_from_proto<'a, T: Display + Schematic + Clone + Into<&'a str>>(
+    fn spawn_projectile_from_proto<'a, T: Display + Clone + Into<&'a str>>(
         &mut self,
         obj: T,
         params: &ProtoParam,
@@ -40,24 +44,23 @@ pub trait CommandsExt<'w, 's> {
         asset_server: &AssetServer,
         scale_up: f32,
     ) -> Option<Entity>;
-    fn spawn_from_proto<'a, T: Display + Schematic + Clone + Into<&'a str>>(
+    fn spawn_from_proto<'a, T: Display + Clone + Into<&'a str>>(
         &mut self,
         obj: T,
-        prototypes: &Prototypes,
+        defs: &GameDefs,
         pos: Vec2,
     ) -> Option<Entity>;
-    fn spawn_object_from_proto<'a, T: Display + Schematic + Clone + Into<&'a str>>(
+    fn spawn_object_from_proto<'a, T: Display + Clone + Into<&'a str>>(
         &mut self,
         obj: T,
         pos: Vec2,
-        prototypes: &Prototypes,
-        proto_param: &mut ProtoParam,
+        proto_param: &ProtoParam,
         is_dirty: bool,
     ) -> Option<Entity>;
 }
 
-impl<'w, 's> CommandsExt<'w, 's> for ProtoCommands<'w, 's> {
-    fn spawn_item_from_proto<'a, T: Display + Schematic + Clone + Into<&'a str>>(
+impl CommandsExt for Commands<'_, '_> {
+    fn spawn_item_from_proto<'a, T: Display + Clone + Into<&'a str>>(
         &mut self,
         obj: T,
         params: &ProtoParam,
@@ -65,19 +68,15 @@ impl<'w, 's> CommandsExt<'w, 's> for ProtoCommands<'w, 's> {
         count: usize,
         level: Option<u8>,
     ) -> Option<Entity> {
-        if let Some(spawned_entity) = self.spawn_from_proto(obj.clone(), &params.prototypes, pos) {
-            // Check entity exists immediately after spawn (can be picked up instantly)
-            let Some(mut spawned_entity_commands) = self.commands().get_entity(spawned_entity)
-            else {
-                return None; // Entity was already despawned
+        if let Some(spawned_entity) = self.spawn_from_proto(obj.clone(), &params.defs, pos) {
+            let Some(mut spawned_entity_commands) = self.get_entity(spawned_entity) else {
+                return None;
             };
 
             let mut glow_rarity = None;
             if let Some(proto_data) = params.get_item_data(obj.clone()) {
-                // modify the item stack count
                 let mut proto_data = proto_data.clone();
                 proto_data.count = count;
-                // Gear with raw attributes gets rarity + glow in `handle_new_items_raw_attributes`.
                 if params
                     .get_component::<RawItemBaseAttributes, _>(obj.clone())
                     .is_none()
@@ -85,9 +84,8 @@ impl<'w, 's> CommandsExt<'w, 's> for ProtoCommands<'w, 's> {
                     glow_rarity = Some(proto_data.rarity.clone());
                 }
                 spawned_entity_commands.insert(proto_data).insert(ItemDrop);
-                // Add despawn timer to reduce lag in endless mode
                 spawned_entity_commands.insert(crate::item::ItemDropDespawnTimer(
-                    Timer::from_seconds(300.0, TimerMode::Once), // Despawn after 60 seconds
+                    Timer::from_seconds(300.0, TimerMode::Once),
                 ));
                 let eqp_type = params
                     .get_component::<EquipmentType, _>(obj.clone())
@@ -100,32 +98,39 @@ impl<'w, 's> CommandsExt<'w, 's> for ProtoCommands<'w, 's> {
                 }
             }
 
-            // Fix item graphics immediately - replace proto atlas with shared game atlas
-            // This ensures items have correct graphics from spawn, not relying on update_graphics
             if let Some(sprite_map) = &params.graphics.spritesheet_map {
                 if let Some(obj_type) = params.get_component::<WorldObject, _>(obj.clone()) {
                     if let Some(sprite) = sprite_map.get(obj_type) {
+                        // Full SpriteSheetBundle (not bare atlas+sprite) so GlobalTransform
+                        // is always present even if spawn_from_def regresses.
                         spawned_entity_commands
-                            .insert(params.graphics.texture_atlas.as_ref().unwrap().clone())
-                            .insert(sprite.clone());
+                            .insert(SpriteSheetBundle {
+                                texture_atlas: params
+                                    .graphics
+                                    .texture_atlas
+                                    .as_ref()
+                                    .unwrap()
+                                    .clone(),
+                                sprite: sprite.clone(),
+                                transform: Transform::from_translation(pos.extend(0.)),
+                                ..default()
+                            })
+                            .remove::<PendingSpriteSheet>()
+                            .remove::<PendingSpriteTexture>();
                     }
                 }
             }
 
             if let Some(rarity) = glow_rarity {
-                add_item_glows(
-                    self.commands(),
-                    &params.graphics,
-                    spawned_entity,
-                    rarity,
-                );
+                add_item_glows(self, &params.graphics, spawned_entity, rarity);
             }
 
             return Some(spawned_entity);
         }
         None
     }
-    fn spawn_projectile_from_proto<'a, T: Display + Schematic + Clone + Into<&'a str>>(
+
+    fn spawn_projectile_from_proto<'a, T: Display + Clone + Into<&'a str>>(
         &mut self,
         obj: T,
         params: &ProtoParam,
@@ -135,18 +140,14 @@ impl<'w, 's> CommandsExt<'w, 's> for ProtoCommands<'w, 's> {
         asset_server: &AssetServer,
         scale_up: f32,
     ) -> Option<Entity> {
-        let obj_type = <T as Into<&str>>::into(obj.clone()).to_owned(); // Get obj_type for logging
-        if let Some(spawned_entity) = self.spawn_from_proto(obj.clone(), &params.prototypes, pos) {
-            // Check entity exists immediately after spawn (projectiles can despawn quickly)
-            let Some(mut spawned_entity_commands) = self.commands().get_entity(spawned_entity)
-            else {
-                return None; // Entity was already despawned
+        if let Some(spawned_entity) = self.spawn_from_proto(obj.clone(), &params.defs, pos) {
+            let Some(mut spawned_entity_commands) = self.get_entity(spawned_entity) else {
+                return None;
             };
 
             let Some(proj_state) = params.get_projectile_state(obj.clone()) else {
                 return None;
             };
-            // modify the direction and offset of projectile
             let mut proto_data = proj_state.clone();
             proto_data.direction = dir;
             let sprite_size = if let Some(sprite_data) = params.get_sprite_sheet_data(obj.clone()) {
@@ -168,10 +169,9 @@ impl<'w, 's> CommandsExt<'w, 's> for ProtoCommands<'w, 's> {
                     None
                 };
             proto_data.mana_bar_full = mana_bar_full;
-            //TODO: make these prototype data
             spawned_entity_commands
                 .insert(proto_data)
-                .insert(Transform {
+                .insert(TransformBundle::from_transform(Transform {
                     translation: pos.extend(0.)
                         + Vec3::new(
                             x_offset + (angle.cos() * proj_state.spawn_offset.x * scale_up),
@@ -181,20 +181,19 @@ impl<'w, 's> CommandsExt<'w, 's> for ProtoCommands<'w, 's> {
                     rotation: Quat::from_rotation_z(angle + custom_rotation.unwrap_or(0.)),
                     scale: Vec3::splat(scale_up),
                     ..default()
-                })
+                }))
                 .insert(ActiveEvents::COLLISION_EVENTS)
                 .insert(Name::new("Projectile"))
                 .insert(ActiveCollisionTypes::all())
                 .remove::<ItemStack>();
 
-            // Fix projectile graphics immediately - replace proto atlas with shared game atlas
-            // This is needed because projectiles are excluded from update_graphics to prevent crashes
             if let Some(sprite_map) = &params.graphics.spritesheet_map {
                 if let Some(obj_type) = params.get_component::<WorldObject, _>(obj.clone()) {
                     if let Some(sprite) = sprite_map.get(obj_type) {
                         spawned_entity_commands
                             .insert(params.graphics.texture_atlas.as_ref().unwrap().clone())
-                            .insert(sprite.clone());
+                            .insert(sprite.clone())
+                            .remove::<PendingSpriteSheet>();
                     }
                 }
             }
@@ -232,7 +231,6 @@ impl<'w, 's> CommandsExt<'w, 's> for ProtoCommands<'w, 's> {
                         .remove::<Handle<TextureAtlas>>()
                         .remove::<AnimationTimer>();
                 } else if proj == &Projectile::EnergyBall {
-                    // Swap the placeholder spritesheet for the aseprite Bullet animation.
                     spawned_entity_commands
                         .insert(AsepriteAnimation::from("Bullet"))
                         .insert(asset_server.load::<Aseprite, _>("textures/effects/EnergyBall.ase"))
@@ -253,47 +251,36 @@ impl<'w, 's> CommandsExt<'w, 's> for ProtoCommands<'w, 's> {
         }
         None
     }
-    fn spawn_from_proto<'a, T: Display + Schematic + Clone + Into<&'a str>>(
+
+    fn spawn_from_proto<'a, T: Display + Clone + Into<&'a str>>(
         &mut self,
         mob: T,
-        prototypes: &Prototypes,
+        defs: &GameDefs,
         pos: Vec2,
     ) -> Option<Entity> {
         let p = <T as Into<&str>>::into(mob).to_owned();
-        let p_clone = p.clone(); // Clone for logging
-        if !prototypes.is_ready(&p) {
-            print!("Prototype {} is not ready", p);
+        let Some(def) = defs.get(&p) else {
+            error!("GameDefs missing entity def: {p}");
             return None;
-        }
-        let spawned_entity = self.spawn(p).id();
-        // Check entity exists immediately after spawn
-        let Some(mut spawned_entity_commands) = self.commands().get_entity(spawned_entity) else {
-            return None; // Entity was already despawned
         };
-
-        spawned_entity_commands
-            .insert(Transform::from_translation(pos.extend(0.)))
-            .insert(ActiveEvents::COLLISION_EVENTS);
-        Some(spawned_entity)
+        Some(spawn_from_def(self, def, pos))
     }
-    fn spawn_object_from_proto<'a, T: Display + Schematic + Clone + Into<&'a str>>(
+
+    fn spawn_object_from_proto<'a, T: Display + Clone + Into<&'a str>>(
         &mut self,
         obj: T,
         pos: Vec2,
-        prototypes: &Prototypes,
-        proto_param: &mut ProtoParam,
+        proto_param: &ProtoParam,
         is_dirty: bool,
     ) -> Option<Entity> {
         let p = <T as Into<&str>>::into(obj.clone()).to_owned();
-        if !prototypes.is_ready(&p) {
-            error!("Prototype {} is not ready", p);
+        let Some(def) = proto_param.defs.get(&p) else {
+            error!("GameDefs missing entity def: {p}");
             return None;
-        }
-        //TODO: add parent to spawned entity
-        let spawned_entity = self.spawn(p.clone()).id();
-        // Check entity exists immediately after spawn
-        let Some(mut spawned_entity_commands) = self.commands().get_entity(spawned_entity) else {
-            return None; // Entity was already despawned
+        };
+        let spawned_entity = spawn_from_def(self, def, pos);
+        let Some(mut spawned_entity_commands) = self.get_entity(spawned_entity) else {
+            return None;
         };
         let relative_tile_pos = world_pos_to_chunk_relative_tile_pos(pos);
         let should_center = proto_param
@@ -301,61 +288,81 @@ impl<'w, 's> CommandsExt<'w, 's> for ProtoCommands<'w, 's> {
             .unwrap_or(&SpriteSize::Small)
             .is_medium();
         let pos = tile_pos_to_world_pos(relative_tile_pos, should_center).extend(0.);
-        spawned_entity_commands.insert(TransformBundle::from_transform(
-            Transform::from_translation(pos),
-        ));
-
+        let mut final_transform = Transform::from_translation(pos);
         if let Some(anchor) = proto_param.get_component::<SpriteAnchor, _>(obj.clone()) {
-            spawned_entity_commands.insert(TransformBundle::from_transform(
-                Transform::from_translation(pos + anchor.0.extend(0.)),
-            ));
+            final_transform.translation = pos + anchor.0.extend(0.);
         }
+        spawned_entity_commands
+            .insert(TransformBundle::from_transform(final_transform));
+
         if let Some(_wall) = proto_param.get_component::<Wall, _>(obj.clone()) {
             let sprite_data = proto_param
                 .get_component::<WallTextureData, _>(obj.clone())
                 .unwrap();
             spawned_entity_commands
-                .insert(
-                    proto_param
+                .insert(SpriteSheetBundle {
+                    texture_atlas: proto_param
                         .graphics
                         .wall_texture_atlas
                         .as_ref()
                         .unwrap()
                         .clone(),
-                )
-                .insert(TextureAtlasSprite {
-                    index: (sprite_data.obj_bit_index + sprite_data.texture_offset * 32) as usize,
+                    sprite: TextureAtlasSprite {
+                        index: (sprite_data.obj_bit_index + sprite_data.texture_offset * 32)
+                            as usize,
+                        ..default()
+                    },
+                    transform: final_transform,
                     ..default()
-                });
+                })
+                .remove::<PendingSpriteSheet>()
+                .remove::<PendingSpriteTexture>();
             if is_dirty {
                 spawned_entity_commands.insert(Dirty);
             }
-        } else {
-            // Fix world object graphics immediately - replace proto atlas with shared game atlas
-            // This ensures world objects have correct graphics from spawn
-            let mut standalone_texture = false;
-            if let Some(sprite_map) = &proto_param.graphics.spritesheet_map {
-                if let Some(obj_type) = proto_param.get_component::<WorldObject, _>(obj.clone()) {
-                    if crate::item::shrine_visuals::uses_standalone_shrine_texture(obj_type)
-                        || obj_type == &WorldObject::PinkFlower
-                    {
-                        // PNG shrine / special visuals applied by dedicated spawn systems.
-                    } else if let Some(sprite) = sprite_map.get(obj_type) {
-                        spawned_entity_commands
-                            .insert(
-                                proto_param.graphics.texture_atlas.as_ref().unwrap().clone(),
-                            )
-                            .insert(sprite.clone());
-                    } else if obj_type == &WorldObject::BossShrine {
-                        standalone_texture = true;
-                    }
-                }
-            }
-            if standalone_texture {
-                spawned_entity_commands.insert(Sprite {
-                    custom_size: Some(Vec2::new(128., 128.)),
+        } else if let Some(texture_path) = def.sprite_texture.as_ref() {
+            // Match old SpriteBundle: use native image size, except BossShrine which
+            // was always forced to 128² by the spawn failsafe.
+            let custom_size = proto_param
+                .get_world_object(obj.clone())
+                .filter(|o| **o == WorldObject::BossShrine)
+                .map(|_| Vec2::new(128., 128.));
+            spawned_entity_commands
+                .insert(SpriteBundle {
+                    texture: proto_param.asset_server.load::<Image, _>(texture_path.as_str()),
+                    sprite: Sprite {
+                        custom_size,
+                        ..default()
+                    },
+                    transform: final_transform,
                     ..default()
-                });
+                })
+                .remove::<PendingSpriteSheet>()
+                .remove::<PendingSpriteTexture>()
+                .remove::<TextureAtlasSprite>()
+                .remove::<Handle<TextureAtlas>>();
+        } else if let Some(sprite_map) = &proto_param.graphics.spritesheet_map {
+            if let Some(obj_type) = proto_param.get_component::<WorldObject, _>(obj.clone()) {
+                if crate::item::shrine_visuals::uses_standalone_shrine_texture(obj_type)
+                    || obj_type == &WorldObject::PinkFlower
+                {
+                    // Art applied by shrine_visuals / special systems.
+                } else if let Some(sprite) = sprite_map.get(obj_type) {
+                    spawned_entity_commands
+                        .insert(SpriteSheetBundle {
+                            texture_atlas: proto_param
+                                .graphics
+                                .texture_atlas
+                                .as_ref()
+                                .unwrap()
+                                .clone(),
+                            sprite: sprite.clone(),
+                            transform: final_transform,
+                            ..default()
+                        })
+                        .remove::<PendingSpriteSheet>()
+                        .remove::<PendingSpriteTexture>();
+                }
             }
         }
 

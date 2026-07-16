@@ -30,7 +30,6 @@ use bevy::transform::TransformSystem;
 use bevy::window::PrimaryWindow;
 
 use bevy_hanabi::EffectSpawner;
-use bevy_proto::prelude::{ProtoCommands, ReflectSchematic, Schematic};
 
 use bevy_rapier2d::prelude::{
     CollisionGroups, Group, KinematicCharacterController, KinematicCharacterControllerOutput,
@@ -437,9 +436,8 @@ pub fn skill_aim_direction(movement: Vec2, aim_facing: Vec2, facing: Vec2) -> Ve
 #[derive(Component, Debug, Default)]
 pub struct MovementVector(pub Vec2);
 
-#[derive(Debug, Clone, PartialEq, Component, Eq, Default, Schematic, FromReflect, Reflect)]
-#[reflect(Component, Schematic, Default)]
-
+#[derive(Debug, Clone, PartialEq, Component, Eq, Default, FromReflect, Reflect)]
+#[reflect(Component, Default)]
 pub enum FacingDirection {
     Left,
     #[default]
@@ -1075,7 +1073,6 @@ pub fn toggle_inventory(
     mut game: GameParam,
     key_input: Res<Input<KeyCode>>,
     mouse_input: Res<Input<MouseButton>>,
-    mut proto_commands: ProtoCommands,
     mut dim_event: EventWriter<DimensionSpawnEvent>,
     proto: ProtoParam,
     inv: Query<&Inventory>,
@@ -1147,30 +1144,30 @@ pub fn toggle_inventory(
             if !can_spawn_mob_here(pos, &game, &proto, false) {
                 return;
             }
-            // proto_commands.spawn_item_from_proto(WorldObject::Crate, &proto, pos, 1, None);
-            // proto_commands.spawn_item_from_proto(WorldObject::TimeFragment, &proto, pos, 1, None);
-            // proto_commands.spawn_item_from_proto(WorldObject::Dagger, &proto, pos, 1, Some(5));
-            // proto_commands.spawn_item_from_proto(WorldObject::WoodBow, &proto, pos, 1, Some(5));
-            // proto_commands.spawn_item_from_proto(WorldObject::Claw, &proto, pos, 1, Some(5));
-            // proto_commands.spawn_item_from_proto(WorldObject::IceStaff, &proto, pos, 1, Some(5));
-            // proto_commands.spawn_item_from_proto(WorldObject::BasicStaff, &proto, pos, 1, Some(5));
-            // proto_commands.spawn_from_proto(Mob::VoidCrawler, &proto.prototypes, pos);
-            // proto_commands.spawn_from_proto(Mob::Lizard, &proto.prototypes, pos);
-            // proto_commands.spawn_from_proto(Mob::StingFly, &proto.prototypes, pos);
-            // proto_commands.spawn_from_proto(Mob::FurDevil, &proto.prototypes, pos);
-            // proto_commands.spawn_from_proto(Mob::VoidWorm, &proto.prototypes, pos);
-            proto_commands.spawn_from_proto(Mob::RedMushking, &proto.prototypes, pos);
-            // proto_commands.spawn_from_proto(Mob::FurDevil, &proto.prototypes, pos);
-            // proto_commands.spawn_from_proto(Mob::BigCactus, &proto.prototypes, pos);
-            // proto_commands.spawn_from_proto(Mob::SmallCactus, &proto.prototypes, pos);
-            // proto_commands.spawn_from_proto(Mob::Bull, &proto.prototypes, pos);
-            // proto_commands.spawn_from_proto(Mob::Fairy, &proto.prototypes, pos);
-            // proto_commands.spawn_from_proto(Mob::FurDevil, &proto.prototypes, pos);
+            // commands.spawn_item_from_proto(WorldObject::Crate, &proto, pos, 1, None);
+            // commands.spawn_item_from_proto(WorldObject::TimeFragment, &proto, pos, 1, None);
+            // commands.spawn_item_from_proto(WorldObject::Dagger, &proto, pos, 1, Some(5));
+            // commands.spawn_item_from_proto(WorldObject::WoodBow, &proto, pos, 1, Some(5));
+            // commands.spawn_item_from_proto(WorldObject::Claw, &proto, pos, 1, Some(5));
+            // commands.spawn_item_from_proto(WorldObject::IceStaff, &proto, pos, 1, Some(5));
+            // commands.spawn_item_from_proto(WorldObject::BasicStaff, &proto, pos, 1, Some(5));
+            // commands.spawn_from_proto(Mob::VoidCrawler, &proto.defs, pos);
+            // commands.spawn_from_proto(Mob::Lizard, &proto.defs, pos);
+            // commands.spawn_from_proto(Mob::StingFly, &proto.defs, pos);
+            // commands.spawn_from_proto(Mob::FurDevil, &proto.defs, pos);
+            // commands.spawn_from_proto(Mob::VoidWorm, &proto.defs, pos);
+            commands.spawn_from_proto(Mob::RedMushking, &proto.defs, pos);
+            // commands.spawn_from_proto(Mob::FurDevil, &proto.defs, pos);
+            // commands.spawn_from_proto(Mob::BigCactus, &proto.defs, pos);
+            // commands.spawn_from_proto(Mob::SmallCactus, &proto.defs, pos);
+            // commands.spawn_from_proto(Mob::Bull, &proto.defs, pos);
+            // commands.spawn_from_proto(Mob::Fairy, &proto.defs, pos);
+            // commands.spawn_from_proto(Mob::FurDevil, &proto.defs, pos);
             // commands.entity(t.unwrap()).insert(MobLevel(10));
-            // proto_commands.spawn_from_proto(Mob::RedMushking, &proto.prototypes, pos);
-            // let f = proto_commands.spawn_from_proto(Mob::SpikeSlime, &proto.prototypes, pos);
+            // commands.spawn_from_proto(Mob::RedMushking, &proto.defs, pos);
+            // let f = commands.spawn_from_proto(Mob::SpikeSlime, &proto.defs, pos);
             // commands.entity(f.unwrap()).insert(MobLevel(10));
-            // proto_commands.spawn_from_proto(Mob::Slime, &proto.prototypes, pos);
+            // commands.spawn_from_proto(Mob::Slime, &proto.defs, pos);
         }
     }
 }

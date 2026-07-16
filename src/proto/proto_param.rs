@@ -1,9 +1,13 @@
 use bevy::{ecs::system::SystemParam, prelude::*};
-use bevy_proto::prelude::*;
 use core::fmt::Display;
 
 use crate::{
     assets::Graphics,
+    defs::{
+        lookup::DefComponent,
+        registry::GameDefs,
+        types::SpriteSheetDef,
+    },
     inventory::ItemStack,
     item::{
         melee::MeleeAttack,
@@ -12,139 +16,75 @@ use crate::{
     },
 };
 
-use super::SpriteSheetProto;
-
+/// Game-definition lookups + shared asset handles.
+///
+/// Formerly backed by `bevy_proto`; now reads exclusively from [`GameDefs`].
+/// Spawn goes through [`crate::custom_commands::CommandsExt`] on [`Commands`].
 #[derive(SystemParam)]
-pub struct ProtoParam<'w, 's> {
-    pub proto_commands: ProtoCommands<'w, 's>,
-    pub prototypes: Prototypes<'w>,
-    pub prototype_assets: Res<'w, Assets<Prototype>>,
+pub struct ProtoParam<'w> {
     pub meshes: ResMut<'w, Assets<Mesh>>,
     pub graphics: Res<'w, Graphics>,
     pub asset_server: Res<'w, AssetServer>,
+    pub defs: Res<'w, GameDefs>,
 }
-impl<'w, 's> ProtoParam<'w, 's> {
-    pub fn get_prototype(&self, id: &str) -> Option<&Prototype> {
-        self.prototype_assets.get(
-            self.prototypes
-                .get(format!("proto/{}.prototype.ron", id.to_lowercase()))?,
-        )
+
+impl<'w> ProtoParam<'w> {
+    fn def_by_name<'a, T: Display + Clone + Into<&'a str>>(
+        &self,
+        obj: T,
+    ) -> Option<&crate::defs::types::EntityDef> {
+        let id = <T as Into<&str>>::into(obj);
+        self.defs.get(id)
     }
-    pub fn get_item_data<'a, T: Display + Schematic + Clone + Into<&'a str>>(
+
+    pub fn get_item_data<'a, T: Display + Clone + Into<&'a str>>(
         &self,
         obj: T,
     ) -> Option<&ItemStack> {
-        let id = <T as Into<&str>>::into(obj).to_owned();
-        if let Some(data) = self.get_prototype(&id) {
-            if let Some(data) = data.schematics().get::<ItemStack>() {
-                return data.input().downcast_ref::<ItemStack>();
-            }
-            None
-        } else {
-            warn!("Could not get item data for: {}", id);
-            None
-        }
+        self.def_by_name(obj).and_then(|d| d.item_stack.as_ref())
     }
-    pub fn get_component<
-        'a,
-        C: Component + Schematic,
-        T: Display + Schematic + Clone + Into<&'a str>,
-    >(
+
+    pub fn get_component<'a, C: DefComponent, T: Display + Clone + Into<&'a str>>(
         &self,
         obj: T,
     ) -> Option<&C> {
-        let id = <T as Into<&str>>::into(obj).to_owned();
-        if let Some(data) = self.get_prototype(&id) {
-            if let Some(data) = data.schematics().get::<C>() {
-                return data.input().downcast_ref::<C>();
-            }
-            None
-        } else {
-            warn!("Could not get component for: {}", id);
-            None
-        }
+        let def = self.def_by_name(obj)?;
+        C::get_from_def(def)
     }
-    pub fn get_world_object<'a, T: Display + Schematic + Clone + Into<&'a str>>(
+
+    pub fn get_world_object<'a, T: Display + Clone + Into<&'a str>>(
         &self,
         obj: T,
     ) -> Option<&WorldObject> {
-        let id = <T as Into<&str>>::into(obj).to_owned();
-        if let Some(data) = self.get_prototype(&id) {
-            data.schematics()
-                .get::<WorldObject>()
-                .unwrap()
-                .input()
-                .downcast_ref::<WorldObject>()
-        } else {
-            warn!("Could not get world object data for: {}", id);
-            None
-        }
+        self.def_by_name(obj).and_then(|d| d.world_object.as_ref())
     }
-    /// Returns the [RangedAttack] component for the given item if it exists
-    pub fn is_item_ranged_weapon<'a, T: Display + Schematic + Clone + Into<&'a str>>(
+
+    pub fn is_item_ranged_weapon<'a, T: Display + Clone + Into<&'a str>>(
         &self,
         obj: T,
     ) -> Option<&RangedAttack> {
-        let id = <T as Into<&str>>::into(obj).to_owned();
-
-        if let Some(data) = self.get_prototype(&id) {
-            let Some(data) = data.schematics().get::<RangedAttack>() else {
-                return None;
-            };
-            data.input().downcast_ref::<RangedAttack>()
-        } else {
-            warn!("Could not get item data for: {}", id);
-            None
-        }
+        self.def_by_name(obj).and_then(|d| d.ranged.as_ref())
     }
-    /// Returns the [MeleeAttack] component for the given item if it exists
-    pub fn is_item_melee_weapon<'a, T: Display + Schematic + Clone + Into<&'a str>>(
+
+    pub fn is_item_melee_weapon<'a, T: Display + Clone + Into<&'a str>>(
         &self,
         obj: T,
     ) -> Option<&MeleeAttack> {
-        let id = <T as Into<&str>>::into(obj).to_owned();
-
-        if let Some(data) = self.get_prototype(&id) {
-            let Some(data) = data.schematics().get::<MeleeAttack>() else {
-                return None;
-            };
-            data.input().downcast_ref::<MeleeAttack>()
-        } else {
-            warn!("Could not get item data for: {}", id);
-            None
-        }
+        self.def_by_name(obj).and_then(|d| d.melee.as_ref())
     }
-    pub fn get_projectile_state<'a, T: Display + Schematic + Clone + Into<&'a str>>(
+
+    pub fn get_projectile_state<'a, T: Display + Clone + Into<&'a str>>(
         &self,
         obj: T,
     ) -> Option<&ProjectileState> {
-        let id = <T as Into<&str>>::into(obj).to_owned();
-
-        if let Some(data) = self.get_prototype(&id) {
-            data.schematics()
-                .get::<ProjectileState>()
-                .unwrap()
-                .input()
-                .downcast_ref::<ProjectileState>()
-        } else {
-            warn!("Could not get projectile data for: {}", id);
-            None
-        }
+        self.def_by_name(obj)
+            .and_then(|d| d.projectile_state.as_ref())
     }
-    pub fn get_sprite_sheet_data<'a, T: Display + Schematic + Clone + Into<&'a str>>(
+
+    pub fn get_sprite_sheet_data<'a, T: Display + Clone + Into<&'a str>>(
         &self,
         obj: T,
-    ) -> Option<&SpriteSheetProto> {
-        let id = <T as Into<&str>>::into(obj).to_owned();
-
-        if let Some(data) = self.get_prototype(&id) {
-            if let Some(data) = data.schematics().get::<SpriteSheetProto>() {
-                return data.input().downcast_ref::<SpriteSheetProto>();
-            }
-            None
-        } else {
-            warn!("Could not get sprite sheet data for: {}", id);
-            None
-        }
+    ) -> Option<&SpriteSheetDef> {
+        self.def_by_name(obj).and_then(|d| d.sprite_sheet.as_ref())
     }
 }

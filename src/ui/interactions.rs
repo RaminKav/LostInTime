@@ -17,7 +17,6 @@ use crate::{
 use bevy::ecs::query::Or;
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
-use bevy_proto::prelude::ProtoCommands;
 use leafwing_input_manager::prelude::ActionState;
 
 use crate::gamepad_input::{UiGamepadAction, UiGamepadInputMarker};
@@ -81,9 +80,7 @@ use super::{
     TooltipTeardownEvent, UIContainersParam, UIState, SKILLS_CHOICE_UI_SIZE,
 };
 
-#[derive(
-    Component, Debug, EnumIter, Clone, Display, Hash, PartialEq, Eq, Serialize, Deserialize,
-)]
+#[derive(Component, Debug, EnumIter, Clone, Display, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub enum UIElement {
     Inventory,
     ChestInventory,
@@ -2005,7 +2002,6 @@ pub fn handle_cursor_skills_buttons(
     mut next_ui_state: ResMut<NextState<UIState>>,
     curr_ui_state: Res<State<UIState>>,
     proto: ProtoParam,
-    mut proto_commands: ProtoCommands,
     mut commands: Commands,
     graphics: Res<Graphics>,
     mut pick_params: SkillChoicePickParams,
@@ -2047,7 +2043,7 @@ pub fn handle_cursor_skills_buttons(
                         if ui_state == &UIState::Skills {
                             skill_queue.handle_pick_skill(
                                 picked_skill.clone(),
-                                &mut proto_commands,
+                                &mut commands,
                                 &proto,
                                 t.translation().truncate(),
                                 &mut skills,
@@ -2711,7 +2707,6 @@ pub fn handle_cursor_heirloom_chest_button(
     time_crystals: Res<TimeCrystals>,
     mut player_query: Query<(Entity, &Transform, &mut PlayerSkills, &PlayerLevel), With<Player>>,
     proto: ProtoParam,
-    mut proto_commands: ProtoCommands,
 ) {
     if item_chest_state.chest_type != ChestType::Heirloom {
         return;
@@ -2726,7 +2721,6 @@ pub fn handle_cursor_heirloom_chest_button(
             &mut skill_queue,
             &mut player_query,
             &proto,
-            &mut proto_commands,
             &mut heirloom_chest_events.att_event,
             &mut heirloom_chest_events.chaos_tracker,
         );
@@ -2759,7 +2753,6 @@ pub fn handle_cursor_heirloom_chest_button(
                                 &mut skill_queue,
                                 &mut player_query,
                                 &proto,
-                                &mut proto_commands,
                                 &mut heirloom_chest_events.att_event,
                                 &mut heirloom_chest_events.chaos_tracker,
                             ),
@@ -2770,7 +2763,6 @@ pub fn handle_cursor_heirloom_chest_button(
                                 &mut skill_queue,
                                 &mut player_query,
                                 &proto,
-                                &mut proto_commands,
                                 &mut heirloom_chest_events.att_event,
                                 &mut heirloom_chest_events.chaos_tracker,
                             ),
@@ -2839,7 +2831,6 @@ fn advance_heirloom_chest_state(
     skill_queue: &mut ResMut<HeirloomChoiceQueue>,
     player_query: &mut Query<(Entity, &Transform, &mut PlayerSkills, &PlayerLevel), With<Player>>,
     proto: &ProtoParam,
-    proto_commands: &mut ProtoCommands,
     att_event: &mut EventWriter<AttributeChangeEvent>,
     chaos_tracker: &mut ChaosTracker,
 ) {
@@ -2862,7 +2853,6 @@ fn advance_heirloom_chest_state(
                 skill_queue,
                 player_query,
                 proto,
-                proto_commands,
                 att_event,
                 chaos_tracker,
             );
@@ -2877,7 +2867,6 @@ fn take_heirloom_chest_reward(
     skill_queue: &mut ResMut<HeirloomChoiceQueue>,
     player_query: &mut Query<(Entity, &Transform, &mut PlayerSkills, &PlayerLevel), With<Player>>,
     proto: &ProtoParam,
-    proto_commands: &mut ProtoCommands,
     att_event: &mut EventWriter<AttributeChangeEvent>,
     chaos_tracker: &mut ChaosTracker,
 ) {
@@ -2885,7 +2874,7 @@ fn take_heirloom_chest_reward(
         let picked_heirloom = item_chest_state.picked_heirloom.clone().unwrap();
         skill_queue.grant_heirloom_from_pool(
             picked_heirloom.clone(),
-            proto_commands,
+            commands,
             proto,
             transform.translation.truncate(),
             &mut skills,

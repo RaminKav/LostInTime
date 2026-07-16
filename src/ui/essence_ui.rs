@@ -1,7 +1,6 @@
 use crate::ui::game_fonts as gf;
 use bevy::{ecs::system::ParamSet, prelude::*, render::view::RenderLayers};
 use bevy_aseprite::{anim::AsepriteAnimation, aseprite, AsepriteBundle};
-use bevy_proto::prelude::ProtoCommands;
 use rand::{seq::SliceRandom, Rng};
 use strum::IntoEnumIterator;
 
@@ -1779,7 +1778,6 @@ pub fn handle_submit_merchant_purchase(
     )>,
     mut shop: ResMut<EssenceShopChoices>,
     mut purchase_tracker: ResMut<BlacksmithPurchaseTracker>,
-    mut proto_commands: ProtoCommands,
     proto: ProtoParam,
     mut minimap_event: EventWriter<UpdateMiniMapEvent>,
     mut cache: ResMut<EssenceShopCache>,
@@ -1844,7 +1842,7 @@ pub fn handle_submit_merchant_purchase(
                         .apply_acquisition_effects(&mut chaos_tracker);
                     let player_pos = player_transform.translation().truncate();
                     if let Some((drop, count)) = heirloom_with_rarity.heirloom.get_instant_drop() {
-                        proto_commands.spawn_item_from_proto(
+                        commands.spawn_item_from_proto(
                             drop,
                             &proto,
                             player_pos + Vec2::new(0., -18.),

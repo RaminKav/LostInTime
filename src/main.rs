@@ -64,6 +64,7 @@ mod collider_load_test;
 mod colors;
 mod combat;
 mod custom_commands;
+mod defs;
 mod display_scale;
 mod ecs_helpers;
 mod enemy;
@@ -312,6 +313,7 @@ fn main() {
         .add_plugin(ClientPlugin)
         .add_plugin(client::leaderboard::LeaderboardPlugin)
         .add_plugin(ProtoPlugin)
+        .add_plugin(defs::DefsPlugin)
         .add_plugin(JuicePlugin)
         .add_plugin(PetsPlugin)
         .add_plugin(BlessingsPlugin)
@@ -319,7 +321,7 @@ fn main() {
         .add_startup_system(setup)
         .add_system(update_pixel_perfect_viewport)
         .add_loading_state(
-            LoadingState::new(GameState::Loading).continue_to_state(GameState::LoadingProtos),
+            LoadingState::new(GameState::Loading).continue_to_state(GameState::MainMenu),
         )
         .add_collection_to_loading_state::<_, ImageAssets>(GameState::Loading)
         .add_system(display_main_menu.in_schedule(OnEnter(GameState::MainMenu)))
@@ -491,8 +493,6 @@ pub enum CoreGameSet {
 pub enum GameState {
     #[default]
     Loading,
-    LoadingProtos,
-    LoadingProtosStage2, // Waits for base templates before loading everything
     MainMenu,
     Initializing, // New state for game initialization with loading screen
     Main,

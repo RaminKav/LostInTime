@@ -23,7 +23,6 @@ use rand::Rng;
 use bevy::prelude::*;
 
 use crate::item::ammo::Ammo;
-use bevy_proto::prelude::*;
 use serde::{Deserialize, Serialize};
 
 pub const INVENTORY_SIZE: usize = 8 * 4;
@@ -125,19 +124,9 @@ impl Inventory {
     }
 }
 
-#[derive(
-    Component,
-    Debug,
-    PartialEq,
-    Reflect,
-    FromReflect,
-    Schematic,
-    Default,
-    Clone,
-    Serialize,
-    Deserialize,
-)]
-#[reflect(Schematic, Default)]
+#[derive(Component, Debug, PartialEq, Reflect, FromReflect, Default, Clone, Serialize, Deserialize)]
+#[reflect(Default)]
+#[serde(default)]
 pub struct ItemStack {
     pub obj_type: WorldObject,
     pub count: usize,

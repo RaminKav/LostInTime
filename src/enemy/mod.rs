@@ -5,7 +5,6 @@ use bevy::{
     sprite::{Material2d, Material2dPlugin},
     utils::Duration,
 };
-use bevy_proto::prelude::{ReflectSchematic, Schematic};
 use bevy_rapier2d::prelude::{Collider, CollisionGroups, Group};
 use seldom_state::{
     prelude::{StateMachine, Trigger},
@@ -36,7 +35,7 @@ use crate::{
         levels::{ExperienceReward, PlayerLevel},
         Player,
     },
-    proto::{proto_param::ProtoParam, ColliderCapsulProto},
+    proto::proto_param::ProtoParam,
     ui::minimap::UpdateMiniMapEvent,
     world::{dungeon::Dungeon, TileMapPosition},
     AppExt, GameParam, GameState,
@@ -145,24 +144,7 @@ impl Plugin for EnemyPlugin {
     }
 }
 
-#[derive(
-    Component,
-    Default,
-    Debug,
-    Clone,
-    Hash,
-    Display,
-    Eq,
-    PartialEq,
-    Schematic,
-    Reflect,
-    FromReflect,
-    IntoStaticStr,
-    EnumIter,
-    Serialize,
-    Deserialize,
-)]
-#[reflect(Schematic)]
+#[derive(Component, Default, Debug, Clone, Hash, Display, Eq, PartialEq, Reflect, FromReflect, IntoStaticStr, EnumIter, Serialize, Deserialize)]
 pub enum Mob {
     #[default]
     None,
@@ -258,10 +240,7 @@ impl Mob {
         }
     }
 }
-#[derive(
-    Component, Default, Deserialize, Debug, Clone, Schematic, Reflect, FromReflect, PartialEq, Eq,
-)]
-#[reflect(Schematic)]
+#[derive(Component, Default, Deserialize, Debug, Clone, Reflect, FromReflect, PartialEq, Eq)]
 pub enum CombatAlignment {
     #[default]
     Passive,
@@ -269,12 +248,10 @@ pub enum CombatAlignment {
     Hostile,
 }
 
-#[derive(Component, Default, Deserialize, Debug, Clone, FromReflect, Schematic, Reflect)]
-#[reflect(Schematic)]
+#[derive(Component, Default, Deserialize, Debug, Clone, FromReflect, Reflect)]
 pub struct EliteMob;
 
-#[derive(Component, Default, Deserialize, Debug, Clone, Schematic, Reflect, FromReflect)]
-#[reflect(Schematic)]
+#[derive(Component, Default, Deserialize, Debug, Clone, Reflect, FromReflect)]
 pub struct FollowSpeed(pub f32);
 
 pub struct EnemySpawnEvent {
@@ -282,12 +259,12 @@ pub struct EnemySpawnEvent {
     pub pos: TileMapPosition,
 }
 
-#[derive(Reflect, FromReflect, Default, Schematic, Component, Clone, Debug, Copy)]
-#[reflect(Component, Schematic)]
+#[derive(Reflect, FromReflect, Default, Component, Clone, Debug, Copy)]
+#[reflect(Component)]
 pub struct MobLevel(pub u8);
 
-#[derive(FromReflect, Debug, Default, Reflect, Clone, Component, Schematic)]
-#[reflect(Component, Schematic, Default)]
+#[derive(FromReflect, Debug, Default, Reflect, Clone, Component)]
+#[reflect(Component, Default)]
 pub struct LeapAttack {
     pub activation_distance: f32,
     pub duration: f32,
@@ -305,8 +282,8 @@ pub struct LeapAttack {
 pub struct MobIsAttacking(pub Mob);
 
 /// Small Cactus attack config: spawns a circle hitbox in front of itself.
-#[derive(FromReflect, Debug, Default, Reflect, Clone, Component, Schematic)]
-#[reflect(Component, Schematic, Default)]
+#[derive(FromReflect, Debug, Default, Reflect, Clone, Component, Deserialize)]
+#[reflect(Component, Default)]
 pub struct CircleAttack {
     pub activation_distance: f32,
     pub cooldown: f32,
@@ -320,8 +297,9 @@ pub struct CircleAttack {
 }
 
 /// Big Cactus attack config: triple-hit leap.
-#[derive(FromReflect, Debug, Reflect, Clone, Component, Schematic)]
-#[reflect(Component, Schematic, Default)]
+#[derive(FromReflect, Debug, Reflect, Clone, Component, Deserialize)]
+#[reflect(Component, Default)]
+#[serde(default)]
 pub struct MultiLeapAttack {
     pub activation_distance: f32,
     pub duration_per_hit: f32,
@@ -354,8 +332,8 @@ impl Default for MultiLeapAttack {
 }
 
 /// Bull charge attack config.
-#[derive(FromReflect, Debug, Default, Reflect, Clone, Component, Schematic)]
-#[reflect(Component, Schematic, Default)]
+#[derive(FromReflect, Debug, Default, Reflect, Clone, Component, Deserialize)]
+#[reflect(Component, Default)]
 pub struct BullChargeAttack {
     pub activation_distance: f32,
     pub charge_speed: f32,
@@ -367,8 +345,9 @@ pub struct BullChargeAttack {
     pub stop_duration: f32,
 }
 
-#[derive(FromReflect, Reflect, Clone, Component, Schematic)]
-#[reflect(Component, Schematic, Default)]
+#[derive(FromReflect, Reflect, Clone, Component, Deserialize)]
+#[reflect(Component, Default)]
+#[serde(default)]
 pub struct ProjectileAttack {
     pub activation_distance: f32,
     pub cooldown: f32,
@@ -396,8 +375,9 @@ impl Default for ProjectileAttack {
 /// stationary laser (a separate aseprite) in a random cardinal direction for
 /// `laser_duration` seconds, then walks for `walk_duration` seconds before
 /// repeating. See [`crate::enemy::void_worm`].
-#[derive(FromReflect, Debug, Reflect, Clone, Component, Schematic)]
-#[reflect(Component, Schematic, Default)]
+#[derive(FromReflect, Debug, Reflect, Clone, Component, Deserialize)]
+#[reflect(Component, Default)]
+#[serde(default)]
 pub struct LaserAttack {
     /// Closest the worm will stop before firing.
     pub min_stop_distance: f32,
@@ -639,12 +619,11 @@ fn juice_up_spawned_elite_mobs(
             })
             .collect();
         let collider_scale_up = 1.5;
-        let mut collider_proto = proto
-            .get_component::<ColliderCapsulProto, _>(mob.clone())
-            .expect("mob should have collider")
-            .clone();
-        collider_proto.scale(collider_scale_up);
-        let collider: Collider = collider_proto.clone().into();
+        let collider = proto
+            .defs
+            .get_mob_def(mob.clone())
+            .and_then(|d| d.scaled_capsule_collider(collider_scale_up))
+            .expect("mob should have collider");
         commands.entity(e).insert(collider);
         sprite.custom_size = Some(Vec2::new(48., 48.));
     }

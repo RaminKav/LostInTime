@@ -44,9 +44,9 @@ use crate::{
 use crate::{BounceEvent, GameParam, DEBUG};
 use bevy::prelude::*;
 use bevy_aseprite::anim::AsepriteAnimation;
-use bevy_proto::prelude::{ReflectSchematic, Schematic};
 use rand::seq::SliceRandom;
 use rand::Rng;
+use serde::Deserialize;
 
 const CHAOS_SHRINE_FLAVOR_TEXTS: [&str; 4] = [
     "You feel the island become tense...",
@@ -55,8 +55,8 @@ const CHAOS_SHRINE_FLAVOR_TEXTS: [&str; 4] = [
     "Something feels off about this shrine...",
 ];
 
-#[derive(Component, Reflect, FromReflect, Schematic, Clone, Default)]
-#[reflect(Component, Schematic)]
+#[derive(Component, Reflect, FromReflect, Clone, Default, Debug, Deserialize)]
+#[reflect(Component)]
 pub enum ObjectAction {
     #[default]
     None,
@@ -85,8 +85,8 @@ pub enum ObjectAction {
     TimePortal,
 }
 
-#[derive(Component, Reflect, FromReflect, Schematic, Default)]
-#[reflect(Component, Schematic)]
+#[derive(Component, Reflect, FromReflect, Default, Clone, Debug, Deserialize)]
+#[reflect(Component)]
 pub enum ObjectActionCost {
     #[default]
     None,
@@ -95,8 +95,8 @@ pub enum ObjectActionCost {
     Item(WorldObject, usize),
 }
 
-#[derive(Component, Reflect, FromReflect, Schematic, Default)]
-#[reflect(Component, Schematic)]
+#[derive(Component, Reflect, FromReflect, Default, Deserialize, Clone, Debug)]
+#[reflect(Component)]
 pub enum TouchTriggerObjectAction {
     #[default]
     None,
@@ -627,14 +627,9 @@ impl ObjectAction {
                 });
 
                 let spawn_pos = pos + Vec2::new(0., -18.);
-                // We need both mutable proto_commands and immutable proto_param.
-                // Since spawn_item_from_proto only reads from proto_param, we can safely
-                // create an immutable reference using a raw pointer cast.
-                let proto_ref: &ProtoParam =
-                    unsafe { &*(proto_param as *mut ProtoParam as *const ProtoParam) };
-                proto_param.proto_commands.spawn_item_from_proto(
+                commands.spawn_item_from_proto(
                     WorldObject::Coin,
-                    proto_ref,
+                    proto_param,
                     spawn_pos,
                     20,
                     None,

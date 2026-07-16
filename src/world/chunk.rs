@@ -126,21 +126,7 @@ pub struct DoneCreateChunkEvent;
 pub struct TileEntityCollection {
     pub map: HashMap<ReflectedPos, Entity>,
 }
-#[derive(
-    Component,
-    Reflect,
-    FromReflect,
-    Default,
-    Clone,
-    Copy,
-    Debug,
-    Hash,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Serialize,
-    Deserialize,
-)]
+#[derive(Component, Reflect, FromReflect, Default, Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Serialize, Deserialize)]
 #[reflect_value(Component, Hash, Serialize, Deserialize)]
 pub struct ReflectedPos {
     x: i32,

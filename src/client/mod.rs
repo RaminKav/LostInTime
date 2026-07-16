@@ -16,7 +16,6 @@ use bevy_ecs_tilemap::{
     tiles::{TileColor, TileFlip, TilePos, TilePosOld, TileStorage, TileTextureIndex, TileVisible},
     FrustumCulling,
 };
-use bevy_proto::prelude::ProtoCommands;
 use bevy_save::prelude::*;
 use rand::Rng;
 pub mod analytics;
@@ -807,7 +806,7 @@ pub fn save_state(
 
 pub fn load_state(
     mut commands: Commands,
-    mut proto_commands: ProtoCommands,
+    defs: Res<crate::defs::GameDefs>,
     mut dim_event: EventWriter<DimensionSpawnEvent>,
     mut game_camera: Query<(&mut Transform, &mut RawPosition), With<TextureCamera>>,
     mut era: ResMut<EraManager>,
@@ -862,7 +861,7 @@ pub fn load_state(
     //             commands.insert_resource(data.player_skill_queue);
     //             commands.insert_resource(data.analytics_data);
     //             commands.insert_resource(data.craft_tracker);
-    //             proto_commands.apply(format!(
+    //             commands.apply(format!(
     //                 "Era{}WorldGenerationParams",
     //                 era.current_era.clone().index() + 1
     //             ));
@@ -886,7 +885,7 @@ pub fn load_state(
     //     }
     // }
     if !save_data_exists {
-        proto_commands.apply("Era1WorldGenerationParams");
+        crate::defs::spawn::apply_era_generation(&mut commands, &defs, "Era1WorldGenerationParams");
         commands.init_resource::<WorldObjectCache>();
     }
     commands.insert_resource(GenerationSeed { seed });

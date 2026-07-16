@@ -10,7 +10,6 @@ use std::{
 use strum_macros::{Display, EnumIter};
 
 use bevy::{ecs::system::EntityCommands, prelude::*};
-use bevy_proto::prelude::{ReflectSchematic, Schematic};
 pub mod health_regen;
 pub mod modifiers;
 pub mod set_bonus;
@@ -61,19 +60,9 @@ use self::health_regen::{handle_health_regen, handle_mana_regen};
 pub struct AttributesPlugin;
 pub const MAX_GEAR_LEVEL: u8 = 10;
 aseprite!(pub RarityGlows, "textures/effects/RarityGlows.aseprite");
-#[derive(
-    Component,
-    PartialEq,
-    Clone,
-    Reflect,
-    FromReflect,
-    Schematic,
-    Default,
-    Debug,
-    Serialize,
-    Deserialize,
-)]
-#[reflect(Schematic, Default)]
+#[derive(Component, PartialEq, Clone, Reflect, FromReflect, Default, Debug, Serialize, Deserialize)]
+#[reflect(Default)]
+#[serde(default)]
 pub struct ItemAttributes {
     pub health: AttributeValue,
     pub shield: AttributeValue,
@@ -843,10 +832,9 @@ macro_rules! setup_raw_bonus_attributes {
     (struct $name:ident {
         $($field_name:ident: $field_type:ty,)*
     }) => {
-        #[derive(Component, PartialEq, Clone, Reflect, FromReflect, Schematic, Default, Debug)]
-        #[reflect(Schematic, Default)]
-        pub struct $name {
-            pub $($field_name: $field_type,)*
+        #[derive(Component, PartialEq, Clone, Reflect, FromReflect, Default, Debug, Deserialize)]
+        #[reflect(Default)]        pub struct $name {
+            $(pub $field_name: $field_type,)*
         }
 
         impl $name {
@@ -910,10 +898,9 @@ macro_rules! setup_raw_base_attributes {
     (struct $name:ident {
         $($field_name:ident: $field_type:ty,)*
     }) => {
-        #[derive(Component, PartialEq, Clone, Reflect, FromReflect, Schematic, Default, Debug)]
-        #[reflect(Schematic, Default)]
-        pub struct $name {
-            pub $($field_name: $field_type,)*
+        #[derive(Component, PartialEq, Clone, Reflect, FromReflect, Default, Debug, Deserialize)]
+        #[reflect(Default)]        pub struct $name {
+            $(pub $field_name: $field_type,)*
         }
 
         impl $name {
@@ -1012,21 +999,8 @@ setup_raw_base_attributes! { struct RawItemBaseAttributes {
      skill_power: Option<RangeInclusive<i32>>,
 }}
 
-#[derive(
-    Display,
-    Component,
-    Reflect,
-    FromReflect,
-    Debug,
-    Schematic,
-    Clone,
-    Default,
-    Eq,
-    PartialEq,
-    Serialize,
-    Deserialize,
-)]
-#[reflect(Component, Schematic)]
+#[derive(Display, Component, Reflect, FromReflect, Debug, Clone, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[reflect(Component)]
 pub enum ItemRarity {
     #[default]
     Common,
@@ -1183,13 +1157,11 @@ pub struct PlayerAttributeBundle {
 }
 
 //TODO: Add max health vs curr health
-#[derive(
-    Reflect, FromReflect, Default, Schematic, Component, Clone, Debug, Copy, Serialize, Deserialize,
-)]
-#[reflect(Component, Schematic)]
+#[derive(Reflect, FromReflect, Default, Component, Clone, Debug, Copy, Serialize, Deserialize)]
+#[reflect(Component)]
 pub struct CurrentHealth(pub i32);
-#[derive(Reflect, FromReflect, Default, Schematic, Component, Clone, Debug)]
-#[reflect(Component, Schematic)]
+#[derive(Reflect, FromReflect, Default, Component, Clone, Debug)]
+#[reflect(Component)]
 pub struct CurrentShield(pub i32);
 
 #[derive(Component)]
@@ -1197,21 +1169,21 @@ pub struct ShieldRegen {
     pub regen_timer: Timer,
     pub delay_timer: Timer,
 }
-#[derive(Reflect, FromReflect, Default, Schematic, Component, Clone, Debug, Copy)]
-#[reflect(Component, Schematic)]
+#[derive(Reflect, FromReflect, Default, Component, Clone, Debug, Copy)]
+#[reflect(Component)]
 pub struct MaxMana(pub i32);
-#[derive(Reflect, FromReflect, Default, Schematic, Component, Clone, Debug, Copy)]
-#[reflect(Component, Schematic)]
+#[derive(Reflect, FromReflect, Default, Component, Clone, Debug, Copy)]
+#[reflect(Component)]
 pub struct CurrentMana(pub i32);
 
-#[derive(Reflect, FromReflect, Default, Schematic, Component, Clone, Debug, Copy)]
-#[reflect(Component, Schematic)]
+#[derive(Reflect, FromReflect, Default, Component, Clone, Debug, Copy)]
+#[reflect(Component)]
 pub struct MaxShield(pub i32);
-#[derive(Reflect, FromReflect, Default, Schematic, Component, Clone, Debug, Copy)]
-#[reflect(Component, Schematic)]
+#[derive(Reflect, FromReflect, Default, Component, Clone, Debug, Copy)]
+#[reflect(Component)]
 pub struct MaxHealth(pub i32);
-#[derive(Reflect, FromReflect, Default, Schematic, Component, Clone, Debug, Copy)]
-#[reflect(Component, Schematic)]
+#[derive(Reflect, FromReflect, Default, Component, Clone, Debug, Copy)]
+#[reflect(Component)]
 pub struct Attack(pub i32);
 
 #[derive(Reflect, FromReflect, Default, Component, Clone, Debug, Copy)]
@@ -1324,8 +1296,8 @@ pub struct XpRateBonus(pub i32);
 #[derive(Default, Component, Clone, Debug, Copy)]
 pub struct LootRateBonus(pub i32);
 
-#[derive(Reflect, FromReflect, Default, Schematic, Component, Clone, Debug, Copy)]
-#[reflect(Component, Schematic)]
+#[derive(Reflect, FromReflect, Default, Component, Clone, Debug, Copy)]
+#[reflect(Component)]
 pub struct ManaRegen(pub i32);
 
 pub fn trigger_attribute_update_on_bonus_speed_change(

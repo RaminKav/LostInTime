@@ -31,7 +31,7 @@ use crate::{
 };
 use bevy::{ecs::system::SystemParam, prelude::*};
 use bevy_ecs_tilemap::tiles::TilePos;
-use bevy_proto::prelude::{ReflectSchematic, Schematic};
+use serde::Deserialize;
 
 use super::{CraftingTracker, PlaceItemEvent, Recipes, WorldObject};
 
@@ -60,8 +60,8 @@ fn push_player_consumable_buff(
     }
 }
 
-#[derive(Component, Reflect, FromReflect, Clone, Schematic, Default, PartialEq)]
-#[reflect(Component, Schematic)]
+#[derive(Component, Reflect, FromReflect, Clone, Default, PartialEq, Debug, Deserialize)]
+#[reflect(Component)]
 pub enum ItemAction {
     #[default]
     None,
@@ -166,8 +166,8 @@ fn format_stat_name(attr: &str) -> &'static str {
     }
 }
 
-#[derive(Component, Reflect, FromReflect, Schematic, Default)]
-#[reflect(Component, Schematic)]
+#[derive(Component, Reflect, FromReflect, Default, Clone, Debug, Deserialize)]
+#[reflect(Component)]
 pub struct ItemActions {
     pub actions: Vec<ItemAction>,
 }
@@ -212,11 +212,11 @@ impl ItemActions {
         }
     }
 }
-#[derive(Component, Reflect, FromReflect, Schematic, Default)]
-#[reflect(Component, Schematic)]
+#[derive(Component, Reflect, FromReflect, Default, Clone, Debug)]
+#[reflect(Component)]
 pub struct ManaCost(pub i32);
-#[derive(Component, Reflect, FromReflect, Schematic, Default)]
-#[reflect(Component, Schematic)]
+#[derive(Component, Reflect, FromReflect, Default, Clone, Debug)]
+#[reflect(Component)]
 pub struct ConsumableItem;
 
 pub struct ActionSuccessEvent {
@@ -410,7 +410,7 @@ impl ItemActions {
                     // spawn_new_dungeon_dimension(
                     //     game,
                     //     commands,
-                    //     &mut proto_param.proto_commands,
+                    //     &mut commands,
                     //     &mut item_action_param.move_player_event,
                     // );
                 }

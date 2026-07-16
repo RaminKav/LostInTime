@@ -47,7 +47,6 @@ use active_skill_shrine::{
 use bevy::prelude::*;
 use bevy::reflect::TypeUuid;
 use bevy::utils::HashMap;
-use bevy_proto::prelude::{ProtoCommands, Prototypes, ReflectSchematic, Schematic};
 use combat_shrine::{
     enhance_combat_shrine_mobs, handle_combat_shrine_activate_animation, handle_shrine_rewards,
     CombatShrineMobCounts, CombatShrineMobDeathEvent,
@@ -111,19 +110,17 @@ use self::item_upgrades::{
 };
 use self::projectile::RangedAttackPlugin;
 
-#[derive(Component, Reflect, FromReflect, Schematic)]
-#[reflect(Schematic)]
+#[derive(Component, Reflect, FromReflect, Clone, Debug)]
 pub struct BreaksWith(pub WorldObject);
-#[derive(Component, Reflect, FromReflect, Schematic)]
-#[reflect(Schematic)]
+#[derive(Component, Reflect, FromReflect, Clone, Debug)]
 pub struct PlacesInto(pub WorldObject);
-#[derive(Component, Reflect, FromReflect, Schematic, Default)]
-#[reflect(Component, Schematic)]
+#[derive(Component, Reflect, FromReflect, Default, Clone, Debug)]
+#[reflect(Component)]
 pub struct Block;
 #[derive(Component)]
 pub struct Equipment(pub Limb);
-#[derive(Component, Reflect, Debug, Clone, FromReflect, Schematic, Default, Eq, PartialEq)]
-#[reflect(Component, Schematic)]
+#[derive(Component, Reflect, Debug, Clone, FromReflect, Default, Eq, PartialEq)]
+#[reflect(Component)]
 pub enum EquipmentType {
     #[default]
     None,
@@ -139,8 +136,8 @@ pub enum EquipmentType {
     Axe,
     Pickaxe,
 }
-#[derive(Component, Reflect, Debug, FromReflect, Schematic, Default)]
-#[reflect(Component, Schematic)]
+#[derive(Component, Reflect, Debug, FromReflect, Default, Clone)]
+#[reflect(Component)]
 pub struct RequiredEquipmentType(pub EquipmentType);
 
 impl EquipmentType {
@@ -252,19 +249,8 @@ impl ActiveMainHandState {
 }
 
 /// Represents a single bonus stat line on an item
-#[derive(
-    Component,
-    PartialEq,
-    Clone,
-    Reflect,
-    FromReflect,
-    Schematic,
-    Default,
-    Debug,
-    Serialize,
-    Deserialize,
-)]
-#[reflect(Schematic, Default)]
+#[derive(Component, PartialEq, Clone, Reflect, FromReflect, Default, Debug, Serialize, Deserialize)]
+#[reflect(Default)]
 pub struct BonusStatLine {
     /// The attribute name (e.g., "crit_chance", "dodge", "health")
     pub attribute_name: String,
@@ -276,19 +262,9 @@ pub struct BonusStatLine {
     pub range_percentage: f32,
 }
 
-#[derive(
-    Component,
-    PartialEq,
-    Clone,
-    Reflect,
-    FromReflect,
-    Schematic,
-    Default,
-    Debug,
-    Serialize,
-    Deserialize,
-)]
-#[reflect(Schematic, Default)]
+#[derive(Component, PartialEq, Clone, Reflect, FromReflect, Default, Debug, Serialize, Deserialize)]
+#[reflect(Default)]
+#[serde(default)]
 pub struct ItemDisplayMetaData {
     pub name: String,
     pub desc: Vec<String>,
@@ -300,28 +276,8 @@ pub struct ItemDisplayMetaData {
     pub bonus_stat_lines: Vec<BonusStatLine>,
 }
 /// The core enum of the game, lists everything that can be held or placed in the game
-#[derive(
-    Debug,
-    FromReflect,
-    Reflect,
-    PartialEq,
-    Eq,
-    Clone,
-    Copy,
-    Hash,
-    Serialize,
-    Deserialize,
-    Component,
-    Schematic,
-    IntoStaticStr,
-    Display,
-    Default,
-    Ord,
-    PartialOrd,
-    EnumIter,
-    TypeUuid,
-)]
-#[reflect(Component, Schematic)]
+#[derive(Debug, FromReflect, Reflect, PartialEq, Eq, Clone, Copy, Hash, Serialize, Deserialize, Component, IntoStaticStr, Display, Default, Ord, PartialOrd, EnumIter, TypeUuid)]
+#[reflect(Component)]
 #[uuid = "413be529-bfeb-41b3-9dc0-4b8b380a4c36"]
 pub enum WorldObject {
     #[default]
@@ -737,24 +693,8 @@ pub enum WorldObject {
     StoneGolemCard,
 }
 
-#[derive(
-    Debug,
-    FromReflect,
-    Reflect,
-    PartialEq,
-    Eq,
-    Clone,
-    Copy,
-    Hash,
-    Serialize,
-    Deserialize,
-    Component,
-    Schematic,
-    IntoStaticStr,
-    Display,
-    EnumIter,
-)]
-#[reflect(Component, Schematic)]
+#[derive(Debug, FromReflect, Reflect, PartialEq, Eq, Clone, Copy, Hash, Serialize, Deserialize, Component, IntoStaticStr, Display, EnumIter)]
+#[reflect(Component)]
 pub enum Foliage {
     SmallGreenTree,
     SmallYellowTree,
@@ -792,28 +732,12 @@ impl Default for Foliage {
         Self::SmallGreenTree
     }
 }
-#[derive(Reflect, FromReflect, Default, Schematic, Component, Clone, Debug, Copy)]
-#[reflect(Component, Schematic)]
+#[derive(Reflect, FromReflect, Default, Component, Clone, Debug, Copy)]
+#[reflect(Component)]
 pub struct FoliageSize(pub Vec2);
 
-#[derive(
-    Debug,
-    Reflect,
-    FromReflect,
-    PartialEq,
-    Eq,
-    Clone,
-    Copy,
-    Hash,
-    Serialize,
-    Deserialize,
-    Component,
-    Schematic,
-    Display,
-    IntoStaticStr,
-    EnumIter,
-)]
-#[reflect(Component, Schematic)]
+#[derive(Debug, Reflect, FromReflect, PartialEq, Eq, Clone, Copy, Hash, Serialize, Deserialize, Component, Display, IntoStaticStr, EnumIter)]
+#[reflect(Component)]
 pub enum Wall {
     StoneWall,
     WoodWall,
@@ -1699,8 +1623,6 @@ impl Plugin for ItemsPlugin {
 }
 
 pub fn handle_placing_world_object(
-    mut proto_commands: ProtoCommands,
-    prototypes: Prototypes,
     mut minimap_event: EventWriter<UpdateMiniMapEvent>,
     mut proto_param: ProtoParam,
     mut game: GameParam,
@@ -1736,12 +1658,7 @@ pub fn handle_placing_world_object(
         match chunk_entity {
             Some(chunk) => {
                 let is_touching_air = true;
-                let item = proto_commands.spawn_object_from_proto(
-                    place_event.obj,
-                    pos,
-                    &prototypes,
-                    &mut proto_param,
-                    is_touching_air,
+                let item = commands.spawn_object_from_proto(place_event.obj, pos, &proto_param, is_touching_air,
                 );
                 match item {
                     Some(item_e) => {
@@ -1915,7 +1832,6 @@ pub fn handle_break_object(
     mut commands: Commands,
     proto_param: ProtoParam,
     mut game: GameParam,
-    mut proto_commands: ProtoCommands,
     mut obj_break_events: EventReader<ObjBreakEvent>,
     mut minimap_event: EventWriter<UpdateMiniMapEvent>,
     mut wall_break_event: EventWriter<WallBreakEvent>,
@@ -2023,7 +1939,7 @@ pub fn handle_break_object(
                     pos.y + rng.gen_range(-drop_spread..drop_spread),
                     0.,
                 );
-                proto_commands.spawn_item_from_proto(
+                commands.spawn_item_from_proto(
                     drop.obj_type,
                     &proto_param,
                     pos.truncate(),

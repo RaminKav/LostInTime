@@ -91,7 +91,9 @@ pub fn handle_pet_spawner_interaction(
                             PetState::default(),
                             YSort(0.001),
                             Collider::capsule(Vec2::new(0., -6.), Vec2::new(0., -6.), 5.0),
-                            Transform::from_translation(spawner_t.translation()),
+                            TransformBundle::from_transform(Transform::from_translation(
+                                spawner_t.translation(),
+                            )),
                             Name::new(format!("{:?} Pet", pet_type)),
                         ));
                     }

@@ -1,7 +1,6 @@
 use bevy::prelude::*;
 use bevy_aseprite::{anim::AsepriteAnimation, aseprite, AsepriteBundle};
-use bevy_proto::backend::schematics::ReflectSchematic;
-use bevy_proto::prelude::Schematic;
+use serde::Deserialize;
 use bevy_rapier2d::prelude::{
     Collider, CollisionGroups, Group, KinematicCharacterController, Sensor,
 };
@@ -79,8 +78,8 @@ const TAIL_ATTACK_SOUTH: &str = "tail-attack-south";
 const TAIL_ATTACK_NORTH: &str = "tail-attack-north";
 
 /// Scorpion boss claw attack config: 3-phase (prep -> loop -> attack with lunge + 34x34 hitbox).
-#[derive(FromReflect, Debug, Default, Reflect, Clone, Component, Schematic)]
-#[reflect(Component, Schematic, Default)]
+#[derive(FromReflect, Debug, Default, Reflect, Clone, Component, Deserialize)]
+#[reflect(Component, Default)]
 pub struct ScorpionClawAttack {
     pub activation_distance: f32,
     pub cooldown: f32,
@@ -99,8 +98,8 @@ pub struct ScorpionClawAttack {
 }
 
 /// Scorpion boss tail attack config: 3-phase (prep -> loop -> attack, 3 waves of cone projectiles).
-#[derive(FromReflect, Debug, Default, Reflect, Clone, Component, Schematic)]
-#[reflect(Component, Schematic, Default)]
+#[derive(FromReflect, Debug, Default, Reflect, Clone, Component, Deserialize)]
+#[reflect(Component, Default)]
 pub struct ScorpionTailAttack {
     pub activation_distance: f32,
     pub cooldown: f32,
@@ -117,8 +116,8 @@ pub struct ScorpionTailAttack {
 }
 
 /// Scorpion boss passive tornado attack config: periodically spawns a desert tornado.
-#[derive(FromReflect, Debug, Default, Reflect, Clone, Component, Schematic)]
-#[reflect(Component, Schematic, Default)]
+#[derive(FromReflect, Debug, Default, Reflect, Clone, Component, Deserialize)]
+#[reflect(Component, Default)]
 pub struct ScorpionTornadoAttack {
     /// Seconds between tornado spawns.
     pub interval: f32,

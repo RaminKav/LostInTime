@@ -1,5 +1,4 @@
 use bevy::prelude::*;
-use bevy_proto::prelude::{ProtoCommands, ReflectSchematic, Schematic};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use strum_macros::{Display, IntoStaticStr};
@@ -29,28 +28,14 @@ use crate::{
 
 use super::{item_upgrades::ArrowSpeedUpgrade, WorldObject};
 
-#[derive(Component, Reflect, Schematic, FromReflect, Default, Clone)]
-#[reflect(Component, Schematic)]
+#[derive(Component, Reflect, FromReflect, Default, Clone, Debug)]
+#[reflect(Component)]
 pub struct RangedAttack(pub Projectile);
 
 pub struct RangedAttackPlugin;
 
-#[derive(
-    Deserialize,
-    FromReflect,
-    Default,
-    Reflect,
-    Clone,
-    Serialize,
-    Component,
-    Schematic,
-    IntoStaticStr,
-    Display,
-    Debug,
-    PartialEq,
-    Eq,
-)]
-#[reflect(Component, Schematic)]
+#[derive(Deserialize, FromReflect, Default, Reflect, Clone, Copy, Hash, Serialize, Component, IntoStaticStr, Display, Debug, PartialEq, Eq)]
+#[reflect(Component)]
 pub enum Projectile {
     #[default]
     None,
@@ -251,8 +236,9 @@ pub enum AnimVisualCategory {
     Heirloom,
 }
 
-#[derive(Deserialize, FromReflect, Default, Reflect, Clone, Serialize, Component, Schematic)]
-#[reflect(Component, Schematic, Default)]
+#[derive(Deserialize, FromReflect, Default, Reflect, Clone, Serialize, Component, Debug)]
+#[reflect(Component, Default)]
+#[serde(default)]
 pub struct ProjectileState {
     pub speed: f32,
     pub direction: Vec2,
@@ -262,12 +248,12 @@ pub struct ProjectileState {
     pub mana_bar_full: bool,
     pub despawn_on_hit: bool,
     /// Bow arrows only: despawn after piercing this many world objects (not mobs).
-    #[serde(default)]
     pub world_object_pierce_count: u8,
 }
 
-#[derive(Deserialize, FromReflect, Default, Reflect, Clone, Serialize, Component, Schematic)]
-#[reflect(Component, Schematic, Default)]
+#[derive(Deserialize, FromReflect, Default, Reflect, Clone, Serialize, Component)]
+#[reflect(Component, Default)]
+#[serde(default)]
 pub struct ArcProjectileData {
     pub size: Vec2,
     pub col_size: Vec2,
@@ -605,7 +591,6 @@ fn handle_spawn_projectiles_after_delay(
     mut projectiles: Query<(Entity, &mut ProjectileSpawnMarker)>,
     time: Res<Time>,
     proto: ProtoParam,
-    mut proto_commands: ProtoCommands,
     game: GameParam,
     cursor_pos: Res<CursorPos>,
     mut commands: Commands,
@@ -649,7 +634,7 @@ fn handle_spawn_projectiles_after_delay(
             } else {
                 (proj.pos, proj.direction)
             };
-            let p = proto_commands.spawn_projectile_from_proto(
+            let p = commands.spawn_projectile_from_proto(
                 proj.proj.clone(),
                 &proto,
                 spawn_pos,

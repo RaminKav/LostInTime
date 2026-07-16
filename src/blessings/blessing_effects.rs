@@ -1,5 +1,4 @@
 use bevy::prelude::*;
-use bevy_proto::prelude::ProtoCommands;
 use rand::seq::SliceRandom;
 use rand::Rng;
 use strum::IntoEnumIterator;
@@ -615,7 +614,6 @@ fn grant_specific_heirloom(
 
 pub fn spawn_blessing_item_drops(
     mut blessing_item_rewards: ResMut<BlessingItemRewards>,
-    mut proto_commands: ProtoCommands,
     proto: ProtoParam,
     mut commands: Commands,
 ) {
@@ -627,7 +625,7 @@ pub fn spawn_blessing_item_drops(
         let is_gear = item.is_weapon() || item.is_armor() || item.is_accessory();
         let level = if is_gear { Some(1) } else { None };
         if let Some(entity) =
-            proto_commands.spawn_item_from_proto(item, &proto, Vec2::new(x, y), 1, level)
+            commands.spawn_item_from_proto(item, &proto, Vec2::new(x, y), 1, level)
         {
             // Forcing rarity only applies to gear, which resolves its rarity from raw attributes.
             if let Some(rarity) = drop.forced_rarity.clone() {

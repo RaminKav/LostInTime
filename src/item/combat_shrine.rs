@@ -1,6 +1,5 @@
 use bevy::{prelude::*, utils::HashMap};
 use bevy_aseprite::aseprite;
-use bevy_proto::prelude::ProtoCommands;
 use rand::{seq::IteratorRandom, Rng};
 
 use crate::{
@@ -64,17 +63,15 @@ pub fn handle_combat_shrine_activate_animation(
                 * Vec2::splat(TILE_SIZE.x);
             let spawn_pos = t.translation().truncate() + offset;
             let choice_mob = rng.gen_range(0..possible_spawns.len());
-            if let Some(mob) = proto_param.proto_commands.spawn_from_proto(
+            if let Some(mob) = commands.spawn_from_proto(
                 possible_spawns[choice_mob].clone(),
-                &proto_param.prototypes,
+                &proto_param.defs,
                 spawn_pos,
             ) {
                 spawned += 1;
-                commands.entity(mob).insert(EliteMob);
-                proto_param
-                    .proto_commands
-                    .commands()
+                commands
                     .entity(mob)
+                    .insert(EliteMob)
                     .insert(CombatAlignment::Hostile)
                     .insert(LootTable {
                         drops: vec![
@@ -130,9 +127,8 @@ fn complete_combat_shrine(
     tile_pos: TileMapPosition,
     shrine_entity: Option<Entity>,
     shrines: &mut Query<(Entity, &GlobalTransform, &CombatShrine)>,
-    proto_commands: &mut ProtoCommands,
-    proto: &ProtoParam,
     commands: &mut Commands,
+    proto: &ProtoParam,
     game: &mut GameParam,
     minimap_event: &mut EventWriter<UpdateMiniMapEvent>,
 ) {
@@ -159,7 +155,7 @@ fn complete_combat_shrine(
         crate::world::world_helpers::tile_pos_to_world_pos(tile_pos, false) + Vec2::new(0., -26.)
     };
 
-    proto_commands.spawn_item_from_proto(
+    commands.spawn_item_from_proto(
         picked_drop,
         proto,
         reward_pos,
@@ -202,7 +198,6 @@ pub fn persist_combat_shrine_done(
 pub fn handle_shrine_rewards(
     mut shrine_mob_event: EventReader<CombatShrineMobDeathEvent>,
     mut shrines: Query<(Entity, &GlobalTransform, &CombatShrine)>,
-    mut proto_commands: ProtoCommands,
     proto: ProtoParam,
     mut commands: Commands,
     mut game: GameParam,
@@ -224,9 +219,8 @@ pub fn handle_shrine_rewards(
             event.tile_pos,
             shrine_entity,
             &mut shrines,
-            &mut proto_commands,
-            &proto,
             &mut commands,
+            &proto,
             &mut game,
             &mut minimap_event,
         );

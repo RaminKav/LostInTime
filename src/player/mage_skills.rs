@@ -1,6 +1,5 @@
 use bevy::prelude::*;
 use bevy_aseprite::{anim::AsepriteAnimation, aseprite, Aseprite};
-use bevy_proto::prelude::ProtoCommands;
 use bevy_rapier2d::{geometry::Collider, prelude::KinematicCharacterController};
 
 use crate::{
@@ -138,7 +137,6 @@ pub fn handle_teleport(
     aim: Res<crate::aim::AimState>,
     game: GameParam,
     proto_param: ProtoParam,
-    mut proto_commands: ProtoCommands,
     mut commands: Commands,
     time: Res<Time>,
 ) {
@@ -211,7 +209,7 @@ pub fn handle_teleport(
             (dmg.0 as f32 * power_mult * attack_damage_multiplier(TELEPORT_SHOCK_ATTACK_PERCENT))
                 as i32;
         let shock_midpoint = from_2d + to_dest * 0.5;
-        if let Some(shock_e) = proto_commands.spawn_projectile_from_proto(
+        if let Some(shock_e) = commands.spawn_projectile_from_proto(
             Projectile::TeleportLightning,
             &proto_param,
             shock_midpoint,

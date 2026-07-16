@@ -35,9 +35,7 @@ impl GroundPatchData {
 }
 
 /// Logical identifiers for decorative ground patch sprites (grass and desert).
-#[derive(
-    Deserialize, Debug, Hash, PartialEq, Eq, Clone, Copy, Reflect, FromReflect, Component, Default,
-)]
+#[derive(Deserialize, Debug, Hash, PartialEq, Eq, Clone, Copy, Reflect, FromReflect, Component, Default)]
 #[reflect(Component)]
 pub enum GroundPatch {
     #[default]

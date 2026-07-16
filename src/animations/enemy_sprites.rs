@@ -7,7 +7,6 @@
 
 use bevy::prelude::*;
 use bevy_aseprite::{anim::AsepriteAnimation, aseprite, AsepriteBundle};
-use bevy_proto::prelude::{ReflectSchematic, Schematic};
 
 use crate::{
     assets::Graphics,
@@ -22,8 +21,8 @@ use super::AnimationTimer;
 
 aseprite!(pub AttackWarning, "textures/effects/AttackWarning.aseprite");
 
-#[derive(Component, Schematic, Reflect, FromReflect, Eq, PartialEq, Debug, Default)]
-#[reflect(Schematic, Default)]
+#[derive(Component, Reflect, FromReflect, Eq, PartialEq, Debug, Default, Clone)]
+#[reflect(Default)]
 pub enum EnemyAnimationState {
     Idle,
     #[default]
@@ -33,12 +32,11 @@ pub enum EnemyAnimationState {
     Death,
     Dash,
 }
-#[derive(Component, Schematic, Reflect, FromReflect, Eq, PartialEq, Debug, Default)]
-#[reflect(Schematic, Default)]
+#[derive(Component, Reflect, FromReflect, Eq, PartialEq, Debug, Default)]
+#[reflect(Default)]
 pub struct LeftFacingSideProfile;
 
-#[derive(Component, Clone, Schematic, Reflect, FromReflect)]
-#[reflect(Schematic)]
+#[derive(Component, Clone, Reflect, FromReflect, Debug)]
 pub struct CharacterAnimationSpriteSheetData {
     pub animation_frames: Vec<u8>,
     pub anim_offset: usize,

@@ -5,7 +5,6 @@ use bevy::prelude::*;
 
 use bevy_aseprite::anim::AsepriteAnimation;
 use bevy_aseprite::Aseprite;
-use bevy_proto::prelude::ProtoCommands;
 use bevy_rapier2d::prelude::Collider;
 use combat_helpers::{
     handle_deferred_aseprite_spawns, spawn_one_time_aseprite_collider, tick_despawn_timer,
@@ -334,7 +333,6 @@ fn handle_enemy_death(
     loot_tables: Query<&LootTable>,
     mob_data: Query<(&Mob, &MobLevel, Option<&EliteMob>)>,
     mut player_xp: Query<(&PlayerLevel, &PlayerSkills, &OwnedBlessings)>,
-    mut proto_commands: ProtoCommands,
     mut commands: Commands,
     infinite_mode: Res<InfiniteMode>,
     enemies: Query<(Entity, &GlobalTransform), (With<Mob>, Without<Player>)>,
@@ -394,7 +392,7 @@ fn handle_enemy_death(
                         let mut rng = rand::thread_rng();
                         let d = if mob.is_boss() { 30. } else { 10. };
                         let drop_offset = Vec2::new(rng.gen_range(-d..d), rng.gen_range(-d..d));
-                        let drop_e = proto_commands.spawn_item_from_proto(
+                        let drop_e = commands.spawn_item_from_proto(
                             drop.obj_type,
                             &proto_param,
                             death_event.enemy_pos + drop_offset,
@@ -419,7 +417,7 @@ fn handle_enemy_death(
             let mut rng = rand::thread_rng();
             let d = if mob.is_boss() { 30. } else { 10. };
             let drop_offset = Vec2::new(rng.gen_range(-d..d), rng.gen_range(-d..d));
-            let _xp_shard_e = proto_commands.spawn_item_from_proto(
+            let _xp_shard_e = commands.spawn_item_from_proto(
                 WorldObject::XPShardMedium,
                 &proto_param,
                 death_event.enemy_pos + drop_offset,
@@ -1144,7 +1142,7 @@ pub fn handle_lifesteal(
     player_query: Query<(&PlayerSkills, &Lifesteal, &GlobalTransform), With<Player>>,
     mut modify_health_events: EventWriter<ModifyHealthEvent>,
     mut modify_mana_events: EventWriter<ModifyManaEvent>,
-    mut proto_commands: ProtoCommands,
+    mut commands: Commands,
     proto: ProtoParam,
     mut trigger_counts: ResMut<HeirloomTriggerCounts>,
 ) {
@@ -1207,7 +1205,7 @@ pub fn handle_lifesteal(
                 if count > 0. && rng.gen_bool((count * 0.1).min(1.)) {
                     let d = 32.0;
                     let drop_offset = Vec2::new(rng.gen_range(-d..d), rng.gen_range(-d..d));
-                    proto_commands.spawn_item_from_proto(
+                    commands.spawn_item_from_proto(
                         WorldObject::Coin,
                         &proto,
                         player_pos + drop_offset,

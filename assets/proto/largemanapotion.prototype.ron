@@ -7,12 +7,11 @@
   "survival_rogue_like::item::item_actions::ConsumableItem": (),
   "survival_rogue_like::inventory::ItemStack": (
         obj_type: LargeManaPotion,
-        rarity: Uncommon,
+        rarity: Rare,
         metadata: (
             name: "Large Mana Potion", 
             desc: ["For advanced Mana", "enjoyers."]
         ),
-        rarity: Rare,
         count: 1
   ),
   }

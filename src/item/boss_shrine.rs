@@ -1,5 +1,4 @@
 use bevy::prelude::*;
-use bevy_proto::prelude::ProtoCommands;
 use leafwing_input_manager::prelude::ActionState;
 use rand::Rng;
 
@@ -213,16 +212,15 @@ pub fn handle_delayed_spawns(
     mut delayed_spawns: ResMut<DelayedSpawn>,
     mut commands: Commands,
     time: Res<Time>,
-    mut proto_commands: ProtoCommands,
     proto: ProtoParam,
 ) {
     delayed_spawns.timer.tick(time.delta());
     if delayed_spawns.timer.finished() {
         let summon_index = delayed_spawns.summon_index;
         commands.remove_resource::<DelayedSpawn>();
-        if let Some(entity) = proto_commands.spawn_from_proto(
+        if let Some(entity) = commands.spawn_from_proto(
             delayed_spawns.mob.clone(),
-            &proto.prototypes,
+            &proto.defs,
             delayed_spawns.pos,
         ) {
             commands
@@ -242,7 +240,7 @@ pub const BOSS_SHRINE_TEXTURE_PATH: &str = "textures/BossShrine.png";
 /// Boss shrine uses a standalone PNG (not the shared atlas). Reset visibility/sprite after spawn.
 ///
 /// We re-insert the texture handle, sprite, and a full visibility bundle here as a failsafe:
-/// `bevy_proto` applies the `SpriteBundle`/`VisibilityBundle` schematics on its own schedule, and
+/// Spawn applies the `SpriteBundle`/`VisibilityBundle` on a deferred schedule, and
 /// the order relative to our manual inserts in `spawn_object_from_proto` is not guaranteed. Forcing
 /// all render components here guarantees a consistent, visible result.
 pub fn ensure_boss_shrine_sprite_on_spawn(

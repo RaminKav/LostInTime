@@ -1,5 +1,4 @@
 use bevy::{prelude::*, utils::HashMap};
-use bevy_proto::prelude::ProtoCommands;
 use bevy_save::{CloneReflect, Snapshot};
 use serde::{Deserialize, Serialize};
 
@@ -46,7 +45,6 @@ pub struct DimensionSpawnEvent {
 }
 #[derive(Component, Reflect, Default, Debug, Clone)]
 #[reflect(Component)]
-
 pub struct ActiveDimension;
 
 #[derive(Component, Default)]
@@ -209,7 +207,7 @@ impl DimensionPlugin {
         mut move_player_event: EventWriter<MovePlayerEvent>,
         player_cache_pos: Query<(Entity, &CachedPlayerPos), With<Player>>,
         mut game: GameParam,
-        mut proto_commands: ProtoCommands,
+        defs: Res<crate::defs::GameDefs>,
         mut chunk_wall_cache: Query<&mut ChunkWallCache>,
         mut next_state: ResMut<NextState<GameState>>,
         mut night: ResMut<NightTracker>,
@@ -359,13 +357,21 @@ impl DimensionPlugin {
                     game.era.visited_eras.push(new_era.clone());
                 }
                 commands.insert_resource(new_world_cache);
-                proto_commands.apply(format!("Era{}WorldGenerationParams", new_era.index() + 1));
+                crate::defs::spawn::apply_era_generation(
+                    &mut commands,
+                    &defs,
+                    &format!("Era{}WorldGenerationParams", new_era.index() + 1),
+                );
             } else {
                 info!("USE CURR ERA: {:?}", game.era.current_era.index());
-                proto_commands.apply(format!(
-                    "Era{}WorldGenerationParams",
-                    game.era.current_era.index() + 1
-                ));
+                crate::defs::spawn::apply_era_generation(
+                    &mut commands,
+                    &defs,
+                    &format!(
+                        "Era{}WorldGenerationParams",
+                        game.era.current_era.index() + 1
+                    ),
+                );
                 if let Some(era_cache) = game.era.era_generation_cache.get(&game.era.current_era) {
                     info!("APPLYING ERA CACHE");
                     commands.insert_resource(era_cache.clone());

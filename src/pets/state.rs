@@ -1,6 +1,4 @@
 use bevy::prelude::*;
-use bevy_proto::backend::schematics::ReflectSchematic;
-use bevy_proto::prelude::Schematic;
 use bevy_rapier2d::prelude::Collider;
 use serde::{Deserialize, Serialize};
 use strum_macros::EnumIter;
@@ -16,23 +14,8 @@ use crate::{
     FairyPetSprite, SlimePetSprite, DEBUG,
 };
 
-#[derive(
-    Component,
-    Reflect,
-    FromReflect,
-    Schematic,
-    Default,
-    EnumIter,
-    Clone,
-    Debug,
-    PartialEq,
-    Eq,
-    Hash,
-    Serialize,
-    Deserialize,
-    Copy,
-)]
-#[reflect(Component, Schematic)]
+#[derive(Component, Reflect, FromReflect, Default, EnumIter, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, Copy)]
+#[reflect(Component)]
 pub enum Pet {
     #[default]
     Slime,
@@ -115,8 +98,8 @@ impl Pet {
     }
 }
 
-#[derive(Component, Reflect, FromReflect, Schematic, Default)]
-#[reflect(Component, Schematic)]
+#[derive(Component, Reflect, FromReflect, Default)]
+#[reflect(Component)]
 pub struct PetState {
     pub max_distance_from_player: f32,
     pub max_target_distance: f32,

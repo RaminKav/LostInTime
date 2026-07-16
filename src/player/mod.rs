@@ -1,6 +1,5 @@
 use bevy::{prelude::*, transform::TransformSystem};
 
-use bevy_proto::prelude::ProtoCommands;
 use bevy_rapier2d::{
     geometry::Sensor,
     prelude::{
@@ -584,7 +583,6 @@ fn spawn_player(
 }
 
 fn give_player_starting_items(
-    mut proto_commands: ProtoCommands,
     mut commands: Commands,
     proto: ProtoParam,
     mut game: GameParam,
@@ -648,11 +646,11 @@ fn give_player_starting_items(
     let player_pos = game.player().position.truncate();
     if let Some(upgrades) = unlock_upgrades.as_ref() {
         if upgrades.has_wood_axe() {
-            proto_commands.spawn_item_from_proto(WorldObject::WoodAxe, &proto, player_pos, 1, None);
+            commands.spawn_item_from_proto(WorldObject::WoodAxe, &proto, player_pos, 1, None);
         }
 
         if upgrades.has_pickaxe() {
-            proto_commands.spawn_item_from_proto(
+            commands.spawn_item_from_proto(
                 WorldObject::WoodPickaxe,
                 &proto,
                 player_pos,
@@ -664,17 +662,17 @@ fn give_player_starting_items(
         force_player_autopick(&mut game);
     }
 
-    // proto_commands.spawn_item_from_proto(WorldObject::UpgradeTome, &proto, Vec2::ZERO, 64, None);
-    // proto_commands.spawn_item_from_proto(WorldObject::PlasmaStaff, &proto, Vec2::ZERO, 1, Some(1));
-    // proto_commands.spawn_item_from_proto(WorldObject::Chestplate, &proto, Vec2::ZERO, 1, Some(1));
-    // proto_commands.spawn_item_from_proto(WorldObject::Chestplate, &proto, Vec2::ZERO, 1, Some(1));
-    // proto_commands.spawn_item_from_proto(WorldObject::Pendant, &proto, Vec2::ZERO, 1, Some(1));
-    // proto_commands.spawn_item_from_proto(WorldObject::Ring, &proto, Vec2::ZERO, 1, Some(1));
-    // proto_commands.spawn_item_from_proto(WorldObject::Pendant, &proto, Vec2::ZERO, 1, Some(1));
-    // proto_commands.spawn_item_from_proto(WorldObject::Ring, &proto, Vec2::ZERO, 1, Some(1));
-    // proto_commands.spawn_item_from_proto(WorldObject::Pendant, &proto, Vec2::ZERO, 1, Some(1));
-    // proto_commands.spawn_item_from_proto(WorldObject::Ring, &proto, Vec2::ZERO, 1, Some(1));
-    // proto_commands.spawn_item_from_proto(
+    // commands.spawn_item_from_proto(WorldObject::UpgradeTome, &proto, Vec2::ZERO, 64, None);
+    // commands.spawn_item_from_proto(WorldObject::PlasmaStaff, &proto, Vec2::ZERO, 1, Some(1));
+    // commands.spawn_item_from_proto(WorldObject::Chestplate, &proto, Vec2::ZERO, 1, Some(1));
+    // commands.spawn_item_from_proto(WorldObject::Chestplate, &proto, Vec2::ZERO, 1, Some(1));
+    // commands.spawn_item_from_proto(WorldObject::Pendant, &proto, Vec2::ZERO, 1, Some(1));
+    // commands.spawn_item_from_proto(WorldObject::Ring, &proto, Vec2::ZERO, 1, Some(1));
+    // commands.spawn_item_from_proto(WorldObject::Pendant, &proto, Vec2::ZERO, 1, Some(1));
+    // commands.spawn_item_from_proto(WorldObject::Ring, &proto, Vec2::ZERO, 1, Some(1));
+    // commands.spawn_item_from_proto(WorldObject::Pendant, &proto, Vec2::ZERO, 1, Some(1));
+    // commands.spawn_item_from_proto(WorldObject::Ring, &proto, Vec2::ZERO, 1, Some(1));
+    // commands.spawn_item_from_proto(
     //     WorldObject::OrbOfTransformation,
     //     &proto,
     //     Vec2::ZERO,
@@ -688,7 +686,7 @@ fn give_player_starting_items(
 
         for supply in roll_starting_supplies(run_state.pending_supplies) {
             spawn_reward_drop(
-                &mut proto_commands,
+                &mut commands,
                 &proto,
                 player_pos,
                 supply.object,
@@ -696,7 +694,7 @@ fn give_player_starting_items(
             );
         }
         for stat_boost in roll_starting_stat_boosts(run_state.pending_stat_boosts) {
-            spawn_reward_drop(&mut proto_commands, &proto, player_pos, stat_boost, 1);
+            spawn_reward_drop(&mut commands, &proto, player_pos, stat_boost, 1);
         }
 
         force_player_autopick(&mut game);
@@ -705,7 +703,7 @@ fn give_player_starting_items(
     // Spawn the starting weapon and mark it for rarity override
     let player_pos = game.player().position.truncate();
     if spawn_default_weapon {
-        if let Some(weapon_entity) = proto_commands.spawn_item_from_proto(
+        if let Some(weapon_entity) = commands.spawn_item_from_proto(
             starting_weapon,
             &proto,
             player_pos,
@@ -718,7 +716,7 @@ fn give_player_starting_items(
             });
             force_player_autopick(&mut game);
         }
-    } else if let Some(weapon_entity) = proto_commands.spawn_item_from_proto(
+    } else if let Some(weapon_entity) = commands.spawn_item_from_proto(
         starting_weapon,
         &proto,
         player_pos,
@@ -738,72 +736,72 @@ fn give_player_starting_items(
     // run_state.pending_tomes = 0;
     // run_state.pending_orbs = 0;
     // run_state.pending_rewards = false;
-    // proto_commands.spawn_item_from_proto(WorldObject::Spear, &proto, Vec2::ZERO, 1, Some(1));
-    // proto_commands.spawn_item_from_proto(WorldObject::Hammer, &proto, Vec2::ZERO, 1, Some(1));
-    // proto_commands.spawn_item_from_proto(WorldObject::Dagger, &proto, Vec2::ZERO, 1, Some(1));
-    // proto_commands.spawn_item_from_proto(WorldObject::FireStaff, &proto, Vec2::ZERO, 1, Some(1));
-    // proto_commands.spawn_item_from_proto(WorldObject::IceStaff, &proto, Vec2::ZERO, 1, Some(1));
-    // proto_commands.spawn_item_from_proto(WorldObject::MagicWhip, &proto, Vec2::ZERO, 1, None);
-    // proto_commands.spawn_item_from_proto(WorldObject::BasicStaff, &proto, Vec2::ZERO, 1, None);
-    // proto_commands.spawn_item_from_proto(WorldObject::Blowdart, &proto, Vec2::ZERO, 1, Some(1));
-    // proto_commands.spawn_item_from_proto(WorldObject::Gun, &proto, Vec2::ZERO, 1, Some(1));
-    // proto_commands.spawn_item_from_proto(WorldObject::WoodBow, &proto, Vec2::ZERO, 1, Some(1));
-    // proto_commands.spawn_item_from_proto(WorldObject::Claw, &proto, Vec2::ZERO, 1, None);
-    // proto_commands.spawn_item_from_proto(WorldObject::Essence, &proto, Vec2::ZERO, 10, None);
-    // proto_commands.spawn_item_from_proto(WorldObject::BedBlock, &proto, Vec2::ZERO, 1, None);
-    // proto_commands.spawn_item_from_proto(WorldObject::MagicTusk, &proto, Vec2::ZERO, 64, None);
-    // proto_commands.spawn_item_from_proto(WorldObject::WoodWallBlock, &proto, Vec2::ZERO, 64, None);
-    // proto_commands.spawn_item_from_proto(WorldObject::WoodAxe, &proto, Vec2::ZERO, 1, None);
-    // proto_commands.spawn_item_from_proto(WorldObject::WoodPlank, &proto, Vec2::ZERO, 1,None);
-    // proto_commands.spawn_item_from_proto(WorldObject::WoodDoorBlock, &proto, Vec2::ZERO, 40, None);
-    // proto_commands.spawn_item_from_proto(WorldObject::ThrowingStar, &proto, Vec2::ZERO, 10,None);
-    // proto_commands.spawn_item_from_proto(WorldObject::BridgeBlock, &proto, Vec2::ZERO, 64,None);
-    // proto_commands.spawn_item_from_proto(WorldObject::FurnaceBlock, &proto, Vec2::ZERO, 64, None);
-    // proto_commands.spawn_item_from_proto(WorldObject::Pendant, &proto, Vec2::ZERO, 1, Some(3));
-    // proto_commands.spawn_item_from_proto(WorldObject::RawMeat, &proto, Vec2::ZERO, 64, None);
-    // proto_commands.spawn_item_from_proto(WorldObject::WoodPickaxe, &proto, Vec2::ZERO, 1,None);
-    // proto_commands.spawn_item_from_proto(WorldObject::Log, &proto, Vec2::ZERO, 64,None);
-    // proto_commands.spawn_item_from_proto(WorldObject::StoneChunk, &proto, Vec2::ZERO, 64,None);
-    // proto_commands.spawn_item_from_proto(WorldObject::Coal, &proto, Vec2::ZERO, 64,None);
-    // proto_commands.spawn_item_from_proto(WorldObject::MetalShard, &proto, Vec2::ZERO, 64,None);
-    // proto_commands.spawn_item_from_proto(WorldObject::MetalBar, &proto, Vec2::ZERO, 64,None);
-    // proto_commands.spawn_item_from_proto(WorldObject::PlantFibre, &proto, Vec2::ZERO, 64,None);
-    // proto_commands.spawn_item_from_proto(WorldObject::Stick, &proto, Vec2::ZERO, 64,None);
-    // proto_commands.spawn_item_from_proto(WorldObject::SmallPotion, &proto, Vec2::ZERO, 64, None);
-    // proto_commands.spawn_item_from_proto(WorldObject::Apple, &proto, Vec2::ZERO, 64, None);
-    // proto_commands.spawn_item_from_proto(WorldObject::WoodPickaxe, &proto, Vec2::ZERO, 1, Some(1));
-    // proto_commands.spawn_item_from_proto(WorldObject::WoodAxe, &proto, Vec2::ZERO, 1, Some(1));
-    // proto_commands.spawn_item_from_proto(WorldObject::BushlingScale, &proto, Vec2::ZERO, 64,None);
-    // proto_commands.spawn_item_from_proto(WorldObject::Tusk, &proto, Vec2::ZERO, 64,None);
-    // proto_commands.spawn_item_from_proto(WorldObject::WoodDoor, &proto, Vec2::ZERO, 1, None);
-    // proto_commands.spawn_item_from_proto(WorldObject::WoodWallBlock, &proto, Vec2::ZERO, 64, None);
-    // proto_commands.spawn_item_from_proto(
+    // commands.spawn_item_from_proto(WorldObject::Spear, &proto, Vec2::ZERO, 1, Some(1));
+    // commands.spawn_item_from_proto(WorldObject::Hammer, &proto, Vec2::ZERO, 1, Some(1));
+    // commands.spawn_item_from_proto(WorldObject::Dagger, &proto, Vec2::ZERO, 1, Some(1));
+    // commands.spawn_item_from_proto(WorldObject::FireStaff, &proto, Vec2::ZERO, 1, Some(1));
+    // commands.spawn_item_from_proto(WorldObject::IceStaff, &proto, Vec2::ZERO, 1, Some(1));
+    // commands.spawn_item_from_proto(WorldObject::MagicWhip, &proto, Vec2::ZERO, 1, None);
+    // commands.spawn_item_from_proto(WorldObject::BasicStaff, &proto, Vec2::ZERO, 1, None);
+    // commands.spawn_item_from_proto(WorldObject::Blowdart, &proto, Vec2::ZERO, 1, Some(1));
+    // commands.spawn_item_from_proto(WorldObject::Gun, &proto, Vec2::ZERO, 1, Some(1));
+    // commands.spawn_item_from_proto(WorldObject::WoodBow, &proto, Vec2::ZERO, 1, Some(1));
+    // commands.spawn_item_from_proto(WorldObject::Claw, &proto, Vec2::ZERO, 1, None);
+    // commands.spawn_item_from_proto(WorldObject::Essence, &proto, Vec2::ZERO, 10, None);
+    // commands.spawn_item_from_proto(WorldObject::BedBlock, &proto, Vec2::ZERO, 1, None);
+    // commands.spawn_item_from_proto(WorldObject::MagicTusk, &proto, Vec2::ZERO, 64, None);
+    // commands.spawn_item_from_proto(WorldObject::WoodWallBlock, &proto, Vec2::ZERO, 64, None);
+    // commands.spawn_item_from_proto(WorldObject::WoodAxe, &proto, Vec2::ZERO, 1, None);
+    // commands.spawn_item_from_proto(WorldObject::WoodPlank, &proto, Vec2::ZERO, 1,None);
+    // commands.spawn_item_from_proto(WorldObject::WoodDoorBlock, &proto, Vec2::ZERO, 40, None);
+    // commands.spawn_item_from_proto(WorldObject::ThrowingStar, &proto, Vec2::ZERO, 10,None);
+    // commands.spawn_item_from_proto(WorldObject::BridgeBlock, &proto, Vec2::ZERO, 64,None);
+    // commands.spawn_item_from_proto(WorldObject::FurnaceBlock, &proto, Vec2::ZERO, 64, None);
+    // commands.spawn_item_from_proto(WorldObject::Pendant, &proto, Vec2::ZERO, 1, Some(3));
+    // commands.spawn_item_from_proto(WorldObject::RawMeat, &proto, Vec2::ZERO, 64, None);
+    // commands.spawn_item_from_proto(WorldObject::WoodPickaxe, &proto, Vec2::ZERO, 1,None);
+    // commands.spawn_item_from_proto(WorldObject::Log, &proto, Vec2::ZERO, 64,None);
+    // commands.spawn_item_from_proto(WorldObject::StoneChunk, &proto, Vec2::ZERO, 64,None);
+    // commands.spawn_item_from_proto(WorldObject::Coal, &proto, Vec2::ZERO, 64,None);
+    // commands.spawn_item_from_proto(WorldObject::MetalShard, &proto, Vec2::ZERO, 64,None);
+    // commands.spawn_item_from_proto(WorldObject::MetalBar, &proto, Vec2::ZERO, 64,None);
+    // commands.spawn_item_from_proto(WorldObject::PlantFibre, &proto, Vec2::ZERO, 64,None);
+    // commands.spawn_item_from_proto(WorldObject::Stick, &proto, Vec2::ZERO, 64,None);
+    // commands.spawn_item_from_proto(WorldObject::SmallPotion, &proto, Vec2::ZERO, 64, None);
+    // commands.spawn_item_from_proto(WorldObject::Apple, &proto, Vec2::ZERO, 64, None);
+    // commands.spawn_item_from_proto(WorldObject::WoodPickaxe, &proto, Vec2::ZERO, 1, Some(1));
+    // commands.spawn_item_from_proto(WorldObject::WoodAxe, &proto, Vec2::ZERO, 1, Some(1));
+    // commands.spawn_item_from_proto(WorldObject::BushlingScale, &proto, Vec2::ZERO, 64,None);
+    // commands.spawn_item_from_proto(WorldObject::Tusk, &proto, Vec2::ZERO, 64,None);
+    // commands.spawn_item_from_proto(WorldObject::WoodDoor, &proto, Vec2::ZERO, 1, None);
+    // commands.spawn_item_from_proto(WorldObject::WoodWallBlock, &proto, Vec2::ZERO, 64, None);
+    // commands.spawn_item_from_proto(
     //     WorldObject::CraftingTableBlock,
     //     &proto,
     //     Vec2::ZERO,
     //     64,
     //     None,
     // );
-    // proto_commands.spawn_item_from_proto(
+    // commands.spawn_item_from_proto(
     //     WorldObject::AlchemyTableBlock,
     //     &proto,
     //     Vec2::ZERO,
     //     64,
     //     None,
     // );
-    // proto_commands.spawn_item_from_proto(WorldObject::StoneWallBlock, &proto, Vec2::ZERO, 64, None);
-    // proto_commands.spawn_item_from_proto(WorldObject::ChestBlock, &proto, Vec2::ZERO, 64, None);
-    // proto_commands.spawn_item_from_proto(WorldObject::ScrapperBlock, &proto, Vec2::ZERO, 64, None);
+    // commands.spawn_item_from_proto(WorldObject::StoneWallBlock, &proto, Vec2::ZERO, 64, None);
+    // commands.spawn_item_from_proto(WorldObject::ChestBlock, &proto, Vec2::ZERO, 64, None);
+    // commands.spawn_item_from_proto(WorldObject::ScrapperBlock, &proto, Vec2::ZERO, 64, None);
 }
 
 pub fn spawn_reward_drop(
-    proto_commands: &mut ProtoCommands,
+    commands: &mut Commands,
     proto: &ProtoParam,
     pos: Vec2,
     obj: WorldObject,
     count: usize,
 ) -> bool {
-    proto_commands
+    commands
         .spawn_item_from_proto(obj, proto, pos, count, None)
         .is_some()
 }

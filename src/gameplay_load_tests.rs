@@ -21,7 +21,6 @@ use std::f32::consts::TAU;
 
 use bevy::prelude::*;
 use bevy_hanabi::prelude::{graph, ParticleEffect, ParticleEffectBundle};
-use bevy_proto::prelude::ProtoCommands;
 use bevy_rapier2d::prelude::{Collider, RapierContext};
 use rand::Rng;
 
@@ -437,7 +436,6 @@ fn heirloom_load_test_burst(
     player: Query<(Entity, &GlobalTransform), With<Player>>,
     asset_server: Res<AssetServer>,
     graphics: Res<Graphics>,
-    mut proto_commands: ProtoCommands,
     proto_param: ProtoParam,
     mut ranged_attack: EventWriter<RangedAttackEvent>,
     dungeon: Query<&Dungeon, With<ActiveDimension>>,
@@ -521,7 +519,7 @@ fn heirloom_load_test_burst(
             }
             HeirloomSimKind::ManaOrb => {
                 let drop_pos = world.truncate() + random_offset(&mut rng, 24.0);
-                if let Some(e) = proto_commands.spawn_item_from_proto(
+                if let Some(e) = commands.spawn_item_from_proto(
                     WorldObject::ManaOrb,
                     &proto_param,
                     drop_pos,
@@ -784,7 +782,6 @@ fn loot_cycle_load_test_burst(
     mut state: ResMut<LootCycleLoadTestState>,
     active: Res<LootCycleLoadTestActive>,
     player: Query<&GlobalTransform, With<Player>>,
-    mut proto_commands: ProtoCommands,
     proto_param: ProtoParam,
     dungeon: Query<&Dungeon, With<ActiveDimension>>,
 ) {
@@ -819,7 +816,7 @@ fn loot_cycle_load_test_burst(
             let offset = random_offset(&mut rng, 80.0);
             let drop_pos = player_pos + offset + drop_offset;
 
-            let drop_e = proto_commands.spawn_item_from_proto(
+            let drop_e = commands.spawn_item_from_proto(
                 drop.obj_type,
                 &proto_param,
                 drop_pos,

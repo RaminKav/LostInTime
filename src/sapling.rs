@@ -1,5 +1,4 @@
 use bevy::prelude::*;
-use bevy_proto::backend::schematics::{ReflectSchematic, Schematic};
 
 use crate::{
     assets::SpriteAnchor,
@@ -8,13 +7,13 @@ use crate::{
     GameState,
 };
 
-#[derive(Component, Reflect, FromReflect, Schematic, Default)]
-#[reflect(Component, Schematic)]
+#[derive(Component, Reflect, FromReflect, Default)]
+#[reflect(Component)]
 pub struct Sapling(pub Timer);
 
-#[derive(Component, Reflect, FromReflect, Schematic, Default)]
-#[reflect(Component, Schematic)]
-pub struct GrowsInto(WorldObject);
+#[derive(Component, Reflect, FromReflect, Default, Clone, Debug)]
+#[reflect(Component)]
+pub struct GrowsInto(pub WorldObject);
 
 pub struct SaplingPlugin;
 

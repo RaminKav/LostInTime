@@ -1,5 +1,4 @@
 use bevy::prelude::*;
-use bevy_proto::prelude::{ProtoCommands, Prototypes};
 use rand::Rng;
 
 use crate::{
@@ -314,9 +313,8 @@ fn sync_overworld_spawners_with_era(
 }
 
 fn handle_spawn_mobs(
-    mut proto_commands: ProtoCommands,
+    defs: Res<crate::defs::GameDefs>,
     mut commands: Commands,
-    prototypes: Prototypes,
     mut spawner_trigger_event: EventReader<MobSpawnEvent>,
     proto_param: ProtoParam,
     player_t: Query<&GlobalTransform, With<Player>>,
@@ -363,7 +361,7 @@ fn handle_spawn_mobs(
         }
         if let Some((mob, pos)) = picked_mob_to_spawn {
             if let Some(spawned_mob) =
-                proto_commands.spawn_from_proto(mob.clone(), &prototypes, pos)
+                commands.spawn_from_proto(mob.clone(), &defs, pos)
             {
                 debug!("SPAWNED A MOB!!! {spawned_mob:?}");
                 let can_be_elite = proto_param
@@ -462,9 +460,8 @@ fn pick_valid_stone_golem_spawn_near_player(
 
 fn try_spawn_stone_golem(
     mode: StoneGolemSpawnMode,
-    proto_commands: &mut ProtoCommands,
-    prototypes: &Prototypes,
     commands: &mut Commands,
+    defs: &crate::defs::GameDefs,
     player_query: &Query<&GlobalTransform, With<Player>>,
     game: &GameParam,
     proto_param: &ProtoParam,
@@ -477,7 +474,7 @@ fn try_spawn_stone_golem(
     else {
         return;
     };
-    if let Some(spawned) = proto_commands.spawn_from_proto(Mob::StoneGolem, prototypes, pos) {
+    if let Some(spawned) = commands.spawn_from_proto(Mob::StoneGolem, defs, pos) {
         if mode.tag_infinite_mode() {
             commands.entity(spawned).insert(InfiniteModeMob);
         }
@@ -488,8 +485,7 @@ fn try_spawn_stone_golem(
 fn spawn_stone_golem_timer(
     time: Res<Time>,
     golem_timer: Option<ResMut<StoneGolemSpawnTimer>>,
-    mut proto_commands: ProtoCommands,
-    prototypes: Prototypes,
+    defs: Res<crate::defs::GameDefs>,
     proto_param: ProtoParam,
     player_query: Query<&GlobalTransform, With<Player>>,
     maybe_dungeon: Query<&Dungeon, With<ActiveDimension>>,
@@ -522,9 +518,8 @@ fn spawn_stone_golem_timer(
     if golem_timer.timer.just_finished() {
         try_spawn_stone_golem(
             StoneGolemSpawnMode::Base,
-            &mut proto_commands,
-            &prototypes,
             &mut commands,
+            &defs,
             &player_query,
             &game,
             &proto_param,
@@ -538,8 +533,7 @@ fn spawn_endless_stone_golem_timer(
     time: Res<Time>,
     endless_golem_timer: Option<ResMut<EndlessStoneGolemSpawnTimer>>,
     mut commands: Commands,
-    mut proto_commands: ProtoCommands,
-    prototypes: Prototypes,
+    defs: Res<crate::defs::GameDefs>,
     proto_param: ProtoParam,
     player_query: Query<&GlobalTransform, With<Player>>,
     maybe_dungeon: Query<&Dungeon, With<ActiveDimension>>,
@@ -573,9 +567,8 @@ fn spawn_endless_stone_golem_timer(
 
     try_spawn_stone_golem(
         StoneGolemSpawnMode::Endless,
-        &mut proto_commands,
-        &prototypes,
         &mut commands,
+        &defs,
         &player_query,
         &game,
         &proto_param,

@@ -19,7 +19,6 @@ use crate::{
     GameParam, TextureCamera,
 };
 use bevy::prelude::*;
-use bevy_proto::prelude::ProtoCommands;
 use bevy_rapier2d::{
     control::KinematicCharacterController,
     geometry::{Collider, Sensor},
@@ -463,7 +462,6 @@ pub fn summon_attack(
     )>,
     mut commands: Commands,
     time: Res<Time>,
-    mut proto_commands: ProtoCommands,
     proto: ProtoParam,
     game: GameParam,
 ) {
@@ -493,10 +491,9 @@ pub fn summon_attack(
             }
 
             if let Some(mob) =
-                proto_commands.spawn_from_proto(Mob::RedMushling, &proto.prototypes, pos)
+                commands.spawn_from_proto(Mob::RedMushling, &proto.defs, pos)
             {
-                proto_commands
-                    .commands()
+                commands
                     .entity(mob)
                     .remove::<LootTable>()
                     .remove::<ExperienceReward>();

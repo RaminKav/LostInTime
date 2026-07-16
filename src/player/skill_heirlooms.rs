@@ -1,7 +1,6 @@
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 use bevy::utils::Duration;
-use bevy_proto::prelude::{ProtoCommands, Prototypes};
 use bevy_rapier2d::prelude::Collider;
 use rand::{seq::SliceRandom, Rng};
 
@@ -197,9 +196,8 @@ pub fn handle_active_skill_event(
     cursor: Res<CursorPos>,
     asset_server: Res<AssetServer>,
     mut ranged_attack_events: EventWriter<RangedAttackEvent>,
-    mut proto_commands: ProtoCommands,
     proto_param: ProtoParam,
-    prototypes: Prototypes,
+    defs: Res<crate::defs::GameDefs>,
     enemies: Query<(Entity, &GlobalTransform), With<Mob>>,
     mut trigger_counts: ResMut<HeirloomTriggerCounts>,
     mut attribute_change: EventWriter<AttributeChangeEvent>,
@@ -243,7 +241,7 @@ pub fn handle_active_skill_event(
                 let mut rng = rand::thread_rng();
                 let d = 15.0;
                 let drop_offset = Vec2::new(rng.gen_range(-d..d), rng.gen_range(-d..d));
-                proto_commands.spawn_item_from_proto(
+                commands.spawn_item_from_proto(
                     WorldObject::Coin,
                     &proto_param,
                     player_txfm.translation().truncate() + drop_offset,
@@ -706,9 +704,9 @@ pub fn handle_active_skill_event(
 
                         // Spawn a non-damageable dummy tree at cursor position
                         let dummy_pos = cursor.world_coords;
-                        if let Some(p) = proto_commands.spawn_from_proto(
+                        if let Some(p) = commands.spawn_from_proto(
                             WorldObject::GreenSaplingStage2,
-                            &prototypes,
+                            &defs,
                             dummy_pos.truncate(),
                         ) {
                             commands

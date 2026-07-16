@@ -77,7 +77,8 @@ pub fn pack_coins_into_stacks(coins: u32) -> Vec<usize> {
 }
 
 fn spawn_time_bonus_drop(
-    proto_param: &mut ProtoParam,
+    commands: &mut Commands,
+    proto_param: &ProtoParam,
     obj: WorldObject,
     pos: Vec2,
     count: usize,
@@ -85,12 +86,9 @@ fn spawn_time_bonus_drop(
 ) {
     let mut rng = rand::thread_rng();
     let drop_offset = Vec2::new(rng.gen_range(-30.0..30.0), rng.gen_range(-30.0..30.0));
-    // `spawn_item_from_proto` needs &mut ProtoCommands and &ProtoParam; same split as chaos shrine.
-    let proto_ref: &ProtoParam = unsafe { &*(proto_param as *mut ProtoParam as *const ProtoParam) };
-    // `spawn_item_from_proto` already attaches ItemDropDespawnTimer.
-    let _ = proto_param.proto_commands.spawn_item_from_proto(
+    let _ = commands.spawn_item_from_proto(
         obj,
-        proto_ref,
+        proto_param,
         pos + drop_offset,
         count,
         player_level,
@@ -99,7 +97,8 @@ fn spawn_time_bonus_drop(
 
 /// Extra loot for clearing the era boss with time remaining — does not replace boss loot table drops.
 fn drop_era_time_bonus_loot(
-    proto_param: &mut ProtoParam,
+    commands: &mut Commands,
+    proto_param: &ProtoParam,
     era: &Era,
     remaining_seconds: f32,
     drop_pos: Vec2,
@@ -118,6 +117,7 @@ fn drop_era_time_bonus_loot(
 
     for _ in 0..large {
         spawn_time_bonus_drop(
+            commands,
             proto_param,
             WorldObject::XPShardLarge,
             drop_pos,
@@ -127,6 +127,7 @@ fn drop_era_time_bonus_loot(
     }
     for _ in 0..medium {
         spawn_time_bonus_drop(
+            commands,
             proto_param,
             WorldObject::XPShardMedium,
             drop_pos,
@@ -135,10 +136,18 @@ fn drop_era_time_bonus_loot(
         );
     }
     for _ in 0..small {
-        spawn_time_bonus_drop(proto_param, WorldObject::XPShard, drop_pos, 1, player_level);
+        spawn_time_bonus_drop(
+            commands,
+            proto_param,
+            WorldObject::XPShard,
+            drop_pos,
+            1,
+            player_level,
+        );
     }
     for stack_count in pack_coins_into_stacks(coins) {
         spawn_time_bonus_drop(
+            commands,
             proto_param,
             WorldObject::Coin,
             drop_pos,
@@ -210,7 +219,8 @@ pub fn track_boss_kills(
     mut mob_spawning_paused: ResMut<MobSpawningPaused>,
     mut tip_event: EventWriter<TipEvent>,
     seen_tips: Res<SeenTips>,
-    mut proto_param: ProtoParam,
+    mut commands: Commands,
+    proto_param: ProtoParam,
     player_level: Query<&PlayerLevel, With<Player>>,
 ) {
     for death_event in death_events.iter() {
@@ -233,7 +243,8 @@ pub fn track_boss_kills(
             if first_clear {
                 let level = player_level.get_single().ok().map(|l| l.level);
                 drop_era_time_bonus_loot(
-                    &mut proto_param,
+                    &mut commands,
+                    &proto_param,
                     &era,
                     era_timer.remaining_seconds,
                     death_event.enemy_pos,

@@ -1,11 +1,13 @@
 use std::cmp::max;
 
 use bevy::{
-    asset::AssetServer, math::Vec3, prelude::Commands, render::view::RenderLayers,
+    asset::AssetServer,
+    math::Vec3,
+    prelude::{Commands, VisibilityBundle},
+    render::view::RenderLayers,
     transform::components::Transform,
 };
 use bevy_aseprite::{anim::AsepriteAnimation, AsepriteBundle};
-use bevy_proto::custom::VisibilityBundle;
 use rand::{rngs::ThreadRng, Rng};
 
 use crate::{

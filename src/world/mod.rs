@@ -16,7 +16,6 @@ use std::fmt::Formatter;
 use bevy_ecs_tilemap::{prelude::*, tiles::TilePos};
 
 use bevy::{prelude::*, utils::HashMap};
-use bevy_proto::prelude::{ReflectSchematic, Schematic};
 use portal::handle_player_near_portal;
 use serde::{Deserialize, Serialize};
 use world_helpers::tile_pos_to_world_pos;
@@ -46,20 +45,7 @@ pub struct ChunkObjectData(pub Vec<(f32, f32, WorldObject)>);
 
 /// A component that represents a position in the tilemap. The `quadrant` is a number from 0 to 3
 /// where 0 is top left, 1 is top right, 2 is bottom left, 3 is bottom right
-#[derive(
-    Eq,
-    Hash,
-    PartialEq,
-    Debug,
-    Component,
-    Copy,
-    Clone,
-    Default,
-    Reflect,
-    FromReflect,
-    Serialize,
-    Deserialize,
-)]
+#[derive(Eq, Hash, PartialEq, Debug, Component, Copy, Clone, Default, Reflect, FromReflect, Serialize, Deserialize)]
 #[reflect(Component)]
 pub struct TileMapPosition {
     pub chunk_pos: IVec2,
@@ -105,19 +91,15 @@ impl Display for TileMapPosition {
     }
 }
 
-#[derive(
-    Eq, Hash, Component, PartialEq, Debug, Clone, Default, Reflect, FromReflect, Schematic,
-)]
-#[reflect(Component, Schematic)]
-
+#[derive(Eq, Hash, Component, PartialEq, Debug, Clone, Default, Reflect, FromReflect, Deserialize)]
+#[reflect(Component)]
 pub struct WallTextureData {
     pub obj_bit_index: u8,
     pub texture_offset: u8,
 }
 
-#[derive(Resource, Schematic, Reflect, FromReflect, Default, Debug, Clone)]
-#[reflect(Schematic)]
-#[schematic(kind = "resource")]
+#[derive(Resource, Reflect, FromReflect, Default, Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct WorldGeneration {
     pub water_frequency: f64,
     pub stone_frequency: f64,
@@ -130,8 +112,8 @@ pub struct WorldGeneration {
     pub obj_allowed_tiles_map: HashMap<WorldObject, Vec<WorldObject>>,
 }
 
-#[derive(Component, Schematic, Reflect, FromReflect, Default, Debug, Clone)]
-#[reflect(Schematic)]
+#[derive(Component, Reflect, FromReflect, Default, Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct ForestGenerationParams {
     pub tree_spacing_radius: f32,
     pub tree_density: f32,
@@ -142,8 +124,8 @@ pub struct ForestGenerationParams {
 
 /// Inclusive [min, max] count range used to roll how many of a given shrine
 /// will exist in the world for a single era.
-#[derive(Component, Schematic, Reflect, FromReflect, Default, Debug, Clone)]
-#[reflect(Schematic)]
+#[derive(Component, Reflect, FromReflect, Default, Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct ShrineCount {
     pub min: u32,
     pub max: u32,

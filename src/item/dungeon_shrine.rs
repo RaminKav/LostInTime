@@ -1,6 +1,5 @@
 use bevy::prelude::*;
 use bevy_aseprite::{anim::AsepriteAnimation, aseprite, AsepriteBundle};
-use bevy_proto::prelude::ProtoCommands;
 use rand::{seq::IteratorRandom, Rng};
 use strum::IntoEnumIterator;
 
@@ -93,9 +92,9 @@ pub fn handle_dungeon_shrine_activation(
                     } else {
                         possible_spawns[choice_mob].clone()
                     };
-                    if let Some(mob_e) = proto_param.proto_commands.spawn_from_proto(
+                    if let Some(mob_e) = commands.spawn_from_proto(
                         spawned_mob.clone(),
-                        &proto_param.prototypes,
+                        &proto_param.defs,
                         spawn_pos,
                     ) {
                         if roll_dungeon_elite(&spawned_mob, &proto_param, &mut rng) {
@@ -104,9 +103,7 @@ pub fn handle_dungeon_shrine_activation(
                         fallback_count = 0;
                         num_to_spawn -= 1;
 
-                        proto_param
-                            .proto_commands
-                            .commands()
+                        commands
                             .entity(mob_e)
                             .insert(CombatAlignment::Hostile)
                             .insert(LootTable {
@@ -143,7 +140,6 @@ pub fn handle_dungeon_shrine_rewards(
         &mut DungeonShrine,
         &mut AsepriteAnimation,
     )>,
-    mut proto_commands: ProtoCommands,
     proto: ProtoParam,
     mut commands: Commands,
     mut game: GameParam,
@@ -171,7 +167,7 @@ pub fn handle_dungeon_shrine_rewards(
                     + (game.get_player_level() as i32 / 10).clamp(0, 10) as u8;
                 let level = rng.gen_range(1..=max_item_level) + 3;
 
-                proto_commands.spawn_item_from_proto(
+                commands.spawn_item_from_proto(
                     reward_item,
                     &proto,
                     t.translation().truncate() + Vec2::new(0., -44.),
