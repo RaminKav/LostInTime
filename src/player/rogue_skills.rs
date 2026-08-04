@@ -1,4 +1,9 @@
+use crate::aseprite_assets::Combo;
+use crate::aseprite_helpers::{aseprite_bundle, collect_finished, pause};
+use bevy_aseprite_ultra::prelude::{AseAnimation, Aseprite};
 use std::{f32::consts::PI, time::Duration};
+
+use bevy_aseprite_ultra::prelude::AnimationEvents;
 
 use crate::{
     animations::{player_sprite::PlayerAnimation, AttackEvent, DoneAnimation},
@@ -20,7 +25,6 @@ use crate::{
     AttackTimer, EnemyDeathEvent, GameParam, HitEvent, PLAYER_MOVE_SPEED,
 };
 use bevy::{prelude::*, sprite::Anchor};
-use bevy_aseprite::{anim::AsepriteAnimation, aseprite, AsepriteBundle};
 use bevy_rapier2d::prelude::{Collider, CollisionGroups, Group, KinematicCharacterController};
 
 use super::{
@@ -29,8 +33,6 @@ use super::{
     skills::active_skill_scaling::{attack_damage_multiplier, SPRINT_LUNGE},
     ActiveSkill, ActiveSkillUsedEvent, Heirloom, Player, PlayerSkills,
 };
-
-aseprite!(pub Combo, "textures/effects/Combo.aseprite");
 
 /// Player sprint active-skill state. Lives on the player only while the sprint
 /// skill is running, so it churns on every use — `SparseSet` avoids moving the
@@ -85,21 +87,20 @@ pub(crate) fn spawn_lunge_shadow(
     direction: Vec2,
 ) {
     let angle = if direction.length_squared() > 0.0 {
-        LUNGE_SHADOW_DEFAULT_DIR.angle_between(direction)
+        LUNGE_SHADOW_DEFAULT_DIR.angle_to(direction)
     } else {
         0.0
     };
     commands
-        .spawn(SpriteBundle {
-            texture: asset_server.load("textures/player/PlayerLungeShadow.png"),
-            sprite: Sprite {
-                color: Color::rgba(1.0, 1.0, 1.0, LUNGE_SHADOW_START_ALPHA),
-                ..Default::default()
+        .spawn((
+            Sprite {
+                image: asset_server.load("textures/player/PlayerLungeShadow.png"),
+                color: Color::srgba(1.0, 1.0, 1.0, LUNGE_SHADOW_START_ALPHA),
+                ..default()
             },
-            transform: Transform::from_translation(Vec3::new(world_pos.x, world_pos.y, 0.9))
+            Transform::from_translation(Vec3::new(world_pos.x, world_pos.y, 0.9))
                 .with_rotation(Quat::from_rotation_z(angle)),
-            ..Default::default()
-        })
+        ))
         .insert(LungeShadow {
             timer: Timer::from_seconds(LUNGE_SHADOW_LIFETIME_SECS, TimerMode::Once),
         })
@@ -114,12 +115,12 @@ pub fn tick_lunge_shadows(
 ) {
     for (e, mut shadow, mut sprite) in query.iter_mut() {
         shadow.timer.tick(time.delta());
-        let remaining = 1.0 - shadow.timer.percent();
+        let remaining = 1.0 - shadow.timer.fraction();
         sprite
             .color
-            .set_a(LUNGE_SHADOW_START_ALPHA * remaining.max(0.0));
-        if shadow.timer.finished() {
-            commands.entity(e).despawn_recursive();
+            .with_alpha(LUNGE_SHADOW_START_ALPHA * remaining.max(0.0));
+        if shadow.timer.is_finished() {
+            commands.entity(e).despawn();
         }
     }
 }
@@ -137,7 +138,7 @@ pub fn handle_toggle_sprinting(
         (Entity, &mut SprintState, &PlayerSkills, Option<&Sprinting>),
         With<SprintState>,
     >,
-    _key_inputs: Res<Input<KeyCode>>,
+    _key_inputs: Res<ButtonInput<KeyCode>>,
     _commands: Commands,
 ) {
     // Sprint is now a button press ability, activated via ActiveSkillUsedEvent
@@ -160,14 +161,14 @@ pub fn handle_sprint_timer(
         ),
         With<Sprinting>,
     >,
-    mouse_inputs: Res<Input<MouseButton>>,
+    mouse_inputs: Res<ButtonInput<MouseButton>>,
     game: GameParam,
-    mut attack_event: EventWriter<AttackEvent>,
+    mut attack_event: MessageWriter<AttackEvent>,
     cursor_pos: Res<CursorPos>,
     mut commands: Commands,
 ) {
     for (e, mut sprint, mut kcc, mut mv, anim, skills, attack_cooldown_option) in query.iter_mut() {
-        if !sprint.startup_timer.finished() {
+        if !sprint.startup_timer.is_finished() {
             sprint.startup_timer.tick(time.delta());
             // Don't reset cooldown timer during startup - let it tick normally
         } else {
@@ -190,7 +191,7 @@ pub fn handle_sprint_timer(
                     .insert(crate::animations::player_sprite::AttackAnimationTimer(
                         Timer::from_seconds(1.0, TimerMode::Once),
                     ));
-                attack_event.send(AttackEvent {
+                attack_event.write(AttackEvent {
                     direction,
                     ignore_cooldown: false,
                 });
@@ -210,7 +211,7 @@ pub fn handle_sprint_timer(
 }
 pub fn handle_lunge(
     time: Res<Time>,
-    mut active_skill_events: EventReader<ActiveSkillUsedEvent>,
+    mut active_skill_events: MessageReader<ActiveSkillUsedEvent>,
     mut query: Query<(
         Entity,
         &mut LungeState,
@@ -231,7 +232,7 @@ pub fn handle_lunge(
     mut trigger_counts: ResMut<crate::player::skills::HeirloomTriggerCounts>,
     aim: Res<crate::aim::AimState>,
 ) {
-    let activated_slots: Vec<usize> = active_skill_events.iter().map(|ev| ev.slot).collect();
+    let activated_slots: Vec<usize> = active_skill_events.read().map(|ev| ev.slot).collect();
 
     for (
         e,
@@ -261,8 +262,7 @@ pub fn handle_lunge(
 
             // Prefer movement input when actively moving; otherwise aim (right stick /
             // mouseless mode) or sprite facing — same rules as teleport / roll.
-            let dash_direction =
-                skill_aim_direction(mv.0, aim.facing_dir, dir.get_dir_vec());
+            let dash_direction = skill_aim_direction(mv.0, aim.facing_dir, dir.get_dir_vec());
             // Tracer #1 fires immediately at the activation position. Subsequent tracers
             // are gated on `LungeDashInfo` which lives in its own component so it isn't
             // wiped by the `LungeState` re-insert that happens later this frame in
@@ -302,7 +302,7 @@ pub fn handle_lunge(
                 let mana_cost = Heirloom::SkillEcho.get_mana_cost();
                 let echo_dmg = (dmg.0 as f32 * 1.) as i32;
                 let size_mult = projectile_size
-                    .get_single()
+                    .single()
                     .map(|s| s.get_multiplier())
                     .unwrap_or(1.0);
 
@@ -337,9 +337,9 @@ pub fn handle_lunge(
 
             lunge_state.lunge_duration.tick(time.delta());
             mv.0 = mv.0 * 0.;
-        } else if lunge_state.lunge_duration.percent() != 0. {
+        } else if lunge_state.lunge_duration.fraction() != 0. {
             lunge_state.lunge_duration.tick(time.delta());
-            let percent = lunge_state.lunge_duration.percent();
+            let percent = lunge_state.lunge_duration.fraction();
             if let Some(mut dash_info) = dash_info_opt {
                 if percent >= 0.40 && dash_info.tracers_spawned < 2 {
                     spawn_lunge_shadow(
@@ -360,8 +360,8 @@ pub fn handle_lunge(
                     dash_info.tracers_spawned = 3;
                 }
             }
-            if lunge_state.lunge_duration.percent() >= 0.20
-                && lunge_state.lunge_duration.percent() <= 0.45
+            if lunge_state.lunge_duration.fraction() >= 0.20
+                && lunge_state.lunge_duration.fraction() <= 0.45
             {
                 commands
                     .entity(e)
@@ -371,9 +371,8 @@ pub fn handle_lunge(
                 // from `mv` and rebuild magnitude from the base move speed,
                 // so Speed stat / hunger / consumable buffs don't scale it.
                 let lunge_dir = mv.0.normalize_or_zero();
-                mv.0 =
-                    lunge_dir * PLAYER_MOVE_SPEED * time.delta_seconds() * lunge_state.lunge_speed;
-            } else if lunge_state.lunge_duration.percent() < 0.20 {
+                mv.0 = lunge_dir * PLAYER_MOVE_SPEED * time.delta_secs() * lunge_state.lunge_speed;
+            } else if lunge_state.lunge_duration.fraction() < 0.20 {
                 mv.0 = mv.0 * 0.;
             } else {
                 commands
@@ -382,7 +381,7 @@ pub fn handle_lunge(
                 kcc.filter_groups = Some(CollisionGroups::new(Group::ALL, Group::ALL));
             }
 
-            if lunge_state.lunge_duration.finished() {
+            if lunge_state.lunge_duration.is_finished() {
                 lunge_state.lunge_duration.reset();
                 commands.entity(e).insert(PlayerAnimation::Walk);
                 commands.entity(e).remove::<LungeDashInfo>();
@@ -409,16 +408,20 @@ pub fn handle_sprinting_cooldown(
 }
 
 pub fn handle_lunge_cooldown(
-    mut query: Query<(
-        Entity,
-        &mut LungeState,
-        &PlayerAnimation,
-        &AsepriteAnimation,
-    )>,
+    mut query: Query<(Entity, &mut LungeState, &PlayerAnimation)>,
+    mut finished_events: MessageReader<AnimationEvents>,
     mut commands: Commands,
 ) {
-    for (e, mut lunge_state, anim, aseprite_anim) in query.iter_mut() {
-        if anim.is_lunging() && aseprite_anim.just_finished() {
+    // Player uses native ultra anims; finish detection uses `AnimationEvents`.
+    let mut finished = std::collections::HashSet::new();
+    for event in finished_events.read() {
+        if let AnimationEvents::Finished(entity) = event {
+            finished.insert(*entity);
+        }
+    }
+
+    for (e, mut lunge_state, anim) in query.iter_mut() {
+        if anim.is_lunging() && finished.contains(&e) {
             lunge_state.lunge_duration.reset();
             commands.entity(e).insert(PlayerAnimation::Walk);
             commands.entity(e).remove::<LungeDashInfo>();
@@ -427,16 +430,18 @@ pub fn handle_lunge_cooldown(
 }
 
 pub fn handle_enemy_death_sprint_reset(
-    mut enemy_death_events: EventReader<EnemyDeathEvent>,
+    mut enemy_death_events: MessageReader<EnemyDeathEvent>,
     mut class_slots: Query<&mut crate::player::skills::ClassSkillSlots, With<Player>>,
     skills: Query<&PlayerSkills>,
 ) {
-    for _ in enemy_death_events.iter() {
-        let skillz = skills.single();
+    for _ in enemy_death_events.read() {
+        let Ok(skillz) = skills.single() else {
+            return;
+        };
         if skillz.has(Heirloom::SprintKillReset) {
             if let Some(lunge_slot) = skillz.has_active_skill(ActiveSkill::SprintLunge) {
                 if lunge_slot < 4 {
-                    if let Ok(mut slots) = class_slots.get_single_mut() {
+                    if let Ok(mut slots) = class_slots.single_mut() {
                         slots.0[lunge_slot]
                             .cooldown_timer
                             .tick(Duration::from_secs_f32(99.0));
@@ -447,7 +452,7 @@ pub fn handle_enemy_death_sprint_reset(
     }
 }
 
-pub fn handle_dodge_crit(dodges: EventReader<DodgeEvent>, mut game: GameParam) {
+pub fn handle_dodge_crit(dodges: MessageReader<DodgeEvent>, mut game: GameParam) {
     if dodges.is_empty() {
         return;
     }
@@ -474,24 +479,24 @@ pub struct ComboAnim;
 
 pub fn handle_add_combo_counter(
     mut commands: Commands,
-    mut hits: EventReader<HitEvent>,
+    mut hits: MessageReader<HitEvent>,
     mobs: Query<&Mob>,
     mut combo: Query<&mut ComboCounter>,
-    old_combo_anims: Query<(Entity, Option<&TextureAtlasSprite>), With<ComboAnim>>,
+    old_combo_anims: Query<Entity, With<ComboAnim>>,
     player: Query<(Entity, &PlayerSkills), With<Player>>,
     asset_server: Res<AssetServer>,
 ) {
-    let (player_e, skills) = player.single();
+    let Ok((player_e, skills)) = player.single() else {
+        return;
+    };
     if !skills.has(Heirloom::DaggerCombo) {
         return;
     }
 
     // Only count weapon hits (melee swings or weapon projectiles).
     let mut combo_increment = 0;
-    for hit in hits.iter() {
-        if hit_is_weapon_damage(hit)
-            && hit.hit_by_pet.is_none()
-            && mobs.get(hit.hit_entity).is_ok()
+    for hit in hits.read() {
+        if hit_is_weapon_damage(hit) && hit.hit_by_pet.is_none() && mobs.get(hit.hit_entity).is_ok()
         {
             combo_increment += 1;
         }
@@ -501,12 +506,8 @@ pub fn handle_add_combo_counter(
         if combo_increment > 0 {
             c.counter = (c.counter + combo_increment).min(combo_cap);
             c.reset_timer.reset();
-            for (e, anim) in old_combo_anims.iter() {
-                if anim.is_some() {
-                    commands.entity(e).despawn_recursive();
-                } else {
-                    commands.entity(e).insert(DoneAnimation);
-                }
+            for e in old_combo_anims.iter() {
+                commands.entity(e).insert(DoneAnimation);
             }
             let text = spawn_text(
                 &mut commands,
@@ -514,21 +515,23 @@ pub fn handle_add_combo_counter(
                 Vec3::new(0., -1., 1.),
                 BLACK,
                 format!("{}", c.counter),
-                Anchor::Center,
+                Anchor::CENTER,
                 FLOATING_TEXT,
                 0,
                 None,
             );
             let count = old_combo_anims.iter().count() as f32;
             commands
-                .spawn(AsepriteBundle {
-                    aseprite: asset_server.load(Combo::PATH),
-                    animation: AsepriteAnimation::from(Combo::tags::COMBO),
-                    transform: Transform::from_translation(Vec3::new(0., 20., count + 1.)),
-                    ..Default::default()
-                })
-                .insert(VisibilityBundle::default())
-                .insert(ComboAnim)
+                .spawn((
+                    aseprite_bundle(
+                        asset_server.load(Combo::PATH),
+                        Combo::tags::COMBO,
+                        Transform::from_translation(Vec3::new(0., 20., count + 1.)),
+                        Visibility::default(),
+                        true,
+                    ),
+                    ComboAnim,
+                ))
                 .safe_add_child(text)
                 .safe_set_parent(player_e);
         }
@@ -543,20 +546,24 @@ pub fn tick_combo_counter(
 ) {
     for mut c in combo.iter_mut() {
         c.reset_timer.tick(time.delta());
-        if c.reset_timer.finished() {
+        if c.reset_timer.is_finished() {
             c.counter = 0;
             c.reset_timer.reset();
             for c in old_combo_anims.iter() {
-                commands.entity(c).despawn_recursive();
+                commands.entity(c).despawn();
             }
         }
     }
 }
 
-pub fn pause_combo_anim_when_done(mut combo: Query<&mut AsepriteAnimation, With<ComboAnim>>) {
-    for mut anim in combo.iter_mut() {
-        if anim.just_finished() {
-            anim.pause();
+pub fn pause_combo_anim_when_done(
+    mut finished_events: MessageReader<AnimationEvents>,
+    mut combo: Query<(Entity, &mut AseAnimation), With<ComboAnim>>,
+) {
+    let finished = collect_finished(&mut finished_events);
+    for (entity, mut anim) in combo.iter_mut() {
+        if finished.contains(&entity) {
+            pause(&mut anim);
         }
     }
 }
@@ -614,7 +621,7 @@ pub fn tick_position_history(
     time: Res<Time>,
     mut q: Query<(&GlobalTransform, &mut PositionHistory), With<Player>>,
 ) {
-    let Ok((tf, mut hist)) = q.get_single_mut() else {
+    let Ok((tf, mut hist)) = q.single_mut() else {
         return;
     };
     hist.sample_timer.tick(time.delta());
@@ -635,14 +642,14 @@ pub fn tick_position_history(
 /// home teleports). Combat Teleport leaves history intact so Shadow Step can
 /// rewind through the jump.
 pub fn clear_position_history_on_move(
-    mut move_events: bevy::ecs::event::EventReader<super::MovePlayerEvent>,
+    mut move_events: bevy::ecs::message::MessageReader<super::MovePlayerEvent>,
     mut q: Query<&mut PositionHistory, With<Player>>,
 ) {
-    let should_clear = move_events.iter().any(|ev| ev.clear_recall_history);
+    let should_clear = move_events.read().any(|ev| ev.clear_recall_history);
     if !should_clear {
         return;
     }
-    if let Ok(mut hist) = q.get_single_mut() {
+    if let Ok(mut hist) = q.single_mut() {
         hist.clear();
     }
 }
@@ -709,7 +716,7 @@ pub struct RecallDashState {
 }
 
 pub fn handle_recall(
-    mut events: bevy::ecs::event::EventReader<ActiveSkillUsedEvent>,
+    mut events: bevy::ecs::message::MessageReader<ActiveSkillUsedEvent>,
     mut q: Query<
         (
             Entity,
@@ -724,17 +731,16 @@ pub fn handle_recall(
     >,
     game: crate::GameParam,
     proto_param: crate::proto::proto_param::ProtoParam,
-    mut ranged_attack_events: bevy::ecs::event::EventWriter<RangedAttackEvent>,
+    mut ranged_attack_events: bevy::ecs::message::MessageWriter<RangedAttackEvent>,
     mut commands: Commands,
 ) {
-    let Ok((player_e, tf, skills, mut hist, atk, skill_power, blessings)) = q.get_single_mut()
-    else {
+    let Ok((player_e, tf, skills, mut hist, atk, skill_power, blessings)) = q.single_mut() else {
         return;
     };
     let Some(slot) = skills.has_active_skill(ActiveSkill::Recall) else {
         return;
     };
-    let should_activate = events.iter().any(|ev| ev.slot == slot);
+    let should_activate = events.read().any(|ev| ev.slot == slot);
     if !should_activate {
         return;
     }
@@ -808,7 +814,7 @@ pub fn handle_recall(
 
     commands.spawn(SoundSpawner::new(AudioSoundEffect::Teleport, 0.1));
 
-    ranged_attack_events.send(RangedAttackEvent {
+    ranged_attack_events.write(RangedAttackEvent {
         projectile: Projectile::Smoke,
         direction: Vec2::ZERO,
         mana_cost: None,
@@ -851,10 +857,10 @@ pub fn tick_recall_dash(
         ),
         With<Player>,
     >,
-    mut ranged_attack_events: bevy::ecs::event::EventWriter<RangedAttackEvent>,
+    mut ranged_attack_events: bevy::ecs::message::MessageWriter<RangedAttackEvent>,
     mut commands: Commands,
 ) {
-    let Ok((player_e, mut dash, mut kcc, mut mv)) = q.get_single_mut() else {
+    let Ok((player_e, mut dash, mut kcc, mut mv)) = q.single_mut() else {
         return;
     };
 
@@ -875,7 +881,7 @@ pub fn tick_recall_dash(
 
     let speed = RECALL_DASH_SPEED_PX_PER_SEC;
     let t0 = dash.traveled;
-    let t1 = (t0 + speed * time.delta_seconds()).min(dash.path_length);
+    let t1 = (t0 + speed * time.delta_secs()).min(dash.path_length);
     let pos0 = position_along_polyline(&dash.path, t0);
     let pos1 = position_along_polyline(&dash.path, t1);
     dash.traveled = t1;
@@ -897,7 +903,7 @@ pub fn tick_recall_dash(
     mv.0 = Vec2::ZERO;
     kcc.translation = Some(step);
 
-    let finished = dash.timer.finished() || dash.traveled >= dash.path_length - 0.25;
+    let finished = dash.timer.is_finished() || dash.traveled >= dash.path_length - 0.25;
 
     if finished {
         commands.entity(player_e).remove::<RecallDashState>();
@@ -910,7 +916,7 @@ pub fn tick_recall_dash(
             })
             .insert(Stealthed);
 
-        ranged_attack_events.send(RangedAttackEvent {
+        ranged_attack_events.write(RangedAttackEvent {
             projectile: Projectile::Smoke,
             direction: Vec2::ZERO,
             mana_cost: None,

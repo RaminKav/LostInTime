@@ -14,7 +14,7 @@ use super::{
 pub struct TilePlugin;
 impl Plugin for TilePlugin {
     fn build(&self, app: &mut App) {
-        app.add_system(Self::update_tile_sprite);
+        app.add_systems(Update, Self::update_tile_sprite);
     }
 }
 

@@ -1,11 +1,13 @@
+use crate::aseprite_assets::ShrineEye;
+use crate::aseprite_helpers::{
+    ase_animation, aseprite_bundle, collect_finished, is_paused, pause, play_loop, play_once, start,
+};
 use bevy::prelude::*;
-use bevy_aseprite::{anim::AsepriteAnimation, aseprite, AsepriteBundle};
+use bevy_aseprite_ultra::prelude::{AnimationState, AseAnimation, Aseprite};
 
 use crate::assets::Graphics;
 
 use super::WorldObject;
-
-aseprite!(pub ShrineEye, "textures/shrines/shrine_eye.ase");
 
 /// Marker on the shrine_eye child entity spawned above every overworld shrine.
 #[derive(Component)]
@@ -41,30 +43,40 @@ pub fn uses_standalone_shrine_texture(obj: &WorldObject) -> bool {
 fn shrine_texture_info(obj: &WorldObject) -> Option<(&'static str, Vec2, f32)> {
     // (path, custom_size, eye local Y offset above shrine center)
     match obj {
-        WorldObject::GambleShrine | WorldObject::GambleShrineDone => {
-            Some(("textures/shrines/WatchtowerShrine.png", Vec2::new(37., 77.), 56.))
-        }
+        WorldObject::GambleShrine | WorldObject::GambleShrineDone => Some((
+            "textures/shrines/WatchtowerShrine.png",
+            Vec2::new(37., 77.),
+            56.,
+        )),
         WorldObject::MicrowaveShrine | WorldObject::MicrowaveShrineDone => {
             Some(("textures/shrines/SwapShrine.png", Vec2::new(45., 45.), 44.))
         }
         WorldObject::ActiveSkillShrine | WorldObject::ActiveSkillShrineDone => {
             Some(("textures/shrines/SkillShrine.png", Vec2::new(35., 45.), 44.))
         }
-        WorldObject::BlacksmithMerchant | WorldObject::BlacksmithMerchantDone => {
-            Some(("textures/shrines/MerchantShrine.png", Vec2::new(32., 30.), 40.))
-        }
-        WorldObject::HeirloomShrine | WorldObject::HeirloomShrineDone => {
-            Some(("textures/shrines/HeirloomShrine.png", Vec2::new(64., 41.), 42.))
-        }
-        WorldObject::CombatShrine | WorldObject::CombatShrineDone => {
-            Some(("textures/shrines/CombatShrine.png", Vec2::new(35., 60.), 50.))
-        }
+        WorldObject::BlacksmithMerchant | WorldObject::BlacksmithMerchantDone => Some((
+            "textures/shrines/MerchantShrine.png",
+            Vec2::new(32., 30.),
+            40.,
+        )),
+        WorldObject::HeirloomShrine | WorldObject::HeirloomShrineDone => Some((
+            "textures/shrines/HeirloomShrine.png",
+            Vec2::new(64., 41.),
+            42.,
+        )),
+        WorldObject::CombatShrine | WorldObject::CombatShrineDone => Some((
+            "textures/shrines/CombatShrine.png",
+            Vec2::new(35., 60.),
+            50.,
+        )),
         WorldObject::ChaosTotem | WorldObject::ChaosTotemDone => {
             Some(("textures/shrines/ChaosShrine.png", Vec2::new(31., 35.), 40.))
         }
-        WorldObject::CauldronShrine | WorldObject::CauldronShrineDone => {
-            Some(("textures/shrines/CauldronShrine.png", Vec2::new(28., 29.), 38.))
-        }
+        WorldObject::CauldronShrine | WorldObject::CauldronShrineDone => Some((
+            "textures/shrines/CauldronShrine.png",
+            Vec2::new(28., 29.),
+            38.,
+        )),
         WorldObject::WellShrine | WorldObject::WellShrineDone => {
             Some(("textures/shrines/WellShrine.png", Vec2::new(38., 56.), 48.))
         }
@@ -109,42 +121,46 @@ fn eye_state_for(obj: &WorldObject, needs_repair: bool) -> ShrineEyeState {
 
 fn apply_eye_state(
     commands: &mut Commands,
+    eye_anims: &mut Query<&mut AseAnimation, With<ShrineEyeMarker>>,
     shrine_entity: Entity,
     children: Option<&Children>,
     eye_markers: &Query<(), With<ShrineEyeMarker>>,
-    eye_handle: &Handle<bevy_aseprite::Aseprite>,
+    eye_handle: &Handle<Aseprite>,
     eye_y: f32,
     eye_state: ShrineEyeState,
 ) {
     let mut existing_eye = None;
     if let Some(children) = children {
         for child in children.iter() {
-            if eye_markers.get(*child).is_ok() {
-                existing_eye = Some(*child);
+            if eye_markers.get(child).is_ok() {
+                existing_eye = Some(child);
                 break;
             }
         }
     }
 
     if let Some(eye_entity) = existing_eye {
-        if let Some(mut eye_commands) = commands.get_entity(eye_entity) {
-            eye_commands.insert(AsepriteAnimation::from(eye_state.tag()));
+        if let Ok(mut anim) = eye_anims.get_mut(eye_entity) {
+            play_loop(&mut anim, eye_state.tag());
+        }
+        if let Ok(mut eye_commands) = commands.get_entity(eye_entity) {
             if eye_state == ShrineEyeState::Done {
                 eye_commands.insert(ShrineEyeDoneVisual);
             } else {
                 eye_commands.remove::<ShrineEyeDoneVisual>();
             }
         }
-    } else if let Some(mut entity_commands) = commands.get_entity(shrine_entity) {
+    } else if let Ok(mut entity_commands) = commands.get_entity(shrine_entity) {
         entity_commands.with_children(|parent| {
             let mut eye = parent.spawn((
                 ShrineEyeMarker,
-                AsepriteBundle {
-                    aseprite: eye_handle.clone(),
-                    animation: AsepriteAnimation::from(eye_state.tag()),
-                    transform: Transform::from_translation(Vec3::new(0., eye_y, 1.)),
-                    ..default()
-                },
+                aseprite_bundle(
+                    eye_handle.clone(),
+                    eye_state.tag(),
+                    Transform::from_translation(Vec3::new(0., eye_y, 1.)),
+                    Visibility::Inherited,
+                    false,
+                ),
                 Name::new("ShrineEye"),
             ));
             if eye_state == ShrineEyeState::Done {
@@ -175,6 +191,7 @@ pub fn apply_shrine_visuals_on_spawn(
         )>,
     >,
     eye_markers: Query<(), With<ShrineEyeMarker>>,
+    mut eye_anims: Query<&mut AseAnimation, With<ShrineEyeMarker>>,
     eye_one_shots: Query<(), With<crate::item::shrine_repair::ShrineEyeOneShot>>,
 ) {
     let Some(eye_handle) = graphics.shrine_eye.as_ref() else {
@@ -185,30 +202,25 @@ pub fn apply_shrine_visuals_on_spawn(
         let Some((path, size, eye_y)) = shrine_texture_info(obj) else {
             continue;
         };
-        let Some(mut entity_commands) = commands.get_entity(entity) else {
+        let Ok(mut entity_commands) = commands.get_entity(entity) else {
             continue;
         };
 
         let texture: Handle<Image> = asset_server.load(path);
         entity_commands
-            .insert((
-                texture,
-                Sprite {
-                    custom_size: Some(size),
-                    ..default()
-                },
-                VisibilityBundle {
-                    visibility: Visibility::Inherited,
-                    ..default()
-                },
-            ))
-            .remove::<TextureAtlasSprite>()
-            .remove::<Handle<TextureAtlas>>();
+            .insert(Sprite {
+                image: texture,
+                custom_size: Some(size),
+                ..default()
+            })
+            .insert(Visibility::Inherited);
 
         // Don't clobber Startup / FlashGreen / FlashRed / Done-wait while repair runs.
         let eye_busy = repair_channel.is_some()
             || pending_finish.is_some()
-            || children.map_or(false, |c| c.iter().any(|child| eye_one_shots.get(*child).is_ok()));
+            || children.map_or(false, |c| {
+                c.iter().any(|child| eye_one_shots.get(child).is_ok())
+            });
         if eye_busy {
             continue;
         }
@@ -216,6 +228,7 @@ pub fn apply_shrine_visuals_on_spawn(
         let eye_state = eye_state_for(obj, needs_repair.is_some());
         apply_eye_state(
             &mut commands,
+            &mut eye_anims,
             entity,
             children,
             &eye_markers,
@@ -237,6 +250,7 @@ pub fn sync_shrine_eye_after_repair(
         Option<&crate::item::shrine_repair::PendingShrineRepairFinish>,
     )>,
     eye_markers: Query<(), With<ShrineEyeMarker>>,
+    mut eye_anims: Query<&mut AseAnimation, With<ShrineEyeMarker>>,
     eye_one_shots: Query<(), With<crate::item::shrine_repair::ShrineEyeOneShot>>,
     graphics: Res<Graphics>,
 ) {
@@ -244,7 +258,7 @@ pub fn sync_shrine_eye_after_repair(
         return;
     };
 
-    for entity in removed.iter() {
+    for entity in removed.read() {
         let Ok((obj, children, pending_finish)) = shrines.get(entity) else {
             continue;
         };
@@ -253,7 +267,7 @@ pub fn sync_shrine_eye_after_repair(
             continue;
         }
         if let Some(children) = children {
-            if children.iter().any(|c| eye_one_shots.get(*c).is_ok()) {
+            if children.iter().any(|c| eye_one_shots.get(c).is_ok()) {
                 continue;
             }
         }
@@ -263,6 +277,7 @@ pub fn sync_shrine_eye_after_repair(
         let eye_state = eye_state_for(obj, false);
         apply_eye_state(
             &mut commands,
+            &mut eye_anims,
             entity,
             children,
             &eye_markers,

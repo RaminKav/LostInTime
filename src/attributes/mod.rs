@@ -1,4 +1,6 @@
-use bevy_aseprite::{anim::AsepriteAnimation, aseprite, AsepriteBundle};
+use crate::aseprite_assets::RarityGlows;
+use crate::aseprite_helpers::aseprite_bundle;
+use bevy_aseprite_ultra::prelude::Aseprite;
 use item_abilities::handle_item_abilitiy_on_attack;
 use rand::{seq::IteratorRandom, Rng};
 use serde::{Deserialize, Serialize};
@@ -57,10 +59,10 @@ use hunger::*;
 pub mod item_abilities;
 
 use self::health_regen::{handle_health_regen, handle_mana_regen};
+use bevy::sprite_render::MeshMaterial2d;
 pub struct AttributesPlugin;
 pub const MAX_GEAR_LEVEL: u8 = 10;
-aseprite!(pub RarityGlows, "textures/effects/RarityGlows.aseprite");
-#[derive(Component, PartialEq, Clone, Reflect, FromReflect, Default, Debug, Serialize, Deserialize)]
+#[derive(Component, PartialEq, Clone, Reflect, Default, Debug, Serialize, Deserialize)]
 #[reflect(Default)]
 #[serde(default)]
 pub struct ItemAttributes {
@@ -91,7 +93,7 @@ pub struct ItemAttributes {
     pub skill_power: AttributeValue,
 }
 
-#[derive(PartialEq, Clone, Copy, Reflect, FromReflect, Default, Debug, Serialize, Deserialize)]
+#[derive(PartialEq, Clone, Copy, Reflect, Default, Debug, Serialize, Deserialize)]
 pub struct AttributeValue {
     pub value: i32,
     pub quality: AttributeQuality,
@@ -136,7 +138,7 @@ impl Add<i32> for AttributeValue {
     }
 }
 
-#[derive(PartialEq, Clone, Copy, Reflect, FromReflect, Default, Debug, Serialize, Deserialize)]
+#[derive(PartialEq, Clone, Copy, Reflect, Default, Debug, Serialize, Deserialize)]
 pub enum AttributeQuality {
     #[default]
     Low,
@@ -832,7 +834,7 @@ macro_rules! setup_raw_bonus_attributes {
     (struct $name:ident {
         $($field_name:ident: $field_type:ty,)*
     }) => {
-        #[derive(Component, PartialEq, Clone, Reflect, FromReflect, Default, Debug, Deserialize)]
+        #[derive(Component, PartialEq, Clone, Reflect, Default, Debug, Deserialize)]
         #[reflect(Default)]        pub struct $name {
             $(pub $field_name: $field_type,)*
         }
@@ -898,7 +900,7 @@ macro_rules! setup_raw_base_attributes {
     (struct $name:ident {
         $($field_name:ident: $field_type:ty,)*
     }) => {
-        #[derive(Component, PartialEq, Clone, Reflect, FromReflect, Default, Debug, Deserialize)]
+        #[derive(Component, PartialEq, Clone, Reflect, Default, Debug, Deserialize)]
         #[reflect(Default)]        pub struct $name {
             $(pub $field_name: $field_type,)*
         }
@@ -999,7 +1001,9 @@ setup_raw_base_attributes! { struct RawItemBaseAttributes {
      skill_power: Option<RangeInclusive<i32>>,
 }}
 
-#[derive(Display, Component, Reflect, FromReflect, Debug, Clone, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(
+    Display, Component, Reflect, Debug, Clone, Default, Eq, PartialEq, Serialize, Deserialize,
+)]
 #[reflect(Component)]
 pub enum ItemRarity {
     #[default]
@@ -1120,7 +1124,7 @@ impl ItemRarity {
     }
 }
 
-#[derive(Reflect, FromReflect, Default, Component, Clone, Debug, Copy)]
+#[derive(Reflect, Default, Component, Clone, Debug, Copy)]
 #[reflect(Component)]
 pub struct ItemLevel(pub u8);
 
@@ -1129,7 +1133,7 @@ pub struct AttributeModifier {
     pub delta: i32,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Message)]
 pub struct AttributeChangeEvent;
 
 #[derive(Bundle, Clone, Debug, Copy, Default)]
@@ -1157,10 +1161,10 @@ pub struct PlayerAttributeBundle {
 }
 
 //TODO: Add max health vs curr health
-#[derive(Reflect, FromReflect, Default, Component, Clone, Debug, Copy, Serialize, Deserialize)]
+#[derive(Reflect, Default, Component, Clone, Debug, Copy, Serialize, Deserialize)]
 #[reflect(Component)]
 pub struct CurrentHealth(pub i32);
-#[derive(Reflect, FromReflect, Default, Component, Clone, Debug)]
+#[derive(Reflect, Default, Component, Clone, Debug)]
 #[reflect(Component)]
 pub struct CurrentShield(pub i32);
 
@@ -1169,27 +1173,27 @@ pub struct ShieldRegen {
     pub regen_timer: Timer,
     pub delay_timer: Timer,
 }
-#[derive(Reflect, FromReflect, Default, Component, Clone, Debug, Copy)]
+#[derive(Reflect, Default, Component, Clone, Debug, Copy)]
 #[reflect(Component)]
 pub struct MaxMana(pub i32);
-#[derive(Reflect, FromReflect, Default, Component, Clone, Debug, Copy)]
+#[derive(Reflect, Default, Component, Clone, Debug, Copy)]
 #[reflect(Component)]
 pub struct CurrentMana(pub i32);
 
-#[derive(Reflect, FromReflect, Default, Component, Clone, Debug, Copy)]
+#[derive(Reflect, Default, Component, Clone, Debug, Copy)]
 #[reflect(Component)]
 pub struct MaxShield(pub i32);
-#[derive(Reflect, FromReflect, Default, Component, Clone, Debug, Copy)]
+#[derive(Reflect, Default, Component, Clone, Debug, Copy)]
 #[reflect(Component)]
 pub struct MaxHealth(pub i32);
-#[derive(Reflect, FromReflect, Default, Component, Clone, Debug, Copy)]
+#[derive(Reflect, Default, Component, Clone, Debug, Copy)]
 #[reflect(Component)]
 pub struct Attack(pub i32);
 
-#[derive(Reflect, FromReflect, Default, Component, Clone, Debug, Copy)]
+#[derive(Reflect, Default, Component, Clone, Debug, Copy)]
 #[reflect(Component)]
 pub struct AttackCooldown(pub f32);
-#[derive(Reflect, FromReflect, Default, Component, Clone, Debug, Copy)]
+#[derive(Reflect, Default, Component, Clone, Debug, Copy)]
 #[reflect(Component)]
 pub struct InvincibilityCooldown(pub f32);
 
@@ -1296,7 +1300,7 @@ pub struct XpRateBonus(pub i32);
 #[derive(Default, Component, Clone, Debug, Copy)]
 pub struct LootRateBonus(pub i32);
 
-#[derive(Reflect, FromReflect, Default, Component, Clone, Debug, Copy)]
+#[derive(Reflect, Default, Component, Clone, Debug, Copy)]
 #[reflect(Component)]
 pub struct ManaRegen(pub i32);
 
@@ -1309,19 +1313,20 @@ pub fn trigger_attribute_update_on_bonus_speed_change(
             Changed<BonusAttackSpeed>,
         ),
     >,
-    mut attribute_event: EventWriter<AttributeChangeEvent>,
+    mut attribute_event: MessageWriter<AttributeChangeEvent>,
 ) {
     if !changed_bonus.is_empty() {
-        attribute_event.send_default();
+        attribute_event.write_default();
     }
 }
 
 impl Plugin for AttributesPlugin {
     fn build(&self, app: &mut App) {
-        app.add_event::<AttributeChangeEvent>()
-            .add_event::<ModifyHealthEvent>()
-            .add_event::<ModifyManaEvent>()
+        app.add_message::<AttributeChangeEvent>()
+            .add_message::<ModifyHealthEvent>()
+            .add_message::<ModifyManaEvent>()
             .add_systems(
+                Update,
                 (
                     clamp_health,
                     clamp_mana,
@@ -1339,32 +1344,36 @@ impl Plugin for AttributesPlugin {
                     handle_new_items_raw_attributes.before(CustomFlush),
                     handle_player_item_attribute_change_events.after(CustomFlush),
                 )
-                    .in_set(OnUpdate(GameState::Main)),
+                    .run_if(in_state(GameState::Main)),
             )
-            .add_system(
+            .add_systems(
+                Update,
                 update_attributes_with_pet_slot_change
                     .before(handle_player_item_attribute_change_events)
-                    .in_set(OnUpdate(GameState::Main)),
+                    .run_if(in_state(GameState::Main)),
             )
-            .add_system(
+            .add_systems(
+                Update,
                 tick_active_consumable_buffs
                     .run_if(is_not_paused)
                     .before(handle_player_item_attribute_change_events)
-                    .in_set(OnUpdate(GameState::Main)),
+                    .run_if(in_state(GameState::Main)),
             )
             .add_systems(
+                Update,
                 (trigger_attribute_update_on_bonus_speed_change
                     .before(handle_player_item_attribute_change_events),)
-                    .in_set(OnUpdate(GameState::Main)),
+                    .run_if(in_state(GameState::Main)),
             )
             .add_systems(
+                Update,
                 (
                     add_current_shield_with_max_shield,
                     handle_cape_att_increase_on_level_up.before(handle_level_up),
                     regen_shield.run_if(is_not_paused),
                     update_player_health_percent,
                 )
-                    .in_set(OnUpdate(GameState::Main)),
+                    .run_if(in_state(GameState::Main)),
             );
     }
 }
@@ -1392,11 +1401,11 @@ pub fn clamp_health(
         ),
         With<Player>,
     >,
-    mut game_over_event: EventWriter<GameOverEvent>,
-    mut death_defiance_events: EventWriter<
+    mut game_over_event: MessageWriter<GameOverEvent>,
+    mut death_defiance_events: MessageWriter<
         crate::player::combat_heirlooms::DeathDefianceSurvivedEvent,
     >,
-    mobs: Query<(Entity, &TextureAtlasSprite), With<crate::enemy::Mob>>,
+    mobs: Query<Entity, With<crate::enemy::Mob>>,
     mut run_beastiary: Option<ResMut<crate::player::beastiary::RunBeastiary>>,
     last_attacker: Option<Res<crate::player::beastiary::LastPlayerAttackerMob>>,
 ) {
@@ -1416,24 +1425,18 @@ pub fn clamp_health(
                     // Restore to 50% max health
                     h.0 = max_h.0 / 2;
 
-                    death_defiance_events.send(
-                        crate::player::combat_heirlooms::DeathDefianceSurvivedEvent,
-                    );
+                    death_defiance_events
+                        .write(crate::player::combat_heirlooms::DeathDefianceSurvivedEvent);
 
                     // Freeze all mobs for 3 seconds with blue tint
-                    use crate::combat::status_effects::STATUS_EFFECT_BLUE_TINT;
-                    for (mob_entity, sprite) in mobs.iter() {
-                        commands.entity(mob_entity).insert(
+                    use crate::combat::status_effects::DeathDefianceTint;
+                    for mob_entity in mobs.iter() {
+                        commands.entity(mob_entity).insert((
                             crate::player::combat_heirlooms::DeathDefianceFrozen {
                                 timer: Timer::from_seconds(3.0, TimerMode::Once),
-                                original_color: sprite.color,
                             },
-                        );
-                        // Apply blue tint
-                        commands.entity(mob_entity).insert(TextureAtlasSprite {
-                            color: STATUS_EFFECT_BLUE_TINT,
-                            ..sprite.clone()
-                        });
+                            DeathDefianceTint,
+                        ));
                     }
 
                     continue; // Don't trigger game over
@@ -1443,7 +1446,7 @@ pub fn clamp_health(
             h.0 = 0;
             // Only send game over event once
             if game_over_sent.is_none() {
-                game_over_event.send_default();
+                game_over_event.write_default();
                 commands.entity(entity).insert(GameOverSent);
                 if let (Some(rb), Some(la)) = (run_beastiary.as_mut(), last_attacker.as_ref()) {
                     if let Some(attacker) = la.0.clone() {
@@ -1617,8 +1620,8 @@ fn handle_player_item_attribute_change_events(
     mut commands: Commands,
     player: Query<(Entity, &Inventory), With<Player>>,
     eqp_attributes: Query<&ItemAttributes, With<Equipment>>,
-    mut att_events: EventReader<AttributeChangeEvent>,
-    mut stats_event: EventWriter<ShowInvPlayerStatsEvent>,
+    mut att_events: MessageReader<AttributeChangeEvent>,
+    mut stats_event: MessageWriter<ShowInvPlayerStatsEvent>,
     player_atts: Query<
         (
             &ItemAttributes,
@@ -1646,7 +1649,7 @@ fn handle_player_item_attribute_change_events(
     proto: crate::proto::proto_param::ProtoParam,
     consumable_buffs_q: Query<&ActiveConsumableBuffs, With<Player>>,
 ) {
-    for _event in att_events.iter() {
+    for _event in att_events.read() {
         let (
             att,
             skills,
@@ -1663,10 +1666,12 @@ fn handle_player_item_attribute_change_events(
             bonus_attack_speed,
             food_bonuses,
             blessing_max_hp_penalty,
-        ) = player_atts.single();
+        ) = player_atts.single().expect("player attributes");
         let blessing_max_hp_penalty_flat = blessing_max_hp_penalty.map(|p| p.0).unwrap_or(0);
         let mut new_att = att.clone();
-        let (player, inv) = player.single();
+        let Ok((player, inv)) = player.single() else {
+            return;
+        };
         let equips: Vec<ItemAttributes> = inv
             .equipment_items
             .items
@@ -1726,7 +1731,8 @@ fn handle_player_item_attribute_change_events(
             .map(|tracker| tracker.bonus_skill_power)
             .unwrap_or(0);
 
-        let consumable_summary = summarize_active_consumable_buffs(consumable_buffs_q.single());
+        let consumable_summary =
+            summarize_active_consumable_buffs(consumable_buffs_q.single().expect("player buffs"));
         let consumable_attack_add = consumable_summary.attack_speed_add;
         let merged_stats =
             merge_intrinsic_stats_with_consumable_buff_layer(new_att, &consumable_summary);
@@ -1754,8 +1760,8 @@ fn handle_player_item_attribute_change_events(
         } else {
             None
         };
-        if ui_state.0.is_inv_open() {
-            stats_event.send(ShowInvPlayerStatsEvent {
+        if ui_state.is_inv_open() {
+            stats_event.write(ShowInvPlayerStatsEvent {
                 stat,
                 ignore_timer: true,
             });
@@ -1770,7 +1776,7 @@ pub fn add_current_health_with_max_health(
 ) {
     for (entity, max_health) in health.iter_mut() {
         // Check if entity still exists before inserting components
-        if let Some(mut entity_commands) = commands.get_entity(entity) {
+        if let Ok(mut entity_commands) = commands.get_entity(entity) {
             entity_commands.insert(CurrentHealth(max_health.0));
         }
     }
@@ -1782,7 +1788,7 @@ pub fn add_current_shield_with_max_shield(
 ) {
     for (entity, max_shield) in shield.iter_mut() {
         // Check if entity still exists before inserting components
-        if let Some(mut entity_commands) = commands.get_entity(entity) {
+        if let Ok(mut entity_commands) = commands.get_entity(entity) {
             entity_commands.insert(CurrentShield(max_shield.0));
         }
     }
@@ -1795,9 +1801,9 @@ pub fn regen_shield(
     for (max_shield, mut current_shield, mut timer) in shield.iter_mut() {
         if current_shield.0 < max_shield.0 {
             timer.delay_timer.tick(time.delta());
-            if timer.delay_timer.finished() {
+            if timer.delay_timer.is_finished() {
                 timer.regen_timer.tick(time.delta());
-                if timer.regen_timer.finished() {
+                if timer.regen_timer.is_finished() {
                     current_shield.0 += 1;
                     timer.regen_timer.reset();
                 }
@@ -1820,10 +1826,13 @@ fn update_attributes_with_held_item_change(
     mut game_param: GameParam,
     mut inv: Query<&mut Inventory>,
     item_stack_query: Query<&ItemAttributes>,
-    mut att_event: EventWriter<AttributeChangeEvent>,
+    mut att_event: MessageWriter<AttributeChangeEvent>,
     proto: ProtoParam,
 ) {
-    let equipped_weapon = inv.single_mut().weapon_items.items[0].clone();
+    let Ok(mut inv) = inv.single_mut() else {
+        return;
+    };
+    let equipped_weapon = inv.weapon_items.items[0].clone();
     let player_data = game_param.player_mut();
     let prev_held_item_data = &player_data.main_hand_slot;
     if let Some(new_item) = equipped_weapon {
@@ -1832,29 +1841,29 @@ fn update_attributes_with_held_item_change(
             let Ok(curr_attributes) = item_stack_query.get(current_item.entity) else {
                 // Entity no longer exists, respawn the item
                 new_item.spawn_item_on_hand(&mut commands, &mut game_param, &proto);
-                att_event.send(AttributeChangeEvent);
+                att_event.write(AttributeChangeEvent);
                 return;
             };
             let new_attributes = &(new_item.item_stack.attributes);
             if new_item_stack != current_item.item_stack {
                 new_item.spawn_item_on_hand(&mut commands, &mut game_param, &proto);
-                att_event.send(AttributeChangeEvent);
+                att_event.write(AttributeChangeEvent);
             } else if curr_attributes != new_attributes {
-                if let Some(mut ec) = commands.get_entity(current_item.entity) {
+                if let Ok(mut ec) = commands.get_entity(current_item.entity) {
                     ec.insert(new_attributes.clone());
                 }
-                att_event.send(AttributeChangeEvent);
+                att_event.write(AttributeChangeEvent);
             }
         } else {
             new_item.spawn_item_on_hand(&mut commands, &mut game_param, &proto);
-            att_event.send(AttributeChangeEvent);
+            att_event.write(AttributeChangeEvent);
         }
     } else if let Some(current_item) = prev_held_item_data {
-        if let Some(mut entity_commands) = commands.get_entity(current_item.entity) {
+        if let Ok(mut entity_commands) = commands.get_entity(current_item.entity) {
             entity_commands.despawn();
         }
         player_data.main_hand_slot = None;
-        att_event.send(AttributeChangeEvent);
+        att_event.write(AttributeChangeEvent);
     }
 }
 
@@ -1862,10 +1871,10 @@ fn update_attributes_with_held_item_change(
 /// are included in `handle_player_item_attribute_change_events` (alongside armor/accessories).
 fn update_attributes_with_pet_slot_change(
     inv: Query<&Inventory>,
-    mut att_event: EventWriter<AttributeChangeEvent>,
+    mut att_event: MessageWriter<AttributeChangeEvent>,
     mut prev_pet_weapon: Local<Option<ItemStack>>,
 ) {
-    let Ok(inv) = inv.get_single() else {
+    let Ok(inv) = inv.single() else {
         return;
     };
     let current = inv
@@ -1883,21 +1892,21 @@ fn update_attributes_with_pet_slot_change(
 
     if changed {
         *prev_pet_weapon = current;
-        att_event.send(AttributeChangeEvent);
+        att_event.write(AttributeChangeEvent);
     }
 }
 
 ///Tracks player equip or accessory inventory slot changes,
 ///spawns new held equipment entity, and updates player attributes
 fn update_attributes_and_sprite_with_equipment_change(
-    player_limbs: Query<(&mut Handle<AnimatedTextureMaterial>, &Limb)>,
+    player_limbs: Query<(&MeshMaterial2d<AnimatedTextureMaterial>, &Limb)>,
     asset_server: Res<AssetServer>,
     proto_param: ProtoParam,
     mut materials: ResMut<Assets<AnimatedTextureMaterial>>,
-    mut att_event: EventWriter<AttributeChangeEvent>,
-    mut events: EventReader<DropOnSlotEvent>,
+    mut att_event: MessageWriter<AttributeChangeEvent>,
+    mut events: MessageReader<DropOnSlotEvent>,
 ) {
-    for drop in events.iter() {
+    for drop in events.read() {
         if drop.drop_target_slot_state.r#type.is_equipment()
             || drop.drop_target_slot_state.r#type.is_accessory()
         {
@@ -1910,11 +1919,13 @@ fn update_attributes_and_sprite_with_equipment_change(
             if !eqp_type.is_equipment() || !eqp_type.get_valid_slots().contains(&slot) {
                 continue;
             }
-            att_event.send(AttributeChangeEvent);
+            att_event.write(AttributeChangeEvent);
             if drop.drop_target_slot_state.r#type.is_equipment() {
                 for (mat, limb) in player_limbs.iter() {
                     if Limb::from_slot(slot).contains(limb) {
-                        let mat = materials.get_mut(mat).unwrap();
+                        let Some(mut mat) = materials.get_mut(&mat.0) else {
+                            continue;
+                        };
                         let armor_texture_handle = asset_server.load(format!(
                             "textures/player/{}.png",
                             drop.dropped_item_stack.obj_type
@@ -1929,16 +1940,18 @@ fn update_attributes_and_sprite_with_equipment_change(
 ///Tracks player equip or accessory inventory slot changes,
 ///spawns new held equipment entity, and updates player attributes
 fn update_sprite_with_equipment_removed(
-    mut removed_inv_item: EventReader<RemoveFromSlotEvent>,
-    player_limbs: Query<(&mut Handle<AnimatedTextureMaterial>, &Limb)>,
+    mut removed_inv_item: MessageReader<RemoveFromSlotEvent>,
+    player_limbs: Query<(&MeshMaterial2d<AnimatedTextureMaterial>, &Limb)>,
     asset_server: Res<AssetServer>,
     mut materials: ResMut<Assets<AnimatedTextureMaterial>>,
 ) {
-    for item in removed_inv_item.iter() {
+    for item in removed_inv_item.read() {
         if item.removed_slot_state.r#type.is_equipment() {
             for (mat, limb) in player_limbs.iter() {
                 if Limb::from_slot(item.removed_slot_state.slot_index).contains(limb) {
-                    let mat = materials.get_mut(mat).unwrap();
+                    let Some(mut mat) = materials.get_mut(&mat.0) else {
+                        continue;
+                    };
                     let armor_texture_handle = asset_server.load(format!(
                         "textures/player/player-texture-{}.png",
                         if limb == &Limb::Torso || limb == &Limb::Hands {
@@ -1997,27 +2010,29 @@ fn handle_new_items_raw_attributes(
         );
 
         if new_stack.rarity.clone() == ItemRarity::Rare {
-            commands
-                .spawn(AsepriteBundle {
-                    aseprite: asset_server.load(RarityGlows::PATH),
-                    animation: AsepriteAnimation::from(RarityGlows::tags::RARE),
-                    transform: Transform::from_translation(Vec3::new(0., 0., 1.)),
-                    ..Default::default()
-                })
-                .insert(VisibilityBundle::default())
-                .insert(DoneAnimation)
-                .set_parent(e);
+            commands.spawn((
+                aseprite_bundle(
+                    asset_server.load(RarityGlows::PATH),
+                    RarityGlows::tags::RARE,
+                    Transform::from_translation(Vec3::new(0., 0., 1.)),
+                    Visibility::default(),
+                    true,
+                ),
+                DoneAnimation,
+                ChildOf(e),
+            ));
         } else if new_stack.rarity.clone() == ItemRarity::Legendary {
-            commands
-                .spawn(AsepriteBundle {
-                    aseprite: asset_server.load(RarityGlows::PATH),
-                    animation: AsepriteAnimation::from(RarityGlows::tags::RARER),
-                    transform: Transform::from_translation(Vec3::new(0., 0., 1.)),
-                    ..Default::default()
-                })
-                .insert(VisibilityBundle::default())
-                .insert(DoneAnimation)
-                .set_parent(e);
+            commands.spawn((
+                aseprite_bundle(
+                    asset_server.load(RarityGlows::PATH),
+                    RarityGlows::tags::RARER,
+                    Transform::from_translation(Vec3::new(0., 0., 1.)),
+                    Visibility::default(),
+                    true,
+                ),
+                DoneAnimation,
+                ChildOf(e),
+            ));
             let mut rng = rand::thread_rng();
             let seed = rng.gen_range(0..100000);
             let speed = 10.;
@@ -2046,25 +2061,24 @@ pub fn add_item_glows(
     rarity: ItemRarity,
 ) -> Option<Entity> {
     // Check if parent entity exists before trying to set parent
-    if commands.get_entity(new_item_e).is_none() {
+    if commands.get_entity(new_item_e).is_err() {
         return None;
     }
     rarity.get_item_glow().map(|glow| {
         commands
-            .spawn(SpriteBundle {
-                texture: graphics.get_item_glow(glow.clone()),
-                sprite: Sprite {
+            .spawn((
+                Sprite {
+                    image: graphics.get_item_glow(glow.clone()),
                     custom_size: Some(Vec2::new(20., 20.)),
-                    ..Default::default()
+                    ..default()
                 },
-                transform: Transform {
+                Transform {
                     translation: Vec3::new(0., 0., -1.),
                     scale: Vec3::new(1., 1., 1.),
                     ..Default::default()
                 },
-                ..Default::default()
-            })
-            .set_parent(new_item_e)
+            ))
+            .insert(ChildOf(new_item_e))
             .id()
     })
 }
@@ -2192,18 +2206,22 @@ fn item_attributes_to_bonus_stat_lines(attrs: &ItemAttributes) -> Vec<crate::ite
 }
 
 pub fn handle_cape_att_increase_on_level_up(
-    mut player: Query<(&mut Inventory, &PlayerLevel, &PlayerClass), Changed<PlayerLevel>>,
-    mut att_event: EventWriter<AttributeChangeEvent>,
+    mut player: Query<(&mut Inventory, &PlayerLevel), Changed<PlayerLevel>>,
+    player_class: Res<PlayerClass>,
+    mut att_event: MessageWriter<AttributeChangeEvent>,
     proto: ProtoParam,
 ) {
-    for (mut inv, level, class) in player.iter_mut() {
+    for (mut inv, level) in player.iter_mut() {
         if level.level == level.next_level {
-            let mut cape_stack = proto.get_item_data(class.class.get_cape()).unwrap().clone();
+            let mut cape_stack = proto
+                .get_item_data(player_class.class.get_cape())
+                .unwrap()
+                .clone();
             let level = level.level as i32 - 1;
-            let mut cape_attrs = class.class.compute_cape_stats(level);
+            let mut cape_attrs = player_class.class.compute_cape_stats(level);
 
             // Add pet passive bonuses
-            for pet in class.pets.iter() {
+            for pet in player_class.pets.iter() {
                 let pet_stats = pet.compute_pet_stats(level);
                 cape_attrs = cape_attrs.combine(&pet_stats);
             }
@@ -2223,7 +2241,7 @@ pub fn handle_cape_att_increase_on_level_up(
             }
             cape_stack.metadata.level = Some((level + 1) as u8);
             inv.equipment_items.with_item_in_slot(3, cape_stack);
-            att_event.send(AttributeChangeEvent);
+            att_event.write(AttributeChangeEvent);
         }
     }
 }
@@ -2234,7 +2252,7 @@ pub fn update_player_health_percent(
     player_health: Query<(&CurrentHealth, &MaxHealth), With<crate::player::Player>>,
     mut health_percent: ResMut<crate::PlayerHealthPercent>,
 ) {
-    if let Ok((current, max)) = player_health.get_single() {
+    if let Ok((current, max)) = player_health.single() {
         if max.0 > 0 {
             health_percent.percent = current.0 as f32 / max.0 as f32;
         } else {

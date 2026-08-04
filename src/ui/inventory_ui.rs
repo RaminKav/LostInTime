@@ -1,13 +1,10 @@
-use bevy::{ecs::system::SystemParam, prelude::*, render::view::RenderLayers, sprite::Anchor};
-
-use bevy_aseprite::{anim::AsepriteAnimation, aseprite, Aseprite, AsepriteBundle};
-
-aseprite!(pub CraftingArrowAse, "textures/effects/CraftingArrow.aseprite");
-
-/// Marker for the indicator arrow spawned over the crafting result slot when the
-/// player has all the ingredients needed for the selected recipe.
-#[derive(Component)]
-pub struct CraftingArrowIndicator;
+use bevy::text::Justify;
+use crate::aseprite_assets::CraftingArrowAse;
+use crate::aseprite_helpers::aseprite_bundle;
+use bevy::{
+    camera::visibility::RenderLayers, ecs::system::SystemParam, prelude::*, sprite::Anchor,
+};
+use bevy_aseprite_ultra::prelude::Aseprite;
 
 use crate::chaos::ChaosTracker;
 use crate::colors::{
@@ -43,11 +40,10 @@ use crate::ui::{
     INVENTORY_EQUIPMENT_UI_SIZE, INVENTORY_UPGRADE_UI_SIZE, INVENTORY_Y_OFFSET,
     INV_BLUEPRINT_SLOT_CENTER_X, INV_BLUEPRINT_SLOT_ICON_X_OFFSET,
     INV_BLUEPRINT_SLOT_LABEL_X_OFFSET, INV_BLUEPRINT_SLOT_ROW_GAP, INV_BLUEPRINT_SLOT_SIZE,
-    INV_BLUEPRINT_SLOT_TOP_Y, INV_CRAFTING_INPUT_SLOTS_Y_LOCAL, INV_CRAFTING_INPUT_SLOT_SPACING_X,
-    INV_CRAFTING_PANEL_INGREDIENT_COUNT_Y_OFFSET, INV_CRAFTING_PANEL_INGREDIENT_ICON_Y_OFFSET,
-    INV_CRAFTING_PANEL_INGREDIENT_ROW_Y,
+    INV_BLUEPRINT_SLOT_TOP_Y, INV_CRAFTING_INGREDIENT_SLOT_SIZE, INV_CRAFTING_INPUT_SLOTS_Y_LOCAL,
+    INV_CRAFTING_INPUT_SLOT_SPACING_X, INV_CRAFTING_PANEL_INGREDIENT_COUNT_Y_OFFSET,
+    INV_CRAFTING_PANEL_INGREDIENT_ICON_Y_OFFSET, INV_CRAFTING_PANEL_INGREDIENT_ROW_Y,
     INV_CRAFTING_PANEL_INGREDIENT_SPACING_X, INV_CRAFTING_PANEL_RESULT_Y,
-    INV_CRAFTING_INGREDIENT_SLOT_SIZE,
     INV_UPGRADE_PANEL_OFFSET_Y_CRAFTING, MAX_BLUEPRINT_ROWS, UI_UPGRADE_SLOT_SIZE,
 };
 use crate::world::dimension::{DimensionSpawnEvent, Era};
@@ -74,7 +70,7 @@ use crate::{GameParam, DEBUG};
 use super::{
     crafting_ui::CraftingContainer,
     icon_hover_tooltips::IconHoverTooltipText,
-    interactions::{Interactable, Interaction},
+    interactions::{set_sprite_image, Interactable, Interaction},
     inventory_panel_center_x,
     options_ui::CheatSettings,
     player_hud::FlashExpBarEvent,
@@ -95,6 +91,11 @@ use super::{
     INV_SLOT_SPACING_Y, INV_SORT_BUTTON_OFFSET_X, INV_SORT_BUTTON_OFFSET_Y, INV_TRASH_OFFSET_X,
     INV_TRASH_OFFSET_Y, INV_UI_PARENT_OFFSET_CRAFTING, UI_SLOT_SIZE,
 };
+
+/// Marker for the indicator arrow spawned over the crafting result slot when the
+/// player has all the ingredients needed for the selected recipe.
+#[derive(Component)]
+pub struct CraftingArrowIndicator;
 
 #[derive(Clone, Eq, PartialEq, Debug, Hash, Default, States, Component)]
 pub enum UIState {
@@ -154,9 +155,11 @@ impl UIState {
 }
 
 /// Event to grant an heirloom from dev mode (handled in a separate system to avoid query conflicts).
+#[derive(Message)]
 pub struct GrantHeirloomDevEvent(pub HeirloomChoiceState);
 
 /// Event to remove one copy of an heirloom from dev mode (handled in a separate system).
+#[derive(Message)]
 pub struct RevokeHeirloomDevEvent(pub Heirloom);
 
 /// When true, the dev heirloom picker grid is shown beside the dev buttons.
@@ -164,6 +167,7 @@ pub struct RevokeHeirloomDevEvent(pub Heirloom);
 pub struct DevHeirloomGridOpen(pub bool);
 
 /// Event to grant an active skill from dev mode (handled in a separate system to avoid query conflicts).
+#[derive(Message)]
 pub struct GrantSkillDevEvent {
     pub skill: ActiveSkill,
     /// Player skill slot index: 1 = 2nd slot, 2 = 3rd slot.
@@ -178,7 +182,7 @@ pub struct DevSkillGridOpen(pub bool);
 pub struct InventoryUI;
 
 /// Dynamic prompt text shown on the upgrade panel (Inventory mode only).
-/// Text switches between "Add Upgrade Material", "Use Tome", and "Use Orb" depending on which
+/// Text2d switches between "Add Upgrade Material", "Use Tome", and "Use Orb" depending on which
 /// consumable is sitting in furnace slot 0 (see `update_upgrade_material_prompt_text`).
 #[derive(Component, Default, Clone)]
 pub struct UpgradeMaterialPromptText;
@@ -271,7 +275,7 @@ pub struct DevEndlessButtonLabel;
 #[derive(SystemParam)]
 pub(crate) struct DevEndlessButtonParams<'w> {
     infinite_mode: ResMut<'w, InfiniteMode>,
-    infinite_mode_event: EventWriter<'w, InfiniteModeStartedEvent>,
+    infinite_mode_event: MessageWriter<'w, InfiniteModeStartedEvent>,
     mob_spawning_paused: Res<'w, MobSpawningPaused>,
 }
 
@@ -282,7 +286,7 @@ pub struct DevHeirloomPickerToggleButton;
 /// Dev button that toggles the full-pool active skill picker grid.
 #[derive(Component)]
 pub struct DevSkillPickerToggleButton;
-#[derive(Component, FromReflect, Reflect, Clone, Debug)]
+#[derive(Component, Reflect, Clone, Debug)]
 pub struct InventorySlotState {
     pub slot_index: usize,
     pub item: Option<Entity>,
@@ -296,7 +300,7 @@ pub struct InventoryState {
     pub inv_size: Vec2,
     pub furnace_state: FurnaceState,
 }
-#[derive(FromReflect, PartialEq, Reflect, Debug, Clone, Copy)]
+#[derive(PartialEq, Reflect, Debug, Clone, Copy)]
 pub enum InventorySlotType {
     Normal,
     Hotbar,
@@ -377,7 +381,7 @@ pub fn setup_inv_ui(
     cur_inv_state: Res<State<UIState>>,
     mut dev_grid_open: ResMut<DevHeirloomGridOpen>,
     mut dev_skill_grid_open: ResMut<DevSkillGridOpen>,
-    mut stats_event: EventWriter<ShowInvPlayerStatsEvent>,
+    mut stats_event: MessageWriter<ShowInvPlayerStatsEvent>,
     resolution: Res<ScreenResolution>,
     asset_server: Res<AssetServer>,
     cheat_settings: Option<Res<CheatSettings>>,
@@ -390,7 +394,7 @@ pub fn setup_inv_ui(
 ) {
     dev_grid_open.0 = false;
     dev_skill_grid_open.0 = false;
-    let (size, texture, pos_offset) = match cur_inv_state.0 {
+    let (size, texture, pos_offset) = match cur_inv_state.get() {
         UIState::Inventory | UIState::InventoryCrafting => (
             INVENTORY_UI_SIZE,
             graphics.get_ui_element_texture(UIElement::Inventory),
@@ -425,65 +429,58 @@ pub fn setup_inv_ui(
     spawn_full_screen_ui_overlay(&mut commands, &resolution, 0.8, 9.);
 
     let inv = commands
-        .spawn(SpriteBundle {
-            texture,
-            sprite: Sprite {
+        .spawn((
+            Sprite {
+                image: texture,
                 custom_size: Some(size),
                 ..Default::default()
             },
-            transform: Transform {
+            Transform {
                 translation: Vec3::new(pos_offset.x, pos_offset.y, 10.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
-            ..Default::default()
-        })
+        ))
         .insert(InventoryUI)
-        .insert(cur_inv_state.0.clone())
+        .insert(cur_inv_state.get().clone())
         .insert(Name::new("INVENTORY"))
         .insert(RenderLayers::from_layers(&[3]))
         .insert(UiShadow::container())
         .id();
     let _inv_text = commands
-        .spawn(Text2dBundle {
-            text: Text::from_section(
-                "INVENTORY",
-                gf::DISPLAY.text_style(&asset_server, STATS_TITLE),
-            ),
-            text_anchor: Anchor::Center,
-            transform: Transform {
-                translation: Vec3::new(3., size.y / 2. - 10., 1.),
-                scale: gf::DISPLAY.transform_scale(),
-                ..Default::default()
-            },
-            ..default()
-        })
+        .spawn(
+            gf::DISPLAY
+                .text(&asset_server, "INVENTORY", STATS_TITLE)
+                .anchor(Anchor::CENTER)
+                .with_transform(Transform {
+                    translation: Vec3::new(3., size.y / 2. - 10., 1.),
+                    scale: gf::DISPLAY.transform_scale(),
+                    ..Default::default()
+                }),
+        )
         .insert(RenderLayers::from_layers(&[3]))
         .insert(Name::new("INVENTORY TITLE"))
-        .insert(cur_inv_state.0.clone())
-        .set_parent(inv)
+        .insert(cur_inv_state.get().clone())
+        .insert(ChildOf(inv))
         .id();
     let _hotbar_text = commands
-        .spawn(Text2dBundle {
-            text: Text::from_section(
-                "HOTBAR",
-                gf::DISPLAY.text_style(&asset_server, HOTBAR_TITLE),
-            ),
-            text_anchor: Anchor::Center,
-            transform: Transform {
-                translation: Vec3::new(3., size.y / 2. - 246., 1.),
-                scale: gf::DISPLAY.transform_scale(),
-                ..Default::default()
-            },
-            ..default()
-        })
+        .spawn(
+            gf::DISPLAY
+                .text(&asset_server, "HOTBAR", HOTBAR_TITLE)
+                .anchor(Anchor::CENTER)
+                .with_transform(Transform {
+                    translation: Vec3::new(3., size.y / 2. - 246., 1.),
+                    scale: gf::DISPLAY.transform_scale(),
+                    ..Default::default()
+                }),
+        )
         .insert(RenderLayers::from_layers(&[3]))
         .insert(Name::new("HOTBAR TITLE"))
-        .insert(cur_inv_state.0.clone())
-        .set_parent(inv)
+        .insert(cur_inv_state.get().clone())
+        .insert(ChildOf(inv))
         .id();
 
-    let is_crafting_mode = cur_inv_state.0 == UIState::InventoryCrafting;
+    let is_crafting_mode = *cur_inv_state.get() == UIState::InventoryCrafting;
 
     // Side panel: CraftingPanel + Brew only in Cauldron blueprints mode.
     // Normal Inventory no longer shows the old CraftButtonContainer under equipment.
@@ -491,13 +488,13 @@ pub fn setup_inv_ui(
         let side_panel_size = INVENTORY_CRAFTING_PANEL_UI_SIZE;
         let side_panel_element = UIElement::CraftingPanel;
         let upgrade_panel = commands
-            .spawn(SpriteBundle {
-                texture: graphics.get_ui_element_texture(side_panel_element.clone()),
-                sprite: Sprite {
+            .spawn((
+                Sprite {
+                    image: graphics.get_ui_element_texture(side_panel_element.clone()),
                     custom_size: Some(side_panel_size),
                     ..Default::default()
                 },
-                transform: Transform {
+                Transform {
                     translation: Vec3::new(
                         INV_EQUIP_PANEL_OFFSET_X + 3.,
                         INV_UPGRADE_PANEL_OFFSET_Y_CRAFTING,
@@ -506,9 +503,8 @@ pub fn setup_inv_ui(
                     scale: Vec3::new(1., 1., 1.),
                     ..Default::default()
                 },
-                ..Default::default()
-            })
-            .insert(cur_inv_state.0.clone())
+            ))
+            .insert(cur_inv_state.get().clone())
             .insert(Name::new("CRAFTING PANEL"))
             .insert(side_panel_element)
             .insert(RenderLayers::from_layers(&[3]))
@@ -517,23 +513,20 @@ pub fn setup_inv_ui(
         commands.entity(inv).add_child(upgrade_panel);
 
         let _upgrade_text = commands
-            .spawn(Text2dBundle {
-                text: Text::from_section(
-                    "CRAFTING",
-                    gf::DISPLAY.text_style(&asset_server, EQUIP_TITLE),
-                ),
-                text_anchor: Anchor::Center,
-                transform: Transform {
-                    translation: Vec3::new(0., side_panel_size.y / 2. - 12., 1.),
-                    scale: gf::DISPLAY.transform_scale(),
-                    ..Default::default()
-                },
-                ..default()
-            })
+            .spawn(
+                gf::DISPLAY
+                    .text(&asset_server, "CRAFTING", EQUIP_TITLE)
+                    .anchor(Anchor::CENTER)
+                    .with_transform(Transform {
+                        translation: Vec3::new(0., side_panel_size.y / 2. - 12., 1.),
+                        scale: gf::DISPLAY.transform_scale(),
+                        ..Default::default()
+                    }),
+            )
             .insert(RenderLayers::from_layers(&[3]))
             .insert(Name::new("upgrade/crafting TITLE"))
-            .insert(cur_inv_state.0.clone())
-            .set_parent(upgrade_panel)
+            .insert(cur_inv_state.get().clone())
+            .insert(ChildOf(upgrade_panel))
             .id();
         Some((upgrade_panel, side_panel_size))
     } else {
@@ -541,45 +534,41 @@ pub fn setup_inv_ui(
     };
 
     // Equipment panel (only in standard Inventory mode — crafting mode hides equipment).
-    if cur_inv_state.0 == UIState::Inventory {
+    if *cur_inv_state.get() == UIState::Inventory {
         let equip_panel = commands
-            .spawn(SpriteBundle {
-                texture: graphics.get_ui_element_texture(UIElement::EquipmentPanel),
-                sprite: Sprite {
+            .spawn((
+                Sprite {
+                    image: graphics.get_ui_element_texture(UIElement::EquipmentPanel),
                     custom_size: Some(INVENTORY_EQUIPMENT_UI_SIZE),
                     ..Default::default()
                 },
-                transform: Transform {
+                Transform {
                     translation: Vec3::new(INV_EQUIP_PANEL_OFFSET_X, INV_EQUIP_PANEL_OFFSET_Y, 0.),
                     scale: Vec3::new(1., 1., 1.),
                     ..Default::default()
                 },
-                ..Default::default()
-            })
-            .insert(cur_inv_state.0.clone())
+            ))
+            .insert(cur_inv_state.get().clone())
             .insert(Name::new("EQUIPMENTS"))
             .insert(RenderLayers::from_layers(&[3]))
             .insert(UiShadow::container())
             .id();
         commands.entity(inv).add_child(equip_panel);
         let _eqp_text = commands
-            .spawn(Text2dBundle {
-                text: Text::from_section(
-                    "EQUIPMENT",
-                    gf::DISPLAY.text_style(&asset_server, EQUIP_TITLE),
-                ),
-                text_anchor: Anchor::Center,
-                transform: Transform {
-                    translation: Vec3::new(0., INVENTORY_EQUIPMENT_UI_SIZE.y / 2. - 11., 1.),
-                    scale: gf::DISPLAY.transform_scale(),
-                    ..Default::default()
-                },
-                ..default()
-            })
+            .spawn(
+                gf::DISPLAY
+                    .text(&asset_server, "EQUIPMENT", EQUIP_TITLE)
+                    .anchor(Anchor::CENTER)
+                    .with_transform(Transform {
+                        translation: Vec3::new(0., INVENTORY_EQUIPMENT_UI_SIZE.y / 2. - 11., 1.),
+                        scale: gf::DISPLAY.transform_scale(),
+                        ..Default::default()
+                    }),
+            )
             .insert(RenderLayers::from_layers(&[3]))
             .insert(Name::new("eqp TITLE"))
             .insert(UIState::Inventory)
-            .set_parent(equip_panel)
+            .insert(ChildOf(equip_panel))
             .id();
     }
 
@@ -594,45 +583,41 @@ pub fn setup_inv_ui(
             + 8.)
             / 2.;
         let blueprint_panel = commands
-            .spawn(SpriteBundle {
-                texture: graphics.get_ui_element_texture(UIElement::BlueprintsPanel),
-                sprite: Sprite {
+            .spawn((
+                Sprite {
+                    image: graphics.get_ui_element_texture(UIElement::BlueprintsPanel),
                     custom_size: Some(INVENTORY_BLUEPRINT_UI_SIZE),
                     ..Default::default()
                 },
-                transform: Transform {
+                Transform {
                     translation: Vec3::new(blueprint_x_local, 0., 2.),
                     scale: Vec3::new(1., 1., 1.),
                     ..Default::default()
                 },
-                ..Default::default()
-            })
-            .insert(cur_inv_state.0.clone())
+            ))
+            .insert(cur_inv_state.get().clone())
             .insert(Name::new("BLUEPRINTS"))
             .insert(UIElement::BlueprintsPanel)
             .insert(RenderLayers::from_layers(&[3]))
             .insert(UiShadow::container())
             .id();
         let _bp_text = commands
-            .spawn(Text2dBundle {
-                text: Text::from_section(
-                    "BLUEPRINTS",
-                    gf::DISPLAY.text_style(&asset_server, STATS_TITLE),
-                ),
-                text_anchor: Anchor::Center,
-                transform: Transform {
-                    translation: Vec3::new(0., INVENTORY_BLUEPRINT_UI_SIZE.y / 2. - 11., 1.),
-                    scale: gf::DISPLAY.transform_scale(),
-                    ..Default::default()
-                },
-                ..default()
-            })
+            .spawn(
+                gf::DISPLAY
+                    .text(&asset_server, "BLUEPRINTS", STATS_TITLE)
+                    .anchor(Anchor::CENTER)
+                    .with_transform(Transform {
+                        translation: Vec3::new(0., INVENTORY_BLUEPRINT_UI_SIZE.y / 2. - 11., 1.),
+                        scale: gf::DISPLAY.transform_scale(),
+                        ..Default::default()
+                    }),
+            )
             .insert(RenderLayers::from_layers(&[3]))
             .insert(Name::new("blueprint TITLE"))
-            .insert(cur_inv_state.0.clone())
-            .set_parent(blueprint_panel)
+            .insert(cur_inv_state.get().clone())
+            .insert(ChildOf(blueprint_panel))
             .id();
-        commands.entity(inv).push_children(&[blueprint_panel]);
+        commands.entity(inv).add_children(&[blueprint_panel]);
 
         // Reset any previously-held selection; refreshing logic re-populates on pick.
         selected_recipe.0 = None;
@@ -654,19 +639,18 @@ pub fn setup_inv_ui(
         for i in 0..3 {
             let local_x = 1. + (i as f32 - 1.0) * INV_CRAFTING_PANEL_INGREDIENT_SPACING_X;
             let slot_entity = commands
-                .spawn(SpriteBundle {
-                    texture: graphics.get_ui_element_texture(UIElement::CraftingIngredientSlot),
-                    sprite: Sprite {
+                .spawn((
+                    Sprite {
+                        image: graphics.get_ui_element_texture(UIElement::CraftingIngredientSlot),
                         custom_size: Some(INV_CRAFTING_INGREDIENT_SLOT_SIZE),
                         ..Default::default()
                     },
-                    transform: Transform {
+                    Transform {
                         translation: Vec3::new(local_x, INV_CRAFTING_PANEL_INGREDIENT_ROW_Y, 1.),
                         scale: Vec3::new(1., 1., 1.),
                         ..Default::default()
                     },
-                    ..Default::default()
-                })
+                ))
                 .insert(Name::new(format!("CRAFTING INGREDIENT SLOT {}", i)))
                 // Hover + tooltip via `handle_crafting_ingredient_tooltip_hover` (not
                 // `handle_hovering`, which requires `InventorySlotState`).
@@ -674,127 +658,117 @@ pub fn setup_inv_ui(
                 .insert(Interactable::default())
                 .insert(CraftingIngredientDisplaySlot { slot_index: i })
                 .insert(Focusable {
-                    group: cur_inv_state.0.clone(),
+                    group: cur_inv_state.get().clone(),
                     index: INV_FOCUS_CRAFT_INGREDIENT_BASE + i as u32,
                 })
-                .insert(cur_inv_state.0.clone())
+                .insert(cur_inv_state.get().clone())
                 .insert(RenderLayers::from_layers(&[3]))
                 .id();
 
             // "owned/needed" label (4x5 font, size 5). Starts blank.
             let count_text = commands
-                .spawn(Text2dBundle {
-                    text: Text::from_section("", gf::BODY.text_style(&asset_server, Color::WHITE))
-                        .with_alignment(TextAlignment::Center),
-                    text_anchor: Anchor::Center,
-                    transform: Transform {
-                        translation: Vec3::new(
-                            0.,
-                            INV_CRAFTING_PANEL_INGREDIENT_COUNT_Y_OFFSET,
-                            2.,
-                        ),
-                        scale: gf::BODY.transform_scale(),
-                        ..Default::default()
-                    },
-                    ..default()
-                })
+                .spawn(
+                    gf::BODY
+                        .text(&asset_server, "", Color::WHITE)
+                        .justify(Justify::Center)
+                        .anchor(Anchor::CENTER)
+                        .with_transform(Transform {
+                            translation: Vec3::new(
+                                0.,
+                                INV_CRAFTING_PANEL_INGREDIENT_COUNT_Y_OFFSET,
+                                2.,
+                            ),
+                            scale: gf::BODY.transform_scale(),
+                            ..Default::default()
+                        }),
+                )
                 .insert(RenderLayers::from_layers(&[3]))
                 .insert(CraftingIngredientCountText { slot_index: i })
-                .insert(cur_inv_state.0.clone())
+                .insert(cur_inv_state.get().clone())
                 .insert(Name::new("CRAFTING INGREDIENT COUNT"))
-                .set_parent(slot_entity)
+                .insert(ChildOf(slot_entity))
                 .id();
             let _ = count_text;
-            commands.entity(upgrade_panel).push_children(&[slot_entity]);
+            commands.entity(upgrade_panel).add_children(&[slot_entity]);
         }
 
         // Craft result slot (hotbar-style). Clicking it crafts one into the dragged cursor
         // stack via `handle_crafting_result_slot_click`.
         let result_slot = commands
-            .spawn(SpriteBundle {
-                texture: graphics.get_ui_element_texture(UIElement::InventorySlotHotbar),
-                sprite: Sprite {
+            .spawn((
+                Sprite {
+                    image: graphics.get_ui_element_texture(UIElement::InventorySlotHotbar),
                     custom_size: Some(UI_SLOT_SIZE),
-                    color: Color::Rgba {
-                        red: 0.,
-                        green: 0.,
-                        blue: 0.,
-                        alpha: 0.,
-                    },
+                    color: Color::srgba(0., 0., 0., 0.),
                     ..Default::default()
                 },
-                transform: Transform {
+                Transform {
                     translation: Vec3::new(1., INV_CRAFTING_PANEL_RESULT_Y, 1.),
                     scale: Vec3::new(1., 1., 1.),
                     ..Default::default()
                 },
-                ..Default::default()
-            })
+            ))
             .insert(Name::new("CRAFTING RESULT SLOT"))
             .insert(UIElement::InventorySlotHotbar)
             .insert(Interactable::default())
             .insert(CraftingResultSlot)
             // Mouse-only: controllers craft via the Brew button, so this slot is not focusable.
-            .insert(cur_inv_state.0.clone())
+            .insert(cur_inv_state.get().clone())
             .insert(RenderLayers::from_layers(&[3]))
             .id();
-        commands.entity(upgrade_panel).push_children(&[result_slot]);
+        commands.entity(upgrade_panel).add_children(&[result_slot]);
 
         // Brew button on the Cauldron blueprints crafting panel.
         let toggle_button = commands
-            .spawn(SpriteBundle {
-                texture: graphics.get_ui_element_texture(UIElement::CraftButton),
-                sprite: Sprite {
+            .spawn((
+                Sprite {
+                    image: graphics.get_ui_element_texture(UIElement::CraftButton),
                     custom_size: Some(Vec2::new(60., 18.)),
                     ..Default::default()
                 },
-                transform: Transform {
+                Transform {
                     translation: Vec3::new(0., -side_panel_size.y / 2. + 36., 2.),
                     scale: Vec3::new(1., 1., 1.),
                     ..Default::default()
                 },
-                ..Default::default()
-            })
+            ))
             .insert(RenderLayers::from_layers(&[3]))
             .insert(Interactable::default())
             .insert(UIElement::CraftButton)
             .insert(CraftModeToggleButton)
             .insert(Focusable {
-                group: cur_inv_state.0.clone(),
+                group: cur_inv_state.get().clone(),
                 index: INV_FOCUS_CRAFT_TOGGLE,
             })
-            .insert(cur_inv_state.0.clone())
+            .insert(cur_inv_state.get().clone())
             .insert(Name::new("BREW BUTTON"))
             .id();
         let _toggle_text = commands
-            .spawn(Text2dBundle {
-                text: Text::from_section(
-                    "Brew",
-                    gf::DISPLAY.text_style(&asset_server, CRAFT_BUTTON_TEXT),
-                ),
-                text_anchor: Anchor::Center,
-                transform: Transform {
-                    translation: Vec3::new(0., -1., 1.),
-                    scale: gf::DISPLAY.transform_scale(),
-                    ..Default::default()
-                },
-                ..default()
-            })
+            .spawn(
+                gf::DISPLAY
+                    .text(&asset_server, "Brew", CRAFT_BUTTON_TEXT)
+                    .anchor(Anchor::CENTER)
+                    .with_transform(Transform {
+                        translation: Vec3::new(0., -1., 1.),
+                        scale: gf::DISPLAY.transform_scale(),
+                        ..Default::default()
+                    }),
+            )
             .insert(RenderLayers::from_layers(&[3]))
             .insert(Name::new("BREW LABEL"))
-            .insert(cur_inv_state.0.clone())
-            .set_parent(toggle_button)
+            .insert(cur_inv_state.get().clone())
+            .insert(ChildOf(toggle_button))
             .id();
         commands
             .entity(upgrade_panel)
-            .push_children(&[toggle_button]);
+            .add_children(&[toggle_button]);
     }
 
     inv_state.inv_size = size;
 
     // Dev mode buttons (far left of inventory, only when Options > Dev Mode is on)
     let dev_mode = *DEBUG || cheat_settings.map(|c| c.dev_mode).unwrap_or(false);
-    if cur_inv_state.0 == UIState::Inventory && dev_mode {
+    if *cur_inv_state.get() == UIState::Inventory && dev_mode {
         const DEV_BUTTON_WIDTH: f32 = 38.;
         const DEV_BUTTON_HEIGHT: f32 = 11.;
         const DEV_BUTTON_SPACING: f32 = 14.;
@@ -821,15 +795,14 @@ pub fn setup_inv_ui(
         for (i, (action, label)) in labels.iter().enumerate() {
             let y = start_y - i as f32 * DEV_BUTTON_SPACING;
             let btn = commands
-                .spawn(SpriteBundle {
-                    texture: graphics.get_ui_element_texture(UIElement::XLKey).clone(),
-                    sprite: Sprite {
+                .spawn((
+                    Sprite {
+                        image: graphics.get_ui_element_texture(UIElement::XLKey).clone(),
                         custom_size: Some(Vec2::new(DEV_BUTTON_WIDTH, DEV_BUTTON_HEIGHT)),
                         ..Default::default()
                     },
-                    transform: Transform::from_xyz(dev_x, y, 10.),
-                    ..Default::default()
-                })
+                    Transform::from_xyz(dev_x, y, 10.),
+                ))
                 .insert(RenderLayers::from_layers(&[3]))
                 .insert(UIState::Inventory)
                 .insert(Interactable::default())
@@ -838,25 +811,20 @@ pub fn setup_inv_ui(
                 .id();
             let label_entity = commands
                 .spawn((
-                    Text2dBundle {
-                        text: Text::from_section(
-                            *label,
-                            gf::BODY.text_style(&asset_server, DARK_WOOD_BROWN),
-                        )
-                        .with_alignment(TextAlignment::Center),
-                        text_anchor: Anchor::Center,
-                        transform: Transform {
+                    gf::BODY
+                        .text(&asset_server, *label, DARK_WOOD_BROWN)
+                        .justify(Justify::Center)
+                        .anchor(Anchor::CENTER)
+                        .with_transform(Transform {
                             translation: Vec3::new(0., 0.5, 1.),
                             scale: gf::BODY.transform_scale(),
                             ..default()
-                        },
-                        ..Default::default()
-                    },
+                        }),
                     RenderLayers::from_layers(&[3]),
                     UIState::Inventory,
                     Name::new("Dev Button Label"),
                 ))
-                .set_parent(btn)
+                .insert(ChildOf(btn))
                 .id();
             if matches!(action, DevButtonAction::TriggerEndless) {
                 commands.entity(label_entity).insert(DevEndlessButtonLabel);
@@ -865,15 +833,14 @@ pub fn setup_inv_ui(
         }
 
         let picker_btn = commands
-            .spawn(SpriteBundle {
-                texture: graphics.get_ui_element_texture(UIElement::XLKey).clone(),
-                sprite: Sprite {
+            .spawn((
+                Sprite {
+                    image: graphics.get_ui_element_texture(UIElement::XLKey).clone(),
                     custom_size: Some(Vec2::new(DEV_BUTTON_WIDTH, DEV_BUTTON_HEIGHT)),
                     ..Default::default()
                 },
-                transform: Transform::from_xyz(dev_x, heirloom_picker_y, 10.),
-                ..Default::default()
-            })
+                Transform::from_xyz(dev_x, heirloom_picker_y, 10.),
+            ))
             .insert(RenderLayers::from_layers(&[3]))
             .insert(UIState::Inventory)
             .insert(Interactable::default())
@@ -882,37 +849,31 @@ pub fn setup_inv_ui(
             .id();
         commands
             .spawn((
-                Text2dBundle {
-                    text: Text::from_section(
-                        "heirlooms",
-                        gf::BODY.text_style(&asset_server, DARK_WOOD_BROWN),
-                    )
-                    .with_alignment(TextAlignment::Center),
-                    text_anchor: Anchor::Center,
-                    transform: Transform {
+                gf::BODY
+                    .text(&asset_server, "heirlooms", DARK_WOOD_BROWN)
+                    .justify(Justify::Center)
+                    .anchor(Anchor::CENTER)
+                    .with_transform(Transform {
                         translation: Vec3::new(0., 0.5, 1.),
                         scale: gf::BODY.transform_scale(),
                         ..default()
-                    },
-                    ..Default::default()
-                },
+                    }),
                 RenderLayers::from_layers(&[3]),
                 UIState::Inventory,
                 Name::new("Dev Heirloom Picker Toggle Label"),
             ))
-            .set_parent(picker_btn);
+            .insert(ChildOf(picker_btn));
         commands.entity(inv).add_child(picker_btn);
 
         let skill_picker_btn = commands
-            .spawn(SpriteBundle {
-                texture: graphics.get_ui_element_texture(UIElement::XLKey).clone(),
-                sprite: Sprite {
+            .spawn((
+                Sprite {
+                    image: graphics.get_ui_element_texture(UIElement::XLKey).clone(),
                     custom_size: Some(Vec2::new(DEV_BUTTON_WIDTH, DEV_BUTTON_HEIGHT)),
                     ..Default::default()
                 },
-                transform: Transform::from_xyz(dev_x, skill_picker_y, 10.),
-                ..Default::default()
-            })
+                Transform::from_xyz(dev_x, skill_picker_y, 10.),
+            ))
             .insert(RenderLayers::from_layers(&[3]))
             .insert(UIState::Inventory)
             .insert(Interactable::default())
@@ -921,29 +882,24 @@ pub fn setup_inv_ui(
             .id();
         commands
             .spawn((
-                Text2dBundle {
-                    text: Text::from_section(
-                        "+skills",
-                        gf::BODY.text_style(&asset_server, DARK_WOOD_BROWN),
-                    )
-                    .with_alignment(TextAlignment::Center),
-                    text_anchor: Anchor::Center,
-                    transform: Transform {
+                gf::BODY
+                    .text(&asset_server, "+skills", DARK_WOOD_BROWN)
+                    .justify(Justify::Center)
+                    .anchor(Anchor::CENTER)
+                    .with_transform(Transform {
                         translation: Vec3::new(0., 0.5, 1.),
                         scale: gf::BODY.transform_scale(),
                         ..default()
-                    },
-                    ..Default::default()
-                },
+                    }),
                 RenderLayers::from_layers(&[3]),
                 UIState::Inventory,
                 Name::new("Dev Skill Picker Toggle Label"),
             ))
-            .set_parent(skill_picker_btn);
+            .insert(ChildOf(skill_picker_btn));
         commands.entity(inv).add_child(skill_picker_btn);
     }
 
-    stats_event.send(ShowInvPlayerStatsEvent {
+    stats_event.write(ShowInvPlayerStatsEvent {
         stat: None,
         ignore_timer: true,
     });
@@ -966,11 +922,14 @@ pub fn setup_inv_slots_ui(
     damage_tracker_menu: Res<DamageTrackerMenuOpen>,
     proto_param: ProtoParam,
 ) {
-    if inv_spawn_check.get_single().is_err() {
+    if inv_spawn_check.single().is_err() {
         return;
     }
-    let (should_spawn_equipment, crafting_items_option) = match inv_state.0 {
-        UIState::Inventory => (true, Some(inv.single().crafting_items.clone())),
+    let Ok(inv_ref) = inv.single() else {
+        return;
+    };
+    let (should_spawn_equipment, crafting_items_option) = match inv_state.get() {
+        UIState::Inventory => (true, Some(inv_ref.crafting_items.clone())),
         UIState::InventoryCrafting => (false, None),
         UIState::Crafting => (true, Some(crafting_container.unwrap().items.clone())),
         UIState::Chest => (false, None),
@@ -978,7 +937,10 @@ pub fn setup_inv_slots_ui(
         UIState::Furnace => (true, None),
         _ => return,
     };
-    for (slot_index, item) in inv.single_mut().items.items.iter().enumerate() {
+    let Ok(mut inv_mut) = inv.single_mut() else {
+        return;
+    };
+    for (slot_index, item) in inv_mut.items.items.iter().enumerate() {
         spawn_inv_slot(
             &mut commands,
             &inv_state,
@@ -1032,12 +994,7 @@ pub fn setup_inv_slots_ui(
     // World weapon pickups auto-fill these when empty via `inventory::try_auto_equip_weapon_on_pickup`
     // (`check_item_drop_collisions`): main weapon first, then pet slot if the player has a pet.
     if should_spawn_equipment {
-        let weapon_item = inv
-            .single_mut()
-            .weapon_items
-            .items
-            .get(0)
-            .and_then(|x| x.clone());
+        let weapon_item = inv_mut.weapon_items.items.get(0).and_then(|x| x.clone());
         spawn_inv_slot(
             &mut commands,
             &inv_state,
@@ -1051,12 +1008,7 @@ pub fn setup_inv_slots_ui(
             weapon_item,
             &resolution,
         );
-        let pet_item = inv
-            .single_mut()
-            .pet_items
-            .items
-            .get(0)
-            .and_then(|x| x.clone());
+        let pet_item = inv_mut.pet_items.items.get(0).and_then(|x| x.clone());
         spawn_inv_slot(
             &mut commands,
             &inv_state,
@@ -1071,22 +1023,17 @@ pub fn setup_inv_slots_ui(
             &resolution,
         );
     }
-    if inv_state.0 != UIState::Scrapper {
+    if *inv_state.get() != UIState::Scrapper {
         // In crafting mode the upgrade panel is replaced by the `CraftingPanel`, which hosts
         // three ingredient *display* slots plus the craft result slot. Those are spawned by
         // `spawn_inventory_crafting_side_panel_slots` since they are not regular droppable
         // inventory slots.
         // Spawn trash slot (only in regular inventory, not scrapper)
-        if inv_state.0 == UIState::Inventory
-            || inv_state.0 == UIState::InventoryCrafting
-            || inv_state.0 == UIState::Crafting
+        if *inv_state.get() == UIState::Inventory
+            || *inv_state.get() == UIState::InventoryCrafting
+            || *inv_state.get() == UIState::Crafting
         {
-            let trash_item = inv
-                .single_mut()
-                .trash_items
-                .items
-                .get(0)
-                .and_then(|x| x.clone());
+            let trash_item = inv_mut.trash_items.items.get(0).and_then(|x| x.clone());
             spawn_inv_slot(
                 &mut commands,
                 &inv_state,
@@ -1109,17 +1056,17 @@ pub fn setup_inv_slots_ui(
                 &asset_server,
                 &inv_query,
                 inv_state_res.inv_size,
-                &inv_state.0,
+                inv_state.get(),
             );
             // Drop-filter + damage-tracker toggles are inventory-only (hidden on Cauldron blueprints).
-            if inv_state.0 == UIState::Inventory {
+            if *inv_state.get() == UIState::Inventory {
                 spawn_material_drops_toggle_button(
                     &mut commands,
                     &graphics,
                     &asset_server,
                     &inv_query,
                     inv_state_res.inv_size,
-                    &inv_state.0,
+                    inv_state.get(),
                 );
                 spawn_damage_tracker_toggle_button(
                     &mut commands,
@@ -1127,11 +1074,11 @@ pub fn setup_inv_slots_ui(
                     &asset_server,
                     &inv_query,
                     inv_state_res.inv_size,
-                    &inv_state.0,
+                    inv_state.get(),
                 );
             }
             let (panel_pos_offset, panel_inv_size) =
-                inventory_panel_layout(&inv_state.0, damage_tracker_menu.0);
+                inventory_panel_layout(inv_state.get(), damage_tracker_menu.0);
             spawn_material_drop_filter_panel(
                 &mut commands,
                 &graphics,
@@ -1141,7 +1088,7 @@ pub fn setup_inv_slots_ui(
                 panel_pos_offset,
                 panel_inv_size,
                 &break_drop_filter,
-                menu_open.0 && inv_state.0 == UIState::Inventory,
+                menu_open.0 && *inv_state.get() == UIState::Inventory,
             );
         }
     }
@@ -1185,18 +1132,17 @@ fn spawn_sort_inventory_button(
     );
 
     let button = commands
-        .spawn(SpriteBundle {
-            texture: graphics.get_ui_element_texture(UIElement::InventorySlot),
-            transform: Transform {
-                translation,
-                ..Default::default()
-            },
-            sprite: Sprite {
+        .spawn((
+            Sprite {
+                image: graphics.get_ui_element_texture(UIElement::InventorySlot),
                 custom_size: Some(UI_SLOT_SIZE),
                 ..Default::default()
             },
-            ..Default::default()
-        })
+            Transform {
+                translation,
+                ..Default::default()
+            },
+        ))
         .insert(RenderLayers::from_layers(&[3]))
         // Deliberately do NOT insert `UIElement::InventorySlot` — `handle_hovering` assumes
         // any entity tagged with that element also has an `InventorySlotState` component and
@@ -1213,24 +1159,24 @@ fn spawn_sort_inventory_button(
         .id();
 
     let label = commands
-        .spawn(Text2dBundle {
-            text: Text::from_section("SORT", gf::BODY.text_style(&asset_server, YELLOW_2))
-                .with_alignment(TextAlignment::Center),
-            text_anchor: Anchor::Center,
-            transform: Transform {
-                translation: Vec3::new(0., 0., 1.),
-                scale: gf::BODY.transform_scale(),
-                ..Default::default()
-            },
-            ..default()
-        })
+        .spawn(
+            gf::BODY
+                .text(&asset_server, "SORT", YELLOW_2)
+                .justify(Justify::Center)
+                .anchor(Anchor::CENTER)
+                .with_transform(Transform {
+                    translation: Vec3::new(0., 0., 1.),
+                    scale: gf::BODY.transform_scale(),
+                    ..Default::default()
+                }),
+        )
         .insert(RenderLayers::from_layers(&[3]))
         .insert(Name::new("SORT LABEL"))
         .id();
-    commands.entity(button).push_children(&[label]);
+    commands.entity(button).add_children(&[label]);
 
-    if let Ok(inv_e) = inv_query.get_single() {
-        commands.entity(button).set_parent(inv_e);
+    if let Ok(inv_e) = inv_query.single() {
+        commands.entity(button).insert(ChildOf(inv_e));
     }
 }
 
@@ -1272,19 +1218,18 @@ fn spawn_material_drops_toggle_button(
         });
 
     let button = commands
-        .spawn(SpriteBundle {
-            texture: graphics.get_ui_element_texture(UIElement::InventorySlot),
-            transform: Transform {
+        .spawn((
+            Sprite {
+                image: graphics.get_ui_element_texture(UIElement::InventorySlot),
+                custom_size: Some(UI_SLOT_SIZE),
+                ..Default::default()
+            },
+            Transform {
                 translation,
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
-            sprite: Sprite {
-                custom_size: Some(UI_SLOT_SIZE),
-                ..Default::default()
-            },
-            ..Default::default()
-        })
+        ))
         .insert(RenderLayers::from_layers(&[3]))
         .insert(Interactable::default())
         .insert(MaterialDropsToggleButton)
@@ -1297,24 +1242,22 @@ fn spawn_material_drops_toggle_button(
         .id();
 
     let icon = commands
-        .spawn(SpriteSheetBundle {
-            sprite: {
+        .spawn((
+            {
                 let mut s = plant_sprite;
                 s.custom_size = Some(Vec2::splat(18.));
-                s
+                s.clone()
             },
-            texture_atlas: graphics.texture_atlas.as_ref().unwrap().clone(),
-            transform: Transform::from_translation(Vec3::new(0., 0., 0.5)),
-            ..Default::default()
-        })
+            Transform::from_translation(Vec3::new(0., 0., 0.5)),
+        ))
         .insert(RenderLayers::from_layers(&[3]))
         .insert(Name::new("MATERIAL DROPS TOGGLE ICON"))
         .id();
 
-    commands.entity(button).push_children(&[icon]);
+    commands.entity(button).add_children(&[icon]);
 
-    if let Ok(inv_e) = inv_query.get_single() {
-        commands.entity(button).set_parent(inv_e);
+    if let Ok(inv_e) = inv_query.single() {
+        commands.entity(button).insert(ChildOf(inv_e));
     }
 }
 
@@ -1336,19 +1279,18 @@ fn spawn_damage_tracker_toggle_button(
     );
 
     let button = commands
-        .spawn(SpriteBundle {
-            texture: graphics.get_ui_element_texture(UIElement::InventorySlot),
-            transform: Transform {
+        .spawn((
+            Sprite {
+                image: graphics.get_ui_element_texture(UIElement::InventorySlot),
+                custom_size: Some(UI_SLOT_SIZE),
+                ..Default::default()
+            },
+            Transform {
                 translation,
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
-            sprite: Sprite {
-                custom_size: Some(UI_SLOT_SIZE),
-                ..Default::default()
-            },
-            ..Default::default()
-        })
+        ))
         .insert(RenderLayers::from_layers(&[3]))
         .insert(Interactable::default())
         .insert(DamageTrackerToggleButton)
@@ -1361,24 +1303,24 @@ fn spawn_damage_tracker_toggle_button(
         .id();
 
     let label = commands
-        .spawn(Text2dBundle {
-            text: Text::from_section("DMG", gf::BODY.text_style(&asset_server, YELLOW_2))
-                .with_alignment(TextAlignment::Center),
-            text_anchor: Anchor::Center,
-            transform: Transform {
-                translation: Vec3::new(0., 0., 1.),
-                scale: gf::BODY.transform_scale(),
-                ..Default::default()
-            },
-            ..default()
-        })
+        .spawn(
+            gf::BODY
+                .text(&asset_server, "DMG", YELLOW_2)
+                .justify(Justify::Center)
+                .anchor(Anchor::CENTER)
+                .with_transform(Transform {
+                    translation: Vec3::new(0., 0., 1.),
+                    scale: gf::BODY.transform_scale(),
+                    ..Default::default()
+                }),
+        )
         .insert(RenderLayers::from_layers(&[3]))
         .insert(Name::new("DMG LABEL"))
         .id();
-    commands.entity(button).push_children(&[label]);
+    commands.entity(button).add_children(&[label]);
 
-    if let Ok(inv_e) = inv_query.get_single() {
-        commands.entity(button).set_parent(inv_e);
+    if let Ok(inv_e) = inv_query.single() {
+        commands.entity(button).insert(ChildOf(inv_e));
     }
 }
 
@@ -1429,18 +1371,17 @@ fn spawn_material_drop_filter_panel(
 
     let panel = commands
         .spawn((
-            SpriteBundle {
-                sprite: Sprite {
-                    color: Color::rgba(0.22, 0.18, 0.14, 0.98),
+            (
+                Sprite {
+                    color: Color::srgba(0.22, 0.18, 0.14, 0.98),
                     custom_size: Some(Vec2::new(panel_w, panel_h)),
                     ..Default::default()
                 },
-                transform: Transform::from_translation(initial_translation),
-                ..Default::default()
-            },
+                Transform::from_translation(initial_translation),
+            ),
             RenderLayers::from_layers(&[3]),
             MaterialDropFilterPanel { open_translation },
-            inv_state.0.clone(),
+            inv_state.get().clone(),
             Name::new("DROP FILTER PANEL"),
         ))
         .id();
@@ -1449,25 +1390,20 @@ fn spawn_material_drop_filter_panel(
     let title_y = top_y - INV_DROP_FILTER_TITLE_ROW_HEIGHT * 0.5;
     commands
         .spawn((
-            Text2dBundle {
-                text: Text::from_section(
-                    "Toggle Item Drop Filters",
-                    gf::BODY.text_style(&asset_server, YELLOW_2),
-                )
-                .with_alignment(TextAlignment::Center),
-                text_anchor: Anchor::Center,
-                transform: Transform {
+            gf::BODY
+                .text(&asset_server, "Toggle Item Drop Filters", YELLOW_2)
+                .justify(Justify::Center)
+                .anchor(Anchor::CENTER)
+                .with_transform(Transform {
                     translation: Vec3::new(0., title_y, 11.),
                     scale: gf::BODY.transform_scale(),
                     ..default()
-                },
-                ..default()
-            },
+                }),
             RenderLayers::from_layers(&[3]),
-            inv_state.0.clone(),
+            inv_state.get().clone(),
             Name::new("DROP FILTER TITLE"),
         ))
-        .set_parent(panel);
+        .insert(ChildOf(panel));
 
     let button_row_y = title_y
         - INV_DROP_FILTER_TITLE_ROW_HEIGHT * 0.5
@@ -1479,18 +1415,17 @@ fn spawn_material_drop_filter_panel(
     ] {
         let hit_w = 28.0;
         let hit_h = 12.0;
-        let mut btn_ec = commands.spawn(SpriteBundle {
-            sprite: Sprite {
+        let mut btn_ec = commands.spawn((
+            Sprite {
                 color: Color::NONE,
                 custom_size: Some(Vec2::new(hit_w, hit_h)),
                 ..Default::default()
             },
-            transform: Transform::from_translation(Vec3::new(x_offset, button_row_y, 1.)),
-            ..Default::default()
-        });
+            Transform::from_translation(Vec3::new(x_offset, button_row_y, 1.)),
+        ));
         btn_ec.insert(RenderLayers::from_layers(&[3]));
         btn_ec.insert(Interactable::default());
-        btn_ec.insert(inv_state.0.clone());
+        btn_ec.insert(inv_state.get().clone());
         btn_ec.insert(Name::new(if is_all {
             "DROP FILTER ALL"
         } else {
@@ -1503,23 +1438,23 @@ fn spawn_material_drop_filter_panel(
         }
         let btn = btn_ec.id();
         let text = commands
-            .spawn(Text2dBundle {
-                text: Text::from_section(label, gf::BODY.text_style(&asset_server, Color::WHITE))
-                    .with_alignment(TextAlignment::Center),
-                text_anchor: Anchor::Center,
-                transform: Transform {
-                    translation: Vec3::new(0., 0., 1.),
-                    scale: gf::BODY.transform_scale(),
-                    ..default()
-                },
-                ..default()
-            })
+            .spawn(
+                gf::BODY
+                    .text(&asset_server, label, Color::WHITE)
+                    .justify(Justify::Center)
+                    .anchor(Anchor::CENTER)
+                    .with_transform(Transform {
+                        translation: Vec3::new(0., 0., 1.),
+                        scale: gf::BODY.transform_scale(),
+                        ..default()
+                    }),
+            )
             .insert(RenderLayers::from_layers(&[3]))
             .id();
         commands
             .entity(btn)
-            .push_children(&[text])
-            .set_parent(panel);
+            .add_children(&[text])
+            .insert(ChildOf(panel));
     }
 
     let grid_top_y = button_row_y
@@ -1535,19 +1470,18 @@ fn spawn_material_drop_filter_panel(
         let y = grid_top_y - row as f32 * cell;
 
         let entry = commands
-            .spawn(SpriteBundle {
-                sprite: Sprite {
+            .spawn((
+                Sprite {
                     color: Color::NONE,
                     custom_size: Some(Vec2::splat(INV_DROP_FILTER_ICON_SIZE)),
                     ..Default::default()
                 },
-                transform: Transform::from_translation(Vec3::new(x, y, 1.)),
-                ..Default::default()
-            })
+                Transform::from_translation(Vec3::new(x, y, 1.)),
+            ))
             .insert(RenderLayers::from_layers(&[3]))
             .insert(Interactable::default())
             .insert(MaterialDropFilterEntry { obj })
-            .insert(inv_state.0.clone())
+            .insert(inv_state.get().clone())
             .insert(Name::new(format!("DROP FILTER ENTRY {:?}", obj)))
             .id();
 
@@ -1556,7 +1490,7 @@ fn spawn_material_drop_filter_panel(
             .map(|d| d.copy_with_count(1))
             .unwrap_or_else(|| ItemStack::crate_icon_stack(obj));
         let icon = spawn_drop_filter_icon(commands, graphics, &icon_stack);
-        commands.entity(icon).set_parent(entry);
+        commands.entity(icon).insert(ChildOf(entry));
 
         let blocked = break_drop_filter.is_blocked(obj);
         let x_vis = if blocked {
@@ -1565,25 +1499,25 @@ fn spawn_material_drop_filter_panel(
             Visibility::Hidden
         };
         let x_overlay = commands
-            .spawn(Text2dBundle {
-                text: Text::from_section("X", gf::DISPLAY.text_style(&asset_server, RED))
-                    .with_alignment(TextAlignment::Center),
-                text_anchor: Anchor::Center,
-                visibility: x_vis,
-                transform: Transform {
-                    translation: Vec3::new(0., 0., 3.),
-                    scale: gf::DISPLAY.transform_scale(),
-                    ..default()
-                },
-                ..default()
-            })
+            .spawn((
+                gf::DISPLAY
+                    .text(&asset_server, "X", RED)
+                    .justify(Justify::Center)
+                    .anchor(Anchor::CENTER)
+                    .with_transform(Transform {
+                        translation: Vec3::new(0., 0., 3.),
+                        scale: gf::DISPLAY.transform_scale(),
+                        ..default()
+                    }),
+                x_vis,
+            ))
             .insert(RenderLayers::from_layers(&[3]))
             .insert(MaterialDropFilterEntryX)
             .id();
         commands
             .entity(entry)
-            .push_children(&[x_overlay])
-            .set_parent(panel);
+            .add_children(&[x_overlay])
+            .insert(ChildOf(panel));
     }
 }
 
@@ -1616,12 +1550,10 @@ fn spawn_drop_filter_icon(
     let mut sprite = sprite;
     sprite.custom_size = Some(Vec2::splat(INV_DROP_FILTER_ICON_SIZE));
     commands
-        .spawn(SpriteSheetBundle {
-            sprite,
-            texture_atlas: graphics.texture_atlas.as_ref().unwrap().clone(),
-            transform: Transform::from_translation(Vec3::new(0., 0., 2.)),
-            ..Default::default()
-        })
+        .spawn((
+            sprite.clone(),
+            Transform::from_translation(Vec3::new(0., 0., 2.)),
+        ))
         .insert(RenderLayers::from_layers(&[3]))
         .id()
 }
@@ -1833,7 +1765,7 @@ pub fn spawn_inv_slot(
 ) -> Entity {
     // spawns an inv slot, with an item icon as its child if an item exists in that inv slot.
     // the slot's parent is set to the inv ui entity.
-    let inv_slot_offset = match inv_ui_state.0 {
+    let inv_slot_offset = match *inv_ui_state.get() {
         UIState::Crafting => INV_UI_PARENT_OFFSET_CRAFTING,
         _ => Vec2::ZERO,
     };
@@ -1842,7 +1774,7 @@ pub fn spawn_inv_slot(
         slot_type,
         slot_index,
         inv_state.inv_size,
-        &inv_ui_state.0,
+        &*inv_ui_state.get(),
         resolution.game_height,
     );
     // HUD hotbar slots must render above the `HudBar` frame (Z=1); class-skill icons use the
@@ -1921,9 +1853,13 @@ pub fn spawn_inv_slot(
 
     let icon_entity_option = slot_icon.map(|slot_icon| {
         commands
-            .spawn(SpriteBundle {
-                texture: asset_server.load(slot_icon),
-                transform: Transform {
+            .spawn((
+                Sprite {
+                    image: asset_server.load(slot_icon),
+                    custom_size: Some(size),
+                    ..Default::default()
+                },
+                Transform {
                     translation: Vec3::new(0., 0., 1.),
                     scale: if slot_type.is_furnace() {
                         Vec3::new(2., 2., 1.)
@@ -1932,34 +1868,25 @@ pub fn spawn_inv_slot(
                     },
                     ..Default::default()
                 },
-                sprite: Sprite {
-                    custom_size: Some(size),
-                    ..Default::default()
-                },
-                ..Default::default()
-            })
+            ))
             .insert(RenderLayers::from_layers(&[3]))
             .id()
     });
 
     // HUD hotbar: anchor only — slot art is baked into `HudBar.png`.
     let mut slot_entity = if slot_type.is_hotbar() {
-        commands.spawn(SpatialBundle::from_transform(Transform::from_translation(
-            translation,
-        )))
+        commands.spawn((
+            Transform::from_translation(translation),
+            Visibility::default(),
+        ))
     } else {
-        commands.spawn(SpriteBundle {
-            texture: graphics.get_ui_element_texture(if slot_type.is_furnace() {
-                UIElement::UpgradeSlot
-            } else {
-                UIElement::InventorySlot
-            }),
-            transform: Transform {
-                translation,
-                scale: Vec3::new(1., 1., 1.),
-                ..Default::default()
-            },
-            sprite: Sprite {
+        commands.spawn((
+            Sprite {
+                image: graphics.get_ui_element_texture(if slot_type.is_furnace() {
+                    UIElement::UpgradeSlot
+                } else {
+                    UIElement::InventorySlot
+                }),
                 custom_size: Some(if slot_type.is_furnace() {
                     UI_UPGRADE_SLOT_SIZE
                 } else {
@@ -1967,8 +1894,12 @@ pub fn spawn_inv_slot(
                 }),
                 ..Default::default()
             },
-            ..Default::default()
-        })
+            Transform {
+                translation,
+                scale: Vec3::new(1., 1., 1.),
+                ..Default::default()
+            },
+        ))
     };
     slot_entity
         .insert(RenderLayers::from_layers(&[3]))
@@ -1991,15 +1922,17 @@ pub fn spawn_inv_slot(
             "SLOT"
         }));
     if let Some(i) = item_icon_option {
-        slot_entity.push_children(&[i]);
+        slot_entity.add_children(&[i]);
     }
     if slot_type.is_trash() {
         slot_entity.insert(IconHoverTooltipText(&["trash: drop items here"]));
     }
     if !slot_type.is_hotbar() {
-        let inv_e = inv_query.single();
+        let Ok(inv_e) = inv_query.single() else {
+            return slot_entity.id();
+        };
         slot_entity
-            .set_parent(inv_e)
+            .insert(ChildOf(inv_e))
             .insert(Interactable::from_state(interactable_state));
     } else {
         // Hotbar slots also get Interactable for click detection when inventory is closed
@@ -2010,19 +1943,19 @@ pub fn spawn_inv_slot(
     // HUD hotbar slots are a separate row at the bottom of the screen — they stay hidden and
     // non-focusable while the inventory panel is open; hotbar items are managed via the main
     // bag grid (Normal slots 0..N, same backing indices).
-    if inv_ui_state.0.is_inv_open() && !slot_type.is_hotbar() {
+    if inv_ui_state.get().is_inv_open() && !slot_type.is_hotbar() {
         slot_entity.insert(Focusable {
-            group: inv_ui_state.0.clone(),
+            group: inv_ui_state.get().clone(),
             index: inv_focus_index(slot_type, slot_index),
         });
     }
 
     if let Some(icon_entity) = icon_entity_option {
-        slot_entity.push_children(&[icon_entity]);
+        slot_entity.add_children(&[icon_entity]);
     }
     slot_entity.id()
 }
-/// Marker on the `Text2dBundle` child that renders an item stack's count number on top of
+/// Marker on the `Text2d` child that renders an item stack's count number on top of
 /// an icon. Used by `update_dragged_item_stack_count_text` to find / update / despawn the
 /// label on dragged items without relying on the entity's `Name`.
 #[derive(Component)]
@@ -2050,17 +1983,15 @@ pub fn spawn_item_stack_icon(
             .clone()
     };
     let item_entity = commands
-        .spawn(SpriteSheetBundle {
-            sprite,
-            texture_atlas: graphics.texture_atlas.as_ref().unwrap().clone(),
-            transform: Transform {
+        .spawn((
+            sprite.clone(),
+            Transform {
                 translation: Vec3::new(icon_offset.x, icon_offset.y, 2.),
                 ..Default::default()
             },
-            ..Default::default()
-        })
+        ))
         .insert(item_stack.clone())
-        .insert(RenderLayers::from_layers(&[render_layer]))
+        .insert(RenderLayers::from_layers(&[render_layer as usize]))
         .id();
     // glow effect for rarity
     if let Some(glow_e) = add_item_glows(commands, graphics, item_entity, item_stack.rarity.clone())
@@ -2073,25 +2004,20 @@ pub fn spawn_item_stack_icon(
     if item_stack.count > 1 {
         let text = commands
             .spawn((
-                Text2dBundle {
-                    text: Text::from_section(
-                        item_stack.count.to_string(),
-                        gf::BODY.text_style(&asset_server, Color::WHITE),
-                    )
-                    .with_alignment(TextAlignment::Center),
-                    transform: Transform {
+                gf::BODY
+                    .text(&asset_server, item_stack.count.to_string(), Color::WHITE)
+                    .justify(Justify::Center)
+                    .with_transform(Transform {
                         translation: Vec3::new(7., -5.5, 3.) + text_offset.extend(0.),
                         scale: gf::BODY.transform_scale(),
                         ..Default::default()
-                    },
-                    ..default()
-                },
+                    }),
                 Name::new("ITEM STACK TEXT"),
                 StackCountText,
-                RenderLayers::from_layers(&[render_layer]),
+                RenderLayers::from_layers(&[render_layer as usize]),
             ))
             .id();
-        commands.entity(item_entity).push_children(&[text]);
+        commands.entity(item_entity).add_children(&[text]);
     }
     item_entity
 }
@@ -2116,13 +2042,11 @@ pub fn update_inventory_ui(
         // hotbars are hidden when inventory is open, so defer update
         // until inv is closed again. But still mark dirty if count changed
         // so they update properly when inv closes.
-        if inv_ui_state.0.is_inv_open() && slot_state.r#type.is_hotbar() {
+        if inv_ui_state.get().is_inv_open() && slot_state.r#type.is_hotbar() {
             // Check if hotbar slot needs updating and mark dirty for later
-            let hotbar_item = inv
-                .single()
-                .get_items_from_slot_type(slot_state.r#type)
-                .items[slot_state.slot_index]
-                .clone();
+            let hotbar_item = inv.single().ok().and_then(|inv| {
+                inv.get_items_from_slot_type(slot_state.r#type).items[slot_state.slot_index].clone()
+            });
             let real_count = hotbar_item.as_ref().map(|i| i.item_stack.count);
             if slot_state.count != real_count {
                 slot_state.dirty = true;
@@ -2136,22 +2060,19 @@ pub fn update_inventory_ui(
         } else if slot_state.r#type.is_scrapper() {
             cont_param.scrapper_option.as_ref().unwrap().items.items[slot_state.slot_index].clone()
         } else if slot_state.r#type.is_furnace() {
-            inv.single()
-                .get_items_from_slot_type(slot_state.r#type)
-                .items[slot_state.slot_index]
-                .clone()
+            inv.single().ok().and_then(|inv| {
+                inv.get_items_from_slot_type(slot_state.r#type).items[slot_state.slot_index].clone()
+            })
         } else if slot_state.r#type.is_trash() {
-            inv.single()
-                .get_items_from_slot_type(slot_state.r#type)
-                .items[slot_state.slot_index]
-                .clone()
+            inv.single().ok().and_then(|inv| {
+                inv.get_items_from_slot_type(slot_state.r#type).items[slot_state.slot_index].clone()
+            })
         } else if slot_state.r#type.is_crafting() && cont_param.crafting_option.is_some() {
             cont_param.crafting_option.as_ref().unwrap().items.items[slot_state.slot_index].clone()
         } else {
-            inv.single()
-                .get_items_from_slot_type(slot_state.r#type)
-                .items[slot_state.slot_index]
-                .clone()
+            inv.single().ok().and_then(|inv| {
+                inv.get_items_from_slot_type(slot_state.r#type).items[slot_state.slot_index].clone()
+            })
         };
         let real_count = if let Some(item) = item_option.clone() {
             Some(item.item_stack.count)
@@ -2160,13 +2081,16 @@ pub fn update_inventory_ui(
         };
 
         if slot_state.dirty || slot_state.count != real_count {
-            if !despawned_item_tooltips {
+            // Cauldron crafting uses blueprint/ingredient tooltips that are not tied to slot
+            // refreshes. Clearing them here raced with blueprint hover (spawn then same-frame
+            // despawn while Interaction stayed Hovering → one-frame flicker, then gone).
+            if !despawned_item_tooltips && *inv_ui_state.get() != UIState::InventoryCrafting {
                 for tooltip in item_tooltips.iter() {
-                    commands.entity(tooltip).despawn_recursive();
+                    commands.entity(tooltip).despawn();
                 }
                 despawned_item_tooltips = true;
             }
-            commands.entity(e).despawn_recursive();
+            commands.entity(e).despawn();
             let new_slot_entity = spawn_inv_slot(
                 &mut commands,
                 &inv_ui_state,
@@ -2194,15 +2118,15 @@ pub fn update_inventory_ui(
 pub fn handle_update_inv_item_entities(
     mut inv: Query<&mut Inventory, Changed<Inventory>>,
     mut inv_slot_state: Query<&mut InventorySlotState>,
-    mut att_event: EventWriter<AttributeChangeEvent>,
+    mut att_event: MessageWriter<AttributeChangeEvent>,
     mut commands: Commands,
     ui_state: Res<State<UIState>>,
 ) {
-    if !ui_state.0.is_inv_open() {
+    if !ui_state.get().is_inv_open() {
         return;
     }
-    if let Ok(inv) = inv.get_single_mut() {
-        att_event.send(AttributeChangeEvent);
+    if let Ok(inv) = inv.single_mut() {
+        att_event.write(AttributeChangeEvent);
         for inv_item_option in inv.clone().items.items.iter() {
             if let Some(inv_item) = inv_item_option {
                 let item = inv_item.item_stack.clone();
@@ -2211,7 +2135,7 @@ pub fn handle_update_inv_item_entities(
                         && (slot_state.r#type.is_inventory() || slot_state.r#type.is_hotbar())
                     {
                         if let Some(item_e) = slot_state.item {
-                            if let Some(mut entity_commands) = commands.get_entity(item_e) {
+                            if let Ok(mut entity_commands) = commands.get_entity(item_e) {
                                 entity_commands.insert(item.clone());
                             }
                         }
@@ -2238,7 +2162,7 @@ pub fn mark_slot_dirty(
 /// Updates the endless dev button label when endless mode starts or ends.
 pub fn sync_dev_endless_button_label(
     infinite_mode: Res<InfiniteMode>,
-    mut labels: Query<&mut Text, With<DevEndlessButtonLabel>>,
+    mut labels: Query<&mut Text2d, With<DevEndlessButtonLabel>>,
 ) {
     let label = if infinite_mode.active {
         "+1 min"
@@ -2246,8 +2170,8 @@ pub fn sync_dev_endless_button_label(
         "endless"
     };
     for mut text in labels.iter_mut() {
-        if text.sections[0].value != label {
-            text.sections[0].value = label.to_string();
+        if text.0 != label {
+            text.0 = label.to_string();
         }
     }
 }
@@ -2255,19 +2179,19 @@ pub fn sync_dev_endless_button_label(
 /// Handles clicks on dev mode buttons (only runs when inventory is open and dev mode is on).
 pub fn handle_dev_button_clicks(
     cursor_pos: Res<CursorPos>,
-    mouse_input: Res<Input<MouseButton>>,
+    mouse_input: Res<ButtonInput<MouseButton>>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     mut dev_buttons: Query<(Entity, &DevButtonAction, &mut Interactable)>,
     mut commands: Commands,
-    mut flash_event: EventWriter<FlashExpBarEvent>,
+    mut flash_event: MessageWriter<FlashExpBarEvent>,
     mut game: GameParam,
     proto: ProtoParam,
-    mut dimension_spawn: EventWriter<DimensionSpawnEvent>,
+    mut dimension_spawn: MessageWriter<DimensionSpawnEvent>,
     mut endless_params: DevEndlessButtonParams,
     mut chaos_tracker: ResMut<ChaosTracker>,
-    mut currency_event: EventWriter<ModifyCurencyEvent>,
+    mut currency_event: MessageWriter<ModifyCurencyEvent>,
     mut run_unlock_state: ResMut<RunUnlockState>,
-    mut grant_heirloom_dev: EventWriter<GrantHeirloomDevEvent>,
+    mut grant_heirloom_dev: MessageWriter<GrantHeirloomDevEvent>,
 ) {
     let hit_test = super::ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
@@ -2289,7 +2213,7 @@ pub fn handle_dev_button_clicks(
                         let mut player_level = game.get_player_level_mut();
                         let (did_level, gained_xp) =
                             player_level.add_xp(250, xp_rate_bonus, &mut chaos_tracker);
-                        flash_event.send(FlashExpBarEvent {
+                        flash_event.write(FlashExpBarEvent {
                             amount: gained_xp,
                             did_level,
                         });
@@ -2299,7 +2223,7 @@ pub fn handle_dev_button_clicks(
                         let mut player_level = game.get_player_level_mut();
                         let (did_level, gained_xp) =
                             player_level.add_xp(1000, xp_rate_bonus, &mut chaos_tracker);
-                        flash_event.send(FlashExpBarEvent {
+                        flash_event.write(FlashExpBarEvent {
                             amount: gained_xp,
                             did_level,
                         });
@@ -2341,13 +2265,13 @@ pub fn handle_dev_button_clicks(
                         );
                     }
                     DevButtonAction::TeleportEra2 => {
-                        dimension_spawn.send(DimensionSpawnEvent {
+                        dimension_spawn.write(DimensionSpawnEvent {
                             swap_to_dim_now: true,
                             new_era: Some(Era::Second),
                         });
                     }
                     DevButtonAction::TeleportEra3 => {
-                        dimension_spawn.send(DimensionSpawnEvent {
+                        dimension_spawn.write(DimensionSpawnEvent {
                             swap_to_dim_now: true,
                             new_era: Some(Era::Third),
                         });
@@ -2356,7 +2280,7 @@ pub fn handle_dev_button_clicks(
                         if endless_params.infinite_mode.active {
                             endless_params.infinite_mode.add_elapsed_seconds(60.0);
                         } else {
-                            endless_params.infinite_mode_event.send_default();
+                            endless_params.infinite_mode_event.write_default();
                             if endless_params.mob_spawning_paused.paused {
                                 commands.insert_resource(MobSpawningPaused { paused: false });
                             }
@@ -2366,7 +2290,7 @@ pub fn handle_dev_button_clicks(
                         chaos_tracker.add_chaos(1.0);
                     }
                     DevButtonAction::AddGold => {
-                        currency_event.send(ModifyCurencyEvent {
+                        currency_event.write(ModifyCurencyEvent {
                             delta: 50,
                             obj: WorldObject::Coin,
                         });
@@ -2400,18 +2324,18 @@ pub fn handle_dev_button_clicks(
 
 /// Applies dev-mode heirloom grants (separate system to avoid GameParam query conflict).
 pub fn apply_grant_heirloom_dev(
-    mut grant_events: EventReader<GrantHeirloomDevEvent>,
+    mut grant_events: MessageReader<GrantHeirloomDevEvent>,
     mut player_query: Query<
         (Entity, &Transform, &mut PlayerSkills, &crate::PlayerLevel),
         With<Player>,
     >,
     mut skill_queue: ResMut<HeirloomChoiceQueue>,
     mut commands: Commands,
-    mut att_event: EventWriter<AttributeChangeEvent>,
+    mut att_event: MessageWriter<AttributeChangeEvent>,
     proto: ProtoParam,
 ) {
-    for GrantHeirloomDevEvent(choice) in grant_events.iter() {
-        if let Ok((player_entity, transform, mut skills, level)) = player_query.get_single_mut() {
+    for GrantHeirloomDevEvent(choice) in grant_events.read() {
+        if let Ok((player_entity, transform, mut skills, level)) = player_query.single_mut() {
             skill_queue.grant_heirloom_from_pool(
                 choice.clone(),
                 &mut commands,
@@ -2423,20 +2347,20 @@ pub fn apply_grant_heirloom_dev(
             choice
                 .heirloom
                 .add_heirloom_components(player_entity, &mut commands, skills.clone());
-            att_event.send(AttributeChangeEvent);
+            att_event.write(AttributeChangeEvent);
         }
     }
 }
 
 /// Removes one copy of an heirloom from the player in dev mode.
 pub fn apply_revoke_heirloom_dev(
-    mut revoke_events: EventReader<RevokeHeirloomDevEvent>,
+    mut revoke_events: MessageReader<RevokeHeirloomDevEvent>,
     mut player_query: Query<(Entity, &mut PlayerSkills), With<Player>>,
     mut commands: Commands,
-    mut att_event: EventWriter<AttributeChangeEvent>,
+    mut att_event: MessageWriter<AttributeChangeEvent>,
 ) {
-    for RevokeHeirloomDevEvent(heirloom) in revoke_events.iter() {
-        if let Ok((player_entity, mut skills)) = player_query.get_single_mut() {
+    for RevokeHeirloomDevEvent(heirloom) in revoke_events.read() {
+        if let Ok((player_entity, mut skills)) = player_query.single_mut() {
             let Some(idx) = skills
                 .heirlooms
                 .iter()
@@ -2446,7 +2370,7 @@ pub fn apply_revoke_heirloom_dev(
             };
             skills.heirlooms.remove(idx);
             heirloom.add_heirloom_components(player_entity, &mut commands, skills.clone());
-            att_event.send(AttributeChangeEvent);
+            att_event.write(AttributeChangeEvent);
         }
     }
 }
@@ -2454,7 +2378,7 @@ pub fn apply_revoke_heirloom_dev(
 /// Toggles the dev heirloom picker grid to the right of the dev buttons.
 pub fn handle_dev_heirloom_picker_toggle(
     cursor_pos: Res<CursorPos>,
-    mouse_input: Res<Input<MouseButton>>,
+    mouse_input: Res<ButtonInput<MouseButton>>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     mut toggle_buttons: Query<(Entity, &mut Interactable), With<DevHeirloomPickerToggleButton>>,
     mut commands: Commands,
@@ -2482,7 +2406,7 @@ pub fn handle_dev_heirloom_picker_toggle(
                 despawn_dev_skill_picker_grid_layers(&mut commands, &skill_grid_layers);
                 skill_grid_open.0 = false;
                 if show {
-                    if let Ok(inv_entity) = inv_ui.get_single() {
+                    if let Ok(inv_entity) = inv_ui.single() {
                         const DEV_BUTTON_WIDTH: f32 = 38.;
                         let dev_x = -INVENTORY_UI_SIZE.x / 2. - DEV_BUTTON_WIDTH / 2.;
                         let entries: Vec<_> = sorted_full_pool_grid_entries()
@@ -2522,15 +2446,15 @@ pub fn handle_dev_heirloom_picker_toggle(
 pub fn handle_dev_heirloom_picker_clicks(
     grid_open: Res<DevHeirloomGridOpen>,
     cursor_pos: Res<CursorPos>,
-    mouse_input: Res<Input<MouseButton>>,
+    mouse_input: Res<ButtonInput<MouseButton>>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     mut icons: Query<
         (Entity, &mut Interactable, &CrystalUnlockIcon),
         With<DevHeirloomPickerGridLayer>,
     >,
     player_skills: Query<&PlayerSkills, With<Player>>,
-    mut grant_heirloom_dev: EventWriter<GrantHeirloomDevEvent>,
-    mut revoke_heirloom_dev: EventWriter<RevokeHeirloomDevEvent>,
+    mut grant_heirloom_dev: MessageWriter<GrantHeirloomDevEvent>,
+    mut revoke_heirloom_dev: MessageWriter<RevokeHeirloomDevEvent>,
     mut commands: Commands,
 ) {
     if !grid_open.0 {
@@ -2540,7 +2464,7 @@ pub fn handle_dev_heirloom_picker_clicks(
     let hit_test = super::ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
     let right_mouse_pressed = mouse_input.just_pressed(MouseButton::Right);
-    let skills = player_skills.get_single().ok();
+    let skills = player_skills.single().ok();
 
     for (entity, mut interactable, icon) in icons.iter_mut() {
         let hit = match &hit_test {
@@ -2553,13 +2477,13 @@ pub fn handle_dev_heirloom_picker_clicks(
             }
             if left_mouse_pressed {
                 let choice = heirloom_choice_from_full_pool(icon.heirloom.clone(), icon.rarity);
-                grant_heirloom_dev.send(GrantHeirloomDevEvent(choice));
+                grant_heirloom_dev.write(GrantHeirloomDevEvent(choice));
                 commands.spawn(crate::audio::SoundSpawner::new(
                     crate::audio::AudioSoundEffect::ButtonClick,
                     0.2,
                 ));
             } else if right_mouse_pressed && skills.is_some_and(|s| s.has(icon.heirloom.clone())) {
-                revoke_heirloom_dev.send(RevokeHeirloomDevEvent(icon.heirloom.clone()));
+                revoke_heirloom_dev.write(RevokeHeirloomDevEvent(icon.heirloom.clone()));
                 commands.spawn(crate::audio::SoundSpawner::new(
                     crate::audio::AudioSoundEffect::ButtonClick,
                     0.2,
@@ -2573,20 +2497,20 @@ pub fn handle_dev_heirloom_picker_clicks(
 
 /// Applies dev-mode active skill grants (separate system to avoid query conflicts).
 pub fn apply_grant_skill_dev(
-    mut grant_events: EventReader<GrantSkillDevEvent>,
+    mut grant_events: MessageReader<GrantSkillDevEvent>,
     mut player_query: Query<(Entity, &mut PlayerSkills), With<Player>>,
     mut commands: Commands,
-    mut att_event: EventWriter<AttributeChangeEvent>,
+    mut att_event: MessageWriter<AttributeChangeEvent>,
 ) {
-    for GrantSkillDevEvent { skill, slot } in grant_events.iter() {
+    for GrantSkillDevEvent { skill, slot } in grant_events.read() {
         if *slot != 1 && *slot != 2 {
             continue;
         }
-        if let Ok((player_entity, mut skills)) = player_query.get_single_mut() {
+        if let Ok((player_entity, mut skills)) = player_query.single_mut() {
             let choice = ActiveSkillChoiceState::new(*skill, HeirloomRarity::Common);
             assign_shrine_skill_to_slot(&mut skills, *slot, choice);
             skill.add_skill_components(player_entity, &mut commands);
-            att_event.send(AttributeChangeEvent);
+            att_event.write(AttributeChangeEvent);
         }
     }
 }
@@ -2594,7 +2518,7 @@ pub fn apply_grant_skill_dev(
 /// Toggles the dev skill picker grid to the right of the dev buttons.
 pub fn handle_dev_skill_picker_toggle(
     cursor_pos: Res<CursorPos>,
-    mouse_input: Res<Input<MouseButton>>,
+    mouse_input: Res<ButtonInput<MouseButton>>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     mut toggle_buttons: Query<(Entity, &mut Interactable), With<DevSkillPickerToggleButton>>,
     mut commands: Commands,
@@ -2621,7 +2545,7 @@ pub fn handle_dev_skill_picker_toggle(
                 despawn_dev_heirloom_picker_grid_layers(&mut commands, &heirloom_grid_layers);
                 heirloom_grid_open.0 = false;
                 if show {
-                    if let Ok(inv_entity) = inv_ui.get_single() {
+                    if let Ok(inv_entity) = inv_ui.single() {
                         const DEV_BUTTON_WIDTH: f32 = 38.;
                         let dev_x = -INVENTORY_UI_SIZE.x / 2. - DEV_BUTTON_WIDTH / 2.;
                         let entries = sorted_dev_skill_grid_entries();
@@ -2655,13 +2579,13 @@ pub fn handle_dev_skill_picker_toggle(
 pub fn handle_dev_skill_picker_clicks(
     grid_open: Res<DevSkillGridOpen>,
     cursor_pos: Res<CursorPos>,
-    mouse_input: Res<Input<MouseButton>>,
+    mouse_input: Res<ButtonInput<MouseButton>>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     mut icons: Query<
         (Entity, &mut Interactable, &DevSkillPickerIcon),
         With<DevSkillPickerGridLayer>,
     >,
-    mut grant_skill_dev: EventWriter<GrantSkillDevEvent>,
+    mut grant_skill_dev: MessageWriter<GrantSkillDevEvent>,
     mut commands: Commands,
 ) {
     if !grid_open.0 {
@@ -2682,7 +2606,7 @@ pub fn handle_dev_skill_picker_clicks(
                 interactable.change(Interaction::Hovering);
             }
             if left_mouse_pressed {
-                grant_skill_dev.send(GrantSkillDevEvent {
+                grant_skill_dev.write(GrantSkillDevEvent {
                     skill: icon.active_skill,
                     slot: 1,
                 });
@@ -2691,7 +2615,7 @@ pub fn handle_dev_skill_picker_clicks(
                     0.2,
                 ));
             } else if right_mouse_pressed {
-                grant_skill_dev.send(GrantSkillDevEvent {
+                grant_skill_dev.write(GrantSkillDevEvent {
                     skill: icon.active_skill,
                     slot: 2,
                 });
@@ -2711,9 +2635,9 @@ pub fn handle_dev_skill_picker_clicks(
 /// is dropped onto the slot.
 pub fn update_upgrade_material_prompt_text(
     inv: Query<&Inventory>,
-    mut prompt: Query<&mut Text, With<UpgradeMaterialPromptText>>,
+    mut prompt: Query<&mut Text2d, With<UpgradeMaterialPromptText>>,
 ) {
-    let Ok(inventory) = inv.get_single() else {
+    let Ok(inventory) = inv.single() else {
         return;
     };
     let next_label = match inventory
@@ -2728,10 +2652,8 @@ pub fn update_upgrade_material_prompt_text(
         _ => "Add Materials",
     };
     for mut text in prompt.iter_mut() {
-        if let Some(section) = text.sections.get_mut(0) {
-            if section.value != next_label {
-                section.value = next_label.to_string();
-            }
+        if text.0 != next_label {
+            text.0 = next_label.to_string();
         }
     }
 }
@@ -2740,8 +2662,8 @@ pub fn update_upgrade_material_prompt_text(
 /// Crafts the selected recipe into the player's inventory, or drops it at the player if full.
 pub fn handle_cursor_inventory_craft_toggle_button(
     cursor_pos: Res<CursorPos>,
-    mouse_input: Res<Input<MouseButton>>,
-    key_input: Res<Input<KeyCode>>,
+    mouse_input: Res<ButtonInput<MouseButton>>,
+    key_input: Res<ButtonInput<KeyCode>>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     mut toggle_buttons: Query<
         (Entity, &mut Interactable, &CraftModeToggleButton),
@@ -2753,13 +2675,13 @@ pub fn handle_cursor_inventory_craft_toggle_button(
     ui_focus: Res<crate::ui::focus::UiFocus>,
     mouseless: Res<crate::inputs::MouselessModeState>,
 ) {
-    if curr_ui_state.0 != UIState::InventoryCrafting {
+    if *curr_ui_state.get() != UIState::InventoryCrafting {
         return;
     }
     let hit_test = super::ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
     let focus_driving = mouseless.0 || cursor_pos.suppress_ui_hover;
-    let shift_key_pressed = key_input.pressed(KeyCode::LShift);
+    let shift_key_pressed = key_input.pressed(KeyCode::ShiftLeft);
 
     for (e, mut interactable, _) in toggle_buttons.iter_mut() {
         let is_focused = ui_focus.is_focused(e);
@@ -2790,7 +2712,7 @@ pub fn handle_cursor_inventory_craft_toggle_button(
         let Some(recipe) = brew.recipes.crafting_list.get(&recipe_obj).cloned() else {
             continue;
         };
-        let Ok(mut inventory) = brew.inv.get_single_mut() else {
+        let Ok(mut inventory) = brew.inv.single_mut() else {
             continue;
         };
         let can_craft = recipe
@@ -2816,10 +2738,10 @@ pub fn handle_cursor_inventory_craft_toggle_button(
 
         let player_pos = brew
             .player_tf
-            .get_single()
+            .single()
             .map(|t| t.translation().truncate())
             .unwrap_or(Vec2::ZERO);
-        let loot_bonus = brew.player_atts.get_single().map(|a| a.0).unwrap_or(0);
+        let loot_bonus = brew.player_atts.single().map(|a| a.0).unwrap_or(0);
 
         let (rolled, allow_hotbar_band) = {
             let proto = brew.params.p0();
@@ -2841,7 +2763,7 @@ pub fn handle_cursor_inventory_craft_toggle_button(
 
         for _ in 0..craft_batches {
             brew.crafted_event
-                .send(CraftedItemEvent { obj: recipe_obj });
+                .write(CraftedItemEvent { obj: recipe_obj });
         }
 
         let add_result = {
@@ -2870,13 +2792,9 @@ pub struct BrewCraftParams<'w, 's> {
     pub selected: Res<'w, SelectedCraftingRecipe>,
     pub recipes: Res<'w, Recipes>,
     pub inv: Query<'w, 's, &'static mut Inventory>,
-    pub crafted_event: EventWriter<'w, CraftedItemEvent>,
-    pub player_atts: Query<
-        'w,
-        's,
-        &'static crate::attributes::LootRateBonus,
-        With<crate::player::Player>,
-    >,
+    pub crafted_event: MessageWriter<'w, CraftedItemEvent>,
+    pub player_atts:
+        Query<'w, 's, &'static crate::attributes::LootRateBonus, With<crate::player::Player>>,
     pub player_tf: Query<'w, 's, &'static GlobalTransform, With<crate::player::Player>>,
     pub params: ParamSet<'w, 's, (ProtoParam<'w>, crate::GameParam<'w, 's>)>,
 }
@@ -2885,7 +2803,7 @@ pub struct BrewCraftParams<'w, 's> {
 /// Shows the ingredient item tooltip (same pipeline as inventory slots, not recipe view).
 pub fn handle_crafting_ingredient_tooltip_hover(
     cursor_pos: Res<CursorPos>,
-    key_input: Res<Input<KeyCode>>,
+    key_input: Res<ButtonInput<KeyCode>>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     slot_transforms: Query<&GlobalTransform>,
     mut ingredient_slots: Query<(Entity, &mut Interactable, &CraftingIngredientDisplaySlot)>,
@@ -2894,18 +2812,18 @@ pub fn handle_crafting_ingredient_tooltip_hover(
     proto: ProtoParam,
     mut commands: Commands,
     graphics: Res<Graphics>,
-    mut tooltip_update: EventWriter<crate::ui::ToolTipUpdateEvent>,
-    mut tooltip_teardown: EventWriter<crate::ui::TooltipTeardownEvent>,
+    mut tooltip_update: MessageWriter<crate::ui::ToolTipUpdateEvent>,
+    mut tooltip_teardown: MessageWriter<crate::ui::TooltipTeardownEvent>,
     cur_ui_state: Res<State<UIState>>,
     ui_focus: Res<crate::ui::focus::UiFocus>,
 ) {
-    if cur_ui_state.0 != UIState::InventoryCrafting {
+    if *cur_ui_state.get() != UIState::InventoryCrafting {
         return;
     }
     let hit_test = super::ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None);
-    let shift_key_pressed = key_input.pressed(KeyCode::LShift);
-    let shift_key_just_pressed = key_input.just_pressed(KeyCode::LShift);
-    let shift_key_just_released = key_input.just_released(KeyCode::LShift);
+    let shift_key_pressed = key_input.pressed(KeyCode::ShiftLeft);
+    let shift_key_just_pressed = key_input.just_pressed(KeyCode::ShiftLeft);
+    let shift_key_just_released = key_input.just_released(KeyCode::ShiftLeft);
 
     for (e, mut interactable, slot) in ingredient_slots.iter_mut() {
         let is_hit = hit_test.map(|(ent, _, _)| ent == e).unwrap_or(false);
@@ -2916,8 +2834,12 @@ pub fn handle_crafting_ingredient_tooltip_hover(
                 interactable.change(Interaction::Hovering);
                 commands
                     .entity(e)
-                    .insert(UIElement::CraftingIngredientSlotHover)
-                    .insert(graphics.get_ui_element_texture(UIElement::CraftingIngredientSlotHover));
+                    .insert(UIElement::CraftingIngredientSlotHover);
+                set_sprite_image(
+                    &mut commands,
+                    e,
+                    graphics.get_ui_element_texture(UIElement::CraftingIngredientSlotHover),
+                );
                 commands.spawn(crate::audio::SoundSpawner::new(
                     crate::audio::AudioSoundEffect::UISlotHover,
                     0.2,
@@ -2937,7 +2859,7 @@ pub fn handle_crafting_ingredient_tooltip_hover(
             }
             (true, Interaction::Hovering) => {
                 if shift_key_just_pressed || shift_key_just_released {
-                    tooltip_teardown.send_default();
+                    tooltip_teardown.write_default();
                     send_crafting_ingredient_tooltip(
                         &selected,
                         &recipes,
@@ -2954,11 +2876,13 @@ pub fn handle_crafting_ingredient_tooltip_hover(
             }
             (false, Interaction::Hovering) => {
                 interactable.change(Interaction::None);
-                tooltip_teardown.send_default();
-                commands
-                    .entity(e)
-                    .insert(UIElement::CraftingIngredientSlot)
-                    .insert(graphics.get_ui_element_texture(UIElement::CraftingIngredientSlot));
+                tooltip_teardown.write_default();
+                commands.entity(e).insert(UIElement::CraftingIngredientSlot);
+                set_sprite_image(
+                    &mut commands,
+                    e,
+                    graphics.get_ui_element_texture(UIElement::CraftingIngredientSlot),
+                );
             }
             _ => {}
         }
@@ -2972,7 +2896,7 @@ fn send_crafting_ingredient_tooltip(
     slot_index: usize,
     show_range: bool,
     anchor_ui: Option<Vec2>,
-    tooltip_update: &mut EventWriter<crate::ui::ToolTipUpdateEvent>,
+    tooltip_update: &mut MessageWriter<crate::ui::ToolTipUpdateEvent>,
 ) {
     let Some(recipe_obj) = selected.0 else {
         return;
@@ -2984,7 +2908,7 @@ fn send_crafting_ingredient_tooltip(
         return;
     };
     if let Some(item_data) = proto.get_item_data(ingredient.item) {
-        tooltip_update.send(crate::ui::ToolTipUpdateEvent {
+        tooltip_update.write(crate::ui::ToolTipUpdateEvent {
             item_stack: item_data.clone(),
             is_recipe: false,
             show_range,
@@ -2999,43 +2923,58 @@ fn send_crafting_ingredient_tooltip(
 /// - Hover enters transition -> emit a recipe tooltip (`is_recipe = true`).
 /// - Hover exits -> despawn the tooltip.
 /// - Click / Confirm -> set `SelectedCraftingRecipe`.
+///
+/// Tooltip show/hide is decided once for the whole row list (not per-row). Per-row
+/// teardown-on-leave raced with enter-on-neighbor: same-frame `TooltipTeardownEvent` +
+/// `ToolTipUpdateEvent` often ran teardown *after* spawn, and while `Interaction` stayed
+/// `Hovering` the tooltip never re-emitted — one-frame flicker then gone.
 pub fn handle_blueprint_slot_interaction(
     mut commands: Commands,
     cursor_pos: Res<CursorPos>,
-    mouse_input: Res<Input<MouseButton>>,
+    mouse_input: Res<ButtonInput<MouseButton>>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     mut blueprint_slots: Query<(Entity, &mut Interactable, &BlueprintSlot)>,
     mut selected: ResMut<SelectedCraftingRecipe>,
-    mut tooltip_update: EventWriter<crate::ui::ToolTipUpdateEvent>,
-    mut tooltip_teardown: EventWriter<crate::ui::TooltipTeardownEvent>,
+    mut tooltip_update: MessageWriter<crate::ui::ToolTipUpdateEvent>,
+    mut tooltip_teardown: MessageWriter<crate::ui::TooltipTeardownEvent>,
+    existing_tooltips: Query<Entity, With<ItemOrRecipeTooltip>>,
     cur_ui_state: Res<State<UIState>>,
     proto: ProtoParam,
     ui_focus: Res<crate::ui::focus::UiFocus>,
+    mut tooltip_recipe: Local<Option<WorldObject>>,
 ) {
-    if cur_ui_state.0 != UIState::InventoryCrafting {
+    if *cur_ui_state.get() != UIState::InventoryCrafting {
+        if tooltip_recipe.is_some() {
+            tooltip_teardown.write_default();
+            *tooltip_recipe = None;
+        }
         return;
     }
     let hit_test = super::ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
 
-    for (e, mut interactable, bp) in blueprint_slots.iter_mut() {
+    // Prefer the pointcast hit; otherwise the focused row (gamepad / mouseless).
+    let mut hovered: Option<(Entity, WorldObject)> = None;
+    for (e, _, bp) in blueprint_slots.iter() {
         let is_hit = hit_test.map(|(ent, _, _)| ent == e).unwrap_or(false);
-        let is_focused = ui_focus.is_focused(e);
-        let hovering = is_hit || is_focused;
-        let confirm_pressed =
-            (is_hit && left_mouse_pressed) || (is_focused && ui_focus.confirm_just_pressed);
+        if is_hit {
+            hovered = Some((e, bp.recipe_obj));
+            break;
+        }
+        if ui_focus.is_focused(e) && hovered.is_none() {
+            hovered = Some((e, bp.recipe_obj));
+        }
+    }
 
-        match (hovering, interactable.current()) {
+    for (e, mut interactable, bp) in blueprint_slots.iter_mut() {
+        let should_hover = hovered.map(|(he, _)| he == e).unwrap_or(false);
+        let confirm_pressed = should_hover
+            && ((hit_test.map(|(ent, _, _)| ent == e).unwrap_or(false) && left_mouse_pressed)
+                || (ui_focus.is_focused(e) && ui_focus.confirm_just_pressed));
+
+        match (should_hover, interactable.current()) {
             (true, Interaction::None) => {
                 interactable.change(Interaction::Hovering);
-                if let Some(item_data) = proto.get_item_data(bp.recipe_obj) {
-                    tooltip_update.send(crate::ui::ToolTipUpdateEvent {
-                        item_stack: item_data.clone(),
-                        is_recipe: true,
-                        show_range: false,
-                        ..Default::default()
-                    });
-                }
             }
             (true, Interaction::Hovering) => {
                 if confirm_pressed {
@@ -3048,10 +2987,29 @@ pub fn handle_blueprint_slot_interaction(
             }
             (false, Interaction::Hovering) => {
                 interactable.change(Interaction::None);
-                tooltip_teardown.send_default();
             }
             _ => {}
         }
+    }
+
+    let next_recipe = hovered.map(|(_, recipe)| recipe);
+    match (*tooltip_recipe, next_recipe) {
+        (_, Some(recipe)) if *tooltip_recipe != Some(recipe) || existing_tooltips.is_empty() => {
+            if let Some(item_data) = proto.get_item_data(recipe) {
+                tooltip_update.write(crate::ui::ToolTipUpdateEvent {
+                    item_stack: item_data.clone(),
+                    is_recipe: true,
+                    show_range: false,
+                    ..Default::default()
+                });
+            }
+            *tooltip_recipe = Some(recipe);
+        }
+        (Some(_), None) => {
+            tooltip_teardown.write_default();
+            *tooltip_recipe = None;
+        }
+        _ => {}
     }
 }
 
@@ -3071,37 +3029,35 @@ pub fn refresh_crafting_ingredient_display(
     existing_ing_icons: Query<Entity, With<CraftingIngredientIcon>>,
     existing_result_icons: Query<Entity, With<CraftingResultIcon>>,
     existing_arrows: Query<Entity, With<CraftingArrowIndicator>>,
-    mut count_texts: Query<(&mut Text, &CraftingIngredientCountText)>,
+    mut count_texts: Query<(&mut Text2d, &mut TextColor, &CraftingIngredientCountText)>,
     graphics: Res<Graphics>,
     asset_server: Res<AssetServer>,
 ) {
-    if cur_ui_state.0 != UIState::InventoryCrafting {
+    if *cur_ui_state.get() != UIState::InventoryCrafting {
         return;
     }
     let needs_refresh = selected.is_changed() || !inv_changed_q.is_empty();
     if !needs_refresh {
         return;
     }
-    let Ok(inv) = inv_q.get_single() else {
+    let Ok(inv) = inv_q.single() else {
         return;
     };
 
     // Clear current icons so we can repaint from scratch.
     for e in existing_ing_icons.iter() {
-        commands.entity(e).despawn_recursive();
+        commands.entity(e).despawn();
     }
     for e in existing_result_icons.iter() {
-        commands.entity(e).despawn_recursive();
+        commands.entity(e).despawn();
     }
     for e in existing_arrows.iter() {
-        commands.entity(e).despawn_recursive();
+        commands.entity(e).despawn();
     }
 
     // Default: clear all count labels.
-    for (mut text, _) in count_texts.iter_mut() {
-        if let Some(section) = text.sections.get_mut(0) {
-            section.value.clear();
-        }
+    for (mut text, _, _) in count_texts.iter_mut() {
+        text.0.clear();
     }
 
     let Some(recipe_obj) = selected.0 else {
@@ -3143,27 +3099,25 @@ pub fn refresh_crafting_ingredient_display(
                     })
                     .insert(UIState::InventoryCrafting);
                 // Fade if unavailable.
-                commands.add(move |world: &mut World| {
-                    if let Some(mut e) = world.get_entity_mut(icon) {
-                        if let Some(mut sprite) = e.get_mut::<TextureAtlasSprite>() {
-                            sprite.color.set_a(alpha);
+                commands.queue(move |world: &mut World| {
+                    if let Ok(mut e) = world.get_entity_mut(icon) {
+                        if let Some(mut sprite) = e.get_mut::<Sprite>() {
+                            sprite.color = sprite.color.with_alpha(alpha);
                         }
                     }
                 });
-                commands.entity(slot_entity).push_children(&[icon]);
+                commands.entity(slot_entity).add_children(&[icon]);
             }
 
             // Update count label.
-            for (mut text, tag) in count_texts.iter_mut() {
+            for (mut text, mut text_color, tag) in count_texts.iter_mut() {
                 if tag.slot_index == slot.slot_index {
-                    if let Some(section) = text.sections.get_mut(0) {
-                        section.value = format!("{}/{}", owned, ingredient.count);
-                        section.style.color = if has_enough {
-                            Color::WHITE
-                        } else {
-                            crate::colors::RED
-                        };
-                    }
+                    text.0 = format!("{}/{}", owned, ingredient.count);
+                    text_color.0 = if has_enough {
+                        Color::WHITE
+                    } else {
+                        crate::colors::RED
+                    };
                 }
             }
         }
@@ -3171,7 +3125,7 @@ pub fn refresh_crafting_ingredient_display(
 
     // Result slot icon.
     let result_alpha = if all_satisfied { 1.0 } else { 0.4 };
-    if let Ok(result_entity) = result_slots.get_single() {
+    if let Ok(result_entity) = result_slots.single() {
         if let Some(result_stack) = proto.get_item_data(recipe_obj).cloned() {
             let stack_count = recipe.2.max(1);
             let icon = spawn_item_stack_icon(
@@ -3187,30 +3141,33 @@ pub fn refresh_crafting_ingredient_display(
                 .entity(icon)
                 .insert(CraftingResultIcon)
                 .insert(UIState::InventoryCrafting);
-            commands.add(move |world: &mut World| {
-                if let Some(mut e) = world.get_entity_mut(icon) {
-                    if let Some(mut sprite) = e.get_mut::<TextureAtlasSprite>() {
-                        sprite.color.set_a(result_alpha);
+            commands.queue(move |world: &mut World| {
+                if let Ok(mut e) = world.get_entity_mut(icon) {
+                    if let Some(mut sprite) = e.get_mut::<Sprite>() {
+                        sprite.color = sprite.color.with_alpha(result_alpha);
                     }
                 }
             });
-            commands.entity(result_entity).push_children(&[icon]);
+            commands.entity(result_entity).add_children(&[icon]);
         }
 
         if all_satisfied {
             let arrow = commands
-                .spawn(AsepriteBundle {
-                    aseprite: asset_server.load::<Aseprite, _>(CraftingArrowAse::PATH),
-                    animation: AsepriteAnimation::from(CraftingArrowAse::tags::IDLE),
-                    transform: Transform::from_translation(Vec3::new(0., 2., 4.)),
-                    ..Default::default()
-                })
-                .insert(Name::new("CRAFTING ARROW INDICATOR"))
-                .insert(CraftingArrowIndicator)
-                .insert(UIState::InventoryCrafting)
-                .insert(RenderLayers::from_layers(&[3]))
+                .spawn((
+                    aseprite_bundle(
+                        asset_server.load::<Aseprite>(CraftingArrowAse::PATH),
+                        CraftingArrowAse::tags::IDLE,
+                        Transform::from_translation(Vec3::new(0., 2., 4.)),
+                        Visibility::Inherited,
+                        false,
+                    ),
+                    Name::new("CRAFTING ARROW INDICATOR"),
+                    CraftingArrowIndicator,
+                    UIState::InventoryCrafting,
+                    RenderLayers::from_layers(&[3]),
+                ))
                 .id();
-            commands.entity(result_entity).push_children(&[arrow]);
+            commands.entity(result_entity).add_children(&[arrow]);
         }
     }
 }
@@ -3224,7 +3181,7 @@ pub struct CraftingResultClickParams<'w, 's> {
     pub graphics: Res<'w, Graphics>,
     pub asset_server: Res<'w, AssetServer>,
     pub dragging_query: Query<'w, 's, (Entity, &'static ItemStack), With<crate::ui::DraggedItem>>,
-    pub crafted_event: EventWriter<'w, CraftedItemEvent>,
+    pub crafted_event: MessageWriter<'w, CraftedItemEvent>,
     pub player_atts:
         Query<'w, 's, &'static crate::attributes::LootRateBonus, With<crate::player::Player>>,
 }
@@ -3235,19 +3192,19 @@ pub struct CraftingResultClickParams<'w, 's> {
 pub fn handle_crafting_result_slot_click(
     mut commands: Commands,
     cursor_pos: Res<CursorPos>,
-    mut mouse_input: ResMut<Input<MouseButton>>,
-    key_input: Res<Input<KeyCode>>,
+    mut mouse_input: ResMut<ButtonInput<MouseButton>>,
+    key_input: Res<ButtonInput<KeyCode>>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     mut result_slots: Query<(Entity, &mut Interactable), With<CraftingResultSlot>>,
     cur_ui_state: Res<State<UIState>>,
     mut params: CraftingResultClickParams,
 ) {
-    if cur_ui_state.0 != UIState::InventoryCrafting {
+    if *cur_ui_state.get() != UIState::InventoryCrafting {
         return;
     }
     let hit_test = super::ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
-    let shift_key_pressed = key_input.pressed(KeyCode::LShift);
+    let shift_key_pressed = key_input.pressed(KeyCode::ShiftLeft);
 
     for (result_entity, mut interactable) in result_slots.iter_mut() {
         let is_hit = matches!(hit_test, Some((hit_ent, _, _)) if hit_ent == result_entity);
@@ -3274,7 +3231,7 @@ pub fn handle_crafting_result_slot_click(
         let Some(recipe) = params.recipes.crafting_list.get(&recipe_obj) else {
             continue;
         };
-        let Ok(inv) = params.inv_q.get_single() else {
+        let Ok(inv) = params.inv_q.single() else {
             continue;
         };
         let can_craft = recipe
@@ -3331,7 +3288,7 @@ pub fn handle_crafting_result_slot_click(
             let Some(base_stack) = params.proto.get_item_data(recipe_obj).cloned() else {
                 continue;
             };
-            let loot_bonus = params.player_atts.get_single().map(|a| a.0).unwrap_or(0);
+            let loot_bonus = params.player_atts.single().map(|a| a.0).unwrap_or(0);
             let rolled = create_new_random_item_stack_with_attributes(
                 &base_stack.copy_with_count(total_output),
                 &params.proto,
@@ -3343,11 +3300,13 @@ pub fn handle_crafting_result_slot_click(
         };
 
         for _ in 0..craft_batches {
-            params.crafted_event.send(CraftedItemEvent { obj: recipe_obj });
+            params
+                .crafted_event
+                .write(CraftedItemEvent { obj: recipe_obj });
         }
 
         if let Some(old) = old_drag_entity {
-            commands.entity(old).despawn_recursive();
+            commands.entity(old).despawn();
         }
 
         let icon = spawn_item_stack_icon(
@@ -3439,19 +3398,18 @@ pub fn render_blueprint_rows_and_nav(
         let row_y = INV_BLUEPRINT_SLOT_TOP_Y
             - i as f32 * (INV_BLUEPRINT_SLOT_SIZE.y + INV_BLUEPRINT_SLOT_ROW_GAP);
         let row_entity = commands
-            .spawn(SpriteBundle {
-                texture: graphics.get_ui_element_texture(UIElement::BlueprintSlot),
-                sprite: Sprite {
+            .spawn((
+                Sprite {
+                    image: graphics.get_ui_element_texture(UIElement::BlueprintSlot),
                     custom_size: Some(INV_BLUEPRINT_SLOT_SIZE),
                     ..Default::default()
                 },
-                transform: Transform {
+                Transform {
                     translation: Vec3::new(INV_BLUEPRINT_SLOT_CENTER_X, row_y, 1.),
                     scale: Vec3::new(1., 1., 1.),
                     ..Default::default()
                 },
-                ..Default::default()
-            })
+            ))
             .insert(Name::new(format!("BLUEPRINT ROW {:?}", recipe_obj)))
             .insert(UIElement::BlueprintSlot)
             .insert(Interactable::default())
@@ -3459,10 +3417,10 @@ pub fn render_blueprint_rows_and_nav(
                 recipe_obj: *recipe_obj,
             })
             .insert(Focusable {
-                group: cur_inv_state.0.clone(),
+                group: cur_inv_state.get().clone(),
                 index: INV_FOCUS_BLUEPRINT_ROW_BASE + i as u32,
             })
-            .insert(cur_inv_state.0.clone())
+            .insert(cur_inv_state.get().clone())
             .insert(RenderLayers::from_layers(&[3]))
             .id();
         if let Some(item_data) = proto_param.get_item_data(*recipe_obj).cloned() {
@@ -3482,33 +3440,31 @@ pub fn render_blueprint_rows_and_nav(
             commands
                 .entity(icon_entity)
                 .insert(Name::new("BLUEPRINT ROW ICON"))
-                .set_parent(row_entity);
+                .insert(ChildOf(row_entity));
         }
         let label = proto_param
             .get_item_data(*recipe_obj)
             .map(|s| s.metadata.name.clone())
             .unwrap_or_else(|| format!("{:?}", recipe_obj));
         commands
-            .spawn(Text2dBundle {
-                text: Text::from_section(label, gf::BODY.text_style(&asset_server, YELLOW_2)),
-                text_anchor: Anchor::CenterLeft,
-                transform: Transform {
-                    translation: Vec3::new(
-                        -INV_BLUEPRINT_SLOT_SIZE.x * 0.5 + INV_BLUEPRINT_SLOT_LABEL_X_OFFSET,
-                        0.,
-                        1.,
-                    ),
-                    scale: gf::BODY.transform_scale(),
-                    ..Default::default()
-                },
-                ..default()
-            })
+            .spawn(
+                gf::BODY
+                    .text(&asset_server, label, YELLOW_2)
+                    .anchor(Anchor::CENTER_LEFT)
+                    .with_transform(Transform {
+                        translation: Vec3::new(
+                            -INV_BLUEPRINT_SLOT_SIZE.x * 0.5 + INV_BLUEPRINT_SLOT_LABEL_X_OFFSET,
+                            0.,
+                            1.,
+                        ),
+                        scale: gf::BODY.transform_scale(),
+                        ..Default::default()
+                    }),
+            )
             .insert(RenderLayers::from_layers(&[3]))
             .insert(Name::new("BLUEPRINT ROW LABEL"))
-            .set_parent(row_entity);
-        commands
-            .entity(blueprint_panel)
-            .push_children(&[row_entity]);
+            .insert(ChildOf(row_entity));
+        commands.entity(blueprint_panel).add_children(&[row_entity]);
     }
 
     // Pagination arrows are always rendered for visual consistency. The click handler
@@ -3516,58 +3472,56 @@ pub fn render_blueprint_rows_and_nav(
     // (prev) / `page + 1 < total_pages` (next), so the buttons are inert at the
     // boundaries — useful when there's only one page or you're already at the first/last.
     let up_btn = commands
-        .spawn(SpriteBundle {
-            texture: graphics.get_ui_element_texture(UIElement::ButtonPageUp),
-            sprite: Sprite {
+        .spawn((
+            Sprite {
+                image: graphics.get_ui_element_texture(UIElement::ButtonPageUp),
                 custom_size: Some(BLUEPRINT_PAGE_BTN_SIZE),
                 ..Default::default()
             },
-            transform: Transform::from_translation(Vec3::new(
+            Transform::from_translation(Vec3::new(
                 BLUEPRINT_PAGE_BTN_UP_X,
                 BLUEPRINT_PAGE_BTN_CENTER_Y,
                 2.,
             )),
-            ..Default::default()
-        })
+        ))
         .insert(UIElement::ButtonPageUp)
         .insert(Interactable::default())
         .insert(BlueprintsPrevButton)
         .insert(Focusable {
-            group: cur_inv_state.0.clone(),
+            group: cur_inv_state.get().clone(),
             index: INV_FOCUS_BLUEPRINT_PREV,
         })
-        .insert(cur_inv_state.0.clone())
+        .insert(cur_inv_state.get().clone())
         .insert(RenderLayers::from_layers(&[3]))
         .insert(Name::new("BLUEPRINTS PREV"))
         .id();
-    commands.entity(blueprint_panel).push_children(&[up_btn]);
+    commands.entity(blueprint_panel).add_children(&[up_btn]);
 
     let down_btn = commands
-        .spawn(SpriteBundle {
-            texture: graphics.get_ui_element_texture(UIElement::ButtonPageDown),
-            sprite: Sprite {
+        .spawn((
+            Sprite {
+                image: graphics.get_ui_element_texture(UIElement::ButtonPageDown),
                 custom_size: Some(BLUEPRINT_PAGE_BTN_SIZE),
                 ..Default::default()
             },
-            transform: Transform::from_translation(Vec3::new(
+            Transform::from_translation(Vec3::new(
                 BLUEPRINT_PAGE_BTN_DOWN_X,
                 BLUEPRINT_PAGE_BTN_CENTER_Y,
                 2.,
             )),
-            ..Default::default()
-        })
+        ))
         .insert(UIElement::ButtonPageDown)
         .insert(Interactable::default())
         .insert(BlueprintsNextButton)
         .insert(Focusable {
-            group: cur_inv_state.0.clone(),
+            group: cur_inv_state.get().clone(),
             index: INV_FOCUS_BLUEPRINT_NEXT,
         })
-        .insert(cur_inv_state.0.clone())
+        .insert(cur_inv_state.get().clone())
         .insert(RenderLayers::from_layers(&[3]))
         .insert(Name::new("BLUEPRINTS NEXT"))
         .id();
-    commands.entity(blueprint_panel).push_children(&[down_btn]);
+    commands.entity(blueprint_panel).add_children(&[down_btn]);
 }
 
 /// System that re-renders blueprint rows when [`BlueprintsPagination`] changes (the player
@@ -3590,7 +3544,7 @@ pub fn refresh_blueprints_on_pagination_change(
     if !blueprints_pagination.is_changed() {
         return;
     }
-    if cur_inv_state.0 != UIState::InventoryCrafting {
+    if *cur_inv_state.get() != UIState::InventoryCrafting {
         return;
     }
     let Some((blueprint_panel, _)) = blueprint_panel_q
@@ -3600,18 +3554,18 @@ pub fn refresh_blueprints_on_pagination_change(
         return;
     };
     for e in existing_rows.iter() {
-        if let Some(ec) = commands.get_entity(e) {
-            ec.despawn_recursive();
+        if let Ok(mut ec) = commands.get_entity(e) {
+            ec.despawn();
         }
     }
     for e in existing_prev.iter() {
-        if let Some(ec) = commands.get_entity(e) {
-            ec.despawn_recursive();
+        if let Ok(mut ec) = commands.get_entity(e) {
+            ec.despawn();
         }
     }
     for e in existing_next.iter() {
-        if let Some(ec) = commands.get_entity(e) {
-            ec.despawn_recursive();
+        if let Ok(mut ec) = commands.get_entity(e) {
+            ec.despawn();
         }
     }
     render_blueprint_rows_and_nav(
@@ -3628,24 +3582,28 @@ pub fn refresh_blueprints_on_pagination_change(
 }
 
 fn blueprint_prev_normal_sprite(commands: &mut Commands, graphics: &Graphics, e: Entity) {
-    commands
-        .entity(e)
-        .insert(UIElement::ButtonPageUp)
-        .insert(graphics.get_ui_element_texture(UIElement::ButtonPageUp));
+    commands.entity(e).insert(UIElement::ButtonPageUp);
+    set_sprite_image(
+        commands,
+        e,
+        graphics.get_ui_element_texture(UIElement::ButtonPageUp),
+    );
 }
 
 fn blueprint_next_normal_sprite(commands: &mut Commands, graphics: &Graphics, e: Entity) {
-    commands
-        .entity(e)
-        .insert(UIElement::ButtonPageDown)
-        .insert(graphics.get_ui_element_texture(UIElement::ButtonPageDown));
+    commands.entity(e).insert(UIElement::ButtonPageDown);
+    set_sprite_image(
+        commands,
+        e,
+        graphics.get_ui_element_texture(UIElement::ButtonPageDown),
+    );
 }
 
 /// Click + hover handler for the blueprint pagination buttons on the bottom of the blueprints
 /// panel. Updates [`BlueprintsPagination::page`] on click; swaps `ButtonPage*` / `*Hover` sprites.
 pub fn handle_blueprint_pagination_clicks(
     cursor_pos: Res<CursorPos>,
-    mouse_input: Res<Input<MouseButton>>,
+    mouse_input: Res<ButtonInput<MouseButton>>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     mut prev_buttons: Query<
         (Entity, &mut Interactable),
@@ -3689,10 +3647,12 @@ pub fn handle_blueprint_pagination_clicks(
             match interactable.current() {
                 Interaction::None => {
                     interactable.change(Interaction::Hovering);
-                    commands
-                        .entity(e)
-                        .insert(UIElement::ButtonPageUpHover)
-                        .insert(graphics.get_ui_element_texture(UIElement::ButtonPageUpHover));
+                    commands.entity(e).insert(UIElement::ButtonPageUpHover);
+                    set_sprite_image(
+                        &mut commands,
+                        e,
+                        graphics.get_ui_element_texture(UIElement::ButtonPageUpHover),
+                    );
                     commands.spawn(crate::audio::SoundSpawner::new(
                         crate::audio::AudioSoundEffect::ButtonHover,
                         0.05,
@@ -3725,10 +3685,12 @@ pub fn handle_blueprint_pagination_clicks(
             match interactable.current() {
                 Interaction::None => {
                     interactable.change(Interaction::Hovering);
-                    commands
-                        .entity(e)
-                        .insert(UIElement::ButtonPageDownHover)
-                        .insert(graphics.get_ui_element_texture(UIElement::ButtonPageDownHover));
+                    commands.entity(e).insert(UIElement::ButtonPageDownHover);
+                    set_sprite_image(
+                        &mut commands,
+                        e,
+                        graphics.get_ui_element_texture(UIElement::ButtonPageDownHover),
+                    );
                     commands.spawn(crate::audio::SoundSpawner::new(
                         crate::audio::AudioSoundEffect::ButtonHover,
                         0.05,

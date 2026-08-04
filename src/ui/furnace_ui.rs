@@ -1,5 +1,5 @@
-pub use bevy::prelude::*;
-use bevy::{render::view::RenderLayers, sprite::Anchor};
+use bevy::prelude::*;
+use bevy::{camera::visibility::RenderLayers, sprite::Anchor};
 
 use crate::{
     assets::Graphics,
@@ -15,13 +15,47 @@ use super::{
     UIState,
 };
 
-#[derive(Component, Resource, Debug, Clone)]
+/// World-entity furnace / upgrade-station storage. Must NOT be a [`Resource`]
+/// (see [`super::ChestInventory`]).
+#[derive(Component, Debug, Clone)]
+pub struct FurnaceInventory {
+    pub items: Container,
+    pub slot_map: Vec<Vec<WorldObject>>,
+    pub timer: Timer,
+    pub state: Option<FurnaceState>,
+}
+
+/// Open-furnace UI resource (copied from / written back to [`FurnaceInventory`]).
+#[derive(Resource, Debug, Clone)]
 pub struct FurnaceContainer {
     pub items: Container,
     pub parent: Entity,
     pub slot_map: Vec<Vec<WorldObject>>,
     pub timer: Timer,
     pub state: Option<FurnaceState>,
+}
+
+impl FurnaceInventory {
+    pub fn to_container(&self, parent: Entity) -> FurnaceContainer {
+        FurnaceContainer {
+            items: self.items.clone(),
+            parent,
+            slot_map: self.slot_map.clone(),
+            timer: self.timer.clone(),
+            state: self.state.clone(),
+        }
+    }
+}
+
+impl FurnaceContainer {
+    pub fn to_inventory(&self) -> FurnaceInventory {
+        FurnaceInventory {
+            items: self.items.clone(),
+            slot_map: self.slot_map.clone(),
+            timer: self.timer.clone(),
+            state: self.state.clone(),
+        }
+    }
 }
 #[derive(Debug, Clone)]
 pub struct FurnaceState {
@@ -94,10 +128,10 @@ pub fn setup_furnace_slots_ui(
     inv: Res<FurnaceContainer>,
     resolution: Res<ScreenResolution>,
 ) {
-    if inv_spawn_check.get_single().is_err() {
+    if inv_spawn_check.single().is_err() {
         return;
     }
-    if inv_state.0 != UIState::Furnace {
+    if *inv_state != UIState::Furnace {
         return;
     };
     for (slot_index, item) in inv.items.items.iter().enumerate() {
@@ -116,25 +150,24 @@ pub fn setup_furnace_slots_ui(
         );
     }
     commands
-        .spawn(SpriteBundle {
-            sprite: Sprite {
+        .spawn((
+            Sprite {
                 color: YELLOW,
                 custom_size: Some(Vec2::new(18., 2.)),
-                anchor: Anchor::CenterLeft,
                 ..default()
             },
-            transform: Transform {
+            Transform {
                 translation: Vec3::new(-8., 47., 1.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
-            ..default()
-        })
+        ))
+        .insert(Anchor::CENTER_LEFT)
         .insert(RenderLayers::from_layers(&[3]))
         .insert(UIState::Furnace)
         .insert(FurnaceProgBar)
         .insert(Name::new("inner xp bar"))
-        .set_parent(inv_query.single());
+        .insert(ChildOf(inv_query.single().unwrap()));
 }
 pub fn update_furnace_bar(
     furnace_option: Option<ResMut<FurnaceContainer>>,
@@ -143,9 +176,9 @@ pub fn update_furnace_bar(
     let Some(furnace) = furnace_option else {
         return;
     };
-    if let Ok(mut furnace_bar) = furnace_bar_query.get_single_mut() {
+    if let Ok(mut furnace_bar) = furnace_bar_query.single_mut() {
         furnace_bar.custom_size = Some(Vec2 {
-            x: 18. * furnace.timer.percent(),
+            x: 18. * furnace.timer.fraction(),
             y: 2.,
         })
     };
@@ -170,22 +203,20 @@ pub fn add_container_to_new_furnace_objs(
             WorldObject::Furnace => {
                 let ing: Vec<_> = recipes.furnace_list.iter().map(|(k, _)| *k).collect();
                 let results: Vec<_> = recipes.furnace_list.iter().map(|(_, v)| *v).collect();
-                commands.entity(e).insert(FurnaceContainer {
+                commands.entity(e).insert(FurnaceInventory {
                     items: existing_cont_option
                         .unwrap_or(&Container::with_size(3))
                         .clone(),
-                    parent: e,
                     slot_map: vec![vec![WorldObject::Coal], ing.clone(), results.clone()],
                     timer: Timer::from_seconds(3., TimerMode::Once),
                     state: None,
                 });
             }
             WorldObject::UpgradeStation => {
-                commands.entity(e).insert(FurnaceContainer {
+                commands.entity(e).insert(FurnaceInventory {
                     items: existing_cont_option
                         .unwrap_or(&Container::with_size(2))
                         .clone(),
-                    parent: e,
                     slot_map: vec![
                         vec![WorldObject::UpgradeTome, WorldObject::OrbOfTransformation],
                         recipes.upgradeable_items.clone(),

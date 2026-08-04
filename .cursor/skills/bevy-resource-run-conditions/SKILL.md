@@ -1,11 +1,13 @@
 ---
 name: bevy-resource-run-conditions
-description: Prevent Bevy 0.10 runtime panics when using resource_changed or Res<T> in system run conditions. Use when adding or editing .run_if(...), resource_changed, resource_exists, init_resource, insert_resource on schedule, or when a panic says "Resource requested by ... does not exist".
+description: Prevent Bevy runtime panics when using resource_changed or Res<T> in system run conditions, or when Bevy 0.19 validates Res/ResMut even if a run_if would skip. Use when adding or editing .run_if(...), resource_changed, resource_exists, init_resource, insert_resource on schedule, or when a panic says "Resource does not exist" / "failed validation".
 ---
 
 # Bevy Resource Run Conditions
 
-In Bevy 0.10, **`resource_changed::<T>()` and `Res<T>` inside a `run_if` closure panic if `T` is not in the world** when the condition is evaluated — even if the system itself would never run.
+In Bevy 0.10+, **`resource_changed::<T>()` and `Res<T>` inside a `run_if` closure panic if `T` is not in the world** when the condition is evaluated — even if the system itself would never run.
+
+**Bevy 0.19 change:** system-param validation for `Res`/`ResMut` happens when fetching params. A bare `ResMut<T>` can panic even if another system in the same schedule would `insert_resource` later that frame. Prefer `init_resource::<T>()` at plugin build, or wrap with `Option<ResMut<T>>` / `If<ResMut<T>>` when absence is expected.
 
 The follow-on `RecvError` panic from `bevy_render::pipelined_rendering` is a cascade after the main-thread panic; fix the missing resource, not the render thread.
 

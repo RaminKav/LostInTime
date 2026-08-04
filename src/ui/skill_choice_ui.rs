@@ -1,5 +1,8 @@
-use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
-use bevy_aseprite::{anim::AsepriteAnimation, aseprite, AsepriteBundle};
+use bevy::text::Justify;
+use crate::aseprite_assets::SkillChoiceFlash;
+use crate::aseprite_helpers::aseprite_bundle;
+use bevy::{camera::visibility::RenderLayers, prelude::*, sprite::Anchor};
+use bevy_aseprite_ultra::prelude::{AnimationState, Aseprite};
 
 use crate::{
     animations::DoneAnimation,
@@ -30,7 +33,7 @@ use super::{
         Z_DEPTH_HEIRLOOM_SKILL_CHOICE_CONTENT, Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND,
         Z_DEPTH_HEIRLOOM_SKILL_CHOICE_OVERLAY,
     },
-    Interactable, Focusable,     UIElement, UIState, SKILLS_CHOICE_UI_SIZE,
+    Focusable, Interactable, UIElement, UIState, SKILLS_CHOICE_UI_SIZE,
 };
 
 /// Bounce strength for heirloom choice cards on hover (fraction of default mob bounce).
@@ -62,7 +65,6 @@ pub struct RerollCountText;
 #[derive(Component)]
 pub struct BanishCountText;
 
-aseprite!(pub SkillChoiceFlash, "ui/SkillChoiceFlash.aseprite");
 pub fn handle_skill_choice_info_box_hover(
     mut commands: Commands,
     graphics: Res<Graphics>,
@@ -83,7 +85,7 @@ pub fn handle_skill_choice_info_box_hover(
     }
 
     for root in existing_roots.iter() {
-        commands.entity(root).despawn_recursive();
+        commands.entity(root).despawn();
     }
 
     *last_card = hovered_card;
@@ -117,7 +119,7 @@ pub fn handle_skill_choice_info_box_hover(
         commands
             .entity(root)
             .insert(SkillChoiceInfoBoxRoot)
-            .set_parent(card_e);
+            .insert(ChildOf(card_e));
     }
 }
 
@@ -141,18 +143,13 @@ pub fn setup_skill_choice_ui(
 
     let title_text = commands
         .spawn((
-            Text2dBundle {
-                text: Text::from_section(
-                    "Choose an Heirloom".to_string(),
-                    gf::MENU_TITLE.text_style(&asset_server, WHITE),
-                ),
-                transform: Transform {
+            gf::MENU_TITLE
+                .text(&asset_server, "Choose an Heirloom".to_string(), WHITE)
+                .with_transform(Transform {
                     translation: Vec3::new(0., 115., Z_DEPTH_HEIRLOOM_SKILL_CHOICE_CONTENT),
                     scale: gf::MENU_TITLE.transform_scale(),
                     ..Default::default()
-                },
-                ..default()
-            },
+                }),
             RenderLayers::from_layers(&[3]),
         ))
         .id();
@@ -187,26 +184,25 @@ pub fn setup_skill_choice_ui(
             -110.,
             Z_DEPTH_HEIRLOOM_SKILL_CHOICE_CONTENT,
         );
-        let mut reroll_entity = commands.spawn(SpriteBundle {
-            texture: graphics
-                .get_ui_element_texture(UIElement::RerollDice)
-                .clone(),
-            sprite: Sprite {
+        let mut reroll_entity = commands.spawn((
+            Sprite {
+                image: graphics
+                    .get_ui_element_texture(UIElement::RerollDice)
+                    .clone(),
                 custom_size: Some(Vec2::new(21., 22.)),
                 color: if enabled {
                     Color::WHITE
                 } else {
-                    Color::rgb(0.55, 0.55, 0.55)
+                    Color::srgb(0.55, 0.55, 0.55)
                 },
                 ..Default::default()
             },
-            transform: Transform {
+            Transform {
                 translation,
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
-            ..Default::default()
-        });
+        ));
         reroll_entity
             .insert(RenderLayers::from_layers(&[3]))
             .insert(UIElement::RerollDice)
@@ -234,25 +230,24 @@ pub fn setup_skill_choice_ui(
             -136.,
             Z_DEPTH_HEIRLOOM_SKILL_CHOICE_CONTENT,
         );
-        let mut banish_button = commands.spawn(SpriteBundle {
-            texture: graphics
-                .get_ui_element_texture(UIElement::BackButton)
-                .clone(),
-            sprite: Sprite {
+        let mut banish_button = commands.spawn((
+            Sprite {
+                image: graphics
+                    .get_ui_element_texture(UIElement::BackButton)
+                    .clone(),
                 custom_size: Some(Vec2::new(48., 18.)),
                 color: if banish_enabled {
                     Color::WHITE
                 } else {
-                    Color::rgb(0.5, 0.5, 0.5)
+                    Color::srgb(0.5, 0.5, 0.5)
                 },
                 ..Default::default()
             },
-            transform: Transform {
+            Transform {
                 translation,
                 ..Default::default()
             },
-            ..Default::default()
-        });
+        ));
         let banish_entity = banish_button.id();
         banish_button
             .insert(RenderLayers::from_layers(&[3]))
@@ -269,32 +264,29 @@ pub fn setup_skill_choice_ui(
 
         commands
             .spawn((
-                Text2dBundle {
-                    text: Text::from_section(
+                gf::SKILL_CHOICE_MICRO
+                    .text(
+                        &asset_server,
                         "Banish ",
-                        gf::SKILL_CHOICE_MICRO.text_style(&asset_server,
-                            if banish_enabled {
-                                WHITE
-                            } else {
-                                Color::rgb(0.7, 0.7, 0.7)
-                            },
-                        ),
+                        if banish_enabled {
+                            WHITE
+                        } else {
+                            Color::srgb(0.7, 0.7, 0.7)
+                        },
                     )
-                    .with_alignment(TextAlignment::Center),
-                    text_anchor: Anchor::Center,
-                    transform: Transform {
+                    .justify(Justify::Center)
+                    .anchor(Anchor::CENTER)
+                    .with_transform(Transform {
                         translation: Vec3::new(2., 0., 1.),
                         scale: gf::SKILL_CHOICE_MICRO.transform_scale(),
                         ..Default::default()
-                    },
-                    ..Default::default()
-                },
+                    }),
                 RenderLayers::from_layers(&[3]),
                 UIState::Skills,
                 BanishButtonLabel(slot_index),
                 Name::new(format!("BANISH BUTTON TEXT {slot_index}")),
             ))
-            .set_parent(banish_entity);
+            .insert(ChildOf(banish_entity));
     }
 
     spawn_banish_tracker(
@@ -308,53 +300,43 @@ pub fn setup_skill_choice_ui(
     );
 
     commands.spawn((
-        Text2dBundle {
-            text: Text::from_section(
+        gf::SKILL_CHOICE_MICRO
+            .text(
+                &asset_server,
                 format!("Rerolls: {}", run_unlocks.rerolls_remaining),
-                gf::SKILL_CHOICE_MICRO.text_style(&asset_server, WHITE),
+                WHITE,
             )
-            .with_alignment(TextAlignment::Center),
-            text_anchor: Anchor::Center,
-            transform: Transform {
-                translation: Vec3::new(
-                    -80.5,
-                    -140.,
-                    Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND,
-                ),
+            .justify(Justify::Center)
+            .anchor(Anchor::CENTER)
+            .with_transform(Transform {
+                translation: Vec3::new(-80.5, -140., Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND),
                 scale: gf::SKILL_CHOICE_MICRO.transform_scale(),
                 ..Default::default()
-            },
-            ..Default::default()
-        },
+            }),
         RenderLayers::from_layers(&[3]),
         UIState::Skills,
         RerollCountText,
-        Name::new("Reroll Count Text"),
+        Name::new("Reroll Count Text2d"),
     ));
 
     commands.spawn((
-        Text2dBundle {
-            text: Text::from_section(
+        gf::SKILL_CHOICE_MICRO
+            .text(
+                &asset_server,
                 format!("Banishes: {}", run_unlocks.banishes_remaining),
-                gf::SKILL_CHOICE_MICRO.text_style(&asset_server, WHITE),
+                WHITE,
             )
-            .with_alignment(TextAlignment::Center),
-            text_anchor: Anchor::Center,
-            transform: Transform {
-                translation: Vec3::new(
-                    80.,
-                    -140.,
-                    Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND,
-                ),
+            .justify(Justify::Center)
+            .anchor(Anchor::CENTER)
+            .with_transform(Transform {
+                translation: Vec3::new(80., -140., Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND),
                 scale: gf::SKILL_CHOICE_MICRO.transform_scale(),
                 ..Default::default()
-            },
-            ..Default::default()
-        },
+            }),
         RenderLayers::from_layers(&[3]),
         UIState::Skills,
         BanishCountText,
-        Name::new("Banish Count Text"),
+        Name::new("Banish Count Text2d"),
     ));
 }
 
@@ -363,7 +345,7 @@ pub fn tick_skill_choice_interaction_lock_timers(
     mut query: Query<&mut SkillChoiceUI>,
 ) {
     for mut skill_ui in query.iter_mut() {
-        if skill_ui.interaction_lock_timer.finished() {
+        if skill_ui.interaction_lock_timer.is_finished() {
             continue;
         }
         skill_ui.interaction_lock_timer.tick(time.delta());
@@ -421,14 +403,16 @@ pub fn spawn_skill_choice_entities(
                 group: UIState::Skills,
                 index: index as u32,
             })
-            .insert(BounceOnHit::with_strength_fraction(HEIRLOOM_CARD_BOUNCE_STRENGTH))
+            .insert(BounceOnHit::with_strength_fraction(
+                HEIRLOOM_CARD_BOUNCE_STRENGTH,
+            ))
             .insert(Name::new("SKILLS UI"));
     }
 }
 
 pub fn toggle_skills_visibility(
     curr_ui_state: Res<State<UIState>>,
-    key_input: ResMut<Input<KeyCode>>,
+    key_input: ResMut<ButtonInput<KeyCode>>,
     mut queue: ResMut<HeirloomChoiceQueue>,
     old_skill_entities: Query<Entity, With<SkillChoiceUI>>,
     mut commands: Commands,
@@ -438,12 +422,12 @@ pub fn toggle_skills_visibility(
     player_atts: Query<(&LootRateBonus, &PlayerLevel), With<Player>>,
     cheat_settings: Option<Res<CheatSettings>>,
 ) {
-    if curr_ui_state.0 == UIState::ActiveSkills {
+    if *curr_ui_state.get() == UIState::ActiveSkills {
         return;
     }
     let dev_mode = cheat_settings.map(|c| c.dev_mode).unwrap_or(false);
 
-    if (*DEBUG || dev_mode) && key_input.just_pressed(KeyCode::N) {
+    if (*DEBUG || dev_mode) && key_input.just_pressed(KeyCode::KeyN) {
         if queue.queue.is_empty() {
             return;
         }
@@ -452,12 +436,12 @@ pub fn toggle_skills_visibility(
             queue.pool.push(choice.clone());
         }
         for e in old_skill_entities.iter() {
-            commands.entity(e).despawn_recursive();
+            commands.entity(e).despawn();
         }
 
         let mut rng = rand::thread_rng();
         let (loot_bonus, player_level) = player_atts
-            .get_single()
+            .single()
             .map(|a| (a.0 .0, a.1.level))
             .unwrap_or((0, 1));
         queue.add_new_skills_after_levelup(&mut rng, loot_bonus, player_level);
@@ -472,7 +456,7 @@ pub fn toggle_skills_visibility(
     }
 }
 pub fn handle_skill_reroll_after_flash(
-    flashes: Query<(Entity, &RerollDice, &AsepriteAnimation), With<DoneAnimation>>,
+    flashes: Query<(Entity, &RerollDice, &AnimationState), With<DoneAnimation>>,
     mut skill_queue: ResMut<HeirloomChoiceQueue>,
     old_skill_entities: Query<Entity, With<SkillChoiceUI>>,
     mut commands: Commands,
@@ -481,10 +465,10 @@ pub fn handle_skill_reroll_after_flash(
     res: Res<ScreenResolution>,
     player_atts: Query<(&LootRateBonus, &PlayerLevel), With<Player>>,
 ) {
-    for (e, slot, anim) in flashes.iter() {
-        if anim.current_frame() == 3 {
+    for (e, slot, state) in flashes.iter() {
+        if usize::from(state.current_frame()) == 3 {
             let (loot_bonus, player_level) = player_atts
-                .get_single()
+                .single()
                 .map(|a| (a.0 .0, a.1.level))
                 .unwrap_or((0, 1));
             commands.entity(e).remove::<RerollDice>();
@@ -495,7 +479,7 @@ pub fn handle_skill_reroll_after_flash(
                 player_level,
             );
             for e in old_skill_entities.iter() {
-                commands.entity(e).despawn_recursive();
+                commands.entity(e).despawn();
             }
             spawn_skill_choice_entities(
                 &graphics,
@@ -515,17 +499,18 @@ pub fn spawn_skill_choice_flash(
     slot: usize,
 ) {
     commands
-        .spawn(AsepriteBundle {
-            animation: AsepriteAnimation::from(SkillChoiceFlash::tags::FLASH),
-            aseprite: asset_server.load(SkillChoiceFlash::PATH),
-            transform: Transform {
+        .spawn(aseprite_bundle(
+            asset_server.load(SkillChoiceFlash::PATH),
+            SkillChoiceFlash::tags::FLASH,
+            Transform {
                 translation: pos,
                 ..Default::default()
             },
-            ..Default::default()
-        })
+            Visibility::Inherited,
+            true,
+        ))
         .insert(RenderLayers::from_layers(&[3]))
-        .insert(VisibilityBundle::default())
+        .insert(Visibility::default())
         .insert(RerollDice(slot))
         .insert(DoneAnimation);
 }
@@ -536,7 +521,7 @@ pub fn update_skill_choice_button_states(
     time_crystals: Res<TimeCrystals>,
     mut reroll_buttons: Query<&mut Sprite, (With<RerollDice>, Without<BanishButton>)>,
     mut banish_buttons: Query<(&mut Sprite, &BanishButton), Without<RerollDice>>,
-    mut banish_labels: Query<(&mut Text, &BanishButtonLabel)>,
+    mut banish_labels: Query<(&mut TextColor, &BanishButtonLabel)>,
 ) {
     if !run_unlocks.is_changed() && !skill_queue.is_changed() {
         return;
@@ -545,7 +530,7 @@ pub fn update_skill_choice_button_states(
     let reroll_color = if run_unlocks.rerolls_remaining > 0 {
         Color::WHITE
     } else {
-        Color::rgb(0.55, 0.55, 0.55)
+        Color::srgb(0.55, 0.55, 0.55)
     };
     for mut sprite in reroll_buttons.iter_mut() {
         sprite.color = reroll_color;
@@ -557,34 +542,34 @@ pub fn update_skill_choice_button_states(
         sprite.color = if enabled {
             Color::WHITE
         } else {
-            Color::rgb(0.5, 0.5, 0.5)
+            Color::srgb(0.5, 0.5, 0.5)
         };
     }
-    for (mut text, label) in banish_labels.iter_mut() {
+    for (mut text_color, label) in banish_labels.iter_mut() {
         let enabled = run_unlocks.banishes_remaining > 0
             && skill_queue.banish_allowed_for_choice_slot(&time_crystals, label.0);
-        text.sections[0].style.color = if enabled {
+        text_color.0 = if enabled {
             WHITE
         } else {
-            Color::rgb(0.7, 0.7, 0.7)
+            Color::srgb(0.7, 0.7, 0.7)
         };
     }
 }
 
 pub fn update_skill_choice_count_text(
     run_unlocks: Res<RunUnlockState>,
-    mut reroll_texts: Query<&mut Text, (With<RerollCountText>, Without<BanishCountText>)>,
-    mut banish_texts: Query<&mut Text, (With<BanishCountText>, Without<RerollCountText>)>,
+    mut reroll_texts: Query<&mut Text2d, (With<RerollCountText>, Without<BanishCountText>)>,
+    mut banish_texts: Query<&mut Text2d, (With<BanishCountText>, Without<RerollCountText>)>,
 ) {
     if !run_unlocks.is_changed() {
         return;
     }
 
     for mut text in reroll_texts.iter_mut() {
-        text.sections[0].value = format!("Rerolls: {}", run_unlocks.rerolls_remaining);
+        text.0 = format!("Rerolls: {}", run_unlocks.rerolls_remaining);
     }
 
     for mut text in banish_texts.iter_mut() {
-        text.sections[0].value = format!("Banishes: {}", run_unlocks.banishes_remaining);
+        text.0 = format!("Banishes: {}", run_unlocks.banishes_remaining);
     }
 }

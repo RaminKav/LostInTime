@@ -169,7 +169,11 @@ pub fn shrine_assign_action(
 }
 
 /// Write a shrine skill into the given player slot index (1 or 2).
-pub fn assign_shrine_skill_to_slot(skills: &mut PlayerSkills, slot: usize, skill: ActiveSkillChoiceState) {
+pub fn assign_shrine_skill_to_slot(
+    skills: &mut PlayerSkills,
+    slot: usize,
+    skill: ActiveSkillChoiceState,
+) {
     match slot {
         1 => skills.active_skill_slot_1 = Some(skill),
         2 => skills.active_skill_slot_2 = Some(skill),
@@ -195,7 +199,7 @@ pub fn handle_active_skill_shrine_completion(
     shrines: Query<(Entity, &ActiveSkillShrineState)>,
     mut commands: Commands,
     mut game: GameParam,
-    mut minimap_event: EventWriter<UpdateMiniMapEvent>,
+    mut minimap_event: MessageWriter<UpdateMiniMapEvent>,
 ) {
     for (e, shrine) in shrines.iter() {
         if shrine.is_used {
@@ -211,7 +215,7 @@ pub fn handle_active_skill_shrine_completion(
                 .active_skill_shrine_offers
                 .remove(&shrine.tile_pos);
 
-            minimap_event.send(UpdateMiniMapEvent {
+            minimap_event.write(UpdateMiniMapEvent {
                 pos: Some(shrine.tile_pos),
                 new_tile: Some(WorldObject::ActiveSkillShrineDone),
             });
@@ -243,7 +247,7 @@ pub fn handle_active_skill_shrine_esc(
     mut commands: Commands,
     curr_ui_state: Res<State<UIState>>,
 ) {
-    if curr_ui_state.0 != UIState::Closed {
+    if *curr_ui_state.get() != UIState::Closed {
         return;
     }
     if let Some(selection) = shrine_selection.as_ref() {

@@ -1,25 +1,27 @@
-use bevy::{prelude::*, sprite::MaterialMesh2dBundle};
-use bevy_aseprite::{anim::AsepriteAnimation, aseprite, AsepriteBundle};
+use crate::aseprite_assets::{DesertTornadoAseprite, PinkFlowerAseprite};
+use crate::aseprite_helpers::{ase_animation, aseprite_bundle, is_paused, pause};
+use bevy::{
+    math::primitives::Circle,
+    prelude::*,
+    sprite_render::{ColorMaterial, MeshMaterial2d},
+};
+use bevy_aseprite_ultra::prelude::{AnimationState, AseAnimation};
 use bevy_rapier2d::prelude::{
     ActiveCollisionTypes, ActiveEvents, Collider, CollisionGroups, Group,
-    KinematicCharacterController, RapierContext, Sensor,
+    KinematicCharacterController, ReadRapierContext, Sensor,
 };
 
 use rand::Rng;
 
 use crate::{
     animations::player_sprite::PlayerAnimation,
-    ecs_helpers::SafeHierarchyExt,
     attributes::{hunger::Hunger, Speed},
     audio::{AudioSoundEffect, SoundSpawner},
+    ecs_helpers::SafeHierarchyExt,
     inputs::MovementVector,
     item::{Equipment, WorldObject},
     player::Player,
-    world::{
-        chunk::Chunk,
-        dimension::Era,
-        y_sort::YSort,
-    },
+    world::{chunk::Chunk, dimension::Era, y_sort::YSort},
     GameParam, MainCamera, PLAYER_MOVE_SPEED,
 };
 
@@ -63,7 +65,7 @@ impl BounceEffect {
 
     /// Calculate current position and height based on timer progress
     pub fn update(&mut self) -> BounceState {
-        if self.timer.finished() {
+        if self.timer.is_finished() {
             return BounceState::default();
         }
 
@@ -98,7 +100,7 @@ impl BounceEffect {
             height: current_z,
             shadow_scale,
             shadow_alpha,
-            is_complete: self.timer.finished(),
+            is_complete: self.timer.is_finished(),
             progress: t,
         }
     }
@@ -116,7 +118,7 @@ impl BounceEffect {
     }
 
     pub fn is_active(&self) -> bool {
-        !self.timer.finished()
+        !self.timer.is_finished()
     }
 }
 
@@ -137,7 +139,7 @@ pub struct PlayerShadow {
     pub owner: Entity,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Message)]
 pub struct BounceEvent;
 /// System to update bounce effect and apply to player position
 pub fn update_bounce_effect(
@@ -159,7 +161,9 @@ pub fn update_bounce_effect(
     mut commands: Commands,
     shadow: Query<Entity, With<PlayerShadow>>,
 ) {
-    let (player_e, mut player_kcc, mut mv, bounce_opt) = player_query.single_mut();
+    let Ok((player_e, mut player_kcc, mut mv, bounce_opt)) = player_query.single_mut() else {
+        return;
+    };
 
     let Some(mut bounce) = bounce_opt else {
         return;
@@ -229,13 +233,16 @@ pub fn bounce_player(
         ),
     >,
     time: Res<Time>,
-    key_input: Res<Input<KeyCode>>,
+    key_input: Res<ButtonInput<KeyCode>>,
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
-    mut bounce_events: EventReader<BounceEvent>,
+    mut bounce_events: MessageReader<BounceEvent>,
 ) {
-    let (player_e, transform, bounce_opt, speed, hunger, anim) = player_query.single_mut();
+    let Ok((player_e, transform, bounce_opt, speed, hunger, anim)) = player_query.single_mut()
+    else {
+        return;
+    };
     if anim == &PlayerAnimation::Lunge {
         return;
     }
@@ -247,19 +254,19 @@ pub fn bounce_player(
 
     if !is_bouncing {
         // Normal movement input
-        if key_input.pressed(KeyCode::A) || key_input.pressed(KeyCode::Left) {
+        if key_input.pressed(KeyCode::KeyA) || key_input.pressed(KeyCode::ArrowLeft) {
             d.x -= 1.;
             player.is_moving = true;
         }
-        if key_input.pressed(KeyCode::D) || key_input.pressed(KeyCode::Right) {
+        if key_input.pressed(KeyCode::KeyD) || key_input.pressed(KeyCode::ArrowRight) {
             d.x += 1.;
             player.is_moving = true;
         }
-        if key_input.pressed(KeyCode::W) || key_input.pressed(KeyCode::Up) {
+        if key_input.pressed(KeyCode::KeyW) || key_input.pressed(KeyCode::ArrowUp) {
             d.y += 1.;
             player.is_moving = true;
         }
-        if key_input.pressed(KeyCode::S) || key_input.pressed(KeyCode::Down) {
+        if key_input.pressed(KeyCode::KeyS) || key_input.pressed(KeyCode::ArrowDown) {
             d.y -= 1.;
             player.is_moving = true;
         }
@@ -269,7 +276,7 @@ pub fn bounce_player(
         }
 
         let mut received_bounce_trigger = false;
-        for _event in bounce_events.iter() {
+        for _event in bounce_events.read() {
             received_bounce_trigger = true;
         }
 
@@ -278,38 +285,28 @@ pub fn bounce_player(
             let start_pos = Vec2::new(transform.translation.x, transform.translation.y);
             let direction = d.normalize();
             let s = PLAYER_MOVE_SPEED
-                * time.delta_seconds()
+                * time.delta_secs()
                 * (1. + speed.0 as f32 / 100.)
                 * (if hunger.is_starving() { 0.7 } else { 1. });
             // Use player's current movement speed
-            let bounce_speed = s / time.delta_seconds() * 3.; // Convert back to units per second
+            let bounce_speed = s / time.delta_secs() * 3.; // Convert back to units per second
 
             // Add or update bounce component
             commands.entity(player_e).insert(BounceEffect::new(
                 start_pos,
                 direction,
                 bounce_speed,
-                player.is_dashing && player.player_dash_duration.percent() < 0.25,
+                player.is_dashing && player.player_dash_duration.fraction() < 0.25,
                 0.35, // duration in seconds
                 20.0, // max height
             ));
             commands
                 .spawn((
-                    MaterialMesh2dBundle {
-                        mesh: meshes
-                            .add(
-                                shape::Circle {
-                                    radius: 7.0,
-                                    ..Default::default()
-                                }
-                                .into(),
-                            )
-                            .into(),
-                        material: materials
-                            .add(ColorMaterial::from(Color::rgba(0.0, 0.0, 0.0, 0.3))),
-                        transform: Transform::from_xyz(0.0, 0.0, -1.0),
-                        ..default()
-                    },
+                    Mesh2d(meshes.add(Mesh::from(Circle::new(7.0)))),
+                    MeshMaterial2d(
+                        materials.add(ColorMaterial::from(Color::srgba(0.0, 0.0, 0.0, 0.3))),
+                    ),
+                    Transform::from_xyz(0.0, 0.0, -1.0),
                     PlayerShadow { owner: player_e },
                 ))
                 .safe_set_parent(player_e);
@@ -317,9 +314,6 @@ pub fn bounce_player(
         }
     }
 }
-
-aseprite!(pub PinkFlowerAseprite, "textures/pinkflower.ase");
-aseprite!(pub DesertTornadoAseprite, "textures/effects/desert_tornado.ase");
 
 /// Desert tornado spawned by the Scorpion boss. Travels in a straight line for
 /// its lifetime; on player overlap, the player gets lifted into the air (no
@@ -345,16 +339,15 @@ pub fn spawn_desert_tornado(
     speed: f32,
     lifetime: f32,
 ) -> Entity {
-    let mut animation = AsepriteAnimation::default();
-    animation.play();
     commands
         .spawn((
-            AsepriteBundle {
-                aseprite: asset_server.load(DesertTornadoAseprite::PATH),
-                animation,
-                transform: Transform::from_translation(pos.extend(50.)),
-                ..Default::default()
-            },
+            aseprite_bundle(
+                asset_server.load(DesertTornadoAseprite::PATH),
+                "",
+                Transform::from_translation(pos.extend(50.)),
+                Visibility::Inherited,
+                false,
+            ),
             DesertTornado {
                 direction: direction.normalize_or_zero(),
                 speed,
@@ -384,7 +377,7 @@ pub fn update_desert_tornadoes(
         tornado.lifetime.tick(time.delta());
         tornado.retarget_timer.tick(time.delta());
         if tornado.retarget_timer.just_finished() {
-            if let Ok(player_tf) = player_q.get_single() {
+            if let Ok(player_tf) = player_q.single() {
                 let my = tf.translation.truncate();
                 let to_player = (player_tf.translation().truncate() - my).normalize_or_zero();
                 if to_player.length_squared() > 0.0001 {
@@ -392,11 +385,11 @@ pub fn update_desert_tornadoes(
                 }
             }
         }
-        if tornado.lifetime.finished() {
-            commands.entity(e).despawn_recursive();
+        if tornado.lifetime.is_finished() {
+            commands.entity(e).despawn();
             continue;
         }
-        let delta = tornado.direction * tornado.speed * time.delta_seconds();
+        let delta = tornado.direction * tornado.speed * time.delta_secs();
         tf.translation.x += delta.x;
         tf.translation.y += delta.y;
     }
@@ -407,11 +400,14 @@ pub fn update_desert_tornadoes(
 /// the previous lift completes if the overlap continues.
 pub fn handle_tornado_player_overlap(
     mut commands: Commands,
-    rapier_context: Res<RapierContext>,
+    rapier_context: ReadRapierContext,
     tornadoes: Query<Entity, With<DesertTornado>>,
     player_query: Query<(Entity, &Transform, Option<&BounceEffect>), With<crate::player::Player>>,
 ) {
-    let Ok((player_e, player_tf, bounce_opt)) = player_query.get_single() else {
+    let Ok(rapier_context) = rapier_context.single() else {
+        return;
+    };
+    let Ok((player_e, player_tf, bounce_opt)) = player_query.single() else {
         return;
     };
     if bounce_opt.map(|b| b.is_active()).unwrap_or(false) {
@@ -476,7 +472,8 @@ pub fn spawn_natural_desert_tornadoes(
     let player_pos = game.player().position.truncate();
     let mut rng = rand::thread_rng();
     let spawn_angle: f32 = rng.gen_range(0.0..std::f32::consts::TAU);
-    let spawn_offset = Vec2::new(spawn_angle.cos(), spawn_angle.sin()) * NATURAL_TORNADO_SPAWN_RADIUS;
+    let spawn_offset =
+        Vec2::new(spawn_angle.cos(), spawn_angle.sin()) * NATURAL_TORNADO_SPAWN_RADIUS;
     let spawn_pos = player_pos + spawn_offset;
     let dir = (player_pos - spawn_pos).normalize_or_zero();
     spawn_desert_tornado(
@@ -497,36 +494,44 @@ pub fn spawn_pink_flower_aseprite(
 ) {
     for (entity, transform, world_obj) in pink_flowers.iter() {
         if world_obj == &WorldObject::PinkFlower {
-            let mut animation = AsepriteAnimation::from(PinkFlowerAseprite::tags::BOUNCE);
-            animation.pause();
+            let mut animation = ase_animation(
+                graphics.pink_flower_ase.as_ref().unwrap().clone(),
+                PinkFlowerAseprite::tags::BOUNCE,
+                false,
+            );
+            pause(&mut animation);
 
-            let Some(mut entity_commands) = commands.get_entity(entity) else {
+            let Ok(mut entity_commands) = commands.get_entity(entity) else {
                 continue;
             };
 
-            entity_commands.insert(AsepriteBundle {
-                aseprite: graphics.pink_flower_ase.as_ref().unwrap().clone(),
+            entity_commands.insert((
                 animation,
-                transform: *transform,
-                ..Default::default()
-            });
+                Sprite::default(),
+                *transform,
+                GlobalTransform::default(),
+                Visibility::Inherited,
+                InheritedVisibility::default(),
+                ViewVisibility::default(),
+            ));
         }
     }
 }
 
 pub fn handle_pink_flower_animation_loop(
     mut flower_query: Query<
-        (&mut AsepriteAnimation, &WorldObject),
+        (&mut AseAnimation, &mut AnimationState, &WorldObject),
         (Without<Player>, With<WorldObject>),
     >,
 ) {
-    for (mut anim, world_obj) in flower_query.iter_mut() {
+    for (mut anim, mut state, world_obj) in flower_query.iter_mut() {
         if world_obj == &WorldObject::PinkFlower {
-            if !anim.is_paused() {
-                let current_frame = anim.current_frame();
+            if !is_paused(&anim) {
+                let current_frame = usize::from(state.current_frame());
                 if current_frame == 12 {
-                    anim.pause();
-                    anim.current_frame = 0;
+                    pause(&mut anim);
+                    state.current_frame = 0;
+                    state.relative_frame = 0;
                 }
             }
         }

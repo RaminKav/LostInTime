@@ -5,8 +5,10 @@ use crate::{
     player::Player,
     ui::global_text_message::GlobalTextMessageEvent,
     world::{
-        dimension::{Era, EraManager}, portal::BossKillTracker,
-        world_helpers::tile_pos_to_world_pos, TILE_SIZE,
+        dimension::{Era, EraManager},
+        portal::BossKillTracker,
+        world_helpers::tile_pos_to_world_pos,
+        TILE_SIZE,
     },
     GameParam,
 };
@@ -33,9 +35,9 @@ pub fn handle_goal_state_updates(
     game: GameParam,
     boss_kill_tracker: Option<Res<BossKillTracker>>,
     portal_query: Query<&GlobalTransform, With<crate::world::portal::TimePortal>>,
-    mut global_text_events: EventWriter<GlobalTextMessageEvent>,
+    mut global_text_events: MessageWriter<GlobalTextMessageEvent>,
 ) {
-    let player_t = match player_query.get_single() {
+    let player_t = match player_query.single() {
         Ok(t) => t,
         Err(_) => return,
     };
@@ -66,13 +68,13 @@ pub fn handle_goal_state_updates(
                     } else {
                         GlobalTextMessageEvent::new("Return to the portal...", WHITE)
                     };
-                    global_text_events.send(event);
+                    global_text_events.write(event);
                 }
             }
         }
         GoalState::ReturnToPortal => {
             // Check if player is within 8 tiles of portal
-            if let Ok(portal_t) = portal_query.get_single() {
+            if let Ok(portal_t) = portal_query.single() {
                 let portal_pos = portal_t.translation().truncate();
                 let distance = player_pos.distance(portal_pos);
                 if distance <= GOAL_DISTANCE_THRESHOLD {
@@ -102,6 +104,6 @@ pub fn handle_goal_reset_on_era_change(
 /// Compact progress HUD omits objective text; despawn any legacy `GoalText` entities.
 pub fn display_goal_text(mut commands: Commands, goal_text_query: Query<Entity, With<GoalText>>) {
     for entity in goal_text_query.iter() {
-        commands.entity(entity).despawn_recursive();
+        commands.entity(entity).despawn();
     }
 }

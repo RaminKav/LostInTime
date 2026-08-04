@@ -1,5 +1,5 @@
+use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
-use bevy::render::view::RenderLayers;
 
 use crate::{
     assets::Graphics,
@@ -38,8 +38,8 @@ impl BridgePlacementMode {
     fn exit(&mut self, commands: &mut Commands) {
         self.active = false;
         if let Some(icon) = self.drag_icon.take() {
-            if let Some(ec) = commands.get_entity(icon) {
-                ec.despawn_recursive();
+            if let Ok(mut ec) = commands.get_entity(icon) {
+                ec.despawn();
             }
         }
     }
@@ -70,12 +70,8 @@ fn spawn_bridge_preview_icon(
 
     commands
         .spawn((
-            SpriteSheetBundle {
-                sprite,
-                texture_atlas: graphics.texture_atlas.as_ref().unwrap().clone(),
-                transform: Transform::from_xyz(0., 0., 995.),
-                ..Default::default()
-            },
+            sprite.clone(),
+            Transform::from_xyz(0., 0., 995.),
             RenderLayers::from_layers(&[3]),
             BridgePlacementDragIcon,
             Name::new("Bridge Preview Icon"),
@@ -124,7 +120,7 @@ fn try_place_bridge_at_cursor(
         return false;
     }
 
-    item_action_param.place_item_event.send(PlaceItemEvent {
+    item_action_param.place_item_event.write(PlaceItemEvent {
         obj: WorldObject::Bridge,
         pos,
         placed_by_player: true,
@@ -132,12 +128,12 @@ fn try_place_bridge_at_cursor(
     });
     item_action_param
         .analytics_event
-        .send(AnalyticsUpdateEvent {
+        .write(AnalyticsUpdateEvent {
             update_type: AnalyticsTrigger::ObjectPlaced(WorldObject::Bridge),
         });
     item_action_param
         .action_success_event
-        .send(ActionSuccessEvent {
+        .write(ActionSuccessEvent {
             obj: WorldObject::BridgeBlock,
             item_slot: bridge_mode.hotbar_slot,
         });
@@ -149,7 +145,7 @@ pub fn handle_bridge_placement_mode(
     time: Res<Time>,
     mut bridge_mode: ResMut<BridgePlacementMode>,
     mut commands: Commands,
-    mut mouse_input: ResMut<Input<MouseButton>>,
+    mut mouse_input: ResMut<ButtonInput<MouseButton>>,
     ui_state: Res<State<UIState>>,
     inv: Query<&Inventory>,
     mut game: GameParam,
@@ -161,7 +157,7 @@ pub fn handle_bridge_placement_mode(
         return;
     }
 
-    if ui_state.0 != UIState::Closed {
+    if *ui_state != UIState::Closed {
         bridge_mode.exit(&mut commands);
         return;
     }
@@ -174,12 +170,12 @@ pub fn handle_bridge_placement_mode(
     }
 
     bridge_mode.idle_timer.tick(time.delta());
-    if bridge_mode.idle_timer.finished() {
+    if bridge_mode.idle_timer.is_finished() {
         bridge_mode.exit(&mut commands);
         return;
     }
 
-    let Ok(inventory) = inv.get_single() else {
+    let Ok(inventory) = inv.single() else {
         bridge_mode.exit(&mut commands);
         return;
     };

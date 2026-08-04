@@ -15,7 +15,7 @@ use crate::{
         dungeon::Dungeon,
         TILE_SIZE,
     },
-    GameParam, GameState, DEBUG, NO_SPAWN,
+    Game, GameParam, GameState, DEBUG, NO_SPAWN,
 };
 
 use super::{spawn_helpers::can_spawn_mob_here, CombatAlignment, EliteMob, Mob};
@@ -167,11 +167,15 @@ impl Default for EnemyDespawnTimer {
 pub struct SpawnerPlugin;
 impl Plugin for SpawnerPlugin {
     fn build(&self, app: &mut App) {
-        app.add_event::<MobSpawnEvent>()
+        app.add_message::<MobSpawnEvent>()
             .init_resource::<MobSpawningPaused>()
             .init_resource::<EnemyDespawnTimer>()
             .init_resource::<SpawnerListEraTracker>()
+            // Bevy 0.19 validates `ResMut` even when a sibling system would insert later
+            // in the same frame — always have a default so Main systems cannot panic.
+            .init_resource::<GlobalSpawners>()
             .add_systems(
+                Update,
                 (
                     sync_overworld_spawners_with_era,
                     handle_spawn_mobs,
@@ -182,21 +186,25 @@ impl Plugin for SpawnerPlugin {
                     spawn_stone_golem_timer.run_if(is_not_paused),
                     spawn_endless_stone_golem_timer.run_if(is_not_paused),
                 )
-                    .in_set(OnUpdate(GameState::Main)),
+                    .run_if(in_state(GameState::Main)),
             )
-            .add_system(
+            .add_systems(
+                OnEnter(GameState::Main),
                 reset_stone_golem_timer_on_era_change
-                    .in_base_set(CoreSet::PreUpdate)
                     .before(crate::world::dimension::DimensionPlugin::new_dim_with_params),
             )
-            .add_system(
+            .add_systems(
+                Update,
                 add_spawners_to_new_chunks
-                    .run_if(run_once_per_run())
-                    .in_schedule(OnEnter(GameState::Main)),
+                    // Bevy 0.19 validates SystemParams even when a later run_if would skip;
+                    // Game is only inserted when a run starts from the main menu.
+                    .run_if(in_state(GameState::Main))
+                    .run_if(resource_exists::<Game>)
+                    .run_if(run_once_per_run()),
             )
             // Initialize Stone Golem timer as a fresh resource when entering Main Menu
             // This ensures it resets between runs
-            .add_system(initialize_stone_golem_timer.in_schedule(OnEnter(GameState::MainMenu)));
+            .add_systems(OnEnter(GameState::MainMenu), initialize_stone_golem_timer);
     }
 }
 
@@ -223,14 +231,23 @@ pub struct GlobalSpawners {
     pub initial_spawn_delay: Timer,
 }
 
-#[derive(Debug)]
+impl Default for GlobalSpawners {
+    fn default() -> Self {
+        Self {
+            spawners: Vec::new(),
+            initial_spawn_delay: Timer::from_seconds(5., TimerMode::Once),
+        }
+    }
+}
+
+#[derive(Debug, Message)]
 pub struct MobSpawnEvent {
     mob: Mob,
     bypass_timers: bool,
 }
 
-fn test_mob_count(q: Query<&Mob>, key_input: Res<Input<KeyCode>>) {
-    if *DEBUG && key_input.just_pressed(KeyCode::G) {
+fn test_mob_count(q: Query<&Mob>, key_input: Res<ButtonInput<KeyCode>>) {
+    if *DEBUG && key_input.just_pressed(KeyCode::KeyG) {
         info!(
             "Fur Devils: {:?}",
             q.iter().filter(|m| m == &&Mob::FurDevil).count()
@@ -260,7 +277,7 @@ fn add_spawners_to_new_chunks(
     game: GameParam,
 ) {
     let era = game.era.current_era.clone();
-    let spawners = if maybe_dungeon.get_single().is_err() && !era.is_dungeon() {
+    let spawners = if maybe_dungeon.single().is_err() && !era.is_dungeon() {
         overworld_spawners_for_era(era.clone())
     } else {
         vec![]
@@ -284,7 +301,7 @@ fn sync_overworld_spawners_with_era(
     maybe_dungeon: Query<&Dungeon, With<ActiveDimension>>,
     infinite_mode: Res<InfiniteMode>,
 ) {
-    if maybe_dungeon.get_single().is_ok() {
+    if maybe_dungeon.single().is_ok() {
         return;
     }
     let era = game.era.current_era.clone();
@@ -315,7 +332,7 @@ fn sync_overworld_spawners_with_era(
 fn handle_spawn_mobs(
     defs: Res<crate::defs::GameDefs>,
     mut commands: Commands,
-    mut spawner_trigger_event: EventReader<MobSpawnEvent>,
+    mut spawner_trigger_event: MessageReader<MobSpawnEvent>,
     proto_param: ProtoParam,
     player_t: Query<&GlobalTransform, With<Player>>,
     mut spawners: ResMut<GlobalSpawners>,
@@ -326,18 +343,21 @@ fn handle_spawn_mobs(
     if *NO_SPAWN {
         return;
     }
-    if maybe_dungeon.get_single().is_ok() {
+    if maybe_dungeon.single().is_ok() {
         return;
     }
     if mob_spawning_paused.paused {
         return;
     }
-    'outer: for e in spawner_trigger_event.iter() {
+    'outer: for e in spawner_trigger_event.read() {
         let mut rng = rand::thread_rng();
         let maybe_spawner = spawners.spawners.iter_mut().find(|s| s.enemy == e.mob);
         let mut picked_mob_to_spawn = None;
         if let Some(mut chunk_spawner) = maybe_spawner {
-            let player_pos = player_t.single().translation().truncate();
+            let player_pos = player_t
+                .single()
+                .map(|t| t.translation().truncate())
+                .unwrap_or(Vec2::ZERO);
             let mut pos = player_pos;
             let mut can_spawn_mob_here_check = false;
             let mut fallback_attempts = 10;
@@ -360,9 +380,7 @@ fn handle_spawn_mobs(
             picked_mob_to_spawn = Some((e.mob.clone(), pos));
         }
         if let Some((mob, pos)) = picked_mob_to_spawn {
-            if let Some(spawned_mob) =
-                commands.spawn_from_proto(mob.clone(), &defs, pos)
-            {
+            if let Some(spawned_mob) = commands.spawn_from_proto(mob.clone(), &defs, pos) {
                 debug!("SPAWNED A MOB!!! {spawned_mob:?}");
                 let can_be_elite = proto_param
                     .get_component::<CombatAlignment, _>(mob.clone())
@@ -438,7 +456,7 @@ fn pick_valid_stone_golem_spawn_near_player(
     game: &GameParam,
     proto_param: &ProtoParam,
 ) -> Option<Vec2> {
-    let player_txfm = player_query.get_single().ok()?;
+    let player_txfm = player_query.single().ok()?;
     let player_pos = player_txfm.translation().truncate();
     let mut rng = rand::thread_rng();
     let mut pos = player_pos;
@@ -498,7 +516,7 @@ fn spawn_stone_golem_timer(
         return;
     }
     // Check if in dungeon - don't spawn in dungeons
-    if maybe_dungeon.get_single().is_ok() {
+    if maybe_dungeon.single().is_ok() {
         return;
     }
 
@@ -544,7 +562,7 @@ fn spawn_endless_stone_golem_timer(
     if *NO_SPAWN {
         return;
     }
-    if maybe_dungeon.get_single().is_ok() {
+    if maybe_dungeon.single().is_ok() {
         return;
     }
 
@@ -581,13 +599,13 @@ fn spawn_endless_stone_golem_timer(
 fn reset_stone_golem_timer_on_era_change(
     mut golem_timer: Option<ResMut<StoneGolemSpawnTimer>>,
     mut endless_golem_timer: Option<ResMut<EndlessStoneGolemSpawnTimer>>,
-    mut dimension_spawn_events: EventReader<DimensionSpawnEvent>,
+    mut dimension_spawn_events: MessageReader<DimensionSpawnEvent>,
     era: Option<Res<EraManager>>,
 ) {
     let Some(era) = era else {
         return;
     };
-    for event in dimension_spawn_events.iter() {
+    for event in dimension_spawn_events.read() {
         let Some(new_era) = &event.new_era else {
             continue;
         };
@@ -615,7 +633,7 @@ fn tick_spawner_timers(
     mut spawners: ResMut<GlobalSpawners>,
     night_tracker: Res<NightTracker>,
     infinite_mode: Res<InfiniteMode>,
-    mut spawn_event: EventWriter<MobSpawnEvent>,
+    mut spawn_event: MessageWriter<MobSpawnEvent>,
     mobs: Query<&Mob>,
     chaos_tracker: Res<ChaosTracker>,
     mob_spawning_paused: Res<MobSpawningPaused>,
@@ -624,7 +642,7 @@ fn tick_spawner_timers(
     if *NO_SPAWN {
         return;
     }
-    if !spawners.initial_spawn_delay.finished() {
+    if !spawners.initial_spawn_delay.is_finished() {
         spawners.initial_spawn_delay.tick(time.delta());
         return;
     }
@@ -684,9 +702,9 @@ fn tick_spawner_timers(
                 continue;
             }
             spawner.spawn_timer.tick(time.delta());
-            if spawner.spawn_timer.finished() {
+            if spawner.spawn_timer.is_finished() {
                 spawner.spawn_timer.reset();
-                spawn_event.send(MobSpawnEvent {
+                spawn_event.write(MobSpawnEvent {
                     mob: Mob::VoidWorm,
                     bypass_timers: false,
                 });
@@ -708,7 +726,7 @@ fn tick_spawner_timers(
                 }
             }
         }
-        if spawner.spawn_timer.finished() {
+        if spawner.spawn_timer.is_finished() {
             spawner.spawn_timer.reset();
             let num_to_spawn = if spawner.enemy == Mob::RedMushling {
                 1
@@ -718,7 +736,7 @@ fn tick_spawner_timers(
                     + endless_mode_spawn_count_increase as u32
             };
             for _ in 0..num_to_spawn {
-                spawn_event.send(MobSpawnEvent {
+                spawn_event.write(MobSpawnEvent {
                     mob: spawner.enemy.clone(),
                     bypass_timers: false,
                 });
@@ -740,7 +758,7 @@ fn tick_enemy_despawn_timer(
 ) {
     let NUM_TO_DESPAWN: usize = if infinite_mode.active { 20 } else { 10 };
     let NUM_TO_SKIP: usize = 20;
-    if maybe_dungeon.get_single().is_ok() {
+    if maybe_dungeon.single().is_ok() {
         return;
     }
     despawn_timer.timer.tick(time.delta());
@@ -752,18 +770,14 @@ fn tick_enemy_despawn_timer(
     } else {
         BASE_MAX_MOBS_TOTAL + night_tracker.days as i32 * 10
     };
-    let player_pos = match player_t.get_single() {
+    let player_pos = match player_t.single() {
         Ok(t) => t.translation().truncate(),
         Err(_) => return,
     };
-    let is_cap_mob = |m: &Mob| {
-        m != &Mob::RedMushling && m != &Mob::Hog && m != &Mob::Fairy && !m.is_boss()
-    };
+    let is_cap_mob =
+        |m: &Mob| m != &Mob::RedMushling && m != &Mob::Hog && m != &Mob::Fairy && !m.is_boss();
     // Combat-shrine elites still count toward the cap, but must never be culled mid-wave.
-    let count = mobs
-        .iter()
-        .filter(|(_, _, m, _)| is_cap_mob(m))
-        .count() as i32;
+    let count = mobs.iter().filter(|(_, _, m, _)| is_cap_mob(m)).count() as i32;
     if count < max_mobs {
         return;
     }
@@ -777,6 +791,6 @@ fn tick_enemy_despawn_timer(
         .collect();
     eligible.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
     for (entity, _) in eligible.into_iter().skip(NUM_TO_SKIP).take(NUM_TO_DESPAWN) {
-        commands.entity(entity).despawn_recursive();
+        commands.entity(entity).despawn();
     }
 }

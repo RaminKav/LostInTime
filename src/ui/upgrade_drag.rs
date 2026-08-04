@@ -78,7 +78,7 @@ pub struct UpgradeDragAssets<'w> {
 pub fn handle_drag_upgrade_material_on_equipment(
     mut commands: Commands,
     cursor_pos: Res<CursorPos>,
-    mut mouse_input: ResMut<Input<MouseButton>>,
+    mut mouse_input: ResMut<ButtonInput<MouseButton>>,
     ui_state: Res<State<UIState>>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     mut interactables: Query<(Entity, &mut Interactable)>,
@@ -91,12 +91,12 @@ pub fn handle_drag_upgrade_material_on_equipment(
     mut assets: UpgradeDragAssets,
     mut game_camera: Query<Entity, With<TextureCamera>>,
     player_skills: Query<&PlayerSkills, With<Player>>,
-    mut legendary_rank_events: EventWriter<
+    mut legendary_rank_events: MessageWriter<
         crate::player::combat_heirlooms::LegendaryEquipmentRankedEvent,
     >,
 ) {
     let asset_server = &assets.asset_server;
-    if !ui_state.0.is_inv_open() {
+    if !ui_state.is_inv_open() {
         return;
     }
     let mouse_activate = mouse_input.just_pressed(MouseButton::Left);
@@ -157,7 +157,9 @@ pub fn handle_drag_upgrade_material_on_equipment(
         return;
     }
 
-    let mut inv = inv.single_mut();
+    let Ok(mut inv) = inv.single_mut() else {
+        return;
+    };
 
     let target_stack_opt: Option<ItemStack> = {
         let container = inv.get_items_from_slot_type(target_slot_state.r#type);
@@ -185,7 +187,7 @@ pub fn handle_drag_upgrade_material_on_equipment(
             WHITE,
             "Max Level Reached".to_string(),
             FLOATING_TEXT,
-            bevy::render::view::RenderLayers::from_layers(&[3]),
+            bevy::camera::visibility::RenderLayers::from_layers(&[3]),
         );
         if mouse_activate {
             mouse_input.clear();
@@ -201,7 +203,7 @@ pub fn handle_drag_upgrade_material_on_equipment(
     match dragged_obj {
         WorldObject::UpgradeTome => {
             let tome_double_count = player_skills
-                .get_single()
+                .single()
                 .map(|s| s.get_count(crate::player::skills::Heirloom::TomeDoubleUpgrade))
                 .unwrap_or(0);
             let upgrade_count = 1 + tome_double_count;
@@ -239,7 +241,7 @@ pub fn handle_drag_upgrade_material_on_equipment(
                 spawn_rarity_animation(new_rarity.clone(), &mut commands, &asset_server, anim_pos);
                 if new_rarity == ItemRarity::Legendary && old_rarity != ItemRarity::Legendary {
                     legendary_rank_events
-                        .send(crate::player::combat_heirlooms::LegendaryEquipmentRankedEvent);
+                        .write(crate::player::combat_heirlooms::LegendaryEquipmentRankedEvent);
                     let mut rng = rand::thread_rng();
                     let seed = rng.gen_range(0..100000);
                     for e in game_camera.iter_mut() {
@@ -277,7 +279,7 @@ pub fn handle_drag_upgrade_material_on_equipment(
     }
 
     if stack_empty {
-        commands.entity(item_e).despawn_recursive();
+        commands.entity(item_e).despawn();
         if let Ok((_, mut parent_interactable)) = interactables.get_mut(parent_e) {
             parent_interactable.change(Interaction::None);
         }

@@ -1,6 +1,7 @@
 //! Side info boxes (`TooltipInfoBox.png` + slkscr 8.5) for tooltip glossary entries and trigger counts.
 
-use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
+use bevy::text::Justify;
+use bevy::{camera::visibility::RenderLayers, prelude::*, sprite::Anchor};
 
 use crate::{
     assets::Graphics,
@@ -36,6 +37,7 @@ pub enum TooltipDefinition {
     Speed,
     Health,
     Mana,
+    ManaRegen,
     Thorns,
     Lifesteal,
     Frail,
@@ -53,8 +55,8 @@ impl TooltipDefinition {
     pub fn lines(self) -> [&'static str; 2] {
         match self {
             TooltipDefinition::Echo => ["Echo:", "AoE damage around you"],
-            TooltipDefinition::Summon => ["Summon:", "Auto triggers an effect"],
-            TooltipDefinition::Lightning => ["Lightning:", "Strikes a random enemy"],
+            TooltipDefinition::Summon => ["Summon:", "Auto summons on a timer"],
+            TooltipDefinition::Lightning => ["Lightning Strike:", "Strikes a random enemy"],
             TooltipDefinition::IceExplosion => ["Ice Explosion:", "AoE damage at target"],
             TooltipDefinition::Poison => ["Poisoned enemies take", "damage over time"],
             TooltipDefinition::FreezeChance => ["Frozen enemies are slowed", "by 15% per stack"],
@@ -67,6 +69,7 @@ impl TooltipDefinition {
             TooltipDefinition::Frail => ["Frail enemies take", "+10% Damage per stack"],
             TooltipDefinition::Health => ["Health", "Maximum hit points."],
             TooltipDefinition::Mana => ["Mana is used to trigger", "Heirloom effects"],
+            TooltipDefinition::ManaRegen => ["Mana Regen:", "Restores mana over time"],
             TooltipDefinition::Thorns => ["Thorns returns dmg when", "hit. Scales with attack"],
             TooltipDefinition::Lifesteal => ["Lifesteal triggers heal", "for 1 HP"],
             TooltipDefinition::Dodge => ["Dodge is the chance to", "avoid hits"],
@@ -95,13 +98,36 @@ pub enum HeirloomDescLineKind {
 pub struct HeirloomDescLine {
     pub text: String,
     pub kind: HeirloomDescLineKind,
+    /// Rich spans for keyword highlighting. When `None`, spawn uses plain [`Self::text`].
+    pub spans: Option<Vec<crate::ui::desc_spans::DescSpan>>,
 }
 
 impl HeirloomDescLine {
+    fn flatten_spans(spans: &[crate::ui::desc_spans::DescSpan]) -> String {
+        use crate::ui::desc_spans::DescSpan;
+        spans
+            .iter()
+            .map(|s| match s {
+                DescSpan::Plain(t) | DescSpan::Number(t) => t.as_str(),
+                DescSpan::Keyword { text, .. } | DescSpan::Named { text, .. } => text.as_str(),
+            })
+            .collect()
+    }
+
     pub fn effect(text: impl Into<String>) -> Self {
         Self {
             text: text.into(),
             kind: HeirloomDescLineKind::Effect,
+            spans: None,
+        }
+    }
+
+    pub fn effect_spans(spans: impl IntoIterator<Item = crate::ui::desc_spans::DescSpan>) -> Self {
+        let spans: Vec<_> = spans.into_iter().collect();
+        Self {
+            text: Self::flatten_spans(&spans),
+            kind: HeirloomDescLineKind::Effect,
+            spans: Some(spans),
         }
     }
 
@@ -109,6 +135,7 @@ impl HeirloomDescLine {
         Self {
             text: text.into(),
             kind: HeirloomDescLineKind::Mana,
+            spans: None,
         }
     }
 
@@ -116,6 +143,16 @@ impl HeirloomDescLine {
         Self {
             text: text.into(),
             kind: HeirloomDescLineKind::Stat,
+            spans: None,
+        }
+    }
+
+    pub fn stat_spans(spans: impl IntoIterator<Item = crate::ui::desc_spans::DescSpan>) -> Self {
+        let spans: Vec<_> = spans.into_iter().collect();
+        Self {
+            text: Self::flatten_spans(&spans),
+            kind: HeirloomDescLineKind::Stat,
+            spans: Some(spans),
         }
     }
 
@@ -123,6 +160,16 @@ impl HeirloomDescLine {
         Self {
             text: String::new(),
             kind: HeirloomDescLineKind::Blank,
+            spans: None,
+        }
+    }
+
+    pub fn as_desc_line(&self) -> crate::ui::desc_spans::DescLine {
+        use crate::ui::desc_spans::{DescLine, DescSpan};
+        if let Some(spans) = &self.spans {
+            DescLine::spans(spans.clone())
+        } else {
+            DescLine::plain(self.text.clone())
         }
     }
 }
@@ -227,77 +274,68 @@ pub fn spawn_tooltip_info_boxes(
 
     let root = commands
         .spawn((
-            SpatialBundle::from_transform(Transform::IDENTITY),
+            (Transform::IDENTITY, Visibility::default()),
             RenderLayers::from_layers(&[3]),
             TooltipInfoBox,
             Name::new("Tooltip Info Boxes"),
         ))
         .id();
 
-    let text_style = gf::TOOLTIP_INFO_BOX.text_style(&asset_server, WHITE);
-    let text_style_trigger = gf::TOOLTIP_INFO_BOX.text_style(&asset_server, YELLOW_2);
-
     for (i, spec) in specs.iter().enumerate() {
         let local_y = start_local_y - i as f32 * (box_h + INFO_BOX_STACK_GAP);
         let lines = info_box_text_lines(&spec.kind);
 
         let box_e = commands
-            .spawn(SpriteBundle {
-                texture: graphics.get_ui_element_texture(UIElement::TooltipInfoBox),
-                sprite: Sprite {
+            .spawn((
+                Sprite {
+                    image: graphics.get_ui_element_texture(UIElement::TooltipInfoBox),
                     custom_size: Some(TOOLTIP_INFO_BOX_SIZE),
                     ..default()
                 },
-                transform: Transform::from_translation(Vec3::new(local_x, local_y, 10.)),
-                ..default()
-            })
+                Transform::from_translation(Vec3::new(local_x, local_y, 10.)),
+            ))
             .insert(RenderLayers::from_layers(&[3]))
             .insert(UiShadow::container())
-            .set_parent(root)
+            .insert(ChildOf(root))
             .id();
 
         if !lines[0].is_empty() {
             let is_trigger = lines[0].contains("Triggered");
             let y_bonus = if lines[1].is_empty() { -4. } else { 0. };
-            let style = if is_trigger {
-                text_style_trigger.clone()
-            } else {
-                text_style.clone()
-            };
             commands
-                .spawn(Text2dBundle {
-                    text: Text::from_section(lines[0].clone(), style)
-                        .with_alignment(TextAlignment::Center),
-                    text_anchor: Anchor::Center,
-                    transform: Transform {
-                        translation: Vec3::new(
-                            0.,
-                            INFO_BOX_LINE1_Y + y_bonus,
-                            2.,
-                        ),
-                        scale: gf::TOOLTIP_INFO_BOX.transform_scale(),
-                        ..default()
-                    },
-                    ..default()
-                })
+                .spawn(
+                    gf::TOOLTIP_INFO_BOX
+                        .text(
+                            &asset_server,
+                            lines[0].clone(),
+                            if is_trigger { YELLOW_2 } else { WHITE },
+                        )
+                        .justify(Justify::Center)
+                        .anchor(Anchor::CENTER)
+                        .with_transform(Transform {
+                            translation: Vec3::new(0., INFO_BOX_LINE1_Y + y_bonus, 2.),
+                            scale: gf::TOOLTIP_INFO_BOX.transform_scale(),
+                            ..default()
+                        }),
+                )
                 .insert(RenderLayers::from_layers(&[3]))
-                .set_parent(box_e);
+                .insert(ChildOf(box_e));
         }
         if !lines[1].is_empty() {
             commands
-                .spawn(Text2dBundle {
-                    text: Text::from_section(lines[1].clone(), text_style.clone())
-                        .with_alignment(TextAlignment::Center),
-                    text_anchor: Anchor::Center,
-                    transform: Transform {
-                        translation: Vec3::new(0., INFO_BOX_LINE2_Y, 2.),
-                        scale: gf::TOOLTIP_INFO_BOX.transform_scale(),
-                        ..default()
-                    },
-                    ..default()
-                })
+                .spawn(
+                    gf::TOOLTIP_INFO_BOX
+                        .text(&asset_server, lines[1].clone(), WHITE)
+                        .justify(Justify::Center)
+                        .anchor(Anchor::CENTER)
+                        .with_transform(Transform {
+                            translation: Vec3::new(0., INFO_BOX_LINE2_Y, 2.),
+                            scale: gf::TOOLTIP_INFO_BOX.transform_scale(),
+                            ..default()
+                        }),
+                )
                 .insert(RenderLayers::from_layers(&[3]))
-                .set_parent(box_e);
+                .insert(ChildOf(box_e));
         }
     }
 

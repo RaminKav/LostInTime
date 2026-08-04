@@ -3,22 +3,22 @@
 
 // NOTE: Bindings must come before functions that use them!
 #import bevy_sprite::mesh2d_functions
+#import bevy_sprite::mesh2d_vertex_output::VertexOutput
 
 // x = intensity (overall darkness 0..1), y = bubble radius (uv units),
 // z = bubble softness (0..1), w = edge darkening boost (0..1)
-@group(1) @binding(0)
+@group(#{MATERIAL_BIND_GROUP}) @binding(0)
 var<uniform> params: vec4<f32>;
 // Tint rgb in .xyz (linear 0..1); .w = saturation boost (1 = none, >1 = more vivid hue).
-@group(1) @binding(1)
+@group(#{MATERIAL_BIND_GROUP}) @binding(1)
 var<uniform> tint: vec4<f32>;
 // Player position in quad-uv space in .xy, aspect ratio (w/h) in .z, .w unused.
-@group(1) @binding(2)
+@group(#{MATERIAL_BIND_GROUP}) @binding(2)
 var<uniform> player_uv: vec4<f32>;
 
 @fragment
-fn fragment(
-    #import bevy_sprite::mesh2d_vertex_output
-    ) -> @location(0) vec4<f32> {
+fn fragment(mesh: VertexOutput) -> @location(0) vec4<f32> {
+    let uv = mesh.uv;
     let intensity = params.x;
     let radius = max(params.y, 0.001);
     let softness = clamp(params.z, 0.001, 1.0);

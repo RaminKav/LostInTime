@@ -3,12 +3,12 @@ use bevy::prelude::*;
 
 /// Parent `child` under `parent` when commands flush. If `parent` no longer exists, despawn `child`.
 pub fn safe_add_child(commands: &mut Commands, parent: Entity, child: Entity) {
-    commands.add(move |world: &mut World| {
-        if world.get_entity(parent).is_some() {
-            if let Some(mut parent_commands) = world.get_entity_mut(parent) {
+    commands.queue(move |world: &mut World| {
+        if world.get_entity(parent).is_ok() {
+            if let Ok(mut parent_commands) = world.get_entity_mut(parent) {
                 parent_commands.add_child(child);
             }
-        } else if let Some(mut child_commands) = world.get_entity_mut(child) {
+        } else if let Ok(mut child_commands) = world.get_entity_mut(child) {
             child_commands.despawn();
         }
     });
@@ -22,14 +22,14 @@ pub fn safe_set_parent(commands: &mut Commands, child: Entity, parent: Entity) {
 /// Parent each child under `parent` when commands flush. If `parent` no longer exists, despawn orphans.
 pub fn safe_push_children(commands: &mut Commands, parent: Entity, children: &[Entity]) {
     let children = children.to_vec();
-    commands.add(move |world: &mut World| {
-        if world.get_entity(parent).is_some() {
-            if let Some(mut parent_commands) = world.get_entity_mut(parent) {
-                parent_commands.push_children(&children);
+    commands.queue(move |world: &mut World| {
+        if world.get_entity(parent).is_ok() {
+            if let Ok(mut parent_commands) = world.get_entity_mut(parent) {
+                parent_commands.add_children(&children);
             }
         } else {
             for child in children {
-                if let Some(mut child_commands) = world.get_entity_mut(child) {
+                if let Ok(mut child_commands) = world.get_entity_mut(child) {
                     child_commands.despawn();
                 }
             }
@@ -37,7 +37,7 @@ pub fn safe_push_children(commands: &mut Commands, parent: Entity, children: &[E
     });
 }
 
-pub trait SafeHierarchyExt<'w, 's> {
+pub trait SafeHierarchyExt {
     /// Parent this entity under `parent` when commands flush.
     fn safe_set_parent(&mut self, parent: Entity) -> &mut Self;
 
@@ -45,15 +45,15 @@ pub trait SafeHierarchyExt<'w, 's> {
     fn safe_add_child(&mut self, child: Entity) -> &mut Self;
 }
 
-impl<'w, 's, 'a> SafeHierarchyExt<'w, 's> for EntityCommands<'w, 's, 'a> {
+impl SafeHierarchyExt for EntityCommands<'_> {
     fn safe_set_parent(&mut self, parent: Entity) -> &mut Self {
         let child = self.id();
-        self.commands().add(move |world: &mut World| {
-            if world.get_entity(parent).is_some() {
-                if let Some(mut parent_commands) = world.get_entity_mut(parent) {
+        self.commands().queue(move |world: &mut World| {
+            if world.get_entity(parent).is_ok() {
+                if let Ok(mut parent_commands) = world.get_entity_mut(parent) {
                     parent_commands.add_child(child);
                 }
-            } else if let Some(mut child_commands) = world.get_entity_mut(child) {
+            } else if let Ok(mut child_commands) = world.get_entity_mut(child) {
                 child_commands.despawn();
             }
         });
@@ -62,12 +62,12 @@ impl<'w, 's, 'a> SafeHierarchyExt<'w, 's> for EntityCommands<'w, 's, 'a> {
 
     fn safe_add_child(&mut self, child: Entity) -> &mut Self {
         let parent = self.id();
-        self.commands().add(move |world: &mut World| {
-            if world.get_entity(parent).is_some() {
-                if let Some(mut parent_commands) = world.get_entity_mut(parent) {
+        self.commands().queue(move |world: &mut World| {
+            if world.get_entity(parent).is_ok() {
+                if let Ok(mut parent_commands) = world.get_entity_mut(parent) {
                     parent_commands.add_child(child);
                 }
-            } else if let Some(mut child_commands) = world.get_entity_mut(child) {
+            } else if let Ok(mut child_commands) = world.get_entity_mut(child) {
                 child_commands.despawn();
             }
         });

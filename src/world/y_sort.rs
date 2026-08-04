@@ -6,19 +6,18 @@ pub struct YSortPlugin;
 
 impl Plugin for YSortPlugin {
     fn build(&self, app: &mut App) {
-        app.add_system(Self::y_sort);
+        app.add_systems(Update, Self::y_sort);
     }
 }
 
-#[derive(Component, Reflect, FromReflect, Default, Clone, Debug)]
+#[derive(Component, Reflect, Default, Clone, Debug)]
 #[reflect(Component)]
 pub struct YSort(pub f32);
 
 /// Depth used by [`Transparent2d`] for Y-sorted world sprites and Hanabi FX.
 pub fn y_sort_depth(bias: f32, world_y: f32, world_x: f32, anchor_offset_y: f32) -> f32 {
     bias + 900.
-        - (900.0f32
-            / (1.0f32 + (2.0f32.powf(-0.00001 * (world_y - anchor_offset_y)))))
+        - (900.0f32 / (1.0f32 + (2.0f32.powf(-0.00001 * (world_y - anchor_offset_y)))))
         - 0.00001 * world_x
 }
 

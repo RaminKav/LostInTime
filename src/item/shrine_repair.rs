@@ -1,5 +1,9 @@
+use crate::aseprite_assets::{ShrineEye, ShrineRepairRingAnim};
+use crate::aseprite_helpers::{
+    ase_animation, aseprite_bundle, collect_finished, is_paused, pause, play_loop, play_once, start,
+};
 use bevy::prelude::*;
-use bevy_aseprite::{anim::AsepriteAnimation, aseprite, AsepriteBundle};
+use bevy_aseprite_ultra::prelude::{AnimationEvents, AnimationState, AseAnimation, Aseprite};
 use rand::Rng;
 
 use crate::{
@@ -9,7 +13,7 @@ use crate::{
     inventory::{Inventory, ItemStack},
     item::{
         object_actions::ObjectAction,
-        shrine_visuals::{ShrineEye, ShrineEyeDoneVisual, ShrineEyeMarker, ShrineNeedsRepair},
+        shrine_visuals::{ShrineEyeDoneVisual, ShrineEyeMarker, ShrineNeedsRepair},
         WorldObject,
     },
     keybinds::InputMappings,
@@ -28,8 +32,6 @@ use crate::{
 use leafwing_input_manager::prelude::ActionState;
 
 use super::item_actions::ItemActionParam;
-
-aseprite!(pub ShrineRepairRingAnim, "textures/shrines/ring.aseprite");
 
 /// Average material requirement for repairing a shrine. Actual cost rolls ±25%.
 #[derive(Clone, Copy, Debug)]
@@ -84,17 +86,18 @@ impl ShrineEyeOneShot {
 /// `just_finished` alone can be missed if the last frame is shorter than a game tick
 /// (animation wraps before cleanup runs) — same fix as player one-shot anims.
 fn aseprite_tag_finished(
-    anim: &AsepriteAnimation,
+    state: &AnimationState,
     prev_frame: &mut usize,
     seen_progress: &mut bool,
+    tag_finished: bool,
 ) -> bool {
-    let current = anim.current_frame();
+    let current = usize::from(state.current_frame());
     let looped = *seen_progress && current < *prev_frame;
     if current != *prev_frame {
         *seen_progress = true;
     }
     *prev_frame = current;
-    anim.just_finished() || looped
+    tag_finished || looped
 }
 
 /// Paid + FlashGreen playing; activate the shrine only after FlashGreen finishes
@@ -273,12 +276,12 @@ pub fn roll_repair_costs(
 pub fn tile_pos_for_placed_object(
     transform: &Transform,
     anchor: Option<&SpriteAnchor>,
-    parent: Option<&Parent>,
+    parent: Option<&ChildOf>,
     chunks: &Query<&Chunk>,
 ) -> TileMapPosition {
     let feet = transform.translation.truncate() - anchor.map(|a| a.0).unwrap_or(Vec2::ZERO);
     if let Some(parent) = parent {
-        if let Ok(chunk) = chunks.get(parent.get()) {
+        if let Ok(chunk) = chunks.get(parent.parent()) {
             let local = world_pos_to_tile_pos(feet);
             return TileMapPosition::new(chunk.chunk_pos, local.tile_pos);
         }
@@ -340,7 +343,7 @@ pub fn apply_broken_shrine_state_on_spawn(
             &WorldObject,
             &Transform,
             Option<&SpriteAnchor>,
-            Option<&Parent>,
+            Option<&ChildOf>,
         ),
         Added<WorldObject>,
     >,
@@ -421,6 +424,7 @@ fn try_repair_shrine(
 
 fn set_eye_animation(
     commands: &mut Commands,
+    eye_anims: &mut Query<&mut AseAnimation, With<ShrineEyeMarker>>,
     children: Option<&Children>,
     eye_markers: &Query<(), With<ShrineEyeMarker>>,
     tag: &'static str,
@@ -430,13 +434,26 @@ fn set_eye_animation(
         return;
     };
     for child in children.iter() {
-        if eye_markers.get(*child).is_err() {
+        if eye_markers.get(child).is_err() {
             continue;
         }
-        let Some(mut eye_commands) = commands.get_entity(*child) else {
+        if let Ok(mut anim) = eye_anims.get_mut(child) {
+            if one_shot_return.is_some()
+                || matches!(
+                    tag,
+                    ShrineEye::tags::STARTUP
+                        | ShrineEye::tags::FLASH_RED
+                        | ShrineEye::tags::FLASH_GREEN
+                )
+            {
+                play_once(&mut anim, tag);
+            } else {
+                play_loop(&mut anim, tag);
+            }
+        }
+        let Ok(mut eye_commands) = commands.get_entity(child) else {
             continue;
         };
-        eye_commands.insert(AsepriteAnimation::from(tag));
         if let Some(return_to) = one_shot_return {
             eye_commands.insert(ShrineEyeOneShot::new(return_to));
         } else {
@@ -452,8 +469,8 @@ fn set_eye_animation(
 }
 
 fn despawn_repair_ring(commands: &mut Commands, ring_entity: Entity) {
-    if let Some(entity_commands) = commands.get_entity(ring_entity) {
-        entity_commands.despawn_recursive();
+    if let Ok(mut entity_commands) = commands.get_entity(ring_entity) {
+        entity_commands.despawn();
     }
 }
 
@@ -474,21 +491,22 @@ pub fn handle_broken_shrine_interact(
     >,
     player_query: Query<(&GlobalTransform, &Inventory), With<Player>>,
     eye_markers: Query<(), With<ShrineEyeMarker>>,
+    mut eye_anims: Query<&mut AseAnimation, With<ShrineEyeMarker>>,
     graphics: Res<Graphics>,
-    key_input: Res<Input<KeyCode>>,
-    mouse_input: Res<Input<MouseButton>>,
+    key_input: Res<ButtonInput<KeyCode>>,
+    mouse_input: Res<ButtonInput<MouseButton>>,
     keybinds: Res<InputMappings>,
     gamepad_action_q: Query<&ActionState<GamepadAction>, With<Player>>,
 ) {
     let gamepad_pressed = gamepad_action_q
-        .get_single()
-        .map(|a| a.just_pressed(GamepadAction::Interact))
+        .single()
+        .map(|a| a.just_pressed(&GamepadAction::Interact))
         .unwrap_or(false);
     if !keybinds.check_interact_input(&key_input, &mouse_input) && !gamepad_pressed {
         return;
     }
 
-    let Ok((player_t, inv)) = player_query.get_single() else {
+    let Ok((player_t, inv)) = player_query.single() else {
         return;
     };
     let player_pos = player_t.translation().truncate();
@@ -508,6 +526,7 @@ pub fn handle_broken_shrine_interact(
 
         set_eye_animation(
             &mut commands,
+            &mut eye_anims,
             children,
             &eye_markers,
             ShrineEye::tags::STARTUP,
@@ -517,16 +536,17 @@ pub fn handle_broken_shrine_interact(
         let ring_entity = commands
             .spawn((
                 ShrineRepairRing,
-                AsepriteBundle {
-                    aseprite: ring_handle.clone(),
-                    animation: AsepriteAnimation::from(ShrineRepairRingAnim::tags::RING),
-                    transform: Transform::from_translation(Vec3::new(
+                aseprite_bundle(
+                    ring_handle.clone(),
+                    ShrineRepairRingAnim::tags::RING,
+                    Transform::from_translation(Vec3::new(
                         -anchor.0.x,
                         -anchor.0.y,
                         SHRINE_REPAIR_RING_LOCAL_Z,
                     )),
-                    ..default()
-                },
+                    Visibility::Inherited,
+                    false,
+                ),
                 Name::new("ShrineRepairRing"),
             ))
             .id();
@@ -551,15 +571,18 @@ pub fn tick_shrine_repair_channel(
         &WorldObject,
         Option<&Children>,
     )>,
-    eye_anims: Query<&AsepriteAnimation, With<ShrineEyeMarker>>,
+    eye_states: Query<(Entity, &AnimationState), With<ShrineEyeMarker>>,
     eye_markers: Query<(), With<ShrineEyeMarker>>,
+    mut eye_anims: Query<&mut AseAnimation, With<ShrineEyeMarker>>,
+    mut finished_events: MessageReader<AnimationEvents>,
     mut player_query: Query<(&GlobalTransform, &mut Inventory), With<Player>>,
     mut game: GameParam,
 ) {
-    let Ok((player_t, mut inv)) = player_query.get_single_mut() else {
+    let Ok((player_t, mut inv)) = player_query.single_mut() else {
         return;
     };
     let player_pos = player_t.translation().truncate();
+    let finished = collect_finished(&mut finished_events);
 
     for (shrine_e, mut channel, costs, obj, children) in channels.iter_mut() {
         let left_circle = player_pos.distance(channel.shrine_feet_pos) > SHRINE_REPAIR_RING_RADIUS;
@@ -567,13 +590,18 @@ pub fn tick_shrine_repair_channel(
         let mut startup_finished = false;
         if let Some(children) = children {
             for child in children.iter() {
-                if eye_markers.get(*child).is_err() {
+                if eye_markers.get(child).is_err() {
                     continue;
                 }
-                if let Ok(anim) = eye_anims.get(*child) {
+                if let Ok((eye_entity, state)) = eye_states.get(child) {
                     let mut prev = channel.eye_prev_frame;
                     let mut seen = channel.eye_seen_progress;
-                    startup_finished = aseprite_tag_finished(anim, &mut prev, &mut seen);
+                    startup_finished = aseprite_tag_finished(
+                        state,
+                        &mut prev,
+                        &mut seen,
+                        finished.contains(&eye_entity),
+                    );
                     channel.eye_prev_frame = prev;
                     channel.eye_seen_progress = seen;
                 }
@@ -586,6 +614,7 @@ pub fn tick_shrine_repair_channel(
             commands.entity(shrine_e).remove::<ShrineRepairChannel>();
             set_eye_animation(
                 &mut commands,
+                &mut eye_anims,
                 children,
                 &eye_markers,
                 ShrineEye::tags::FLASH_RED,
@@ -612,6 +641,7 @@ pub fn tick_shrine_repair_channel(
             commands.entity(shrine_e).remove::<ShrineRepairChannel>();
             set_eye_animation(
                 &mut commands,
+                &mut eye_anims,
                 children,
                 &eye_markers,
                 ShrineEye::tags::FLASH_RED,
@@ -623,6 +653,7 @@ pub fn tick_shrine_repair_channel(
         despawn_repair_ring(&mut commands, channel.ring_entity);
         set_eye_animation(
             &mut commands,
+            &mut eye_anims,
             children,
             &eye_markers,
             ShrineEye::tags::FLASH_GREEN,
@@ -642,23 +673,23 @@ pub fn tick_shrine_repair_channel(
 pub fn sync_shrine_repair_anim_pause(
     client_state: Res<State<ClientState>>,
     repairing: Query<&Children, Or<(With<ShrineRepairChannel>, With<PendingShrineRepairFinish>)>>,
-    mut anims: Query<&mut AsepriteAnimation>,
+    mut anims: Query<&mut AseAnimation>,
     rings: Query<(), With<ShrineRepairRing>>,
     eyes: Query<(), With<ShrineEyeMarker>>,
 ) {
-    let playing = client_state.0 == ClientState::Unpaused;
+    let playing = *client_state.get() == ClientState::Unpaused;
     for children in repairing.iter() {
         for child in children.iter() {
-            if rings.get(*child).is_err() && eyes.get(*child).is_err() {
+            if rings.get(child).is_err() && eyes.get(child).is_err() {
                 continue;
             }
-            let Ok(mut anim) = anims.get_mut(*child) else {
+            let Ok(mut anim) = anims.get_mut(child) else {
                 continue;
             };
             if playing {
-                anim.play();
+                start(&mut anim);
             } else {
-                anim.pause();
+                pause(&mut anim);
             }
         }
     }
@@ -670,11 +701,11 @@ pub struct PendingMerchantOpenAfterRepair;
 
 pub fn open_merchant_after_repair(
     mut commands: Commands,
-    pending: Query<(Entity, &crate::ui::EssenceShopChoices), With<PendingMerchantOpenAfterRepair>>,
+    pending: Query<(Entity, &crate::ui::MerchantShop), With<PendingMerchantOpenAfterRepair>>,
     mut next_inv_state: ResMut<NextState<crate::ui::UIState>>,
 ) {
-    for (entity, choices) in pending.iter() {
-        commands.insert_resource(choices.clone());
+    for (entity, shop) in pending.iter() {
+        commands.insert_resource(shop.to_resource());
         commands.insert_resource(crate::ui::MerchantShopOpenLock(Timer::from_seconds(
             0.45,
             TimerMode::Once,
@@ -693,23 +724,26 @@ pub fn finish_shrine_eye_one_shots(
     mut eyes: Query<
         (
             Entity,
-            &Parent,
-            &mut AsepriteAnimation,
+            &ChildOf,
+            &mut AseAnimation,
+            &AnimationState,
             &mut ShrineEyeOneShot,
         ),
         With<ShrineEyeMarker>,
     >,
+    mut finished_events: MessageReader<AnimationEvents>,
 ) {
-    for (entity, _parent, mut anim, mut one_shot) in eyes.iter_mut() {
+    let finished = collect_finished(&mut finished_events);
+    for (entity, _parent, mut anim, state, mut one_shot) in eyes.iter_mut() {
         let mut prev = one_shot.prev_frame;
         let mut seen = one_shot.seen_progress;
-        if !aseprite_tag_finished(&anim, &mut prev, &mut seen) {
+        if !aseprite_tag_finished(state, &mut prev, &mut seen, finished.contains(&entity)) {
             one_shot.prev_frame = prev;
             one_shot.seen_progress = seen;
             continue;
         }
         let return_to = one_shot.return_to;
-        *anim = AsepriteAnimation::from(return_to);
+        play_loop(&mut anim, return_to);
         if return_to == ShrineEye::tags::DONE {
             commands.entity(entity).insert(ShrineEyeDoneVisual);
         } else {
@@ -731,7 +765,7 @@ pub fn activate_pending_shrine_after_repair(
     mut proto_param: ProtoParam,
     mut item_action_param: ItemActionParam,
 ) {
-    let Ok(mut inv) = player_query.get_single_mut() else {
+    let Ok(mut inv) = player_query.single_mut() else {
         return;
     };
 
@@ -740,7 +774,7 @@ pub fn activate_pending_shrine_after_repair(
         if let Ok(children) = children_q.get(shrine_e) {
             if children
                 .iter()
-                .any(|child| eye_one_shots.get(*child).is_ok())
+                .any(|child| eye_one_shots.get(child).is_ok())
             {
                 continue;
             }

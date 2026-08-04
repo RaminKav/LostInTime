@@ -1,3 +1,4 @@
+use crate::aseprite_assets::{FairyPetSprite, SlimePetSprite};
 use bevy::prelude::*;
 use bevy_rapier2d::prelude::Collider;
 use serde::{Deserialize, Serialize};
@@ -11,10 +12,23 @@ use crate::{
     player::Player,
     proto::proto_param::ProtoParam,
     world::y_sort::YSort,
-    FairyPetSprite, SlimePetSprite, DEBUG,
+    DEBUG,
 };
 
-#[derive(Component, Reflect, FromReflect, Default, EnumIter, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, Copy)]
+#[derive(
+    Component,
+    Reflect,
+    Default,
+    EnumIter,
+    Clone,
+    Debug,
+    PartialEq,
+    Eq,
+    Hash,
+    Serialize,
+    Deserialize,
+    Copy,
+)]
 #[reflect(Component)]
 pub enum Pet {
     #[default]
@@ -98,7 +112,7 @@ impl Pet {
     }
 }
 
-#[derive(Component, Reflect, FromReflect, Default)]
+#[derive(Component, Reflect, Default)]
 #[reflect(Component)]
 pub struct PetState {
     pub max_distance_from_player: f32,
@@ -112,7 +126,7 @@ pub struct PetState {
     pub projectile: Projectile,
     pub is_following_player: bool,
 }
-#[derive(Clone)]
+#[derive(Clone, Message)]
 pub struct UpdatePetWeaponEvent;
 
 impl PetState {
@@ -155,12 +169,12 @@ impl PetState {
 
 pub fn handle_inv_change_pet_wep_update(
     inv_updates: Query<&Inventory, Changed<Inventory>>,
-    mut events: EventWriter<UpdatePetWeaponEvent>,
+    mut events: MessageWriter<UpdatePetWeaponEvent>,
 ) {
     if inv_updates.is_empty() {
         return;
     }
-    events.send(UpdatePetWeaponEvent);
+    events.write(UpdatePetWeaponEvent);
 }
 
 pub fn find_new_target(
@@ -169,9 +183,12 @@ pub fn find_new_target(
     player_txfm: Query<&GlobalTransform, With<Player>>,
 ) {
     for (pet_transform, mut pet_state) in pets.iter_mut() {
-        let distance_from_player = pet_transform
-            .translation
-            .distance(player_txfm.single().translation());
+        let distance_from_player = pet_transform.translation.distance(
+            player_txfm
+                .single()
+                .map(|t| t.translation())
+                .unwrap_or(Vec3::ZERO),
+        );
         if distance_from_player > pet_state.max_distance_from_player {
             pet_state.current_target = None;
             continue;
@@ -205,7 +222,7 @@ pub fn use_weapon(
         (With<Pet>, Without<Player>, Without<Mob>),
     >,
     mobs: Query<(&Transform, Entity), (With<Mob>, Without<Pet>, Without<Player>)>,
-    mut ranged_attack_event: EventWriter<RangedAttackEvent>,
+    mut ranged_attack_event: MessageWriter<RangedAttackEvent>,
     time: Res<Time>,
 ) {
     for (pet_e, pet_transform, mut pet_state) in pets.iter_mut() {
@@ -224,8 +241,8 @@ pub fn use_weapon(
 
         let delta = target_transform.translation - pet_transform.translation;
         let dir = delta.normalize_or_zero().truncate();
-        if pet_state.attack_cooldown.finished() {
-            ranged_attack_event.send(RangedAttackEvent {
+        if pet_state.attack_cooldown.is_finished() {
+            ranged_attack_event.write(RangedAttackEvent {
                 projectile: pet_state.projectile.clone(),
                 direction: dir,
                 from_enemy: false,
@@ -246,12 +263,13 @@ pub fn use_weapon(
     }
 }
 
-pub fn test_spawn_pet(mut commands: Commands, _proto: ProtoParam, keys: Res<Input<KeyCode>>) {
-    if !keys.just_pressed(KeyCode::Z) || !*DEBUG {
+pub fn test_spawn_pet(mut commands: Commands, _proto: ProtoParam, keys: Res<ButtonInput<KeyCode>>) {
+    if !keys.just_pressed(KeyCode::KeyZ) || !*DEBUG {
         return;
     }
     commands.spawn((
         Pet::Slime,
+        PetState::default(),
         YSort(0.001),
         Collider::capsule(Vec2::new(0., -6.), Vec2::new(0., -6.), 5.0),
         Transform::from_xyz(0.0, 0.0, 1.0),
@@ -262,7 +280,7 @@ pub fn test_spawn_pet(mut commands: Commands, _proto: ProtoParam, keys: Res<Inpu
 pub fn configure_pet_on_spawn(
     mut commands: Commands,
     new_pets: Query<(Entity, &Pet), Added<Pet>>,
-    mut events: EventWriter<UpdatePetWeaponEvent>,
+    mut events: MessageWriter<UpdatePetWeaponEvent>,
 ) {
     for (pet_entity, pet) in new_pets.iter() {
         let pet_state = PetState {
@@ -314,7 +332,7 @@ pub fn configure_pet_on_spawn(
             crate::pets::state::Pet::Goliath => {}
         }
 
-        events.send(UpdatePetWeaponEvent);
+        events.write(UpdatePetWeaponEvent);
     }
 }
 
@@ -330,12 +348,14 @@ pub fn update_pet_weapon_on_inv_change(
     mut pets: Query<&mut PetState, With<Pet>>,
     player_inventory: Query<&Inventory>,
     proto: ProtoParam,
-    mut events: EventReader<UpdatePetWeaponEvent>,
+    mut events: MessageReader<UpdatePetWeaponEvent>,
     blessings: Query<&OwnedBlessings>,
 ) {
-    for _ in events.iter() {
-        if let Ok(inventory) = player_inventory.get_single() {
-            let blessings = blessings.single();
+    for _ in events.read() {
+        if let Ok(inventory) = player_inventory.single() {
+            let Ok(blessings) = blessings.single() else {
+                return;
+            };
             let attack_speed_buff = if blessings.has_blessing(Blessing::PetAttackSpeed) {
                 0.75
             } else {

@@ -1,22 +1,20 @@
 use bevy::{
+    camera::visibility::RenderLayers,
+    math::primitives::Rectangle,
+    mesh::Mesh2d,
     prelude::*,
-    reflect::TypeUuid,
     render::{
-        mesh::MeshVertexBufferLayout,
+        mesh::MeshVertexBufferLayoutRef,
         render_resource::{
             AsBindGroup, BlendComponent, BlendFactor, BlendOperation, BlendState,
-            RenderPipelineDescriptor, ShaderRef, SpecializedMeshPipelineError,
+            RenderPipelineDescriptor, SpecializedMeshPipelineError,
         },
-        view::RenderLayers,
     },
-    sprite::{Material2d, Material2dKey, Mesh2dHandle},
+    shader::ShaderRef,
+    sprite_render::{AlphaMode2d, Material2d, Material2dKey, MeshMaterial2d},
 };
 
-use crate::{
-    attributes::hunger::Hunger,
-    player::Player,
-    ScreenResolution,
-};
+use crate::{attributes::hunger::Hunger, player::Player, ScreenResolution};
 
 const SCREEN_BLEND: BlendState = BlendState {
     color: BlendComponent {
@@ -38,9 +36,13 @@ impl Material2d for ScreenEffectMaterial {
         "shaders/screen_effect.wgsl".into()
     }
 
+    fn alpha_mode(&self) -> AlphaMode2d {
+        AlphaMode2d::Blend
+    }
+
     fn specialize(
         descriptor: &mut RenderPipelineDescriptor,
-        _layout: &MeshVertexBufferLayout,
+        _layout: &MeshVertexBufferLayoutRef,
         _key: Material2dKey<Self>,
     ) -> Result<(), SpecializedMeshPipelineError> {
         if let Some(fragment) = &mut descriptor.fragment {
@@ -53,8 +55,7 @@ impl Material2d for ScreenEffectMaterial {
     }
 }
 
-#[derive(AsBindGroup, TypeUuid, Debug, Clone)]
-#[uuid = "3e77336e-4012-4d79-b559-7267288b4d16"]
+#[derive(Asset, TypePath, AsBindGroup, Debug, Clone)]
 pub struct ScreenEffectMaterial {
     #[uniform(0)]
     pub opacity: f32,
@@ -76,7 +77,7 @@ pub fn setup_screen_effects(
         return;
     }
 
-    let Ok(hunger) = player_stats.get_single() else {
+    let Ok(hunger) = player_stats.single() else {
         return;
     };
     let hunger_percent = (hunger.current as f32 / hunger.max as f32).clamp(0.0, 1.0);
@@ -87,28 +88,25 @@ pub fn setup_screen_effects(
         opacity: (1.0 - hunger_percent).clamp(0.0, 1.0),
     });
     commands.spawn((
-        Mesh2dHandle::from(meshes.add(Mesh::from(shape::Quad {
-            size: Vec2::new(res.game_width, res.game_height),
-            ..Default::default()
-        }))),
-        hunger_effect_material.clone(),
+        Mesh2d(meshes.add(Mesh::from(Rectangle::new(res.game_width, res.game_height)))),
+        MeshMaterial2d(hunger_effect_material.clone()),
         HungerScreenEffect,
         RenderLayers::from_layers(&[3]),
         Name::new("hunger screen effect"),
-        SpatialBundle::from_transform(Transform::from_xyz(0., 0., 1.)),
+        (Transform::from_xyz(0., 0., 1.), Visibility::default()),
     ));
 }
 
 pub fn handle_screen_effects(
     player_stats: Query<&Hunger, With<Player>>,
     mut materials: ResMut<Assets<ScreenEffectMaterial>>,
-    hunger_effect: Query<&Handle<ScreenEffectMaterial>, With<HungerScreenEffect>>,
+    hunger_effect: Query<&MeshMaterial2d<ScreenEffectMaterial>, With<HungerScreenEffect>>,
 ) {
-    let Ok(hunger) = player_stats.get_single() else {
+    let Ok(hunger) = player_stats.single() else {
         return;
     };
-    if let Ok(hunger_mat_handle) = hunger_effect.get_single() {
-        if let Some(hunger_effect_material) = materials.get_mut(hunger_mat_handle) {
+    if let Ok(hunger_mat_handle) = hunger_effect.single() {
+        if let Some(mut hunger_effect_material) = materials.get_mut(&hunger_mat_handle.0) {
             let hunger_percent = (hunger.current as f32 / hunger.max as f32).clamp(0.0, 1.0);
             hunger_effect_material.opacity = (1.0 - hunger_percent).clamp(0.0, 1.0);
         }

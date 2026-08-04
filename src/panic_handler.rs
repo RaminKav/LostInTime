@@ -1,6 +1,9 @@
-//! A wrapper for panics using Bevy's plugin system.
+//! Panic hook plugin: log the panic, then hard-abort the process.
 //!
-//! On supported platforms (windows, macos, linux) will produce a popup using the `msgbox` crate in addition to writing via `log::error!`, or if `bevy::log::LogPlugin` is not enabled, `stderr`.
+//! We intentionally do **not** show a native modal dialog here. On macOS, AppKit alerts
+//! must run on the main thread; showing one from a panicking compute-pool thread (common
+//! for Bevy system-param failures) can wedge the process so hard Force Quit fails.
+//! Waiting on that dialog before abort made the window sit in "Not Responding".
 
 #![warn(clippy::all, clippy::pedantic, clippy::nursery, clippy::cargo)]
 
@@ -8,8 +11,14 @@ use std::sync::Arc;
 
 use bevy::prelude::*;
 
-pub trait PanicHandleFn<Res>: Fn(&std::panic::PanicInfo) -> Res + Send + Sync + 'static {}
-impl<Res, T: Fn(&std::panic::PanicInfo) -> Res + Send + Sync + 'static> PanicHandleFn<Res> for T {}
+pub trait PanicHandleFn<Res>:
+    Fn(&std::panic::PanicHookInfo) -> Res + Send + Sync + 'static
+{
+}
+impl<Res, T: Fn(&std::panic::PanicHookInfo) -> Res + Send + Sync + 'static> PanicHandleFn<Res>
+    for T
+{
+}
 
 #[derive(Default)]
 pub struct PanicHandlerBuilder {
@@ -24,7 +33,7 @@ impl PanicHandlerBuilder {
         PanicHandler {
             custom_title: {
                 self.custom_name.unwrap_or_else(|| {
-                    Arc::new(|_: &std::panic::PanicInfo| "Fatal Error".to_owned())
+                    Arc::new(|_: &std::panic::PanicHookInfo| "Fatal Error".to_owned())
                 })
             },
             custom_body: {
@@ -47,35 +56,35 @@ impl PanicHandlerBuilder {
     }
 
     #[must_use]
-    /// After the popup is closed, the previously existing panic hook will be called
+    /// After logging, the previously existing panic hook will be called (then we abort).
     pub fn take_call_from_existing(mut self) -> Self {
         self.custom_hook = Some(Arc::new(std::panic::take_hook()));
         self
     }
 
     #[must_use]
-    /// After the popup is closed, this function will be called
+    /// After logging, this function will be called (then we abort).
     pub fn set_call_func(mut self, call_func: impl PanicHandleFn<()>) -> Self {
         self.custom_hook = Some(Arc::new(call_func));
         self
     }
 
     #[must_use]
-    /// The popup title will be set to the result of this function
+    /// The log title will be set to the result of this function
     pub fn set_title_func(mut self, title_func: impl PanicHandleFn<String>) -> Self {
         self.custom_name = Some(Arc::new(title_func));
         self
     }
 
     #[must_use]
-    /// The popup body will be set to the result of this function
+    /// The log body will be set to the result of this function
     pub fn set_body_func(mut self, body_func: impl PanicHandleFn<String>) -> Self {
         self.custom_body = Some(Arc::new(body_func));
         self
     }
 }
 
-/// Bevy plugin that opens a popup window on panic & logs an error
+/// Bevy plugin that logs panics and aborts the process.
 #[derive(Clone)]
 pub struct PanicHandler {
     pub custom_title: Arc<dyn PanicHandleFn<String>>,
@@ -94,31 +103,21 @@ impl PanicHandler {
 impl Plugin for PanicHandler {
     fn build(&self, _: &mut App) {
         let handler = self.clone();
+        // Do not chain the previous hook — some default hooks try to unwind or touch the
+        // runtime after a pooled-thread panic and can deadlock with winit/Metal.
+        let _previous = std::panic::take_hook();
         std::panic::set_hook(Box::new(move |info| {
             let title_string = (handler.custom_title)(info);
             let info_string = (handler.custom_body)(info);
 
-            // Known limitations: Logging in tests prints to stdout immediately.
-            // This will print duplicate messages to stdout if the default panic hook is being used & env_logger is initialized.
             bevy::log::error!("{title_string}\n{info_string}");
-
-            // Don't interrupt test execution with a popup, and dont try on unsupported platforms.
-            #[cfg(all(
-                not(test),
-                any(target_os = "windows", target_os = "macos", target_os = "linux")
-            ))]
-            {
-                if let Err(e) = native_dialog::MessageDialog::new()
-                    .set_title(&title_string)
-                    .set_text(&info_string)
-                    .set_type(native_dialog::MessageType::Error)
-                    .show_alert()
-                {
-                    bevy::log::error!("{e}");
-                }
-            }
+            eprintln!("{title_string}\n{info_string}");
+            eprintln!("(aborting process — no modal dialog; see log above)");
 
             (handler.custom_hook)(info);
+
+            // Never return into a half-dead Bevy/winit frame.
+            std::process::abort();
         }));
     }
 }

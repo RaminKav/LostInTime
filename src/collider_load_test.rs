@@ -70,19 +70,22 @@ impl Plugin for ColliderLoadTestPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<ColliderLoadTestState>()
             .init_resource::<ColliderLoadTestActive>()
-            .add_system(
+            .add_systems(
+                Update,
                 collider_load_test_spawn_wave
-                    .in_set(OnUpdate(GameState::Main))
+                    .run_if(in_state(GameState::Main))
                     .run_if(is_not_paused),
             )
-            .add_system(
+            .add_systems(
+                Update,
                 tick_collider_load_test_kill
-                    .in_set(OnUpdate(GameState::Main))
+                    .run_if(in_state(GameState::Main))
                     .after(collider_load_test_spawn_wave),
             )
-            .add_system(
+            .add_systems(
+                Update,
                 tick_collider_load_test_despawn
-                    .in_set(OnUpdate(GameState::Main))
+                    .run_if(in_state(GameState::Main))
                     .after(collider_load_test_spawn_wave),
             );
         info!(
@@ -105,10 +108,10 @@ fn collider_load_test_spawn_wave(
     if !active.active {
         return;
     }
-    if dungeon.get_single().is_ok() {
+    if dungeon.single().is_ok() {
         return;
     }
-    let Ok(player_txfm) = player.get_single() else {
+    let Ok(player_txfm) = player.single() else {
         return;
     };
     let player_pos = player_txfm.translation().truncate();
@@ -177,13 +180,13 @@ fn collider_load_test_spawn_wave(
 fn tick_collider_load_test_kill(
     time: Res<Time>,
     mut q: Query<(Entity, &mut ColliderLoadTestKillTimer)>,
-    mut hit_events: EventWriter<HitEvent>,
+    mut hit_events: MessageWriter<HitEvent>,
     mut commands: Commands,
 ) {
     for (entity, mut kill) in q.iter_mut() {
         kill.timer.tick(time.delta());
-        if kill.timer.finished() {
-            hit_events.send(HitEvent {
+        if kill.timer.is_finished() {
+            hit_events.write(HitEvent {
                 hit_entity: entity,
                 damage: 999,
                 dir: Vec2::X,
@@ -211,9 +214,9 @@ fn tick_collider_load_test_despawn(
 ) {
     for (entity, mut despawn) in q.iter_mut() {
         despawn.timer.tick(time.delta());
-        if despawn.timer.finished() {
-            if let Some(ec) = commands.get_entity(entity) {
-                ec.despawn_recursive();
+        if despawn.timer.is_finished() {
+            if let Ok(mut ec) = commands.get_entity(entity) {
+                ec.despawn();
             }
         }
     }

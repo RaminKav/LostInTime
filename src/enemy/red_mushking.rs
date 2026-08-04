@@ -1,3 +1,7 @@
+use crate::aseprite_assets::RedMushking;
+use crate::aseprite_helpers::{
+    ase_animation, aseprite_bundle, collect_finished, is_paused, pause, play_loop, play_once, start,
+};
 use crate::{
     combat::{
         combat_helpers::DespawnTimer,
@@ -19,16 +23,14 @@ use crate::{
     GameParam, TextureCamera,
 };
 use bevy::prelude::*;
+use bevy_aseprite_ultra::prelude::{AnimationEvents, AnimationState, AseAnimation, Aseprite};
 use bevy_rapier2d::{
     control::KinematicCharacterController,
     geometry::{Collider, Sensor},
     prelude::{CollisionGroups, Group},
 };
 use rand::Rng;
-use seldom_state::{
-    prelude::StateMachine,
-    trigger::{BoolTrigger, Trigger},
-};
+use seldom_state::prelude::StateMachine;
 
 use crate::{
     ai::{EnemyAttackCooldown, FollowState, LeapAttackState},
@@ -41,13 +43,11 @@ use crate::{
     ui::{boss_warning_indicator_color, CheatSettings},
     PLAYER_MOVE_SPEED,
 };
-use bevy::prelude::shape;
-use bevy::sprite::{ColorMaterial, MaterialMesh2dBundle};
-use bevy_aseprite::{anim::AsepriteAnimation, aseprite, AsepriteBundle};
+use bevy::math::primitives;
+use bevy::sprite_render::{ColorMaterial, MeshMaterial2d};
 
 use super::{FollowSpeed, LeapAttack, Mob, MobIsAttacking};
 
-aseprite!(pub RedMushking, "textures/redmushking/red_mushking.ase");
 // Spawn as IDLE
 // Always Aggro on player, follow using WALK, unless player out of range from spawn shrine
 // perform jump attack in 2 variations
@@ -112,9 +112,6 @@ pub fn handle_new_red_mushking_state_machine(
             continue;
         }
         let mut e_cmds = commands.entity(e);
-        let mut animation = AsepriteAnimation::from(RedMushking::tags::IDLE);
-        animation.play();
-
         let shrine_pos = tile_pos_to_world_pos(
             *game
                 .world_obj_cache
@@ -124,14 +121,14 @@ pub fn handle_new_red_mushking_state_machine(
             false,
         );
         mover.filter_groups = Some(CollisionGroups::new(Group::NONE, Group::NONE));
-
         e_cmds
-            .insert(AsepriteBundle {
-                aseprite: asset_server.load(RedMushking::PATH),
-                animation,
-                transform: *transform,
-                ..Default::default()
-            })
+            .insert(aseprite_bundle(
+                asset_server.load(RedMushking::PATH),
+                RedMushking::tags::IDLE,
+                *transform,
+                Visibility::Inherited,
+                false,
+            ))
             .insert(FollowState {
                 target: game.game.player,
                 curr_delta: None,
@@ -149,8 +146,8 @@ pub fn handle_new_red_mushking_state_machine(
         let state_machine = StateMachine::default()
             .set_trans_logging(false)
             .with_state::<DeathState>()
-            .trans::<FollowState>(
-                JumpTimer,
+            .trans::<FollowState, _>(
+                jump_timer,
                 LeapAttackState {
                     target: game.game.player,
                     attack_startup_timer: Timer::from_seconds(leap_attack.startup, TimerMode::Once),
@@ -167,16 +164,19 @@ pub fn handle_new_red_mushking_state_machine(
                     attack_preview_entity: None,
                 },
             )
-            .trans::<FollowState>(SummonTrigger, summon_attack_state(boss_summon_index))
-            .trans::<FollowState>(AoEAttackTimerTrigger, aoe_attack_state(boss_summon_index));
-        // .trans::<FollowState>(
-        //     Trigger::not(ShrineLOS {
+            .trans::<FollowState, _>(summon_trigger, summon_attack_state(boss_summon_index))
+            .trans::<FollowState, _>(
+                aoe_attack_timer_trigger,
+                aoe_attack_state(boss_summon_index),
+            );
+        // .trans::<FollowState, _>(
+        //     (ShrineLOS {
         //         range: TILE_SIZE.x * 16.,
         //         shrine_pos,
         //     }),
         //     ReturnToShrineState,
         // )
-        // .trans::<ReturnToShrineState>(
+        // .trans::<ReturnToShrineState, _>(
         //     HurtByPlayer,
         //     FollowState {
         //         target: game.game.player,
@@ -262,7 +262,8 @@ pub fn new_leap_attack(
         &mut KinematicCharacterController,
         &mut LeapAttackState,
         &FollowSpeed,
-        &mut AsepriteAnimation,
+        &mut AseAnimation,
+        &AnimationState,
         &mut AttackCollider,
     )>,
     mut commands: Commands,
@@ -280,16 +281,17 @@ pub fn new_leap_attack(
         mut leap_attack,
         follow_speed,
         mut anim_state,
+        anim_frame_state,
         mut att_collider,
     ) in attacks.iter_mut()
     {
         // Debug: Log timer states
         let startup_elapsed = leap_attack.attack_startup_timer.elapsed_secs();
         let startup_duration = leap_attack.attack_startup_timer.duration().as_secs_f32();
-        let startup_finished = leap_attack.attack_startup_timer.finished();
-        let duration_finished = leap_attack.attack_duration_timer.finished();
+        let startup_finished = leap_attack.attack_startup_timer.is_finished();
+        let duration_finished = leap_attack.attack_duration_timer.is_finished();
         const SLAM_TIME: f32 = 0.55;
-        let has_slammed = leap_attack.attack_duration_timer.percent() >= SLAM_TIME;
+        let has_slammed = leap_attack.attack_duration_timer.fraction() >= SLAM_TIME;
 
         // PHASE 1: Startup (wind-up animation)
         // Tick startup timer and wait for it to finish
@@ -297,10 +299,9 @@ pub fn new_leap_attack(
             leap_attack.attack_startup_timer.tick(time.delta());
 
             // Set animation if not already set
-            let frame = anim_state.current_frame();
+            let frame = usize::from(anim_frame_state.current_frame());
             if !(14..=28).contains(&frame) {
-                *anim_state = AsepriteAnimation::from(RedMushking::tags::ATTACK_HOP);
-                anim_state.play();
+                play_once(&mut anim_state, RedMushking::tags::ATTACK_HOP);
             }
             continue;
         }
@@ -328,25 +329,15 @@ pub fn new_leap_attack(
                 "Leap Attack PHASE 1 START: direction {:?}, distance {:.1}, startup: {:.3}/{:.3}s",
                 leap_attack.dir, distance, startup_elapsed, startup_duration
             );
+            let preview_material = materials.add(ColorMaterial::from(
+                boss_warning_indicator_color(&cheat_settings),
+            ));
             let preview_entity = commands
                 .spawn((
-                    MaterialMesh2dBundle {
-                        mesh: meshes
-                            .add(
-                                shape::Circle {
-                                    radius: 40.0, // 40px diameter
-                                    ..Default::default()
-                                }
-                                .into(),
-                            )
-                            .into(),
-                        material: materials.add(ColorMaterial::from(boss_warning_indicator_color(
-                            &cheat_settings,
-                        ))),
-                        transform: Transform {
-                            translation: target_translation + Vec3::new(0., -15., 100.),
-                            ..default()
-                        },
+                    Mesh2d(meshes.add(Mesh::from(Circle::new(40.0)))),
+                    MeshMaterial2d(preview_material),
+                    Transform {
+                        translation: target_translation + Vec3::new(0., -15., 100.),
                         ..default()
                     },
                     BossAttackPreview,
@@ -371,7 +362,7 @@ pub fn new_leap_attack(
 
                 let hitbox = commands
                     .spawn((
-                        TransformBundle::default(),
+                        Transform::default(),
                         *attack,
                         leap_attack.clone(),
                         Collider::capsule(Vec2::new(-17., -15.), Vec2::new(17., -15.), 20.),
@@ -397,8 +388,8 @@ pub fn new_leap_attack(
                     });
                 }
                 if let Some(entity) = leap_attack.attack_preview_entity {
-                    if let Some(entity_commands) = commands.get_entity(entity) {
-                        entity_commands.despawn_recursive();
+                    if let Ok(mut entity_commands) = commands.get_entity(entity) {
+                        entity_commands.despawn();
                     }
                 }
             }
@@ -412,7 +403,7 @@ pub fn new_leap_attack(
                     let leap_speed = dir.length() / leap_duration;
                     let normalized_dir = dir.normalize_or_zero();
 
-                    kcc.translation = Some(normalized_dir * leap_speed * time.delta_seconds());
+                    kcc.translation = Some(normalized_dir * leap_speed * time.delta_secs());
                 }
             }
             continue;
@@ -426,12 +417,11 @@ pub fn new_leap_attack(
         }
 
         // Reset animation to WALK
-        *anim_state = AsepriteAnimation::from(RedMushking::tags::WALK);
-        anim_state.play();
+        play_loop(&mut anim_state, RedMushking::tags::WALK);
 
         // Despawn hitbox
         if let Some(hitbox) = att_collider.0.take() {
-            commands.entity(hitbox).despawn_recursive();
+            commands.entity(hitbox).despawn();
         }
 
         // Transition back to FollowState
@@ -455,7 +445,7 @@ pub fn summon_attack(
     mut attacks: Query<(
         Entity,
         &mut SummonAttackState,
-        &mut AsepriteAnimation,
+        &mut AseAnimation,
         &GlobalTransform,
         &FollowSpeed,
         &mut AttackRotation,
@@ -464,17 +454,19 @@ pub fn summon_attack(
     time: Res<Time>,
     proto: ProtoParam,
     game: GameParam,
+    mut finished_events: MessageReader<AnimationEvents>,
 ) {
+    let finished = collect_finished(&mut finished_events);
     for (entity, mut summon_attack, mut anim_state, txfm, follow_speed, mut rotation) in
         attacks.iter_mut()
     {
-        if anim_state.is_paused() {
-            anim_state.play();
+        if is_paused(&anim_state) {
+            start(&mut anim_state);
         }
 
         // --- Effect: spawn mushlings for the full duration, decoupled from the animation. ---
         summon_attack.duration_timer.tick(time.delta());
-        if !summon_attack.duration_timer.finished()
+        if !summon_attack.duration_timer.is_finished()
             && summon_attack.spawn_timer.tick(time.delta()).just_finished()
         {
             let mut rng = rand::thread_rng();
@@ -490,9 +482,7 @@ pub fn summon_attack(
                 );
             }
 
-            if let Some(mob) =
-                commands.spawn_from_proto(Mob::RedMushling, &proto.defs, pos)
-            {
+            if let Some(mob) = commands.spawn_from_proto(Mob::RedMushling, &proto.defs, pos) {
                 commands
                     .entity(mob)
                     .remove::<LootTable>()
@@ -503,26 +493,26 @@ pub fn summon_attack(
         // --- Animation: a single play-through (no loop), chained on just_finished. ---
         match summon_attack.anim_phase {
             0 => {
-                *anim_state = AsepriteAnimation::from(RedMushking::tags::START_SUMMON);
+                play_once(&mut anim_state, RedMushking::tags::START_SUMMON);
                 summon_attack.anim_phase = 1;
             }
-            1 if anim_state.just_finished() => {
-                *anim_state = AsepriteAnimation::from(RedMushking::tags::SUMMONING);
+            1 if finished.contains(&entity) => {
+                play_once(&mut anim_state, RedMushking::tags::SUMMONING);
                 summon_attack.anim_phase = 2;
             }
-            2 if anim_state.just_finished() => {
-                *anim_state = AsepriteAnimation::from(RedMushking::tags::END_SUMMON);
+            2 if finished.contains(&entity) => {
+                play_once(&mut anim_state, RedMushking::tags::END_SUMMON);
                 summon_attack.anim_phase = 3;
             }
-            3 if anim_state.just_finished() => {
-                *anim_state = AsepriteAnimation::from(RedMushking::tags::WALK);
+            3 if finished.contains(&entity) => {
+                play_loop(&mut anim_state, RedMushking::tags::WALK);
                 summon_attack.anim_phase = 4;
             }
             _ => {}
         }
 
         // --- The effect timer (not the animation) drives the end of the summon. ---
-        if summon_attack.duration_timer.finished() {
+        if summon_attack.duration_timer.is_finished() {
             rotation.advance();
             commands
                 .entity(entity)
@@ -537,15 +527,16 @@ pub fn summon_attack(
                     TimerMode::Once,
                 )))
                 .remove::<SummonAttackState>();
-            *anim_state = AsepriteAnimation::from(RedMushking::tags::WALK);
+            play_loop(&mut anim_state, RedMushking::tags::WALK);
         }
     }
 }
 pub fn handle_death(
     mut commands: Commands,
-    mut death: Query<(Entity, &mut AsepriteAnimation, &super::Mob), With<DeathState>>,
+    mut death: Query<(Entity, &mut AseAnimation, &super::Mob), With<DeathState>>,
+    mut finished_events: MessageReader<AnimationEvents>,
     era_manager: Res<EraManager>,
-    mut infinite_mode_event: EventWriter<InfiniteModeStartedEvent>,
+    mut infinite_mode_event: MessageWriter<InfiniteModeStartedEvent>,
     mut boss_kill_tracker: ResMut<BossKillTracker>,
     era_timer: Res<EraTimer>,
     mut mob_spawning_paused: ResMut<MobSpawningPaused>,
@@ -554,47 +545,56 @@ pub fn handle_death(
     pets: Query<(), With<Pet>>,
     proto: ProtoParam,
 ) {
+    let finished = collect_finished(&mut finished_events);
+
     for (entity, mut anim, mob) in death.iter_mut() {
         // Only handle RedMushking death animations
         if mob != &super::Mob::RedMushking {
             continue;
         }
 
-        if anim.current_frame() < 43 {
-            *anim = AsepriteAnimation::from(RedMushking::tags::DEATH_START);
-        }
-        if anim.current_frame() == 48 {
-            *anim = AsepriteAnimation::from(RedMushking::tags::DEATH_LOOP);
-        }
-        if anim.current_frame() == 56 {
-            *anim = AsepriteAnimation::from(RedMushking::tags::DEATH_END);
-        }
-        if anim.current_frame() == 62 {
-            // Check if we're in Era 3 - trigger infinite mode when the main boss dies
-            if era_manager.current_era == Era::Third {
-                info!("Red Mushking defeated in Era 3! Starting INFINITE MODE!");
-                infinite_mode_event.send_default();
-            } else {
-                // Mark the current era's boss as killed
-                boss_kill_tracker.mark_boss_killed(era_manager.current_era.clone());
-                info!("Boss killed in era {:?}", era_manager.current_era);
-
-                if (era_manager.current_era == Era::Main || era_manager.current_era == Era::Second)
-                    && era_timer.remaining_seconds > 0.0
-                {
-                    mob_spawning_paused.paused = true;
-                }
+        let tag = anim.animation.tag.as_deref();
+        match tag {
+            Some(RedMushking::tags::DEATH_START) if finished.contains(&entity) => {
+                play_once(&mut anim, RedMushking::tags::DEATH_LOOP);
             }
+            Some(RedMushking::tags::DEATH_LOOP) if finished.contains(&entity) => {
+                play_once(&mut anim, RedMushking::tags::DEATH_END);
+            }
+            Some(RedMushking::tags::DEATH_END) if finished.contains(&entity) => {
+                // Check if we're in Era 3 - trigger infinite mode when the main boss dies
+                if era_manager.current_era == Era::Third {
+                    info!("Red Mushking defeated in Era 3! Starting INFINITE MODE!");
+                    infinite_mode_event.write_default();
+                } else {
+                    // Mark the current era's boss as killed
+                    boss_kill_tracker.mark_boss_killed(era_manager.current_era.clone());
+                    info!("Boss killed in era {:?}", era_manager.current_era);
 
-            pull_all_eligible_ground_items_to_player(
-                &mut commands,
-                &item_drop_query,
-                &inv,
-                &pets,
-                &proto,
-            );
+                    if (era_manager.current_era == Era::Main
+                        || era_manager.current_era == Era::Second)
+                        && era_timer.remaining_seconds > 0.0
+                    {
+                        mob_spawning_paused.paused = true;
+                    }
+                }
 
-            commands.entity(entity).despawn_recursive();
+                pull_all_eligible_ground_items_to_player(
+                    &mut commands,
+                    &item_drop_query,
+                    &inv,
+                    &pets,
+                    &proto,
+                );
+
+                commands.entity(entity).despawn();
+            }
+            Some(RedMushking::tags::DEATH_START)
+            | Some(RedMushking::tags::DEATH_LOOP)
+            | Some(RedMushking::tags::DEATH_END) => {}
+            _ => {
+                play_once(&mut anim, RedMushking::tags::DEATH_START);
+            }
         }
     }
 }
@@ -605,7 +605,7 @@ pub fn new_follow(
         Entity,
         &FollowState,
         Option<&EnemyAttackCooldown>,
-        &mut AsepriteAnimation,
+        &mut AseAnimation,
         &mut KinematicCharacterController,
         Option<&Mob>,
     )>,
@@ -613,7 +613,7 @@ pub fn new_follow(
     time: Res<Time>,
 ) {
     for (entity, follow, att_cooldown, mut anim, mut mover, mob_option) in follows.iter_mut() {
-        if att_cooldown.is_some() && att_cooldown.unwrap().0.percent() <= 0.5 {
+        if att_cooldown.is_some() && att_cooldown.unwrap().0.fraction() <= 0.5 {
             continue;
         }
         // Get the positions of the follower and target
@@ -626,146 +626,85 @@ pub fn new_follow(
             .normalize_or_zero()
             .truncate();
         // Find the direction from the follower to the target and go that way
-        mover.translation = Some(delta * follow.speed * PLAYER_MOVE_SPEED * time.delta_seconds());
+        mover.translation = Some(delta * follow.speed * PLAYER_MOVE_SPEED * time.delta_secs());
 
         if added.get(entity).is_ok() {
             if let Some(Mob::RedMushking) = mob_option {
-                *anim = AsepriteAnimation::from(RedMushking::tags::WALK);
+                play_loop(&mut anim, RedMushking::tags::WALK);
             }
         }
     }
 }
 
-#[derive(Clone, Copy, Reflect)]
-pub struct JumpTimer;
+fn jump_timer(
+    In(entity): In<Entity>,
+    rotation_query: Query<(&AttackRotation, Option<&EnemyAttackCooldown>)>,
+    transforms: Query<&Transform>,
+    player_query: Query<(Entity, &crate::player::Player)>,
+) -> bool {
+    match rotation_query.get(entity) {
+        Ok((rotation, attack_cooldown)) => {
+            // Jump is index 0 of the rotation
+            if rotation.index != 0 {
+                return false;
+            }
+            if attack_cooldown.is_some() {
+                return false;
+            }
+            if !rotation.timer.is_finished() {
+                return false;
+            }
 
-impl BoolTrigger for JumpTimer {
-    type Param<'w, 's> = (
-        Query<
-            'w,
-            's,
-            (
-                &'static AttackRotation,
-                Option<&'static EnemyAttackCooldown>,
-            ),
-        >,
-        Query<'w, 's, &'static Transform>,
-        Query<'w, 's, (Entity, &'static crate::player::Player)>,
-    );
+            // Check if player is within 10 tiles (160 pixels)
+            if let Ok(boss_txfm) = transforms.get(entity) {
+                if let Ok((player_entity, _)) = player_query.single() {
+                    if let Ok(player_txfm) = transforms.get(player_entity) {
+                        let distance = (boss_txfm.translation.truncate()
+                            - player_txfm.translation.truncate())
+                        .length();
+                        let max_leap_distance = 10.0 * 16.0;
 
-    fn trigger(
-        &self,
-        entity: Entity,
-        (rotation_query, transforms, player_query): Self::Param<'_, '_>,
-    ) -> bool {
-        match rotation_query.get(entity) {
-            Ok((rotation, attack_cooldown)) => {
-                // Jump is index 0 of the rotation
-                if rotation.index != 0 {
-                    return false;
-                }
-                if attack_cooldown.is_some() {
-                    return false;
-                }
-                if !rotation.timer.finished() {
-                    return false;
-                }
-
-                // Check if player is within 10 tiles (160 pixels)
-                if let Ok(boss_txfm) = transforms.get(entity) {
-                    if let Ok((player_entity, _)) = player_query.get_single() {
-                        if let Ok(player_txfm) = transforms.get(player_entity) {
-                            let distance = (boss_txfm.translation.truncate()
-                                - player_txfm.translation.truncate())
-                            .length();
-                            let max_leap_distance = 10.0 * 16.0;
-
-                            if distance <= max_leap_distance {
-                                return true;
-                            }
+                        if distance <= max_leap_distance {
+                            return true;
                         }
                     }
                 }
-
-                false
             }
-            Err(_) => false,
+
+            false
         }
+        Err(_) => false,
     }
 }
 
-#[derive(Clone, Copy, Reflect)]
-pub struct SummonTrigger;
-
-impl BoolTrigger for SummonTrigger {
-    type Param<'w, 's> = Query<
-        'w,
-        's,
-        (
-            &'static AttackRotation,
-            Option<&'static EnemyAttackCooldown>,
-        ),
-    >;
-
-    fn trigger(&self, entity: Entity, query: Self::Param<'_, '_>) -> bool {
-        match query.get(entity) {
-            Ok((rotation, attack_cooldown)) => {
-                // Summon is index 1 of the rotation
-                rotation.index == 1 && attack_cooldown.is_none() && rotation.timer.finished()
-            }
-            Err(_) => false,
+fn summon_trigger(
+    In(entity): In<Entity>,
+    query: Query<(&AttackRotation, Option<&EnemyAttackCooldown>)>,
+) -> bool {
+    match query.get(entity) {
+        Ok((rotation, attack_cooldown)) => {
+            // Summon is index 1 of the rotation
+            rotation.index == 1 && attack_cooldown.is_none() && rotation.timer.is_finished()
         }
+        Err(_) => false,
     }
 }
 
-#[derive(Clone, Copy, Reflect)]
-pub struct AoEAttackTimerTrigger;
-
-impl BoolTrigger for AoEAttackTimerTrigger {
-    type Param<'w, 's> = Query<
-        'w,
-        's,
-        (
-            &'static AttackRotation,
-            Option<&'static EnemyAttackCooldown>,
-        ),
-    >;
-
-    fn trigger(&self, entity: Entity, query: Self::Param<'_, '_>) -> bool {
-        match query.get(entity) {
-            Ok((rotation, attack_cooldown)) => {
-                // AoE is index 2 of the rotation
-                rotation.index == 2 && attack_cooldown.is_none() && rotation.timer.finished()
-            }
-            Err(_) => false,
+fn aoe_attack_timer_trigger(
+    In(entity): In<Entity>,
+    query: Query<(&AttackRotation, Option<&EnemyAttackCooldown>)>,
+) -> bool {
+    match query.get(entity) {
+        Ok((rotation, attack_cooldown)) => {
+            // AoE is index 2 of the rotation
+            rotation.index == 2 && attack_cooldown.is_none() && rotation.timer.is_finished()
         }
+        Err(_) => false,
     }
 }
 #[derive(Component)]
 pub struct HealthThreshold(pub f32);
 
-#[derive(Clone, Copy, Reflect)]
-pub struct HealthTrigger(f32);
-
-impl BoolTrigger for HealthTrigger {
-    type Param<'w, 's> = Query<
-        'w,
-        's,
-        (
-            &'static HealthThreshold,
-            &'static CurrentHealth,
-            &'static MaxHealth,
-        ),
-    >;
-
-    fn trigger(&self, entity: Entity, query: Self::Param<'_, '_>) -> bool {
-        let (threshold, hp, max_hp) = query.get(entity).unwrap();
-        if self.0 >= hp.0 as f32 / max_hp.0 as f32 && threshold.0 > self.0 {
-            return true;
-        }
-        false
-    }
-}
 //TODO: this may be frail and miss some summons. maybe we add this inside the actual summon fn
 pub fn handle_boss_health_threshold(
     mut thresholds: Query<
@@ -782,7 +721,8 @@ pub fn return_to_shrine(
     mut state_machines: Query<
         (
             Entity,
-            &mut AsepriteAnimation,
+            &mut AseAnimation,
+            &AnimationState,
             &mut KinematicCharacterController,
             &mut CurrentHealth,
             &MaxHealth,
@@ -793,7 +733,7 @@ pub fn return_to_shrine(
     mut transforms: Query<&mut Transform>,
     time: Res<Time>,
 ) {
-    for (entity, mut anim, mut mover, mut hp, max_hp) in state_machines.iter_mut() {
+    for (entity, mut anim, state, mut mover, mut hp, max_hp) in state_machines.iter_mut() {
         let shrine_pos = tile_pos_to_world_pos(
             *game
                 .world_obj_cache
@@ -810,38 +750,15 @@ pub fn return_to_shrine(
         let normal_delta = (delta).normalize_or_zero().truncate();
         debug!("d {normal_delta:?}");
         // Find the direction from the follower to the target and go that way
-        mover.translation = Some(normal_delta * 2. * PLAYER_MOVE_SPEED * time.delta_seconds());
+        mover.translation = Some(normal_delta * 2. * PLAYER_MOVE_SPEED * time.delta_secs());
 
-        if anim.current_frame() < 6 || anim.current_frame() > 13 {
-            *anim = AsepriteAnimation::from(RedMushking::tags::WALK);
+        let frame = usize::from(state.current_frame());
+        if frame < 6 || frame > 13 {
+            play_loop(&mut anim, RedMushking::tags::WALK);
         }
 
         if delta.length() < 16. {
             hp.0 = max_hp.0;
-        }
-    }
-}
-
-#[derive(Clone, Copy, Reflect)]
-pub struct ShrineLOS {
-    pub range: f32,
-    pub shrine_pos: Vec2,
-}
-
-impl Trigger for ShrineLOS {
-    type Param<'w, 's> = Query<'w, 's, &'static Transform>;
-    type Ok = f32;
-    type Err = f32;
-
-    // Return `Ok` to trigger and `Err` to not trigger
-    fn trigger(&self, entity: Entity, transforms: Self::Param<'_, '_>) -> Result<f32, f32> {
-        if let Ok(tfxm) = transforms.get(entity) {
-            let delta = tfxm.translation.truncate() - self.shrine_pos;
-
-            let distance = (delta.x * delta.x + delta.y * delta.y).sqrt();
-            (distance <= self.range).then_some(distance).ok_or(distance)
-        } else {
-            Err(0.)
         }
     }
 }
@@ -863,14 +780,14 @@ pub fn handle_aoe_attack(
     boss_health: Query<(&CurrentHealth, &MaxHealth), With<Mob>>,
     player_query: Query<&Transform, With<Player>>,
     time: Res<Time>,
-    mut ranged_attack_events: EventWriter<RangedAttackEvent>,
+    mut ranged_attack_events: MessageWriter<RangedAttackEvent>,
     game: GameParam,
     cheat_settings: Res<CheatSettings>,
 ) {
     for (boss_entity, mut aoe_state, attack, _boss_txfm) in aoe_attacks.iter_mut() {
         // First frame: generate all cloud positions (doubled when below half health)
         if aoe_state.cloud_positions.is_empty() {
-            let Ok(player_txfm) = player_query.get_single() else {
+            let Ok(player_txfm) = player_query.single() else {
                 continue;
             };
             let target_pos = player_txfm.translation.truncate();
@@ -904,25 +821,15 @@ pub fn handle_aoe_attack(
         while aoe_state.preview_entities.len() < aoe_state.cloud_positions.len() {
             let idx = aoe_state.preview_entities.len();
             let pos = aoe_state.cloud_positions[idx];
+            let preview_material = materials.add(ColorMaterial::from(
+                boss_warning_indicator_color(&cheat_settings),
+            ));
             let preview = commands
                 .spawn((
-                    MaterialMesh2dBundle {
-                        mesh: meshes
-                            .add(
-                                shape::Circle {
-                                    radius: 16.0,
-                                    ..Default::default()
-                                }
-                                .into(),
-                            )
-                            .into(),
-                        material: materials.add(ColorMaterial::from(boss_warning_indicator_color(
-                            &cheat_settings,
-                        ))),
-                        transform: Transform {
-                            translation: pos.extend(990.0),
-                            ..default()
-                        },
+                    Mesh2d(meshes.add(Mesh::from(Circle::new(16.0)))),
+                    MeshMaterial2d(preview_material),
+                    Transform {
+                        translation: pos.extend(990.0),
                         ..default()
                     },
                     BossAttackPreview,
@@ -935,7 +842,7 @@ pub fn handle_aoe_attack(
         if aoe_state.delay_timer.just_finished() {
             // Spawn a poison cloud at every position
             for pos in &aoe_state.cloud_positions {
-                ranged_attack_events.send(RangedAttackEvent {
+                ranged_attack_events.write(RangedAttackEvent {
                     projectile: Projectile::PoisonCloud,
                     direction: Vec2::ZERO,
                     mana_cost: None,
@@ -950,8 +857,8 @@ pub fn handle_aoe_attack(
             }
 
             for preview_e in &aoe_state.preview_entities {
-                if let Some(entity_commands) = commands.get_entity(*preview_e) {
-                    entity_commands.despawn_recursive();
+                if let Ok(mut entity_commands) = commands.get_entity(*preview_e) {
+                    entity_commands.despawn();
                 }
             }
 
@@ -959,7 +866,7 @@ pub fn handle_aoe_attack(
                 rotation.advance();
             }
 
-            if let Some(mut entity_commands) = commands.get_entity(boss_entity) {
+            if let Ok(mut entity_commands) = commands.get_entity(boss_entity) {
                 entity_commands
                     .remove::<AoEAttackState>()
                     .insert(FollowState {

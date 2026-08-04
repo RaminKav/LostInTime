@@ -1,6 +1,6 @@
 use bevy::prelude::*;
-
 use bevy_hanabi::prelude::*;
+use bevy_hanabi::Gradient as HanabiGradient;
 
 use crate::{
     assets::SpriteAnchor,
@@ -25,24 +25,11 @@ use super::{CpuParticleGenerator, CpuParticleType};
 const DUST_OFFSET: Vec2 = Vec2::new(3., 4.);
 
 /// Slightly above mob feet (`YSort(0)`) so hit/death bursts sit on the body, not
-/// under the sprite. Hanabi ignores `Transform::z` and only sorts via `z_layer_2d`,
-/// so [`sync_hanabi_z_layer_from_y_sort`] copies the Y-sorted depth each frame.
+/// under the sprite. Hanabi 2D sorts by the effect entity's `Transform::z`.
 const COMBAT_PARTICLE_Y_SORT: f32 = 0.05;
-
-#[derive(Component)]
-pub struct SyncHanabiZLayer;
 
 fn combat_particle_depth(world_pos: Vec2) -> f32 {
     y_sort_depth(COMBAT_PARTICLE_Y_SORT, world_pos.y, world_pos.x, 0.)
-}
-
-/// Hanabi 2D particles sort by `ParticleEffect::z_layer_2d`, not `Transform::z`.
-pub fn sync_hanabi_z_layer_from_y_sort(
-    mut q: Query<(&Transform, &mut ParticleEffect), With<SyncHanabiZLayer>>,
-) {
-    for (tf, mut effect) in q.iter_mut() {
-        effect.z_layer_2d = Some(tf.translation.z);
-    }
 }
 
 #[derive(Component)]
@@ -61,12 +48,147 @@ pub struct Particles {
 pub struct DustParticles;
 #[derive(Component)]
 pub struct ExpParticles;
+#[derive(Message)]
 pub struct UseItemEvent(pub WorldObject);
 
 #[derive(Component)]
 pub struct ObjectHitParticles {
     pub despawn_timer: Timer,
     pub velocity: Vec3,
+}
+
+struct BurstEffectConfig {
+    name: &'static str,
+    spawner: SpawnerSettings,
+    radius: f32,
+    speed: f32,
+    lifetime: f32,
+    size_range: (f32, f32),
+    gradient: Option<HanabiGradient<Vec4>>,
+    color_property: bool,
+    default_accel: Vec3,
+    /// When false, omit `AccelModifier`. 0.10 death FX declared `my_accel` but
+    /// never wired accel — so `cleanup_object_particles` gravity was a no-op.
+    use_accel: bool,
+}
+
+fn build_burst_effect(config: BurstEffectConfig) -> EffectAsset {
+    let BurstEffectConfig {
+        name,
+        spawner,
+        radius,
+        speed,
+        lifetime,
+        size_range,
+        gradient,
+        color_property,
+        default_accel,
+        use_accel,
+    } = config;
+
+    let writer = ExprWriter::new();
+
+    let init_age = SetAttributeModifier::new(Attribute::AGE, writer.lit(0.).expr());
+    let init_lifetime = SetAttributeModifier::new(Attribute::LIFETIME, writer.lit(lifetime).expr());
+
+    let init_pos = SetPositionCircleModifier {
+        center: writer.lit(Vec3::ZERO).expr(),
+        axis: writer.lit(Vec3::Z).expr(),
+        radius: writer.lit(radius).expr(),
+        dimension: ShapeDimension::Surface,
+    };
+
+    let init_vel = SetVelocityCircleModifier {
+        center: writer.lit(Vec3::ZERO).expr(),
+        axis: writer.lit(Vec3::Z).expr(),
+        speed: writer.lit(speed).expr(),
+    };
+
+    let (size_min, size_max) = size_range;
+    let size_span = size_max - size_min;
+    // Hanabi 0.19 `Attribute::SIZE` is a scalar (uniform size), not Vec3.
+    let init_size = SetAttributeModifier::new(
+        Attribute::SIZE,
+        (writer.rand(ScalarType::Float) * writer.lit(size_span) + writer.lit(size_min)).expr(),
+    );
+
+    let my_accel = writer.add_property("my_accel", default_accel.into());
+    let init_color = if color_property {
+        let my_color = writer.add_property("my_color", 0xFFFFFFFFu32.into());
+        Some(SetAttributeModifier::new(
+            Attribute::COLOR,
+            writer.prop(my_color).expr(),
+        ))
+    } else {
+        None
+    };
+
+    let mut module = writer.finish();
+    let update_accel = AccelModifier::via_property(&mut module, my_accel);
+
+    let mut effect = EffectAsset::new(32768, spawner, module)
+        .with_name(name)
+        .init(init_pos)
+        .init(init_vel)
+        .init(init_age)
+        .init(init_lifetime)
+        .init(init_size);
+
+    if use_accel {
+        effect = effect.update(update_accel);
+    }
+
+    if let Some(init_color) = init_color {
+        effect = effect.init(init_color);
+    }
+    if let Some(gradient) = gradient {
+        effect = effect.render(ColorOverLifetimeModifier::new(gradient));
+    }
+
+    effect
+}
+
+fn build_dust_effect(gradient: HanabiGradient<Vec4>) -> EffectAsset {
+    let writer = ExprWriter::new();
+
+    let init_age = SetAttributeModifier::new(Attribute::AGE, writer.lit(0.).expr());
+    let init_lifetime = SetAttributeModifier::new(Attribute::LIFETIME, writer.lit(0.2).expr());
+
+    let init_pos = SetPositionCircleModifier {
+        center: writer.lit(Vec3::ZERO).expr(),
+        axis: writer.lit(Vec3::Z).expr(),
+        radius: writer.lit(3.5).expr(),
+        dimension: ShapeDimension::Surface,
+    };
+
+    let init_vel = SetVelocityCircleModifier {
+        center: writer.lit(Vec3::ZERO).expr(),
+        axis: writer.lit(Vec3::Z).expr(),
+        speed: writer.lit(5.).expr(),
+    };
+
+    let init_size = SetAttributeModifier::new(
+        Attribute::SIZE,
+        (writer.rand(ScalarType::Float) * writer.lit(1.9) + writer.lit(0.1)).expr(),
+    );
+
+    let my_accel = writer.add_property("my_accel", Vec3::new(-3., -3., 0.).into());
+    let mut module = writer.finish();
+    let update_accel = AccelModifier::via_property(&mut module, my_accel);
+
+    EffectAsset::new(
+        32768,
+        SpawnerSettings::once(10.0.into()).with_emit_on_start(false),
+        module,
+    )
+    .with_name("dust_particle_emit")
+    .init(init_pos)
+    .init(init_vel)
+    .init(init_age)
+    .init(init_lifetime)
+    .init(init_size)
+    .update(update_accel)
+    .render(ColorOverLifetimeModifier::new(gradient))
 }
 
 pub fn setup_particles(
@@ -83,212 +205,86 @@ pub fn setup_particles(
             effects.remove(&old.enemy_hit_particles);
             effects.remove(&old.xp_particles);
         }
-        // Note: same as gradient2, will yield shared render shader between effects #2
-        let mut gradient = Gradient::new();
+
+        let mut gradient = HanabiGradient::new();
         gradient.add_key(0.0, Vec4::new(208. / 255., 165. / 255., 106. / 255., 0.8));
         gradient.add_key(1.0, Vec4::new(208. / 255., 165. / 255., 106. / 255., 0.0));
-        // gradient.add_key(1.0, Vec4::splat(0.0));
-        let mut gradient2 = Gradient::new();
-        gradient2.add_key(0.0, Vec4::new(163. / 255., 182. / 255., 69. / 255., 1.));
-        gradient2.add_key(1.0, Vec4::new(163. / 255., 182. / 255., 69. / 255., 0.0));
 
-        let mut gradient3 = Gradient::new();
+        let mut gradient3 = HanabiGradient::new();
         gradient3.add_key(0.0, Vec4::new(255. / 255., 255. / 255., 255. / 255., 0.8));
         gradient3.add_key(1.0, Vec3::splat(0.4).extend(0.2));
-        let mut gradient4 = Gradient::new();
+
+        let mut gradient4 = HanabiGradient::new();
         gradient4.add_key(0.0, Vec4::new(170. / 255., 39. / 255., 44. / 255., 1.));
         gradient4.add_key(1.0, Vec4::new(170. / 255., 39. / 255., 44. / 255., 0.));
-        let mut gradient4 = Gradient::new();
-        gradient4.add_key(0.0, Vec4::new(170. / 255., 39. / 255., 44. / 255., 1.));
-        gradient4.add_key(1.0, Vec4::new(170. / 255., 39. / 255., 44. / 255., 0.));
-        let effect3 = effects.add(
-            EffectAsset {
-                name: "dust_particle_emit".to_string(),
-                capacity: 32768,
-                spawner: Spawner::once(10.0.into(), false),
-                ..Default::default()
-            }
-            .with_property("my_accel", graph::Value::Float3(Vec3::new(-3., -3., 0.)))
-            .init(InitPositionCircleModifier {
-                center: Vec3::ZERO,
-                axis: Vec3::Z,
-                radius: 3.5,
-                dimension: ShapeDimension::Surface,
-            })
-            .init(InitVelocityCircleModifier {
-                center: Vec3::ZERO,
-                axis: Vec3::Z,
-                speed: 5_f32.into(),
-            })
-            .init(InitLifetimeModifier {
-                lifetime: 0.2_f32.into(),
-            })
-            .init(InitSizeModifier {
-                // At spawn time, assign each particle a random size between 0.3 and 0.7
-                size: Value::<f32>::Uniform((0.1, 2.)).into(),
-            })
-            .update(AccelModifier::via_property("my_accel"))
-            .render(ColorOverLifetimeModifier { gradient }),
-        );
-        let obj_hit_particle = effects.add(
-            EffectAsset {
-                name: "emit:obj_hit_particle".to_string(),
-                capacity: 32768,
-                spawner: Spawner::once(Value::Uniform((10., 35.)), true),
-                ..Default::default()
-            }
-            .with_property("my_accel", graph::Value::Float3(Vec3::new(-3., -3., 0.)))
-            .with_property("my_color", graph::Value::Uint(0xFFFFFFFF))
-            .init(InitPositionCircleModifier {
-                center: Vec3::ZERO,
-                axis: Vec3::Z,
-                radius: 1.5,
-                dimension: ShapeDimension::Surface,
-            })
-            .init(InitVelocityCircleModifier {
-                center: Vec3::ZERO,
-                axis: Vec3::Z,
-                speed: 25_f32.into(),
-            })
-            .init(InitLifetimeModifier {
-                lifetime: 0.23_f32.into(),
-            })
-            .init(InitSizeModifier {
-                // At spawn time, assign each particle a random size between 0.3 and 0.7
-                size: Value::<f32>::Uniform((0.1, 2.)).into(),
-            })
-            .init(InitAttributeModifier {
-                attribute: Attribute::COLOR,
-                value: "my_color".into(),
-            })
-            .update(AccelModifier::via_property("my_accel")),
-        );
-        let enemy_death_particle = effects.add(
-            EffectAsset {
-                name: "emit:enemy_death_particles".to_string(),
-                capacity: 32768,
-                spawner: Spawner::once(Value::Uniform((10., 20.)), true),
-                ..Default::default()
-            }
-            .with_property("my_accel", graph::Value::Float3(Vec3::new(-3., -3., 0.)))
-            .init(InitPositionCircleModifier {
-                center: Vec3::ZERO,
-                axis: Vec3::Z,
-                radius: 2.,
-                dimension: ShapeDimension::Surface,
-            })
-            .init(InitVelocityCircleModifier {
-                center: Vec3::ZERO,
-                axis: Vec3::Z,
-                speed: 7_f32.into(),
-            })
-            .init(InitLifetimeModifier {
-                lifetime: 0.7_f32.into(),
-            })
-            .init(InitSizeModifier {
-                // At spawn time, assign each particle a random size between 0.3 and 0.7
-                size: Value::<f32>::Uniform((2., 8.)).into(),
-            })
-            .render(ColorOverLifetimeModifier {
-                gradient: gradient3,
-            }),
-        );
-        let use_item_particle = effects.add(
-            EffectAsset {
-                name: "emit:use_item".to_string(),
-                capacity: 32768,
-                spawner: Spawner::once(Value::Uniform((10., 35.)), true),
-                ..Default::default()
-            }
-            .with_property("my_accel", graph::Value::Float3(Vec3::new(-3., -3., 0.)))
-            .init(InitPositionCircleModifier {
-                center: Vec3::ZERO,
-                axis: Vec3::Z,
-                radius: 1.5,
-                dimension: ShapeDimension::Surface,
-            })
-            .init(InitVelocityCircleModifier {
-                center: Vec3::ZERO,
-                axis: Vec3::Z,
-                speed: 25_f32.into(),
-            })
-            .init(InitLifetimeModifier {
-                lifetime: 0.23_f32.into(),
-            })
-            .init(InitSizeModifier {
-                // At spawn time, assign each particle a random size between 0.3 and 0.7
-                size: Value::<f32>::Uniform((0.1, 4.)).into(),
-            })
-            .update(AccelModifier::via_property("my_accel"))
-            .render(ColorOverLifetimeModifier {
-                gradient: gradient4,
-            }),
-        );
-        let enemy_hit_particles = effects.add(
-            EffectAsset {
-                name: "emit:enemy_hit".to_string(),
-                capacity: 32768,
-                spawner: Spawner::once(Value::Uniform((20., 55.)), true),
-                ..Default::default()
-            }
-            .with_property("my_accel", graph::Value::Float3(Vec3::new(-3., -3., 0.)))
-            .with_property("my_color", graph::Value::Uint(0xFFFFFFFF))
-            .init(InitPositionCircleModifier {
-                center: Vec3::ZERO,
-                axis: Vec3::Z,
-                radius: 2.,
-                dimension: ShapeDimension::Surface,
-            })
-            .init(InitVelocityCircleModifier {
-                center: Vec3::ZERO,
-                axis: Vec3::Z,
-                speed: 16_f32.into(),
-            })
-            .init(InitLifetimeModifier {
-                lifetime: 0.23_f32.into(),
-            })
-            .init(InitSizeModifier {
-                // At spawn time, assign each particle a random size between 0.3 and 0.7
-                size: Value::<f32>::Uniform((0.1, 3.)).into(),
-            })
-            .init(InitAttributeModifier {
-                attribute: Attribute::COLOR,
-                value: "my_color".into(),
-            })
-            .update(AccelModifier::via_property("my_accel")),
-        );
-        let xp_particles = effects.add(
-            EffectAsset {
-                name: "emit:xp".to_string(),
-                capacity: 32768,
-                spawner: Spawner::once(Value::Uniform((20., 55.)), true),
-                ..Default::default()
-            }
-            .with_property("my_accel", graph::Value::Float3(Vec3::new(0., 0., 0.)))
-            .with_property("my_color", graph::Value::Uint(0xFFFFFFFF))
-            .init(InitPositionCircleModifier {
-                center: Vec3::ZERO,
-                axis: Vec3::Z,
-                radius: 1.5,
-                dimension: ShapeDimension::Surface,
-            })
-            .init(InitVelocityCircleModifier {
-                center: Vec3::ZERO,
-                axis: Vec3::Z,
-                speed: 0_f32.into(),
-            })
-            .init(InitLifetimeModifier {
-                lifetime: 0.23_f32.into(),
-            })
-            .init(InitSizeModifier {
-                size: Value::<f32>::Uniform((0.05, 2.)).into(),
-            })
-            .init(InitAttributeModifier {
-                attribute: Attribute::COLOR,
-                value: "my_color".into(),
-            })
-            .update(AccelModifier::via_property("my_accel")),
-        );
+
+        let effect3 = effects.add(build_dust_effect(gradient));
+
+        let obj_hit_particle = effects.add(build_burst_effect(BurstEffectConfig {
+            name: "emit:obj_hit_particle",
+            spawner: SpawnerSettings::once(CpuValue::Uniform((10., 35.))),
+            radius: 1.5,
+            speed: 25.,
+            lifetime: 0.23,
+            size_range: (0.1, 2.),
+            gradient: None,
+            color_property: true,
+            default_accel: Vec3::new(-3., -3., 0.),
+            use_accel: true,
+        }));
+
+        let enemy_death_particle = effects.add(build_burst_effect(BurstEffectConfig {
+            name: "emit:enemy_death_particles",
+            spawner: SpawnerSettings::once(CpuValue::Uniform((10., 20.))),
+            radius: 2.,
+            speed: 7.,
+            lifetime: 0.7,
+            size_range: (2., 8.),
+            gradient: Some(gradient3),
+            color_property: false,
+            default_accel: Vec3::ZERO,
+            use_accel: false,
+        }));
+
+        let use_item_particle = effects.add(build_burst_effect(BurstEffectConfig {
+            name: "emit:use_item",
+            spawner: SpawnerSettings::once(CpuValue::Uniform((10., 35.))),
+            radius: 1.5,
+            speed: 25.,
+            lifetime: 0.23,
+            size_range: (0.1, 4.),
+            gradient: Some(gradient4),
+            color_property: false,
+            default_accel: Vec3::new(-3., -3., 0.),
+            use_accel: true,
+        }));
+
+        let enemy_hit_particles = effects.add(build_burst_effect(BurstEffectConfig {
+            name: "emit:enemy_hit",
+            spawner: SpawnerSettings::once(CpuValue::Uniform((20., 55.))),
+            radius: 2.,
+            speed: 16.,
+            lifetime: 0.23,
+            size_range: (0.1, 3.),
+            gradient: None,
+            color_property: true,
+            default_accel: Vec3::new(-3., -3., 0.),
+            use_accel: true,
+        }));
+
+        let xp_particles = effects.add(build_burst_effect(BurstEffectConfig {
+            name: "emit:xp",
+            spawner: SpawnerSettings::once(CpuValue::Uniform((20., 55.))),
+            radius: 1.5,
+            speed: 0.,
+            lifetime: 0.23,
+            size_range: (0.05, 2.),
+            gradient: None,
+            color_property: true,
+            default_accel: Vec3::ZERO,
+            use_accel: true,
+        }));
+
         commands.insert_resource(Particles {
             obj_hit_particle,
             enemy_death_particle,
@@ -296,14 +292,12 @@ pub fn setup_particles(
             enemy_hit_particles,
             xp_particles,
         });
+
         commands
             .spawn((
                 Name::new("dust_particles"),
-                ParticleEffectBundle {
-                    effect: ParticleEffect::new(effect3).with_z_layer_2d(Some(2.)),
-                    transform: Transform::from_translation(DUST_OFFSET.extend(1.)),
-                    ..Default::default()
-                },
+                ParticleEffect::new(effect3),
+                Transform::from_translation(DUST_OFFSET.extend(2.)),
                 DustParticles,
             ))
             .safe_set_parent(player_e);
@@ -314,10 +308,10 @@ pub fn update_dust_particle_dir(
     mut dust: Query<&mut Transform, With<DustParticles>>,
     player_move: Query<&MovementVector, (With<Player>, Changed<MovementVector>)>,
 ) {
-    let Ok(mv) = player_move.get_single() else {
+    let Ok(mv) = player_move.single() else {
         return;
     };
-    let Ok(mut dust_t) = dust.get_single_mut() else {
+    let Ok(mut dust_t) = dust.single_mut() else {
         return;
     };
     let mut is_moving_up = true;
@@ -343,9 +337,55 @@ pub fn update_dust_particle_dir(
         DUST_OFFSET.y * movement_offset.y * -1. + if is_moving_up { -6. } else { 6. };
 }
 
+fn spawn_colored_burst(
+    commands: &mut Commands,
+    effect: Handle<EffectAsset>,
+    world_pos: Vec2,
+    depth: f32,
+    color: u32,
+    despawn_timer: Timer,
+    velocity: Vec3,
+) {
+    commands.spawn((
+        Name::new("emit:burst"),
+        ParticleEffect::new(effect),
+        EffectProperties::default().with_properties([
+            ("my_color".to_string(), color.into()),
+            ("my_accel".to_string(), Vec3::ZERO.into()),
+        ]),
+        Transform::from_translation(world_pos.extend(depth)),
+        YSort(COMBAT_PARTICLE_Y_SORT),
+        ObjectHitParticles {
+            despawn_timer,
+            velocity,
+        },
+    ));
+}
+
+fn spawn_burst(
+    commands: &mut Commands,
+    effect: Handle<EffectAsset>,
+    world_pos: Vec2,
+    depth: f32,
+    despawn_timer: Timer,
+    velocity: Vec3,
+) {
+    commands.spawn((
+        Name::new("emit:burst"),
+        ParticleEffect::new(effect),
+        EffectProperties::default().with_properties([("my_accel".to_string(), Vec3::ZERO.into())]),
+        Transform::from_translation(world_pos.extend(depth)),
+        YSort(COMBAT_PARTICLE_Y_SORT),
+        ObjectHitParticles {
+            despawn_timer,
+            velocity,
+        },
+    ));
+}
+
 pub fn spawn_obj_hit_particles(
     mut commands: Commands,
-    mut hit_events: EventReader<HitEvent>,
+    mut hit_events: MessageReader<HitEvent>,
     game: Res<Game>,
     transforms: Query<&GlobalTransform>,
     particles: Res<Particles>,
@@ -356,8 +396,7 @@ pub fn spawn_obj_hit_particles(
     if infinite_mode.active {
         return;
     }
-    // add spark animation entity as child, will animate once and remove itself.
-    for hit in hit_events.iter() {
+    for hit in hit_events.read() {
         if hit.hit_entity == game.player {
             continue;
         }
@@ -379,7 +418,7 @@ pub fn spawn_obj_hit_particles(
         } else {
             particles.obj_hit_particle.clone()
         };
-        //TODO: fix this bs unwrap panic
+
         let color = if is_mob {
             mob_query.get(hit.hit_entity).unwrap().get_mob_color()
         } else if is_object {
@@ -391,94 +430,69 @@ pub fn spawn_obj_hit_particles(
         let world_pos = hit_pos.truncate() + anchor * -1. + Vec2::new(0., 4.);
         let depth = combat_particle_depth(world_pos);
 
-        commands.spawn((
-            Name::new("emit:burst"),
-            ParticleEffectBundle {
-                effect: ParticleEffect::new(effect)
-                    .with_properties::<ParticleEffect>(vec![(
-                        "my_color".to_string(),
-                        graph::Value::Uint(color.as_linear_rgba_u32()),
-                    )])
-                    .with_z_layer_2d(Some(depth)),
-                transform: Transform::from_translation(world_pos.extend(depth)),
-                ..Default::default()
-            },
-            YSort(COMBAT_PARTICLE_Y_SORT),
-            SyncHanabiZLayer,
-            ObjectHitParticles {
-                despawn_timer: Timer::from_seconds(0.23, TimerMode::Once),
-                velocity: Vec3::new(0., 8000., 0.),
-            },
-        ));
+        spawn_colored_burst(
+            &mut commands,
+            effect,
+            world_pos,
+            depth,
+            color.to_linear().as_u32(),
+            Timer::from_seconds(0.23, TimerMode::Once),
+            Vec3::new(0., 8000., 0.),
+        );
     }
 }
+
 pub fn spawn_use_item_particles(
     mut commands: Commands,
-    mut use_item_events: EventReader<UseItemEvent>,
+    mut use_item_events: MessageReader<UseItemEvent>,
     game: Res<Game>,
     transforms: Query<&GlobalTransform>,
     particles: Res<Particles>,
 ) {
-    // add spark animation entity as child, will animate once and remove itself.
-    for _event in use_item_events.iter() {
+    for _event in use_item_events.read() {
         let hit_pos = transforms.get(game.player).unwrap().translation();
-
         let world_pos = hit_pos.truncate() + Vec2::new(0., 5.);
         let depth = combat_particle_depth(world_pos);
 
-        commands.spawn((
-            Name::new("emit:burst"),
-            ParticleEffectBundle {
-                effect: ParticleEffect::new(particles.use_item_particle.clone())
-                    .with_z_layer_2d(Some(depth)),
-                transform: Transform::from_translation(world_pos.extend(depth)),
-                ..Default::default()
-            },
-            YSort(COMBAT_PARTICLE_Y_SORT),
-            SyncHanabiZLayer,
-            ObjectHitParticles {
-                despawn_timer: Timer::from_seconds(1., TimerMode::Once),
-                velocity: Vec3::new(0., 10000., 0.),
-            },
-        ));
+        spawn_burst(
+            &mut commands,
+            particles.use_item_particle.clone(),
+            world_pos,
+            depth,
+            Timer::from_seconds(1., TimerMode::Once),
+            Vec3::new(0., 10000., 0.),
+        );
     }
 }
+
 pub fn spawn_enemy_death_particles(
     mut commands: Commands,
-    mut death_events: EventReader<EnemyDeathEvent>,
+    mut death_events: MessageReader<EnemyDeathEvent>,
     particles: Res<Particles>,
 ) {
-    for death_event in death_events.iter() {
+    for death_event in death_events.read() {
         let t = death_event.enemy_pos;
-
         let world_pos = t + Vec2::new(0., 4.);
         let depth = combat_particle_depth(world_pos);
 
-        commands.spawn((
-            Name::new("spawn_enemy_death_particles"),
-            ParticleEffectBundle {
-                effect: ParticleEffect::new(particles.enemy_death_particle.clone())
-                    .with_z_layer_2d(Some(depth)),
-                transform: Transform::from_translation(world_pos.extend(depth)),
-                ..Default::default()
-            },
-            YSort(COMBAT_PARTICLE_Y_SORT),
-            SyncHanabiZLayer,
-            ObjectHitParticles {
-                despawn_timer: Timer::from_seconds(1.1, TimerMode::Once),
-                velocity: Vec3::new(0., 8000., 0.),
-            },
-        ));
+        spawn_burst(
+            &mut commands,
+            particles.enemy_death_particle.clone(),
+            world_pos,
+            depth,
+            Timer::from_seconds(1.1, TimerMode::Once),
+            Vec3::new(0., 8000., 0.),
+        );
     }
 }
 
 pub fn spawn_obj_death_particles(
     mut commands: Commands,
-    mut death_events: EventReader<ObjBreakEvent>,
+    mut death_events: MessageReader<ObjBreakEvent>,
     particles: Res<Particles>,
     proto_param: ProtoParam,
 ) {
-    for death_event in death_events.iter() {
+    for death_event in death_events.read() {
         let t = tile_pos_to_world_pos(death_event.pos, true);
         if (!death_event.obj.is_medium_size(&proto_param) && !death_event.obj.is_tree())
             && death_event.obj != WorldObject::Crate
@@ -490,41 +504,30 @@ pub fn spawn_obj_death_particles(
         let world_pos = Vec2::new(t.x as f32, t.y + 4.);
         let depth = combat_particle_depth(world_pos);
 
-        commands.spawn((
-            Name::new("spawn_obj_death_particles"),
-            ParticleEffectBundle {
-                effect: ParticleEffect::new(particles.enemy_death_particle.clone())
-                    .with_z_layer_2d(Some(depth)),
-                transform: Transform::from_translation(world_pos.extend(depth)),
-                ..Default::default()
-            },
-            YSort(COMBAT_PARTICLE_Y_SORT),
-            SyncHanabiZLayer,
-            ObjectHitParticles {
-                despawn_timer: Timer::from_seconds(1.1, TimerMode::Once),
-                velocity: Vec3::new(0., 8000., 0.),
-            },
-        ));
+        spawn_burst(
+            &mut commands,
+            particles.enemy_death_particle.clone(),
+            world_pos,
+            depth,
+            Timer::from_seconds(1.1, TimerMode::Once),
+            Vec3::new(0., 8000., 0.),
+        );
     }
 }
 
 pub fn cleanup_object_particles(
     mut commands: Commands,
-    mut particles: Query<(Entity, &mut CompiledParticleEffect, &mut ObjectHitParticles)>,
+    mut particles: Query<(Entity, &mut EffectProperties, &mut ObjectHitParticles)>,
     time: Res<Time>,
 ) {
     for (e, mut effect, mut p) in particles.iter_mut() {
-        // t.translation.y -= 10.;
         let accel = -3500.;
         p.velocity.y += accel;
 
-        effect.set_property(
-            "my_accel",
-            graph::Value::Float3(p.velocity * time.delta_seconds()),
-        );
+        effect.set("my_accel", (p.velocity * time.delta_secs()).into());
 
         p.despawn_timer.tick(time.delta());
-        if p.despawn_timer.finished() {
+        if p.despawn_timer.is_finished() {
             commands.entity(e).despawn();
         }
     }
@@ -536,7 +539,7 @@ pub fn handle_exp_particles(
         (
             Entity,
             &Transform,
-            &mut CompiledParticleEffect,
+            &mut EffectProperties,
             &mut ObjectHitParticles,
         ),
         With<ExpParticles>,
@@ -545,22 +548,18 @@ pub fn handle_exp_particles(
     time: Res<Time>,
 ) {
     for (e, t, mut effect, mut p) in particles.iter_mut() {
-        let xp_bar_txfm = game.player().position.truncate(); //+ Vec2::new(0., -5.5 * TILE_SIZE.x);
+        let xp_bar_txfm = game.player().position.truncate();
         let delta = xp_bar_txfm - t.translation.truncate();
         let delta_norm = delta.normalize();
 
-        // t.translation.y -= 10.;
         let accel = 4000.;
         p.velocity.y += delta_norm.y * accel;
         p.velocity.x += delta_norm.x * accel;
-        effect.set_property(
-            "my_accel",
-            graph::Value::Float3(p.velocity * time.delta_seconds()),
-        );
+        effect.set("my_accel", (p.velocity * time.delta_secs()).into());
         if delta.length() <= 3. {
             p.despawn_timer.tick(time.delta());
         }
-        if p.despawn_timer.finished() {
+        if p.despawn_timer.is_finished() {
             commands.entity(e).despawn();
         }
     }
@@ -568,7 +567,7 @@ pub fn handle_exp_particles(
 
 pub fn spawn_xp_particles(t: Vec2, commands: &mut Commands, amount: u32, did_level_up: bool) {
     commands.spawn((
-        TransformBundle::from_transform(Transform::from_translation(t.extend(0.))),
+        Transform::from_translation(t.extend(0.)),
         CpuParticleGenerator {
             min_particle_size: 1. + f32::min(f32::floor(amount as f32 / 10.), 3.),
             max_particle_size: 2. + f32::min(f32::floor(amount as f32 / 10.), 10.),

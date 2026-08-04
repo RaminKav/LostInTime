@@ -3,7 +3,7 @@ use std::time::Duration;
 use bevy::prelude::*;
 
 use crate::player::{
-    skills::{Heirloom, HealthGainSource, ManaGainSource, PlayerSkills},
+    skills::{HealthGainSource, Heirloom, ManaGainSource, PlayerSkills},
     Player,
 };
 
@@ -45,12 +45,11 @@ pub fn handle_health_regen(
         ),
         With<Player>,
     >,
-    mut modify_health_event: EventWriter<ModifyHealthEvent>,
+    mut modify_health_event: MessageWriter<ModifyHealthEvent>,
     mut trigger_counts: ResMut<crate::player::skills::HeirloomTriggerCounts>,
     time: Res<Time>,
 ) {
-    let Ok((health_regen, mut timer, hunger, skills, current_health)) =
-        player_regen.get_single_mut()
+    let Ok((health_regen, mut timer, hunger, skills, current_health)) = player_regen.single_mut()
     else {
         return;
     };
@@ -81,7 +80,7 @@ pub fn handle_health_regen(
         if regen_delta > 0 {
             trigger_counts.record_health_gain(HealthGainSource::HealthRegen, regen_delta);
         }
-        modify_health_event.send(ModifyHealthEvent(regen_delta));
+        modify_health_event.write(ModifyHealthEvent(regen_delta));
         timer.0.reset();
     }
 }
@@ -93,10 +92,10 @@ pub fn handle_mana_regen(
         (&ManaRegen, &mut ManaRegenTimer, &Hunger, &PlayerSkills),
         With<Player>,
     >,
-    mut modify_mana_event: EventWriter<ModifyManaEvent>,
+    mut modify_mana_event: MessageWriter<ModifyManaEvent>,
     time: Res<Time>,
 ) {
-    let Ok((mana_regen, mut timer, hunger, skills)) = player_regen.get_single_mut() else {
+    let Ok((mana_regen, mut timer, hunger, skills)) = player_regen.single_mut() else {
         return;
     };
     let d = time.delta();
@@ -109,11 +108,11 @@ pub fn handle_mana_regen(
         (d.as_secs() as f32 / multiplier) as u64,
         (d.subsec_nanos() as f32 / multiplier) as u32,
     ));
-    if timer.0.finished() {
+    if timer.0.is_finished() {
         if hunger.is_starving() {
             return;
         }
-        modify_mana_event.send(ModifyManaEvent::gain(
+        modify_mana_event.write(ModifyManaEvent::gain(
             mana_regen.0,
             ManaGainSource::ManaRegen,
         ));

@@ -1,6 +1,7 @@
+use bevy::text::Justify;
 use crate::ui::game_fonts as gf;
+use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
-use bevy::render::view::RenderLayers;
 use bevy::sprite::Anchor;
 
 use crate::{
@@ -15,8 +16,9 @@ use crate::{
         unlocks::{persist_unlock_data, UnlockUpgradeKind, UnlockUpgrades, UnlockedClasses},
     },
     ui::{
-        interactions::Interaction, main_menu::spawn_exit_icon_button, spawn_item_stack_icon,
-        ui_helpers, Focusable, Interactable, UIElement, UIState,
+        interactions::{set_sprite_image, Interaction},
+        main_menu::spawn_exit_icon_button,
+        spawn_item_stack_icon, ui_helpers, Focusable, Interactable, UIElement, UIState,
     },
     ScreenResolution,
 };
@@ -47,8 +49,8 @@ pub struct UnlocksCurrencyText;
 
 /// Vertical offset applied to title, currency, and unlock rows (back button stays put).
 const UNLOCKS_CONTENT_Y_OFFSET: f32 = 62.0;
-const UNLOCK_BUTTON_DISABLED_SPRITE: Color = Color::rgb(0.55, 0.55, 0.55);
-const UNLOCK_BUTTON_DISABLED_LABEL: Color = Color::rgb(0.7, 0.7, 0.7);
+const UNLOCK_BUTTON_DISABLED_SPRITE: Color = Color::srgb(0.55, 0.55, 0.55);
+const UNLOCK_BUTTON_DISABLED_LABEL: Color = Color::srgb(0.7, 0.7, 0.7);
 
 fn unlock_purchase_button_enabled(is_maxed: bool, affordable: bool) -> bool {
     !is_maxed && affordable
@@ -167,7 +169,7 @@ fn unlock_effect_summary(kind: UnlockUpgradeKind, upgrades: &UnlockUpgrades) -> 
 
 pub fn handle_unlocks_clicks(
     cursor_pos: Res<CursorPos>,
-    mouse_input: Res<Input<MouseButton>>,
+    mouse_input: Res<ButtonInput<MouseButton>>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     mut buttons: Query<(Entity, &mut Interactable, &UnlockPurchaseButton)>,
     mut commands: Commands,
@@ -199,10 +201,12 @@ pub fn handle_unlocks_clicks(
                     }
                     interactable.change(Interaction::Hovering);
                     commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonHover, 0.05));
-                    commands
-                        .entity(entity)
-                        .insert(UIElement::BackButtonHover)
-                        .insert(graphics.get_ui_element_texture(UIElement::BackButtonHover));
+                    commands.entity(entity).insert(UIElement::BackButtonHover);
+                    set_sprite_image(
+                        &mut commands,
+                        entity,
+                        graphics.get_ui_element_texture(UIElement::BackButtonHover),
+                    );
                 }
                 Interaction::Hovering => {
                     if (left_mouse_released && is_hit && affordable)
@@ -221,10 +225,12 @@ pub fn handle_unlocks_clicks(
                             );
                         }
                         interactable.change(Interaction::None);
-                        commands
-                            .entity(entity)
-                            .insert(UIElement::BackButton)
-                            .insert(graphics.get_ui_element_texture(UIElement::BackButton));
+                        commands.entity(entity).insert(UIElement::BackButton);
+                        set_sprite_image(
+                            &mut commands,
+                            entity,
+                            graphics.get_ui_element_texture(UIElement::BackButton),
+                        );
                     }
                 }
                 _ => {}
@@ -235,24 +241,26 @@ pub fn handle_unlocks_clicks(
                 continue;
             };
             interactable.change(Interaction::None);
-            commands
-                .entity(entity)
-                .insert(UIElement::BackButton)
-                .insert(graphics.get_ui_element_texture(UIElement::BackButton));
+            commands.entity(entity).insert(UIElement::BackButton);
+            set_sprite_image(
+                &mut commands,
+                entity,
+                graphics.get_ui_element_texture(UIElement::BackButton),
+            );
         }
     }
 }
 
 pub fn update_unlocks_currency_text(
     currency: Res<TimeFragmentCurrency>,
-    mut query: Query<&mut Text, With<UnlocksCurrencyText>>,
+    mut query: Query<&mut Text2d, With<UnlocksCurrencyText>>,
 ) {
     if !currency.is_changed() {
         return;
     }
 
     for mut text in query.iter_mut() {
-        text.sections[0].value = format!("{}", currency.time_fragments.max(0));
+        text.0 = format!("{}", currency.time_fragments.max(0));
     }
 }
 
@@ -268,9 +276,9 @@ pub fn refresh_unlock_button_states(
         Option<&Interactable>,
     )>,
     mut text_queries: ParamSet<(
-        Query<&mut Text, With<UnlockButtonLabel>>,
-        Query<(&UnlockCostText, &mut Text)>,
-        Query<(&UnlockInfoText, &mut Text)>,
+        Query<(&mut Text2d, &mut TextColor), With<UnlockButtonLabel>>,
+        Query<(&UnlockCostText, &mut Text2d)>,
+        Query<(&UnlockInfoText, &mut Text2d)>,
     )>,
 ) {
     if !currency.is_changed() && !upgrades.is_changed() {
@@ -298,9 +306,9 @@ pub fn refresh_unlock_button_states(
         {
             let mut labels = text_queries.p0();
             for child in children.iter() {
-                if let Ok(mut text) = labels.get_mut(*child) {
-                    text.sections[0].value = unlock_purchase_button_label(is_maxed).to_string();
-                    text.sections[0].style.color = if enabled {
+                if let Ok((mut text, mut text_color)) = labels.get_mut(child) {
+                    text.0 = unlock_purchase_button_label(is_maxed).to_string();
+                    text_color.0 = if enabled {
                         crate::colors::WHITE
                     } else {
                         UNLOCK_BUTTON_DISABLED_LABEL
@@ -313,21 +321,21 @@ pub fn refresh_unlock_button_states(
     {
         let mut cost_texts = text_queries.p1();
         for (cost, mut text) in cost_texts.iter_mut() {
-            text.sections[0].value = unlock_cost_label(cost.kind, &upgrades);
+            text.0 = unlock_cost_label(cost.kind, &upgrades);
         }
     }
 
     {
         let mut info_texts = text_queries.p2();
         for (info, mut text) in info_texts.iter_mut() {
-            text.sections[0].value = unlock_effect_summary(info.kind, &upgrades);
+            text.0 = unlock_effect_summary(info.kind, &upgrades);
         }
     }
 }
 
 pub fn cleanup_unlocks_ui(mut commands: Commands, query: Query<Entity, With<UnlocksUI>>) {
     for entity in query.iter() {
-        commands.entity(entity).despawn_recursive();
+        commands.entity(entity).despawn();
     }
 }
 
@@ -347,20 +355,15 @@ pub fn setup_unlocks_ui(
 
     // Title
     commands.spawn((
-        Text2dBundle {
-            text: Text::from_section(
-                "Unlocks",
-                gf::DISPLAY_LARGE.text_style(&asset_server, crate::colors::WHITE),
-            )
-            .with_alignment(TextAlignment::Center),
-            text_anchor: bevy::sprite::Anchor::Center,
-            transform: Transform {
+        gf::DISPLAY_LARGE
+            .text(&asset_server, "Unlocks", crate::colors::WHITE)
+            .justify(Justify::Center)
+            .anchor(bevy::sprite::Anchor::CENTER)
+            .with_transform(Transform {
                 translation: Vec3::new(0., 104. + UNLOCKS_CONTENT_Y_OFFSET, 11.),
                 scale: gf::DISPLAY_LARGE.transform_scale(),
                 ..Default::default()
-            },
-            ..Default::default()
-        },
+            }),
         RenderLayers::from_layers(&[3]),
         UnlocksUI,
         Name::new("Unlocks Title"),
@@ -369,24 +372,23 @@ pub fn setup_unlocks_ui(
     // Currency text
     let currency_text = commands
         .spawn((
-            Text2dBundle {
-                text: Text::from_section(
+            gf::DISPLAY
+                .text(
+                    &asset_server,
                     format!("{}", currency.time_fragments.max(0)),
-                    gf::DISPLAY.text_style(&asset_server, crate::colors::WHITE),
+                    crate::colors::WHITE,
                 )
-                .with_alignment(TextAlignment::Left),
-                text_anchor: bevy::sprite::Anchor::CenterLeft,
-                transform: Transform {
+                .justify(Justify::Left)
+                .anchor(bevy::sprite::Anchor::CENTER_LEFT)
+                .with_transform(Transform {
                     translation: Vec3::new(-160., 104.5 + UNLOCKS_CONTENT_Y_OFFSET, 11.),
                     scale: gf::DISPLAY.transform_scale(),
                     ..Default::default()
-                },
-                ..Default::default()
-            },
+                }),
             RenderLayers::from_layers(&[3]),
             UnlocksUI,
             UnlocksCurrencyText,
-            Name::new("Unlocks Currency Text"),
+            Name::new("Unlocks Currency Text2d"),
         ))
         .id();
     let currency_stack = spawn_item_stack_icon(
@@ -398,7 +400,9 @@ pub fn setup_unlocks_ui(
         Vec2::new(0., 0.),
         3,
     );
-    commands.entity(currency_stack).set_parent(currency_text);
+    commands
+        .entity(currency_stack)
+        .insert(ChildOf(currency_text));
 
     let start_y = 54.5 + UNLOCKS_CONTENT_Y_OFFSET;
     let row_spacing = -39.0;
@@ -446,20 +450,15 @@ fn spawn_unlock_row(
 ) {
     let title_name = format!("Unlock Row Title {}", kind.display_name());
     commands.spawn((
-        Text2dBundle {
-            text: Text::from_section(
-                kind.display_name(),
-                gf::DISPLAY.text_style(&asset_server, crate::colors::WHITE),
-            )
-            .with_alignment(TextAlignment::Left),
-            text_anchor: bevy::sprite::Anchor::CenterLeft,
-            transform: Transform {
+        gf::DISPLAY
+            .text(&asset_server, kind.display_name(), crate::colors::WHITE)
+            .justify(Justify::Left)
+            .anchor(bevy::sprite::Anchor::CENTER_LEFT)
+            .with_transform(Transform {
                 translation: info_pos,
                 scale: gf::DISPLAY.transform_scale(),
                 ..Default::default()
-            },
-            ..Default::default()
-        },
+            }),
         RenderLayers::from_layers(&[3]),
         UnlocksUI,
         UIState::Unlocks,
@@ -468,20 +467,19 @@ fn spawn_unlock_row(
 
     let info_text_pos = Vec3::new(info_pos.x, info_pos.y - 13., info_pos.z);
     commands.spawn((
-        Text2dBundle {
-            text: Text::from_section(
+        gf::BODY
+            .text(
+                &asset_server,
                 unlock_effect_summary(kind, upgrades),
-                gf::BODY.text_style(&asset_server, crate::colors::YELLOW_2),
+                crate::colors::YELLOW_2,
             )
-            .with_alignment(TextAlignment::Left),
-            text_anchor: bevy::sprite::Anchor::CenterLeft,
-            transform: Transform {
+            .justify(Justify::Left)
+            .anchor(bevy::sprite::Anchor::CENTER_LEFT)
+            .with_transform(Transform {
                 translation: info_text_pos,
                 scale: gf::BODY.transform_scale(),
                 ..Default::default()
-            },
-            ..Default::default()
-        },
+            }),
         RenderLayers::from_layers(&[3]),
         UnlocksUI,
         UIState::Unlocks,
@@ -491,20 +489,19 @@ fn spawn_unlock_row(
 
     let cost_pos = Vec3::new(35., info_pos.y, info_pos.z);
     commands.spawn((
-        Text2dBundle {
-            text: Text::from_section(
+        gf::BODY
+            .text(
+                &asset_server,
                 unlock_cost_label(kind, upgrades),
-                gf::BODY.text_style(&asset_server, crate::colors::WHITE),
+                crate::colors::WHITE,
             )
-            .with_alignment(TextAlignment::Left),
-            text_anchor: bevy::sprite::Anchor::CenterLeft,
-            transform: Transform {
+            .justify(Justify::Left)
+            .anchor(bevy::sprite::Anchor::CENTER_LEFT)
+            .with_transform(Transform {
                 translation: cost_pos,
                 scale: gf::BODY.transform_scale(),
                 ..Default::default()
-            },
-            ..Default::default()
-        },
+            }),
         RenderLayers::from_layers(&[3]),
         UnlocksUI,
         UIState::Unlocks,
@@ -527,18 +524,17 @@ fn spawn_unlock_row(
     } else {
         UNLOCK_BUTTON_DISABLED_LABEL
     };
-    let mut button_cmd = commands.spawn(SpriteBundle {
-        texture: graphics
-            .get_ui_element_texture(UIElement::BackButton)
-            .clone(),
-        sprite: Sprite {
+    let mut button_cmd = commands.spawn((
+        Sprite {
+            image: graphics
+                .get_ui_element_texture(UIElement::BackButton)
+                .clone(),
             custom_size: Some(Vec2::new(53., 18.)),
             color: button_color,
             ..Default::default()
         },
-        transform: Transform::from_translation(button_pos),
-        ..Default::default()
-    });
+        Transform::from_translation(button_pos),
+    ));
     button_cmd
         .insert(RenderLayers::from_layers(&[3]))
         .insert(UIState::Unlocks)
@@ -563,24 +559,23 @@ fn spawn_unlock_row(
 
     commands
         .spawn((
-            Text2dBundle {
-                text: Text::from_section(
+            gf::BODY
+                .text(
+                    &asset_server,
                     unlock_purchase_button_label(is_maxed),
-                    gf::BODY.text_style(&asset_server, label_color),
+                    label_color,
                 )
-                .with_alignment(TextAlignment::Center),
-                text_anchor: Anchor::Center,
-                transform: Transform {
+                .justify(Justify::Center)
+                .anchor(Anchor::CENTER)
+                .with_transform(Transform {
                     translation: Vec3::new(0.5, 0.5, 1.),
                     scale: gf::BODY.transform_scale(),
                     ..Default::default()
-                },
-                ..Default::default()
-            },
+                }),
             RenderLayers::from_layers(&[3]),
             UIState::Unlocks,
             UnlockButtonLabel,
             Name::new(format!("Unlock Purchase Label {}", kind.display_name())),
         ))
-        .set_parent(button_entity);
+        .insert(ChildOf(button_entity));
 }

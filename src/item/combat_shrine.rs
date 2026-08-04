@@ -1,5 +1,5 @@
-use bevy::{prelude::*, utils::HashMap};
-use bevy_aseprite::aseprite;
+use crate::aseprite_assets::CombatShrineAnim;
+use bevy::{platform::collections::HashMap, prelude::*};
 use rand::{seq::IteratorRandom, Rng};
 
 use crate::{
@@ -9,14 +9,13 @@ use crate::{
     item::LootTable,
     proto::proto_param::ProtoParam,
     ui::minimap::UpdateMiniMapEvent,
-    world::{TileMapPosition, TILE_SIZE},
+    world::{y_sort::YSort, TileMapPosition, TILE_SIZE},
     GameParam,
 };
 
 use super::{Loot, WorldObject};
 
 // Kept for dungeon shrine activate/done animation tags.
-aseprite!(pub CombatShrineAnim, "textures/combat_shrine/combat_shrine.ase");
 
 #[derive(Component)]
 pub struct CombatShrineMob {
@@ -37,6 +36,7 @@ pub struct CombatShrineMobCounts {
     pub remaining: HashMap<TileMapPosition, usize>,
 }
 
+#[derive(Message)]
 pub struct CombatShrineMobDeathEvent {
     pub shrine: Entity,
     pub tile_pos: TileMapPosition,
@@ -102,14 +102,11 @@ pub fn handle_combat_shrine_activate_animation(
 
 /// Combat shrine mobs are always elite, move 25% faster, and use the red endless-mode tint.
 pub fn enhance_combat_shrine_mobs(
-    mut mobs: Query<
-        (Entity, &mut FollowSpeed, Option<&mut TextureAtlasSprite>),
-        Added<CombatShrineMob>,
-    >,
+    mut mobs: Query<(Entity, &mut FollowSpeed, Option<&mut Sprite>), Added<CombatShrineMob>>,
     mut commands: Commands,
 ) {
     const COMBAT_SHRINE_SPEED_MULTIPLIER: f32 = 1.25;
-    const COMBAT_SHRINE_TINT: Color = Color::rgba(1.0, 0.5, 0.5, 1.0);
+    const COMBAT_SHRINE_TINT: Color = Color::srgba(1.0, 0.5, 0.5, 1.0);
 
     for (entity, mut follow_speed, maybe_sprite) in mobs.iter_mut() {
         follow_speed.0 *= COMBAT_SHRINE_SPEED_MULTIPLIER;
@@ -130,7 +127,7 @@ fn complete_combat_shrine(
     commands: &mut Commands,
     proto: &ProtoParam,
     game: &mut GameParam,
-    minimap_event: &mut EventWriter<UpdateMiniMapEvent>,
+    minimap_event: &mut MessageWriter<UpdateMiniMapEvent>,
 ) {
     let drop_list = [
         WorldObject::ChestBlock,
@@ -144,24 +141,29 @@ fn complete_combat_shrine(
         _ => 1,
     };
 
+    // Beside + below the 35×60 shrine (anchor +24). Pure -Y offsets still sat under the
+    // body when drops were Mesh2d; keep a side offset so the Sprite reward is obvious.
+    let reward_offset = Vec2::new(0., -40.);
     let reward_pos = if let Some(shrine_e) = shrine_entity {
         if let Ok((_, t, _)) = shrines.get(shrine_e) {
-            t.translation().truncate() + Vec2::new(0., -26.)
+            t.translation().truncate() + reward_offset
         } else {
-            crate::world::world_helpers::tile_pos_to_world_pos(tile_pos, false)
-                + Vec2::new(0., -18.)
+            crate::world::world_helpers::tile_pos_to_world_pos(tile_pos, false) + reward_offset
         }
     } else {
-        crate::world::world_helpers::tile_pos_to_world_pos(tile_pos, false) + Vec2::new(0., -26.)
+        crate::world::world_helpers::tile_pos_to_world_pos(tile_pos, false) + reward_offset
     };
 
-    commands.spawn_item_from_proto(
+    if let Some(drop_e) = commands.spawn_item_from_proto(
         picked_drop,
         proto,
         reward_pos,
         count,
         Some(game.get_player_level()),
-    );
+    ) {
+        // Bias above nearby world props so the reward reads clearly at the shrine feet.
+        commands.entity(drop_e).insert(YSort(0.5));
+    }
 
     if let Some(shrine_e) = shrine_entity {
         if shrines.get(shrine_e).is_ok() {
@@ -181,7 +183,7 @@ fn complete_combat_shrine(
 pub fn persist_combat_shrine_done(
     game: &mut GameParam,
     tile_pos: TileMapPosition,
-    minimap_event: &mut EventWriter<UpdateMiniMapEvent>,
+    minimap_event: &mut MessageWriter<UpdateMiniMapEvent>,
 ) {
     game.add_object_to_chunk_cache(tile_pos, WorldObject::CombatShrineDone);
     if game.world_obj_cache.shrines.contains_key(&tile_pos) {
@@ -189,22 +191,22 @@ pub fn persist_combat_shrine_done(
             .shrines
             .insert(tile_pos, WorldObject::CombatShrineDone);
     }
-    minimap_event.send(UpdateMiniMapEvent {
+    minimap_event.write(UpdateMiniMapEvent {
         pos: Some(tile_pos),
         new_tile: Some(WorldObject::CombatShrineDone),
     });
 }
 
 pub fn handle_shrine_rewards(
-    mut shrine_mob_event: EventReader<CombatShrineMobDeathEvent>,
+    mut shrine_mob_event: MessageReader<CombatShrineMobDeathEvent>,
     mut shrines: Query<(Entity, &GlobalTransform, &CombatShrine)>,
     proto: ProtoParam,
     mut commands: Commands,
     mut game: GameParam,
-    mut minimap_event: EventWriter<UpdateMiniMapEvent>,
+    mut minimap_event: MessageWriter<UpdateMiniMapEvent>,
     mut mob_counts: ResMut<CombatShrineMobCounts>,
 ) {
-    for event in shrine_mob_event.iter() {
+    for event in shrine_mob_event.read() {
         let Some(remaining) = mob_counts.remaining.get_mut(&event.tile_pos) else {
             continue;
         };

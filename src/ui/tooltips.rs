@@ -1,5 +1,10 @@
-use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
-use bevy_aseprite::{anim::AsepriteAnimation, aseprite, AsepriteBundle};
+use bevy::text::Justify;
+use crate::aseprite_assets::{
+    InventoryStatHighlightCommon, InventoryStatHighlightLegendary, InventoryStatHighlightRare,
+    InventoryStatHighlightUncommon,
+};
+use crate::aseprite_helpers::aseprite_bundle;
+use bevy::{camera::visibility::RenderLayers, prelude::*, sprite::Anchor};
 
 use crate::{
     assets::{asset_helpers::spawn_sprite, Graphics},
@@ -51,10 +56,6 @@ use super::{
     INV_EQUIP_PANEL_OFFSET_X, INV_SIDE_STATS_BG_ALPHA, INV_SIDE_STATS_BG_PADDING,
 };
 
-aseprite!(pub InventoryStatHighlightCommon, "textures/effects/InventoryStatHighlightCommon.ase");
-aseprite!(pub InventoryStatHighlightUncommon, "textures/effects/InventoryStatHighlightUncommon.ase");
-aseprite!(pub InventoryStatHighlightRare, "textures/effects/InventoryStatHighlightRare.ase");
-aseprite!(pub InventoryStatHighlightLegendary, "textures/effects/InventoryStatHighlightLegendary.ase");
 
 /// Panel size for `LargeTooltip*` sprites (inventory item card + consumable buff HUD hover).
 pub const ITEM_TOOLTIP_LARGE_CARD_SIZE: Vec2 = Vec2::new(172., 272.);
@@ -178,7 +179,7 @@ pub struct TooltipsManager {
     pub stats_respawn_delay: Option<Timer>,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Message)]
 pub struct ToolTipUpdateEvent {
     pub item_stack: ItemStack,
     pub is_recipe: bool,
@@ -212,15 +213,14 @@ pub struct ToolTipUpdateEvent {
     pub pin_right: bool,
 }
 
-#[derive(Debug, Clone, Default)]
-
+#[derive(Debug, Clone, Default, Message)]
 pub struct ShowInvPlayerStatsEvent {
     pub stat: Option<StatType>,
     pub ignore_timer: bool,
 }
 
 /// Rebuilds inventory damage/mob stat side panels without touching the player stats tooltip.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Message)]
 pub struct DamageTrackerRefreshEvent;
 
 #[derive(Debug, Clone)]
@@ -252,24 +252,24 @@ impl TooltipTextProps {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Message)]
 pub struct TooltipTeardownEvent;
 
 pub fn tick_tooltip_timer(
     time: Res<Time>,
     mut tooltip_manager: ResMut<TooltipsManager>,
-    mut stats_event: EventWriter<ShowInvPlayerStatsEvent>,
+    mut stats_event: MessageWriter<ShowInvPlayerStatsEvent>,
     cur_ui_state: Res<State<UIState>>,
 ) {
-    if !tooltip_manager.timer.finished() {
+    if !tooltip_manager.timer.is_finished() {
         tooltip_manager.timer.tick(time.delta());
     }
     if let Some(ref mut delay) = tooltip_manager.stats_respawn_delay {
         delay.tick(time.delta());
-        if delay.finished() {
+        if delay.is_finished() {
             tooltip_manager.stats_respawn_delay = None;
-            if cur_ui_state.0 == UIState::Inventory {
-                stats_event.send(ShowInvPlayerStatsEvent {
+            if *cur_ui_state.get() == UIState::Inventory {
+                stats_event.write(ShowInvPlayerStatsEvent {
                     stat: None,
                     ignore_timer: true,
                 });
@@ -280,18 +280,20 @@ pub fn tick_tooltip_timer(
 
 pub fn handle_tooltip_teardown(
     mut commands: Commands,
-    mut updates: EventReader<TooltipTeardownEvent>,
+    mut updates: MessageReader<TooltipTeardownEvent>,
     tooltip: Query<Entity, With<ItemOrRecipeTooltip>>,
     mut tooltip_manager: ResMut<TooltipsManager>,
     inv: Query<&Inventory>,
 
-    mut tooltip_update_events: EventWriter<ToolTipUpdateEvent>,
+    mut tooltip_update_events: MessageWriter<ToolTipUpdateEvent>,
     cur_ui_state: Res<State<UIState>>,
 ) {
-    if updates.iter().count() > 0 {
-        let inv = inv.single();
+    if updates.read().next().is_some() {
+        let Ok(inv) = inv.single() else {
+            return;
+        };
         if let Some(item) = &inv.furnace_items.items[1] {
-            tooltip_update_events.send(ToolTipUpdateEvent {
+            tooltip_update_events.write(ToolTipUpdateEvent {
                 item_stack: item.item_stack.clone(),
                 is_recipe: false,
                 show_range: false,
@@ -300,7 +302,7 @@ pub fn handle_tooltip_teardown(
         } else {
             let had_tooltips = tooltip.iter().next().is_some();
             for t in tooltip.iter() {
-                commands.entity(t).despawn_recursive();
+                commands.entity(t).despawn();
             }
             if had_tooltips {
                 tooltip_manager.timer.reset();
@@ -313,7 +315,7 @@ pub fn handle_spawn_inv_item_tooltip(
     mut commands: Commands,
     graphics: Res<Graphics>,
     asset_server: Res<AssetServer>,
-    mut updates: EventReader<ToolTipUpdateEvent>,
+    mut updates: MessageReader<ToolTipUpdateEvent>,
     inv: Query<Entity, With<InventoryUI>>,
     essence: Query<Entity, With<EssenceUI>>,
     item_chest: Query<Entity, With<ItemChestUI>>,
@@ -326,7 +328,7 @@ pub fn handle_spawn_inv_item_tooltip(
     mouseless: Res<MouselessModeState>,
     resolution: Res<ScreenResolution>,
 ) {
-    for item in updates.iter() {
+    for item in updates.read() {
         let asset_server = asset_server.as_ref();
         tooltip_manager.stats_respawn_delay = None;
         // Secondary tooltips (e.g. the chest's "Currently Equipped" side card) explicitly
@@ -334,7 +336,7 @@ pub fn handle_spawn_inv_item_tooltip(
         // them. Primary tooltips clear any previous card before rendering.
         if item.position_override.is_none() {
             for t in old_tooltips.iter() {
-                commands.entity(t).despawn_recursive();
+                commands.entity(t).despawn();
             }
         }
         // Standard "right of inventory UI" tooltip anchor — used for normal inventory
@@ -354,7 +356,7 @@ pub fn handle_spawn_inv_item_tooltip(
         } else if let Some(p) = item.position_override {
             p
         } else {
-            match cur_inv_state.0 {
+            match *cur_inv_state.get() {
                 UIState::Inventory => {
                     let focus_driving = mouseless.0 || cursor_pos.suppress_ui_hover;
                     let tooltip_anchor = inventory_item_tooltip_placement_anchor(
@@ -402,12 +404,12 @@ pub fn handle_spawn_inv_item_tooltip(
         };
 
         let use_absolute_inventory_tooltip =
-            cur_inv_state.0 == UIState::Inventory && item.position_override.is_none();
+            *cur_inv_state.get() == UIState::Inventory && item.position_override.is_none();
         let tooltip_z = if let Some(world) = item.world_anchor {
             world.z
         } else if use_absolute_inventory_tooltip {
             INVENTORY_CURSOR_TOOLTIP_Z
-        } else if cur_inv_state.0 == UIState::WellShrine {
+        } else if *cur_inv_state.get() == UIState::WellShrine {
             // Above the well shrine full-screen overlay (container z ≈ 50).
             70.
         } else {
@@ -439,20 +441,19 @@ pub fn handle_spawn_inv_item_tooltip(
         let size = ITEM_TOOLTIP_LARGE_CARD_SIZE;
         let tooltip = commands
             .spawn((
-                SpriteBundle {
-                    texture: graphics
-                        .get_ui_element_texture(item_rarity.clone().get_tooltip_ui_element()),
-                    transform: Transform {
+                (
+                    Sprite {
+                        image: graphics
+                            .get_ui_element_texture(item_rarity.clone().get_tooltip_ui_element()),
+                        custom_size: Some(size),
+                        ..Default::default()
+                    },
+                    Transform {
                         translation: Vec3::new(parent_offset.x, parent_offset.y, tooltip_z),
                         scale: Vec3::new(1., 1., 1.),
                         ..Default::default()
                     },
-                    sprite: Sprite {
-                        custom_size: Some(size),
-                        ..Default::default()
-                    },
-                    ..Default::default()
-                },
+                ),
                 RenderLayers::from_layers(&[3]),
                 item_rarity.get_tooltip_ui_element(),
                 Name::new("TOOLTIP"),
@@ -512,28 +513,25 @@ pub fn handle_spawn_inv_item_tooltip(
 
         let _level_text = commands
             .spawn((
-                Text2dBundle {
-                    text: Text::from_section(
+                if is_item_action {
+                    gf::TOOLTIP_CARD_LINE.text(&asset_server, level_string, ORANGE)
+                } else {
+                    gf::TOOLTIP_CARD_SUBHEAD_BOLD.text(
+                        &asset_server,
                         level_string,
-                        if is_item_action {
-                            gf::TOOLTIP_CARD_LINE.text_style(&asset_server, ORANGE)
-                        } else {
-                            gf::TOOLTIP_CARD_SUBHEAD_BOLD
-                                .text_style(&asset_server, item.item_stack.rarity.get_color())
-                        },
-                    ),
-                    text_anchor: Anchor::CenterLeft,
-                    transform: Transform {
-                        translation: Vec3::new(-16., 76., 1.),
-                        scale: gf::TOOLTIP_CARD_LINE.transform_scale(),
-                        ..Default::default()
-                    },
-                    ..default()
-                },
+                        item.item_stack.rarity.get_color(),
+                    )
+                }
+                .anchor(Anchor::CENTER_LEFT)
+                .with_transform(Transform {
+                    translation: Vec3::new(-16., 76., 1.),
+                    scale: gf::TOOLTIP_CARD_LINE.transform_scale(),
+                    ..Default::default()
+                }),
                 Name::new("TOOLTIP Rarity TEXT"),
                 RenderLayers::from_layers(&[3]),
             ))
-            .set_parent(tooltip)
+            .insert(ChildOf(tooltip))
             .id();
 
         // Accessories don't have base stats (health/defence/attack/speed). To keep their
@@ -545,48 +543,42 @@ pub fn handle_spawn_inv_item_tooltip(
         if should_show_attributes {
             let _header_text = commands
                 .spawn((
-                    Text2dBundle {
-                        text: Text::from_section(
+                    gf::TOOLTIP_CARD_SUBHEAD_BOLD
+                        .text(
+                            &asset_server,
                             if is_accessory_tooltip {
                                 "Bonus Stats"
                             } else {
                                 "Base Stats"
                             },
-                            gf::TOOLTIP_CARD_SUBHEAD_BOLD.text_style(&asset_server, YELLOW_2),
-                        ),
-                        text_anchor: Anchor::CenterLeft,
-                        transform: Transform {
+                            YELLOW_2,
+                        )
+                        .anchor(Anchor::CENTER_LEFT)
+                        .with_transform(Transform {
                             translation: Vec3::new(-57., 20., 1.),
                             scale: gf::TOOLTIP_CARD_SUBHEAD_BOLD.transform_scale(),
                             ..Default::default()
-                        },
-                        ..default()
-                    },
+                        }),
                     Name::new("TOOLTIP Rarity TEXT"),
                     RenderLayers::from_layers(&[3]),
                 ))
-                .set_parent(tooltip)
+                .insert(ChildOf(tooltip))
                 .id();
         } else if !item.is_recipe {
             let _header_text = commands
                 .spawn((
-                    Text2dBundle {
-                        text: Text::from_section(
-                            "Description",
-                            gf::TOOLTIP_CARD_SUBHEAD_BOLD.text_style(&asset_server, YELLOW_2),
-                        ),
-                        text_anchor: Anchor::CenterLeft,
-                        transform: Transform {
+                    gf::TOOLTIP_CARD_SUBHEAD_BOLD
+                        .text(&asset_server, "Description", YELLOW_2)
+                        .anchor(Anchor::CENTER_LEFT)
+                        .with_transform(Transform {
                             translation: Vec3::new(-58., -36., 1.),
                             scale: gf::TOOLTIP_CARD_SUBHEAD_BOLD.transform_scale(),
                             ..Default::default()
-                        },
-                        ..default()
-                    },
+                        }),
                     Name::new("TOOLTIP Rarity TEXT"),
                     RenderLayers::from_layers(&[3]),
                 ))
-                .set_parent(tooltip)
+                .insert(ChildOf(tooltip))
                 .id();
             // Consumable usage hint — only for proto-tagged consumables.
             if proto.get_component::<ConsumableItem, _>(obj_type).is_some() {
@@ -594,24 +586,18 @@ pub fn handle_spawn_inv_item_tooltip(
                 for (i, text) in consume_text.iter().enumerate() {
                     let _instructions_to_consume = commands
                         .spawn((
-                            Text2dBundle {
-                                text: Text::from_section(
-                                    text.to_string(),
-                                    gf::TOOLTIP_CARD_SUBHEAD_BOLD
-                                        .text_style(&asset_server, YELLOW_2),
-                                ),
-                                text_anchor: Anchor::CenterLeft,
-                                transform: Transform {
+                            gf::TOOLTIP_CARD_SUBHEAD_BOLD
+                                .text(&asset_server, text.to_string(), YELLOW_2)
+                                .anchor(Anchor::CENTER_LEFT)
+                                .with_transform(Transform {
                                     translation: Vec3::new(-58., 16. - (i as f32 * 10.), 1.),
                                     scale: gf::TOOLTIP_CARD_SUBHEAD_BOLD.transform_scale(),
                                     ..Default::default()
-                                },
-                                ..default()
-                            },
+                                }),
                             Name::new("TOOLTIP Rarity TEXT"),
                             RenderLayers::from_layers(&[3]),
                         ))
-                        .set_parent(tooltip)
+                        .insert(ChildOf(tooltip))
                         .id();
                 }
             }
@@ -619,14 +605,14 @@ pub fn handle_spawn_inv_item_tooltip(
         // ======== rarity ========
         let _rarity_text = commands
             .spawn((
-                Text2dBundle {
-                    text: Text::from_section(
+                gf::TOOLTIP_CARD_LINE
+                    .text(
+                        &asset_server,
                         item.item_stack.rarity.get_name(),
-                        gf::TOOLTIP_CARD_LINE
-                            .text_style(&asset_server, item.item_stack.rarity.get_color()),
-                    ),
-                    text_anchor: Anchor::CenterLeft,
-                    transform: Transform {
+                        item.item_stack.rarity.get_color(),
+                    )
+                    .anchor(Anchor::CENTER_LEFT)
+                    .with_transform(Transform {
                         translation: Vec3::new(
                             -16.,
                             if is_upgrade_material { 68. } else { 62. },
@@ -634,13 +620,11 @@ pub fn handle_spawn_inv_item_tooltip(
                         ),
                         scale: gf::TOOLTIP_CARD_LINE.transform_scale(),
                         ..Default::default()
-                    },
-                    ..default()
-                },
+                    }),
                 Name::new("TOOLTIP Rarity TEXT"),
                 RenderLayers::from_layers(&[3]),
             ))
-            .set_parent(tooltip)
+            .insert(ChildOf(tooltip))
             .id();
         // ======== type ========
         let type_string = if obj_type.is_melee_weapon() {
@@ -664,24 +648,22 @@ pub fn handle_spawn_inv_item_tooltip(
         };
         let _type_text = commands
             .spawn((
-                Text2dBundle {
-                    text: Text::from_section(
+                gf::TOOLTIP_CARD_LINE
+                    .text(
+                        &asset_server,
                         type_string.to_string(),
-                        gf::TOOLTIP_CARD_LINE
-                            .text_style(&asset_server, item.item_stack.rarity.get_color()),
-                    ),
-                    text_anchor: Anchor::CenterLeft,
-                    transform: Transform {
+                        item.item_stack.rarity.get_color(),
+                    )
+                    .anchor(Anchor::CENTER_LEFT)
+                    .with_transform(Transform {
                         translation: Vec3::new(-16., 52., 1.),
                         scale: gf::TOOLTIP_CARD_LINE.transform_scale(),
                         ..Default::default()
-                    },
-                    ..default()
-                },
+                    }),
                 Name::new("TOOLTIP Rarity TEXT"),
                 RenderLayers::from_layers(&[3]),
             ))
-            .set_parent(tooltip)
+            .insert(ChildOf(tooltip))
             .id();
 
         if should_show_attributes {
@@ -691,23 +673,18 @@ pub fn handle_spawn_inv_item_tooltip(
                 //======== Header 2 ========
                 let _text = commands
                     .spawn((
-                        Text2dBundle {
-                            text: Text::from_section(
-                                "Bonus Stats".to_string(),
-                                gf::TOOLTIP_CARD_SUBHEAD_BOLD.text_style(&asset_server, YELLOW_2),
-                            ),
-                            text_anchor: Anchor::CenterLeft,
-                            transform: Transform {
+                        gf::TOOLTIP_CARD_SUBHEAD_BOLD
+                            .text(&asset_server, "Bonus Stats".to_string(), YELLOW_2)
+                            .anchor(Anchor::CENTER_LEFT)
+                            .with_transform(Transform {
                                 translation: Vec3::new(-58., -34., 1.),
                                 scale: gf::TOOLTIP_CARD_SUBHEAD_BOLD.transform_scale(),
                                 ..Default::default()
-                            },
-                            ..default()
-                        },
+                            }),
                         Name::new("TOOLTIP Rarity TEXT"),
                         RenderLayers::from_layers(&[3]),
                     ))
-                    .set_parent(tooltip)
+                    .insert(ChildOf(tooltip))
                     .id();
             }
 
@@ -755,7 +732,7 @@ pub fn handle_spawn_inv_item_tooltip(
                     vec![a.to_string(), range.to_string()],
                     d,
                     *q,
-                    Anchor::CenterLeft,
+                    Anchor::CENTER_LEFT,
                     paths::SLKSCR.to_string(),
                 ));
             }
@@ -764,30 +741,25 @@ pub fn handle_spawn_inv_item_tooltip(
                 //======== "Description" sub-header (body text is white below) ========
                 let _text = commands
                     .spawn((
-                        Text2dBundle {
-                            text: Text::from_section(
-                                "Description".to_string(),
-                                gf::TOOLTIP_CARD_SUBHEAD_BOLD.text_style(&asset_server, YELLOW_2),
-                            ),
-                            text_anchor: Anchor::CenterLeft,
-                            transform: Transform {
+                        gf::TOOLTIP_CARD_SUBHEAD_BOLD
+                            .text(&asset_server, "Description".to_string(), YELLOW_2)
+                            .anchor(Anchor::CENTER_LEFT)
+                            .with_transform(Transform {
                                 translation: Vec3::new(-58., -36., 1.),
                                 scale: gf::TOOLTIP_CARD_SUBHEAD_BOLD.transform_scale(),
                                 ..Default::default()
-                            },
-                            ..default()
-                        },
+                            }),
                         Name::new("TOOLTIP Rarity TEXT"),
                         RenderLayers::from_layers(&[3]),
                     ))
-                    .set_parent(tooltip)
+                    .insert(ChildOf(tooltip))
                     .id();
             } else {
                 tooltip_text.push(TooltipTextProps::new(
                     vec!["".to_string()],
                     0.,
                     AttributeQuality::Low,
-                    Anchor::CenterLeft,
+                    Anchor::CENTER_LEFT,
                     paths::SLKSCR.to_string(),
                 ));
             }
@@ -804,7 +776,7 @@ pub fn handle_spawn_inv_item_tooltip(
                     } else {
                         AttributeQuality::Average
                     },
-                    Anchor::CenterLeft,
+                    Anchor::CENTER_LEFT,
                     paths::SLKSCR.to_string(),
                 ));
             }
@@ -825,46 +797,40 @@ pub fn handle_spawn_inv_item_tooltip(
                 if !item.show_range && j == 1 {
                     continue;
                 }
-                let text =
-                    commands
-                        .spawn((
-                            Text2dBundle {
-                                text: Text::from_section(
-                                    t,
-                                    if j == 1 {
-                                        gf::TOOLTIP_CARD_LINE.text_style(&asset_server, WHITE)
-                                    } else {
-                                        match props.quality {
-                                            AttributeQuality::Low => gf::TOOLTIP_CARD_LINE
-                                                .text_style(&asset_server, WHITE),
-                                            AttributeQuality::Average => gf::TOOLTIP_CARD_LINE
-                                                .text_style(&asset_server, WHITE),
-                                            AttributeQuality::High => gf::TOOLTIP_CARD_LINE
-                                                .text_style(&asset_server, YELLOW),
-                                        }
-                                    },
-                                ),
-                                text_anchor: if j == 0 {
-                                    props.anchor.clone()
+                let text = commands
+                    .spawn((
+                        gf::TOOLTIP_CARD_LINE
+                            .text(
+                                &asset_server,
+                                t,
+                                if j == 1 {
+                                    WHITE
                                 } else {
-                                    Anchor::CenterRight
+                                    match props.quality {
+                                        AttributeQuality::Low | AttributeQuality::Average => WHITE,
+                                        AttributeQuality::High => YELLOW,
+                                    }
                                 },
-                                transform: Transform {
-                                    translation: text_pos
-                                        + Vec3::new(
-                                            if j == 1 { TOOLTIP_UI_SIZE.x - 34. } else { 0. },
-                                            0.,
-                                            0.,
-                                        ),
-                                    scale: gf::TOOLTIP_CARD_LINE.transform_scale(),
-                                    ..Default::default()
-                                },
-                                ..default()
-                            },
-                            Name::new("TOOLTIP TEXT"),
-                            RenderLayers::from_layers(&[3]),
-                        ))
-                        .id();
+                            )
+                            .anchor(if j == 0 {
+                                props.anchor.clone()
+                            } else {
+                                Anchor::CENTER_RIGHT
+                            })
+                            .with_transform(Transform {
+                                translation: text_pos
+                                    + Vec3::new(
+                                        if j == 1 { TOOLTIP_UI_SIZE.x - 34. } else { 0. },
+                                        0.,
+                                        0.,
+                                    ),
+                                scale: gf::TOOLTIP_CARD_LINE.transform_scale(),
+                                ..Default::default()
+                            }),
+                        Name::new("TOOLTIP TEXT"),
+                        RenderLayers::from_layers(&[3]),
+                    ))
+                    .id();
                 commands.entity(tooltip).add_child(text);
             }
 
@@ -982,26 +948,24 @@ pub fn handle_spawn_inv_item_tooltip(
                             InventoryStatHighlightLegendary::tags::IDLE,
                         ),
                     };
-                    let mut anim = AsepriteAnimation::from(idle_tag);
-                    anim.current_frame = 0;
-                    anim.play();
-                    commands
-                        .spawn(AsepriteBundle {
-                            aseprite: handle.unwrap_or_default(),
-                            animation: anim,
-                            transform: Transform::from_translation(box_pos),
-                            ..Default::default()
-                        })
-                        .insert(VisibilityBundle::default())
-                        .insert(RenderLayers::from_layers(&[3]))
-                        .set_parent(tooltip);
+                    commands.spawn((
+                        aseprite_bundle(
+                            handle.unwrap_or_default(),
+                            idle_tag,
+                            Transform::from_translation(box_pos),
+                            Visibility::Inherited,
+                            false,
+                        ),
+                        RenderLayers::from_layers(&[3]),
+                        ChildOf(tooltip),
+                    ));
                 }
             }
         }
 
         // ======== Set Bonus line (gear sets like Leather/Metal/Forest) ========
         if let Some(set) = EquipmentSet::from_world_object(obj_type) {
-            let count = if let Ok(player_inv) = player_inv.get_single() {
+            let count = if let Ok(player_inv) = player_inv.single() {
                 set.count_equipped(player_inv)
             } else {
                 0
@@ -1019,26 +983,22 @@ pub fn handle_spawn_inv_item_tooltip(
             let set_bonus_y = size.y / 2. - 126. - (row_count * 9.) - 44.;
             commands
                 .spawn((
-                    Text2dBundle {
-                        text: Text::from_section(
+                    gf::TOOLTIP_CARD_LINE
+                        .text(
+                            &asset_server,
                             label,
-                            gf::TOOLTIP_CARD_LINE.text_style(
-                                &asset_server,
-                                if active { LIGHT_GREEN } else { LIGHT_GREY },
-                            ),
-                        ),
-                        text_anchor: Anchor::CenterLeft,
-                        transform: Transform {
+                            if active { LIGHT_GREEN } else { LIGHT_GREY },
+                        )
+                        .anchor(Anchor::CENTER_LEFT)
+                        .with_transform(Transform {
                             translation: Vec3::new(-size.x / 2. + 26., set_bonus_y, 2.),
                             scale: gf::TOOLTIP_CARD_LINE.transform_scale(),
                             ..Default::default()
-                        },
-                        ..default()
-                    },
+                        }),
                     Name::new("TOOLTIP Set Bonus TEXT"),
                     RenderLayers::from_layers(&[3]),
                 ))
-                .set_parent(tooltip);
+                .insert(ChildOf(tooltip));
         }
 
         for i in 0..num_stars {
@@ -1050,7 +1010,7 @@ pub fn handle_spawn_inv_item_tooltip(
                 )),
                 3,
             );
-            commands.entity(star).set_parent(tooltip);
+            commands.entity(star).insert(ChildOf(tooltip));
         }
         // Optional header rendered above the card (e.g. "Currently Equipped" on the chest
         // secondary tooltip). Parented to the tooltip sprite so it inherits transform +
@@ -1058,24 +1018,19 @@ pub fn handle_spawn_inv_item_tooltip(
         if let Some(header) = item.header_text.as_ref() {
             commands
                 .spawn((
-                    Text2dBundle {
-                        text: Text::from_section(
-                            header.clone(),
-                            gf::TOOLTIP_ITEM_TITLE.text_style(&asset_server, WHITE),
-                        )
-                        .with_alignment(TextAlignment::Center),
-                        text_anchor: Anchor::Center,
-                        transform: Transform {
+                    gf::TOOLTIP_ITEM_TITLE
+                        .text(&asset_server, header.clone(), WHITE)
+                        .justify(Justify::Center)
+                        .anchor(Anchor::CENTER)
+                        .with_transform(Transform {
                             translation: Vec3::new(0., size.y / 2. + 12., 2.),
                             scale: gf::TOOLTIP_ITEM_TITLE.transform_scale(),
                             ..default()
-                        },
-                        ..default()
-                    },
+                        }),
                     RenderLayers::from_layers(&[3]),
                     Name::new("TOOLTIP HEADER"),
                 ))
-                .set_parent(tooltip);
+                .insert(ChildOf(tooltip));
         }
 
         if let Some(tag) = item.ui_state_tag.clone() {
@@ -1087,11 +1042,11 @@ pub fn handle_spawn_inv_item_tooltip(
             // World-space tooltip (e.g. blessing choice screen); stays unparented.
         } else if use_absolute_inventory_tooltip {
             // Absolute UI-space position near the cursor; stats panel stays visible.
-        } else if let Ok(inv) = inv.get_single() {
+        } else if let Ok(inv) = inv.single() {
             commands.entity(inv).add_child(tooltip);
-        } else if let Ok(essence) = essence.get_single() {
+        } else if let Ok(essence) = essence.single() {
             commands.entity(essence).add_child(tooltip);
-        } else if let Ok(chest) = item_chest.get_single() {
+        } else if let Ok(chest) = item_chest.single() {
             commands.entity(chest).add_child(tooltip);
         }
 
@@ -1109,7 +1064,7 @@ pub fn handle_spawn_inv_item_tooltip(
                 },
                 &item.info_boxes,
             ) {
-                commands.entity(info_root).set_parent(tooltip);
+                commands.entity(info_root).insert(ChildOf(tooltip));
             }
         }
     }
@@ -1127,7 +1082,7 @@ pub fn handle_spawn_inv_player_stats(
     mut commands: Commands,
     graphics: Res<Graphics>,
     asset_server: Res<AssetServer>,
-    mut updates: EventReader<ShowInvPlayerStatsEvent>,
+    mut updates: MessageReader<ShowInvPlayerStatsEvent>,
     curr_ui_state: Res<State<UIState>>,
     player_stats: Query<
         (
@@ -1166,21 +1121,22 @@ pub fn handle_spawn_inv_player_stats(
     mut tooltip_manager: ResMut<TooltipsManager>,
     old_tooltips: Query<Entity, With<PlayerStatsTooltip>>,
 ) {
-    if ui_state.0 == UIState::Closed {
+    if *ui_state == UIState::Closed {
         let d = tooltip_manager.timer.duration();
         tooltip_manager.timer.tick(d);
         return;
     }
-    if updates.iter().len() > 0
-        && (tooltip_manager.timer.finished() || updates.iter().next().unwrap().ignore_timer)
+    let pending_updates: Vec<_> = updates.read().collect();
+    if !pending_updates.is_empty()
+        && (tooltip_manager.timer.is_finished() || pending_updates[0].ignore_timer)
     {
         for t in old_tooltips.iter() {
-            commands.entity(t).despawn_recursive();
+            commands.entity(t).despawn();
         }
         tooltip_manager.timer.reset();
-        let (Ok(parent_e), translation) = (if curr_ui_state.0 == UIState::Inventory {
+        let (Ok(parent_e), translation) = (if *curr_ui_state.get() == UIState::Inventory {
             (
-                inv.get_single(),
+                inv.single(),
                 Vec3::new(
                     (INVENTORY_UI_SIZE.x
                         + TOOLTIP_UI_SIZE.x
@@ -1198,7 +1154,7 @@ pub fn handle_spawn_inv_player_stats(
             return;
         };
 
-        let (
+        let Ok((
             (
                 attack,
                 max_health,
@@ -1226,7 +1182,10 @@ pub fn handle_spawn_inv_player_stats(
             mana_regen_timer,
             health_regen_timer,
             skills,
-        ) = player_stats.single();
+        )) = player_stats.single()
+        else {
+            return;
+        };
 
         let mp_regen_period_secs = effective_regen_period_secs(
             mana_regen_timer.0.duration().as_secs_f32(),
@@ -1285,9 +1244,7 @@ fn stat_tooltip_value_text(
     value: &str,
     bold_font: Handle<Font>,
     regular_font: Handle<Font>,
-    font_size: f32,
-    color: Color,
-) -> Text {
+) -> Vec<(String, Handle<Font>)> {
     const SPACE_OPEN_PAREN: &str = " (";
     if let Some(pos) = value.find(SPACE_OPEN_PAREN) {
         let after = &value[pos + SPACE_OPEN_PAREN.len()..];
@@ -1303,63 +1260,19 @@ fn stat_tooltip_value_text(
                 .and_then(|inner| inner.parse::<f32>().ok())
                 .is_some();
         if is_mitigation || is_damage_mult || is_regen_cd_secs {
-            return Text {
-                sections: vec![
-                    TextSection {
-                        value: value[..pos].to_string(),
-                        style: TextStyle {
-                            font: bold_font,
-                            font_size,
-                            color,
-                        },
-                    },
-                    TextSection {
-                        value: value[pos..].to_string(),
-                        style: TextStyle {
-                            font: regular_font,
-                            font_size,
-                            color,
-                        },
-                    },
-                ],
-                alignment: TextAlignment::Right,
-                ..Default::default()
-            };
+            return vec![
+                (value[..pos].to_string(), bold_font),
+                (value[pos..].to_string(), regular_font),
+            ];
         }
     }
     if value.len() > 1 && value.ends_with('%') && !value.contains('(') {
-        return Text {
-            sections: vec![
-                TextSection {
-                    value: value[..value.len() - 1].to_string(),
-                    style: TextStyle {
-                        font: bold_font,
-                        font_size,
-                        color,
-                    },
-                },
-                TextSection {
-                    value: "%".to_string(),
-                    style: TextStyle {
-                        font: regular_font,
-                        font_size,
-                        color,
-                    },
-                },
-            ],
-            alignment: TextAlignment::Right,
-            ..Default::default()
-        };
+        return vec![
+            (value[..value.len() - 1].to_string(), bold_font),
+            ("%".to_string(), regular_font),
+        ];
     }
-    Text::from_section(
-        value.to_string(),
-        TextStyle {
-            font: bold_font,
-            font_size,
-            color,
-        },
-    )
-    .with_alignment(TextAlignment::Right)
+    vec![(value.to_string(), bold_font)]
 }
 
 /// Single helper for spawning the player stats tooltip (inventory "Final Stats" hover and game over "Final Stats" hover).
@@ -1381,19 +1294,18 @@ pub fn spawn_stats_tooltip_at(
 
     let tooltip = commands
         .spawn((
-            SpriteBundle {
-                texture: graphics.get_ui_element_texture(UIElement::StatTooltip),
-                transform: Transform {
+            (
+                Sprite {
+                    image: graphics.get_ui_element_texture(UIElement::StatTooltip),
+                    custom_size: Some(TOOLTIP_UI_SIZE),
+                    ..Default::default()
+                },
+                Transform {
                     translation,
                     scale: Vec3::new(1., 1., 1.),
                     ..Default::default()
                 },
-                sprite: Sprite {
-                    custom_size: Some(TOOLTIP_UI_SIZE),
-                    ..Default::default()
-                },
-                ..Default::default()
-            },
+            ),
             RenderLayers::from_layers(&[3]),
             UIElement::StatTooltip,
             PlayerStatsTooltip,
@@ -1428,44 +1340,38 @@ pub fn spawn_stats_tooltip_at(
 
         let _text_att_name = commands
             .spawn((
-                Text2dBundle {
-                    text: Text::from_section(
-                        text.0.to_string(),
-                        if i == 0 {
-                            gf::STATS_TOOLTIP_TITLE_ROW.text_style(&asset_server, STATS_TITLE)
-                        } else {
-                            gf::STATS_TOOLTIP_ROW_NAME.text_style(&asset_server, YELLOW_2)
-                        },
-                    ),
-                    text_anchor: Anchor::CenterLeft,
-                    transform: Transform {
-                        translation: text_pos,
-                        scale: if i == 0 {
-                            gf::STATS_TOOLTIP_TITLE_ROW.transform_scale()
-                        } else {
-                            gf::STATS_TOOLTIP_ROW_NAME.transform_scale()
-                        },
-                        ..Default::default()
+                if i == 0 {
+                    gf::STATS_TOOLTIP_TITLE_ROW.text(&asset_server, text.0.to_string(), STATS_TITLE)
+                } else {
+                    gf::STATS_TOOLTIP_ROW_NAME.text(&asset_server, text.0.to_string(), YELLOW_2)
+                }
+                .anchor(Anchor::CENTER_LEFT)
+                .with_transform(Transform {
+                    translation: text_pos,
+                    scale: if i == 0 {
+                        gf::STATS_TOOLTIP_TITLE_ROW.transform_scale()
+                    } else {
+                        gf::STATS_TOOLTIP_ROW_NAME.transform_scale()
                     },
-                    ..default()
-                },
+                    ..Default::default()
+                }),
                 Name::new("TOOLTIP TEXT"),
                 RenderLayers::from_layers(&[3]),
             ))
             .id();
         commands.entity(tooltip).add_child(_text_att_name);
-        let _text_att_value = commands
+        let value_spans = stat_tooltip_value_text(
+            &text.1,
+            stat_value_font_bold.clone(),
+            stat_value_font_regular.clone(),
+        );
+        let mut value_commands = commands
             .spawn((
-                Text2dBundle {
-                    text: stat_tooltip_value_text(
-                        &text.1,
-                        stat_value_font_bold.clone(),
-                        stat_value_font_regular.clone(),
-                        gf::STATS_TOOLTIP_ROW_VALUE.size,
-                        YELLOW_2,
-                    ),
-                    text_anchor: Anchor::CenterRight,
-                    transform: Transform {
+                gf::STATS_TOOLTIP_ROW_VALUE
+                    .text(&asset_server, "", YELLOW_2)
+                    .justify(Justify::Right)
+                    .anchor(Anchor::CENTER_RIGHT)
+                    .with_transform(Transform {
                         translation: text_pos
                             + Vec3::new(
                                 TOOLTIP_UI_SIZE.x - 2. * STAT_TOOLTIP_INNER_PAD_X - 6.,
@@ -1474,13 +1380,27 @@ pub fn spawn_stats_tooltip_at(
                             ),
                         scale: gf::STATS_TOOLTIP_ROW_VALUE.transform_scale(),
                         ..Default::default()
-                    },
-                    ..default()
-                },
+                    }),
                 Name::new("TOOLTIP TEXT"),
                 RenderLayers::from_layers(&[3]),
-            ))
-            .id();
+            ));
+        value_commands.with_children(|parent| {
+            for (value, font) in value_spans {
+                parent.spawn((
+                    TextSpan::new(value),
+                    TextFont {
+                        font: font.into(),
+                        font_size: gf::STATS_TOOLTIP_ROW_VALUE.text_font(&asset_server).font_size,
+                        font_smoothing: gf::STATS_TOOLTIP_ROW_VALUE
+                            .text_font(&asset_server)
+                            .font_smoothing,
+                        ..default()
+                    },
+                    TextColor(YELLOW_2),
+                ));
+            }
+        });
+        let _text_att_value = value_commands.id();
         commands.entity(tooltip).add_child(_text_att_value);
     }
     commands.entity(parent).add_child(tooltip);
@@ -1500,7 +1420,7 @@ fn spawn_inventory_damage_tracker_panels(
     pet_stats: Option<&PetAbilityStats>,
 ) {
     for e in old_panels.iter() {
-        commands.entity(e).despawn_recursive();
+        commands.entity(e).despawn();
     }
 
     let panel_x = (INVENTORY_UI_SIZE.x
@@ -1554,19 +1474,14 @@ fn spawn_inventory_damage_tracker_panels(
         let bg_center_y = (start_y + bottom_y) * 0.5;
         let bg = commands
             .spawn((
-                SpriteBundle {
-                    sprite: Sprite {
-                        color: Color::rgba(0.15, 0.12, 0.10, INV_SIDE_STATS_BG_ALPHA),
+                (
+                    Sprite {
+                        color: Color::srgba(0.15, 0.12, 0.10, INV_SIDE_STATS_BG_ALPHA),
                         custom_size: Some(Vec2::new(bg_w, bg_h)),
                         ..Default::default()
                     },
-                    transform: Transform::from_translation(Vec3::new(
-                        panel_x + 6.,
-                        bg_center_y,
-                        1.5,
-                    )),
-                    ..Default::default()
-                },
+                    Transform::from_translation(Vec3::new(panel_x + 6., bg_center_y, 1.5)),
+                ),
                 RenderLayers::from_layers(&[3]),
                 InventorySideStatsPanel,
                 Name::new("INVENTORY SIDE STATS BACKGROUND"),
@@ -1579,8 +1494,8 @@ fn spawn_inventory_damage_tracker_panels(
 pub fn spawn_damage_tracker_in_inventory(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
-    mut stats_updates: EventReader<ShowInvPlayerStatsEvent>,
-    mut tracker_refresh: EventReader<DamageTrackerRefreshEvent>,
+    mut stats_updates: MessageReader<ShowInvPlayerStatsEvent>,
+    mut tracker_refresh: MessageReader<DamageTrackerRefreshEvent>,
     inv: Query<Entity, With<InventoryUI>>,
     ui_state: Res<State<UIState>>,
     damage_tracker_menu: Res<crate::inventory::DamageTrackerMenuOpen>,
@@ -1589,23 +1504,23 @@ pub fn spawn_damage_tracker_in_inventory(
     mob_tracker: Res<MobStatTracker>,
     pet_stats: Option<Res<PetAbilityStats>>,
 ) {
-    if ui_state.0 != UIState::Inventory {
+    if *ui_state != UIState::Inventory {
         return;
     }
     let should_refresh =
-        tracker_refresh.iter().next().is_some() || stats_updates.iter().next().is_some();
+        tracker_refresh.read().next().is_some() || stats_updates.read().next().is_some();
     if !should_refresh {
         return;
     }
 
     if !damage_tracker_menu.0 {
         for e in old_panels.iter() {
-            commands.entity(e).despawn_recursive();
+            commands.entity(e).despawn();
         }
         return;
     }
 
-    let Ok(inv_entity) = inv.get_single() else {
+    let Ok(inv_entity) = inv.single() else {
         return;
     };
 
@@ -1656,23 +1571,22 @@ pub fn spawn_item_tooltip_icon_name_header(
     }
     commands
         .spawn((
-            Text2dBundle {
-                text: Text::from_section(
+            gf::TOOLTIP_ITEM_TITLE
+                .text(
+                    &asset_server,
                     item_stack.metadata.name.clone(),
-                    gf::TOOLTIP_ITEM_TITLE.text_style(&asset_server, item_stack.rarity.get_color()),
-                ),
-                text_anchor: Anchor::Center,
-                transform: Transform {
+                    item_stack.rarity.get_color(),
+                )
+                .anchor(Anchor::CENTER)
+                .with_transform(Transform {
                     translation: Vec3::new(-ITEM_TOOLTIP_LARGE_CARD_SIZE.x / 2. + 85., 101., 1.),
                     scale: gf::TOOLTIP_ITEM_TITLE.transform_scale(),
                     ..Default::default()
-                },
-                ..default()
-            },
+                }),
             Name::new("TOOLTIP Rarity TEXT"),
             RenderLayers::from_layers(&[3]),
         ))
-        .set_parent(tooltip);
+        .insert(ChildOf(tooltip));
 }
 
 /// World-space offset from HUD icon anchor to the large item tooltip panel center
@@ -1698,18 +1612,23 @@ pub fn spawn_world_item_tooltip_for_stack(
 
     let panel_center_offset = world_item_tooltip_hud_anchor_offset();
 
+    let panel_pos = anchor_translation + panel_center_offset;
+
     let tooltip = commands
         .spawn((
-            SpriteBundle {
-                texture: graphics
-                    .get_ui_element_texture(item_rarity.clone().get_tooltip_ui_element()),
-                transform: Transform::from_translation(anchor_translation + panel_center_offset),
-                sprite: Sprite {
+            (
+                Sprite {
+                    image: graphics
+                        .get_ui_element_texture(item_rarity.clone().get_tooltip_ui_element()),
                     custom_size: Some(size),
-                    ..default()
+                    ..Default::default()
                 },
-                ..default()
-            },
+                Transform {
+                    translation: panel_pos,
+                    scale: Vec3::ONE,
+                    ..Default::default()
+                },
+            ),
             RenderLayers::from_layers(&[3]),
             item_rarity.get_tooltip_ui_element(),
             Name::new("HUD_ITEM_TOOLTIP"),
@@ -1740,44 +1659,34 @@ pub fn spawn_world_item_tooltip_for_stack(
     if has_action_line {
         let _t = commands
             .spawn((
-                Text2dBundle {
-                    text: Text::from_section(
-                        action_or_level,
-                        gf::TOOLTIP_CARD_LINE.text_style(&asset_server, ORANGE),
-                    ),
-                    text_anchor: Anchor::CenterLeft,
-                    transform: Transform {
+                gf::TOOLTIP_CARD_LINE
+                    .text(&asset_server, action_or_level, ORANGE)
+                    .anchor(Anchor::CENTER_LEFT)
+                    .with_transform(Transform {
                         translation: Vec3::new(-16., 78., 2.),
                         scale: gf::TOOLTIP_CARD_LINE.transform_scale(),
                         ..default()
-                    },
-                    ..default()
-                },
+                    }),
                 RenderLayers::from_layers(&[3]),
             ))
-            .set_parent(tooltip)
+            .insert(ChildOf(tooltip))
             .id();
     }
     for (d, line) in item_stack.metadata.desc.iter().enumerate() {
         let y = size.y / 2. - 97. - 9. * d as f32;
         let _d = commands
             .spawn((
-                Text2dBundle {
-                    text: Text::from_section(
-                        line.clone(),
-                        gf::TOOLTIP_BODY.text_style(&asset_server, TOOLTIP_BLACK_2),
-                    ),
-                    text_anchor: Anchor::CenterLeft,
-                    transform: Transform {
+                gf::TOOLTIP_BODY
+                    .text(&asset_server, line.clone(), TOOLTIP_BLACK_2)
+                    .anchor(Anchor::CENTER_LEFT)
+                    .with_transform(Transform {
                         translation: Vec3::new(body_text_x, y, 2.),
                         scale: gf::TOOLTIP_BODY.transform_scale(),
                         ..default()
-                    },
-                    ..default()
-                },
+                    }),
                 RenderLayers::from_layers(&[3]),
             ))
-            .set_parent(tooltip)
+            .insert(ChildOf(tooltip))
             .id();
     }
 

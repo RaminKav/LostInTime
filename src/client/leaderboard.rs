@@ -135,7 +135,7 @@ pub struct LastSubmittedScore {
 }
 
 /// Event to trigger score submission
-#[derive(Debug)]
+#[derive(Debug, Message)]
 pub struct SubmitScoreEvent {
     pub user_id: String,
     pub player_name: String,
@@ -154,7 +154,7 @@ pub struct SubmitScoreEvent {
 }
 
 /// Event to trigger leaderboard fetch
-#[derive(Debug)]
+#[derive(Debug, Message)]
 pub struct FetchLeaderboardEvent {
     pub limit: i32,
     pub class_filter: Option<String>,
@@ -222,11 +222,11 @@ pub fn fetch_leaderboard_blocking(
 /// System to handle score submission events (spawns async task)
 pub fn handle_submit_score_event(
     mut commands: Commands,
-    mut events: EventReader<SubmitScoreEvent>,
+    mut events: MessageReader<SubmitScoreEvent>,
 ) {
     let thread_pool = AsyncComputeTaskPool::get();
 
-    for event in events.iter() {
+    for event in events.read() {
         let request = SubmitScoreRequest {
             user_id: event.user_id.clone(),
             player_name: event.player_name.clone(),
@@ -255,12 +255,12 @@ pub fn handle_submit_score_event(
 /// System to handle leaderboard fetch events (spawns async task)
 pub fn handle_fetch_leaderboard_event(
     mut commands: Commands,
-    mut events: EventReader<FetchLeaderboardEvent>,
+    mut events: MessageReader<FetchLeaderboardEvent>,
     mut cache: ResMut<LeaderboardCache>,
 ) {
     let thread_pool = AsyncComputeTaskPool::get();
 
-    for event in events.iter() {
+    for event in events.read() {
         info!("=== HANDLE_FETCH_LEADERBOARD_EVENT processing event ===");
         cache.is_loading = true;
 
@@ -316,7 +316,7 @@ pub fn poll_fetch_tasks(
                 }
             }
 
-            if let Some(mut entity_cmd) = commands.get_entity(entity) {
+            if let Ok(mut entity_cmd) = commands.get_entity(entity) {
                 entity_cmd.despawn();
             }
         }
@@ -346,7 +346,7 @@ pub fn poll_submit_tasks(
                 }
             }
 
-            if let Some(mut entity_cmd) = commands.get_entity(entity) {
+            if let Ok(mut entity_cmd) = commands.get_entity(entity) {
                 entity_cmd.despawn();
             }
         }
@@ -355,7 +355,7 @@ pub fn poll_submit_tasks(
 
 /// Auto-fetch leaderboard when entering main menu
 pub fn auto_fetch_leaderboard_on_menu(
-    mut events: EventWriter<FetchLeaderboardEvent>,
+    mut events: MessageWriter<FetchLeaderboardEvent>,
     mut cache: ResMut<LeaderboardCache>,
 ) {
     info!("=== AUTO_FETCH_LEADERBOARD_ON_MENU CALLED ===");
@@ -365,7 +365,7 @@ pub fn auto_fetch_leaderboard_on_menu(
     cache.is_loading = true;
 
     // Fetch every time we enter the main menu
-    events.send(FetchLeaderboardEvent {
+    events.write(FetchLeaderboardEvent {
         limit: 10,
         class_filter: None,
     });
@@ -375,8 +375,8 @@ pub fn auto_fetch_leaderboard_on_menu(
 
 /// Auto-submit score on game over
 pub fn auto_submit_score_on_game_over(
-    mut game_over_events: EventReader<crate::client::GameOverEvent>,
-    mut submit_events: EventWriter<SubmitScoreEvent>,
+    mut game_over_events: MessageReader<crate::client::GameOverEvent>,
+    mut submit_events: MessageWriter<SubmitScoreEvent>,
     run_score: Res<RunScore>,
     run_timer: Res<RunTimer>,
     game_data: Res<crate::client::GameData>,
@@ -393,7 +393,7 @@ pub fn auto_submit_score_on_game_over(
     cheat_settings: Option<Res<CheatSettings>>,
 ) {
     let dev_mode = cheat_settings.map(|c| c.dev_mode).unwrap_or(false);
-    for _ in game_over_events.iter() {
+    for _ in game_over_events.read() {
         // Get player name from game data or use default
         let player_name = game_data
             .player_name
@@ -434,22 +434,16 @@ pub fn auto_submit_score_on_game_over(
                 Some(serde_json::json!({ "mob_stats": mob }))
             }
             (Err(e1), Err(e2)) => {
-                warn!(
-                    "Failed to serialize trackers (damage: {}, mob: {})",
-                    e1, e2
-                );
+                warn!("Failed to serialize trackers (damage: {}, mob: {})", e1, e2);
                 None
             }
         };
 
-        let player_heirlooms_json = player_skills_q
-            .get_single()
-            .ok()
-            .and_then(|skills| {
-                serde_json::to_value(skills)
-                    .map_err(|e| warn!("Failed to serialize PlayerSkills: {}", e))
-                    .ok()
-            });
+        let player_heirlooms_json = player_skills_q.single().ok().and_then(|skills| {
+            serde_json::to_value(skills)
+                .map_err(|e| warn!("Failed to serialize PlayerSkills: {}", e))
+                .ok()
+        });
 
         let main_weapon = game
             .player_state
@@ -460,7 +454,7 @@ pub fn auto_submit_score_on_game_over(
         let era_reached = Some(era_display_name(&era_manager.current_era).to_string());
 
         if !dev_mode {
-            submit_events.send(SubmitScoreEvent {
+            submit_events.write(SubmitScoreEvent {
                 user_id: game_data.user_id.to_string(),
                 player_name: player_name.clone(),
                 score,
@@ -495,17 +489,23 @@ pub struct LeaderboardPlugin;
 
 impl Plugin for LeaderboardPlugin {
     fn build(&self, app: &mut App) {
-        app.add_event::<SubmitScoreEvent>()
-            .add_event::<FetchLeaderboardEvent>()
+        app.add_message::<SubmitScoreEvent>()
+            .add_message::<FetchLeaderboardEvent>()
             .init_resource::<LeaderboardCache>()
             .init_resource::<LastSubmittedScore>()
-            .add_systems((
-                handle_submit_score_event,
-                handle_fetch_leaderboard_event,
-                poll_fetch_tasks.run_if(has_fetch_tasks),
-                poll_submit_tasks.run_if(has_submit_tasks),
-            ))
-            .add_system(auto_submit_score_on_game_over.in_set(OnUpdate(GameState::Main)))
-            .add_system(auto_fetch_leaderboard_on_menu.in_schedule(OnEnter(GameState::MainMenu)));
+            .add_systems(
+                Update,
+                (
+                    handle_submit_score_event,
+                    handle_fetch_leaderboard_event,
+                    poll_fetch_tasks.run_if(has_fetch_tasks),
+                    poll_submit_tasks.run_if(has_submit_tasks),
+                ),
+            )
+            .add_systems(
+                Update,
+                auto_submit_score_on_game_over.run_if(in_state(GameState::Main)),
+            )
+            .add_systems(OnEnter(GameState::MainMenu), auto_fetch_leaderboard_on_menu);
     }
 }

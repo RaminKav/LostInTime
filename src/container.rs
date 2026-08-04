@@ -2,18 +2,16 @@ use std::cmp::min;
 
 use crate::{
     inventory::{
-        InventoryError, InventoryItemStack, ItemStack, MAX_STACK_SIZE, INVENTORY_HOTBAR_BAND_SLOTS,
-        INVENTORY_HOTBAR_SLOTS, INVENTORY_SIZE,
+        InventoryError, InventoryItemStack, ItemStack, INVENTORY_HOTBAR_BAND_SLOTS,
+        INVENTORY_HOTBAR_SLOTS, INVENTORY_SIZE, MAX_STACK_SIZE,
     },
-    item::{
-        item_actions::proto_item_allows_hotbar_band, CraftedItemEvent, WorldObject,
-    },
+    item::{item_actions::proto_item_allows_hotbar_band, CraftedItemEvent, WorldObject},
     proto::proto_param::ProtoParam,
     ui::{mark_slot_dirty, InventorySlotState, InventorySlotType, UIContainersParam},
     world::TileMapPosition,
 };
 
-use bevy::{prelude::*, utils::HashMap};
+use bevy::{platform::collections::HashMap, prelude::*};
 use serde::{Deserialize, Serialize};
 
 pub const CONTAINER_UNIT: Option<InventoryItemStack> = None;
@@ -48,9 +46,7 @@ fn first_empty_player_main_inventory(c: &Container) -> Option<usize> {
     let len = c.items.len();
     (0..INVENTORY_HOTBAR_SLOTS.min(len))
         .find(|&i| c.items[i].is_none())
-        .or_else(|| {
-            player_main_inv_bag_slots_top_to_bottom(len).find(|&i| c.items[i].is_none())
-        })
+        .or_else(|| player_main_inv_bag_slots_top_to_bottom(len).find(|&i| c.items[i].is_none()))
 }
 
 fn first_empty_player_main_inventory_skipping_hotbar_band(c: &Container) -> Option<usize> {
@@ -224,8 +220,10 @@ impl Container {
                         .item_stack
                         .clone();
                     let next_avail_slot = match pickup_proto {
-                        Some(p) if target_container.items.len() == INVENTORY_SIZE => target_container
-                            .get_first_empty_player_slot_for_pickup(&remainder_stack, p),
+                        Some(p) if target_container.items.len() == INVENTORY_SIZE => {
+                            target_container
+                                .get_first_empty_player_slot_for_pickup(&remainder_stack, p)
+                        }
                         _ => Self::get_first_empty_slot(target_container),
                     };
                     if let Some(next_avail_slot) = next_avail_slot {
@@ -241,8 +239,9 @@ impl Container {
                 }
             } else {
                 let next_avail_slot = match pickup_proto {
-                    Some(p) if target_container.items.len() == INVENTORY_SIZE => target_container
-                        .get_first_empty_player_slot_for_pickup(stack_ref, p),
+                    Some(p) if target_container.items.len() == INVENTORY_SIZE => {
+                        target_container.get_first_empty_player_slot_for_pickup(stack_ref, p)
+                    }
                     _ => Self::get_first_empty_slot(target_container),
                 };
                 if let Some(next_avail_slot) = next_avail_slot {
@@ -262,12 +261,8 @@ impl Container {
             let stack_count = inv_item_stack.item_stack.count;
             let stack_ref = &inv_item_stack.item_stack;
             let allows_hotbar = proto_item_allows_hotbar_band(stack_ref.obj_type, proto);
-            if let Some(existing_item_slot) =
-                self.get_slot_for_item_in_container_with_space_for_pickup(
-                    stack_ref,
-                    Some(slot),
-                    proto,
-                )
+            if let Some(existing_item_slot) = self
+                .get_slot_for_item_in_container_with_space_for_pickup(stack_ref, Some(slot), proto)
             {
                 if is_from_hotbar && existing_item_slot < INVENTORY_HOTBAR_SLOTS {
                     if let Some(next_avail_inv_slot) = Self::get_first_empty_non_hotbar_slot(self) {
@@ -315,9 +310,8 @@ impl Container {
                 }
             } else if !is_from_hotbar && allows_hotbar {
                 // Prefer keyed hotbar slots (0..INVENTORY_HOTBAR_SLOTS), then passive row slots 4–5.
-                let next_avail_slot = Self::get_first_empty_hotbar_slot(self).or_else(|| {
-                    Self::get_first_empty_hotbar_slot_excluding_quick_use(self)
-                });
+                let next_avail_slot = Self::get_first_empty_hotbar_slot(self)
+                    .or_else(|| Self::get_first_empty_hotbar_slot_excluding_quick_use(self));
                 if let Some(next_avail_slot) = next_avail_slot {
                     self.items[next_avail_slot] = Some(inv_item_stack.modify_slot(next_avail_slot));
                     self.items[slot] = None;
@@ -384,7 +378,7 @@ impl Container {
             let item_b_count = pickup_item.item_stack.count;
             let combined_size = item_a_count + item_b_count;
             let new_item = Some(dragging_item.copy_with_count(min(combined_size, MAX_STACK_SIZE)));
-            cont_param.crafted_event.send(CraftedItemEvent {
+            cont_param.crafted_event.write(CraftedItemEvent {
                 obj: dragging_item_type,
             });
             new_item

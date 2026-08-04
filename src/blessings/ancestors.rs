@@ -12,7 +12,7 @@ use crate::{
         ActiveSkill, Heirloom, HeirloomChoiceQueue, HeirloomRarity, HeirloomWithRarity,
         PlayerSkills,
     },
-    ui::tooltip_info_boxes::TooltipDefinition,
+    ui::{desc_spans::NamedSpanKind, tooltip_info_boxes::TooltipDefinition},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -218,9 +218,15 @@ impl AncestorBlessing {
 
     pub fn display_card_rarity(&self) -> Option<HeirloomRarity> {
         match self {
-            AncestorBlessing::ThreeCommonHeirlooms => Some(HeirloomRarity::Common),
-            AncestorBlessing::OneUncommonHeirloom => Some(HeirloomRarity::Uncommon),
-            AncestorBlessing::TwoRandomRareHeirlooms => Some(HeirloomRarity::Rare),
+            AncestorBlessing::ThreeCommonHeirlooms
+            | AncestorBlessing::TwoOfSpecificCommon
+            | AncestorBlessing::FiveOfRandomCommon => Some(HeirloomRarity::Common),
+            AncestorBlessing::OneUncommonHeirloom
+            | AncestorBlessing::SpecificUncommon
+            | AncestorBlessing::ThreeOfRandomUncommon => Some(HeirloomRarity::Uncommon),
+            AncestorBlessing::TwoRandomRareHeirlooms
+            | AncestorBlessing::SpecificRareHeirloom
+            | AncestorBlessing::RandomRareEquipment => Some(HeirloomRarity::Rare),
             _ => None,
         }
     }
@@ -395,6 +401,38 @@ pub struct ResolvedAncestorBlessing {
     pub resolved_skill: Option<ActiveSkill>,
     pub resolved_item: Option<WorldObject>,
     pub display_icon: Option<AncestorBlessingIcon>,
+}
+
+impl ResolvedAncestorBlessing {
+    /// Specific skill / heirloom / item names present in the card description text.
+    pub fn description_highlight_phrases(&self) -> Vec<(String, NamedSpanKind)> {
+        let joined = self.description.join(" ");
+        let mut phrases = Vec::new();
+
+        if let Some(h) = &self.resolved_heirloom {
+            let title = h.heirloom.get_title();
+            if joined.contains(&title) {
+                phrases.push((title, NamedSpanKind::Rarity(h.rarity)));
+            }
+        }
+        if let Some(skill) = self.resolved_skill {
+            let title = skill.get_title();
+            if joined.contains(&title) {
+                phrases.push((title, NamedSpanKind::Reward));
+            }
+        }
+        if let Some(item) = self.resolved_weapon.or(self.resolved_item) {
+            let debug_name = format!("{item:?}");
+            if joined.contains(&debug_name) {
+                phrases.push((debug_name, NamedSpanKind::Reward));
+            }
+        }
+        if matches!(self.blessing, AncestorBlessing::PlasmaWeapon) {
+            phrases.push(("plasma staff".to_string(), NamedSpanKind::Reward));
+        }
+
+        phrases
+    }
 }
 
 #[derive(Resource, Clone, Debug)]

@@ -63,6 +63,7 @@ pub struct CoinCurrency {
     pub bounce_timer: Timer,
 }
 
+#[derive(Message)]
 pub struct ModifyCurencyEvent {
     pub delta: i32,
     pub obj: WorldObject,
@@ -70,23 +71,23 @@ pub struct ModifyCurencyEvent {
 
 pub fn handle_modify_currency(
     mut time_fragments: ResMut<TimeFragmentCurrency>,
-    mut events: EventReader<ModifyCurencyEvent>,
+    mut events: MessageReader<ModifyCurencyEvent>,
     state: Res<State<GameState>>,
     mut commands: Commands,
     mut coins: ResMut<CoinCurrency>,
     player_skills: Query<&PlayerSkills, With<Player>>,
     player_query: Query<(&GlobalTransform, &Attack, &CurrentMana), With<Player>>,
     enemies: Query<(&GlobalTransform, &Mob), (With<Mob>, Without<Player>)>,
-    mut modify_health_event: EventWriter<ModifyHealthEvent>,
-    mut attribute_change_event: EventWriter<AttributeChangeEvent>,
-    mut ranged_attack_event: EventWriter<RangedAttackEvent>,
-    mut modify_mana_event: EventWriter<ModifyManaEvent>,
+    mut modify_health_event: MessageWriter<ModifyHealthEvent>,
+    mut attribute_change_event: MessageWriter<AttributeChangeEvent>,
+    mut ranged_attack_event: MessageWriter<RangedAttackEvent>,
+    mut modify_mana_event: MessageWriter<ModifyManaEvent>,
     mut trigger_counts: ResMut<crate::player::skills::HeirloomTriggerCounts>,
 ) {
-    let skills = player_skills.get_single().ok();
+    let skills = player_skills.single().ok();
     let mut rng = rand::thread_rng();
 
-    for event in events.iter() {
+    for event in events.read() {
         if event.obj == WorldObject::TimeFragment {
             time_fragments.time_fragments = (time_fragments.time_fragments + event.delta).max(0);
 
@@ -101,7 +102,7 @@ pub fn handle_modify_currency(
             // Trigger attribute recalculation if player has GoldIntoDamage
             if let Some(skills) = skills {
                 if skills.has(Heirloom::GoldIntoDamage) {
-                    attribute_change_event.send_default();
+                    attribute_change_event.write_default();
                 }
             }
 
@@ -128,7 +129,7 @@ pub fn handle_modify_currency(
                                 0
                             };
                             if heal_amount > 0 {
-                                modify_health_event.send(ModifyHealthEvent(heal_amount));
+                                modify_health_event.write(ModifyHealthEvent(heal_amount));
                                 trigger_counts.increment(Heirloom::CoinHeal);
                                 trigger_counts.record_health_gain(
                                     crate::player::skills::HealthGainSource::CoinHeal,
@@ -140,7 +141,7 @@ pub fn handle_modify_currency(
 
                     // CoinLightning: Picking up a coin causes a lightning strike
                     if skills.has(Heirloom::CoinLightning) {
-                        if let Ok((player_txfm, attack, current_mana)) = player_query.get_single() {
+                        if let Ok((player_txfm, attack, current_mana)) = player_query.single() {
                             const MANA_COST: i32 = 5;
                             if current_mana.0 >= MANA_COST {
                                 // Find nearest enemy for lightning target
@@ -157,7 +158,7 @@ pub fn handle_modify_currency(
 
                                 if let Some((target_pos, _)) = enemy_distances.first() {
                                     let lightning_damage = attack.0; // 100% damage
-                                    ranged_attack_event.send(RangedAttackEvent {
+                                    ranged_attack_event.write(RangedAttackEvent {
                                         projectile: Projectile::Lightning,
                                         direction: Vec2::ZERO,
                                         mana_cost: Some(MANA_COST),
@@ -169,7 +170,7 @@ pub fn handle_modify_currency(
                                         pos_override: Some(*target_pos + Vec2::new(0., 48.)),
                                         spawn_delay: 0.0,
                                     });
-                                    modify_mana_event.send(ModifyManaEvent::new(-MANA_COST));
+                                    modify_mana_event.write(ModifyManaEvent::new(-MANA_COST));
                                     commands.spawn(SoundSpawner::new(
                                         AudioSoundEffect::LightningStaffCast,
                                         0.4,
@@ -185,9 +186,9 @@ pub fn handle_modify_currency(
 
         if event.delta > 0 {
             if event.obj == WorldObject::TimeFragment {
-                if state.0 == GameState::Main {
+                if *state == GameState::Main {
                     time_fragments.total_collected_time_fragments_this_run += event.delta;
-                } else if state.0 == GameState::GameOver {
+                } else if *state == GameState::GameOver {
                     time_fragments.total_collected_time_fragments_all_time += event.delta as u128;
                 }
             }

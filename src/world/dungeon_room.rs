@@ -1,5 +1,5 @@
+use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
-use bevy::render::view::RenderLayers;
 use bevy::sprite::Anchor;
 use bevy_rapier2d::prelude::Collider;
 use rand::Rng;
@@ -14,9 +14,7 @@ use crate::{
     inputs::FacingDirection,
     inventory::ItemStack,
     item::{
-        dungeon_shrine::{
-            roll_dungeon_elite, DungeonShrineMob, DungeonShrineMobDeathEvent,
-        },
+        dungeon_shrine::{roll_dungeon_elite, DungeonShrineMob, DungeonShrineMobDeathEvent},
         Loot, LootTable, WorldObject,
     },
     player::Player,
@@ -92,6 +90,7 @@ pub struct ExitRewardPreview;
 const REWARD_PREVIEW_DISTANCE: f32 = 48.;
 
 /// Sent when the player interacts with the wave shrine to begin the next wave.
+#[derive(Message)]
 pub struct StartNextDungeonWaveEvent(pub Entity);
 
 #[derive(Default, PartialEq, Eq, Clone, Copy, Debug)]
@@ -235,11 +234,12 @@ const WAVES: [[&[(Mob, u32)]; 3]; 3] = [
 pub struct DungeonRoomPlugin;
 impl Plugin for DungeonRoomPlugin {
     fn build(&self, app: &mut App) {
-        app.add_event::<StartNextDungeonWaveEvent>()
+        app.add_message::<StartNextDungeonWaveEvent>()
             .init_resource::<DungeonWaveState>()
             .init_resource::<DungeonRewards>()
             .init_resource::<DungeonRewardDrop>()
             .add_systems(
+                Update,
                 (
                     spawn_dungeon_room,
                     handle_start_dungeon_wave,
@@ -249,7 +249,7 @@ impl Plugin for DungeonRoomPlugin {
                     update_exit_reward_preview,
                     drop_dungeon_rewards_on_return,
                 )
-                    .in_set(OnUpdate(GameState::Main)),
+                    .run_if(in_state(GameState::Main)),
             );
     }
 }
@@ -261,11 +261,11 @@ fn spawn_dungeon_room(
     mut commands: Commands,
     defs: Res<crate::defs::GameDefs>,
     asset_server: Res<AssetServer>,
-    mut move_player_event: EventWriter<crate::player::MovePlayerEvent>,
+    mut move_player_event: MessageWriter<crate::player::MovePlayerEvent>,
     mut wave_state: ResMut<DungeonWaveState>,
     mut rewards: ResMut<DungeonRewards>,
 ) {
-    let Ok(_dim_e) = new_dungeon.get_single() else {
+    let Ok(_dim_e) = new_dungeon.single() else {
         return;
     };
 
@@ -274,25 +274,21 @@ fn spawn_dungeon_room(
     rewards.clear();
 
     // Move the player to the room's spawn point.
-    move_player_event.send(crate::player::MovePlayerEvent {
+    move_player_event.write(crate::player::MovePlayerEvent {
         pos: world_pos_to_tile_pos(PLAYER_SPAWN),
         clear_recall_history: true,
     });
 
     // Room art.
     commands.spawn((
-        SpriteBundle {
-            texture: asset_server.load("textures/dungeon.png"),
-            sprite: Sprite {
+        (
+            Sprite {
+                image: asset_server.load("textures/dungeon.png"),
                 custom_size: Some(ROOM_ASSET_SIZE),
                 ..default()
             },
-            // Floor sits at z=0 like the normal chunk tilemap; world objects
-            // y-sort to much higher z so they render on top. A negative z would
-            // fall outside the 2D camera's near clip and render nothing.
-            transform: Transform::from_translation(Vec3::new(0., 0., 0.)),
-            ..default()
-        },
+            Transform::from_translation(Vec3::new(0., 0., 0.)),
+        ),
         DungeonRoomEntity,
         Name::new("Dungeon Room"),
     ));
@@ -300,7 +296,7 @@ fn spawn_dungeon_room(
     // Manual colliders.
     for (center, half_extents) in DUNGEON_COLLIDERS.iter() {
         commands.spawn((
-            TransformBundle::from_transform(Transform::from_translation(center.extend(0.))),
+            Transform::from_translation(center.extend(0.)),
             Collider::cuboid(half_extents.x, half_extents.y),
             DungeonRoomEntity,
             Name::new("Dungeon Collider"),
@@ -308,14 +304,11 @@ fn spawn_dungeon_room(
     }
 
     // Central wave shrine (reuse the weapon shrine art/animation).
-    if let Some(shrine_e) =
-        commands.spawn_from_proto(WorldObject::WeaponShrine, &defs, SHRINE_POS)
+    if let Some(shrine_e) = commands.spawn_from_proto(WorldObject::WeaponShrine, &defs, SHRINE_POS)
     {
         commands
             .entity(shrine_e)
-            .insert(TransformBundle::from_transform(Transform::from_translation(
-                SHRINE_POS.extend(0.),
-            )))
+            .insert(Transform::from_translation(SHRINE_POS.extend(0.)))
             .insert(DungeonRoomEntity)
             .insert(DungeonWaveShrine);
         wave_state.shrine = Some(shrine_e);
@@ -323,14 +316,10 @@ fn spawn_dungeon_room(
 
     // Exit door. The art is part of the room asset, so hide the proto sprite and
     // keep only the interaction trigger + collider.
-    if let Some(door_e) =
-        commands.spawn_from_proto(WorldObject::DungeonExit, &defs, DOOR_POS)
-    {
+    if let Some(door_e) = commands.spawn_from_proto(WorldObject::DungeonExit, &defs, DOOR_POS) {
         commands
             .entity(door_e)
-            .insert(TransformBundle::from_transform(Transform::from_translation(
-                DOOR_POS.extend(0.),
-            )))
+            .insert(Transform::from_translation(DOOR_POS.extend(0.)))
             .insert(Visibility::Hidden)
             .insert(DungeonRoomEntity);
     }
@@ -338,15 +327,15 @@ fn spawn_dungeon_room(
 
 /// Starts the next wave when the player interacts with the shrine.
 fn handle_start_dungeon_wave(
-    mut events: EventReader<StartNextDungeonWaveEvent>,
+    mut events: MessageReader<StartNextDungeonWaveEvent>,
     mut wave_state: ResMut<DungeonWaveState>,
     proto: ProtoParam,
     mut commands: Commands,
     game: GameParam,
-    mut global_text: EventWriter<GlobalTextMessageEvent>,
+    mut global_text: MessageWriter<GlobalTextMessageEvent>,
     mut guides: Query<&mut InteractionGuideTrigger>,
 ) {
-    for event in events.iter() {
+    for event in events.read() {
         // Only start a wave from Idle (before wave 1) or Cleared (between waves).
         if wave_state.phase == WavePhase::InProgress || wave_state.phase == WavePhase::Done {
             continue;
@@ -372,7 +361,7 @@ fn handle_start_dungeon_wave(
         );
         wave_state.mobs_alive += count as i32;
 
-        global_text.send(GlobalTextMessageEvent::new("Danger!!!", RED));
+        global_text.write(GlobalTextMessageEvent::new("Danger!!!", RED));
 
         if let Ok(mut guide) = guides.get_mut(event.0) {
             guide.text = Some("...".to_string());
@@ -394,7 +383,7 @@ fn tick_dungeon_waves(
     if wave_state.phase != WavePhase::InProgress {
         return;
     }
-    wave_state.clock += time.delta_seconds();
+    wave_state.clock += time.delta_secs();
 
     let Some(shrine_e) = wave_state.shrine else {
         return;
@@ -468,10 +457,10 @@ fn tick_dungeon_waves(
 
 /// Decrements the alive count when a wave mob dies.
 fn handle_dungeon_wave_mob_deaths(
-    mut deaths: EventReader<DungeonShrineMobDeathEvent>,
+    mut deaths: MessageReader<DungeonShrineMobDeathEvent>,
     mut wave_state: ResMut<DungeonWaveState>,
 ) {
-    for death in deaths.iter() {
+    for death in deaths.read() {
         if Some(death.0) == wave_state.shrine {
             wave_state.mobs_alive -= 1;
         }
@@ -507,7 +496,9 @@ fn count_wave_golems_alive(
 ) -> usize {
     wave_mobs
         .iter()
-        .filter(|(mob, shrine_mob)| shrine_mob.parent_shrine == shrine_e && **mob == Mob::StoneGolem)
+        .filter(|(mob, shrine_mob)| {
+            shrine_mob.parent_shrine == shrine_e && **mob == Mob::StoneGolem
+        })
         .count()
 }
 
@@ -533,9 +524,7 @@ fn spawn_mini_wave(
         for _ in 0..*count {
             let offset = Vec2::new(rng.gen_range(-170. ..=170.), rng.gen_range(-140. ..=110.));
             let spawn_pos = offset;
-            if let Some(mob_e) =
-                commands.spawn_from_proto(mob.clone(), &proto.defs, spawn_pos)
-            {
+            if let Some(mob_e) = commands.spawn_from_proto(mob.clone(), &proto.defs, spawn_pos) {
                 if roll_dungeon_elite(mob, proto, &mut rng) {
                     commands.entity(mob_e).insert(EliteMob);
                 }
@@ -607,7 +596,7 @@ fn drop_dungeon_rewards_on_return(
         return;
     };
     timer.tick(time.delta());
-    if !timer.finished() {
+    if !timer.is_finished() {
         return;
     }
     drop.timer = None;
@@ -618,7 +607,7 @@ fn drop_dungeon_rewards_on_return(
         return;
     }
 
-    let Ok((player_t, facing)) = player_query.get_single() else {
+    let Ok((player_t, facing)) = player_query.single() else {
         return;
     };
     let base = player_t.translation().truncate() + facing.get_dir_vec() * 28.;
@@ -683,7 +672,7 @@ fn update_exit_reward_preview(
     exit_query: Query<(&GlobalTransform, &WorldObject), With<DungeonRoomEntity>>,
     existing: Query<Entity, With<ExitRewardPreview>>,
 ) {
-    let Ok(player_t) = player_query.get_single() else {
+    let Ok(player_t) = player_query.single() else {
         return;
     };
     let Some(exit_pos) = exit_query
@@ -692,7 +681,7 @@ fn update_exit_reward_preview(
         .map(|(t, _)| t.translation().truncate())
     else {
         for e in existing.iter() {
-            commands.entity(e).despawn_recursive();
+            commands.entity(e).despawn();
         }
         return;
     };
@@ -702,7 +691,7 @@ fn update_exit_reward_preview(
 
     if !should_show {
         for e in existing.iter() {
-            commands.entity(e).despawn_recursive();
+            commands.entity(e).despawn();
         }
         return;
     }
@@ -712,7 +701,7 @@ fn update_exit_reward_preview(
         return;
     }
     for e in existing.iter() {
-        commands.entity(e).despawn_recursive();
+        commands.entity(e).despawn();
     }
 
     let entries = reward_preview_entries(&rewards);
@@ -729,7 +718,7 @@ fn update_exit_reward_preview(
     let root_pos = Vec3::new(exit_pos.x, exit_pos.y + 30., 750.);
     let root = commands
         .spawn((
-            SpatialBundle::from_transform(Transform::from_translation(root_pos)),
+            (Transform::from_translation(root_pos), Visibility::default()),
             RenderLayers::from_layers(&[0]),
             ExitRewardPreview,
             Name::new("Exit Reward Preview"),
@@ -739,19 +728,18 @@ fn update_exit_reward_preview(
     // Dark semi-transparent background container.
     commands
         .spawn((
-            SpriteBundle {
-                sprite: Sprite {
-                    color: Color::rgba(0., 0., 0., 0.6),
+            (
+                Sprite {
+                    color: Color::srgba(0., 0., 0., 0.6),
                     custom_size: Some(Vec2::new(panel_w, PANEL_H)),
                     ..default()
                 },
-                transform: Transform::from_translation(Vec3::new(0., 0., 0.)),
-                ..default()
-            },
+                Transform::from_translation(Vec3::new(0., 0., 0.)),
+            ),
             RenderLayers::from_layers(&[0]),
             Name::new("Exit Reward Preview Panel"),
         ))
-        .set_parent(root);
+        .insert(ChildOf(root));
 
     let start_x = -panel_w / 2. + PANEL_PAD + CELL_W / 2.;
     for (i, (obj, label)) in entries.iter().enumerate() {
@@ -769,7 +757,7 @@ fn update_exit_reward_preview(
             translation: Vec3::new(x, 3., 1.),
             ..default()
         });
-        commands.entity(icon).set_parent(root);
+        commands.entity(icon).insert(ChildOf(root));
 
         let text = spawn_text(
             &mut commands,
@@ -777,11 +765,11 @@ fn update_exit_reward_preview(
             Vec3::new(x, -9., 2.),
             Color::WHITE,
             label.clone(),
-            Anchor::Center,
+            Anchor::CENTER,
             FLOATING_TEXT,
             0,
             None,
         );
-        commands.entity(text).set_parent(root);
+        commands.entity(text).insert(ChildOf(root));
     }
 }

@@ -142,8 +142,8 @@ pub fn bounce_on_hit(
         let sign_y = if sign_y == 0. { 1. } else { sign_y };
         let mut mag_x = t.scale.x.abs();
         let mut mag_y = t.scale.y.abs();
-        let bump = bump_rate * time.delta_seconds() * modifier;
-        if bounce_on_hit.timer.percent() < 0.5 {
+        let bump = bump_rate * time.delta_secs() * modifier;
+        if bounce_on_hit.timer.fraction() < 0.5 {
             mag_x += bump;
             mag_y += bump;
         } else {
@@ -154,7 +154,7 @@ pub fn bounce_on_hit(
         mag_y = mag_y.clamp(rest, peak);
         t.scale.x = sign_x * mag_x;
         t.scale.y = sign_y * mag_y;
-        if bounce_on_hit.timer.finished() {
+        if bounce_on_hit.timer.is_finished() {
             t.scale.x = sign_x * rest;
             t.scale.y = sign_y * rest;
             bounce_on_hit.is_active = false;

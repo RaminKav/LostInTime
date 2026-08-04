@@ -10,12 +10,11 @@
 //! ([`crate::ui::game_fonts::ALAGARD_SCALED_ATLAS_SIZE`]), and this system only switches an
 //! atlas to linear when a text entity with a fractional mapping actually uses it.
 
+use bevy::asset::AssetId;
+use bevy::image::{ImageFilterMode, ImageSampler, ImageSamplerDescriptor};
+use bevy::platform::collections::HashSet;
 use bevy::prelude::*;
-use bevy::render::render_resource::FilterMode;
-use bevy::render::texture::ImageSampler;
-use bevy::sprite::TextureAtlas;
 use bevy::text::TextLayoutInfo;
-use bevy::utils::HashSet;
 use bevy::window::{PrimaryWindow, Window};
 
 use crate::ScreenResolution;
@@ -24,7 +23,7 @@ fn sampler_is_linear(sampler: &ImageSampler) -> bool {
     match sampler {
         ImageSampler::Default => false,
         ImageSampler::Descriptor(desc) => {
-            desc.mag_filter == FilterMode::Linear && desc.min_filter == FilterMode::Linear
+            desc.mag_filter == ImageFilterMode::Linear && desc.min_filter == ImageFilterMode::Linear
         }
     }
 }
@@ -33,7 +32,8 @@ fn sampler_is_nearest_like(sampler: &ImageSampler) -> bool {
     match sampler {
         ImageSampler::Default => true,
         ImageSampler::Descriptor(desc) => {
-            desc.mag_filter == FilterMode::Nearest && desc.min_filter == FilterMode::Nearest
+            desc.mag_filter == ImageFilterMode::Nearest
+                && desc.min_filter == ImageFilterMode::Nearest
         }
     }
 }
@@ -55,16 +55,15 @@ pub fn ensure_font_atlas_linear_sampling(
     res: Res<ScreenResolution>,
     windows: Query<&Window, With<PrimaryWindow>>,
     text_q: Query<(&Transform, &TextLayoutInfo)>,
-    atlases: Res<Assets<TextureAtlas>>,
     mut images: ResMut<Assets<Image>>,
 ) {
-    let Ok(window) = windows.get_single() else {
+    let Ok(window) = windows.single() else {
         return;
     };
     let scale_factor = window.resolution.scale_factor() as f32;
     let ui_scale = res.scale.max(1) as f32;
 
-    let mut linear_handles: HashSet<Handle<Image>> = HashSet::new();
+    let mut linear_handles: HashSet<AssetId<Image>> = HashSet::new();
     for (transform, layout) in text_q.iter() {
         // Text styles use uniform Transform.scale from FontStyle.
         let entity_scale = transform.scale.x;
@@ -72,27 +71,24 @@ pub fn ensure_font_atlas_linear_sampling(
             continue;
         }
         for glyph in &layout.glyphs {
-            let Some(atlas) = atlases.get(&glyph.atlas_info.texture_atlas) else {
-                continue;
-            };
-            linear_handles.insert(atlas.texture.clone_weak());
+            linear_handles.insert(glyph.atlas_info.texture);
         }
     }
 
     for handle in linear_handles {
-        let Some(image) = images.get(&handle) else {
+        let Some(image) = images.get(handle) else {
             continue;
         };
-        if sampler_is_linear(&image.sampler_descriptor) {
+        if sampler_is_linear(&image.sampler) {
             continue;
         }
         // Only override default/nearest; never fight an explicit non-nearest custom sampler.
-        if !sampler_is_nearest_like(&image.sampler_descriptor) {
+        if !sampler_is_nearest_like(&image.sampler) {
             continue;
         }
-        let Some(image) = images.get_mut(&handle) else {
+        let Some(mut image) = images.get_mut(handle) else {
             continue;
         };
-        image.sampler_descriptor = ImageSampler::linear();
+        image.sampler = ImageSampler::Descriptor(ImageSamplerDescriptor::linear());
     }
 }

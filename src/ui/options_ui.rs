@@ -1,18 +1,21 @@
+use bevy::text::Justify;
+use crate::aseprite_assets::OptionsCursor;
+use crate::aseprite_helpers::aseprite_bundle;
+use bevy::camera::visibility::RenderLayers;
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
-use bevy::render::view::RenderLayers;
 use bevy::sprite::Anchor;
-use bevy_aseprite::{anim::AsepriteAnimation, aseprite, AsepriteBundle};
 
 use std::collections::HashSet;
 use std::fs::File;
 use std::io::{BufReader, BufWriter};
 
-use bevy::input::gamepad::{GamepadButton, GamepadButtonType};
+use bevy::input::gamepad::GamepadButton;
 use leafwing_input_manager::prelude::ActionState;
 
 use crate::gamepad_bindings::{
-    format_binding_label, gamepad_connected, BindingLabel, GamepadBindingButton, GamepadMappings,
+    format_binding_label, gamepad_connected, BindingLabel, ConnectedGamepads, GamepadBindingButton,
+    GamepadMappings,
 };
 use crate::gamepad_input::{UiGamepadAction, UiGamepadInputMarker};
 use crate::{
@@ -34,7 +37,7 @@ use crate::{
             ModalFocusable, UiFocus, UiNavDir, UiNavStickStability, UiStickNavLatch,
         },
         game_fonts as gf,
-        interactions::Interaction,
+        interactions::{set_sprite_image, Interaction},
         main_menu::{spawn_exit_icon_button, spawn_main_menu_wide_button, MenuButton},
         ui_helpers, Interactable, UIElement, UIState,
     },
@@ -312,9 +315,9 @@ pub struct OptionsCheckbox(pub OptionsCheckboxType);
 /// Color for boss damage warning indicators. When color blind mode is on, uses dark purple (visible on green/blue backgrounds).
 pub fn boss_warning_indicator_color(settings: &CheatSettings) -> Color {
     if settings.color_blind_mode {
-        Color::rgba(0.35, 0.0, 0.5, 0.3)
+        Color::srgba(0.35, 0.0, 0.5, 0.3)
     } else {
-        Color::rgba(1.0, 0.0, 0.0, 0.3)
+        Color::srgba(1.0, 0.0, 0.0, 0.3)
     }
 }
 
@@ -332,7 +335,7 @@ pub struct OptionsControlsNeedsLabelSync;
 /// Shifts tab body content up; title and bottom button row stay put.
 const OPTIONS_BODY_Y_OFFSET: f32 = 20.;
 
-const OPTIONS_TAB_GREY: Color = Color::rgba(0.25, 0.25, 0.25, 1.0);
+const OPTIONS_TAB_GREY: Color = Color::srgba(0.25, 0.25, 0.25, 1.0);
 const OPTIONS_TAB_BUTTON_SIZE: Vec2 = Vec2::new(72., 18.);
 const OPTIONS_TAB_SPACING: f32 = 24.;
 const OPTIONS_CONTENT_ROW_SPACING: f32 = -18.;
@@ -426,8 +429,6 @@ pub struct OptionsRowLabel {
     pub row: Entity,
 }
 
-aseprite!(pub OptionsCursor, "textures/effects/OptionsCursor.aseprite");
-
 /// 8×8 cursor shown left of a focused/hovered options row label.
 #[derive(Component)]
 pub(crate) struct OptionsRowCursor {
@@ -456,7 +457,7 @@ fn tab_visibility(tab: OptionsTab, active: OptionsTab) -> Visibility {
 fn options_pointcast<'a>(
     cursor_pos: &Res<CursorPos>,
     ui_sprites: &'a Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
-    computed_visibility: &Query<&ComputedVisibility>,
+    computed_visibility: &Query<&ViewVisibility>,
 ) -> Option<(Entity, &'a Sprite, &'a GlobalTransform)> {
     ui_helpers::pointcast_2d(cursor_pos, ui_sprites, None, Some(computed_visibility))
 }
@@ -480,20 +481,19 @@ fn spawn_stepper_row_focus(
     let row_center_x = label_pos.x + 65.;
     commands
         .spawn((
-            SpriteBundle {
-                sprite: Sprite {
-                    color: Color::rgba(0., 0., 0., 0.),
+            (
+                Sprite {
+                    color: Color::srgba(0., 0., 0., 0.),
                     custom_size: Some(Vec2::new(150., 16.)),
                     ..default()
                 },
-                transform: Transform::from_translation(Vec3::new(
+                Transform::from_translation(Vec3::new(
                     row_center_x,
                     label_pos.y,
                     label_pos.z - 0.01,
                 )),
-                visibility: tab_visibility(tab, active),
-                ..default()
-            },
+                tab_visibility(tab, active),
+            ),
             RenderLayers::from_layers(&[3]),
             UIState::Options,
             OptionsUI,
@@ -629,10 +629,10 @@ pub struct DamageTextSizeValueText;
 
 pub fn handle_options_clicks(
     cursor_pos: Res<CursorPos>,
-    mouse_input: Res<Input<MouseButton>>,
+    mouse_input: Res<ButtonInput<MouseButton>>,
     focus_input: FocusInput,
-    gamepads: Res<Gamepads>,
-    computed_visibility: Query<&ComputedVisibility>,
+    gamepads: ConnectedGamepads,
+    computed_visibility: Query<&ViewVisibility>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     mut buttons: Query<(Entity, &mut Interactable, &KeyBindButton), Without<WaitingForKeyInput>>,
     mut commands: Commands,
@@ -649,10 +649,12 @@ pub fn handle_options_clicks(
                 Interaction::None => {
                     interactable.change(Interaction::Hovering);
                     commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonHover, 0.05));
-                    commands
-                        .entity(entity)
-                        .insert(UIElement::XLKeyHover)
-                        .insert(graphics.get_ui_element_texture(UIElement::XLKeyHover));
+                    commands.entity(entity).insert(UIElement::XLKeyHover);
+                    set_sprite_image(
+                        &mut commands,
+                        entity,
+                        graphics.get_ui_element_texture(UIElement::XLKeyHover),
+                    );
                 }
                 Interaction::Hovering => {
                     if (is_hit && left_mouse_released)
@@ -673,21 +675,24 @@ pub fn handle_options_clicks(
                 continue;
             };
             interactable.change(Interaction::None);
-            commands
-                .entity(entity)
-                .insert(UIElement::XLKey)
-                .insert(graphics.get_ui_element_texture(UIElement::XLKey));
+            commands.entity(entity).insert(UIElement::XLKey);
+            set_sprite_image(
+                &mut commands,
+                entity,
+                graphics.get_ui_element_texture(UIElement::XLKey),
+            );
         }
     }
 }
 
 pub fn handle_key_rebind_input(
     mut commands: Commands,
-    mut key_input: ResMut<Input<KeyCode>>,
-    mut mouse_input: ResMut<Input<MouseButton>>,
+    mut key_input: ResMut<ButtonInput<KeyCode>>,
+    mut mouse_input: ResMut<ButtonInput<MouseButton>>,
     mut keybinds: ResMut<InputMappings>,
     mut gamepad_mappings: ResMut<GamepadMappings>,
-    gamepad_buttons: Res<Input<GamepadButton>>,
+    // Bevy 0.19: gamepad digital state lives on each `Gamepad` component, not a global resource.
+    gamepads: Query<&Gamepad>,
     mut waiting: Query<(Entity, &mut WaitingForKeyInput)>,
     graphics: Res<Graphics>,
 ) {
@@ -697,8 +702,10 @@ pub fn handle_key_rebind_input(
 
     let just_pressed_key: Vec<KeyCode> = key_input.get_just_pressed().copied().collect();
     let just_pressed_mouse: Vec<MouseButton> = mouse_input.get_just_pressed().copied().collect();
-    let just_pressed_gamepad: Vec<GamepadButton> =
-        gamepad_buttons.get_just_pressed().copied().collect();
+    let just_pressed_gamepad: Vec<GamepadButton> = gamepads
+        .iter()
+        .flat_map(|gamepad| gamepad.get_just_pressed().copied())
+        .collect();
 
     for (_, mut waiting_for) in waiting.iter_mut() {
         if waiting_for.ignore_mouse_frames > 0 {
@@ -712,10 +719,12 @@ pub fn handle_key_rebind_input(
         if *key == KeyCode::Escape {
             for (entity, _) in waiting.iter() {
                 commands.entity(entity).remove::<WaitingForKeyInput>();
-                commands
-                    .entity(entity)
-                    .insert(UIElement::BackButton)
-                    .insert(graphics.get_ui_element_texture(UIElement::BackButton));
+                commands.entity(entity).insert(UIElement::BackButton);
+                set_sprite_image(
+                    &mut commands,
+                    entity,
+                    graphics.get_ui_element_texture(UIElement::BackButton),
+                );
             }
             key_input.clear();
             return;
@@ -724,18 +733,20 @@ pub fn handle_key_rebind_input(
 
     if capture_gamepad {
         for button in just_pressed_gamepad {
-            if button.button_type == GamepadButtonType::East {
+            if button == GamepadButton::East {
                 for (entity, _) in waiting.iter() {
                     commands.entity(entity).remove::<WaitingForKeyInput>();
-                    commands
-                        .entity(entity)
-                        .insert(UIElement::BackButton)
-                        .insert(graphics.get_ui_element_texture(UIElement::BackButton));
+                    commands.entity(entity).insert(UIElement::BackButton);
+                    set_sprite_image(
+                        &mut commands,
+                        entity,
+                        graphics.get_ui_element_texture(UIElement::BackButton),
+                    );
                 }
                 return;
             }
 
-            let Some(binding) = GamepadBindingButton::from_button_type(button.button_type) else {
+            let Some(binding) = GamepadBindingButton::from_button_type(button) else {
                 continue;
             };
 
@@ -743,10 +754,12 @@ pub fn handle_key_rebind_input(
                 apply_gamepad_rebind(&mut gamepad_mappings, waiting_for.bind_type, binding);
                 gamepad_mappings.save();
                 commands.entity(entity).remove::<WaitingForKeyInput>();
-                commands
-                    .entity(entity)
-                    .insert(UIElement::BackButton)
-                    .insert(graphics.get_ui_element_texture(UIElement::BackButton));
+                commands.entity(entity).insert(UIElement::BackButton);
+                set_sprite_image(
+                    &mut commands,
+                    entity,
+                    graphics.get_ui_element_texture(UIElement::BackButton),
+                );
                 commands.spawn(SoundSpawner::new(AudioSoundEffect::UISkillSelection, 0.15));
             }
             return;
@@ -774,10 +787,12 @@ pub fn handle_key_rebind_input(
             }
             keybinds.save();
             commands.entity(entity).remove::<WaitingForKeyInput>();
-            commands
-                .entity(entity)
-                .insert(UIElement::BackButton)
-                .insert(graphics.get_ui_element_texture(UIElement::BackButton));
+            commands.entity(entity).insert(UIElement::BackButton);
+            set_sprite_image(
+                &mut commands,
+                entity,
+                graphics.get_ui_element_texture(UIElement::BackButton),
+            );
             commands.spawn(SoundSpawner::new(AudioSoundEffect::UISkillSelection, 0.15));
         }
         key_input.clear();
@@ -813,10 +828,12 @@ pub fn handle_key_rebind_input(
             }
             keybinds.save();
             commands.entity(entity).remove::<WaitingForKeyInput>();
-            commands
-                .entity(entity)
-                .insert(UIElement::BackButton)
-                .insert(graphics.get_ui_element_texture(UIElement::BackButton));
+            commands.entity(entity).insert(UIElement::BackButton);
+            set_sprite_image(
+                &mut commands,
+                entity,
+                graphics.get_ui_element_texture(UIElement::BackButton),
+            );
             commands.spawn(SoundSpawner::new(AudioSoundEffect::UISkillSelection, 0.15));
         }
         mouse_input.clear();
@@ -846,9 +863,14 @@ fn options_display_binding(
     bind_type: KeyBindType,
     keybinds: &InputMappings,
     gamepad_mappings: &GamepadMappings,
-    gamepads: &Gamepads,
+    gamepad_connected: bool,
 ) -> String {
-    format_binding_label(bind_type.into(), keybinds, gamepad_mappings, gamepads)
+    format_binding_label(
+        bind_type.into(),
+        keybinds,
+        gamepad_mappings,
+        gamepad_connected,
+    )
 }
 
 impl From<KeyBindType> for BindingLabel {
@@ -867,10 +889,10 @@ impl From<KeyBindType> for BindingLabel {
 pub fn update_keybind_text(
     keybinds: Res<InputMappings>,
     gamepad_mappings: Res<GamepadMappings>,
-    gamepads: Res<Gamepads>,
+    gamepads: ConnectedGamepads,
     needs_sync: Option<Res<OptionsControlsNeedsLabelSync>>,
     waiting: Query<&WaitingForKeyInput>,
-    mut texts: Query<(&KeyBindText, &mut Text)>,
+    mut texts: Query<(&KeyBindText, &mut Text2d, &mut TextColor)>,
     mut was_waiting: Local<bool>,
     mut last_gamepad_connected: Local<Option<bool>>,
 ) {
@@ -893,36 +915,36 @@ pub fn update_keybind_text(
 
     *was_waiting = is_waiting;
 
-    for (key_text, mut text) in texts.iter_mut() {
+    for (key_text, mut text, mut text_color) in texts.iter_mut() {
         if waiting_binds.contains(&key_text.bind_type) {
             let waiting_gamepad = waiting
                 .iter()
                 .find(|w| w.bind_type == key_text.bind_type)
                 .map(|w| w.capture_gamepad)
                 .unwrap_or(use_gamepad);
-            text.sections[0].value = if waiting_gamepad {
+            text.0 = if waiting_gamepad {
                 "Press any button...".to_string()
             } else {
                 "Press any key...".to_string()
             };
-            text.sections[0].style.color = WHITE;
+            text_color.0 = WHITE;
         } else {
-            text.sections[0].value = options_display_binding(
+            text.0 = options_display_binding(
                 key_text.bind_type,
                 &keybinds,
                 &gamepad_mappings,
-                &gamepads,
+                gamepad_connected(&gamepads),
             );
-            text.sections[0].style.color = WHITE;
+            text_color.0 = WHITE;
         }
     }
 }
 
 pub fn update_options_controls_section_titles(
-    gamepads: Res<Gamepads>,
+    gamepads: ConnectedGamepads,
     needs_sync: Option<Res<OptionsControlsNeedsLabelSync>>,
     mut commands: Commands,
-    mut titles: Query<(&OptionsControlsSectionTitle, &mut Text)>,
+    mut titles: Query<(&OptionsControlsSectionTitle, &mut Text2d)>,
     mut last_gamepad_connected: Local<Option<bool>>,
 ) {
     let use_gamepad = gamepad_connected(&gamepads);
@@ -938,7 +960,7 @@ pub fn update_options_controls_section_titles(
 
     let suffix = if use_gamepad { " (Controller)" } else { "" };
     for (title, mut text) in titles.iter_mut() {
-        text.sections[0].value = format!("{}{}", title.0, suffix);
+        text.0 = format!("{}{}", title.0, suffix);
     }
 }
 
@@ -952,10 +974,10 @@ pub fn cleanup_options_ui(
         query.iter().count()
     );
     for entity in query.iter() {
-        commands.entity(entity).despawn_recursive();
+        commands.entity(entity).despawn();
     }
     for entity in popup.iter() {
-        commands.entity(entity).despawn_recursive();
+        commands.entity(entity).despawn();
     }
 }
 
@@ -999,7 +1021,7 @@ pub fn setup_options_ui(mut commands: Commands, deps: SetupOptionsResources) {
         existing_ui,
     } = deps;
     for entity in existing_ui.iter() {
-        commands.entity(entity).despawn_recursive();
+        commands.entity(entity).despawn();
     }
 
     let active = active_tab.0;
@@ -1018,20 +1040,15 @@ pub fn setup_options_ui(mut commands: Commands, deps: SetupOptionsResources) {
         .insert(UIState::Options);
 
     commands.spawn((
-        Text2dBundle {
-            text: Text::from_section(
-                "Options",
-                gf::MENU_TITLE_LARGE.text_style(&asset_server, WHITE),
-            )
-            .with_alignment(TextAlignment::Center),
-            text_anchor: bevy::sprite::Anchor::Center,
-            transform: Transform {
+        gf::MENU_TITLE_LARGE
+            .text(&asset_server, "Options", WHITE)
+            .justify(Justify::Center)
+            .anchor(bevy::sprite::Anchor::CENTER)
+            .with_transform(Transform {
                 translation: Vec3::new(0., resolution.game_height / 2. - 40., z),
                 scale: gf::MENU_TITLE_LARGE.transform_scale(),
                 ..default()
-            },
-            ..Default::default()
-        },
+            }),
         RenderLayers::from_layers(&[3]),
         OptionsUI,
         Name::new("Options Title"),
@@ -1083,7 +1100,7 @@ pub fn setup_options_ui(mut commands: Commands, deps: SetupOptionsResources) {
         &cheat_settings,
     );
 
-    if game_state.0 == crate::GameState::Main {
+    if *game_state == crate::GameState::Main {
         let tutorial_btn = spawn_main_menu_wide_button(
             Vec3::new(-75., -156., z),
             "Show Tutorial",
@@ -1147,8 +1164,8 @@ fn spawn_options_tab_column(
         let is_active = *tab == active;
         let button_e = commands
             .spawn((
-                SpriteBundle {
-                    sprite: Sprite {
+                (
+                    Sprite {
                         color: if is_active {
                             DARK_GREEN
                         } else {
@@ -1157,9 +1174,8 @@ fn spawn_options_tab_column(
                         custom_size: Some(OPTIONS_TAB_BUTTON_SIZE),
                         ..default()
                     },
-                    transform: Transform::from_translation(Vec3::new(tab_x, y, z)),
-                    ..default()
-                },
+                    Transform::from_translation(Vec3::new(tab_x, y, z)),
+                ),
                 Interactable::default(),
                 RenderLayers::from_layers(&[3]),
                 OptionsUI,
@@ -1172,24 +1188,19 @@ fn spawn_options_tab_column(
 
         commands
             .spawn((
-                Text2dBundle {
-                    text: Text::from_section(
-                        tab.label(),
-                        gf::MENU_TITLE.text_style(&asset_server, WHITE),
-                    )
-                    .with_alignment(TextAlignment::Center),
-                    text_anchor: Anchor::Center,
-                    transform: Transform {
+                gf::MENU_TITLE
+                    .text(&asset_server, tab.label(), WHITE)
+                    .justify(Justify::Center)
+                    .anchor(Anchor::CENTER)
+                    .with_transform(Transform {
                         translation: Vec3::new(0., -1., 1.),
                         scale: gf::MENU_TITLE.transform_scale(),
                         ..default()
-                    },
-                    ..default()
-                },
+                    }),
                 RenderLayers::from_layers(&[3]),
                 OptionsUI,
             ))
-            .set_parent(button_e);
+            .insert(ChildOf(button_e));
     }
 }
 
@@ -1202,18 +1213,18 @@ fn spawn_controls_section_title(
     active: OptionsTab,
 ) {
     commands.spawn((
-        Text2dBundle {
-            text: Text::from_section(title, gf::MENU_TITLE.text_style(&asset_server, YELLOW_2))
-                .with_alignment(TextAlignment::Left),
-            text_anchor: bevy::sprite::Anchor::CenterLeft,
-            transform: Transform {
-                translation: pos,
-                scale: gf::MENU_TITLE.transform_scale(),
-                ..default()
-            },
-            visibility: tab_visibility(tab, active),
-            ..Default::default()
-        },
+        (
+            gf::MENU_TITLE
+                .text(&asset_server, title, YELLOW_2)
+                .justify(Justify::Left)
+                .anchor(bevy::sprite::Anchor::CENTER_LEFT)
+                .with_transform(Transform {
+                    translation: pos,
+                    scale: gf::MENU_TITLE.transform_scale(),
+                    ..default()
+                }),
+            tab_visibility(tab, active),
+        ),
         RenderLayers::from_layers(&[3]),
         OptionsUI,
         OptionsTabContent(tab),
@@ -1231,18 +1242,18 @@ fn spawn_options_section_title(
     active: OptionsTab,
 ) {
     commands.spawn((
-        Text2dBundle {
-            text: Text::from_section(title, gf::MENU_TITLE.text_style(&asset_server, YELLOW_2))
-                .with_alignment(TextAlignment::Left),
-            text_anchor: bevy::sprite::Anchor::CenterLeft,
-            transform: Transform {
-                translation: pos,
-                scale: gf::MENU_TITLE.transform_scale(),
-                ..default()
-            },
-            visibility: tab_visibility(tab, active),
-            ..Default::default()
-        },
+        (
+            gf::MENU_TITLE
+                .text(&asset_server, title, YELLOW_2)
+                .justify(Justify::Left)
+                .anchor(bevy::sprite::Anchor::CENTER_LEFT)
+                .with_transform(Transform {
+                    translation: pos,
+                    scale: gf::MENU_TITLE.transform_scale(),
+                    ..default()
+                }),
+            tab_visibility(tab, active),
+        ),
         RenderLayers::from_layers(&[3]),
         OptionsUI,
         OptionsTabContent(tab),
@@ -1857,7 +1868,7 @@ pub fn sync_options_tab_visibility(
 pub fn handle_options_tab_buttons(
     mut commands: Commands,
     cursor_pos: Res<CursorPos>,
-    mouse_input: Res<Input<MouseButton>>,
+    mouse_input: Res<ButtonInput<MouseButton>>,
     mouseless: Res<crate::inputs::MouselessModeState>,
     mut active_tab: ResMut<ActiveOptionsTab>,
     mut ui_focus: ResMut<UiFocus>,
@@ -1994,16 +2005,15 @@ fn spawn_keybind_row(
     };
 
     let button_entity = commands
-        .spawn(SpriteBundle {
-            texture: graphics.get_ui_element_texture(UIElement::XLKey).clone(),
-            sprite: Sprite {
+        .spawn((
+            Sprite {
+                image: graphics.get_ui_element_texture(UIElement::XLKey).clone(),
                 custom_size: Some(Vec2::new(40., 12.)),
-                ..Default::default()
+                ..default()
             },
-            transform: Transform::from_translation(button_pos),
-            visibility: tab_visibility(tab, active),
-            ..Default::default()
-        })
+            Transform::from_translation(button_pos),
+            tab_visibility(tab, active),
+        ))
         .insert(RenderLayers::from_layers(&[3]))
         .insert(UIState::Options)
         .insert(UIElement::BackButton)
@@ -2018,36 +2028,34 @@ fn spawn_keybind_row(
 
     commands
         .spawn((
-            Text2dBundle {
-                text: Text::from_section("Rebind ", gf::BODY.text_style(&asset_server, WHITE))
-                    .with_alignment(TextAlignment::Center),
-                text_anchor: Anchor::Center,
-                transform: Transform {
+            gf::BODY
+                .text(&asset_server, "Rebind ", WHITE)
+                .justify(Justify::Center)
+                .anchor(Anchor::CENTER)
+                .with_transform(Transform {
                     translation: Vec3::new(2., 0.5, 1.),
                     scale: gf::BODY.transform_scale(),
                     ..default()
-                },
-                ..Default::default()
-            },
+                }),
             RenderLayers::from_layers(&[3]),
             UIState::Options,
             Name::new(format!("Keybind Button Label {:?}", bind_type)),
         ))
-        .set_parent(button_entity);
+        .insert(ChildOf(button_entity));
 
     commands.spawn((
-        Text2dBundle {
-            text: Text::from_section(label, gf::BODY.text_style(&asset_server, WHITE))
-                .with_alignment(TextAlignment::Left),
-            text_anchor: bevy::sprite::Anchor::CenterLeft,
-            transform: Transform {
-                translation: label_pos,
-                scale: gf::BODY.transform_scale(),
-                ..default()
-            },
-            visibility: tab_visibility(tab, active),
-            ..Default::default()
-        },
+        (
+            gf::BODY
+                .text(&asset_server, label, WHITE)
+                .justify(Justify::Left)
+                .anchor(bevy::sprite::Anchor::CENTER_LEFT)
+                .with_transform(Transform {
+                    translation: label_pos,
+                    scale: gf::BODY.transform_scale(),
+                    ..default()
+                }),
+            tab_visibility(tab, active),
+        ),
         RenderLayers::from_layers(&[3]),
         OptionsUI,
         OptionsTabContent(tab),
@@ -2057,21 +2065,22 @@ fn spawn_keybind_row(
 
     let current_key_pos = Vec3::new(label_pos.x + 72., label_pos.y, label_pos.z);
     commands.spawn((
-        Text2dBundle {
-            text: Text::from_section(
-                crate::keybinds::get_key_display_name(current_key),
-                gf::BODY.text_style(&asset_server, WHITE),
-            )
-            .with_alignment(TextAlignment::Left),
-            text_anchor: bevy::sprite::Anchor::CenterLeft,
-            transform: Transform {
-                translation: current_key_pos,
-                scale: gf::BODY.transform_scale(),
-                ..default()
-            },
-            visibility: tab_visibility(tab, active),
-            ..Default::default()
-        },
+        (
+            gf::BODY
+                .text(
+                    &asset_server,
+                    crate::keybinds::get_key_display_name(current_key),
+                    WHITE,
+                )
+                .justify(Justify::Left)
+                .anchor(bevy::sprite::Anchor::CENTER_LEFT)
+                .with_transform(Transform {
+                    translation: current_key_pos,
+                    scale: gf::BODY.transform_scale(),
+                    ..default()
+                }),
+            tab_visibility(tab, active),
+        ),
         RenderLayers::from_layers(&[3]),
         OptionsUI,
         OptionsTabContent(tab),
@@ -2099,16 +2108,15 @@ fn spawn_options_checkbox(
         UIElement::CheckBox
     };
     let checkbox_entity = commands
-        .spawn(SpriteBundle {
-            texture: graphics.get_ui_element_texture(ui_checkbox).clone(),
-            sprite: Sprite {
+        .spawn((
+            Sprite {
+                image: graphics.get_ui_element_texture(ui_checkbox).clone(),
                 custom_size: Some(Vec2::new(16., 16.)),
-                ..Default::default()
+                ..default()
             },
-            transform: Transform::from_translation(checkbox_pos),
-            visibility: tab_visibility(tab, active),
-            ..Default::default()
-        })
+            Transform::from_translation(checkbox_pos),
+            tab_visibility(tab, active),
+        ))
         .insert(RenderLayers::from_layers(&[3]))
         .insert(UIState::Options)
         .insert(OptionsUI)
@@ -2121,18 +2129,18 @@ fn spawn_options_checkbox(
         .id();
 
     commands.spawn((
-        Text2dBundle {
-            text: Text::from_section(label, gf::BODY.text_style(&asset_server, WHITE))
-                .with_alignment(TextAlignment::Left),
-            text_anchor: bevy::sprite::Anchor::CenterLeft,
-            transform: Transform {
-                translation: label_pos,
-                scale: gf::BODY.transform_scale(),
-                ..default()
-            },
-            visibility: tab_visibility(tab, active),
-            ..Default::default()
-        },
+        (
+            gf::BODY
+                .text(&asset_server, label, WHITE)
+                .justify(Justify::Left)
+                .anchor(bevy::sprite::Anchor::CENTER_LEFT)
+                .with_transform(Transform {
+                    translation: label_pos,
+                    scale: gf::BODY.transform_scale(),
+                    ..default()
+                }),
+            tab_visibility(tab, active),
+        ),
         RenderLayers::from_layers(&[3]),
         OptionsUI,
         OptionsTabContent(tab),
@@ -2145,9 +2153,9 @@ fn spawn_options_checkbox(
 
 pub fn handle_cheat_checkbox_click(
     cursor_pos: Res<CursorPos>,
-    mouse_input: Res<Input<MouseButton>>,
+    mouse_input: Res<ButtonInput<MouseButton>>,
     focus_input: FocusInput,
-    computed_visibility: Query<&ComputedVisibility>,
+    computed_visibility: Query<&ViewVisibility>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     mut checkboxes: Query<(Entity, &OptionsCheckbox, &mut Interactable), With<OptionsCheckbox>>,
     mut cheat_settings: ResMut<CheatSettings>,
@@ -2220,7 +2228,7 @@ pub fn update_cheat_checkbox_visual(
     mouseless_mode: Res<MouselessModeState>,
     swap_movement_aim_keys: Res<SwapMovementAimKeysState>,
     cursor_color: Res<CursorColorSettings>,
-    mut checkboxes: Query<(&OptionsCheckbox, &mut Handle<Image>)>,
+    mut checkboxes: Query<(&OptionsCheckbox, &mut Sprite)>,
     graphics: Res<Graphics>,
 ) {
     if !cheat_settings.is_changed()
@@ -2232,7 +2240,7 @@ pub fn update_cheat_checkbox_visual(
         return;
     }
 
-    for (options_checkbox, mut texture) in checkboxes.iter_mut() {
+    for (options_checkbox, mut sprite) in checkboxes.iter_mut() {
         let checked = if options_checkbox.0.uses_cheat_settings() {
             cheat_settings.checkbox_value(options_checkbox.0)
         } else {
@@ -2244,9 +2252,7 @@ pub fn update_cheat_checkbox_visual(
                 _ => false,
             }
         };
-        *texture = graphics
-            .get_ui_element_texture(options_checkbox_ui(checked))
-            .clone();
+        sprite.image = graphics.get_ui_element_texture(options_checkbox_ui(checked));
     }
 }
 
@@ -2273,18 +2279,18 @@ fn spawn_volume_row(
     );
 
     commands.spawn((
-        Text2dBundle {
-            text: Text::from_section(label, gf::BODY.text_style(&asset_server, WHITE))
-                .with_alignment(TextAlignment::Left),
-            text_anchor: bevy::sprite::Anchor::CenterLeft,
-            transform: Transform {
-                translation: label_pos,
-                scale: gf::BODY.transform_scale(),
-                ..default()
-            },
-            visibility: tab_visibility(tab, active),
-            ..Default::default()
-        },
+        (
+            gf::BODY
+                .text(&asset_server, label, WHITE)
+                .justify(Justify::Left)
+                .anchor(bevy::sprite::Anchor::CENTER_LEFT)
+                .with_transform(Transform {
+                    translation: label_pos,
+                    scale: gf::BODY.transform_scale(),
+                    ..default()
+                }),
+            tab_visibility(tab, active),
+        ),
         RenderLayers::from_layers(&[3]),
         OptionsUI,
         OptionsTabContent(tab),
@@ -2295,20 +2301,15 @@ fn spawn_volume_row(
     let controls_x = label_pos.x + 50.;
 
     let minus_entity = commands
-        .spawn(SpriteBundle {
-            texture: graphics.get_ui_element_texture(UIElement::XLKey).clone(),
-            sprite: Sprite {
+        .spawn((
+            Sprite {
+                image: graphics.get_ui_element_texture(UIElement::XLKey).clone(),
                 custom_size: Some(Vec2::new(14., 12.)),
-                ..Default::default()
+                ..default()
             },
-            transform: Transform::from_translation(Vec3::new(
-                controls_x,
-                label_pos.y - 3.5,
-                label_pos.z,
-            )),
-            visibility: tab_visibility(tab, active),
-            ..Default::default()
-        })
+            Transform::from_translation(Vec3::new(controls_x, label_pos.y - 3.5, label_pos.z)),
+            tab_visibility(tab, active),
+        ))
         .insert(RenderLayers::from_layers(&[3]))
         .insert(UIState::Options)
         .insert(UIElement::XLKey)
@@ -2325,42 +2326,38 @@ fn spawn_volume_row(
 
     commands
         .spawn((
-            Text2dBundle {
-                text: Text::from_section(
-                    "<",
-                    gf::BODY.text_style(&asset_server, crate::colors::WHITE),
-                )
-                .with_alignment(TextAlignment::Center),
-                text_anchor: bevy::sprite::Anchor::Center,
-                transform: Transform {
+            gf::BODY
+                .text(&asset_server, "<", crate::colors::WHITE)
+                .justify(Justify::Center)
+                .anchor(bevy::sprite::Anchor::CENTER)
+                .with_transform(Transform {
                     translation: Vec3::new(0., 0.5, 1.),
                     scale: gf::BODY.transform_scale(),
                     ..default()
-                },
-                ..Default::default()
-            },
+                }),
             RenderLayers::from_layers(&[3]),
             UIState::Options,
         ))
-        .set_parent(minus_entity);
+        .insert(ChildOf(minus_entity));
 
     // Value text
     commands.spawn((
-        Text2dBundle {
-            text: Text::from_section(
-                format!("{}", current_value),
-                gf::BODY.text_style(&asset_server, crate::colors::WHITE),
-            )
-            .with_alignment(TextAlignment::Center),
-            text_anchor: bevy::sprite::Anchor::Center,
-            transform: Transform {
-                translation: Vec3::new(controls_x + 18., label_pos.y - 3., label_pos.z),
-                scale: gf::BODY.transform_scale(),
-                ..default()
-            },
-            visibility: tab_visibility(tab, active),
-            ..Default::default()
-        },
+        (
+            gf::BODY
+                .text(
+                    &asset_server,
+                    format!("{}", current_value),
+                    crate::colors::WHITE,
+                )
+                .justify(Justify::Center)
+                .anchor(bevy::sprite::Anchor::CENTER)
+                .with_transform(Transform {
+                    translation: Vec3::new(controls_x + 18., label_pos.y - 3., label_pos.z),
+                    scale: gf::BODY.transform_scale(),
+                    ..default()
+                }),
+            tab_visibility(tab, active),
+        ),
         RenderLayers::from_layers(&[3]),
         OptionsUI,
         OptionsTabContent(tab),
@@ -2370,20 +2367,19 @@ fn spawn_volume_row(
 
     // "+" button
     let plus_entity = commands
-        .spawn(SpriteBundle {
-            texture: graphics.get_ui_element_texture(UIElement::XLKey).clone(),
-            sprite: Sprite {
+        .spawn((
+            Sprite {
+                image: graphics.get_ui_element_texture(UIElement::XLKey).clone(),
                 custom_size: Some(Vec2::new(14., 12.)),
-                ..Default::default()
+                ..default()
             },
-            transform: Transform::from_translation(Vec3::new(
+            Transform::from_translation(Vec3::new(
                 controls_x + 36.,
                 label_pos.y - 3.5,
                 label_pos.z,
             )),
-            visibility: tab_visibility(tab, active),
-            ..Default::default()
-        })
+            tab_visibility(tab, active),
+        ))
         .insert(RenderLayers::from_layers(&[3]))
         .insert(UIState::Options)
         .insert(UIElement::XLKey)
@@ -2400,24 +2396,19 @@ fn spawn_volume_row(
 
     commands
         .spawn((
-            Text2dBundle {
-                text: Text::from_section(
-                    ">",
-                    gf::BODY.text_style(&asset_server, crate::colors::WHITE),
-                )
-                .with_alignment(TextAlignment::Center),
-                text_anchor: bevy::sprite::Anchor::Center,
-                transform: Transform {
+            gf::BODY
+                .text(&asset_server, ">", crate::colors::WHITE)
+                .justify(Justify::Center)
+                .anchor(bevy::sprite::Anchor::CENTER)
+                .with_transform(Transform {
                     translation: Vec3::new(0., 0.5, 1.),
                     scale: gf::BODY.transform_scale(),
                     ..default()
-                },
-                ..Default::default()
-            },
+                }),
             RenderLayers::from_layers(&[3]),
             UIState::Options,
         ))
-        .set_parent(plus_entity);
+        .insert(ChildOf(plus_entity));
 }
 
 fn spawn_damage_text_size_row(
@@ -2438,46 +2429,41 @@ fn spawn_damage_text_size_row(
         active,
         focus_index,
         OptionsRowKind::DamageTextSize,
-        "Damage Text Size Row Focus",
+        "Damage Text2d Size Row Focus",
     );
 
     commands.spawn((
-        Text2dBundle {
-            text: Text::from_section(label, gf::BODY.text_style(&asset_server, WHITE))
-                .with_alignment(TextAlignment::Left),
-            text_anchor: Anchor::CenterLeft,
-            transform: Transform {
-                translation: label_pos,
-                scale: gf::BODY.transform_scale(),
-                ..default()
-            },
-            visibility: tab_visibility(tab, active),
-            ..Default::default()
-        },
+        (
+            gf::BODY
+                .text(&asset_server, label, WHITE)
+                .justify(Justify::Left)
+                .anchor(Anchor::CENTER_LEFT)
+                .with_transform(Transform {
+                    translation: label_pos,
+                    scale: gf::BODY.transform_scale(),
+                    ..default()
+                }),
+            tab_visibility(tab, active),
+        ),
         RenderLayers::from_layers(&[3]),
         OptionsUI,
         OptionsTabContent(tab),
         OptionsRowLabel { row: row_entity },
-        Name::new("Damage Text Size Label"),
+        Name::new("Damage Text2d Size Label"),
     ));
 
     let controls_x = label_pos.x + 90.;
 
     let minus_entity = commands
-        .spawn(SpriteBundle {
-            texture: graphics.get_ui_element_texture(UIElement::XLKey).clone(),
-            sprite: Sprite {
+        .spawn((
+            Sprite {
+                image: graphics.get_ui_element_texture(UIElement::XLKey).clone(),
                 custom_size: Some(Vec2::new(14., 12.)),
-                ..Default::default()
+                ..default()
             },
-            transform: Transform::from_translation(Vec3::new(
-                controls_x,
-                label_pos.y - 3.5,
-                label_pos.z,
-            )),
-            visibility: tab_visibility(tab, active),
-            ..Default::default()
-        })
+            Transform::from_translation(Vec3::new(controls_x, label_pos.y - 3.5, label_pos.z)),
+            tab_visibility(tab, active),
+        ))
         .insert(RenderLayers::from_layers(&[3]))
         .insert(UIState::Options)
         .insert(UIElement::XLKey)
@@ -2488,68 +2474,59 @@ fn spawn_damage_text_size_row(
         })
         .insert(OptionsRowMember { row: row_entity })
         .insert(Interactable::default())
-        .insert(Name::new("Damage Text Size Down"))
+        .insert(Name::new("Damage Text2d Size Down"))
         .id();
 
     commands
         .spawn((
-            Text2dBundle {
-                text: Text::from_section(
-                    "<",
-                    gf::BODY.text_style(&asset_server, crate::colors::WHITE),
-                )
-                .with_alignment(TextAlignment::Center),
-                text_anchor: Anchor::Center,
-                transform: Transform {
+            gf::BODY
+                .text(&asset_server, "<", crate::colors::WHITE)
+                .justify(Justify::Center)
+                .anchor(Anchor::CENTER)
+                .with_transform(Transform {
                     translation: Vec3::new(0., 0.5, 1.),
                     scale: gf::BODY.transform_scale(),
                     ..default()
-                },
-                ..Default::default()
-            },
+                }),
             RenderLayers::from_layers(&[3]),
             UIState::Options,
         ))
-        .set_parent(minus_entity);
+        .insert(ChildOf(minus_entity));
 
     commands.spawn((
-        Text2dBundle {
-            text: Text::from_section(
-                current.label(),
-                gf::BODY.text_style(&asset_server, crate::colors::WHITE),
-            )
-            .with_alignment(TextAlignment::Center),
-            text_anchor: Anchor::Center,
-            transform: Transform {
-                translation: Vec3::new(controls_x + 18., label_pos.y - 3., label_pos.z),
-                scale: gf::BODY.transform_scale(),
-                ..default()
-            },
-            visibility: tab_visibility(tab, active),
-            ..Default::default()
-        },
+        (
+            gf::BODY
+                .text(&asset_server, current.label(), crate::colors::WHITE)
+                .justify(Justify::Center)
+                .anchor(Anchor::CENTER)
+                .with_transform(Transform {
+                    translation: Vec3::new(controls_x + 18., label_pos.y - 3., label_pos.z),
+                    scale: gf::BODY.transform_scale(),
+                    ..default()
+                }),
+            tab_visibility(tab, active),
+        ),
         RenderLayers::from_layers(&[3]),
         OptionsUI,
         OptionsTabContent(tab),
         DamageTextSizeValueText,
-        Name::new("Damage Text Size Value"),
+        Name::new("Damage Text2d Size Value"),
     ));
 
     let plus_entity = commands
-        .spawn(SpriteBundle {
-            texture: graphics.get_ui_element_texture(UIElement::XLKey).clone(),
-            sprite: Sprite {
+        .spawn((
+            Sprite {
+                image: graphics.get_ui_element_texture(UIElement::XLKey).clone(),
                 custom_size: Some(Vec2::new(14., 12.)),
-                ..Default::default()
+                ..default()
             },
-            transform: Transform::from_translation(Vec3::new(
+            Transform::from_translation(Vec3::new(
                 controls_x + 36.,
                 label_pos.y - 3.5,
                 label_pos.z,
             )),
-            visibility: tab_visibility(tab, active),
-            ..Default::default()
-        })
+            tab_visibility(tab, active),
+        ))
         .insert(RenderLayers::from_layers(&[3]))
         .insert(UIState::Options)
         .insert(UIElement::XLKey)
@@ -2560,29 +2537,24 @@ fn spawn_damage_text_size_row(
         })
         .insert(OptionsRowMember { row: row_entity })
         .insert(Interactable::default())
-        .insert(Name::new("Damage Text Size Up"))
+        .insert(Name::new("Damage Text2d Size Up"))
         .id();
 
     commands
         .spawn((
-            Text2dBundle {
-                text: Text::from_section(
-                    ">",
-                    gf::BODY.text_style(&asset_server, crate::colors::WHITE),
-                )
-                .with_alignment(TextAlignment::Center),
-                text_anchor: Anchor::Center,
-                transform: Transform {
+            gf::BODY
+                .text(&asset_server, ">", crate::colors::WHITE)
+                .justify(Justify::Center)
+                .anchor(Anchor::CENTER)
+                .with_transform(Transform {
                     translation: Vec3::new(0., 0.5, 1.),
                     scale: gf::BODY.transform_scale(),
                     ..default()
-                },
-                ..Default::default()
-            },
+                }),
             RenderLayers::from_layers(&[3]),
             UIState::Options,
         ))
-        .set_parent(plus_entity);
+        .insert(ChildOf(plus_entity));
 }
 
 /// "Aim Sensitivity" stepper row (same `-`/value/`+` layout as `spawn_volume_row`), for the
@@ -2611,18 +2583,18 @@ fn spawn_sensitivity_row(
     );
 
     commands.spawn((
-        Text2dBundle {
-            text: Text::from_section(label, gf::BODY.text_style(&asset_server, WHITE))
-                .with_alignment(TextAlignment::Left),
-            text_anchor: bevy::sprite::Anchor::CenterLeft,
-            transform: Transform {
-                translation: label_pos,
-                scale: gf::BODY.transform_scale(),
-                ..default()
-            },
-            visibility: tab_visibility(tab, active),
-            ..Default::default()
-        },
+        (
+            gf::BODY
+                .text(&asset_server, label, WHITE)
+                .justify(Justify::Left)
+                .anchor(bevy::sprite::Anchor::CENTER_LEFT)
+                .with_transform(Transform {
+                    translation: label_pos,
+                    scale: gf::BODY.transform_scale(),
+                    ..default()
+                }),
+            tab_visibility(tab, active),
+        ),
         RenderLayers::from_layers(&[3]),
         OptionsUI,
         OptionsTabContent(tab),
@@ -2633,20 +2605,15 @@ fn spawn_sensitivity_row(
     let controls_x = label_pos.x + 70.;
 
     let minus_entity = commands
-        .spawn(SpriteBundle {
-            texture: graphics.get_ui_element_texture(UIElement::XLKey).clone(),
-            sprite: Sprite {
+        .spawn((
+            Sprite {
+                image: graphics.get_ui_element_texture(UIElement::XLKey).clone(),
                 custom_size: Some(Vec2::new(14., 12.)),
-                ..Default::default()
+                ..default()
             },
-            transform: Transform::from_translation(Vec3::new(
-                controls_x,
-                label_pos.y - 3.5,
-                label_pos.z,
-            )),
-            visibility: tab_visibility(tab, active),
-            ..Default::default()
-        })
+            Transform::from_translation(Vec3::new(controls_x, label_pos.y - 3.5, label_pos.z)),
+            tab_visibility(tab, active),
+        ))
         .insert(RenderLayers::from_layers(&[3]))
         .insert(UIState::Options)
         .insert(UIElement::XLKey)
@@ -2663,41 +2630,37 @@ fn spawn_sensitivity_row(
 
     commands
         .spawn((
-            Text2dBundle {
-                text: Text::from_section(
-                    "<",
-                    gf::BODY.text_style(&asset_server, crate::colors::WHITE),
-                )
-                .with_alignment(TextAlignment::Center),
-                text_anchor: bevy::sprite::Anchor::Center,
-                transform: Transform {
+            gf::BODY
+                .text(&asset_server, "<", crate::colors::WHITE)
+                .justify(Justify::Center)
+                .anchor(bevy::sprite::Anchor::CENTER)
+                .with_transform(Transform {
                     translation: Vec3::new(0., 0.5, 1.),
                     scale: gf::BODY.transform_scale(),
                     ..default()
-                },
-                ..Default::default()
-            },
+                }),
             RenderLayers::from_layers(&[3]),
             UIState::Options,
         ))
-        .set_parent(minus_entity);
+        .insert(ChildOf(minus_entity));
 
     commands.spawn((
-        Text2dBundle {
-            text: Text::from_section(
-                format!("{}", current_value),
-                gf::BODY.text_style(&asset_server, crate::colors::WHITE),
-            )
-            .with_alignment(TextAlignment::Center),
-            text_anchor: bevy::sprite::Anchor::Center,
-            transform: Transform {
-                translation: Vec3::new(controls_x + 18., label_pos.y - 3., label_pos.z),
-                scale: gf::BODY.transform_scale(),
-                ..default()
-            },
-            visibility: tab_visibility(tab, active),
-            ..Default::default()
-        },
+        (
+            gf::BODY
+                .text(
+                    &asset_server,
+                    format!("{}", current_value),
+                    crate::colors::WHITE,
+                )
+                .justify(Justify::Center)
+                .anchor(bevy::sprite::Anchor::CENTER)
+                .with_transform(Transform {
+                    translation: Vec3::new(controls_x + 18., label_pos.y - 3., label_pos.z),
+                    scale: gf::BODY.transform_scale(),
+                    ..default()
+                }),
+            tab_visibility(tab, active),
+        ),
         RenderLayers::from_layers(&[3]),
         OptionsUI,
         OptionsTabContent(tab),
@@ -2706,20 +2669,19 @@ fn spawn_sensitivity_row(
     ));
 
     let plus_entity = commands
-        .spawn(SpriteBundle {
-            texture: graphics.get_ui_element_texture(UIElement::XLKey).clone(),
-            sprite: Sprite {
+        .spawn((
+            Sprite {
+                image: graphics.get_ui_element_texture(UIElement::XLKey).clone(),
                 custom_size: Some(Vec2::new(14., 12.)),
-                ..Default::default()
+                ..default()
             },
-            transform: Transform::from_translation(Vec3::new(
+            Transform::from_translation(Vec3::new(
                 controls_x + 36.,
                 label_pos.y - 3.5,
                 label_pos.z,
             )),
-            visibility: tab_visibility(tab, active),
-            ..Default::default()
-        })
+            tab_visibility(tab, active),
+        ))
         .insert(RenderLayers::from_layers(&[3]))
         .insert(UIState::Options)
         .insert(UIElement::XLKey)
@@ -2736,24 +2698,19 @@ fn spawn_sensitivity_row(
 
     commands
         .spawn((
-            Text2dBundle {
-                text: Text::from_section(
-                    ">",
-                    gf::BODY.text_style(&asset_server, crate::colors::WHITE),
-                )
-                .with_alignment(TextAlignment::Center),
-                text_anchor: bevy::sprite::Anchor::Center,
-                transform: Transform {
+            gf::BODY
+                .text(&asset_server, ">", crate::colors::WHITE)
+                .justify(Justify::Center)
+                .anchor(bevy::sprite::Anchor::CENTER)
+                .with_transform(Transform {
                     translation: Vec3::new(0., 0.5, 1.),
                     scale: gf::BODY.transform_scale(),
                     ..default()
-                },
-                ..Default::default()
-            },
+                }),
             RenderLayers::from_layers(&[3]),
             UIState::Options,
         ))
-        .set_parent(plus_entity);
+        .insert(ChildOf(plus_entity));
 }
 
 fn spawn_scale_row(
@@ -2779,18 +2736,18 @@ fn spawn_scale_row(
     );
 
     commands.spawn((
-        Text2dBundle {
-            text: Text::from_section(label, gf::BODY.text_style(&asset_server, WHITE))
-                .with_alignment(TextAlignment::Left),
-            text_anchor: bevy::sprite::Anchor::CenterLeft,
-            transform: Transform {
-                translation: label_pos,
-                scale: gf::BODY.transform_scale(),
-                ..default()
-            },
-            visibility: tab_visibility(tab, active),
-            ..Default::default()
-        },
+        (
+            gf::BODY
+                .text(&asset_server, label, WHITE)
+                .justify(Justify::Left)
+                .anchor(bevy::sprite::Anchor::CENTER_LEFT)
+                .with_transform(Transform {
+                    translation: label_pos,
+                    scale: gf::BODY.transform_scale(),
+                    ..default()
+                }),
+            tab_visibility(tab, active),
+        ),
         RenderLayers::from_layers(&[3]),
         OptionsUI,
         OptionsTabContent(tab),
@@ -2801,20 +2758,15 @@ fn spawn_scale_row(
     let controls_x = label_pos.x + 50.;
 
     let minus_entity = commands
-        .spawn(SpriteBundle {
-            texture: graphics.get_ui_element_texture(UIElement::XLKey).clone(),
-            sprite: Sprite {
+        .spawn((
+            Sprite {
+                image: graphics.get_ui_element_texture(UIElement::XLKey).clone(),
                 custom_size: Some(Vec2::new(14., 12.)),
-                ..Default::default()
+                ..default()
             },
-            transform: Transform::from_translation(Vec3::new(
-                controls_x,
-                label_pos.y - 3.5,
-                label_pos.z,
-            )),
-            visibility: tab_visibility(tab, active),
-            ..Default::default()
-        })
+            Transform::from_translation(Vec3::new(controls_x, label_pos.y - 3.5, label_pos.z)),
+            tab_visibility(tab, active),
+        ))
         .insert(RenderLayers::from_layers(&[3]))
         .insert(UIState::Options)
         .insert(UIElement::XLKey)
@@ -2831,41 +2783,37 @@ fn spawn_scale_row(
 
     commands
         .spawn((
-            Text2dBundle {
-                text: Text::from_section(
-                    "<",
-                    gf::BODY.text_style(&asset_server, crate::colors::WHITE),
-                )
-                .with_alignment(TextAlignment::Center),
-                text_anchor: bevy::sprite::Anchor::Center,
-                transform: Transform {
+            gf::BODY
+                .text(&asset_server, "<", crate::colors::WHITE)
+                .justify(Justify::Center)
+                .anchor(bevy::sprite::Anchor::CENTER)
+                .with_transform(Transform {
                     translation: Vec3::new(0., 0.5, 1.),
                     scale: gf::BODY.transform_scale(),
                     ..default()
-                },
-                ..Default::default()
-            },
+                }),
             RenderLayers::from_layers(&[3]),
             UIState::Options,
         ))
-        .set_parent(minus_entity);
+        .insert(ChildOf(minus_entity));
 
     commands.spawn((
-        Text2dBundle {
-            text: Text::from_section(
-                current_value.to_string(),
-                gf::BODY.text_style(&asset_server, crate::colors::WHITE),
-            )
-            .with_alignment(TextAlignment::Center),
-            text_anchor: bevy::sprite::Anchor::Center,
-            transform: Transform {
-                translation: Vec3::new(controls_x + 18., label_pos.y - 3., label_pos.z),
-                scale: gf::BODY.transform_scale(),
-                ..default()
-            },
-            visibility: tab_visibility(tab, active),
-            ..Default::default()
-        },
+        (
+            gf::BODY
+                .text(
+                    &asset_server,
+                    current_value.to_string(),
+                    crate::colors::WHITE,
+                )
+                .justify(Justify::Center)
+                .anchor(bevy::sprite::Anchor::CENTER)
+                .with_transform(Transform {
+                    translation: Vec3::new(controls_x + 18., label_pos.y - 3., label_pos.z),
+                    scale: gf::BODY.transform_scale(),
+                    ..default()
+                }),
+            tab_visibility(tab, active),
+        ),
         RenderLayers::from_layers(&[3]),
         OptionsUI,
         OptionsTabContent(tab),
@@ -2874,20 +2822,19 @@ fn spawn_scale_row(
     ));
 
     let plus_entity = commands
-        .spawn(SpriteBundle {
-            texture: graphics.get_ui_element_texture(UIElement::XLKey).clone(),
-            sprite: Sprite {
+        .spawn((
+            Sprite {
+                image: graphics.get_ui_element_texture(UIElement::XLKey).clone(),
                 custom_size: Some(Vec2::new(14., 12.)),
-                ..Default::default()
+                ..default()
             },
-            transform: Transform::from_translation(Vec3::new(
+            Transform::from_translation(Vec3::new(
                 controls_x + 36.,
                 label_pos.y - 3.5,
                 label_pos.z,
             )),
-            visibility: tab_visibility(tab, active),
-            ..Default::default()
-        })
+            tab_visibility(tab, active),
+        ))
         .insert(RenderLayers::from_layers(&[3]))
         .insert(UIState::Options)
         .insert(UIElement::XLKey)
@@ -2904,24 +2851,19 @@ fn spawn_scale_row(
 
     commands
         .spawn((
-            Text2dBundle {
-                text: Text::from_section(
-                    ">",
-                    gf::BODY.text_style(&asset_server, crate::colors::WHITE),
-                )
-                .with_alignment(TextAlignment::Center),
-                text_anchor: bevy::sprite::Anchor::Center,
-                transform: Transform {
+            gf::BODY
+                .text(&asset_server, ">", crate::colors::WHITE)
+                .justify(Justify::Center)
+                .anchor(bevy::sprite::Anchor::CENTER)
+                .with_transform(Transform {
                     translation: Vec3::new(0., 0.5, 1.),
                     scale: gf::BODY.transform_scale(),
                     ..default()
-                },
-                ..Default::default()
-            },
+                }),
             RenderLayers::from_layers(&[3]),
             UIState::Options,
         ))
-        .set_parent(plus_entity);
+        .insert(ChildOf(plus_entity));
 }
 
 /// Cursor color row: `[label]  [<]  [sprite preview]  [>]`, mirroring `spawn_scale_row`
@@ -2948,18 +2890,18 @@ fn spawn_cursor_color_row(
     );
 
     commands.spawn((
-        Text2dBundle {
-            text: Text::from_section(label, gf::BODY.text_style(&asset_server, WHITE))
-                .with_alignment(TextAlignment::Left),
-            text_anchor: bevy::sprite::Anchor::CenterLeft,
-            transform: Transform {
-                translation: label_pos,
-                scale: gf::BODY.transform_scale(),
-                ..default()
-            },
-            visibility: tab_visibility(tab, active),
-            ..Default::default()
-        },
+        (
+            gf::BODY
+                .text(&asset_server, label, WHITE)
+                .justify(Justify::Left)
+                .anchor(bevy::sprite::Anchor::CENTER_LEFT)
+                .with_transform(Transform {
+                    translation: label_pos,
+                    scale: gf::BODY.transform_scale(),
+                    ..default()
+                }),
+            tab_visibility(tab, active),
+        ),
         RenderLayers::from_layers(&[3]),
         OptionsUI,
         OptionsTabContent(tab),
@@ -2970,20 +2912,15 @@ fn spawn_cursor_color_row(
     let controls_x = label_pos.x + 50.;
 
     let minus_entity = commands
-        .spawn(SpriteBundle {
-            texture: graphics.get_ui_element_texture(UIElement::XLKey).clone(),
-            sprite: Sprite {
+        .spawn((
+            Sprite {
+                image: graphics.get_ui_element_texture(UIElement::XLKey).clone(),
                 custom_size: Some(Vec2::new(14., 12.)),
-                ..Default::default()
+                ..default()
             },
-            transform: Transform::from_translation(Vec3::new(
-                controls_x,
-                label_pos.y - 3.5,
-                label_pos.z,
-            )),
-            visibility: tab_visibility(tab, active),
-            ..Default::default()
-        })
+            Transform::from_translation(Vec3::new(controls_x, label_pos.y - 3.5, label_pos.z)),
+            tab_visibility(tab, active),
+        ))
         .insert(RenderLayers::from_layers(&[3]))
         .insert(UIState::Options)
         .insert(UIElement::XLKey)
@@ -2999,43 +2936,30 @@ fn spawn_cursor_color_row(
 
     commands
         .spawn((
-            Text2dBundle {
-                text: Text::from_section(
-                    "<",
-                    gf::BODY.text_style(&asset_server, crate::colors::WHITE),
-                )
-                .with_alignment(TextAlignment::Center),
-                text_anchor: bevy::sprite::Anchor::Center,
-                transform: Transform {
+            gf::BODY
+                .text(&asset_server, "<", crate::colors::WHITE)
+                .justify(Justify::Center)
+                .anchor(bevy::sprite::Anchor::CENTER)
+                .with_transform(Transform {
                     translation: Vec3::new(0., 0.5, 1.),
                     scale: gf::BODY.transform_scale(),
                     ..default()
-                },
-                ..Default::default()
-            },
+                }),
             RenderLayers::from_layers(&[3]),
             UIState::Options,
         ))
-        .set_parent(minus_entity);
+        .insert(ChildOf(minus_entity));
 
     // Sprite preview of the currently selected cursor color.
     let mut preview_sprite = graphics
         .get_cursor_color_sprite(current_index)
         .unwrap_or_default();
     preview_sprite.custom_size = Some(Vec2::new(16., 16.));
-    if let Some(atlas) = graphics.texture_atlas.as_ref() {
+    if graphics.texture_atlas_layout.is_some() && graphics.texture_atlas_image.is_some() {
         commands.spawn((
-            SpriteSheetBundle {
-                texture_atlas: atlas.clone(),
-                sprite: preview_sprite,
-                transform: Transform::from_translation(Vec3::new(
-                    controls_x + 14.,
-                    label_pos.y,
-                    label_pos.z,
-                )),
-                visibility: tab_visibility(tab, active),
-                ..Default::default()
-            },
+            preview_sprite.clone(),
+            Transform::from_translation(Vec3::new(controls_x + 14., label_pos.y, label_pos.z)),
+            tab_visibility(tab, active),
             RenderLayers::from_layers(&[3]),
             OptionsUI,
             OptionsTabContent(tab),
@@ -3045,20 +2969,19 @@ fn spawn_cursor_color_row(
     }
 
     let plus_entity = commands
-        .spawn(SpriteBundle {
-            texture: graphics.get_ui_element_texture(UIElement::XLKey).clone(),
-            sprite: Sprite {
+        .spawn((
+            Sprite {
+                image: graphics.get_ui_element_texture(UIElement::XLKey).clone(),
                 custom_size: Some(Vec2::new(14., 12.)),
-                ..Default::default()
+                ..default()
             },
-            transform: Transform::from_translation(Vec3::new(
+            Transform::from_translation(Vec3::new(
                 controls_x + 36.,
                 label_pos.y - 3.5,
                 label_pos.z,
             )),
-            visibility: tab_visibility(tab, active),
-            ..Default::default()
-        })
+            tab_visibility(tab, active),
+        ))
         .insert(RenderLayers::from_layers(&[3]))
         .insert(UIState::Options)
         .insert(UIElement::XLKey)
@@ -3074,32 +2997,27 @@ fn spawn_cursor_color_row(
 
     commands
         .spawn((
-            Text2dBundle {
-                text: Text::from_section(
-                    ">",
-                    gf::BODY.text_style(&asset_server, crate::colors::WHITE),
-                )
-                .with_alignment(TextAlignment::Center),
-                text_anchor: bevy::sprite::Anchor::Center,
-                transform: Transform {
+            gf::BODY
+                .text(&asset_server, ">", crate::colors::WHITE)
+                .justify(Justify::Center)
+                .anchor(bevy::sprite::Anchor::CENTER)
+                .with_transform(Transform {
                     translation: Vec3::new(0., 0.5, 1.),
                     scale: gf::BODY.transform_scale(),
                     ..default()
-                },
-                ..Default::default()
-            },
+                }),
             RenderLayers::from_layers(&[3]),
             UIState::Options,
         ))
-        .set_parent(plus_entity);
+        .insert(ChildOf(plus_entity));
 }
 
 /// Arrow-click handler for the cursor color row. Mirrors `handle_scale_button_click`.
 pub fn handle_cursor_color_button_click(
     cursor_pos: Res<CursorPos>,
-    mouse_input: Res<Input<MouseButton>>,
+    mouse_input: Res<ButtonInput<MouseButton>>,
     focus_input: FocusInput,
-    computed_visibility: Query<&ComputedVisibility>,
+    computed_visibility: Query<&ViewVisibility>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     mut buttons: Query<(Entity, &mut Interactable, &CursorColorButton)>,
     mut cursor_color: ResMut<CursorColorSettings>,
@@ -3117,10 +3035,12 @@ pub fn handle_cursor_color_button_click(
                 Interaction::None => {
                     interactable.change(Interaction::Hovering);
                     commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonHover, 0.05));
-                    commands
-                        .entity(entity)
-                        .insert(UIElement::XLKeyHover)
-                        .insert(graphics.get_ui_element_texture(UIElement::XLKeyHover));
+                    commands.entity(entity).insert(UIElement::XLKeyHover);
+                    set_sprite_image(
+                        &mut commands,
+                        entity,
+                        graphics.get_ui_element_texture(UIElement::XLKeyHover),
+                    );
                 }
                 Interaction::Hovering => {
                     if (is_hit && left_mouse_released)
@@ -3138,10 +3058,12 @@ pub fn handle_cursor_color_button_click(
                 continue;
             };
             interactable.change(Interaction::None);
-            commands
-                .entity(entity)
-                .insert(UIElement::XLKey)
-                .insert(graphics.get_ui_element_texture(UIElement::XLKey));
+            commands.entity(entity).insert(UIElement::XLKey);
+            set_sprite_image(
+                &mut commands,
+                entity,
+                graphics.get_ui_element_texture(UIElement::XLKey),
+            );
         }
     }
 }
@@ -3150,7 +3072,7 @@ pub fn handle_cursor_color_button_click(
 pub fn update_cursor_color_preview(
     cursor_color: Res<CursorColorSettings>,
     graphics: Res<Graphics>,
-    mut previews: Query<&mut TextureAtlasSprite, With<CursorColorPreview>>,
+    mut previews: Query<&mut Sprite, With<CursorColorPreview>>,
 ) {
     if !cursor_color.is_changed() {
         return;
@@ -3159,15 +3081,15 @@ pub fn update_cursor_color_preview(
         return;
     };
     for mut sprite in previews.iter_mut() {
-        sprite.index = new_sprite.index;
+        *sprite = new_sprite.clone();
     }
 }
 
 pub fn handle_volume_button_click(
     cursor_pos: Res<CursorPos>,
-    mouse_input: Res<Input<MouseButton>>,
+    mouse_input: Res<ButtonInput<MouseButton>>,
     focus_input: FocusInput,
-    computed_visibility: Query<&ComputedVisibility>,
+    computed_visibility: Query<&ViewVisibility>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     mut buttons: Query<(Entity, &mut Interactable, &VolumeButton)>,
     mut audio_volume: ResMut<AudioVolume>,
@@ -3185,10 +3107,12 @@ pub fn handle_volume_button_click(
                 Interaction::None => {
                     interactable.change(Interaction::Hovering);
                     commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonHover, 0.05));
-                    commands
-                        .entity(entity)
-                        .insert(UIElement::XLKeyHover)
-                        .insert(graphics.get_ui_element_texture(UIElement::XLKeyHover));
+                    commands.entity(entity).insert(UIElement::XLKeyHover);
+                    set_sprite_image(
+                        &mut commands,
+                        entity,
+                        graphics.get_ui_element_texture(UIElement::XLKeyHover),
+                    );
                 }
                 Interaction::Hovering => {
                     if (is_hit && left_mouse_released)
@@ -3218,19 +3142,21 @@ pub fn handle_volume_button_click(
                 continue;
             };
             interactable.change(Interaction::None);
-            commands
-                .entity(entity)
-                .insert(UIElement::XLKey)
-                .insert(graphics.get_ui_element_texture(UIElement::XLKey));
+            commands.entity(entity).insert(UIElement::XLKey);
+            set_sprite_image(
+                &mut commands,
+                entity,
+                graphics.get_ui_element_texture(UIElement::XLKey),
+            );
         }
     }
 }
 
 pub fn handle_scale_button_click(
     cursor_pos: Res<CursorPos>,
-    mouse_input: Res<Input<MouseButton>>,
+    mouse_input: Res<ButtonInput<MouseButton>>,
     focus_input: FocusInput,
-    computed_visibility: Query<&ComputedVisibility>,
+    computed_visibility: Query<&ViewVisibility>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     mut buttons: Query<(Entity, &mut Interactable, &ScaleButton), Without<VolumeButton>>,
     mut display_scale: ResMut<DisplayScaleSettings>,
@@ -3248,10 +3174,12 @@ pub fn handle_scale_button_click(
                 Interaction::None => {
                     interactable.change(Interaction::Hovering);
                     commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonHover, 0.05));
-                    commands
-                        .entity(entity)
-                        .insert(UIElement::XLKeyHover)
-                        .insert(graphics.get_ui_element_texture(UIElement::XLKeyHover));
+                    commands.entity(entity).insert(UIElement::XLKeyHover);
+                    set_sprite_image(
+                        &mut commands,
+                        entity,
+                        graphics.get_ui_element_texture(UIElement::XLKeyHover),
+                    );
                 }
                 Interaction::Hovering => {
                     if (is_hit && left_mouse_released)
@@ -3283,10 +3211,12 @@ pub fn handle_scale_button_click(
                 continue;
             };
             interactable.change(Interaction::None);
-            commands
-                .entity(entity)
-                .insert(UIElement::XLKey)
-                .insert(graphics.get_ui_element_texture(UIElement::XLKey));
+            commands.entity(entity).insert(UIElement::XLKey);
+            set_sprite_image(
+                &mut commands,
+                entity,
+                graphics.get_ui_element_texture(UIElement::XLKey),
+            );
         }
     }
 }
@@ -3308,7 +3238,7 @@ fn options_row_entity(
 fn options_row_under_label_cursor(
     cursor_pos: &CursorPos,
     labels: &Query<(Entity, &OptionsRowLabel, &GlobalTransform)>,
-    computed_visibility: &Query<&ComputedVisibility>,
+    computed_visibility: &Query<&ViewVisibility>,
 ) -> Option<Entity> {
     if !cursor_pos.ui_hover_hit_allowed() {
         return None;
@@ -3322,7 +3252,7 @@ fn options_row_under_label_cursor(
         if computed_visibility
             .get(label_entity)
             .ok()
-            .is_some_and(|visibility| !visibility.is_visible())
+            .is_some_and(|visibility| !visibility.get())
         {
             continue;
         }
@@ -3346,7 +3276,7 @@ fn options_row_under_label_cursor(
 fn highlighted_options_rows(
     ui_focus: &UiFocus,
     cursor_pos: &Res<CursorPos>,
-    computed_visibility: &Query<&ComputedVisibility>,
+    computed_visibility: &Query<&ViewVisibility>,
     ui_sprites: &Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     focus_rows: &Query<Entity, With<OptionsFocusRow>>,
     row_members: &Query<&OptionsRowMember>,
@@ -3381,9 +3311,9 @@ fn highlighted_options_rows(
 pub fn update_options_row_label_colors(
     ui_focus: Res<UiFocus>,
     cursor_pos: Res<CursorPos>,
-    computed_visibility: Query<&ComputedVisibility>,
+    computed_visibility: Query<&ViewVisibility>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
-    mut row_labels: Query<(&OptionsRowLabel, &mut Text), With<OptionsRowLabel>>,
+    mut row_labels: Query<(&OptionsRowLabel, &mut TextColor), With<OptionsRowLabel>>,
     label_transforms: Query<(Entity, &OptionsRowLabel, &GlobalTransform)>,
     focus_rows: Query<Entity, With<OptionsFocusRow>>,
     row_members: Query<&OptionsRowMember>,
@@ -3400,11 +3330,8 @@ pub fn update_options_row_label_colors(
         &label_transforms,
     );
 
-    for (label, mut text) in row_labels.iter_mut() {
-        if text.sections.is_empty() {
-            continue;
-        }
-        text.sections[0].style.color = if highlighted.contains(&label.row) {
+    for (label, mut text_color) in row_labels.iter_mut() {
+        text_color.0 = if highlighted.contains(&label.row) {
             YELLOW_2
         } else {
             WHITE
@@ -3418,7 +3345,7 @@ pub fn sync_options_row_cursor(
     asset_server: Res<AssetServer>,
     ui_focus: Res<UiFocus>,
     cursor_pos: Res<CursorPos>,
-    computed_visibility: Query<&ComputedVisibility>,
+    computed_visibility: Query<&ViewVisibility>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     focus_rows: Query<Entity, With<OptionsFocusRow>>,
     row_members: Query<&OptionsRowMember>,
@@ -3450,7 +3377,7 @@ pub fn sync_options_row_cursor(
     let mut kept: HashSet<Entity> = HashSet::new();
     for (cursor_entity, cursor, mut transform) in existing.iter_mut() {
         if !desired_labels.contains(&cursor.label) {
-            commands.entity(cursor_entity).despawn_recursive();
+            commands.entity(cursor_entity).despawn();
             continue;
         }
         kept.insert(cursor.label);
@@ -3467,19 +3394,18 @@ pub fn sync_options_row_cursor(
         if kept.contains(&label_entity) {
             continue;
         }
-        let mut animation = AsepriteAnimation::from(OptionsCursor::tags::SELECT);
-        animation.play();
         commands.spawn((
-            AsepriteBundle {
-                aseprite: asset_server.load(OptionsCursor::PATH),
-                animation,
-                transform: Transform::from_translation(Vec3::new(
+            aseprite_bundle(
+                asset_server.load(OptionsCursor::PATH),
+                OptionsCursor::tags::SELECT,
+                Transform::from_translation(Vec3::new(
                     pos.x + OPTIONS_CURSOR_OFFSET_X,
                     pos.y,
                     pos.z + 1.,
                 )),
-                ..Default::default()
-            },
+                Visibility::Inherited,
+                false,
+            ),
             RenderLayers::from_layers(&[3]),
             OptionsUI,
             UIState::Options,
@@ -3554,7 +3480,7 @@ fn nudge_options_stepper(
 /// Left/right on a focused stepper row adjusts its value instead of moving focus.
 pub fn handle_options_focus_row_input(
     ui_focus: Res<UiFocus>,
-    key_input: Res<Input<KeyCode>>,
+    key_input: Res<ButtonInput<KeyCode>>,
     ui_gamepad_q: Query<&ActionState<UiGamepadAction>, With<UiGamepadInputMarker>>,
     focus_rows: Query<&OptionsFocusRow>,
     mut focus_nav_blocked: ResMut<FocusNavBlocked>,
@@ -3591,7 +3517,7 @@ pub fn handle_options_focus_row_input(
     let Some(dir) = ui_nav_dir_just_pressed(
         &key_input,
         true,
-        ui_gamepad_q.get_single().ok(),
+        ui_gamepad_q.single().ok(),
         &mut stick_latch,
         *ui_nav_stick_stability,
     ) else {
@@ -3631,15 +3557,14 @@ pub fn spawn_wipe_data_popup(
     let backdrop_z = ui_helpers::Z_DEPTH_OPTIONS_CONTENT + 5.0;
     let backdrop = commands
         .spawn((
-            SpriteBundle {
-                sprite: Sprite {
-                    color: Color::rgba(0.0, 0.0, 0.0, 0.7),
+            (
+                Sprite {
+                    color: Color::srgba(0.0, 0.0, 0.0, 0.7),
                     custom_size: Some(Vec2::new(10000., 10000.)),
                     ..Default::default()
                 },
-                transform: Transform::from_translation(Vec3::new(0., 0., backdrop_z)),
-                ..Default::default()
-            },
+                Transform::from_translation(Vec3::new(0., 0., backdrop_z)),
+            ),
             RenderLayers::from_layers(&[3]),
             UIState::Options,
             WipeDataPopup,
@@ -3650,83 +3575,67 @@ pub fn spawn_wipe_data_popup(
     // Panel
     let panel = commands
         .spawn((
-            SpriteBundle {
-                sprite: Sprite {
-                    color: Color::rgba(0.05, 0.05, 0.05, 0.95),
+            (
+                Sprite {
+                    color: Color::srgba(0.05, 0.05, 0.05, 0.95),
                     custom_size: Some(Vec2::new(260., 110.)),
                     ..Default::default()
                 },
-                transform: Transform::from_translation(Vec3::new(0., 0., 1.)),
-                ..Default::default()
-            },
+                Transform::from_translation(Vec3::new(0., 0., 1.)),
+            ),
             RenderLayers::from_layers(&[3]),
             UIState::Options,
             WipeDataPopup,
             Name::new("Wipe Data Popup Panel"),
         ))
         .id();
-    commands.entity(panel).set_parent(backdrop);
+    commands.entity(panel).insert(ChildOf(backdrop));
 
     // Title
     commands
         .spawn((
-            Text2dBundle {
-                text: Text::from_section(
-                    "Wipe Game Data?",
-                    gf::MENU_TITLE_LARGE.text_style(&asset_server, crate::colors::YELLOW_2),
-                )
-                .with_alignment(TextAlignment::Center),
-                text_anchor: Anchor::Center,
-                transform: Transform {
+            gf::MENU_TITLE_LARGE
+                .text(&asset_server, "Wipe Game Data?", crate::colors::YELLOW_2)
+                .justify(Justify::Center)
+                .anchor(Anchor::CENTER)
+                .with_transform(Transform {
                     translation: Vec3::new(0., 36., 1.),
                     scale: gf::MENU_TITLE_LARGE.transform_scale(),
                     ..default()
-                },
-                ..Default::default()
-            },
+                }),
             RenderLayers::from_layers(&[3]),
             UIState::Options,
             WipeDataPopup,
             Name::new("Wipe Data Popup Title"),
         ))
-        .set_parent(panel);
+        .insert(ChildOf(panel));
 
     // Warning text
     commands
         .spawn((
-            Text2dBundle {
-                text: Text::from_section(
-                    "This will reset all game progress\n\nto a fresh account.\n\nThis cannot be undone.",
-                    gf::BODY.text_style(&asset_server, crate::colors::WHITE),
-                )
-                .with_alignment(TextAlignment::Center),
-                text_anchor: Anchor::Center,
-                transform: Transform {
+            gf::BODY.text(&asset_server, "This will reset all game progress\n\nto a fresh account.\n\nThis cannot be undone.", crate::colors::WHITE).justify(Justify::Center).anchor(Anchor::CENTER).with_transform(Transform {
                     translation: Vec3::new(0., 4., 1.),
                     scale: gf::BODY.transform_scale(),
                     ..default()
-                },
-                ..Default::default()
-            },
+                }),
             RenderLayers::from_layers(&[3]),
             UIState::Options,
             WipeDataPopup,
             Name::new("Wipe Data Popup Warning"),
         ))
-        .set_parent(panel);
+        .insert(ChildOf(panel));
 
     // Delete button (left)
     let delete_btn = commands
         .spawn((
-            SpriteBundle {
-                texture: graphics.get_ui_element_texture(UIElement::BackButton),
-                sprite: Sprite {
+            (
+                Sprite {
+                    image: graphics.get_ui_element_texture(UIElement::BackButton),
                     custom_size: Some(Vec2::new(80., 18.)),
-                    ..Default::default()
+                    ..default()
                 },
-                transform: Transform::from_translation(Vec3::new(-50., -30., 1.)),
-                ..Default::default()
-            },
+                Transform::from_translation(Vec3::new(-50., -30., 1.)),
+            ),
             RenderLayers::from_layers(&[3]),
             Interactable::default(),
             UIElement::BackButton,
@@ -3737,37 +3646,33 @@ pub fn spawn_wipe_data_popup(
             Name::new("Wipe Data Delete Button"),
         ))
         .id();
-    commands.entity(delete_btn).set_parent(panel);
+    commands.entity(delete_btn).insert(ChildOf(panel));
     commands
-        .spawn(Text2dBundle {
-            text: Text::from_section(
-                "Delete",
-                gf::MENU_TITLE.text_style(&asset_server, crate::colors::WHITE),
-            )
-            .with_alignment(TextAlignment::Center),
-            text_anchor: Anchor::Center,
-            transform: Transform {
-                translation: Vec3::new(0., -1., 1.),
-                scale: gf::MENU_TITLE.transform_scale(),
-                ..default()
-            },
-            ..Default::default()
-        })
+        .spawn(
+            gf::MENU_TITLE
+                .text(&asset_server, "Delete", crate::colors::WHITE)
+                .justify(Justify::Center)
+                .anchor(Anchor::CENTER)
+                .with_transform(Transform {
+                    translation: Vec3::new(0., -1., 1.),
+                    scale: gf::MENU_TITLE.transform_scale(),
+                    ..default()
+                }),
+        )
         .insert(RenderLayers::from_layers(&[3]))
-        .set_parent(delete_btn);
+        .insert(ChildOf(delete_btn));
 
     // Back button (right)
     let back_btn = commands
         .spawn((
-            SpriteBundle {
-                texture: graphics.get_ui_element_texture(UIElement::BackButton),
-                sprite: Sprite {
+            (
+                Sprite {
+                    image: graphics.get_ui_element_texture(UIElement::BackButton),
                     custom_size: Some(Vec2::new(80., 18.)),
-                    ..Default::default()
+                    ..default()
                 },
-                transform: Transform::from_translation(Vec3::new(50., -30., 1.)),
-                ..Default::default()
-            },
+                Transform::from_translation(Vec3::new(50., -30., 1.)),
+            ),
             RenderLayers::from_layers(&[3]),
             Interactable::default(),
             UIElement::BackButton,
@@ -3778,29 +3683,26 @@ pub fn spawn_wipe_data_popup(
             Name::new("Wipe Data Back Button"),
         ))
         .id();
-    commands.entity(back_btn).set_parent(panel);
+    commands.entity(back_btn).insert(ChildOf(panel));
     commands
-        .spawn(Text2dBundle {
-            text: Text::from_section(
-                "Back",
-                gf::MENU_TITLE.text_style(&asset_server, crate::colors::WHITE),
-            )
-            .with_alignment(TextAlignment::Center),
-            text_anchor: Anchor::Center,
-            transform: Transform {
-                translation: Vec3::new(0., -1., 1.),
-                scale: gf::MENU_TITLE.transform_scale(),
-                ..default()
-            },
-            ..Default::default()
-        })
+        .spawn(
+            gf::MENU_TITLE
+                .text(&asset_server, "Back", crate::colors::WHITE)
+                .justify(Justify::Center)
+                .anchor(Anchor::CENTER)
+                .with_transform(Transform {
+                    translation: Vec3::new(0., -1., 1.),
+                    scale: gf::MENU_TITLE.transform_scale(),
+                    ..default()
+                }),
+        )
         .insert(RenderLayers::from_layers(&[3]))
-        .set_parent(back_btn);
+        .insert(ChildOf(back_btn));
 }
 
 pub fn update_volume_text(
     audio_volume: Res<AudioVolume>,
-    mut texts: Query<(&VolumeValueText, &mut Text)>,
+    mut texts: Query<(&VolumeValueText, &mut Text2d)>,
 ) {
     if !audio_volume.is_changed() {
         return;
@@ -3812,15 +3714,15 @@ pub fn update_volume_text(
             VolumeChannel::Sfx => audio_volume.sfx,
         };
         let new_value = format!("{}", val);
-        if text.sections[0].value != new_value {
-            text.sections[0].value = new_value;
+        if text.0 != new_value {
+            text.0 = new_value;
         }
     }
 }
 
 pub fn update_scale_text(
     display_scale: Res<DisplayScaleSettings>,
-    mut texts: Query<(&ScaleValueText, &mut Text)>,
+    mut texts: Query<(&ScaleValueText, &mut Text2d)>,
 ) {
     if !display_scale.is_changed() {
         return;
@@ -3830,17 +3732,17 @@ pub fn update_scale_text(
             ScaleChannel::Game => display_scale.format_game_zoom_display(),
             ScaleChannel::Ui => display_scale.format_ui_zoom_display(),
         };
-        if text.sections[0].value != new_value {
-            text.sections[0].value = new_value;
+        if text.0 != new_value {
+            text.0 = new_value;
         }
     }
 }
 
 pub fn handle_sensitivity_button_click(
     cursor_pos: Res<CursorPos>,
-    mouse_input: Res<Input<MouseButton>>,
+    mouse_input: Res<ButtonInput<MouseButton>>,
     focus_input: FocusInput,
-    computed_visibility: Query<&ComputedVisibility>,
+    computed_visibility: Query<&ViewVisibility>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     mut buttons: Query<(Entity, &mut Interactable, &SensitivityButton)>,
     mut aim_sensitivity: ResMut<AimSensitivity>,
@@ -3859,10 +3761,12 @@ pub fn handle_sensitivity_button_click(
                 Interaction::None => {
                     interactable.change(Interaction::Hovering);
                     commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonHover, 0.05));
-                    commands
-                        .entity(entity)
-                        .insert(UIElement::XLKeyHover)
-                        .insert(graphics.get_ui_element_texture(UIElement::XLKeyHover));
+                    commands.entity(entity).insert(UIElement::XLKeyHover);
+                    set_sprite_image(
+                        &mut commands,
+                        entity,
+                        graphics.get_ui_element_texture(UIElement::XLKeyHover),
+                    );
                 }
                 Interaction::Hovering => {
                     if (is_hit && left_mouse_released)
@@ -3908,19 +3812,21 @@ pub fn handle_sensitivity_button_click(
                 continue;
             };
             interactable.change(Interaction::None);
-            commands
-                .entity(entity)
-                .insert(UIElement::XLKey)
-                .insert(graphics.get_ui_element_texture(UIElement::XLKey));
+            commands.entity(entity).insert(UIElement::XLKey);
+            set_sprite_image(
+                &mut commands,
+                entity,
+                graphics.get_ui_element_texture(UIElement::XLKey),
+            );
         }
     }
 }
 
 pub fn handle_damage_text_size_button_click(
     cursor_pos: Res<CursorPos>,
-    mouse_input: Res<Input<MouseButton>>,
+    mouse_input: Res<ButtonInput<MouseButton>>,
     focus_input: FocusInput,
-    computed_visibility: Query<&ComputedVisibility>,
+    computed_visibility: Query<&ViewVisibility>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     mut buttons: Query<(Entity, &mut Interactable, &DamageTextSizeButton)>,
     mut cheat_settings: ResMut<CheatSettings>,
@@ -3938,10 +3844,12 @@ pub fn handle_damage_text_size_button_click(
                 Interaction::None => {
                     interactable.change(Interaction::Hovering);
                     commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonHover, 0.05));
-                    commands
-                        .entity(entity)
-                        .insert(UIElement::XLKeyHover)
-                        .insert(graphics.get_ui_element_texture(UIElement::XLKeyHover));
+                    commands.entity(entity).insert(UIElement::XLKeyHover);
+                    set_sprite_image(
+                        &mut commands,
+                        entity,
+                        graphics.get_ui_element_texture(UIElement::XLKeyHover),
+                    );
                 }
                 Interaction::Hovering => {
                     if (is_hit && left_mouse_released)
@@ -3960,28 +3868,27 @@ pub fn handle_damage_text_size_button_click(
                 continue;
             };
             interactable.change(Interaction::None);
-            commands
-                .entity(entity)
-                .insert(UIElement::XLKey)
-                .insert(graphics.get_ui_element_texture(UIElement::XLKey));
+            commands.entity(entity).insert(UIElement::XLKey);
+            set_sprite_image(
+                &mut commands,
+                entity,
+                graphics.get_ui_element_texture(UIElement::XLKey),
+            );
         }
     }
 }
 
 pub fn update_damage_text_size_text(
     cheat_settings: Res<CheatSettings>,
-    mut texts: Query<&mut Text, With<DamageTextSizeValueText>>,
+    mut texts: Query<&mut Text2d, With<DamageTextSizeValueText>>,
 ) {
     if !cheat_settings.is_changed() {
         return;
     }
     let label = cheat_settings.damage_text_size.label();
     for mut text in texts.iter_mut() {
-        if text.sections.is_empty() {
-            continue;
-        }
-        if text.sections[0].value != label {
-            text.sections[0].value = label.to_string();
+        if text.0 != label {
+            text.0 = label.to_string();
         }
     }
 }
@@ -3989,7 +3896,7 @@ pub fn update_damage_text_size_text(
 pub fn update_sensitivity_text(
     aim_sensitivity: Res<AimSensitivity>,
     ui_nav_stick_stability: Res<UiNavStickStability>,
-    mut texts: Query<(&mut Text, &SensitivityValueText)>,
+    mut texts: Query<(&mut Text2d, &SensitivityValueText)>,
 ) {
     for (mut text, value_for) in texts.iter_mut() {
         let new_value = match value_for.0 {
@@ -4006,8 +3913,8 @@ pub fn update_sensitivity_text(
                 format!("{}", ui_nav_stick_stability.0)
             }
         };
-        if text.sections[0].value != new_value {
-            text.sections[0].value = new_value;
+        if text.0 != new_value {
+            text.0 = new_value;
         }
     }
 }

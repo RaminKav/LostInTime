@@ -2,13 +2,16 @@ use super::active_skill_shrine::{
     refresh_active_skill_shrine_offer_skills, skill_choices_from_offer_skills,
     ActiveSkillShrineSelection, ActiveSkillShrineState,
 };
-use super::combat_shrine::{CombatShrine, CombatShrineAnim};
+use super::combat_shrine::CombatShrine;
 use super::dungeon_shrine::{DungeonShrine, DungeonShrineType};
 use super::gamble_shrine::GambleShrine;
 use super::heirloom_shrine::HeirloomShrineState;
 use super::item_actions::ItemActionParam;
 use super::microwave_shrine::MicrowaveShrineState;
 use super::{get_crafting_inventory_item_stacks, PlaceItemEvent, WorldObject};
+use crate::aseprite_assets::CombatShrineAnim;
+use crate::aseprite_helpers::{play_loop, play_once};
+use bevy_aseprite_ultra::prelude::{AnimationState, AseAnimation, Aseprite};
 
 use crate::assets::SpriteAnchor;
 use crate::chaos::IncreaseChaosEvent;
@@ -29,7 +32,7 @@ use crate::ui::game_fonts::FLOATING_TEXT;
 use crate::ui::item_chest::ItemChestState;
 use crate::ui::key_input_guide::InteractionGuideTrigger;
 use crate::ui::minimap::UpdateMiniMapEvent;
-use crate::ui::UIState;
+use crate::ui::{ChestContainer, ScrapperContainer, UIState};
 use crate::world::dimension::{DimensionSpawnEvent, Era};
 use crate::world::dungeon_room::StartNextDungeonWaveEvent;
 use crate::world::world_helpers;
@@ -43,7 +46,6 @@ use crate::{
 };
 use crate::{BounceEvent, GameParam, DEBUG};
 use bevy::prelude::*;
-use bevy_aseprite::anim::AsepriteAnimation;
 use rand::seq::SliceRandom;
 use rand::Rng;
 use serde::Deserialize;
@@ -55,7 +57,7 @@ const CHAOS_SHRINE_FLAVOR_TEXTS: [&str; 4] = [
     "Something feels off about this shrine...",
 ];
 
-#[derive(Component, Reflect, FromReflect, Clone, Default, Debug, Deserialize)]
+#[derive(Component, Reflect, Clone, Default, Debug, Deserialize)]
 #[reflect(Component)]
 pub enum ObjectAction {
     #[default]
@@ -85,7 +87,7 @@ pub enum ObjectAction {
     TimePortal,
 }
 
-#[derive(Component, Reflect, FromReflect, Default, Clone, Debug, Deserialize)]
+#[derive(Component, Reflect, Default, Clone, Debug, Deserialize)]
 #[reflect(Component)]
 pub enum ObjectActionCost {
     #[default]
@@ -95,7 +97,7 @@ pub enum ObjectActionCost {
     Item(WorldObject, usize),
 }
 
-#[derive(Component, Reflect, FromReflect, Default, Deserialize, Clone, Debug)]
+#[derive(Component, Reflect, Default, Deserialize, Clone, Debug)]
 #[reflect(Component)]
 pub enum TouchTriggerObjectAction {
     #[default]
@@ -118,7 +120,7 @@ impl Default for ChestPickupDelay {
 
 impl ChestPickupDelay {
     pub fn finished(&self) -> bool {
-        self.0.finished()
+        self.0.is_finished()
     }
 }
 
@@ -140,7 +142,7 @@ impl ObjectAction {
             match cost {
                 ObjectActionCost::CoinCost(cost) => {
                     if game.get_coins() as i32 >= *cost {
-                        item_action_param.currency_event.send(ModifyCurencyEvent {
+                        item_action_param.currency_event.write(ModifyCurencyEvent {
                             delta: -cost,
                             obj: WorldObject::Coin,
                         });
@@ -151,7 +153,7 @@ impl ObjectAction {
                 }
                 ObjectActionCost::TimeFragmentCost(cost) => {
                     if game.get_time_fragments() as i32 >= *cost {
-                        item_action_param.currency_event.send(ModifyCurencyEvent {
+                        item_action_param.currency_event.write(ModifyCurencyEvent {
                             delta: -cost,
                             obj: WorldObject::TimeFragment,
                         });
@@ -178,16 +180,14 @@ impl ObjectAction {
             ObjectAction::ModifyHealth(delta) => {
                 item_action_param
                     .modify_health_event
-                    .send(ModifyHealthEvent(*delta));
+                    .write(ModifyHealthEvent(*delta));
             }
             ObjectAction::Teleport(pos) => {
                 let pos = world_pos_to_tile_pos(*pos);
-                item_action_param
-                    .move_player_event
-                    .send(MovePlayerEvent {
-                        pos,
-                        clear_recall_history: true,
-                    });
+                item_action_param.move_player_event.write(MovePlayerEvent {
+                    pos,
+                    clear_recall_history: true,
+                });
             }
             ObjectAction::DungeonTeleport => {
                 // Prevent dungeon entry if endless mode is active
@@ -195,7 +195,7 @@ impl ObjectAction {
                     info!("Cannot enter dungeon while endless mode is active");
                     return;
                 }
-                item_action_param.dim_event.send(DimensionSpawnEvent {
+                item_action_param.dim_event.write(DimensionSpawnEvent {
                     swap_to_dim_now: true,
                     new_era: Some(Era::DungeonMain),
                 });
@@ -206,7 +206,7 @@ impl ObjectAction {
                     use crate::player::achievements::{persist_achievements_state, Achievement};
                     if achievements.complete(Achievement::DungeonCrawler) {
                         persist_achievements_state(achievements);
-                        item_action_param.achievement_events.send(
+                        item_action_param.achievement_events.write(
                             crate::player::achievements::AchievementUnlockedEvent {
                                 achievement: Achievement::DungeonCrawler,
                                 reward_currency: Achievement::DungeonCrawler.reward_currency(),
@@ -226,7 +226,7 @@ impl ObjectAction {
                     .sorted()
                     .last()
                     .unwrap_or(0); // Default to Era::Main (index 0) if no previous era
-                item_action_param.dim_event.send(DimensionSpawnEvent {
+                item_action_param.dim_event.write(DimensionSpawnEvent {
                     swap_to_dim_now: true,
                     new_era: Some(Era::from_index(current_era)),
                 });
@@ -237,18 +237,24 @@ impl ObjectAction {
             }
             ObjectAction::Chest => {
                 let chest_inv = item_action_param.chest_query.get(e).unwrap();
-                commands.insert_resource(chest_inv.clone());
+                commands.insert_resource(ChestContainer {
+                    items: chest_inv.items.clone(),
+                    parent: e,
+                });
             }
             ObjectAction::Scrapper => {
                 let scrapper_inv = item_action_param.scrapper_query.get(e).unwrap();
-                commands.insert_resource(scrapper_inv.clone());
+                commands.insert_resource(ScrapperContainer {
+                    items: scrapper_inv.items.clone(),
+                    parent: e,
+                });
             }
             ObjectAction::ChangeObject(new_obj) => {
-                commands.entity(e).despawn_recursive();
+                commands.entity(e).despawn();
                 let pos = item_action_param.cursor_pos.world_coords.truncate();
                 game.remove_object_from_chunk_cache(world_pos_to_tile_pos(pos));
 
-                item_action_param.place_item_event.send(PlaceItemEvent {
+                item_action_param.place_item_event.write(PlaceItemEvent {
                     obj: *new_obj,
                     pos,
                     placed_by_player: true,
@@ -281,8 +287,8 @@ impl ObjectAction {
                     .push(crafting_type.clone());
             }
             ObjectAction::Furnace => {
-                let furnace_res = item_action_param.furnace_query.get(e).unwrap();
-                commands.insert_resource(furnace_res.clone());
+                let furnace_inv = item_action_param.furnace_query.get(e).unwrap();
+                commands.insert_resource(furnace_inv.to_container(e));
             }
             ObjectAction::SetHome => {
                 let pos =
@@ -330,17 +336,17 @@ impl ObjectAction {
                 match target {
                     BeaconTarget::Portal => {
                         if let Some(e) = item_action_param.beacon_guidance.portal.take() {
-                            commands.entity(e).despawn_recursive();
+                            commands.entity(e).despawn();
                         }
                     }
                     BeaconTarget::DungeonEntrance => {
                         if let Some(e) = item_action_param.beacon_guidance.dungeon.take() {
-                            commands.entity(e).despawn_recursive();
+                            commands.entity(e).despawn();
                         }
                     }
                     BeaconTarget::BossShrine => {
                         if let Some(e) = item_action_param.beacon_guidance.boss.take() {
-                            commands.entity(e).despawn_recursive();
+                            commands.entity(e).despawn();
                         }
                     }
                 }
@@ -443,7 +449,7 @@ impl ObjectAction {
                     .unwrap_or_default();
                 let offer_skills = refresh_active_skill_shrine_offer_skills(
                     &cached_offer,
-                    item_action_param.player_skills.get_single().ok(),
+                    item_action_param.player_skills.single().ok(),
                 );
 
                 if offer_skills != cached_offer {
@@ -534,7 +540,7 @@ impl ObjectAction {
                 // The weapon shrine drives the dungeon wave system.
                 item_action_param
                     .dungeon_wave_event
-                    .send(StartNextDungeonWaveEvent(e));
+                    .write(StartNextDungeonWaveEvent(e));
             }
             ObjectAction::ArmorShrine => {
                 // Screen Shake
@@ -555,6 +561,9 @@ impl ObjectAction {
                     });
                 }
 
+                if let Ok(mut anim) = item_action_param.aseprite_anims.get_mut(e) {
+                    play_once(&mut anim, CombatShrineAnim::tags::ACTIVATE);
+                }
                 commands
                     .entity(e)
                     .insert(DungeonShrine {
@@ -564,11 +573,16 @@ impl ObjectAction {
                         is_activated: false,
                         tile_pos: obj_pos,
                     })
-                    .insert(AsepriteAnimation::from(CombatShrineAnim::tags::ACTIVATE))
                     .remove::<InteractionGuideTrigger>()
                     .remove::<ObjectAction>();
 
-                mark_other_dungeon_shrines_completed(commands, game, proto_param, e);
+                mark_other_dungeon_shrines_completed(
+                    commands,
+                    game,
+                    proto_param,
+                    e,
+                    &mut item_action_param.aseprite_anims,
+                );
             }
             ObjectAction::AccessoryShrine => {
                 // Screen Shake
@@ -589,6 +603,9 @@ impl ObjectAction {
                     });
                 }
 
+                if let Ok(mut anim) = item_action_param.aseprite_anims.get_mut(e) {
+                    play_once(&mut anim, CombatShrineAnim::tags::ACTIVATE);
+                }
                 commands
                     .entity(e)
                     .insert(DungeonShrine {
@@ -598,16 +615,21 @@ impl ObjectAction {
                         is_activated: false,
                         tile_pos: obj_pos,
                     })
-                    .insert(AsepriteAnimation::from(CombatShrineAnim::tags::ACTIVATE))
                     .remove::<InteractionGuideTrigger>()
                     .remove::<ObjectAction>();
 
-                mark_other_dungeon_shrines_completed(commands, game, proto_param, e);
+                mark_other_dungeon_shrines_completed(
+                    commands,
+                    game,
+                    proto_param,
+                    e,
+                    &mut item_action_param.aseprite_anims,
+                );
             }
             ObjectAction::IncreaseChaos(amount) => {
                 item_action_param
                     .increase_chaos_event
-                    .send(IncreaseChaosEvent { amount: *amount });
+                    .write(IncreaseChaosEvent { amount: *amount });
                 let pos = tile_pos_to_world_pos(obj_pos, true);
                 info!("{pos:?} {obj_pos:?}");
 
@@ -621,19 +643,13 @@ impl ObjectAction {
                 game.add_object_to_chunk_cache(obj_pos, WorldObject::ChaosTotemDone);
 
                 // Update minimap to reflect the totem is now "Done"
-                item_action_param.minimap_event.send(UpdateMiniMapEvent {
+                item_action_param.minimap_event.write(UpdateMiniMapEvent {
                     pos: Some(obj_pos),
                     new_tile: Some(WorldObject::ChaosTotemDone),
                 });
 
                 let spawn_pos = pos + Vec2::new(0., -18.);
-                commands.spawn_item_from_proto(
-                    WorldObject::Coin,
-                    proto_param,
-                    spawn_pos,
-                    20,
-                    None,
-                );
+                commands.spawn_item_from_proto(WorldObject::Coin, proto_param, spawn_pos, 20, None);
 
                 spawn_floating_text_with_shadow_anim(
                     commands,
@@ -717,7 +733,7 @@ impl ObjectAction {
                 };
 
                 if let Some(era) = next_era {
-                    item_action_param.dim_event.send(DimensionSpawnEvent {
+                    item_action_param.dim_event.write(DimensionSpawnEvent {
                         swap_to_dim_now: true,
                         new_era: Some(era),
                     });
@@ -736,15 +752,15 @@ impl TouchTriggerObjectAction {
     ) {
         match self {
             TouchTriggerObjectAction::Bounce => {
-                item_action_param.bounce_event.send(BounceEvent);
+                item_action_param.bounce_event.write(BounceEvent);
             }
             TouchTriggerObjectAction::ItemChest => {
                 commands.insert_resource(ItemChestState::new_item_chest());
-                commands.entity(entity).despawn_recursive();
+                commands.entity(entity).despawn();
             }
             TouchTriggerObjectAction::HeirloomChest => {
                 commands.insert_resource(ItemChestState::new_heirloom_chest());
-                commands.entity(entity).despawn_recursive();
+                commands.entity(entity).despawn();
             }
             _ => {}
         }
@@ -756,6 +772,7 @@ fn mark_other_dungeon_shrines_completed(
     game: &mut GameParam,
     proto_param: &ProtoParam,
     activated_entity: Entity,
+    aseprite_anims: &mut Query<&mut AseAnimation>,
 ) {
     let mut shrine_updates: Vec<(Entity, WorldObject, TileMapPosition)> = Vec::new();
 
@@ -782,10 +799,12 @@ fn mark_other_dungeon_shrines_completed(
     }
 
     for (entity, done_obj, tile_pos) in shrine_updates {
+        if let Ok(mut anim) = aseprite_anims.get_mut(entity) {
+            play_loop(&mut anim, CombatShrineAnim::tags::DONE);
+        }
         commands
             .entity(entity)
             .insert(done_obj)
-            .insert(AsepriteAnimation::from(CombatShrineAnim::tags::DONE))
             .remove::<ObjectAction>()
             .remove::<InteractionGuideTrigger>();
 

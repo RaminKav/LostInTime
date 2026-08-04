@@ -1,3 +1,5 @@
+use crate::aseprite_assets::Portal;
+use crate::aseprite_helpers::play_loop;
 use crate::combat::EnemyDeathEvent;
 use crate::custom_commands::CommandsExt;
 use crate::enemy::{spawner::MobSpawningPaused, Mob};
@@ -10,8 +12,7 @@ use crate::proto::proto_param::ProtoParam;
 use crate::ui::tips::{SeenTips, Tip, TipEvent};
 use crate::world::dimension::{Era, EraManager};
 use bevy::prelude::*;
-use bevy_aseprite::anim::AsepriteAnimation;
-use bevy_aseprite::aseprite;
+use bevy_aseprite_ultra::prelude::{AnimationState, AseAnimation};
 use rand::Rng;
 use std::collections::HashSet;
 
@@ -86,13 +87,8 @@ fn spawn_time_bonus_drop(
 ) {
     let mut rng = rand::thread_rng();
     let drop_offset = Vec2::new(rng.gen_range(-30.0..30.0), rng.gen_range(-30.0..30.0));
-    let _ = commands.spawn_item_from_proto(
-        obj,
-        proto_param,
-        pos + drop_offset,
-        count,
-        player_level,
-    );
+    let _ =
+        commands.spawn_item_from_proto(obj, proto_param, pos + drop_offset, count, player_level);
 }
 
 /// Extra loot for clearing the era boss with time remaining — does not replace boss loot table drops.
@@ -157,26 +153,26 @@ fn drop_era_time_bonus_loot(
     }
 }
 
-aseprite!(pub Portal, "textures/portal/portal.ase");
-aseprite!(pub UIPortal, "textures/portal/portal_large.aseprite");
-
 pub fn handle_player_near_portal(
     player_query: Query<&Transform, With<Player>>,
-    mut portal_query: Query<(&GlobalTransform, &mut AsepriteAnimation), With<TimePortal>>,
+    mut portal_query: Query<
+        (&GlobalTransform, &mut AseAnimation, &AnimationState),
+        With<TimePortal>,
+    >,
 ) {
     for player_transform in player_query.iter() {
-        for (portal_transform, mut anim) in portal_query.iter_mut() {
+        for (portal_transform, mut anim, state) in portal_query.iter_mut() {
             let distance = player_transform
                 .translation
                 .distance(portal_transform.translation());
-            if distance <= 32. && anim.current_frame() <= 8 {
-                *anim = AsepriteAnimation::from(Portal::tags::ERA2);
+            if distance <= 32. && usize::from(state.current_frame()) <= 8 {
+                play_loop(&mut anim, Portal::tags::ERA2);
             }
         }
     }
-    for (_portal_transform, mut anim) in portal_query.iter_mut() {
-        if anim.current_frame() == 35 {
-            *anim = AsepriteAnimation::from(Portal::tags::IDLE);
+    for (_portal_transform, mut anim, state) in portal_query.iter_mut() {
+        if usize::from(state.current_frame()) == 35 {
+            play_loop(&mut anim, Portal::tags::IDLE);
         }
     }
 }
@@ -210,20 +206,20 @@ impl BossKillTracker {
 
 /// System to track boss kills and update the tracker
 pub fn track_boss_kills(
-    mut death_events: EventReader<EnemyDeathEvent>,
+    mut death_events: MessageReader<EnemyDeathEvent>,
     mob_query: Query<&Mob>,
     era_manager: Res<EraManager>,
     mut boss_kill_tracker: ResMut<BossKillTracker>,
     run_timer: Res<RunTimer>,
     era_timer: Res<EraTimer>,
     mut mob_spawning_paused: ResMut<MobSpawningPaused>,
-    mut tip_event: EventWriter<TipEvent>,
+    mut tip_event: MessageWriter<TipEvent>,
     seen_tips: Res<SeenTips>,
     mut commands: Commands,
     proto_param: ProtoParam,
     player_level: Query<&PlayerLevel, With<Player>>,
 ) {
-    for death_event in death_events.iter() {
+    for death_event in death_events.read() {
         if let Ok(mob) = mob_query.get(death_event.entity) {
             // StoneGolem is a boss but doesn't count for era completion
             if !mob.is_boss() || mob == &Mob::StoneGolem {
@@ -241,7 +237,7 @@ pub fn track_boss_kills(
             info!("Boss killed in era {:?}", era);
 
             if first_clear {
-                let level = player_level.get_single().ok().map(|l| l.level);
+                let level = player_level.single().ok().map(|l| l.level);
                 drop_era_time_bonus_loot(
                     &mut commands,
                     &proto_param,
@@ -256,7 +252,7 @@ pub fn track_boss_kills(
                 mob_spawning_paused.paused = true;
 
                 if !seen_tips.has_seen(&Tip::PeacefulPeriod) {
-                    tip_event.send(TipEvent {
+                    tip_event.write(TipEvent {
                         tip: Tip::PeacefulPeriod,
                         pos: Vec3::new(-184., -116., 95.),
                     });

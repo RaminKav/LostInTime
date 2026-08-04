@@ -25,7 +25,7 @@ use crate::status_effects::{
     handle_frail_stack_ticks, handle_frozen_ticks, handle_slow_stack_ticks,
 };
 use crate::ui::minimap::UpdateMiniMapEvent;
-use crate::ui::{EssenceShopChoices, FlashExpBarEvent, InventorySlotType};
+use crate::ui::{FlashExpBarEvent, InventorySlotType, MerchantShop};
 use crate::world::dimension::Era;
 use crate::world::generation::WallBreakEvent;
 use crate::world::grass_patches::{
@@ -41,12 +41,9 @@ use crate::world::world_helpers::{
 use crate::world::TileMapPosition;
 use crate::{custom_commands::CommandsExt, player::Limb, CustomFlush, GameParam, GameState};
 use crate::{handle_pink_flower_animation_loop, spawn_pink_flower_aseprite};
-use active_skill_shrine::{
-    handle_active_skill_shrine_completion, handle_active_skill_shrine_esc,
-};
+use active_skill_shrine::{handle_active_skill_shrine_completion, handle_active_skill_shrine_esc};
+use bevy::platform::collections::HashMap;
 use bevy::prelude::*;
-use bevy::reflect::TypeUuid;
-use bevy::utils::HashMap;
 use combat_shrine::{
     enhance_combat_shrine_mobs, handle_combat_shrine_activate_animation, handle_shrine_rewards,
     CombatShrineMobCounts, CombatShrineMobDeathEvent,
@@ -110,16 +107,16 @@ use self::item_upgrades::{
 };
 use self::projectile::RangedAttackPlugin;
 
-#[derive(Component, Reflect, FromReflect, Clone, Debug)]
+#[derive(Component, Reflect, Clone, Debug)]
 pub struct BreaksWith(pub WorldObject);
-#[derive(Component, Reflect, FromReflect, Clone, Debug)]
+#[derive(Component, Reflect, Clone, Debug)]
 pub struct PlacesInto(pub WorldObject);
-#[derive(Component, Reflect, FromReflect, Default, Clone, Debug)]
+#[derive(Component, Reflect, Default, Clone, Debug)]
 #[reflect(Component)]
 pub struct Block;
 #[derive(Component)]
 pub struct Equipment(pub Limb);
-#[derive(Component, Reflect, Debug, Clone, FromReflect, Default, Eq, PartialEq)]
+#[derive(Component, Reflect, Debug, Clone, Default, Eq, PartialEq)]
 #[reflect(Component)]
 pub enum EquipmentType {
     #[default]
@@ -136,7 +133,7 @@ pub enum EquipmentType {
     Axe,
     Pickaxe,
 }
-#[derive(Component, Reflect, Debug, FromReflect, Default, Clone)]
+#[derive(Component, Reflect, Debug, Default, Clone)]
 #[reflect(Component)]
 pub struct RequiredEquipmentType(pub EquipmentType);
 
@@ -249,7 +246,7 @@ impl ActiveMainHandState {
 }
 
 /// Represents a single bonus stat line on an item
-#[derive(Component, PartialEq, Clone, Reflect, FromReflect, Default, Debug, Serialize, Deserialize)]
+#[derive(Component, PartialEq, Clone, Reflect, Default, Debug, Serialize, Deserialize)]
 #[reflect(Default)]
 pub struct BonusStatLine {
     /// The attribute name (e.g., "crit_chance", "dodge", "health")
@@ -262,7 +259,7 @@ pub struct BonusStatLine {
     pub range_percentage: f32,
 }
 
-#[derive(Component, PartialEq, Clone, Reflect, FromReflect, Default, Debug, Serialize, Deserialize)]
+#[derive(Component, PartialEq, Clone, Reflect, Default, Debug, Serialize, Deserialize)]
 #[reflect(Default)]
 #[serde(default)]
 pub struct ItemDisplayMetaData {
@@ -276,9 +273,25 @@ pub struct ItemDisplayMetaData {
     pub bonus_stat_lines: Vec<BonusStatLine>,
 }
 /// The core enum of the game, lists everything that can be held or placed in the game
-#[derive(Debug, FromReflect, Reflect, PartialEq, Eq, Clone, Copy, Hash, Serialize, Deserialize, Component, IntoStaticStr, Display, Default, Ord, PartialOrd, EnumIter, TypeUuid)]
+#[derive(
+    Debug,
+    Reflect,
+    PartialEq,
+    Eq,
+    Clone,
+    Copy,
+    Hash,
+    Serialize,
+    Deserialize,
+    Component,
+    IntoStaticStr,
+    Display,
+    Default,
+    Ord,
+    PartialOrd,
+    EnumIter,
+)]
 #[reflect(Component)]
-#[uuid = "413be529-bfeb-41b3-9dc0-4b8b380a4c36"]
 pub enum WorldObject {
     #[default]
     None,
@@ -693,7 +706,21 @@ pub enum WorldObject {
     StoneGolemCard,
 }
 
-#[derive(Debug, FromReflect, Reflect, PartialEq, Eq, Clone, Copy, Hash, Serialize, Deserialize, Component, IntoStaticStr, Display, EnumIter)]
+#[derive(
+    Debug,
+    Reflect,
+    PartialEq,
+    Eq,
+    Clone,
+    Copy,
+    Hash,
+    Serialize,
+    Deserialize,
+    Component,
+    IntoStaticStr,
+    Display,
+    EnumIter,
+)]
 #[reflect(Component)]
 pub enum Foliage {
     SmallGreenTree,
@@ -732,11 +759,25 @@ impl Default for Foliage {
         Self::SmallGreenTree
     }
 }
-#[derive(Reflect, FromReflect, Default, Component, Clone, Debug, Copy)]
+#[derive(Reflect, Default, Component, Clone, Debug, Copy)]
 #[reflect(Component)]
 pub struct FoliageSize(pub Vec2);
 
-#[derive(Debug, Reflect, FromReflect, PartialEq, Eq, Clone, Copy, Hash, Serialize, Deserialize, Component, Display, IntoStaticStr, EnumIter)]
+#[derive(
+    Debug,
+    Reflect,
+    PartialEq,
+    Eq,
+    Clone,
+    Copy,
+    Hash,
+    Serialize,
+    Deserialize,
+    Component,
+    Display,
+    IntoStaticStr,
+    EnumIter,
+)]
 #[reflect(Component)]
 pub enum Wall {
     StoneWall,
@@ -1471,12 +1512,14 @@ impl WorldObject {
     }
 }
 
+#[derive(Message)]
 pub struct PlaceItemEvent {
     pub obj: WorldObject,
     pub pos: Vec2,
     pub placed_by_player: bool,
     pub override_existing_obj: bool,
 }
+#[derive(Message)]
 pub struct UpdateObjectEvent {
     pub obj: WorldObject,
     pub pos: Vec2,
@@ -1501,30 +1544,32 @@ impl Plugin for ItemsPlugin {
             .init_resource::<CombatShrineMobCounts>()
             .insert_resource(AmmoMemory::default())
             .init_resource::<BridgePlacementMode>()
-            .add_event::<PlaceItemEvent>()
-            .add_event::<UpdateObjectEvent>()
-            .add_event::<CombatShrineMobDeathEvent>()
-            .add_event::<DungeonShrineMobDeathEvent>()
-            .add_event::<GambleShrineEvent>()
-            .add_plugin(CraftingPlugin)
-            .add_plugin(RangedAttackPlugin)
-            .add_plugin(LootTablePlugin)
-            .add_plugin(ItemDropOutlinePlugin)
-            .add_system(
+            .add_message::<PlaceItemEvent>()
+            .add_message::<UpdateObjectEvent>()
+            .add_message::<CombatShrineMobDeathEvent>()
+            .add_message::<DungeonShrineMobDeathEvent>()
+            .add_message::<GambleShrineEvent>()
+            .add_plugins(CraftingPlugin)
+            .add_plugins(RangedAttackPlugin)
+            .add_plugins(LootTablePlugin)
+            .add_plugins(ItemDropOutlinePlugin)
+            .add_systems(
+                Update,
                 handle_break_object
                     .before(CustomFlush)
                     .after(spawn_obj_death_particles)
-                    .in_set(OnUpdate(GameState::Main)),
+                    .run_if(in_state(GameState::Main)),
             )
-            .add_system(
+            .add_systems(
+                Update,
                 handle_placing_world_object
-                    .in_base_set(CoreSet::PostUpdate)
                     .run_if(in_state(GameState::Main).or_else(in_state(GameState::Initializing))),
             )
             .add_systems(
+                Update,
                 (
                     handle_pay_shrine_cost,
-                    handle_delayed_spawns.run_if(resource_exists::<DelayedSpawn>()),
+                    handle_delayed_spawns.run_if(resource_exists::<DelayedSpawn>),
                     handle_item_action_success,
                     handle_delayed_ranged_attack.run_if(is_not_paused),
                     handle_spread_arrows_attack
@@ -1541,9 +1586,10 @@ impl Plugin for ItemsPlugin {
                     check_freeze_on_slow_stacks.run_if(is_not_paused),
                     handle_combat_shrine_activate_animation,
                 )
-                    .in_set(OnUpdate(GameState::Main)),
+                    .run_if(in_state(GameState::Main)),
             )
             .add_systems(
+                Update,
                 (
                     sync_shrine_repair_anim_pause,
                     tick_shrine_repair_channel.run_if(is_not_paused),
@@ -1557,55 +1603,67 @@ impl Plugin for ItemsPlugin {
                         .after(activate_pending_shrine_after_repair)
                         .run_if(is_not_paused),
                 )
-                    .in_set(OnUpdate(GameState::Main)),
+                    .run_if(in_state(GameState::Main)),
             )
-            .add_system(
+            .add_systems(
+                Update,
                 apply_broken_shrine_state_on_spawn
                     .after(apply_shrine_visuals_on_spawn)
                     .after(crate::ui::key_input_guide::add_guide_to_unique_objs)
-                    .in_set(OnUpdate(GameState::Main)),
+                    .run_if(in_state(GameState::Main)),
             )
-            .add_system(
-                enhance_combat_shrine_mobs.in_set(OnUpdate(GameState::Main)),
+            .add_systems(
+                Update,
+                enhance_combat_shrine_mobs.run_if(in_state(GameState::Main)),
             )
-            .add_system(
+            .add_systems(
+                Update,
                 handle_bridge_placement_mode
                     .run_if(is_not_paused)
-                    .in_set(OnUpdate(GameState::Main)),
+                    .run_if(in_state(GameState::Main)),
             )
-            .add_system(
+            .add_systems(
+                Update,
                 handle_bridge_preview_dragging
                     .run_if(is_not_paused)
-                    .in_set(OnUpdate(GameState::Main)),
+                    .run_if(in_state(GameState::Main)),
             )
-            .add_system(ensure_mob_status_effects.in_set(OnUpdate(GameState::Main)))
             .add_systems(
+                Update,
+                ensure_mob_status_effects.run_if(in_state(GameState::Main)),
+            )
+            .add_systems(
+                Update,
                 (
                     update_boss_shrine_guide_cost,
                     ensure_boss_shrine_sprite_on_spawn,
                     handle_on_hit_upgrades.run_if(is_not_paused),
                     handle_reset_proj_hit_enemies_state.run_if(is_not_paused),
                 )
-                    .in_set(OnUpdate(GameState::Main)),
-            )
-            .add_system(
-                handle_item_drop_despawn_timer
-                    .run_if(is_not_paused)
-                    .in_set(OnUpdate(GameState::Main)),
-            )
-            .add_system(
-                tick_reload
-                    .run_if(is_not_paused)
-                    .in_set(OnUpdate(GameState::Main)),
+                    .run_if(in_state(GameState::Main)),
             )
             .add_systems(
+                Update,
+                handle_item_drop_despawn_timer
+                    .run_if(is_not_paused)
+                    .run_if(in_state(GameState::Main)),
+            )
+            .add_systems(
+                Update,
+                tick_reload
+                    .run_if(is_not_paused)
+                    .run_if(in_state(GameState::Main)),
+            )
+            .add_systems(
+                Update,
                 (
                     spawn_pink_flower_aseprite,
                     handle_pink_flower_animation_loop,
                 )
-                    .in_set(OnUpdate(GameState::Main)),
+                    .run_if(in_state(GameState::Main)),
             )
             .add_systems(
+                Update,
                 (
                     handle_active_skill_shrine_completion,
                     handle_active_skill_shrine_esc,
@@ -1616,26 +1674,26 @@ impl Plugin for ItemsPlugin {
                     handle_microwave_shrine_completion,
                     handle_microwave_shrine_esc,
                 )
-                    .in_set(OnUpdate(GameState::Main)),
+                    .run_if(in_state(GameState::Main)),
             )
-            .add_system(apply_system_buffers.in_set(CustomFlush));
+            .add_systems(Update, ApplyDeferred.in_set(CustomFlush));
     }
 }
 
 pub fn handle_placing_world_object(
-    mut minimap_event: EventWriter<UpdateMiniMapEvent>,
+    mut minimap_event: MessageWriter<UpdateMiniMapEvent>,
     mut proto_param: ProtoParam,
     mut game: GameParam,
     mut commands: Commands,
     ground_patch_graphics: Res<GroundPatchesGraphics>,
-    mut events: EventReader<PlaceItemEvent>,
+    mut events: MessageReader<PlaceItemEvent>,
     water_colliders: Query<
         (Entity, &Collider, &GlobalTransform),
         (Without<WorldObject>, Without<Mob>, Without<Player>),
     >,
     container_reg: Res<ContainerRegistry>,
 ) {
-    for place_event in events.iter() {
+    for place_event in events.read() {
         let pos = place_event.pos;
         let tile_pos = world_pos_to_tile_pos(pos);
         if !place_event.override_existing_obj
@@ -1649,7 +1707,7 @@ pub fn handle_placing_world_object(
         if place_event.override_existing_obj {
             //TODO: this fn is slow, optimize get_obj_entity_at_tile
             if let Some((old_obj, _)) = game.get_obj_entity_at_tile(tile_pos, &proto_param) {
-                commands.entity(old_obj).despawn_recursive();
+                commands.entity(old_obj).despawn();
             }
         }
 
@@ -1658,7 +1716,11 @@ pub fn handle_placing_world_object(
         match chunk_entity {
             Some(chunk) => {
                 let is_touching_air = true;
-                let item = commands.spawn_object_from_proto(place_event.obj, pos, &proto_param, is_touching_air,
+                let item = commands.spawn_object_from_proto(
+                    place_event.obj,
+                    pos,
+                    &proto_param,
+                    is_touching_air,
                 );
                 match item {
                     Some(item_e) => {
@@ -1668,25 +1730,25 @@ pub fn handle_placing_world_object(
                         safe_set_parent(&mut commands, item_e, chunk);
 
                         if place_event.obj == WorldObject::BlacksmithMerchant {
-                            commands.entity(item_e).insert(EssenceShopChoices {
+                            commands.entity(item_e).insert(MerchantShop {
                                 tile_pos: Some(tile_pos),
                                 ..default()
                             });
                         }
 
                         if place_event.obj.is_medium_size(&proto_param) {
-                            minimap_event.send(UpdateMiniMapEvent {
+                            minimap_event.write(UpdateMiniMapEvent {
                                 pos: Some(tile_pos),
                                 new_tile: Some(place_event.obj),
                             });
                             for q in 0..3 {
-                                minimap_event.send(UpdateMiniMapEvent {
+                                minimap_event.write(UpdateMiniMapEvent {
                                     pos: Some(tile_pos.get_neighbour_tiles_for_medium_objects()[q]),
                                     new_tile: Some(place_event.obj),
                                 });
                             }
                         } else {
-                            minimap_event.send(UpdateMiniMapEvent {
+                            minimap_event.write(UpdateMiniMapEvent {
                                 pos: Some(tile_pos),
                                 new_tile: Some(place_event.obj),
                             });
@@ -1832,22 +1894,22 @@ pub fn handle_break_object(
     mut commands: Commands,
     proto_param: ProtoParam,
     mut game: GameParam,
-    mut obj_break_events: EventReader<ObjBreakEvent>,
-    mut minimap_event: EventWriter<UpdateMiniMapEvent>,
-    mut wall_break_event: EventWriter<WallBreakEvent>,
+    mut obj_break_events: MessageReader<ObjBreakEvent>,
+    mut minimap_event: MessageWriter<UpdateMiniMapEvent>,
+    mut wall_break_event: MessageWriter<WallBreakEvent>,
     loot_tables: Query<&LootTable>,
     xp: Query<&ExperienceReward>,
-    mut analytics_events: EventWriter<AnalyticsUpdateEvent>,
+    mut analytics_events: MessageWriter<AnalyticsUpdateEvent>,
     water_colliders: Query<
         (Entity, &Collider, &GlobalTransform),
         (Without<WorldObject>, Without<Mob>, Without<Player>),
     >,
     mut chaos_tracker: ResMut<ChaosTracker>,
-    mut flash_event: EventWriter<FlashExpBarEvent>,
+    mut flash_event: MessageWriter<FlashExpBarEvent>,
     break_drop_filter: Res<BreakDropFilter>,
     mobs: Query<&Mob>,
 ) {
-    for broken in obj_break_events.iter() {
+    for broken in obj_break_events.read() {
         let mut rng = rand::thread_rng();
         let world_pos = tile_pos_to_world_pos(broken.pos, false);
         let is_mob = mobs.get(broken.entity).is_ok();
@@ -1867,28 +1929,28 @@ pub fn handle_break_object(
             }
         }
 
-        if let Some(entity_commands) = commands.get_entity(broken.entity) {
-            entity_commands.despawn_recursive();
+        if let Ok(mut entity_commands) = commands.get_entity(broken.entity) {
+            entity_commands.despawn();
         }
         game.remove_object_from_chunk_cache(broken.pos);
 
         if let Some(_wall) = proto_param.get_component::<Wall, _>(broken.obj) {
-            wall_break_event.send(WallBreakEvent { pos: broken.pos })
+            wall_break_event.write(WallBreakEvent { pos: broken.pos });
         }
 
         if broken.obj.is_medium_size(&proto_param) {
-            minimap_event.send(UpdateMiniMapEvent {
+            minimap_event.write(UpdateMiniMapEvent {
                 pos: Some(broken.pos),
                 new_tile: None,
             });
             for q in 0..3 {
-                minimap_event.send(UpdateMiniMapEvent {
+                minimap_event.write(UpdateMiniMapEvent {
                     pos: Some(broken.pos.get_neighbour_tiles_for_medium_objects()[q]),
                     new_tile: None,
                 });
             }
         } else {
-            minimap_event.send(UpdateMiniMapEvent {
+            minimap_event.write(UpdateMiniMapEvent {
                 pos: Some(broken.pos),
                 new_tile: None,
             });
@@ -1913,7 +1975,7 @@ pub fn handle_break_object(
                 // reaches the ground. Shows whether the filter is populated and why this item
                 // slipped through (not blocked vs. bypassed). Remove once the leak is resolved.
                 if !is_mob && crate::inventory::BREAK_DROP_FILTER_ITEMS.contains(&drop.obj_type) {
-                    warn!(
+                    debug!(
                         "[DROP-FILTER] spawned {:?} from {:?} | filter_active={} bypass={} blocked={} filter_size={} contents={:?}",
                         drop.obj_type,
                         broken.obj,
@@ -1953,18 +2015,17 @@ pub fn handle_break_object(
         if let Ok(exp) = xp.get(broken.entity) {
             let xp_rate_bonus = game.get_xp_rate_bonus();
             let mut player_xp = game.get_player_level_mut();
-            let (did_level, gained_xp) =
-                player_xp.add_xp(exp.0, xp_rate_bonus, &mut chaos_tracker);
+            let (did_level, gained_xp) = player_xp.add_xp(exp.0, xp_rate_bonus, &mut chaos_tracker);
             let t = tile_pos_to_world_pos(broken.pos, true);
             spawn_xp_particles(t, &mut commands, gained_xp, did_level);
-            flash_event.send(FlashExpBarEvent {
+            flash_event.write(FlashExpBarEvent {
                 amount: gained_xp,
                 did_level,
             });
         }
 
         // Analytics
-        analytics_events.send(AnalyticsUpdateEvent {
+        analytics_events.write(AnalyticsUpdateEvent {
             update_type: AnalyticsTrigger::ObjectBroken(broken.obj),
         });
     }
@@ -1979,9 +2040,9 @@ fn handle_item_drop_despawn_timer(
 ) {
     for (entity, mut timer) in item_drops.iter_mut() {
         timer.0.tick(time.delta());
-        if timer.0.finished() {
-            if let Some(commands) = commands.get_entity(entity) {
-                commands.despawn_recursive();
+        if timer.0.is_finished() {
+            if let Ok(mut entity_cmds) = commands.get_entity(entity) {
+                entity_cmds.despawn();
             }
         }
     }

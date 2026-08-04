@@ -1,5 +1,5 @@
+use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
-use bevy::render::view::RenderLayers;
 use bevy::sprite::Anchor;
 
 use crate::{
@@ -68,19 +68,14 @@ pub fn spawn_boss_health_bar(
         // Spawn boss name text
         let _name_text = commands
             .spawn((
-                Text2dBundle {
-                    text: Text::from_section(
-                        boss_name.clone(),
-                        gf::DISPLAY.text_style(&asset_server, BLACK),
-                    ),
-                    text_anchor: Anchor::Center,
-                    transform: Transform {
+                gf::DISPLAY
+                    .text(&asset_server, boss_name.clone(), BLACK)
+                    .anchor(Anchor::CENTER)
+                    .with_transform(Transform {
                         translation: Vec3::new(0., y_offset + 12.0, 10.),
                         scale: gf::DISPLAY.transform_scale(),
                         ..Default::default()
-                    },
-                    ..default()
-                },
+                    }),
                 BossNameText,
                 BossEntity(boss_entity),
                 RenderLayers::from_layers(&[3]),
@@ -90,20 +85,19 @@ pub fn spawn_boss_health_bar(
         // Spawn health bar frame (background) - centered
         let _bar_frame = commands
             .spawn((
-                SpriteBundle {
-                    sprite: Sprite {
+                (
+                    Sprite {
                         color: YELLOW,
                         custom_size: Some(Vec2::new(BOSS_BAR_WIDTH, BOSS_BAR_HEIGHT)),
-                        anchor: Anchor::Center,
                         ..default()
                     },
-                    transform: Transform {
+                    Transform {
                         translation: Vec3::new(0., y_offset, 9.),
                         ..Default::default()
                     },
-                    visibility: Visibility::Visible,
-                    ..default()
-                },
+                    Visibility::Visible,
+                ),
+                Anchor::CENTER,
                 BossHealthBarFrame,
                 BossEntity(boss_entity),
                 RenderLayers::from_layers(&[3]),
@@ -113,21 +107,20 @@ pub fn spawn_boss_health_bar(
         // Spawn health bar fill with initial health - starts from left edge, scales to right
         let bar_fill = commands
             .spawn((
-                SpriteBundle {
-                    sprite: Sprite {
+                (
+                    Sprite {
                         color: RED,
                         custom_size: Some(Vec2::new(BOSS_BAR_WIDTH, BOSS_BAR_HEIGHT)),
-                        anchor: Anchor::CenterLeft,
                         ..default()
                     },
-                    transform: Transform {
+                    Transform {
                         translation: Vec3::new(-BOSS_BAR_WIDTH / 2.0, y_offset, 10.),
                         scale: Vec3::new(health_percent, 1.0, 1.0),
                         ..Default::default()
                     },
-                    visibility: Visibility::Visible,
-                    ..default()
-                },
+                    Visibility::Visible,
+                ),
+                Anchor::CENTER_LEFT,
                 BossHealthBar,
                 BossEntity(boss_entity),
                 RenderLayers::from_layers(&[3]),
@@ -176,14 +169,14 @@ pub fn cleanup_boss_health_bar_on_despawn(
     for (ui_entity, boss_entity) in boss_ui_elements.iter() {
         // Check if boss entity still exists
         if !existing_boss_entities.contains(&boss_entity.0) {
-            commands.entity(ui_entity).despawn_recursive();
+            commands.entity(ui_entity).despawn();
             continue;
         }
 
         // Check if boss is dead
         if let Ok(current_health) = boss_health.get(boss_entity.0) {
             if current_health.0 <= 0 {
-                commands.entity(ui_entity).despawn_recursive();
+                commands.entity(ui_entity).despawn();
             }
         }
     }

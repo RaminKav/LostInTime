@@ -5,11 +5,10 @@ use std::cmp::max;
 use std::f32::consts::PI;
 
 pub mod ui_animaitons;
-use bevy::reflect::TypeUuid;
-use bevy::render::render_resource::ShaderRef;
-use bevy::sprite::{Material2d, Material2dPlugin};
+use bevy::shader::ShaderRef;
+use bevy::sprite_render::MeshMaterial2d;
+use bevy::sprite_render::{AlphaMode2d, Material2d, Material2dPlugin};
 use bevy::{prelude::*, render::render_resource::AsBindGroup};
-use bevy_aseprite::anim::AsepriteAnimation;
 use bevy_rapier2d::prelude::KinematicCharacterController;
 use game_over::{
     handle_game_over_fadeout, handle_game_over_final_stats_tooltip,
@@ -19,7 +18,7 @@ use game_over::{
 use player_sprite::{
     change_player_class_visuals, cleanup_one_time_animations,
     handle_anim_change_when_player_dir_changes, handle_player_animation_change,
-    preload_player_sprites, PlayerAnimation,
+    handle_restart_player_attack_anim, preload_player_sprites, PlayerAnimation,
 };
 use serde::{Deserialize, Serialize};
 use ui_animaitons::{handle_move_animations, handle_ui_time_fragments};
@@ -45,13 +44,13 @@ use self::enemy_sprites::{
 
 pub struct AnimationsPlugin;
 
-#[derive(Component, Reflect, FromReflect, Default, Clone, Debug)]
+#[derive(Component, Reflect, Default, Clone, Debug)]
 pub struct AnimationPosTracker(pub f32, pub f32, pub f32);
 
-#[derive(Component, Reflect, FromReflect, Default, Clone, Copy, Debug, Deserialize)]
+#[derive(Component, Reflect, Default, Clone, Copy, Debug, Deserialize)]
 pub struct AnimationFrameTracker(pub i32, pub i32);
 
-#[derive(Component, Clone, Deref, DerefMut, Reflect, FromReflect)]
+#[derive(Component, Clone, Deref, DerefMut, Reflect)]
 pub struct AnimationTimer(pub Timer);
 /// Per-entity hit-reaction state.
 ///
@@ -86,17 +85,16 @@ impl Default for HitAnimationTracker {
 /// tear them down after the animation finishes. Highly transient — stored
 /// `SparseSet` so attaching/detaching doesn't move the animation entity
 /// through extra archetypes every time an effect plays.
-#[derive(Component, Reflect, FromReflect, Debug)]
+#[derive(Component, Reflect, Debug)]
 #[component(storage = "SparseSet")]
 pub struct DoneAnimation;
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Message)]
 pub struct AttackEvent {
     pub direction: Vec2,
     pub ignore_cooldown: bool,
 }
-#[derive(AsBindGroup, TypeUuid, Debug, Clone)]
-#[uuid = "f690fdae-d598-45ab-8225-97e2a3f056f0"]
+#[derive(Asset, TypePath, AsBindGroup, Debug, Clone)]
 pub struct AnimatedTextureMaterial {
     #[texture(0)]
     #[sampler(1)]
@@ -115,51 +113,70 @@ impl Material2d for AnimatedTextureMaterial {
         "shaders/texture_map.wgsl".into()
     }
 
-    // fn alpha_mode(&self) -> AlphaMode {
-    //     self.alpha_mode
-    // }
+    fn alpha_mode(&self) -> AlphaMode2d {
+        AlphaMode2d::Blend
+    }
 }
 
 impl Plugin for AnimationsPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugin(Material2dPlugin::<AnimatedTextureMaterial>::default())
-            .add_event::<CleanUpRunStateEvent>()
-            .add_system(preload_player_sprites.in_schedule(OnExit(GameState::Loading)))
+        app.add_plugins(Material2dPlugin::<AnimatedTextureMaterial>::default())
+            .add_message::<CleanUpRunStateEvent>()
+            .add_systems(OnExit(GameState::Loading), preload_player_sprites)
             .add_systems(
+                Update,
                 (
                     change_anim_offset_when_character_action_state_changes,
                     change_character_anim_direction,
                     animate_character_spritesheet_animations,
                     animate_enemies,
                     animate_dropped_items,
-                    handle_held_item_direction_change,
                     move_player_attack_collider,
                     animate_hit,
-                    animate_spritesheet_animations.after(mouse_click_system),
                     animate_foliage_opacity,
                 )
-                    .in_set(OnUpdate(GameState::Main)),
+                    .run_if(in_state(GameState::Main)),
             )
-            .add_system(handle_game_over_fadeout.in_set(OnUpdate(GameState::Main)))
             .add_systems(
+                Update,
+                animate_spritesheet_animations
+                    .after(mouse_click_system)
+                    .run_if(in_state(GameState::Main)),
+            )
+            .add_systems(
+                Update,
+                handle_game_over_fadeout.run_if(in_state(GameState::Main)),
+            )
+            .add_systems(
+                Update,
                 (
                     handle_anim_change_when_player_dir_changes,
                     handle_player_animation_change,
+                    handle_restart_player_attack_anim,
                     cleanup_one_time_animations,
-                    handle_cleanup_one_time_aseprite_animations,
                 )
-                    .in_set(OnUpdate(GameState::Main)),
+                    .chain()
+                    .run_if(in_state(GameState::Main)),
             )
-            .add_systems((change_player_class_visuals,).in_set(OnUpdate(GameState::Main)))
-            .add_systems((
-                tick_game_over_overlay,
-                handle_spawn_collected_time_fragments,
-                update_game_over_rank_text,
-                handle_game_over_final_stats_tooltip,
-                handle_move_animations,
-                handle_ui_time_fragments,
-            ))
-            .add_system(maintain_player_red_tint.in_set(OnUpdate(GameState::GameOver)));
+            .add_systems(
+                Update,
+                (change_player_class_visuals,).run_if(in_state(GameState::Main)),
+            )
+            .add_systems(
+                Update,
+                (
+                    tick_game_over_overlay,
+                    handle_spawn_collected_time_fragments,
+                    update_game_over_rank_text,
+                    handle_game_over_final_stats_tooltip,
+                    handle_move_animations,
+                    handle_ui_time_fragments,
+                ),
+            )
+            .add_systems(
+                Update,
+                maintain_player_red_tint.run_if(in_state(GameState::GameOver)),
+            );
     }
 }
 
@@ -171,12 +188,12 @@ fn animate_enemies(
     mut enemy_query: Query<(
         &mut AnimationFrameTracker,
         &mut AnimationTimer,
-        &Handle<EnemyMaterial>,
+        &MeshMaterial2d<EnemyMaterial>,
         &Mob,
         Option<&LeapAttackState>,
     )>,
 ) {
-    for (mut tracker, mut timer, enemy_handle, _enemy, att_option) in enemy_query.iter_mut() {
+    for (mut tracker, mut timer, enemy_mat, _enemy, att_option) in enemy_query.iter_mut() {
         timer.tick(time.delta());
 
         let frame_changed = timer.just_finished();
@@ -185,7 +202,9 @@ fn animate_enemies(
         }
 
         let new_attacking = att_option.map_or(0., |attack| {
-            if attack.attack_startup_timer.finished() && !attack.attack_duration_timer.finished() {
+            if attack.attack_startup_timer.is_finished()
+                && !attack.attack_duration_timer.is_finished()
+            {
                 1.
             } else {
                 0.
@@ -194,14 +213,14 @@ fn animate_enemies(
 
         let needs_material_update = frame_changed
             || materials
-                .get(enemy_handle)
+                .get(&enemy_mat.0)
                 .map_or(false, |m| m.is_attacking != new_attacking);
 
         if !needs_material_update {
             continue;
         }
 
-        if let Some(mat) = materials.get_mut(enemy_handle) {
+        if let Some(mut mat) = materials.get_mut(&enemy_mat.0) {
             mat.source_texture = Some(
                 asset_server.load(format!("textures/slime/{}-move-{}.png", "slime", tracker.0)),
             );
@@ -250,10 +269,12 @@ fn animate_hit(
         ),
         With<Player>,
     >,
-    anim_state: Query<(&CharacterAnimationSpriteSheetData, &TextureAtlasSprite)>,
+    anim_state: Query<(&CharacterAnimationSpriteSheetData, &Sprite)>,
     time: Res<Time>,
 ) {
-    let (p_e, mut kcc, _mv) = player.single_mut();
+    let Ok((p_e, mut kcc, _mv)) = player.single_mut() else {
+        return;
+    };
     for (e, mut hit, mob_option) in hit_tracker.iter_mut() {
         if !hit.is_active {
             continue;
@@ -265,23 +286,24 @@ fn animate_hit(
         }
         hit.timer.tick(time.delta());
 
-        if hit.timer.percent() <= 0.25 {
+        if hit.timer.fraction() <= 0.25 {
             if e == p_e {
-                let d = hit.dir * hit.knockback * time.delta_seconds();
+                let d = hit.dir * hit.knockback * time.delta_secs();
                 kcc.translation = Some(d);
             } else if let Ok(mut hit_t) = transforms.get_mut(e) {
-                hit_t.translation += hit.dir.extend(0.) * hit.knockback * time.delta_seconds();
+                hit_t.translation += hit.dir.extend(0.) * hit.knockback * time.delta_secs();
             }
         }
 
-        if hit.timer.finished() {
+        if hit.timer.is_finished() {
             if let Some(state) = mob_option {
                 // For mobs we keep `is_active = true` (and keep the system ticking
                 // this entity each frame) until the sprite has cycled back to the
                 // starting frame of the Hit animation. Only then do we transition
                 // back to Walk and deactivate.
                 let (anim_data, sprite) = anim_state.get(e).unwrap();
-                if sprite.index == anim_data.get_starting_frame_for_animation(state)
+                let sprite_index = sprite.texture_atlas.as_ref().map(|a| a.index).unwrap_or(0);
+                if sprite_index == anim_data.get_starting_frame_for_animation(state)
                     && state == &EnemyAnimationState::Hit
                 {
                     commands.entity(e).insert(EnemyAnimationState::Walk);
@@ -294,39 +316,20 @@ fn animate_hit(
     }
     //TODO: move to hit_handler fn
 }
-fn handle_held_item_direction_change(
-    game: GameParam,
-    mut tool_query: Query<
-        (&WorldObject, &mut Transform, &mut TextureAtlasSprite),
-        (With<MainHand>, Without<Chunk>),
-    >,
-) {
-    if let Ok((obj, mut t, mut sprite)) = tool_query.get_single_mut() {
-        let obj_data = game.world_obj_data.properties.get(obj).unwrap();
-        let anchor = obj_data.anchor.unwrap_or(Vec2::ZERO);
-
-        let is_facing_left = game.player().direction == FacingDirection::Left;
-
-        t.translation.x = PLAYER_EQUIPMENT_POSITIONS[&Limb::Hands].x
-            + anchor.x * obj_data.size.x
-            + if is_facing_left { 0. } else { 11. };
-        sprite.flip_x = is_facing_left;
-    }
-}
 fn move_player_attack_collider(
     game: GameParam,
     mut tool_query: Query<(&WorldObject, &mut Transform), (With<Equipment>, Without<Chunk>)>,
-    mut attack_event: EventReader<AttackEvent>,
+    mut attack_event: MessageReader<AttackEvent>,
     mut dir_state: Local<Vec2>,
     player_anim: Query<&PlayerAnimation>,
 ) {
-    if let Ok((obj, mut t)) = tool_query.get_single_mut() {
-        let attack_option = attack_event.iter().next();
+    if let Ok((obj, mut t)) = tool_query.single_mut() {
+        let attack_option = attack_event.read().next();
         if let Some(attack) = attack_option {
             *dir_state = attack.direction;
         }
 
-        if attack_option.is_some() || player_anim.single().is_an_attack() {
+        if attack_option.is_some() || player_anim.single().ok().is_some_and(|a| a.is_an_attack()) {
             let mut x_offset = 0.;
             let mut y_offset = 0.;
             let angle = dir_state.y.atan2(dir_state.x);
@@ -354,13 +357,12 @@ fn move_player_attack_collider(
 fn animate_spritesheet_animations(
     mut commands: Commands,
     time: Res<Time>,
-    texture_atlases: Res<Assets<TextureAtlas>>,
+    texture_atlases: Res<Assets<TextureAtlasLayout>>,
     mut query: Query<
         (
             Entity,
             &mut AnimationTimer,
-            &mut TextureAtlasSprite,
-            &Handle<TextureAtlas>,
+            &mut Sprite,
             &GlobalTransform,
             Option<&Children>,
             Option<&ArcProjectileData>,
@@ -374,35 +376,39 @@ fn animate_spritesheet_animations(
         ),
     >,
     mut children_txfm_query: Query<&mut Transform>,
-    mut ranged_att_event: EventWriter<RangedAttackEvent>,
+    mut ranged_att_event: MessageWriter<RangedAttackEvent>,
 ) {
     for (
         e,
         mut timer,
         mut sprite,
-        texture_atlas_handle,
         transform,
         children_option,
         proj_arc_option,
         remove_me_option,
         proj_option,
         proj_state_option,
-    ) in &mut query
+    ) in query.iter_mut()
     {
         timer.tick(time.delta());
         if timer.just_finished() {
-            let texture_atlas = texture_atlases.get(texture_atlas_handle).unwrap();
+            let Some(atlas) = sprite.texture_atlas.as_ref() else {
+                continue;
+            };
+            let Some(texture_atlas) = texture_atlases.get(&atlas.layout) else {
+                continue;
+            };
             let num_frame = texture_atlas.textures.len();
             //hack to fix soem projectiles animating
             if num_frame >= 50 {
                 continue;
             }
-            if sprite.index == num_frame - 1 && remove_me_option.is_some() {
-                commands.entity(e).despawn_recursive();
+            if atlas.index == num_frame - 1 && remove_me_option.is_some() {
+                commands.entity(e).despawn();
                 if let Some(proj) = proj_option {
                     if proj == &Projectile::PlasmaBall {
                         // despawn plasmaball projectile and spawn explosion
-                        ranged_att_event.send(RangedAttackEvent {
+                        ranged_att_event.write(RangedAttackEvent {
                             projectile: Projectile::PlasmaExplosion,
                             direction: proj_state_option
                                 .map(|state| state.direction)
@@ -422,23 +428,28 @@ fn animate_spritesheet_animations(
                 continue;
             }
 
-            sprite.index = (sprite.index + 1) % num_frame;
+            if let Some(atlas) = sprite.texture_atlas.as_mut() {
+                atlas.index = (atlas.index + 1) % num_frame;
+            }
             if let Some(children) = children_option {
                 for child in children.iter() {
                     let Some(arc_data) = proj_arc_option else {
                         continue;
                     };
 
-                    let angle = arc_data.col_points[sprite.index];
+                    let index = sprite.texture_atlas.as_ref().map(|a| a.index).unwrap_or(0);
+                    let angle = arc_data.col_points[index];
                     let x_offset =
                         (angle.cos() * (arc_data.size.x) + angle.cos() * (arc_data.size.y)) / 2.;
                     let y_offset = ((angle.sin() * (arc_data.size.x))
                         + (angle.sin() * (arc_data.size.y)))
                         / 2.;
-                    let mut t = children_txfm_query.get_mut(*child).unwrap();
+                    let Ok(mut t) = children_txfm_query.get_mut(child) else {
+                        continue;
+                    };
                     t.translation.x = x_offset; //* (angle.cos() * arc_data.arc.x) - arc_data.size.x / 2.;
                     t.translation.y = y_offset;
-                    t.rotation = Quat::from_rotation_z(arc_data.col_points[sprite.index] - PI / 2.);
+                    t.rotation = Quat::from_rotation_z(arc_data.col_points[index] - PI / 2.);
                 }
             }
             timer.reset();
@@ -446,7 +457,7 @@ fn animate_spritesheet_animations(
     }
 }
 
-#[derive(FromReflect, Default, Reflect, Clone, Serialize, Deserialize, Component, Debug)]
+#[derive(Default, Reflect, Clone, Serialize, Deserialize, Component, Debug)]
 #[reflect(Component)]
 pub struct FadeOpacity;
 
@@ -463,12 +474,12 @@ fn animate_foliage_opacity(
     /// Seconds for a full opaque <-> faded transition.
     const FADE_DURATION: f32 = 0.15;
 
-    let p_txfm = match player.get_single() {
+    let p_txfm = match player.single() {
         Ok(t) => t,
         Err(_) => return,
     };
     let player_pos = p_txfm.translation().truncate();
-    let step = ((NORMAL_ALPHA - FADED_ALPHA) / FADE_DURATION) * time.delta_seconds();
+    let step = ((NORMAL_ALPHA - FADED_ALPHA) / FADE_DURATION) * time.delta_secs();
 
     for (txfm, mut sprite) in tree_query.iter_mut() {
         let delta_t = player_pos - txfm.translation().truncate();
@@ -478,7 +489,7 @@ fn animate_foliage_opacity(
             } else {
                 NORMAL_ALPHA
             };
-        let current = sprite.color.a();
+        let current = sprite.color.to_srgba().alpha;
         if (current - target).abs() <= f32::EPSILON {
             continue;
         }
@@ -487,18 +498,7 @@ fn animate_foliage_opacity(
         } else {
             (current - step).max(target)
         };
-        sprite.color.set_a(new_alpha);
-    }
-}
-
-pub fn handle_cleanup_one_time_aseprite_animations(
-    anims: Query<(Entity, &AsepriteAnimation), With<DoneAnimation>>,
-    mut commands: Commands,
-) {
-    for (e, anim) in anims.iter() {
-        if anim.just_finished() {
-            commands.entity(e).despawn_recursive();
-        }
+        sprite.color = sprite.color.with_alpha(new_alpha);
     }
 }
 
@@ -533,7 +533,7 @@ pub fn handle_cleanup_one_time_aseprite_animations(
 //             //         .load::<Handle<Image>>(format!("{}.png", foliage.to_string().to_lowercase())),
 //             // )
 //             .insert(Name::new("FOLIAGE:GREEN_TREE"));
-//         // .insert(Mesh2dHandle::from(meshes.add(Mesh::from(shape::Quad {
+//         // .insert(Mesh2d::from(meshes.add(Mesh::from(shape::Quad {
 //         //     size,
 //         //     ..Default::default()
 //         // }))));

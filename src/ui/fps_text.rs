@@ -1,11 +1,11 @@
 use bevy::{
-    diagnostic::{Diagnostics, FrameTimeDiagnosticsPlugin},
+    camera::visibility::RenderLayers,
+    diagnostic::{DiagnosticsStore, FrameTimeDiagnosticsPlugin},
     prelude::*,
-    render::view::RenderLayers,
 };
 
-use bevy::sprite::TextureAtlas;
-use bevy::text::TextLayoutInfo;
+use bevy::image::TextureAtlas;
+use bevy::text::{Justify, TextLayoutInfo};
 
 use crate::{ui::game_fonts as gf, ScreenResolution, UICamera, DEBUG};
 const VERSION: &str = "v0.26.0";
@@ -32,28 +32,18 @@ pub fn spawn_fps_text(
 
     // DEBUG FPS
     commands.spawn((
-        Text2dBundle {
-            text: Text::from_section(
+        gf::HUD_FPS_DEBUG
+            .text(
+                &asset_server,
                 format!("FPS: \n\n{VERSION}"),
-                TextStyle {
-                    font: gf::HUD_FPS_DEBUG.load_font(&asset_server.as_ref()),
-                    font_size: gf::HUD_FPS_DEBUG.size,
-                    color: Color::Rgba {
-                        red: 75. / 255.,
-                        green: 61. / 255.,
-                        blue: 68. / 255.,
-                        alpha: 1.,
-                    },
-                },
+                Color::srgba(75. / 255., 61. / 255., 68. / 255., 1.),
             )
-            .with_alignment(TextAlignment::Right),
-            transform: Transform {
+            .justify(Justify::Right)
+            .with_transform(Transform {
                 translation: Vec3::new(snapped.x, snapped.y, 1.),
                 scale: gf::HUD_FPS_DEBUG.transform_scale(),
                 ..Default::default()
-            },
-            ..default()
-        },
+            }),
         Name::new("FPS TEXT"),
         FPSText,
         RenderLayers::from_layers(&[3]),
@@ -75,14 +65,14 @@ pub fn phase1_fps_text_viewport_diag(
     if last_key.as_ref() == Some(&key) {
         return;
     }
-    let Ok(fps_gt) = fps_q.get_single() else {
+    let Ok(fps_gt) = fps_q.single() else {
         return;
     };
-    let Ok((cam, cam_gt)) = ui_cam.get_single() else {
+    let Ok((cam, cam_gt)) = ui_cam.single() else {
         return;
     };
     let world = fps_gt.translation();
-    let Some(vp) = cam.world_to_viewport(cam_gt, world) else {
+    let Ok(vp) = cam.world_to_viewport(cam_gt, world) else {
         return;
     };
     info!(
@@ -113,7 +103,7 @@ pub fn phase1_fps_text_viewport_diag(
 pub fn phase2_fps_text_layout_diag(
     res: Res<ScreenResolution>,
     mut last_key: Local<Option<(u32, u32, u32)>>,
-    fps_q: Query<(&GlobalTransform, &TextLayoutInfo, &Text), With<FPSText>>,
+    fps_q: Query<(&GlobalTransform, &TextLayoutInfo), With<FPSText>>,
     ui_cam: Query<(&Camera, &GlobalTransform), (With<UICamera>, Without<FPSText>)>,
     windows: Query<&bevy::window::Window, With<bevy::window::PrimaryWindow>>,
 ) {
@@ -124,13 +114,13 @@ pub fn phase2_fps_text_layout_diag(
     if last_key.as_ref() == Some(&key) {
         return;
     }
-    let Ok((fps_gt, layout, text)) = fps_q.get_single() else {
+    let Ok((fps_gt, layout)) = fps_q.single() else {
         return;
     };
-    let Ok((cam, cam_gt)) = ui_cam.get_single() else {
+    let Ok((cam, cam_gt)) = ui_cam.single() else {
         return;
     };
-    let Ok(window) = windows.get_single() else {
+    let Ok(window) = windows.single() else {
         return;
     };
     if layout.glyphs.is_empty() {
@@ -175,7 +165,7 @@ pub fn phase2_fps_text_layout_diag(
             viewport.map(|v| (format!("{:.4}", v.x), format!("{:.4}", v.y))),
             phys.map(|p| (format!("{:.4}", p.x), format!("{:.4}", p.y))),
             phys.map(|p| (format!("{:.4}", p.x.fract()), format!("{:.4}", p.y.fract()))),
-            text.sections.get(g.section_index).map(|_| (g.size.x, g.size.y)),
+            Some((g.atlas_info.rect.width(), g.atlas_info.rect.height())),
         );
     }
     *last_key = Some(key);
@@ -200,7 +190,7 @@ pub fn phase3_fps_atlas_dump(
     mut last_key: Local<Option<(u32, u32, u32)>>,
     res: Res<ScreenResolution>,
     fps_q: Query<&TextLayoutInfo, With<FPSText>>,
-    atlases: Res<Assets<TextureAtlas>>,
+    atlases: Res<Assets<TextureAtlasLayout>>,
     images: Res<Assets<Image>>,
 ) {
     if !*DEBUG {
@@ -210,7 +200,7 @@ pub fn phase3_fps_atlas_dump(
     if last_key.as_ref() == Some(&key) {
         return;
     }
-    let Ok(layout) = fps_q.get_single() else {
+    let Ok(layout) = fps_q.single() else {
         return;
     };
     if layout.glyphs.is_empty() {
@@ -218,13 +208,10 @@ pub fn phase3_fps_atlas_dump(
     }
 
     for (i, g) in layout.glyphs.iter().enumerate().take(8) {
-        let Some(atlas) = atlases.get(&g.atlas_info.texture_atlas) else {
+        let Some(image) = images.get(g.atlas_info.texture) else {
             continue;
         };
-        let Some(image) = images.get(&atlas.texture) else {
-            continue;
-        };
-        let rect = atlas.textures[g.atlas_info.glyph_index];
+        let rect = g.atlas_info.rect;
         let img_w = image.texture_descriptor.size.width as usize;
         let img_h = image.texture_descriptor.size.height as usize;
         let bytes_per_pixel = 4;
@@ -247,7 +234,12 @@ pub fn phase3_fps_atlas_dump(
                     continue;
                 }
                 let pixel_idx = (y * img_w + x) * bytes_per_pixel;
-                let alpha = image.data.get(pixel_idx + 3).copied().unwrap_or(0);
+                let alpha = image
+                    .data
+                    .as_ref()
+                    .and_then(|data| data.get(pixel_idx + 3))
+                    .copied()
+                    .unwrap_or(0);
                 let ch = match alpha {
                     0 => ' ',
                     1..=63 => '.',
@@ -269,14 +261,13 @@ pub fn phase3_fps_atlas_dump(
 }
 
 pub fn text_update_system(
-    diagnostics: Res<Diagnostics>,
-    mut query: Query<&mut Text, With<FPSText>>,
+    diagnostics: Res<DiagnosticsStore>,
+    mut query: Query<&mut Text2d, With<FPSText>>,
 ) {
     for mut text in &mut query {
-        if let Some(fps) = diagnostics.get(FrameTimeDiagnosticsPlugin::FPS) {
+        if let Some(fps) = diagnostics.get(&FrameTimeDiagnosticsPlugin::FPS) {
             if let Some(value) = fps.smoothed() {
-                // Update the value of the second section
-                text.sections[0].value = format!("FPS: {value:.0}\n{VERSION}");
+                text.0 = format!("FPS: {value:.0}\n{VERSION}");
             }
         }
     }

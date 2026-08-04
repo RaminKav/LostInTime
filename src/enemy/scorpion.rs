@@ -1,10 +1,14 @@
+use crate::aseprite_assets::Scorpion;
+use crate::aseprite_helpers::{
+    ase_animation, aseprite_bundle, collect_finished, is_paused, pause, play_loop, play_once, start,
+};
 use bevy::prelude::*;
-use bevy_aseprite::{anim::AsepriteAnimation, aseprite, AsepriteBundle};
-use serde::Deserialize;
+use bevy_aseprite_ultra::prelude::{AnimationEvents, AnimationState, AseAnimation, Aseprite};
 use bevy_rapier2d::prelude::{
     Collider, CollisionGroups, Group, KinematicCharacterController, Sensor,
 };
-use seldom_state::{prelude::StateMachine, trigger::BoolTrigger};
+use seldom_state::prelude::StateMachine;
+use serde::Deserialize;
 
 use crate::{
     ai::{EnemyAttackCooldown, FollowState},
@@ -37,8 +41,6 @@ use crate::{
     },
     GameParam, PLAYER_MOVE_SPEED,
 };
-
-aseprite!(pub Scorpion, "textures/scorpion/scorpion.ase");
 
 /// Target standoff while following (px). Boss backs away when closer than this minus a buffer.
 const SCORPION_COMFORT_DIST: f32 = 60.0;
@@ -78,7 +80,7 @@ const TAIL_ATTACK_SOUTH: &str = "tail-attack-south";
 const TAIL_ATTACK_NORTH: &str = "tail-attack-north";
 
 /// Scorpion boss claw attack config: 3-phase (prep -> loop -> attack with lunge + 34x34 hitbox).
-#[derive(FromReflect, Debug, Default, Reflect, Clone, Component, Deserialize)]
+#[derive(Debug, Default, Reflect, Clone, Component, Deserialize)]
 #[reflect(Component, Default)]
 pub struct ScorpionClawAttack {
     pub activation_distance: f32,
@@ -98,7 +100,7 @@ pub struct ScorpionClawAttack {
 }
 
 /// Scorpion boss tail attack config: 3-phase (prep -> loop -> attack, 3 waves of cone projectiles).
-#[derive(FromReflect, Debug, Default, Reflect, Clone, Component, Deserialize)]
+#[derive(Debug, Default, Reflect, Clone, Component, Deserialize)]
 #[reflect(Component, Default)]
 pub struct ScorpionTailAttack {
     pub activation_distance: f32,
@@ -116,7 +118,7 @@ pub struct ScorpionTailAttack {
 }
 
 /// Scorpion boss passive tornado attack config: periodically spawns a desert tornado.
-#[derive(FromReflect, Debug, Default, Reflect, Clone, Component, Deserialize)]
+#[derive(Debug, Default, Reflect, Clone, Component, Deserialize)]
 #[reflect(Component, Default)]
 pub struct ScorpionTornadoAttack {
     /// Seconds between tornado spawns.
@@ -129,7 +131,7 @@ pub struct ScorpionTornadoAttack {
     pub spawn_distance: f32,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Default, Reflect, FromReflect)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Default, Reflect)]
 pub enum ScorpionFacing {
     #[default]
     South,
@@ -300,12 +302,9 @@ fn scorpion_claw_lunge_dir(to_player: Vec2, facing_fallback: ScorpionFacing) -> 
     }
 }
 
-fn set_anim_tag(anim: &mut AsepriteAnimation, current: &mut ScorpionCurrentTag, new_tag: &str) {
+fn set_anim_tag(anim: &mut AseAnimation, current: &mut ScorpionCurrentTag, new_tag: &str) {
     if current.0 != new_tag {
-        *anim = AsepriteAnimation::from(new_tag);
-        if anim.is_paused() {
-            anim.play();
-        }
+        play_loop(anim, new_tag);
         current.0 = new_tag.to_string();
     }
 }
@@ -328,7 +327,7 @@ fn refresh_scorpion_facing<'a>(
     delta: Vec2,
     facing_out: &mut ScorpionFacing,
     facing_dir: &mut ScorpionFacingDir,
-    anim: &mut AsepriteAnimation,
+    anim: &mut AseAnimation,
     current_tag: &mut ScorpionCurrentTag,
     tag_for_facing: impl Fn(ScorpionFacing) -> &'static str,
     transform: Option<Mut<'a, Transform>>,
@@ -392,19 +391,22 @@ pub fn handle_new_scorpion_state_machine(
         let tornado_interval =
             tornado_cfg.interval / summon_index.scorpion_tornado_frequency_scale();
         let tornado_spawns_per_tick = summon_index.scorpion_tornado_spawns_per_tick();
-        let mut animation = AsepriteAnimation::from(WALK_SOUTH);
-        animation.play();
+        let mut animation = ase_animation(asset_server.load(Scorpion::PATH), WALK_SOUTH, false);
+        start(&mut animation);
         mover.filter_groups = Some(CollisionGroups::new(Group::NONE, Group::NONE));
 
         commands
             .entity(e)
             .insert(CollisionGroups::new(Group::GROUP_1, Group::GROUP_1))
-            .insert(AsepriteBundle {
-                aseprite: asset_server.load(Scorpion::PATH),
+            .insert((
                 animation,
-                transform: *transform,
-                ..Default::default()
-            })
+                Sprite::default(),
+                *transform,
+                GlobalTransform::default(),
+                Visibility::Inherited,
+                InheritedVisibility::default(),
+                ViewVisibility::default(),
+            ))
             .insert(FollowState {
                 target: game.game.player,
                 curr_delta: None,
@@ -427,10 +429,8 @@ pub fn handle_new_scorpion_state_machine(
         let state_machine = StateMachine::default()
             .set_trans_logging(false)
             .with_state::<DeathState>()
-            .trans::<FollowState>(
-                ClawTrigger {
-                    activation_distance: claw_cfg.activation_distance,
-                },
+            .trans::<FollowState, _>(
+                claw_trigger,
                 ClawAttackState {
                     phase: ClawPhase::Prep,
                     phase_timer: Timer::from_seconds(claw_cfg.prep_duration, TimerMode::Once),
@@ -441,10 +441,8 @@ pub fn handle_new_scorpion_state_machine(
                     lunge_dir: Vec2::ZERO,
                 },
             )
-            .trans::<FollowState>(
-                TailTrigger {
-                    activation_distance: tail_cfg.activation_distance,
-                },
+            .trans::<FollowState, _>(
+                tail_trigger,
                 TailAttackState {
                     phase: TailPhase::Prep,
                     phase_timer: Timer::from_seconds(tail_cfg.prep_duration, TimerMode::Once),
@@ -463,7 +461,7 @@ pub fn handle_new_scorpion_state_machine(
         debug!(
             entity = ?e,
             path = Scorpion::PATH,
-            "Scorpion boss: inserted AsepriteBundle and state machine"
+            "Scorpion boss: inserted aseprite components and state machine"
         );
     }
 }
@@ -477,7 +475,7 @@ pub fn scorpion_follow(
             Entity,
             &mut FollowState,
             &Mob,
-            &mut AsepriteAnimation,
+            &mut AseAnimation,
             &mut ScorpionCurrentTag,
             &mut ScorpionFacingDir,
             &mut ScorpionComfortRing,
@@ -533,7 +531,7 @@ pub fn scorpion_follow(
             move_dir
                 * follow.speed
                 * PLAYER_MOVE_SPEED
-                * time.delta_seconds()
+                * time.delta_secs()
                 * move_speed_mul
                 * status_option
                     .map(|s| s.movement_speed_multiplier())
@@ -554,98 +552,76 @@ pub fn scorpion_follow(
 }
 
 // ---------- triggers ----------
-#[derive(Clone, Copy, Reflect)]
-pub struct ClawTrigger {
-    pub activation_distance: f32,
-}
-
-impl BoolTrigger for ClawTrigger {
-    type Param<'w, 's> = (
-        Query<
-            'w,
-            's,
-            (
-                &'static Transform,
-                &'static ScorpionAttackTimers,
-                Option<&'static EnemyAttackCooldown>,
-                Option<&'static ScorpionQueuedAttack>,
-            ),
-        >,
-        Query<'w, 's, &'static Transform, With<Player>>,
-    );
-
-    fn trigger(&self, entity: Entity, (q, player): Self::Param<'_, '_>) -> bool {
-        let Ok((my_tf, timers, cd, queued)) = q.get(entity) else {
-            return false;
-        };
-        if cd.is_some() {
-            return false;
-        }
-        if !timers.attack_cooldown.finished() {
-            return false;
-        }
-        if !matches!(
-            queued,
-            Some(&ScorpionQueuedAttack(ScorpionQueuedAttackKind::Claw))
-        ) {
-            return false;
-        }
-        let Ok(player_tf) = player.get_single() else {
-            return false;
-        };
-        let dist_sq = my_tf
-            .translation
-            .truncate()
-            .distance_squared(player_tf.translation.truncate());
-        dist_sq <= self.activation_distance * self.activation_distance
+fn claw_trigger(
+    In(entity): In<Entity>,
+    q: Query<(
+        &Transform,
+        &ScorpionAttackTimers,
+        Option<&EnemyAttackCooldown>,
+        Option<&ScorpionQueuedAttack>,
+        &ScorpionClawAttack,
+    )>,
+    player: Query<&Transform, With<Player>>,
+) -> bool {
+    let Ok((my_tf, timers, cd, queued, attack)) = q.get(entity) else {
+        return false;
+    };
+    if cd.is_some() {
+        return false;
     }
-}
-
-#[derive(Clone, Copy, Reflect)]
-pub struct TailTrigger {
-    pub activation_distance: f32,
-}
-
-impl BoolTrigger for TailTrigger {
-    type Param<'w, 's> = (
-        Query<
-            'w,
-            's,
-            (
-                &'static Transform,
-                &'static ScorpionAttackTimers,
-                Option<&'static EnemyAttackCooldown>,
-                Option<&'static ScorpionQueuedAttack>,
-            ),
-        >,
-        Query<'w, 's, &'static Transform, With<Player>>,
-    );
-
-    fn trigger(&self, entity: Entity, (q, player): Self::Param<'_, '_>) -> bool {
-        let Ok((my_tf, timers, cd, queued)) = q.get(entity) else {
-            return false;
-        };
-        if cd.is_some() {
-            return false;
-        }
-        if !timers.attack_cooldown.finished() {
-            return false;
-        }
-        if !matches!(
-            queued,
-            Some(&ScorpionQueuedAttack(ScorpionQueuedAttackKind::Tail))
-        ) {
-            return false;
-        }
-        let Ok(player_tf) = player.get_single() else {
-            return false;
-        };
-        let dist_sq = my_tf
-            .translation
-            .truncate()
-            .distance_squared(player_tf.translation.truncate());
-        dist_sq <= self.activation_distance * self.activation_distance
+    if !timers.attack_cooldown.is_finished() {
+        return false;
     }
+    if !matches!(
+        queued,
+        Some(&ScorpionQueuedAttack(ScorpionQueuedAttackKind::Claw))
+    ) {
+        return false;
+    }
+    let Ok(player_tf) = player.single() else {
+        return false;
+    };
+    let dist_sq = my_tf
+        .translation
+        .truncate()
+        .distance_squared(player_tf.translation.truncate());
+    dist_sq <= attack.activation_distance * attack.activation_distance
+}
+
+fn tail_trigger(
+    In(entity): In<Entity>,
+    q: Query<(
+        &Transform,
+        &ScorpionAttackTimers,
+        Option<&EnemyAttackCooldown>,
+        Option<&ScorpionQueuedAttack>,
+        &ScorpionTailAttack,
+    )>,
+    player: Query<&Transform, With<Player>>,
+) -> bool {
+    let Ok((my_tf, timers, cd, queued, attack)) = q.get(entity) else {
+        return false;
+    };
+    if cd.is_some() {
+        return false;
+    }
+    if !timers.attack_cooldown.is_finished() {
+        return false;
+    }
+    if !matches!(
+        queued,
+        Some(&ScorpionQueuedAttack(ScorpionQueuedAttackKind::Tail))
+    ) {
+        return false;
+    }
+    let Ok(player_tf) = player.single() else {
+        return false;
+    };
+    let dist_sq = my_tf
+        .translation
+        .truncate()
+        .distance_squared(player_tf.translation.truncate());
+    dist_sq <= attack.activation_distance * attack.activation_distance
 }
 
 pub fn tick_scorpion_timers(
@@ -683,7 +659,7 @@ pub fn scorpion_queue_next_attack(
     >,
     player_q: Query<&GlobalTransform, With<Player>>,
 ) {
-    let Ok(player_tf) = player_q.get_single() else {
+    let Ok(player_tf) = player_q.single() else {
         return;
     };
     let player_pos = player_tf.translation();
@@ -695,7 +671,7 @@ pub fn scorpion_queue_next_attack(
         if cd.is_some() {
             continue;
         }
-        if !timers.attack_cooldown.finished() {
+        if !timers.attack_cooldown.is_finished() {
             continue;
         }
 
@@ -744,7 +720,7 @@ pub fn handle_claw_attack(
             &mut ClawAttackState,
             &ScorpionClawAttack,
             &FollowSpeed,
-            &mut AsepriteAnimation,
+            &mut AseAnimation,
             &mut ScorpionCurrentTag,
             &mut ScorpionFacingDir,
             &mut ScorpionAttackTimers,
@@ -757,7 +733,9 @@ pub fn handle_claw_attack(
     time: Res<Time>,
     game: GameParam,
     asset_server: Res<AssetServer>,
+    mut finished_events: MessageReader<AnimationEvents>,
 ) {
+    let finished = collect_finished(&mut finished_events);
     for (
         entity,
         mob,
@@ -808,7 +786,7 @@ pub fn handle_claw_attack(
                     );
                 }
                 state.phase_timer.tick(time.delta());
-                if state.phase_timer.finished() {
+                if state.phase_timer.is_finished() {
                     state.phase = ClawPhase::Loop;
                     state.phase_timer =
                         Timer::from_seconds(claw_cfg.loop_duration, TimerMode::Once);
@@ -826,7 +804,7 @@ pub fn handle_claw_attack(
             }
             ClawPhase::Loop => {
                 state.phase_timer.tick(time.delta());
-                if state.phase_timer.finished() {
+                if state.phase_timer.is_finished() {
                     state.phase = ClawPhase::Attack;
                     state.lunge_timer.reset();
                     state.hitbox_timer.reset();
@@ -853,7 +831,7 @@ pub fn handle_claw_attack(
                     );
                     let hitbox = commands
                         .spawn((
-                            TransformBundle::from_transform(Transform::from_translation(offset)),
+                            Transform::from_translation(offset),
                             Attack(enemy_attack.0),
                             Collider::cuboid(17., 17.),
                             Sensor,
@@ -872,14 +850,14 @@ pub fn handle_claw_attack(
                 }
 
                 state.lunge_timer.tick(time.delta());
-                if !state.lunge_timer.finished() {
-                    kcc.translation = Some(state.lunge_dir * lunge_speed * time.delta_seconds());
+                if !state.lunge_timer.is_finished() {
+                    kcc.translation = Some(state.lunge_dir * lunge_speed * time.delta_secs());
                 }
 
                 state.hitbox_timer.tick(time.delta());
-                if anim.just_finished() {
+                if finished.contains(&entity) {
                     if let Some(hitbox) = claw_collider.0.take() {
-                        commands.entity(hitbox).despawn_recursive();
+                        commands.entity(hitbox).despawn();
                     }
                     timers.attack_cooldown =
                         Timer::from_seconds(claw_cfg.cooldown, TimerMode::Once);
@@ -914,7 +892,7 @@ pub fn handle_tail_attack(
             &mut TailAttackState,
             &ScorpionTailAttack,
             &FollowSpeed,
-            &mut AsepriteAnimation,
+            &mut AseAnimation,
             &mut ScorpionCurrentTag,
             &mut ScorpionFacingDir,
             &mut ScorpionAttackTimers,
@@ -924,7 +902,7 @@ pub fn handle_tail_attack(
     >,
     time: Res<Time>,
     game: GameParam,
-    mut events: EventWriter<RangedAttackEvent>,
+    mut events: MessageWriter<RangedAttackEvent>,
 ) {
     for (
         entity,
@@ -968,7 +946,7 @@ pub fn handle_tail_attack(
                     );
                 }
                 state.phase_timer.tick(time.delta());
-                if state.phase_timer.finished() {
+                if state.phase_timer.is_finished() {
                     state.phase = TailPhase::Loop;
                     state.phase_timer =
                         Timer::from_seconds(tail_cfg.loop_duration, TimerMode::Once);
@@ -986,7 +964,7 @@ pub fn handle_tail_attack(
             }
             TailPhase::Loop => {
                 state.phase_timer.tick(time.delta());
-                if state.phase_timer.finished() {
+                if state.phase_timer.is_finished() {
                     state.phase = TailPhase::Wave;
                     state.phase_timer = Timer::from_seconds(state.wave_duration, TimerMode::Once);
                     state.fired_this_wave = false;
@@ -1017,7 +995,7 @@ pub fn handle_tail_attack(
                         };
                         let angle = base_angle + t * state.cone_half_angle;
                         let proj_dir = Vec2::new(angle.cos(), angle.sin());
-                        events.send(RangedAttackEvent {
+                        events.write(RangedAttackEvent {
                             projectile: Projectile::ScorpionProjectile,
                             direction: proj_dir,
                             from_entity: Some(entity),
@@ -1032,7 +1010,7 @@ pub fn handle_tail_attack(
                     }
                 }
                 state.phase_timer.tick(time.delta());
-                if state.phase_timer.finished() {
+                if state.phase_timer.is_finished() {
                     state.waves_left = state.waves_left.saturating_sub(1);
                     if state.waves_left == 0 {
                         timers.attack_cooldown =
@@ -1122,15 +1100,7 @@ pub fn tick_tornado_timer(
 // ---------- Death handling ----------
 pub fn handle_scorpion_death(
     mut commands: Commands,
-    mut death: Query<
-        (
-            Entity,
-            &mut AsepriteAnimation,
-            &Mob,
-            &mut ScorpionCurrentTag,
-        ),
-        With<DeathState>,
-    >,
+    mut death: Query<(Entity, &mut AseAnimation, &Mob, &mut ScorpionCurrentTag), With<DeathState>>,
     era_manager: Res<EraManager>,
     mut boss_kill_tracker: ResMut<BossKillTracker>,
     era_timer: Res<EraTimer>,
@@ -1162,6 +1132,6 @@ pub fn handle_scorpion_death(
             &proto,
         );
 
-        commands.entity(entity).despawn_recursive();
+        commands.entity(entity).despawn();
     }
 }

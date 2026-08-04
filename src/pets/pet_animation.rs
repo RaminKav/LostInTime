@@ -1,14 +1,15 @@
+use crate::aseprite_assets::{FairyPetSprite, SlimePetSprite};
+use crate::aseprite_helpers::{
+    ase_animation, aseprite_bundle, collect_finished, is_paused, pause, play_loop, play_once, start,
+};
 use bevy::prelude::*;
-use bevy_aseprite::{anim::AsepriteAnimation, aseprite, AsepriteBundle};
+use bevy_aseprite_ultra::prelude::{AnimationState, AseAnimation, Aseprite};
 use rand::Rng;
-use seldom_state::{prelude::StateMachine, trigger::Trigger};
+use seldom_state::prelude::StateMachine;
 
 use crate::{
-    ai::LineOfSight, enemy::Mob, inputs::FacingDirection, player::Player, Game, Pet, PetState,
+    ai::line_of_sight, enemy::Mob, inputs::FacingDirection, player::Player, Game, Pet, PetState,
 };
-
-aseprite!(pub SlimePetSprite, "textures/pets/slime-pet.ase");
-aseprite!(pub FairyPetSprite, "textures/pets/fairy-pet.ase");
 
 pub mod tags {
     pub const IDLE: &str = "IDLE";
@@ -57,44 +58,49 @@ impl Default for PetIdleState {
 
 pub fn handle_new_pet_state_machine(
     mut commands: Commands,
-    spawn_events: Query<(Entity, &Transform, &PetState, &Pet), Added<crate::pets::state::PetState>>,
+    // Gate on missing visuals, not `Added<Pet>`. Starting pets spawn without
+    // `PetState`; `configure_pet_on_spawn` inserts it a flush later, after
+    // `Added<Pet>` has already expired — so the old query never attached art.
+    spawn_events: Query<(Entity, &Transform, &PetState, &Pet), (With<Pet>, Without<AseAnimation>)>,
     asset_server: Res<AssetServer>,
     game: Res<Game>,
 ) {
+    let player = game.player;
     for (e, transform, pet_state, pet) in spawn_events.iter() {
-        let mut e_cmds = commands.entity(e);
+        let follow_speed = pet_state.follow_speed;
+        let idle_tag = pet.get_idle_anim().to_owned();
+        let aseprite_path = pet.get_aseprite_path().to_owned();
 
-        // Use Aseprite animation system
-        let mut animation = AsepriteAnimation::from(pet.get_idle_anim());
-        animation.pause();
-        e_cmds
-            .insert(AsepriteBundle {
-                aseprite: asset_server.load(pet.get_aseprite_path()),
+        let handle = asset_server.load(aseprite_path);
+        let mut animation = ase_animation(handle, idle_tag.as_str(), false);
+        pause(&mut animation);
+        commands
+            .entity(e)
+            .insert((
                 animation,
-                transform: *transform,
-                ..Default::default()
-            })
-            .insert(PetIdleState::default());
-
-        // Create the state machine
-        let state_machine = StateMachine::default()
-            .set_trans_logging(true)
-            .with_state::<PetFollowState>()
-            .with_state::<PetIdleState>()
-            .trans::<PetAttackState>(
-                Trigger::not(LineOfSight {
-                    target: game.player,
-                    range: 16. * 8.,
-                }),
-                PetFollowState {
-                    target: game.player,
-                    curr_delta: None,
-                    curr_path: None,
-                    speed: pet_state.follow_speed * 2.,
-                },
+                Sprite::default(),
+                *transform,
+                GlobalTransform::default(),
+                Visibility::Inherited,
+                InheritedVisibility::default(),
+                ViewVisibility::default(),
+            ))
+            .insert(PetIdleState::default())
+            .insert(
+                StateMachine::default()
+                    .set_trans_logging(true)
+                    .with_state::<PetFollowState>()
+                    .with_state::<PetIdleState>()
+                    .trans::<PetAttackState, _>(
+                        line_of_sight(player, 16. * 8.),
+                        PetFollowState {
+                            target: player,
+                            curr_delta: None,
+                            curr_path: None,
+                            speed: follow_speed * 2.,
+                        },
+                    ),
             );
-
-        e_cmds.insert(state_machine);
     }
 }
 
@@ -104,7 +110,8 @@ pub fn handle_pet_idle_state(
             Entity,
             &mut Transform,
             &mut PetIdleState,
-            &mut AsepriteAnimation,
+            &mut AseAnimation,
+            &AnimationState,
             &mut PetState,
             &Pet,
         ),
@@ -115,16 +122,18 @@ pub fn handle_pet_idle_state(
     players: Query<(Entity, &GlobalTransform), With<Player>>,
     mob_txfms: Query<&Transform, (With<Mob>, Without<PetIdleState>)>,
 ) {
-    let (player_entity, player_transform) = players.single();
-    for (entity, mut transform, mut idle_state, mut animation, mut pet_state, pet) in
+    let Ok((player_entity, player_transform)) = players.single() else {
+        return;
+    };
+    for (entity, mut transform, mut idle_state, mut animation, state, mut pet_state, pet) in
         pets.iter_mut()
     {
         idle_state.walk_timer.tick(time.delta());
         idle_state.locked_in_idle_timer.tick(time.delta());
 
         // Set animation to idle
-        if animation.current_frame() < 7 || animation.is_paused() {
-            *animation = AsepriteAnimation::from(pet.get_idle_anim());
+        if usize::from(state.current_frame()) < 7 || is_paused(&animation) {
+            play_loop(&mut *animation, pet.get_idle_anim());
         }
 
         let pet_txfm = transform.translation;
@@ -143,7 +152,7 @@ pub fn handle_pet_idle_state(
             };
             let distance_to_target = pet_txfm.distance(target_txfm);
             if distance_to_target > pet_state.min_target_distance
-                && idle_state.locked_in_idle_timer.finished()
+                && idle_state.locked_in_idle_timer.is_finished()
             {
                 commands
                     .entity(entity)
@@ -161,7 +170,7 @@ pub fn handle_pet_idle_state(
 
         // If too far from player, follow player
         if distance_to_player > pet_state.max_distance_from_player
-            && idle_state.locked_in_idle_timer.finished()
+            && idle_state.locked_in_idle_timer.is_finished()
         {
             commands
                 .entity(entity)
@@ -177,7 +186,7 @@ pub fn handle_pet_idle_state(
         }
 
         // We're close to player and have no target, do random idle movement
-        if idle_state.walk_timer.finished() && !idle_state.is_stopped {
+        if idle_state.walk_timer.is_finished() && !idle_state.is_stopped {
             idle_state.direction = FacingDirection::new_rand_dir(rand::thread_rng());
             idle_state.walk_timer =
                 Timer::from_seconds(rand::thread_rng().gen_range(1.0..3.0), TimerMode::Repeating);
@@ -186,7 +195,7 @@ pub fn handle_pet_idle_state(
         // Move in the current direction
         if !idle_state.is_stopped {
             let direction = idle_state.direction.get_dir_vec();
-            let movement = direction * idle_state.speed * time.delta_seconds();
+            let movement = direction * idle_state.speed * time.delta_secs();
             transform.translation += movement.extend(0.0);
         }
     }
@@ -198,7 +207,8 @@ pub fn handle_pet_follow_state(
             Entity,
             &mut Transform,
             &PetFollowState,
-            &mut AsepriteAnimation,
+            &mut AseAnimation,
+            &AnimationState,
             &crate::pets::state::PetState,
             &Pet,
         ),
@@ -208,9 +218,11 @@ pub fn handle_pet_follow_state(
     time: Res<Time>,
     mut commands: Commands,
 ) {
-    for (entity, mut transform, follow_state, mut animation, pet_state, pet) in pets.iter_mut() {
-        if animation.current_frame() > 7 || animation.is_paused() {
-            *animation = AsepriteAnimation::from(pet.get_walk_anim());
+    for (entity, mut transform, follow_state, mut animation, state, pet_state, pet) in
+        pets.iter_mut()
+    {
+        if usize::from(state.current_frame()) > 7 || is_paused(&animation) {
+            play_loop(&mut *animation, pet.get_walk_anim());
         }
 
         // Check if we should return to idle (no target or target is too close)
@@ -237,7 +249,7 @@ pub fn handle_pet_follow_state(
 
             // Move towards target
             let direction = (target_transform.translation - transform.translation).normalize();
-            let movement = direction * follow_state.speed * time.delta_seconds();
+            let movement = direction * follow_state.speed * time.delta_secs();
             transform.translation += movement;
         } else {
             // Target no longer exists, return to idle

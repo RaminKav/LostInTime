@@ -1,7 +1,7 @@
 //! Central typography map: change **[`paths`]** and role **[`FontStyle`]** constants here to
 //! retheme text across the game (and later swap fonts for localization).
 //!
-//! Call sites load handles via **[`FontStyle::load_font`]** / **[`FontStyle::text_style`]**,
+//! Call sites load handles via **[`FontStyle::load_font`]** / **[`FontStyle::text_font`]**,
 //! and apply visual size with **[`FontStyle::transform_scale`]** on the text entity `Transform`.
 //!
 //! **Workspace rules:** Alagard logical sizes use steps of **15.0** (or **30.0** for large
@@ -10,6 +10,8 @@
 //! scale-1.0 display text (keeps titles nearest-crisp while body text can use linear).
 
 use bevy::prelude::*;
+use bevy::sprite::Anchor;
+use bevy::text::{FontSize, FontSmoothing, Justify, TextLayout};
 use serde::{Deserialize, Serialize};
 
 /// Floating combat / pickup label size selected in options.
@@ -69,18 +71,97 @@ impl FontStyle {
         asset_server.load(self.path)
     }
 
+    /// Native Bevy text font for this role (`FontSmoothing::None` for pixel fonts).
     #[inline]
-    pub fn text_style(&self, asset_server: &AssetServer, color: Color) -> TextStyle {
-        TextStyle {
-            font: self.load_font(asset_server),
-            font_size: self.size,
-            color,
+    pub fn text_font(&self, asset_server: &AssetServer) -> TextFont {
+        TextFont {
+            font: self.load_font(asset_server).into(),
+            font_size: FontSize::Px(self.size),
+            font_smoothing: FontSmoothing::None,
+            ..default()
+        }
+    }
+
+    /// Spawn-ready 2d text for this role. Applies [`Self::transform_scale`] by default.
+    #[inline]
+    pub fn text(
+        &self,
+        asset_server: &AssetServer,
+        value: impl Into<String>,
+        color: Color,
+    ) -> StyledText2d {
+        StyledText2d {
+            text_2d: Text2d::new(value.into()),
+            text_font: self.text_font(asset_server),
+            text_color: TextColor(color),
+            text_layout: TextLayout::default(),
+            text_anchor: Anchor::CENTER,
+            transform: Transform {
+                scale: self.transform_scale(),
+                ..default()
+            },
         }
     }
 
     #[inline]
     pub fn transform_scale(&self) -> Vec3 {
         Vec3::splat(self.scale)
+    }
+}
+
+/// Bundle for world/HUD `Text2d` spawned from a [`FontStyle`] role.
+///
+/// `Text2d`'s required components pull in visibility / layout defaults; this only
+/// sets the fields call sites commonly override.
+#[derive(Bundle, Clone)]
+pub struct StyledText2d {
+    pub text_2d: Text2d,
+    pub text_font: TextFont,
+    pub text_color: TextColor,
+    pub text_layout: TextLayout,
+    pub text_anchor: Anchor,
+    pub transform: Transform,
+}
+
+impl StyledText2d {
+    #[inline]
+    pub fn at(mut self, translation: Vec3) -> Self {
+        self.transform.translation = translation;
+        self
+    }
+
+    #[inline]
+    pub fn anchor(mut self, anchor: Anchor) -> Self {
+        self.text_anchor = anchor;
+        self
+    }
+
+    #[inline]
+    pub fn justify(mut self, justify: Justify) -> Self {
+        self.text_layout = TextLayout::justify(justify);
+        self
+    }
+
+    #[inline]
+    pub fn with_transform(mut self, transform: Transform) -> Self {
+        // Preserve role scale unless the caller already set a non-default scale.
+        // Callers that need an intentional identity scale (e.g. shadow children that
+        // inherit parent scale) should use [`Self::with_scale`] after `.at(...)`.
+        if transform.scale == Vec3::ONE {
+            let scale = self.transform.scale;
+            self.transform = transform;
+            self.transform.scale = scale;
+        } else {
+            self.transform = transform;
+        }
+        self
+    }
+
+    /// Force local scale, including identity (needed for shadow children).
+    #[inline]
+    pub fn with_scale(mut self, scale: Vec3) -> Self {
+        self.transform.scale = scale;
+        self
     }
 }
 

@@ -1,5 +1,5 @@
+use bevy::platform::collections::HashMap;
 use bevy::prelude::*;
-use bevy::utils::HashMap;
 
 use crate::enemy::Mob;
 
@@ -93,7 +93,7 @@ pub fn build_enemy_spatial_grid(
 /// A stable per-entity flank sign (-1 or +1) so each enemy consistently arcs
 /// in from one side rather than jittering.
 pub fn flank_sign(entity: Entity) -> f32 {
-    if entity.index() % 2 == 0 {
+    if entity.index_u32() % 2 == 0 {
         1.0
     } else {
         -1.0

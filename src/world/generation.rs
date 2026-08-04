@@ -2,20 +2,22 @@ use super::chunk::{ChunkPlugin, GenerateObjectsEvent, TileSpriteData};
 use super::dimension::{ActiveDimension, Era, GenerationSeed};
 use super::dungeon::Dungeon;
 use super::noise_helpers::{_poisson_disk_sampling, get_object_points_for_chunk};
-use super::portal::{Portal, TimePortal};
-use super::wall_auto_tile::{handle_wall_break, handle_wall_placed, update_wall, ChunkWallCache};
+use super::portal::TimePortal;
+use super::wall_auto_tile::ChunkWallCache;
 use super::world_helpers::tile_pos_to_world_pos;
 use super::y_sort::YSort;
 use super::{WorldGeneration, ISLAND_SIZE};
+use crate::aseprite_assets::Portal;
+use crate::aseprite_helpers::aseprite_bundle;
 use crate::assets::{Graphics, SpriteAnchor};
 use crate::enemy::spawn_helpers::is_tile_water;
-use crate::item::{handle_break_object, object_actions::ObjectAction, PlaceItemEvent, WorldObject};
+use crate::item::{object_actions::ObjectAction, PlaceItemEvent, WorldObject};
 use crate::pets::state::{Pet, PetSpawner};
 use crate::player::skills::ActiveSkill;
 use crate::proto::proto_param::ProtoParam;
 use crate::ui::key_input_guide::InteractionGuideTrigger;
 use crate::world::chunk::DoneCreateChunkEvent;
-use bevy_aseprite::{anim::AsepriteAnimation, AsepriteBundle};
+use bevy_aseprite_ultra::prelude::Aseprite;
 use itertools::Itertools;
 
 use crate::world::world_helpers::{get_neighbour_tile, world_pos_to_tile_pos};
@@ -23,9 +25,12 @@ use crate::world::{noise_helpers, world_helpers, TileMapPosition, CHUNK_SIZE, TI
 use crate::{run_once_per_run, CustomFlush, GameParam, GameState, DEBUG_AI};
 use crate::{DEBUG, NO_GEN, TEST_SHRINES};
 
-use bevy::prelude::*;
-use bevy::sprite::MaterialMesh2dBundle;
-use bevy::utils::{HashMap, HashSet};
+use bevy::platform::collections::{HashMap, HashSet};
+use bevy::{
+    math::primitives::Rectangle,
+    prelude::*,
+    sprite_render::{ColorMaterial, MeshMaterial2d},
+};
 use bevy_ecs_tilemap::prelude::*;
 use bevy_rapier2d::prelude::Collider;
 
@@ -34,10 +39,11 @@ use rand::{
     Rng,
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Message)]
 pub struct WallBreakEvent {
     pub pos: TileMapPosition,
 }
+#[derive(Message)]
 pub struct DoneGeneratingEvent {
     pub chunk_pos: IVec2,
 }
@@ -80,44 +86,34 @@ pub struct GenerationPlugin;
 
 impl Plugin for GenerationPlugin {
     fn build(&self, app: &mut App) {
-        app.add_event::<WallBreakEvent>()
-            .add_event::<DoneGeneratingEvent>()
+        app.add_message::<WallBreakEvent>()
+            .add_message::<DoneGeneratingEvent>()
             .add_systems(
-                (
-                    handle_wall_break
-                        .before(CustomFlush)
-                        .before(handle_break_object),
-                    handle_wall_placed.before(CustomFlush),
-                )
-                    .in_set(OnUpdate(GameState::Main)),
-            )
-            .add_system(
+                Update,
                 Self::generate_unique_objects_for_new_world
                     .run_if(in_state(GameState::Main).or_else(in_state(GameState::Initializing))),
             )
-            .add_system(
+            .add_systems(
+                Update,
                 Self::generate_and_cache_objects
                     .before(ChunkPlugin::mark_outofrange_chunks_for_despawn)
                     .before(CustomFlush)
-                    .run_if(resource_exists::<GenerationSeed>().and_then(
-                        in_state(GameState::Main).or_else(in_state(GameState::Initializing)),
-                    )),
+                    .run_if(
+                        resource_exists::<GenerationSeed>.and_then(
+                            in_state(GameState::Main).or_else(in_state(GameState::Initializing)),
+                        ),
+                    ),
             )
-            .add_system(
-                update_wall
-                    .in_base_set(CoreSet::PostUpdate)
-                    .run_if(in_state(GameState::Main).or_else(in_state(GameState::Initializing))),
-            )
-            .add_system(
+            .add_systems(
+                Update,
                 Self::spawn_test_shrine_grid
                     .run_if(in_state(GameState::Main).or_else(in_state(GameState::Initializing))),
             )
-            .add_system(
-                Self::spawn_debug_chunk_borders
-                    .run_if(run_once_per_run())
-                    .in_schedule(OnEnter(GameState::Main)),
+            .add_systems(
+                OnEnter(GameState::Main),
+                Self::spawn_debug_chunk_borders.run_if(run_once_per_run()),
             )
-            .add_system(apply_system_buffers.in_set(CustomFlush));
+            .add_systems(Update, ApplyDeferred.in_set(CustomFlush));
     }
 }
 
@@ -128,23 +124,20 @@ impl GenerationPlugin {
         pet_type: Pet,
         world_pos: Vec2,
     ) {
-        let aseprite_path = pet_type.get_aseprite_path();
+        let aseprite_path = pet_type.get_aseprite_path().to_owned();
         let idle_anim = pet_type.get_idle_anim();
-
-        // Animation is not paused, so it will loop continuously
-        let animation = AsepriteAnimation::from(idle_anim);
-        // Don't pause - let it loop
 
         commands.spawn((
             PetSpawner {
                 pet_type: pet_type.clone(),
             },
-            AsepriteBundle {
-                aseprite: asset_server.load(aseprite_path),
-                animation,
-                transform: Transform::from_translation(world_pos.extend(1.0)),
-                ..Default::default()
-            },
+            aseprite_bundle(
+                asset_server.load(aseprite_path),
+                idle_anim,
+                Transform::from_translation(world_pos.extend(1.0)),
+                Visibility::Inherited,
+                false,
+            ),
             YSort(0.001),
             Collider::capsule(Vec2::new(0., -6.), Vec2::new(0., -6.), 5.0),
             InteractionGuideTrigger {
@@ -446,8 +439,7 @@ impl GenerationPlugin {
                 let tx = rng.gen_range(4..13);
                 let ty = rng.gen_range(4..13);
                 let candidate = TileMapPosition::new(chunk_pos, TilePos::new(tx, ty));
-                if !Self::is_valid_shrine_tile(game, candidate, max_dist_sq, placed, enforce_gap)
-                {
+                if !Self::is_valid_shrine_tile(game, candidate, max_dist_sq, placed, enforce_gap) {
                     continue;
                 }
                 chosen = Some((chunk_idx, candidate));
@@ -582,7 +574,7 @@ impl GenerationPlugin {
             // selection is stable from world-gen. The offer is still re-validated
             // and topped up against the player's current skills at interaction time.
             if *shrine_obj == WorldObject::ActiveSkillShrine {
-                if let Ok((_, player_skills, _)) = game.player_query.get_single() {
+                if let Ok((_, player_skills, _)) = game.player_query.single() {
                     let skills =
                         crate::item::active_skill_shrine::roll_active_skill_shrine_offer_skills(
                             Some(player_skills),
@@ -610,7 +602,7 @@ impl GenerationPlugin {
     //TODO: do the same shit w graphcis resource loading, but w GameData and pkvStore
     pub fn generate_unique_objects_for_new_world(
         mut game: GameParam,
-        done_chunks_event: EventReader<DoneCreateChunkEvent>,
+        done_chunks_event: MessageReader<DoneCreateChunkEvent>,
         mut commands: Commands,
         dungeon_check: Query<&Dungeon>,
         mut meshes: ResMut<Assets<Mesh>>,
@@ -745,11 +737,11 @@ impl GenerationPlugin {
             Self::pre_roll_shrines(&mut game);
         }
 
-        if dungeon_check.get_single().is_err() && !*NO_GEN {
+        if dungeon_check.single().is_err() && !*NO_GEN {
             info!("SPAWN PORTAL");
             // summon portal
             commands
-                .spawn(VisibilityBundle::default())
+                .spawn(Visibility::default())
                 .insert(YSort(0.))
                 .insert(TimePortal)
                 .insert(WorldObject::TimePortal)
@@ -765,12 +757,13 @@ impl GenerationPlugin {
                     Vec2::new(0., -18.),
                     11.,
                 ))
-                .insert(AsepriteBundle {
-                    aseprite: graphics.portal_ase.as_ref().unwrap().clone(),
-                    animation: AsepriteAnimation::from(Portal::tags::IDLE),
-                    transform: Transform::from_translation(Vec3::new(0., 50., 0.)),
-                    ..Default::default()
-                })
+                .insert(aseprite_bundle(
+                    graphics.portal_ase.as_ref().unwrap().clone(),
+                    Portal::tags::IDLE,
+                    Transform::from_translation(Vec3::new(0., 50., 0.)),
+                    Visibility::Inherited,
+                    false,
+                ))
                 .insert(Name::new("Time Portal"));
             for y in 3..9 {
                 for x in 0..2 {
@@ -783,22 +776,11 @@ impl GenerationPlugin {
                         ] {
                             let pos = Vec2::new(pos.0, pos.1);
                             commands
-                                .spawn(MaterialMesh2dBundle {
-                                    mesh: meshes
-                                        .add(
-                                            shape::Quad {
-                                                size: Vec2::new(7.0, 7.0),
-                                                ..Default::default()
-                                            }
-                                            .into(),
-                                        )
-                                        .into(),
-                                    transform: Transform::from_translation(Vec3::new(
-                                        pos.x, pos.y, 0.,
-                                    )),
-                                    material: materials.add(Color::RED.into()),
-                                    ..default()
-                                })
+                                .spawn((
+                                    Mesh2d(meshes.add(Mesh::from(Rectangle::new(7.0, 7.0)))),
+                                    MeshMaterial2d(materials.add(Color::srgb(1.0, 0.0, 0.0))),
+                                    Transform::from_translation(Vec3::new(pos.x, pos.y, 0.)),
+                                ))
                                 .insert(YSort(-0.1))
                                 .insert(Name::new("debug chunk border x"));
                         }
@@ -811,13 +793,13 @@ impl GenerationPlugin {
     pub fn generate_and_cache_objects(
         mut commands: Commands,
         mut game: GameParam,
-        mut chunk_spawn_event: EventReader<GenerateObjectsEvent>,
+        mut chunk_spawn_event: MessageReader<GenerateObjectsEvent>,
         dungeon_check: Query<&Dungeon, With<ActiveDimension>>,
         seed: Res<GenerationSeed>,
         _chunk_wall_cache: Query<&mut ChunkWallCache>,
         proto_param: ProtoParam,
-        mut done_event: EventWriter<DoneGeneratingEvent>,
-        mut place_item_event: EventWriter<PlaceItemEvent>,
+        mut done_event: MessageWriter<DoneGeneratingEvent>,
+        mut place_item_event: MessageWriter<PlaceItemEvent>,
     ) {
         if *NO_GEN || *TEST_SHRINES {
             return;
@@ -825,8 +807,8 @@ impl GenerationPlugin {
         let mut total_coal = 0;
         let mut total_metal = 0;
         // Get dungeon check result once for all chunks (it's the same query result)
-        let dungeon_check_result = dungeon_check.get_single();
-        for chunk in chunk_spawn_event.iter() {
+        let in_dungeon = dungeon_check.single().is_ok();
+        for chunk in chunk_spawn_event.read() {
             let chunk_pos = chunk.chunk_pos;
             let is_chunk_generated = game.is_chunk_generated(chunk_pos);
             if !is_chunk_generated {
@@ -954,7 +936,7 @@ impl GenerationPlugin {
                     .copied()
                     .collect::<HashMap<_, _>>();
 
-                if dungeon_check_result.is_err() {
+                if !in_dungeon {
                     // clear out spawn area
                     let clear_tiles = get_radial_tile_positions(
                         TileMapPosition::new(IVec2::ZERO, TilePos::new(0, 0)),
@@ -1013,7 +995,7 @@ impl GenerationPlugin {
                                             || obj_to_despawn.is_medium_size(&proto_param))
                                             && !obj_to_despawn.is_unique_object()
                                         {
-                                            commands.entity(entity_to_despawn).despawn_recursive();
+                                            commands.entity(entity_to_despawn).despawn();
                                         }
                                     }
                                     game.remove_object_from_chunk_cache(pos_to_clear);
@@ -1043,7 +1025,7 @@ impl GenerationPlugin {
                                             || obj_to_despawn.is_medium_size(&proto_param))
                                             && !obj_to_despawn.is_unique_object()
                                         {
-                                            commands.entity(entity_to_despawn).despawn_recursive();
+                                            commands.entity(entity_to_despawn).despawn();
                                         }
                                     }
                                     game.remove_object_from_chunk_cache(pos_to_clear);
@@ -1052,7 +1034,7 @@ impl GenerationPlugin {
                         }
                     }
                 }
-                if dungeon_check_result.is_err() && game.era.current_era == Era::Third {
+                if !in_dungeon && game.era.current_era == Era::Third {
                     extend_ice_patches_from_seeds(&mut objs, &game);
                 }
                 // For non-dungeon chunks, we don't need distance checks since chunks are generated dynamically
@@ -1078,10 +1060,10 @@ impl GenerationPlugin {
                     // Fixed: Remove distance restriction for non-dungeon chunks - objects should spawn
                     // wherever chunks are generated. Distance check only applies to dungeons.
                     // The chunk existence and generation checks are sufficient for normal world gen.
-                    if (dungeon_check_result.is_ok() || game.get_chunk_entity(chunk_pos).is_some())
+                    if (in_dungeon || game.get_chunk_entity(chunk_pos).is_some())
                         && (pos.chunk_pos == chunk_pos || game.is_chunk_generated(pos.chunk_pos))
                     {
-                        place_item_event.send(PlaceItemEvent {
+                        place_item_event.write(PlaceItemEvent {
                             obj: *obj_to_spawn,
                             pos: tile_pos_to_world_pos(
                                 *pos,
@@ -1099,7 +1081,7 @@ impl GenerationPlugin {
             } else {
                 let objs = game.get_objects_from_chunk_cache(chunk_pos);
                 for (pos, obj_to_spawn) in objs {
-                    place_item_event.send(PlaceItemEvent {
+                    place_item_event.write(PlaceItemEvent {
                         obj: obj_to_spawn,
                         pos: tile_pos_to_world_pos(pos, obj_to_spawn.is_medium_size(&proto_param)),
                         placed_by_player: false,
@@ -1108,7 +1090,7 @@ impl GenerationPlugin {
                 }
             }
 
-            done_event.send(DoneGeneratingEvent { chunk_pos });
+            done_event.write(DoneGeneratingEvent { chunk_pos });
         }
     }
 
@@ -1134,7 +1116,7 @@ impl GenerationPlugin {
     /// `TEST_SHRINES=1`: once chunks around origin exist, place every Era1 `shrine_counts`
     /// shrine (active + done) in a 5-row grid for visual / interaction debugging.
     pub fn spawn_test_shrine_grid(
-        mut place_item_event: EventWriter<PlaceItemEvent>,
+        mut place_item_event: MessageWriter<PlaceItemEvent>,
         game: GameParam,
         mut spawned: Local<bool>,
     ) {
@@ -1176,7 +1158,7 @@ impl GenerationPlugin {
             let mut col: usize = 0;
             for shrine in &shrines {
                 let active_x = start_x + col as f32 * SPACING_X;
-                place_item_event.send(PlaceItemEvent {
+                place_item_event.write(PlaceItemEvent {
                     obj: *shrine,
                     pos: Vec2::new(active_x, y),
                     placed_by_player: false,
@@ -1186,7 +1168,7 @@ impl GenerationPlugin {
 
                 if let Some(done) = Self::shrine_done_variant(*shrine) {
                     let done_x = start_x + col as f32 * SPACING_X;
-                    place_item_event.send(PlaceItemEvent {
+                    place_item_event.write(PlaceItemEvent {
                         obj: done,
                         pos: Vec2::new(done_x, y),
                         placed_by_player: false,
@@ -1210,48 +1192,30 @@ impl GenerationPlugin {
         //vertical
         for i in -10..10 {
             commands
-                .spawn(MaterialMesh2dBundle {
-                    mesh: meshes
-                        .add(
-                            shape::Quad {
-                                size: Vec2::new(1.0, 100000.0),
-                                ..Default::default()
-                            }
-                            .into(),
-                        )
-                        .into(),
-                    transform: Transform::from_translation(Vec3::new(
+                .spawn((
+                    Mesh2d(meshes.add(Mesh::from(Rectangle::new(1.0, 100000.0)))),
+                    MeshMaterial2d(materials.add(Color::srgb(1.0, 0.0, 0.0))),
+                    Transform::from_translation(Vec3::new(
                         i as f32 * CHUNK_SIZE as f32 * TILE_SIZE.x + offset.x,
                         0. + offset.y,
                         900.,
                     )),
-                    material: materials.add(Color::RED.into()),
-                    ..default()
-                })
+                ))
                 .insert(Name::new("debug chunk border y"));
         }
 
         //horizontal
         for i in -10..10 {
             commands
-                .spawn(MaterialMesh2dBundle {
-                    mesh: meshes
-                        .add(
-                            shape::Quad {
-                                size: Vec2::new(100000.0, 1.0),
-                                ..Default::default()
-                            }
-                            .into(),
-                        )
-                        .into(),
-                    transform: Transform::from_translation(Vec3::new(
+                .spawn((
+                    Mesh2d(meshes.add(Mesh::from(Rectangle::new(100000.0, 1.0)))),
+                    MeshMaterial2d(materials.add(Color::srgb(1.0, 0.0, 0.0))),
+                    Transform::from_translation(Vec3::new(
                         offset.x,
                         i as f32 * CHUNK_SIZE as f32 * TILE_SIZE.y + offset.y,
                         900.,
                     )),
-                    material: materials.add(Color::RED.into()),
-                    ..default()
-                })
+                ))
                 .insert(Name::new("debug chunk border x"));
         }
     }

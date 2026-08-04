@@ -1,11 +1,13 @@
+use bevy::text::Justify;
+use crate::aseprite_helpers::aseprite_bundle;
 use crate::ui::game_fonts as gf;
-use bevy::{ecs::system::ParamSet, prelude::*, render::view::RenderLayers};
-use bevy_aseprite::{anim::AsepriteAnimation, aseprite, AsepriteBundle};
+use bevy::{camera::visibility::RenderLayers, ecs::system::ParamSet, prelude::*};
 use rand::{seq::SliceRandom, Rng};
 use strum::IntoEnumIterator;
 
 use crate::{
     animations::DoneAnimation,
+    aseprite_assets::SkillChoiceFlash,
     assets::Graphics,
     attributes::{
         attribute_helpers::create_new_random_item_stack_with_attributes, AttributeChangeEvent,
@@ -31,7 +33,6 @@ use crate::{
         item_chest::{spawn_chest_button, ChestButtonKind},
         key_input_guide::InteractionGuideTrigger,
         minimap::UpdateMiniMapEvent,
-        skill_choice_ui::SkillChoiceFlash,
         ui_helpers::spawn_full_screen_ui_overlay_tuned,
     },
     GameParam, ScreenResolution,
@@ -94,7 +95,7 @@ pub fn tick_merchant_shop_open_lock(
     let Some(mut lock) = lock else {
         return;
     };
-    if lock.0.tick(time.delta()).finished() {
+    if lock.0.tick(time.delta()).is_finished() {
         commands.remove_resource::<MerchantShopOpenLock>();
     }
 }
@@ -119,7 +120,7 @@ const MERCHANT_WORLD_MARKER_Z: f32 = 990.;
 use super::{
     heirloom_tooltip::{HeirloomTooltipRequest, HeirloomTooltipShow},
     spawn_item_stack_icon,
-    tooltips::{ToolTipUpdateEvent, TooltipTeardownEvent},
+    tooltips::{ItemOrRecipeTooltip, ToolTipUpdateEvent, TooltipTeardownEvent},
     Focusable, Interactable, UIElement, UIState, CURRENCY_BACKGROUND_SIZE, KEYBIND_BADGE_COLOR,
     TOOLTIP_INFO_BOX_SIZE,
 };
@@ -212,13 +213,48 @@ impl Default for MerchantShopSlot {
     }
 }
 
-#[derive(Resource, Component, Clone, Default)]
+/// Per-merchant shop data on the world entity. Must NOT be a [`Resource`] —
+/// Bevy 0.19 treats resources as unique `IsResource` components and panics if
+/// that entity is despawned while uniqueness hooks still queue `remove_by_id`.
+#[derive(Component, Clone, Default)]
+pub struct MerchantShop {
+    pub slots: [MerchantShopSlot; MERCHANT_SLOT_COUNT],
+    pub owner_entity: Option<Entity>,
+    pub tile_pos: Option<crate::world::TileMapPosition>,
+    /// Slot index the player marked to track (1 per shop). `None` when nothing is tracked.
+    pub marked_slot: Option<usize>,
+}
+
+/// Open blacksmith UI resource (copied from / written back to [`MerchantShop`]).
+#[derive(Resource, Clone, Default)]
 pub struct EssenceShopChoices {
     pub slots: [MerchantShopSlot; MERCHANT_SLOT_COUNT],
     pub owner_entity: Option<Entity>,
     pub tile_pos: Option<crate::world::TileMapPosition>,
     /// Slot index the player marked to track (1 per shop). `None` when nothing is tracked.
     pub marked_slot: Option<usize>,
+}
+
+impl MerchantShop {
+    pub fn all_purchased(&self) -> bool {
+        self.slots.iter().all(|s| s.purchased)
+    }
+
+    pub fn category_fully_purchased(&self, category: MerchantCategory) -> bool {
+        category
+            .slot_indices()
+            .iter()
+            .all(|i| self.slots[*i].purchased)
+    }
+
+    pub fn to_resource(&self) -> EssenceShopChoices {
+        EssenceShopChoices {
+            slots: self.slots.clone(),
+            owner_entity: self.owner_entity,
+            tile_pos: self.tile_pos,
+            marked_slot: self.marked_slot,
+        }
+    }
 }
 
 impl EssenceShopChoices {
@@ -232,14 +268,23 @@ impl EssenceShopChoices {
             .iter()
             .all(|i| self.slots[*i].purchased)
     }
+
+    pub fn to_world(&self) -> MerchantShop {
+        MerchantShop {
+            slots: self.slots.clone(),
+            owner_entity: self.owner_entity,
+            tile_pos: self.tile_pos,
+            marked_slot: self.marked_slot,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Message)]
 pub struct SubmitMerchantPurchase {
     pub slot_index: usize,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Message)]
 pub struct MerchantCategoryRerollEvent {
     pub category: MerchantCategory,
 }
@@ -399,7 +444,7 @@ pub fn refresh_merchant_prices_on_timer(
     mut timer: ResMut<MerchantPriceRefreshTimer>,
     player_level: Query<&PlayerLevel, With<Player>>,
     mut cache: ResMut<EssenceShopCache>,
-    mut merchants: Query<&mut EssenceShopChoices>,
+    mut merchants: Query<&mut MerchantShop>,
     open_shop: Option<ResMut<EssenceShopChoices>>,
     ui_dirty: Option<ResMut<MerchantShopUiDirty>>,
     mut commands: Commands,
@@ -409,7 +454,7 @@ pub fn refresh_merchant_prices_on_timer(
         return;
     }
 
-    let level = player_level.get_single().map(|l| l.level).unwrap_or(1);
+    let level = player_level.single().map(|l| l.level).unwrap_or(1);
     let multiplier = purchase_multiplier_for_level(level);
 
     for slots in cache.shops.values_mut() {
@@ -422,7 +467,7 @@ pub fn refresh_merchant_prices_on_timer(
     // World-space tracked-item markers cache their price at spawn; despawn them so
     // `sync_merchant_world_marker_displays` rebuilds them next frame with the new price.
     for e in world_markers.iter() {
-        commands.entity(e).despawn_recursive();
+        commands.entity(e).despawn();
     }
 
     // Refresh the open shop's badges so the displayed numbers update immediately.
@@ -442,7 +487,7 @@ pub fn sync_merchant_shop_to_world(
     cache: &mut EssenceShopCache,
 ) {
     if let Some(owner) = shop.owner_entity {
-        commands.entity(owner).insert(shop.clone());
+        commands.entity(owner).insert(shop.to_world());
     }
     if let Some(tile_pos) = shop.tile_pos {
         cache.shops.insert(tile_pos, shop.slots.clone());
@@ -468,44 +513,38 @@ fn spawn_currency_counter(
     icon_spawner: impl FnOnce(&mut Commands, Entity, &Graphics, &AssetServer) -> Entity,
 ) {
     let bg = commands
-        .spawn(SpriteBundle {
-            texture: graphics.get_ui_element_texture(UIElement::CurrencyBackground),
-            sprite: Sprite {
+        .spawn((
+            Sprite {
+                image: graphics.get_ui_element_texture(UIElement::CurrencyBackground),
                 custom_size: Some(CURRENCY_BACKGROUND_SIZE),
                 ..default()
             },
-            transform: Transform::from_translation(Vec3::new(center.x, center.y, 2.)),
-            ..default()
-        })
+            Transform::from_translation(Vec3::new(center.x, center.y, 2.)),
+        ))
         .insert(RenderLayers::from_layers(&[3]))
         .insert(UIState::Essence)
         .id();
 
     let text = commands
         .spawn((
-            Text2dBundle {
-                text: Text::from_section(
-                    count.to_string(),
-                    gf::DISPLAY.text_style(&asset_server, WHITE),
-                )
-                .with_alignment(TextAlignment::Center),
-                text_anchor: bevy::sprite::Anchor::CenterLeft,
-                transform: Transform {
-                translation: Vec3::new(-4., 0., 2.),
-                scale: gf::DISPLAY.transform_scale(),
-                ..Default::default()
-            },
-                ..default()
-            },
+            gf::DISPLAY
+                .text(&asset_server, count.to_string(), WHITE)
+                .justify(Justify::Center)
+                .anchor(bevy::sprite::Anchor::CENTER_LEFT)
+                .with_transform(Transform {
+                    translation: Vec3::new(-4., 0., 2.),
+                    scale: gf::DISPLAY.transform_scale(),
+                    ..Default::default()
+                }),
             RenderLayers::from_layers(&[3]),
             text_marker,
         ))
         .id();
 
     let icon_e = icon_spawner(commands, text, graphics, asset_server);
-    commands.entity(icon_e).set_parent(text);
-    commands.entity(text).set_parent(bg);
-    commands.entity(bg).set_parent(parent);
+    commands.entity(icon_e).insert(ChildOf(text));
+    commands.entity(text).insert(ChildOf(bg));
+    commands.entity(bg).insert(ChildOf(parent));
 }
 
 fn spawn_reroll_icon_sprite(
@@ -514,17 +553,16 @@ fn spawn_reroll_icon_sprite(
     parent: Entity,
 ) -> Entity {
     commands
-        .spawn(SpriteBundle {
-            texture: asset_server.load(MERCHANT_REROLL_ICON_PATH),
-            sprite: Sprite {
+        .spawn((
+            Sprite {
+                image: asset_server.load(MERCHANT_REROLL_ICON_PATH),
                 custom_size: Some(MERCHANT_REROLL_ICON_SIZE),
                 ..default()
             },
-            transform: Transform::from_translation(Vec3::new(-12., 0., 2.)),
-            ..default()
-        })
+            Transform::from_translation(Vec3::new(-12., 0., 2.)),
+        ))
         .insert(RenderLayers::from_layers(&[3]))
-        .set_parent(parent)
+        .insert(ChildOf(parent))
         .id()
 }
 
@@ -542,16 +580,15 @@ fn spawn_price_badge(
 
     let row = commands
         .spawn((
-            SpatialBundle::from_transform(Transform::from_translation(Vec3::new(
-                pos.x,
-                pos.y,
-                MERCHANT_ICON_Z - 1.,
-            ))),
+            (
+                Transform::from_translation(Vec3::new(pos.x, pos.y, MERCHANT_ICON_Z - 1.)),
+                Visibility::default(),
+            ),
             RenderLayers::from_layers(&[3]),
             UIState::Essence,
             Name::new("Merchant Price Row"),
         ))
-        .set_parent(parent)
+        .insert(ChildOf(parent))
         .id();
 
     let coin_icon = spawn_item_stack_icon(
@@ -563,43 +600,37 @@ fn spawn_price_badge(
         Vec2::ZERO,
         3,
     );
-    commands.entity(coin_icon).set_parent(row);
+    commands.entity(coin_icon).insert(ChildOf(row));
 
     let badge = commands
-        .spawn(SpriteBundle {
-            sprite: Sprite {
+        .spawn((
+            Sprite {
                 color: KEYBIND_BADGE_COLOR,
                 custom_size: Some(Vec2::new(badge_width, 14.)),
                 ..default()
             },
-            transform: Transform::from_translation(Vec3::new(-5., 0., 1.)),
-            ..default()
-        })
+            Transform::from_translation(Vec3::new(-5., 0., 1.)),
+        ))
         .insert(RenderLayers::from_layers(&[3]))
         .id();
 
     commands
         .spawn((
-            Text2dBundle {
-                text: Text::from_section(
-                    count_str,
-                    gf::BODY.text_style(&asset_server, WHITE),
-                )
-                .with_alignment(TextAlignment::Center),
-                text_anchor: bevy::sprite::Anchor::Center,
-                transform: Transform {
-                translation: Vec3::new(5., 0., 2.),
-                scale: gf::BODY.transform_scale(),
-                ..Default::default()
-            },
-                ..default()
-            },
+            gf::BODY
+                .text(&asset_server, count_str, WHITE)
+                .justify(Justify::Center)
+                .anchor(bevy::sprite::Anchor::CENTER)
+                .with_transform(Transform {
+                    translation: Vec3::new(5., 0., 2.),
+                    scale: gf::BODY.transform_scale(),
+                    ..Default::default()
+                }),
             RenderLayers::from_layers(&[3]),
             MerchantPriceText { slot_index },
         ))
-        .set_parent(badge);
+        .insert(ChildOf(badge));
 
-    commands.entity(badge).set_parent(row);
+    commands.entity(badge).insert(ChildOf(row));
 }
 
 /// First line of the merchant track info box (`"Press X:"`, `"Right click:"`, etc.).
@@ -608,10 +639,10 @@ pub fn format_merchant_track_action_header(
     active_device: &crate::gamepad_input::ActiveInputDevice,
 ) -> String {
     // Mouse mark is always RMB in `handle_merchant_shop_interactions` (hardcoded). Do not use
-    // `shop_mark` here — it defaults to keyboard `KeyCode::X`, which produced a fake "Press X:"
+    // `shop_mark` here — it defaults to keyboard `KeyCode::KeyX`, which produced a fake "Press X:"
     // while `active_device` was already KeyboardMouse.
-    let use_controller_prompt = mouseless.0
-        || active_device.0 == crate::gamepad_input::InputDeviceKind::Gamepad;
+    let use_controller_prompt =
+        mouseless.0 || active_device.0 == crate::gamepad_input::InputDeviceKind::Gamepad;
     let action = if use_controller_prompt {
         format!(
             "Press {}",
@@ -627,7 +658,7 @@ pub fn format_merchant_track_action_header(
 pub fn update_merchant_track_info_box_label(
     mouseless: Res<crate::inputs::MouselessModeState>,
     active_device: Res<crate::gamepad_input::ActiveInputDevice>,
-    mut texts: Query<&mut Text, With<MerchantTrackInfoBoxHeaderText>>,
+    mut texts: Query<&mut Text2d, With<MerchantTrackInfoBoxHeaderText>>,
     mut last_logged: Local<Option<(bool, crate::gamepad_input::InputDeviceKind, String)>>,
 ) {
     let header = format_merchant_track_action_header(&mouseless, &active_device);
@@ -640,10 +671,8 @@ pub fn update_merchant_track_info_box_label(
         *last_logged = Some(snapshot);
     }
     for mut text in texts.iter_mut() {
-        if let Some(section) = text.sections.first_mut() {
-            if section.value != header {
-                section.value = header.clone();
-            }
+        if text.0 != header {
+            text.0 = header.clone();
         }
     }
 }
@@ -663,63 +692,56 @@ fn spawn_merchant_track_info_box(
         8.,
     );
     let box_e = commands
-        .spawn(SpriteBundle {
-            texture: graphics.get_ui_element_texture(UIElement::TooltipInfoBox),
-            sprite: Sprite {
+        .spawn((
+            Sprite {
+                image: graphics.get_ui_element_texture(UIElement::TooltipInfoBox),
                 custom_size: Some(TOOLTIP_INFO_BOX_SIZE),
                 ..default()
             },
-            transform: Transform::from_translation(Vec3::new(pos.x, pos.y, 2.)),
-            ..default()
-        })
+            Transform::from_translation(Vec3::new(pos.x, pos.y, 2.)),
+        ))
         .insert(RenderLayers::from_layers(&[3]))
         .insert(UIState::Essence)
         .insert(MerchantTrackInfoBox)
         .insert(Name::new("Merchant Track Info Box"))
         .insert(crate::item::item_drop_outline::UiShadow::container())
-        .set_parent(parent)
+        .insert(ChildOf(parent))
         .id();
 
     commands
         .spawn((
-            Text2dBundle {
-                text: Text::from_section(
-                    header.to_string(),
-                    gf::BODY.text_style(&asset_server, WHITE),
-                )
-                .with_alignment(TextAlignment::Center),
-                text_anchor: bevy::sprite::Anchor::Center,
-                transform: Transform {
-                translation: Vec3::new(0., 5., 2.),
-                scale: gf::BODY.transform_scale(),
-                ..Default::default()
-            },
-                ..default()
-            },
+            gf::BODY
+                .text(&asset_server, header.to_string(), WHITE)
+                .justify(Justify::Center)
+                .anchor(bevy::sprite::Anchor::CENTER)
+                .with_transform(Transform {
+                    translation: Vec3::new(0., 5., 2.),
+                    scale: gf::BODY.transform_scale(),
+                    ..Default::default()
+                }),
             RenderLayers::from_layers(&[3]),
             MerchantTrackInfoBoxHeaderText,
         ))
-        .set_parent(box_e);
+        .insert(ChildOf(box_e));
 
     commands
         .spawn((
-            Text2dBundle {
-                text: Text::from_section(
+            gf::BODY
+                .text(
+                    &asset_server,
                     "Mark a shop item to track".to_string(),
-                    gf::BODY.text_style(&asset_server, WHITE),
+                    WHITE,
                 )
-                .with_alignment(TextAlignment::Center),
-                text_anchor: bevy::sprite::Anchor::Center,
-                transform: Transform {
-                translation: Vec3::new(0., -6., 2.),
-                scale: gf::BODY.transform_scale(),
-                ..Default::default()
-            },
-                ..default()
-            },
+                .justify(Justify::Center)
+                .anchor(bevy::sprite::Anchor::CENTER)
+                .with_transform(Transform {
+                    translation: Vec3::new(0., -6., 2.),
+                    scale: gf::BODY.transform_scale(),
+                    ..Default::default()
+                }),
             RenderLayers::from_layers(&[3]),
         ))
-        .set_parent(box_e);
+        .insert(ChildOf(box_e));
 }
 
 fn spawn_section_label(
@@ -731,24 +753,19 @@ fn spawn_section_label(
 ) {
     commands
         .spawn((
-            Text2dBundle {
-                text: Text::from_section(
-                    label.to_string(),
-                    gf::BODY.text_style(&asset_server, WHITE),
-                )
-                .with_alignment(TextAlignment::Center),
-                text_anchor: bevy::sprite::Anchor::Center,
-                transform: Transform {
-                translation: Vec3::new(pos.x, pos.y, 2.),
-                scale: gf::BODY.transform_scale(),
-                ..Default::default()
-            },
-                ..default()
-            },
+            gf::BODY
+                .text(&asset_server, label.to_string(), WHITE)
+                .justify(Justify::Center)
+                .anchor(bevy::sprite::Anchor::CENTER)
+                .with_transform(Transform {
+                    translation: Vec3::new(pos.x, pos.y, 2.),
+                    scale: gf::BODY.transform_scale(),
+                    ..Default::default()
+                }),
             RenderLayers::from_layers(&[3]),
             UIState::Essence,
         ))
-        .set_parent(parent);
+        .insert(ChildOf(parent));
 }
 
 fn attach_merchant_icon_glow(
@@ -759,31 +776,30 @@ fn attach_merchant_icon_glow(
     faded: bool,
 ) {
     let color = if faded {
-        Color::rgb(0.45, 0.45, 0.45)
+        Color::srgb(0.45, 0.45, 0.45)
     } else {
         Color::WHITE
     };
     commands
-        .spawn(SpriteBundle {
-            texture: graphics.get_item_glow(glow),
-            sprite: Sprite {
+        .spawn((
+            Sprite {
+                image: graphics.get_item_glow(glow),
                 custom_size: Some(Vec2::new(20., 20.)),
                 color,
                 ..default()
             },
-            transform: Transform::from_translation(Vec3::new(0., 0., -1.)),
-            ..default()
-        })
+            Transform::from_translation(Vec3::new(0., 0., -1.)),
+        ))
         .insert(RenderLayers::from_layers(&[3]))
         .insert(UIState::Essence)
-        .set_parent(icon_e);
+        .insert(ChildOf(icon_e));
 }
 
 fn spawn_merchant_slot_icon(
     commands: &mut Commands,
     graphics: &Graphics,
     slot_root: Entity,
-    atlas_sprite: TextureAtlasSprite,
+    atlas_sprite: Sprite,
     hit_extra: impl Bundle,
     item_glow: Option<ItemGlow>,
     faded: bool,
@@ -792,16 +808,14 @@ fn spawn_merchant_slot_icon(
     let hit_size = Vec2::splat(MERCHANT_ICON_HIT_SIZE);
 
     let icon_e = commands
-        .spawn(SpriteSheetBundle {
-            sprite: atlas_sprite,
-            texture_atlas: graphics.texture_atlas.as_ref().unwrap().clone(),
-            transform: Transform::from_translation(Vec3::new(0., 0., MERCHANT_ICON_Z)),
-            ..Default::default()
-        })
+        .spawn((
+            atlas_sprite.clone(),
+            Transform::from_translation(Vec3::new(0., 0., MERCHANT_ICON_Z)),
+        ))
         .insert(RenderLayers::from_layers(&[3]))
         .insert(UIState::Essence)
         .insert(MerchantSlotIcon)
-        .set_parent(slot_root)
+        .insert(ChildOf(slot_root))
         .id();
 
     if let Some(glow) = item_glow {
@@ -809,15 +823,14 @@ fn spawn_merchant_slot_icon(
     }
 
     let mut hit_cmd = commands.spawn((
-        SpriteBundle {
-            sprite: Sprite {
+        (
+            Sprite {
                 color: Color::NONE,
                 custom_size: Some(hit_size),
                 ..default()
             },
-            transform: Transform::from_translation(Vec3::new(0., 0., MERCHANT_ICON_HIT_Z)),
-            ..default()
-        },
+            Transform::from_translation(Vec3::new(0., 0., MERCHANT_ICON_HIT_Z)),
+        ),
         RenderLayers::from_layers(&[3]),
         UIState::Essence,
         hit_extra,
@@ -831,7 +844,7 @@ fn spawn_merchant_slot_icon(
                 index: slot_index as u32,
             });
     }
-    hit_cmd.set_parent(slot_root);
+    hit_cmd.insert(ChildOf(slot_root));
 }
 
 pub fn spawn_merchant_slot_ui(
@@ -847,7 +860,10 @@ pub fn spawn_merchant_slot_ui(
 
     let slot_root_e = commands
         .spawn((
-            SpatialBundle::from_transform(Transform::from_translation(Vec3::new(pos.x, pos.y, 0.))),
+            (
+                Transform::from_translation(Vec3::new(pos.x, pos.y, 0.)),
+                Visibility::default(),
+            ),
             UIState::Essence,
             MerchantSlotUi { slot_index },
             Name::new(format!("Merchant Slot {slot_index}")),
@@ -855,7 +871,7 @@ pub fn spawn_merchant_slot_ui(
         .id();
 
     let icon_color = if faded {
-        Color::rgb(0.45, 0.45, 0.45)
+        Color::srgb(0.45, 0.45, 0.45)
     } else {
         Color::WHITE
     };
@@ -927,12 +943,12 @@ pub fn spawn_merchant_slot_ui(
                     Vec2::ZERO,
                     3,
                 );
-                commands.entity(tf_icon).set_parent(slot_root_e);
+                commands.entity(tf_icon).insert(ChildOf(slot_root_e));
             }
         }
     }
 
-    commands.entity(slot_root_e).set_parent(parent);
+    commands.entity(slot_root_e).insert(ChildOf(parent));
 }
 
 /// Keeps the in-shop `MerchantMarker.png` overlay attached to the marked slot's icon.
@@ -963,31 +979,26 @@ pub fn sync_merchant_marker_overlay(
     });
 
     for (e, _) in overlays.iter() {
-        commands.entity(e).despawn_recursive();
+        commands.entity(e).despawn();
     }
 
     if let (Some(slot), Some(root)) = (desired, desired_root) {
         commands
             .spawn((
-                SpriteBundle {
-                    texture: asset_server.load(MERCHANT_MARKER_ICON_PATH),
-                    sprite: Sprite {
+                (
+                    Sprite {
+                        image: asset_server.load(MERCHANT_MARKER_ICON_PATH),
                         custom_size: Some(MERCHANT_MARKER_ICON_SIZE),
                         ..default()
                     },
-                    transform: Transform::from_translation(Vec3::new(
-                        0.,
-                        0.,
-                        MERCHANT_ICON_HIT_Z + 1.,
-                    )),
-                    ..default()
-                },
+                    Transform::from_translation(Vec3::new(0., 0., MERCHANT_ICON_HIT_Z + 1.)),
+                ),
                 RenderLayers::from_layers(&[3]),
                 UIState::Essence,
                 MerchantMarkerOverlay { slot_index: slot },
                 Name::new("Merchant Marker Overlay"),
             ))
-            .set_parent(root);
+            .insert(ChildOf(root));
     }
 }
 
@@ -995,7 +1006,7 @@ pub fn sync_merchant_marker_overlay(
 fn merchant_world_marker_icon_sprite(
     graphics: &Graphics,
     slot: &MerchantShopSlot,
-) -> TextureAtlasSprite {
+) -> Sprite {
     match &slot.kind {
         MerchantItemKind::Heirloom { heirloom, .. } => graphics.get_heirloom_icon(heirloom.clone()),
         MerchantItemKind::Equipment(stack) | MerchantItemKind::Material(stack) => graphics
@@ -1031,11 +1042,14 @@ fn spawn_merchant_world_marker_display(
 ) {
     let root = commands
         .spawn((
-            SpatialBundle::from_transform(Transform::from_translation(Vec3::new(
-                merchant_pos.x,
-                merchant_pos.y + MERCHANT_WORLD_MARKER_Y_OFFSET,
-                MERCHANT_WORLD_MARKER_Z,
-            ))),
+            (
+                Transform::from_translation(Vec3::new(
+                    merchant_pos.x,
+                    merchant_pos.y + MERCHANT_WORLD_MARKER_Y_OFFSET,
+                    MERCHANT_WORLD_MARKER_Z,
+                )),
+                Visibility::default(),
+            ),
             MerchantWorldMarkerDisplay { owner, slot_index },
             Name::new("Merchant World Marker Display"),
         ))
@@ -1043,39 +1057,35 @@ fn spawn_merchant_world_marker_display(
 
     // Black background behind the icon for contrast against the world.
     commands
-        .spawn(SpriteBundle {
-            sprite: Sprite {
+        .spawn((
+            Sprite {
                 color: KEYBIND_BADGE_COLOR,
                 custom_size: Some(Vec2::new(20., 20.)),
                 ..default()
             },
-            transform: Transform::from_translation(Vec3::new(0., 0., 0.)),
-            ..default()
-        })
-        .set_parent(root);
+            Transform::from_translation(Vec3::new(0., 0., 0.)),
+        ))
+        .insert(ChildOf(root));
 
     let icon_e = commands
-        .spawn(SpriteSheetBundle {
-            sprite: merchant_world_marker_icon_sprite(graphics, slot),
-            texture_atlas: graphics.texture_atlas.as_ref().unwrap().clone(),
-            transform: Transform::from_translation(Vec3::new(0., 0., 2.)),
-            ..default()
-        })
-        .set_parent(root)
+        .spawn((
+            (merchant_world_marker_icon_sprite(graphics, slot)).clone(),
+            Transform::from_translation(Vec3::new(0., 0., 2.)),
+        ))
+        .insert(ChildOf(root))
         .id();
 
     if let Some(glow) = merchant_world_marker_glow(slot) {
         commands
-            .spawn(SpriteBundle {
-                texture: graphics.get_item_glow(glow),
-                sprite: Sprite {
+            .spawn((
+                Sprite {
+                    image: graphics.get_item_glow(glow),
                     custom_size: Some(Vec2::new(20., 20.)),
                     ..default()
                 },
-                transform: Transform::from_translation(Vec3::new(0., 0., -1.)),
-                ..default()
-            })
-            .set_parent(icon_e);
+                Transform::from_translation(Vec3::new(0., 0., -1.)),
+            ))
+            .insert(ChildOf(icon_e));
     }
 
     // Coin cost badge: coin icon + black background + number (green when affordable).
@@ -1089,10 +1099,13 @@ fn spawn_merchant_world_marker_display(
 
     let row = commands
         .spawn((
-            SpatialBundle::from_transform(Transform::from_translation(Vec3::new(5., -18., 0.5))),
+            (
+                Transform::from_translation(Vec3::new(5., -18., 0.5)),
+                Visibility::default(),
+            ),
             Name::new("Merchant World Marker Price"),
         ))
-        .set_parent(root)
+        .insert(ChildOf(root))
         .id();
 
     let coin_sprite = graphics
@@ -1110,48 +1123,40 @@ fn spawn_merchant_world_marker_display(
         .cloned()
         .expect("coin icon");
     commands
-        .spawn(SpriteSheetBundle {
-            sprite: coin_sprite,
-            texture_atlas: graphics.texture_atlas.as_ref().unwrap().clone(),
-            transform: Transform::from_translation(Vec3::new(-12., 0., 1.)),
-            ..default()
-        })
-        .set_parent(row);
+        .spawn((
+            coin_sprite.clone(),
+            Transform::from_translation(Vec3::new(-12., 0., 1.)),
+        ))
+        .insert(ChildOf(row));
 
     let badge = commands
-        .spawn(SpriteBundle {
-            sprite: Sprite {
+        .spawn((
+            Sprite {
                 color: KEYBIND_BADGE_COLOR,
                 custom_size: Some(Vec2::new(badge_width, 14.)),
                 ..default()
             },
-            transform: Transform::from_translation(Vec3::new(-5., 0., 1.)),
-            ..default()
-        })
-        .set_parent(row)
+            Transform::from_translation(Vec3::new(-5., 0., 1.)),
+        ))
+        .insert(ChildOf(row))
         .id();
 
     commands
         .spawn((
-            Text2dBundle {
-                text: Text::from_section(
-                    count_str,
-                    gf::BODY.text_style(&asset_server, price_color),
-                )
-                .with_alignment(TextAlignment::Center),
-                text_anchor: bevy::sprite::Anchor::Center,
-                transform: Transform {
-                translation: Vec3::new(5., 0., 2.),
-                scale: gf::BODY.transform_scale(),
-                ..Default::default()
-            },
-                ..default()
-            },
+            gf::BODY
+                .text(&asset_server, count_str, price_color)
+                .justify(Justify::Center)
+                .anchor(bevy::sprite::Anchor::CENTER)
+                .with_transform(Transform {
+                    translation: Vec3::new(5., 0., 2.),
+                    scale: gf::BODY.transform_scale(),
+                    ..Default::default()
+                }),
             MerchantWorldMarkerPriceText {
                 coin_cost: slot.coin_cost,
             },
         ))
-        .set_parent(badge);
+        .insert(ChildOf(badge));
 }
 
 /// Keeps the world-space tracked-item display in sync with each merchant's marked slot.
@@ -1160,7 +1165,7 @@ pub fn sync_merchant_world_marker_displays(
     graphics: Res<Graphics>,
     asset_server: Res<AssetServer>,
     coins: Res<CoinCurrency>,
-    merchants: Query<(Entity, &EssenceShopChoices, &GlobalTransform)>,
+    merchants: Query<(Entity, &MerchantShop, &GlobalTransform)>,
     displays: Query<(Entity, &MerchantWorldMarkerDisplay)>,
 ) {
     // Desired (owner -> slot) tracked items that are still valid.
@@ -1177,7 +1182,7 @@ pub fn sync_merchant_world_marker_displays(
     // Despawn displays that no longer match a desired (owner, slot).
     for (e, display) in displays.iter() {
         if desired.get(&display.owner) != Some(&display.slot_index) {
-            commands.entity(e).despawn_recursive();
+            commands.entity(e).despawn();
         }
     }
 
@@ -1208,20 +1213,18 @@ pub fn sync_merchant_world_marker_displays(
 /// Recolors world-space tracked-item cost text green once the player can afford it.
 pub fn update_merchant_world_marker_price_colors(
     coins: Res<CoinCurrency>,
-    mut price_texts: Query<(&MerchantWorldMarkerPriceText, &mut Text)>,
+    mut price_texts: Query<(&MerchantWorldMarkerPriceText, &mut TextColor)>,
 ) {
     if !coins.is_changed() {
         return;
     }
-    for (price, mut text) in price_texts.iter_mut() {
+    for (price, mut text_color) in price_texts.iter_mut() {
         let color = if coins.coins >= price.coin_cost {
             SHRINE_GREEN
         } else {
             LIGHT_RED
         };
-        if let Some(section) = text.sections.first_mut() {
-            section.style.color = color;
-        }
+        text_color.0 = color;
     }
 }
 
@@ -1236,18 +1239,17 @@ pub fn spawn_merchant_category_reroll_button(
     let color = if enabled {
         Color::WHITE
     } else {
-        Color::rgb(0.45, 0.45, 0.45)
+        Color::srgb(0.45, 0.45, 0.45)
     };
 
-    let mut btn = commands.spawn(SpriteBundle {
-        sprite: Sprite {
+    let mut btn = commands.spawn((
+        Sprite {
             color: KEYBIND_BADGE_COLOR,
             custom_size: Some(MERCHANT_CATEGORY_REROLL_BADGE_SIZE),
             ..default()
         },
-        transform: Transform::from_translation(Vec3::new(pos.x, pos.y, 3.)),
-        ..default()
-    });
+        Transform::from_translation(Vec3::new(pos.x, pos.y, 3.)),
+    ));
     btn.insert(RenderLayers::from_layers(&[3]))
         .insert(UIState::Essence)
         .insert(MerchantCategoryRerollButton(category))
@@ -1263,21 +1265,20 @@ pub fn spawn_merchant_category_reroll_button(
     let btn_e = btn.id();
 
     commands
-        .spawn(SpriteBundle {
-            texture: asset_server.load(MERCHANT_REROLL_ICON_PATH),
-            sprite: Sprite {
+        .spawn((
+            Sprite {
+                image: asset_server.load(MERCHANT_REROLL_ICON_PATH),
                 custom_size: Some(MERCHANT_REROLL_ICON_SIZE),
                 color,
                 ..default()
             },
-            transform: Transform::from_translation(Vec3::new(0., 0., 1.)),
-            ..default()
-        })
+            Transform::from_translation(Vec3::new(0., 0., 1.)),
+        ))
         .insert(RenderLayers::from_layers(&[3]))
         .insert(MerchantCategoryRerollIcon)
-        .set_parent(btn_e);
+        .insert(ChildOf(btn_e));
 
-    commands.entity(btn_e).set_parent(parent);
+    commands.entity(btn_e).insert(ChildOf(parent));
 }
 
 pub fn refresh_merchant_category_ui(
@@ -1293,12 +1294,12 @@ pub fn refresh_merchant_category_ui(
 ) {
     for (e, ui) in slot_ui.iter() {
         if category.slot_indices().contains(&ui.slot_index) {
-            commands.entity(e).despawn_recursive();
+            commands.entity(e).despawn();
         }
     }
     for (e, btn) in reroll_buttons.iter() {
         if btn.0 == category {
-            commands.entity(e).despawn_recursive();
+            commands.entity(e).despawn();
         }
     }
 
@@ -1332,46 +1333,47 @@ pub fn spawn_merchant_reroll_flash(
     category: MerchantCategory,
 ) {
     commands
-        .spawn(AsepriteBundle {
-            animation: AsepriteAnimation::from(SkillChoiceFlash::tags::FLASH),
-            aseprite: asset_server.load(SkillChoiceFlash::PATH),
-            transform: Transform {
+        .spawn(aseprite_bundle(
+            asset_server.load(SkillChoiceFlash::PATH),
+            SkillChoiceFlash::tags::FLASH,
+            Transform {
                 translation: pos,
                 ..Default::default()
             },
-            ..Default::default()
-        })
+            Visibility::Inherited,
+            true,
+        ))
         .insert(RenderLayers::from_layers(&[3]))
-        .insert(VisibilityBundle::default())
+        .insert(Visibility::default())
         .insert(UIState::Essence)
         .insert(MerchantCategoryReroll(category))
         .insert(DoneAnimation)
-        .set_parent(ui_root);
+        .insert(ChildOf(ui_root));
 }
 
 /// Activate bounce on the visible atlas icon sibling of a merchant slot hit target.
 pub fn bounce_merchant_slot_icon(
     commands: &mut Commands,
     hit_entity: Entity,
-    parents: &Query<&Parent>,
+    parents: &Query<&ChildOf>,
     children: &Query<&Children>,
     icons: &Query<Entity, With<MerchantSlotIcon>>,
 ) {
     let Ok(parent) = parents.get(hit_entity) else {
         return;
     };
-    let Ok(kids) = children.get(parent.get()) else {
+    let Ok(kids) = children.get(parent.parent()) else {
         return;
     };
     for child in kids.iter() {
-        if icons.get(*child).is_ok() {
-            commands.entity(*child).insert(BounceOnHit::new());
+        if icons.get(child).is_ok() {
+            commands.entity(child).insert(BounceOnHit::new());
         }
     }
 }
 
 pub fn handle_essence_heirloom_tooltip(
-    mut tooltip_requests: EventWriter<HeirloomTooltipRequest>,
+    mut tooltip_requests: MessageWriter<HeirloomTooltipRequest>,
     heirloom_hovers: Query<(&MerchantHeirloomHover, &super::interactions::Interactable)>,
     mut last_hovered: Local<Option<Heirloom>>,
 ) {
@@ -1385,13 +1387,15 @@ pub fn handle_essence_heirloom_tooltip(
     }
 
     match &currently_hovered {
-        None => tooltip_requests.send(HeirloomTooltipRequest::Clear),
+        None => {
+            let _ = tooltip_requests.write(HeirloomTooltipRequest::Clear);
+        }
         Some(hovered_heirloom) => {
             for (hover, interactable) in heirloom_hovers.iter() {
                 if matches!(interactable.current(), Interaction::Hovering)
                     && hover.heirloom == *hovered_heirloom
                 {
-                    tooltip_requests.send(HeirloomTooltipRequest::Show(HeirloomTooltipShow {
+                    tooltip_requests.write(HeirloomTooltipRequest::Show(HeirloomTooltipShow {
                         heirloom: hover.heirloom.clone(),
                         rarity: hover.rarity.clone(),
                         position: Vec3::new(-170., 0., 15.),
@@ -1413,8 +1417,9 @@ pub fn handle_merchant_item_tooltip(
     item_slots: Query<(&MerchantShopSlotIndex, &Interactable), Without<MerchantHeirloomHover>>,
     player_inv: Query<&Inventory, With<Player>>,
     proto: ProtoParam,
-    mut tooltip_update_events: EventWriter<ToolTipUpdateEvent>,
-    mut tooltip_teardown_events: EventWriter<TooltipTeardownEvent>,
+    mut tooltip_update_events: MessageWriter<ToolTipUpdateEvent>,
+    mut tooltip_teardown_events: MessageWriter<TooltipTeardownEvent>,
+    existing_tooltips: Query<Entity, With<ItemOrRecipeTooltip>>,
     mut last_hovered: Local<Option<usize>>,
 ) {
     let currently_hovered = item_slots
@@ -1424,49 +1429,61 @@ pub fn handle_merchant_item_tooltip(
         })
         .map(|(idx, _)| idx.0);
 
-    if *last_hovered == currently_hovered {
+    // Same race as blueprint rows: always writing teardown before update often ran
+    // teardown *after* spawn, then `last_hovered` matched and never re-emitted.
+    let needs_tooltip = currently_hovered.is_some()
+        && (*last_hovered != currently_hovered || existing_tooltips.is_empty());
+    if *last_hovered == currently_hovered && !needs_tooltip {
         return;
     }
 
-    tooltip_teardown_events.send_default();
+    let Some(slot_index) = currently_hovered else {
+        if last_hovered.is_some() {
+            tooltip_teardown_events.write_default();
+        }
+        *last_hovered = None;
+        return;
+    };
 
-    if let Some(slot_index) = currently_hovered {
-        let item_stack = match &shop.slots[slot_index].kind {
-            MerchantItemKind::Equipment(s) | MerchantItemKind::Material(s) => s.clone(),
-            MerchantItemKind::Heirloom { .. } => {
-                *last_hovered = currently_hovered;
-                return;
+    let item_stack = match &shop.slots[slot_index].kind {
+        MerchantItemKind::Equipment(s) | MerchantItemKind::Material(s) => s.clone(),
+        MerchantItemKind::Heirloom { .. } => {
+            if last_hovered.is_some() {
+                tooltip_teardown_events.write_default();
             }
-        };
+            *last_hovered = currently_hovered;
+            return;
+        }
+    };
 
-        tooltip_update_events.send(ToolTipUpdateEvent {
-            item_stack: item_stack.clone(),
-            is_recipe: false,
-            show_range: false,
-            ..Default::default()
-        });
+    // `ToolTipUpdateEvent` already clears prior primary cards; no teardown first.
+    tooltip_update_events.write(ToolTipUpdateEvent {
+        item_stack: item_stack.clone(),
+        is_recipe: false,
+        show_range: false,
+        ..Default::default()
+    });
 
-        if matches!(shop.slots[slot_index].kind, MerchantItemKind::Equipment(_)) {
-            if let Ok(inv) = player_inv.get_single() {
-                if let Some(displaced) =
-                    super::item_chest::displaced_equipped_item_stack(inv, &item_stack, &proto)
-                {
-                    tooltip_update_events.send(ToolTipUpdateEvent {
-                        item_stack: displaced,
-                        is_recipe: false,
-                        show_range: false,
-                        anchor_ui: None,
-                        info_boxes: vec![],
-                        position_override: Some(Vec2::new(
-                            MERCHANT_CONTAINER_UI_SIZE.x + 20.,
-                            -MERCHANT_CONTAINER_UI_SIZE.y / 2. + 40.,
-                        )),
-                        header_text: Some("Currently Equipped".to_string()),
-                        world_anchor: None,
-                        ui_state_tag: None,
-                        pin_right: false,
-                    });
-                }
+    if matches!(shop.slots[slot_index].kind, MerchantItemKind::Equipment(_)) {
+        if let Ok(inv) = player_inv.single() {
+            if let Some(displaced) =
+                super::item_chest::displaced_equipped_item_stack(inv, &item_stack, &proto)
+            {
+                tooltip_update_events.write(ToolTipUpdateEvent {
+                    item_stack: displaced,
+                    is_recipe: false,
+                    show_range: false,
+                    anchor_ui: None,
+                    info_boxes: vec![],
+                    position_override: Some(Vec2::new(
+                        MERCHANT_CONTAINER_UI_SIZE.x + 20.,
+                        -MERCHANT_CONTAINER_UI_SIZE.y / 2. + 40.,
+                    )),
+                    header_text: Some("Currently Equipped".to_string()),
+                    world_anchor: None,
+                    ui_state_tag: None,
+                    pin_right: false,
+                });
             }
         }
     }
@@ -1476,24 +1493,22 @@ pub fn handle_merchant_item_tooltip(
 
 pub fn update_blacksmith_coin_display(
     coins: Res<CoinCurrency>,
-    mut q: Query<&mut Text, With<BlacksmithCoinsText>>,
+    mut q: Query<&mut Text2d, With<BlacksmithCoinsText>>,
 ) {
     if !coins.is_changed() {
         return;
     }
     for mut text in q.iter_mut() {
-        if let Some(section) = text.sections.first_mut() {
-            section.value = coins.coins.to_string();
-        }
+        text.0 = coins.coins.to_string();
     }
 }
 
 pub fn update_merchant_price_text_colors(
     coins: Res<CoinCurrency>,
     shop: Res<EssenceShopChoices>,
-    mut price_texts: Query<(&MerchantPriceText, &mut Text)>,
+    mut price_texts: Query<(&MerchantPriceText, &mut TextColor)>,
 ) {
-    for (tag, mut text) in price_texts.iter_mut() {
+    for (tag, mut text_color) in price_texts.iter_mut() {
         let slot = &shop.slots[tag.slot_index];
         if slot.purchased {
             continue;
@@ -1503,23 +1518,19 @@ pub fn update_merchant_price_text_colors(
         } else {
             WHITE
         };
-        if let Some(section) = text.sections.first_mut() {
-            section.style.color = color;
-        }
+        text_color.0 = color;
     }
 }
 
 pub fn update_blacksmith_reroll_display(
     run_unlocks: Res<RunUnlockState>,
-    mut q: Query<&mut Text, With<BlacksmithRerollsText>>,
+    mut q: Query<&mut Text2d, With<BlacksmithRerollsText>>,
 ) {
     if !run_unlocks.is_changed() {
         return;
     }
     for mut text in q.iter_mut() {
-        if let Some(section) = text.sections.first_mut() {
-            section.value = run_unlocks.rerolls_remaining.to_string();
-        }
+        text.0 = run_unlocks.rerolls_remaining.to_string();
     }
 }
 
@@ -1540,13 +1551,13 @@ pub fn update_merchant_reroll_button_states(
         sprite.color = if enabled {
             KEYBIND_BADGE_COLOR
         } else {
-            Color::rgba(62. / 255., 58. / 255., 58. / 255., 0.45)
+            Color::srgba(62. / 255., 58. / 255., 58. / 255., 0.45)
         };
     }
     let icon_color = if run_unlocks.rerolls_remaining > 0 {
         Color::WHITE
     } else {
-        Color::rgb(0.45, 0.45, 0.45)
+        Color::srgb(0.45, 0.45, 0.45)
     };
     for mut sprite in sprites.p1().iter_mut() {
         sprite.color = icon_color;
@@ -1571,25 +1582,24 @@ pub fn setup_essence_ui(
     }
 
     for e in orphan_reroll_flashes.iter() {
-        commands.entity(e).despawn_recursive();
+        commands.entity(e).despawn();
     }
 
     let overlay = spawn_full_screen_ui_overlay_tuned(&mut commands, &resolution, 0.0, 0.95, 9.);
     commands.entity(overlay).insert(UIState::Essence);
 
     let essence_ui_e = commands
-        .spawn(SpriteBundle {
-            texture: graphics.get_ui_element_texture(UIElement::MerchantContainer),
-            sprite: Sprite {
+        .spawn((
+            Sprite {
+                image: graphics.get_ui_element_texture(UIElement::MerchantContainer),
                 custom_size: Some(MERCHANT_CONTAINER_UI_SIZE),
-                ..Default::default()
+                ..default()
             },
-            transform: Transform {
+            Transform {
                 translation: Vec3::new(0., 0., 10.),
                 ..Default::default()
             },
-            ..Default::default()
-        })
+        ))
         .insert(EssenceUI)
         .insert(Name::new("SHOP UI"))
         .insert(UIState::Essence)
@@ -1599,24 +1609,19 @@ pub fn setup_essence_ui(
 
     commands
         .spawn((
-            Text2dBundle {
-                text: Text::from_section(
-                    "Merchant".to_string(),
-                    gf::DISPLAY.text_style(&asset_server, WHITE),
-                )
-                .with_alignment(TextAlignment::Center),
-                text_anchor: bevy::sprite::Anchor::Center,
-                transform: Transform {
-                translation: Vec3::new(0., MERCHANT_TITLE_Y, 3.),
-                scale: gf::DISPLAY.transform_scale(),
-                ..Default::default()
-            },
-                ..default()
-            },
+            gf::DISPLAY
+                .text(&asset_server, "Merchant".to_string(), WHITE)
+                .justify(Justify::Center)
+                .anchor(bevy::sprite::Anchor::CENTER)
+                .with_transform(Transform {
+                    translation: Vec3::new(0., MERCHANT_TITLE_Y, 3.),
+                    scale: gf::DISPLAY.transform_scale(),
+                    ..Default::default()
+                }),
             RenderLayers::from_layers(&[3]),
             UIState::Essence,
         ))
-        .set_parent(essence_ui_e);
+        .insert(ChildOf(essence_ui_e));
 
     spawn_currency_counter(
         &mut commands,
@@ -1649,7 +1654,7 @@ pub fn setup_essence_ui(
                 Vec2::ZERO,
                 3,
             );
-            commands.entity(icon).set_parent(text_parent);
+            commands.entity(icon).insert(ChildOf(text_parent));
             icon
         },
     );
@@ -1737,7 +1742,7 @@ pub fn refresh_merchant_shop_ui_dirty(
         return;
     }
 
-    let Ok(ui_root) = essence_ui.get_single() else {
+    let Ok(ui_root) = essence_ui.single() else {
         ui_dirty.slots.clear();
         ui_dirty.disable_reroll_categories.clear();
         return;
@@ -1745,7 +1750,7 @@ pub fn refresh_merchant_shop_ui_dirty(
 
     for slot_index in ui_dirty.slots.drain(..) {
         if let Some((e, _)) = slot_ui.iter().find(|(_, ui)| ui.slot_index == slot_index) {
-            commands.entity(e).despawn_recursive();
+            commands.entity(e).despawn();
         }
         spawn_merchant_slot_ui(
             &mut commands,
@@ -1768,10 +1773,10 @@ pub fn refresh_merchant_shop_ui_dirty(
 
 pub fn handle_submit_merchant_purchase(
     mut commands: Commands,
-    mut ev: EventReader<SubmitMerchantPurchase>,
+    mut ev: MessageReader<SubmitMerchantPurchase>,
     mut next_inv_state: ResMut<NextState<UIState>>,
-    mut currency_event: EventWriter<ModifyCurencyEvent>,
-    mut attribute_event: EventWriter<AttributeChangeEvent>,
+    mut currency_event: MessageWriter<ModifyCurencyEvent>,
+    mut attribute_event: MessageWriter<AttributeChangeEvent>,
     mut params: ParamSet<(
         GameParam,
         Query<(Entity, &mut PlayerSkills, &GlobalTransform), With<Player>>,
@@ -1779,14 +1784,14 @@ pub fn handle_submit_merchant_purchase(
     mut shop: ResMut<EssenceShopChoices>,
     mut purchase_tracker: ResMut<BlacksmithPurchaseTracker>,
     proto: ProtoParam,
-    mut minimap_event: EventWriter<UpdateMiniMapEvent>,
+    mut minimap_event: MessageWriter<UpdateMiniMapEvent>,
     mut cache: ResMut<EssenceShopCache>,
     mut ui_dirty: ResMut<MerchantShopUiDirty>,
     mut inv: Query<&mut Inventory, With<Player>>,
     mut chaos_tracker: ResMut<ChaosTracker>,
-    mut analytics: EventWriter<crate::client::analytics::AnalyticsUpdateEvent>,
+    mut analytics: MessageWriter<crate::client::analytics::AnalyticsUpdateEvent>,
 ) {
-    for purchase in ev.iter() {
+    for purchase in ev.read() {
         let slot_index = purchase.slot_index;
         if slot_index >= MERCHANT_SLOT_COUNT {
             continue;
@@ -1811,11 +1816,11 @@ pub fn handle_submit_merchant_purchase(
             continue;
         }
 
-        currency_event.send(ModifyCurencyEvent {
+        currency_event.write(ModifyCurencyEvent {
             delta: -(time_fragment_cost as i32),
             obj: WorldObject::TimeFragment,
         });
-        currency_event.send(ModifyCurencyEvent {
+        currency_event.write(ModifyCurencyEvent {
             delta: -(slot.coin_cost as i32),
             obj: WorldObject::Coin,
         });
@@ -1825,7 +1830,7 @@ pub fn handle_submit_merchant_purchase(
                 heirloom, rarity, ..
             } => {
                 if let Ok((player_entity, mut player_skills, player_transform)) =
-                    params.p1().get_single_mut()
+                    params.p1().single_mut()
                 {
                     let heirloom_with_rarity = HeirloomWithRarity {
                         heirloom: heirloom.clone(),
@@ -1850,13 +1855,13 @@ pub fn handle_submit_merchant_purchase(
                             None,
                         );
                     }
-                    attribute_event.send(AttributeChangeEvent);
+                    attribute_event.write(AttributeChangeEvent);
                 }
             }
             MerchantItemKind::Equipment(stack) | MerchantItemKind::Material(stack) => {
                 let collected_obj = stack.obj_type;
                 let has_room = inv
-                    .get_single()
+                    .single()
                     .ok()
                     .and_then(|inventory| {
                         inventory
@@ -1865,7 +1870,7 @@ pub fn handle_submit_merchant_purchase(
                     })
                     .is_some();
                 if has_room {
-                    if let Ok(mut inventory) = inv.get_single_mut() {
+                    if let Ok(mut inventory) = inv.single_mut() {
                         let mut game = params.p0();
                         stack.clone().add_to_inventory(
                             &mut inventory.items,
@@ -1874,12 +1879,12 @@ pub fn handle_submit_merchant_purchase(
                         );
                     }
                     // Direct inventory grant skips ground pickup — still credit Find* achievements.
-                    analytics.send(crate::client::analytics::AnalyticsUpdateEvent {
+                    analytics.write(crate::client::analytics::AnalyticsUpdateEvent {
                         update_type: crate::client::analytics::AnalyticsTrigger::ItemCollected(
                             collected_obj,
                         ),
                     });
-                } else if let Ok((_, _, player_transform)) = params.p1().get_single() {
+                } else if let Ok((_, _, player_transform)) = params.p1().single() {
                     let player_pos = player_transform.translation().truncate();
                     let mut game = params.p0();
                     stack
@@ -1923,7 +1928,7 @@ pub fn handle_submit_merchant_purchase(
                     params
                         .p0()
                         .add_object_to_chunk_cache(tile_pos, WorldObject::BlacksmithMerchantDone);
-                    minimap_event.send(UpdateMiniMapEvent {
+                    minimap_event.write(UpdateMiniMapEvent {
                         pos: Some(tile_pos),
                         new_tile: Some(WorldObject::BlacksmithMerchantDone),
                     });
@@ -2125,7 +2130,7 @@ fn reroll_merchant_category(
 }
 
 pub fn handle_merchant_category_reroll_event(
-    mut ev: EventReader<MerchantCategoryRerollEvent>,
+    mut ev: MessageReader<MerchantCategoryRerollEvent>,
     mut shop: ResMut<EssenceShopChoices>,
     mut commands: Commands,
     graphics: Res<Graphics>,
@@ -2139,11 +2144,11 @@ pub fn handle_merchant_category_reroll_event(
     slot_ui: Query<(Entity, &MerchantSlotUi)>,
     reroll_buttons: Query<(Entity, &MerchantCategoryRerollButton)>,
 ) {
-    let Ok(ui_root) = essence_ui.get_single() else {
+    let Ok(ui_root) = essence_ui.single() else {
         return;
     };
 
-    for request in ev.iter() {
+    for request in ev.read() {
         apply_merchant_category_reroll(
             request.category,
             &mut shop,
@@ -2178,7 +2183,7 @@ pub fn apply_merchant_category_reroll(
     reroll_buttons: &Query<(Entity, &MerchantCategoryRerollButton)>,
 ) {
     let (loot_bonus, player_level) = player_atts
-        .get_single()
+        .single()
         .map(|a| (a.0 .0, a.1.level))
         .unwrap_or((0, 1));
     let purchase_multiplier = purchase_multiplier_for_level(player_level);
@@ -2213,8 +2218,8 @@ pub fn apply_merchant_category_reroll(
 
 pub fn handle_populate_essence_shop_on_new_spawn(
     mut new_spawns: Query<
-        (Entity, &mut EssenceShopChoices, Option<&GlobalTransform>),
-        Added<EssenceShopChoices>,
+        (Entity, &mut MerchantShop, Option<&GlobalTransform>),
+        Added<MerchantShop>,
     >,
     player_atts: Query<(&LootRateBonus, &PlayerLevel), With<crate::player::Player>>,
     heirloom_queue: Res<HeirloomChoiceQueue>,
@@ -2240,8 +2245,8 @@ pub fn handle_populate_essence_shop_on_new_spawn(
             continue;
         };
 
-        let player_level = player_atts.get_single().map(|a| a.1.level).unwrap_or(1);
-        let loot_bonus = player_atts.get_single().map(|a| a.0 .0).unwrap_or(0);
+        let player_level = player_atts.single().map(|a| a.1.level).unwrap_or(1);
+        let loot_bonus = player_atts.single().map(|a| a.0 .0).unwrap_or(0);
         let purchase_multiplier = purchase_multiplier_for_level(player_level);
 
         if let Some(cached) = shop_cache.shops.get(&tile_pos) {

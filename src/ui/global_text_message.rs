@@ -1,5 +1,6 @@
+use bevy::text::Justify;
+use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
-use bevy::render::view::RenderLayers;
 use bevy::sprite::Anchor;
 
 use crate::{
@@ -21,7 +22,7 @@ const MESSAGE_DISPLAY_SECS: f32 = 5.;
 const TOP_MARGIN: f32 = 140.0;
 
 /// Matches tutorial / contextual tip panels in [`super::tutorial_ui`].
-const MESSAGE_PANEL_COLOR: Color = Color::rgba(0.15, 0.12, 0.10, 0.75);
+const MESSAGE_PANEL_COLOR: Color = Color::srgba(0.15, 0.12, 0.10, 0.75);
 const PANEL_HORIZONTAL_PADDING: f32 = 28.0;
 const PANEL_VERTICAL_PADDING: f32 = 8.0;
 const PANEL_MIN_WIDTH: f32 = 100.0;
@@ -41,7 +42,7 @@ const ICON_TEXT_GAP: f32 = 10.0;
 /// Half-width estimate for Alagard at [`GLOBAL_MESSAGE`] size (tune spacing vs. overlap).
 const ESTIMATED_HALF_WIDTH_FACTOR: f32 = 0.24;
 
-#[derive(Clone)]
+#[derive(Clone, Message)]
 pub struct GlobalTextMessageEvent {
     pub text: String,
     pub color: Color,
@@ -228,20 +229,19 @@ fn message_stack_layout(main_h: f32, sub_h: f32) -> MessageStackLayout {
 fn spawn_panel_sprite(commands: &mut Commands, parent: Entity, size: Vec2, center: Vec3) {
     commands
         .spawn((
-            SpriteBundle {
-                sprite: Sprite {
+            (
+                Sprite {
                     color: MESSAGE_PANEL_COLOR,
                     custom_size: Some(size),
                     ..default()
                 },
-                transform: Transform::from_translation(center),
-                ..default()
-            },
+                Transform::from_translation(center),
+            ),
             RenderLayers::from_layers(&[3]),
             GlobalTextMessagePart,
             Name::new("Global Text Message Panel"),
         ))
-        .set_parent(parent);
+        .insert(ChildOf(parent));
 }
 
 fn spawn_main_text(
@@ -255,22 +255,20 @@ fn spawn_main_text(
 ) {
     commands
         .spawn((
-            Text2dBundle {
-                text: Text::from_section(text, style.text_style(&asset_server, color))
-                    .with_alignment(TextAlignment::Center),
-                text_anchor: Anchor::Center,
-                transform: Transform {
+            style
+                .text(asset_server, text, color)
+                .justify(Justify::Center)
+                .anchor(Anchor::CENTER)
+                .with_transform(Transform {
                     translation: center,
                     scale: style.transform_scale(),
                     ..default()
-                },
-                ..default()
-            },
+                }),
             RenderLayers::from_layers(&[3]),
             GlobalTextMessagePart,
             Name::new("Global Text Message Text"),
         ))
-        .set_parent(parent);
+        .insert(ChildOf(parent));
 }
 
 fn spawn_sub_text(
@@ -283,32 +281,27 @@ fn spawn_sub_text(
 ) {
     commands
         .spawn((
-            Text2dBundle {
-                text: Text::from_section(
-                    text,
-                    GLOBAL_MESSAGE_SUBTEXT.text_style(&asset_server, color),
-                )
-                .with_alignment(TextAlignment::Center),
-                text_anchor: Anchor::Center,
-                transform: Transform {
+            GLOBAL_MESSAGE_SUBTEXT
+                .text(asset_server, text, color)
+                .justify(Justify::Center)
+                .anchor(Anchor::CENTER)
+                .with_transform(Transform {
                     translation: center,
                     scale: GLOBAL_MESSAGE_SUBTEXT.transform_scale(),
                     ..default()
-                },
-                ..default()
-            },
+                }),
             RenderLayers::from_layers(&[3]),
             GlobalTextMessagePart,
             Name::new("Global Text Message Subtext"),
         ))
-        .set_parent(parent);
+        .insert(ChildOf(parent));
 }
 
 pub fn show_pending_era_announcement(
     pending: Option<Res<PendingEraAnnouncement>>,
     fade: Query<(), With<super::main_menu::GameStartFadein>>,
     night: Res<NightTracker>,
-    mut events: EventWriter<GlobalTextMessageEvent>,
+    mut events: MessageWriter<GlobalTextMessageEvent>,
     mut commands: Commands,
 ) {
     let Some(pending) = pending else {
@@ -324,7 +317,7 @@ pub fn show_pending_era_announcement(
         PendingEraAnnouncement::OnEraEnter(era) => era.clone(),
     };
     if let Some(event) = GlobalTextMessageEvent::era_start_announcement(era) {
-        events.send(
+        events.write(
             event
                 .with_sub_text(format!("Day {}", night.display_day()), WHITE)
                 .with_sub_panel_width(80.),
@@ -335,24 +328,21 @@ pub fn show_pending_era_announcement(
 
 pub fn handle_global_text_message_events(
     mut commands: Commands,
-    mut events: EventReader<GlobalTextMessageEvent>,
+    mut events: MessageReader<GlobalTextMessageEvent>,
     asset_server: Res<AssetServer>,
     graphics: Res<Graphics>,
     resolution: Res<ScreenResolution>,
     existing: Query<Entity, With<GlobalTextMessage>>,
 ) {
-    for event in events.iter() {
+    for event in events.read() {
         for entity in existing.iter() {
-            commands.entity(entity).despawn_recursive();
+            commands.entity(entity).despawn();
         }
 
         let pos = Vec3::new(0., resolution.game_height / 2. - TOP_MARGIN, 25.);
         let root = commands
             .spawn((
-                SpatialBundle {
-                    transform: Transform::from_translation(pos),
-                    ..Default::default()
-                },
+                (Transform::from_translation(pos), Visibility::default()),
                 RenderLayers::from_layers(&[3]),
                 GlobalTextMessage {
                     timer: Timer::from_seconds(MESSAGE_DISPLAY_SECS, TimerMode::Once),
@@ -408,7 +398,7 @@ pub fn handle_global_text_message_events(
                 },
                 Name::new("Global Text Message Icon"),
             ));
-            commands.entity(icon).set_parent(root);
+            commands.entity(icon).insert(ChildOf(root));
         }
 
         if let (Some(sub_text), Some(sub_size)) = (&event.sub_text, sub_panel_size) {
@@ -432,32 +422,19 @@ pub fn handle_global_text_message_events(
 fn fade_message_parts(
     alpha: f32,
     children: &Children,
-    texts: &mut Query<&mut Text, With<GlobalTextMessagePart>>,
-    atlas_sprites: &mut Query<&mut TextureAtlasSprite, With<GlobalTextMessagePart>>,
-    panel_sprites: &mut Query<&mut Sprite, With<GlobalTextMessagePart>>,
+    texts: &mut Query<&mut TextColor, With<GlobalTextMessagePart>>,
+    sprites: &mut Query<&mut Sprite, With<GlobalTextMessagePart>>,
     child_q: &Query<&Children>,
 ) {
     for child in children.iter() {
-        if let Ok(mut text) = texts.get_mut(*child) {
-            for section in text.sections.iter_mut() {
-                section.style.color.set_a(alpha);
-            }
+        if let Ok(mut color) = texts.get_mut(child) {
+            color.0 = color.0.with_alpha(alpha);
         }
-        if let Ok(mut sprite) = atlas_sprites.get_mut(*child) {
-            sprite.color.set_a(alpha);
+        if let Ok(mut sprite) = sprites.get_mut(child) {
+            sprite.color = sprite.color.with_alpha(alpha.min(0.75));
         }
-        if let Ok(mut sprite) = panel_sprites.get_mut(*child) {
-            sprite.color.set_a(alpha.min(0.75));
-        }
-        if let Ok(grandchildren) = child_q.get(*child) {
-            fade_message_parts(
-                alpha,
-                grandchildren,
-                texts,
-                atlas_sprites,
-                panel_sprites,
-                child_q,
-            );
+        if let Ok(grandchildren) = child_q.get(child) {
+            fade_message_parts(alpha, grandchildren, texts, sprites, child_q);
         }
     }
 }
@@ -466,31 +443,23 @@ pub fn tick_global_text_messages(
     mut commands: Commands,
     time: Res<Time>,
     mut roots: Query<(Entity, &mut GlobalTextMessage, &Children)>,
-    mut texts: Query<&mut Text, With<GlobalTextMessagePart>>,
-    mut atlas_sprites: Query<&mut TextureAtlasSprite, With<GlobalTextMessagePart>>,
-    mut panel_sprites: Query<&mut Sprite, With<GlobalTextMessagePart>>,
+    mut texts: Query<&mut TextColor, With<GlobalTextMessagePart>>,
+    mut sprites: Query<&mut Sprite, With<GlobalTextMessagePart>>,
     child_q: Query<&Children>,
 ) {
     for (entity, mut message, children) in roots.iter_mut() {
         message.timer.tick(time.delta());
 
         let fade_start = 0.65;
-        if message.timer.percent() > fade_start {
+        if message.timer.fraction() > fade_start {
             let fade_t =
-                ((message.timer.percent() - fade_start) / (1.0 - fade_start)).clamp(0.0, 1.0);
+                ((message.timer.fraction() - fade_start) / (1.0 - fade_start)).clamp(0.0, 1.0);
             let alpha = 1.0 - fade_t;
-            fade_message_parts(
-                alpha,
-                children,
-                &mut texts,
-                &mut atlas_sprites,
-                &mut panel_sprites,
-                &child_q,
-            );
+            fade_message_parts(alpha, children, &mut texts, &mut sprites, &child_q);
         }
 
-        if message.timer.finished() {
-            commands.entity(entity).despawn_recursive();
+        if message.timer.is_finished() {
+            commands.entity(entity).despawn();
         }
     }
 }

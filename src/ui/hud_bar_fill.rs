@@ -1,14 +1,14 @@
+use bevy::mesh::Mesh2d;
 use bevy::prelude::*;
-use bevy::reflect::TypeUuid;
-use bevy::render::render_resource::{AsBindGroup, ShaderRef};
-use bevy::sprite::{Material2d, Material2dPlugin, MaterialMesh2dBundle, Mesh2dHandle};
+use bevy::render::render_resource::AsBindGroup;
+use bevy::shader::ShaderRef;
+use bevy::sprite_render::{AlphaMode2d, Material2d, Material2dPlugin, MeshMaterial2d};
 
 /// Material that fills a textured quad from the bottom up, with a brighter
 /// "surface" line at the top of the fill. The bound texture's alpha defines
 /// the bar's silhouette, so non-rectangular shapes (semicircles, potion
 /// flasks, etc.) work without any shape math in the shader.
-#[derive(AsBindGroup, TypeUuid, Debug, Clone)]
-#[uuid = "f4d0a2d2-2c5e-4b27-9b8f-1e3a5b6c7d80"]
+#[derive(Asset, TypePath, AsBindGroup, Debug, Clone)]
 pub struct HudBarFillMaterial {
     /// Current fill level in [0, 1].
     #[uniform(0)]
@@ -28,6 +28,10 @@ pub struct HudBarFillMaterial {
 impl Material2d for HudBarFillMaterial {
     fn fragment_shader() -> ShaderRef {
         "shaders/hud_bar_fill.wgsl".into()
+    }
+
+    fn alpha_mode(&self) -> AlphaMode2d {
+        AlphaMode2d::Blend
     }
 }
 
@@ -49,7 +53,7 @@ pub struct HudBarFillPlugin;
 
 impl Plugin for HudBarFillPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugin(Material2dPlugin::<HudBarFillMaterial>::default());
+        app.add_plugins(Material2dPlugin::<HudBarFillMaterial>::default());
     }
 }
 
@@ -67,18 +71,17 @@ pub fn spawn_hud_fill(
     translation: Vec3,
     initial_fill: f32,
 ) -> Entity {
-    let mesh: Mesh2dHandle = meshes.add(Mesh::from(shape::Quad::new(pixel_size))).into();
+    let mesh = Mesh2d(meshes.add(Mesh::from(Rectangle::new(pixel_size.x, pixel_size.y))));
     let material = materials.add(HudBarFillMaterial::new(
         texture,
         initial_fill,
         pixel_size.y as u32,
     ));
     commands
-        .spawn(MaterialMesh2dBundle {
+        .spawn((
             mesh,
-            material,
-            transform: Transform::from_translation(translation),
-            ..default()
-        })
+            MeshMaterial2d(material),
+            Transform::from_translation(translation),
+        ))
         .id()
 }

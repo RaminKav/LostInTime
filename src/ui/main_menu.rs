@@ -1,3 +1,4 @@
+use bevy::text::Justify;
 use std::{
     fs::{self, create_dir_all, File, OpenOptions},
     io::{BufReader, BufWriter},
@@ -5,8 +6,11 @@ use std::{
 };
 
 use bevy::ecs::system::SystemParam;
-use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
-use bevy_rapier2d::prelude::{Collider, RapierContext};
+use bevy::{camera::visibility::RenderLayers, prelude::*, sprite::Anchor};
+use bevy_rapier2d::prelude::{
+    Collider, RapierContextColliders, RapierContextJoints, RapierContextSimulation,
+    RapierRigidBodySet,
+};
 use strum::IntoEnumIterator;
 use strum_macros::Display;
 
@@ -37,7 +41,7 @@ use crate::{
             ClassUnlockHoverState, PendingGameStart, PlayerSelectSlot, SkillUnlockConfirmState,
         },
         options_ui::CheatSettings,
-        ChestContainer, FurnaceContainer, Focusable, UIState,
+        ChestContainer, Focusable, FurnaceContainer, UIState,
     },
     world::{
         dimension::{ActiveDimension, EraManager, GenerationSeed},
@@ -73,7 +77,7 @@ pub struct MenuButtonExtras<'w, 's> {
     skills: Query<'w, 's, &'static PlayerSkills>,
     night_tracker: Option<Res<'w, NightTracker>>,
     seed: Option<Res<'w, GenerationSeed>>,
-    scrapper_event: EventWriter<'w, ScrapperEvent>,
+    scrapper_event: MessageWriter<'w, ScrapperEvent>,
     selection_state: ResMut<'w, ClassSelectionState>,
     confirm_state: ResMut<'w, ClassUnlockConfirmState>,
     skill_confirm_state: ResMut<'w, SkillUnlockConfirmState>,
@@ -130,6 +134,7 @@ pub enum MenuButton {
 #[derive(Component)]
 pub struct InfoModal;
 
+#[derive(Message)]
 pub struct MenuButtonClickEvent {
     pub button: MenuButton,
 }
@@ -193,28 +198,26 @@ fn main_menu_right_icon_x(game_width: f32, index_from_right: u32) -> f32 {
 pub fn display_main_menu(
     mut commands: Commands,
     graphics: Res<Graphics>,
-    mut bgm_track_event: EventWriter<UpdateBGMTrackEvent>,
+    mut bgm_track_event: MessageWriter<UpdateBGMTrackEvent>,
 ) {
-    let mut menu = commands.spawn(SpriteBundle {
-        texture: graphics.get_ui_element_texture(UIElement::MainMenuNew),
-
-        transform: Transform {
+    let mut menu = commands.spawn((
+        Sprite {
+            image: graphics.get_ui_element_texture(UIElement::MainMenuNew),
+            custom_size: Some(MAIN_MENU_BG_SIZE),
+            ..default()
+        },
+        Transform {
             translation: Vec3::new(16., 0., 0.),
             scale: Vec3::new(1., 1., 1.),
             ..Default::default()
         },
-        sprite: Sprite {
-            custom_size: Some(MAIN_MENU_BG_SIZE),
-            ..Default::default()
-        },
-        ..Default::default()
-    });
+    ));
     menu.insert(UIElement::MainMenuNew)
         .insert(MainMenu)
         .insert(RenderLayers::from_layers(&[3]))
         .insert(Name::new("Main Menu"));
     //start music
-    bgm_track_event.send(UpdateBGMTrackEvent {
+    bgm_track_event.write(UpdateBGMTrackEvent {
         asset_path: "sounds/bgm_day.ogg".to_owned(),
     });
 }
@@ -225,24 +228,24 @@ pub fn remove_main_menu(
     menu_buttons: Query<Entity, With<MenuButton>>,
 ) {
     for entity in query.iter() {
-        commands.entity(entity).despawn_recursive();
+        commands.entity(entity).despawn();
 
         for button in menu_buttons.iter() {
-            commands.entity(button).despawn_recursive();
+            commands.entity(button).despawn();
         }
     }
 }
 
 pub fn handle_menu_button_click_events(
-    mut event_reader: EventReader<MenuButtonClickEvent>,
+    mut event_reader: MessageReader<MenuButtonClickEvent>,
     mut next_state: ResMut<NextState<GameState>>,
     mut next_ui_state: ResMut<NextState<UIState>>,
     mut commands: Commands,
     mut extras: MenuButtonExtras,
     current_ui_state: Res<State<UIState>>,
-    mut cleanup_event: EventWriter<CleanUpRunStateEvent>,
+    mut cleanup_event: MessageWriter<CleanUpRunStateEvent>,
 ) {
-    for event in event_reader.iter() {
+    for event in event_reader.read() {
         let info_modal_open = extras.info_modal.iter().next().is_some();
         let wipe_popup_open = extras.wipe_popup.iter().next().is_some();
         if wipe_popup_open
@@ -255,7 +258,7 @@ pub fn handle_menu_button_click_events(
         }
 
         // Block all menu interactions when name entry popup is open
-        if current_ui_state.0 == UIState::EnterName {
+        if *current_ui_state.get() == UIState::EnterName {
             continue;
         }
 
@@ -347,11 +350,11 @@ pub fn handle_menu_button_click_events(
             }
             MenuButton::InfoOK => {
                 for e in extras.info_modal.iter() {
-                    commands.entity(e).despawn_recursive();
+                    commands.entity(e).despawn();
                 }
             }
             MenuButton::Scrapper => {
-                extras.scrapper_event.send_default();
+                extras.scrapper_event.write_default();
             }
             MenuButton::Back => {
                 next_ui_state.set(crate::ui::UIState::Closed);
@@ -551,14 +554,14 @@ pub fn handle_menu_button_click_events(
                     "Loading...",
                 );
                 for e in extras.world_entities.iter() {
-                    if let Some(entity_commands) = commands.get_entity(e) {
-                        entity_commands.despawn_recursive();
+                    if let Ok(mut entity_commands) = commands.get_entity(e) {
+                        entity_commands.despawn();
                     }
                 }
                 let _ = fs::remove_file(datafiles::save_file());
-                next_state.0 = Some(GameState::MainMenu);
+                next_state.set(GameState::MainMenu);
 
-                cleanup_event.send_default();
+                cleanup_event.write_default();
             }
             MenuButton::OptionsRestart => {
                 info!("Options menu: Restarting with same class/pet");
@@ -579,7 +582,7 @@ pub fn handle_menu_button_click_events(
 
                 next_ui_state.set(UIState::Closed);
                 next_state.set(GameState::Initializing);
-                cleanup_event.send_default();
+                cleanup_event.write_default();
             }
             MenuButton::OptionsExit => {
                 info!("Options menu: Exiting to main menu");
@@ -590,17 +593,18 @@ pub fn handle_menu_button_click_events(
                     "Loading...",
                 );
                 for entity in extras.options_ui.iter() {
-                    commands.entity(entity).despawn_recursive();
+                    commands.entity(entity).despawn();
                 }
                 for entity in extras.wipe_popup.iter() {
-                    commands.entity(entity).despawn_recursive();
+                    commands.entity(entity).despawn();
                 }
                 next_ui_state.set(UIState::Closed);
                 next_state.set(GameState::MainMenu);
-                cleanup_event.send_default();
+                cleanup_event.write_default();
             }
             MenuButton::ShowTutorial => {
-                if extras.game_state.0 != GameState::Main || current_ui_state.0 != UIState::Options
+                if *extras.game_state.get() != GameState::Main
+                    || *current_ui_state.get() != UIState::Options
                 {
                     continue;
                 }
@@ -608,7 +612,7 @@ pub fn handle_menu_button_click_events(
                 next_ui_state.set(UIState::Closed);
             }
             MenuButton::WipeGameData => {
-                if current_ui_state.0 != UIState::Options {
+                if *current_ui_state.get() != UIState::Options {
                     continue;
                 }
                 if extras.wipe_popup.iter().next().is_some() {
@@ -618,7 +622,7 @@ pub fn handle_menu_button_click_events(
             }
             MenuButton::WipeDataCancel => {
                 for e in extras.wipe_popup.iter() {
-                    commands.entity(e).despawn_recursive();
+                    commands.entity(e).despawn();
                 }
             }
             MenuButton::WipeDataConfirm => {
@@ -643,15 +647,14 @@ pub fn spawn_menu_button(
 ) -> Entity {
     let button_e = commands
         .spawn((
-            SpriteBundle {
-                texture: graphics.get_ui_element_texture(ui_element.clone()),
-                sprite: Sprite {
+            (
+                Sprite {
+                    image: graphics.get_ui_element_texture(ui_element.clone()),
                     custom_size: Some(size),
-                    ..Default::default()
+                    ..default()
                 },
-                transform: Transform::from_translation(button_pos),
-                ..Default::default()
-            },
+                Transform::from_translation(button_pos),
+            ),
             Interactable::default(),
             ui_element,
             button_type,
@@ -662,21 +665,18 @@ pub fn spawn_menu_button(
 
     // Button text
     commands
-        .spawn(Text2dBundle {
-            text: Text::from_section(
-                text,
-                gf::MENU_TITLE.text_style(&asset_server, WHITE),
-            ),
-            text_anchor: Anchor::CenterLeft,
-            transform: Transform {
-                translation: text_offset,
-                scale: gf::MENU_TITLE.transform_scale(),
-                ..Default::default()
-            },
-            ..default()
-        })
+        .spawn(
+            gf::MENU_TITLE
+                .text(&asset_server, text, WHITE)
+                .anchor(Anchor::CENTER_LEFT)
+                .with_transform(Transform {
+                    translation: text_offset,
+                    scale: gf::MENU_TITLE.transform_scale(),
+                    ..Default::default()
+                }),
+        )
         .insert(RenderLayers::from_layers(&[3]))
-        .set_parent(button_e);
+        .insert(ChildOf(button_e));
 
     button_e
 }
@@ -691,15 +691,14 @@ pub fn spawn_main_menu_icon_button(
 ) -> Entity {
     let button_name = format!("Main Menu Icon Button: {:?}", button_type);
     let mut button = commands.spawn((
-        SpriteBundle {
-            texture: graphics.get_ui_element_texture(ui_element.clone()),
-            sprite: Sprite {
+        (
+            Sprite {
+                image: graphics.get_ui_element_texture(ui_element.clone()),
                 custom_size: Some(MAIN_MENU_ICON_BUTTON_SIZE),
-                ..Default::default()
+                ..default()
             },
-            transform: Transform::from_translation(button_pos),
-            ..Default::default()
-        },
+            Transform::from_translation(button_pos),
+        ),
         Interactable::default(),
         ui_element,
         button_type,
@@ -771,15 +770,14 @@ pub fn spawn_main_menu_wide_button(
 ) -> Entity {
     let button_e = commands
         .spawn((
-            SpriteBundle {
-                texture: graphics.get_ui_element_texture(ui_element.clone()),
-                sprite: Sprite {
+            (
+                Sprite {
+                    image: graphics.get_ui_element_texture(ui_element.clone()),
                     custom_size: Some(MAIN_MENU_WIDE_BUTTON_SIZE),
-                    ..Default::default()
+                    ..default()
                 },
-                transform: Transform::from_translation(button_pos),
-                ..Default::default()
-            },
+                Transform::from_translation(button_pos),
+            ),
             Interactable::default(),
             ui_element,
             button_type,
@@ -789,22 +787,19 @@ pub fn spawn_main_menu_wide_button(
         .id();
 
     commands
-        .spawn(Text2dBundle {
-            text: Text::from_section(
-                text,
-                gf::MENU_TITLE.text_style(&asset_server, WHITE),
-            )
-            .with_alignment(TextAlignment::Center),
-            text_anchor: Anchor::Center,
-            transform: Transform {
-                translation: Vec3::new(0., -1., 1.),
-                scale: gf::MENU_TITLE.transform_scale(),
-                ..Default::default()
-            },
-            ..default()
-        })
+        .spawn(
+            gf::MENU_TITLE
+                .text(&asset_server, text, WHITE)
+                .justify(Justify::Center)
+                .anchor(Anchor::CENTER)
+                .with_transform(Transform {
+                    translation: Vec3::new(0., -1., 1.),
+                    scale: gf::MENU_TITLE.transform_scale(),
+                    ..Default::default()
+                }),
+        )
         .insert(RenderLayers::from_layers(&[3]))
-        .set_parent(button_e);
+        .insert(ChildOf(button_e));
 
     button_e
 }
@@ -840,7 +835,7 @@ pub fn spawn_main_menu_icon_tooltip(
 
     let root = commands
         .spawn((
-            SpatialBundle::from_transform(Transform::from_translation(pos)),
+            (Transform::from_translation(pos), Visibility::default()),
             RenderLayers::from_layers(&[3]),
             MainMenuIconTooltip,
             Name::new("Main Menu Icon Tooltip"),
@@ -848,34 +843,31 @@ pub fn spawn_main_menu_icon_tooltip(
         .id();
 
     commands
-        .spawn(SpriteBundle {
-            sprite: Sprite {
+        .spawn((
+            Sprite {
                 color: KEYBIND_BADGE_COLOR,
                 custom_size: Some(size),
                 ..default()
             },
-            ..default()
-        })
+            Transform::default(),
+        ))
         .insert(RenderLayers::from_layers(&[3]))
-        .set_parent(root);
+        .insert(ChildOf(root));
 
     commands
-        .spawn(Text2dBundle {
-            text: Text::from_section(
-                label,
-                gf::ICON_HOVER_TOOLTIP.text_style(&asset_server, WHITE),
-            )
-            .with_alignment(TextAlignment::Center),
-            text_anchor: Anchor::Center,
-            transform: Transform {
-                translation: Vec3::new(0., 0., 1.),
-                scale: gf::ICON_HOVER_TOOLTIP.transform_scale(),
-                ..default()
-            },
-            ..default()
-        })
+        .spawn(
+            gf::ICON_HOVER_TOOLTIP
+                .text(&asset_server, label, WHITE)
+                .justify(Justify::Center)
+                .anchor(Anchor::CENTER)
+                .with_transform(Transform {
+                    translation: Vec3::new(0., 0., 1.),
+                    scale: gf::ICON_HOVER_TOOLTIP.transform_scale(),
+                    ..default()
+                }),
+        )
         .insert(RenderLayers::from_layers(&[3]))
-        .set_parent(root);
+        .insert(ChildOf(root));
 
     root
 }
@@ -891,25 +883,26 @@ pub fn handle_main_menu_icon_tooltips(
     existing: Query<Entity, With<MainMenuIconTooltip>>,
     mut last_hovered: Local<Option<Entity>>,
 ) {
-    if game_state.0 != GameState::MainMenu || ui_state.0 != UIState::Closed {
+    if *game_state != GameState::MainMenu || *ui_state != UIState::Closed {
         for tooltip_e in existing.iter() {
-            commands.entity(tooltip_e).despawn_recursive();
+            commands.entity(tooltip_e).despawn();
         }
         *last_hovered = None;
         return;
     }
 
-    let hovered =
-        ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None).and_then(|(entity, _, _)| {
+    let hovered = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None).and_then(
+        |(entity, _, _)| {
             tooltip_targets
                 .get(entity)
                 .ok()
                 .map(|(transform, text)| (entity, transform.translation(), text.0))
-        });
+        },
+    );
 
     let Some((entity, icon_center, label)) = hovered else {
         for tooltip_e in existing.iter() {
-            commands.entity(tooltip_e).despawn_recursive();
+            commands.entity(tooltip_e).despawn();
         }
         *last_hovered = None;
         return;
@@ -920,7 +913,7 @@ pub fn handle_main_menu_icon_tooltips(
     }
 
     for tooltip_e in existing.iter() {
-        commands.entity(tooltip_e).despawn_recursive();
+        commands.entity(tooltip_e).despawn();
     }
 
     spawn_main_menu_icon_tooltip(&mut commands, &asset_server, label, icon_center);
@@ -944,14 +937,14 @@ pub fn setup_archives_ui(
 
     let archives_root = commands
         .spawn((
-            SpatialBundle {
-                transform: Transform::from_translation(Vec3::new(
+            (
+                Transform::from_translation(Vec3::new(
                     0.,
                     0.,
                     ui_helpers::Z_DEPTH_MAIN_MENU_MODAL_CONTENT,
                 )),
-                ..Default::default()
-            },
+                Visibility::default(),
+            ),
             ArchivesUI,
             UIState::Archives,
             RenderLayers::from_layers(&[3]),
@@ -960,20 +953,19 @@ pub fn setup_archives_ui(
         .id();
 
     commands
-        .spawn(SpriteBundle {
-            texture: graphics.get_ui_element_texture(UIElement::BackgroundContainer),
-            sprite: Sprite {
+        .spawn((
+            Sprite {
+                image: graphics.get_ui_element_texture(UIElement::BackgroundContainer),
                 custom_size: Some(ARCHIVES_CONTAINER_UI_SIZE),
-                ..Default::default()
+                ..default()
             },
-            transform: Transform::from_translation(Vec3::new(0., 0., 1.)),
-            ..Default::default()
-        })
+            Transform::from_translation(Vec3::new(0., 0., 1.)),
+        ))
         .insert(ArchivesUI)
         .insert(UIState::Archives)
         .insert(RenderLayers::from_layers(&[3]))
         .insert(crate::item::item_drop_outline::UiShadow::container())
-        .set_parent(archives_root);
+        .insert(ChildOf(archives_root));
 
     let button_entries: [(&str, MenuButton); 2] = [
         ("Bestiary", MenuButton::Beastiary),
@@ -999,7 +991,7 @@ pub fn setup_archives_ui(
                 group: UIState::Archives,
                 index: i as u32,
             })
-            .set_parent(archives_root);
+            .insert(ChildOf(archives_root));
     }
 
     let exit_y = top_y
@@ -1023,12 +1015,12 @@ pub fn setup_archives_ui(
             group: UIState::Archives,
             index: 100,
         })
-        .set_parent(archives_root);
+        .insert(ChildOf(archives_root));
 }
 
 pub fn cleanup_archives_ui(mut commands: Commands, archives_ui: Query<Entity, With<ArchivesUI>>) {
     for entity in archives_ui.iter() {
-        commands.entity(entity).despawn_recursive();
+        commands.entity(entity).despawn();
     }
 }
 
@@ -1169,7 +1161,7 @@ pub fn tick_game_start_overlay(
 ) {
     for (e, mut timer, mut sprite) in query.iter_mut() {
         timer.0.tick(time.delta());
-        if timer.0.finished() {
+        if timer.0.is_finished() {
             commands.insert_resource(
                 crate::ui::tutorial_ui::PendingFindBossShrineHint::WaitingForTrigger,
             );
@@ -1182,7 +1174,7 @@ pub fn tick_game_start_overlay(
             ));
             commands.entity(e).despawn();
         } else {
-            let alpha = f32::max(0., 1. - timer.0.percent());
+            let alpha = f32::max(0., 1. - timer.0.fraction());
             sprite.color = overwrite_alpha(sprite.color, alpha);
         }
     }
@@ -1195,15 +1187,14 @@ pub fn spawn_back_button_texture_only(
     // Back Button (parent sprite + child text)
     let back_button_e = commands
         .spawn((
-            SpriteBundle {
-                texture: graphics.get_ui_element_texture(UIElement::BackButton),
-                sprite: Sprite {
+            (
+                Sprite {
+                    image: graphics.get_ui_element_texture(UIElement::BackButton),
                     custom_size: Some(Vec2::new(53., 18.)),
-                    ..Default::default()
+                    ..default()
                 },
-                transform: Transform::from_translation(pos),
-                ..Default::default()
-            },
+                Transform::from_translation(pos),
+            ),
             Interactable::default(),
             UIElement::BackButton,
             RenderLayers::from_layers(&[3]),
@@ -1224,21 +1215,18 @@ pub fn spawn_back_button(
     commands.entity(back_button_e).insert(MenuButton::Back);
     // Back button text
     commands
-        .spawn(Text2dBundle {
-            text: Text::from_section(
-                "BACK",
-                gf::MENU_TITLE.text_style(&asset_server, WHITE),
-            ),
-            text_anchor: Anchor::Center,
-            transform: Transform {
-                translation: Vec3::new(0., -1., 1.),
-                scale: gf::MENU_TITLE.transform_scale(),
-                ..Default::default()
-            },
-            ..default()
-        })
+        .spawn(
+            gf::MENU_TITLE
+                .text(&asset_server, "BACK", WHITE)
+                .anchor(Anchor::CENTER)
+                .with_transform(Transform {
+                    translation: Vec3::new(0., -1., 1.),
+                    scale: gf::MENU_TITLE.transform_scale(),
+                    ..Default::default()
+                }),
+        )
         .insert(RenderLayers::from_layers(&[3]))
-        .set_parent(back_button_e);
+        .insert(ChildOf(back_button_e));
     back_button_e
 }
 
@@ -1249,14 +1237,14 @@ pub fn update_achievements_notification_icon(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
 ) {
-    let Ok(button_entity) = achievements_button.get_single() else {
+    let Ok(button_entity) = achievements_button.single() else {
         return;
     };
 
     let has_unclaimed = achievements.has_unclaimed_completed();
 
     // Check if notification icon exists
-    if let Ok(icon_entity) = notification_icon.get_single() {
+    if let Ok(icon_entity) = notification_icon.single() {
         // Update visibility
         commands.entity(icon_entity).insert(if has_unclaimed {
             Visibility::Visible
@@ -1280,11 +1268,11 @@ pub fn update_achievements_notification_icon(
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Message)]
 pub struct CleanUpRunStateEvent;
 
 pub fn cleanup_run_state(
-    event: EventReader<CleanUpRunStateEvent>,
+    mut event: MessageReader<CleanUpRunStateEvent>,
     mut commands: Commands,
     world_entities: Query<
         Entity,
@@ -1293,6 +1281,7 @@ pub fn cleanup_run_state(
             Without<DoNotDespawnOnGameOver>,
         ),
     >,
+    players: Query<Entity, With<crate::player::Player>>,
     boss_health_bars: Query<
         Entity,
         Or<(
@@ -1308,18 +1297,28 @@ pub fn cleanup_run_state(
     if event.is_empty() {
         return;
     }
+    // Must consume — `is_empty()` alone does not advance the reader; unread messages
+    // re-trigger cleanup on later non-MainMenu frames (e.g. Initializing) and can
+    // despawn a freshly spawned player for the next run.
+    event.clear();
     info!("Cleaning up ALL run data on GameState::Main exit");
 
     for entity in boss_health_bars.iter() {
-        commands.entity(entity).despawn_recursive();
+        commands.entity(entity).despawn();
     }
     for entity in guide_hud.iter() {
-        commands.entity(entity).despawn_recursive();
+        commands.entity(entity).despawn();
+    }
+    // Explicit: don't rely only on Visibility/Collider matching for the player.
+    for entity in players.iter() {
+        if let Ok(mut entity_commands) = commands.get_entity(entity) {
+            entity_commands.despawn();
+        }
     }
 
     for e in world_entities.iter() {
-        if let Some(entity_commands) = commands.get_entity(e) {
-            entity_commands.despawn_recursive();
+        if let Ok(mut entity_commands) = commands.get_entity(e) {
+            entity_commands.despawn();
         }
     }
 
@@ -1353,6 +1352,20 @@ pub fn cleanup_run_state(
     commands.insert_resource(crate::item::boss_shrine::BossSummonTracker::default());
     commands.insert_resource(BossKillTracker::default());
 
-    // Reset Rapier physics world to free accumulated internal arena allocations
-    commands.insert_resource(RapierContext::default());
+    commands.queue(|world: &mut World| {
+        for (mut sim, mut colliders, mut joints, mut bodies) in world
+            .query::<(
+                &mut RapierContextSimulation,
+                &mut RapierContextColliders,
+                &mut RapierContextJoints,
+                &mut RapierRigidBodySet,
+            )>()
+            .iter_mut(world)
+        {
+            *sim = RapierContextSimulation::default();
+            *colliders = RapierContextColliders::default();
+            *joints = RapierContextJoints::default();
+            *bodies = RapierRigidBodySet::default();
+        }
+    });
 }

@@ -46,9 +46,9 @@ impl PlayerStats {
 
 pub fn send_attribute_event_on_stats_update(
     stats: Query<&PlayerStats, Changed<PlayerStats>>,
-    mut att_event: EventWriter<AttributeChangeEvent>,
+    mut att_event: MessageWriter<AttributeChangeEvent>,
 ) {
-    if stats.get_single().is_ok() {
-        att_event.send(AttributeChangeEvent);
+    if stats.single().is_ok() {
+        att_event.write(AttributeChangeEvent);
     }
 }

@@ -21,18 +21,23 @@
 //!   sticks and only fires once per deliberate tilt — release back to neutral before the next
 //!   step. D-pad and keyboard arrows stay digital/unchanged. Tune via Options → "UI Nav
 //!   Stability" (1 = responsive, 10 = firm tilt required).
+use crate::aseprite_assets::SelectedIndicator;
+use crate::aseprite_helpers::aseprite_bundle;
+use bevy::camera::visibility::RenderLayers;
 use bevy::ecs::system::SystemParam;
 use bevy::input::mouse::MouseMotion;
 use bevy::prelude::*;
-use bevy::render::view::RenderLayers;
-use bevy_aseprite::{anim::AsepriteAnimation, aseprite, AsepriteBundle};
 use leafwing_input_manager::prelude::ActionState;
 use serde::{Deserialize, Serialize};
 
 use crate::cursor::CursorPos;
-use crate::gamepad_input::{ActiveInputDevice, InputDeviceKind, UiGamepadAction, UiGamepadInputMarker};
+use crate::gamepad_input::{
+    ActiveInputDevice, InputDeviceKind, UiGamepadAction, UiGamepadInputMarker,
+};
 use crate::inputs::MouselessModeState;
-use crate::ui::{tips::TipBox, tutorial_ui::TutorialUI, InventorySlotState, InventorySlotType, UIState};
+use crate::ui::{
+    tips::TipBox, tutorial_ui::TutorialUI, InventorySlotState, InventorySlotType, UIState,
+};
 use crate::GameState;
 
 /// Options screen "UI Nav Stability" (1-10): how firmly the left stick must be tilted before
@@ -143,10 +148,7 @@ pub enum FocusAnchor {
         slot_index: usize,
     },
     /// Sidebar buttons, craft toggle, and other focusables without [`InventorySlotState`].
-    FocusIndex {
-        group: UIState,
-        index: u32,
-    },
+    FocusIndex { group: UIState, index: u32 },
 }
 
 /// The single currently-focused entity (if any) plus whether Confirm was pressed this frame.
@@ -247,8 +249,8 @@ fn focus_should_run(
     visibility: Query<&Visibility>,
 ) -> bool {
     resolve_focus_mode_for_frame(
-        &game_state.0,
-        &ui_state.0,
+        game_state.get(),
+        ui_state.get(),
         !tip_boxes.is_empty(),
         !tutorial_ui.is_empty(),
         &modals,
@@ -258,14 +260,14 @@ fn focus_should_run(
 
 fn poll_ui_focus_confirm(
     mut ui_focus: ResMut<UiFocus>,
-    key_input: Res<Input<KeyCode>>,
+    key_input: Res<ButtonInput<KeyCode>>,
     ui_gamepad_q: Query<&ActionState<UiGamepadAction>, With<UiGamepadInputMarker>>,
 ) {
-    ui_focus.confirm_just_pressed = key_input.just_pressed(KeyCode::Return)
+    ui_focus.confirm_just_pressed = key_input.just_pressed(KeyCode::Enter)
         || key_input.just_pressed(KeyCode::NumpadEnter)
         || ui_gamepad_q
-            .get_single()
-            .map(|a| a.just_pressed(UiGamepadAction::Confirm))
+            .single()
+            .map(|a| a.just_pressed(&UiGamepadAction::Confirm))
             .unwrap_or(false);
 }
 
@@ -284,6 +286,8 @@ fn group_defers_default_focus(group: &UIState) -> bool {
             | UIState::Essence
             | UIState::Inventory
             | UIState::InventoryCrafting
+            | UIState::ActiveSkillShrine
+            | UIState::ActiveSkills
     )
 }
 
@@ -475,24 +479,15 @@ fn update_cursor_ui_hover_suppression(
     tutorial_ui: Query<(), With<TutorialUI>>,
     mouseless_mode: Res<MouselessModeState>,
     active_device: Res<ActiveInputDevice>,
+    ui_gamepad_q: Query<&ActionState<UiGamepadAction>, With<UiGamepadInputMarker>>,
     modals: Query<(Entity, &ModalFocusable)>,
     visibility: Query<&Visibility>,
-    mut mouse_motion: EventReader<MouseMotion>,
+    mut mouse_motion: MessageReader<MouseMotion>,
     mut last_context: Local<Option<FocusContextKey>>,
 ) {
-    // Clear on real mouse motion *or* whenever keyboard/mouse is the active device.
-    // Relying on MouseMotion alone failed in practice (Prompt stayed on "Press X" while
-    // moving the mouse) because ActiveInputDevice can already be KeyboardMouse while
-    // suppress was left true from a prior gamepad UI open.
-    if mouse_motion.iter().next().is_some()
-        || active_device.0 == InputDeviceKind::KeyboardMouse
-    {
-        cursor_pos.suppress_ui_hover = false;
-    }
-
     let mode = resolve_focus_mode_for_frame(
-        &game_state.0,
-        &ui_state.0,
+        game_state.get(),
+        ui_state.get(),
         !tip_boxes.is_empty(),
         !tutorial_ui.is_empty(),
         &modals,
@@ -502,10 +497,43 @@ fn update_cursor_ui_hover_suppression(
     let context_changed = last_context.as_ref() != Some(&context);
     if context_changed {
         *last_context = Some(context);
-        let prefer_non_mouse_ui = mouseless_mode.0 || active_device.0 == InputDeviceKind::Gamepad;
-        if mode != FocusMode::None && prefer_non_mouse_ui {
-            cursor_pos.suppress_ui_hover = true;
-        }
+    }
+
+    // UI pad activity (D-pad / Confirm / nav stick) — exists on main menu without a Player.
+    // Menu buttons gate hover/confirm on `suppress_ui_hover`; without this, focus can move
+    // while Start/Options/Begin never highlight or activate.
+    let ui_pad_driving = ui_gamepad_q.iter().any(|actions| {
+        use UiGamepadAction::*;
+        actions.pressed(&Confirm)
+            || actions.pressed(&Cancel)
+            || actions.pressed(&NavUp)
+            || actions.pressed(&NavDown)
+            || actions.pressed(&NavLeft)
+            || actions.pressed(&NavRight)
+            || actions.just_pressed(&Confirm)
+            || actions.just_pressed(&Cancel)
+            || actions.just_pressed(&NavUp)
+            || actions.just_pressed(&NavDown)
+            || actions.just_pressed(&NavLeft)
+            || actions.just_pressed(&NavRight)
+            || actions.clamped_axis_pair(&NavStick).length()
+                > crate::gamepad_input::GAMEPAD_STICK_DEADZONE
+    });
+
+    let prefer_non_mouse_ui =
+        mouseless_mode.0 || active_device.0 == InputDeviceKind::Gamepad || ui_pad_driving;
+
+    // Real mouse motion always restores cursor hover. KeyboardMouse clears suppress only when
+    // the pad is not currently driving UI (avoids the old chicken-egg where device stayed
+    // KeyboardMouse on menus and wiped suppress every frame).
+    if mouse_motion.read().next().is_some() {
+        cursor_pos.suppress_ui_hover = false;
+    } else if active_device.0 == InputDeviceKind::KeyboardMouse && !prefer_non_mouse_ui {
+        cursor_pos.suppress_ui_hover = false;
+    }
+
+    if mode != FocusMode::None && prefer_non_mouse_ui {
+        cursor_pos.suppress_ui_hover = true;
     }
 }
 
@@ -521,15 +549,32 @@ fn ensure_default_focus(
     modals: Query<(Entity, &ModalFocusable)>,
     visibility: Query<&Visibility>,
     inv_slots: Query<&InventorySlotState>,
+    mut last_mode: Local<Option<FocusMode>>,
 ) {
     let mode = resolve_focus_mode_for_frame(
-        &game_state.0,
-        &ui_state.0,
+        game_state.get(),
+        ui_state.get(),
         !tip_boxes.is_empty(),
         !tutorial_ui.is_empty(),
         &modals,
         &visibility,
     );
+
+    // Entering a deferred screen must not restore a previous visit's slot (that would look like
+    // an unintended default pick). Mid-session slot respawns (consume/sort/etc.) keep the same
+    // mode and restore via [`FocusAnchor`] below.
+    let mode_changed = last_mode.as_ref() != Some(&mode);
+    if mode_changed {
+        let entering_deferred =
+            matches!(&mode, FocusMode::Screen(g) if group_defers_default_focus(g));
+        *last_mode = Some(mode.clone());
+        if entering_deferred {
+            ui_focus.focused = None;
+            ui_focus.anchor = None;
+            return;
+        }
+    }
+
     let still_valid = ui_focus
         .focused
         .and_then(|e| {
@@ -543,26 +588,31 @@ fn ensure_default_focus(
         }
         return;
     }
-    // Deferred groups must stay unfocused until the player presses a nav direction — restoring
-    // a stale anchor from a previous visit would immediately highlight something on open.
-    let defer_default = matches!(&mode, FocusMode::Screen(g) if group_defers_default_focus(g));
-    if !defer_default {
-        if let Some(anchor) = ui_focus.anchor.clone() {
-            if let Some(e) = find_entity_for_anchor(
-                &anchor,
-                &mode,
-                &focusables,
-                &inv_slots,
-                &visibility,
-                &ui_state.0,
-            ) {
-                ui_focus.focused = Some(e);
-                return;
-            }
+
+    // Prefer the logical anchor — inventory slots despawn/respawn when stacks change, so the
+    // raw Entity id goes stale while the slot_type + index stay meaningful.
+    if let Some(anchor) = ui_focus.anchor.clone() {
+        if let Some(e) = find_entity_for_anchor(
+            &anchor,
+            &mode,
+            &focusables,
+            &inv_slots,
+            &visibility,
+            ui_state.get(),
+        ) {
+            ui_focus.focused = Some(e);
+            return;
         }
-    } else {
-        ui_focus.anchor = None;
     }
+
+    let defer_default = matches!(&mode, FocusMode::Screen(g) if group_defers_default_focus(g));
+    if defer_default {
+        // Still no valid target mid-visit (e.g. empty screen) — wait for nav.
+        ui_focus.focused = None;
+        ui_focus.anchor = None;
+        return;
+    }
+
     ui_focus.focused = default_focus_entity(
         &mode,
         &focusables,
@@ -570,7 +620,7 @@ fn ensure_default_focus(
         &modals,
         &visibility,
         &inv_slots,
-        &ui_state.0,
+        ui_state.get(),
     );
     ui_focus.anchor = ui_focus
         .focused
@@ -626,23 +676,23 @@ pub struct UiStickNavLatch {
 /// whatever the mouse was actually pointing at). Narrower keyboard-only interactions (e.g. an
 /// options-screen slider nudge while already focused via Tab/click) can pass `true` unconditionally.
 pub fn ui_nav_dir_just_pressed(
-    keys: &Input<KeyCode>,
+    keys: &ButtonInput<KeyCode>,
     keyboard_enabled: bool,
     gamepad: Option<&ActionState<UiGamepadAction>>,
     stick_latch: &mut UiStickNavLatch,
     stability: UiNavStickStability,
 ) -> Option<UiNavDir> {
     if keyboard_enabled {
-        if keys.just_pressed(KeyCode::Up) {
+        if keys.just_pressed(KeyCode::ArrowUp) {
             return Some(UiNavDir::Up);
         }
-        if keys.just_pressed(KeyCode::Down) {
+        if keys.just_pressed(KeyCode::ArrowDown) {
             return Some(UiNavDir::Down);
         }
-        if keys.just_pressed(KeyCode::Left) {
+        if keys.just_pressed(KeyCode::ArrowLeft) {
             return Some(UiNavDir::Left);
         }
-        if keys.just_pressed(KeyCode::Right) {
+        if keys.just_pressed(KeyCode::ArrowRight) {
             return Some(UiNavDir::Right);
         }
     }
@@ -650,23 +700,20 @@ pub fn ui_nav_dir_just_pressed(
     let Some(gamepad) = gamepad else {
         return None;
     };
-    if gamepad.just_pressed(UiGamepadAction::NavUp) {
+    if gamepad.just_pressed(&UiGamepadAction::NavUp) {
         return Some(UiNavDir::Up);
     }
-    if gamepad.just_pressed(UiGamepadAction::NavDown) {
+    if gamepad.just_pressed(&UiGamepadAction::NavDown) {
         return Some(UiNavDir::Down);
     }
-    if gamepad.just_pressed(UiGamepadAction::NavLeft) {
+    if gamepad.just_pressed(&UiGamepadAction::NavLeft) {
         return Some(UiNavDir::Left);
     }
-    if gamepad.just_pressed(UiGamepadAction::NavRight) {
+    if gamepad.just_pressed(&UiGamepadAction::NavRight) {
         return Some(UiNavDir::Right);
     }
 
-    let stick = gamepad
-        .clamped_axis_pair(UiGamepadAction::NavStick)
-        .map(|p| p.xy())
-        .unwrap_or(Vec2::ZERO);
+    let stick = gamepad.clamped_axis_pair(&UiGamepadAction::NavStick);
     let magnitude = stick.length();
     if magnitude <= stability.deadzone() {
         stick_latch.armed = false;
@@ -696,7 +743,7 @@ pub fn ui_nav_dir_just_pressed(
 }
 
 fn pressed_nav_dir(
-    keys: &Input<KeyCode>,
+    keys: &ButtonInput<KeyCode>,
     keyboard_enabled: bool,
     gamepad: Option<&ActionState<UiGamepadAction>>,
     stick_latch: &mut UiStickNavLatch,
@@ -727,7 +774,7 @@ pub struct FocusNavContext<'w, 's> {
 }
 
 fn focus_nav(
-    key_input: Res<Input<KeyCode>>,
+    key_input: Res<ButtonInput<KeyCode>>,
     ui_gamepad_q: Query<&ActionState<UiGamepadAction>, With<UiGamepadInputMarker>>,
     ctx: FocusNavContext,
     mut ui_focus: ResMut<UiFocus>,
@@ -758,8 +805,8 @@ fn focus_nav(
         FocusMode::Modal
     } else {
         resolve_focus_mode(
-            &game_state.0,
-            &ui_state.0,
+            game_state.get(),
+            ui_state.get(),
             !tip_boxes.is_empty(),
             !tutorial_ui.is_empty(),
         )
@@ -771,7 +818,7 @@ fn focus_nav(
     let Some(dir) = pressed_nav_dir(
         &key_input,
         mouseless_mode.0,
-        ui_gamepad_q.get_single().ok(),
+        ui_gamepad_q.single().ok(),
         &mut stick_latch,
         *stick_stability,
     ) else {
@@ -782,7 +829,7 @@ fn focus_nav(
         focusables
             .iter()
             .filter(|(e, _, f)| {
-                screen_focus_candidate(*e, f, group, &ui_state.0, &visibility, &inv_slots)
+                screen_focus_candidate(*e, f, group, ui_state.get(), &visibility, &inv_slots)
             })
             .min_by_key(|(_, _, f)| f.index)
             .map(|(e, _, _)| e)
@@ -818,11 +865,11 @@ fn focus_nav(
                     group,
                     slot_type,
                     slot_index,
-                } if mode_matches_screen(&mode, group) => focusables.iter().find_map(
-                    |(entity, _, focusable)| {
+                } if mode_matches_screen(&mode, group) => {
+                    focusables.iter().find_map(|(entity, _, focusable)| {
                         if focusable.group != *group
                             || !focus_entity_visible(entity, &visibility)
-                            || !focusable_inv_eligible(entity, &ui_state.0, &inv_slots)
+                            || !focusable_inv_eligible(entity, ui_state.get(), &inv_slots)
                         {
                             return None;
                         }
@@ -830,11 +877,9 @@ fn focus_nav(
                             (slot.r#type == *slot_type && slot.slot_index == *slot_index)
                                 .then_some(entity)
                         })
-                    },
-                ),
-                FocusAnchor::FocusIndex { group, index }
-                    if mode_matches_screen(&mode, group) =>
-                {
+                    })
+                }
+                FocusAnchor::FocusIndex { group, index } if mode_matches_screen(&mode, group) => {
                     focusables.iter().find_map(|(entity, _, focusable)| {
                         (focusable.group == *group
                             && focusable.index == *index
@@ -925,8 +970,14 @@ fn focus_nav(
     match &mode {
         FocusMode::Screen(group) => {
             for (e, xf, focusable) in focusables.iter() {
-                if !screen_focus_candidate(e, focusable, group, &ui_state.0, &visibility, &inv_slots)
-                {
+                if !screen_focus_candidate(
+                    e,
+                    focusable,
+                    group,
+                    ui_state.get(),
+                    &visibility,
+                    &inv_slots,
+                ) {
                     continue;
                 }
                 consider(e, xf.translation().truncate());
@@ -971,8 +1022,6 @@ pub struct FocusConfirmSet;
 
 pub struct FocusPlugin;
 
-aseprite!(pub SelectedIndicator, "textures/effects/SelectedIndicator.aseprite");
-
 /// Child overlay spawned on the focused UI icon so controller/mouseless players can see where
 /// focus is. Only used on the merchant shop, microwave shrine, well shrine, and pause HUD —
 /// other screens already convey focus via hover art / bounce.
@@ -997,25 +1046,23 @@ fn sync_ui_focus_selected_indicator(
     mouseless_mode: Res<MouselessModeState>,
     cursor_pos: Res<CursorPos>,
     asset_server: Res<AssetServer>,
-    existing: Query<(Entity, &Parent), With<UiFocusSelectedIndicator>>,
+    existing: Query<(Entity, &ChildOf), With<UiFocusSelectedIndicator>>,
     skip: Query<(), With<SkipFocusSelectedIndicator>>,
 ) {
     let focus_driving = mouseless_mode.0 || cursor_pos.suppress_ui_hover;
-    let show = focus_driving && ui_state_shows_focus_selected_indicator(&ui_state.0);
+    let show = focus_driving && ui_state_shows_focus_selected_indicator(ui_state.get());
     let target = if show {
-        ui_focus
-            .focused
-            .filter(|entity| skip.get(*entity).is_err())
+        ui_focus.focused.filter(|entity| skip.get(*entity).is_err())
     } else {
         None
     };
 
     let mut keep = false;
     for (entity, parent) in existing.iter() {
-        if Some(parent.get()) == target {
+        if Some(parent.parent()) == target {
             keep = true;
         } else {
-            commands.entity(entity).despawn_recursive();
+            commands.entity(entity).despawn();
         }
     }
 
@@ -1026,21 +1073,20 @@ fn sync_ui_focus_selected_indicator(
         return;
     }
 
-    let mut animation = AsepriteAnimation::from(SelectedIndicator::tags::SELECT);
-    animation.play();
     commands
         .spawn((
-            AsepriteBundle {
-                aseprite: asset_server.load(SelectedIndicator::PATH),
-                animation,
-                transform: Transform::from_translation(Vec3::new(0., 0., 8.)),
-                ..Default::default()
-            },
+            aseprite_bundle(
+                asset_server.load(SelectedIndicator::PATH),
+                SelectedIndicator::tags::SELECT,
+                Transform::from_translation(Vec3::new(0., 0., 8.)),
+                Visibility::Inherited,
+                false,
+            ),
             RenderLayers::from_layers(&[3]),
             UiFocusSelectedIndicator,
             Name::new("Ui Focus Selected Indicator"),
         ))
-        .set_parent(parent);
+        .insert(ChildOf(parent));
 }
 
 impl Plugin for FocusPlugin {
@@ -1048,12 +1094,11 @@ impl Plugin for FocusPlugin {
         app.init_resource::<UiFocus>()
             .insert_resource(UiNavStickStability::load())
             .init_resource::<FocusNavBlocked>()
-            .add_system(
-                update_cursor_ui_hover_suppression.in_base_set(CoreSet::PreUpdate),
-            )
-            .add_system(ensure_default_focus)
-            .add_system(reset_focus_nav_blocked.before(FocusNavSet))
+            .add_systems(PreUpdate, update_cursor_ui_hover_suppression)
+            .add_systems(Update, ensure_default_focus)
+            .add_systems(Update, reset_focus_nav_blocked.before(FocusNavSet))
             .add_systems(
+                Update,
                 (
                     poll_ui_focus_confirm.in_set(FocusConfirmSet),
                     focus_nav.in_set(FocusNavSet),
@@ -1062,6 +1107,6 @@ impl Plugin for FocusPlugin {
                     .after(ensure_default_focus)
                     .distributive_run_if(focus_should_run),
             )
-            .add_system(sync_ui_focus_selected_indicator.after(FocusNavSet));
+            .add_systems(Update, sync_ui_focus_selected_indicator.after(FocusNavSet));
     }
 }

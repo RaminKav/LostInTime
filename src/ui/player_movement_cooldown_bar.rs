@@ -34,38 +34,35 @@ pub fn spawn_player_movement_cooldown_bar(
     for player in players.iter() {
         let bar = commands
             .spawn((
-                SpatialBundle {
-                    transform: Transform::from_translation(Vec3::new(0., BAR_Y_OFFSET, 0.5)),
-                    visibility: Visibility::Hidden,
-                    ..default()
-                },
+                (
+                    Transform::from_translation(Vec3::new(0., BAR_Y_OFFSET, 0.5)),
+                    Visibility::Hidden,
+                ),
                 PlayerMovementCooldownBar,
                 Name::new("Movement Cooldown Bar"),
             ))
             .with_children(|parent| {
                 parent
-                    .spawn(SpriteBundle {
-                        sprite: Sprite {
-                            color: Color::rgba(1., 1., 1., 0.25),
+                    .spawn((
+                        Sprite {
+                            color: Color::srgba(1., 1., 1., 0.25),
                             custom_size: Some(BAR_SIZE),
                             ..default()
                         },
-                        transform: Transform::from_xyz(0., 0., 0.),
-                        ..default()
-                    })
+                        Transform::from_xyz(0., 0., 0.),
+                    ))
                     .insert(PlayerMovementCooldownBarBg);
 
                 parent
-                    .spawn(SpriteBundle {
-                        sprite: Sprite {
+                    .spawn((
+                        Sprite {
                             color: Color::WHITE,
                             custom_size: Some(Vec2::new(0., BAR_SIZE.y)),
-                            anchor: Anchor::CenterLeft,
                             ..default()
                         },
-                        transform: Transform::from_xyz(-BAR_SIZE.x / 2., 0., 0.1),
-                        ..default()
-                    })
+                        Transform::from_xyz(-BAR_SIZE.x / 2., 0., 0.1),
+                    ))
+                    .insert(Anchor::CENTER_LEFT)
                     .insert(PlayerMovementCooldownBarFill);
             })
             .id();
@@ -85,10 +82,10 @@ pub fn update_player_movement_cooldown_bar(
     mut bar_roots: Query<&mut Visibility, With<PlayerMovementCooldownBar>>,
     mut fill_sprites: Query<&mut Sprite, With<PlayerMovementCooldownBarFill>>,
 ) {
-    let Ok(skills) = player_skills.get_single() else {
+    let Ok(skills) = player_skills.single() else {
         return;
     };
-    let Ok(slots) = class_slots.get_single() else {
+    let Ok(slots) = class_slots.single() else {
         return;
     };
 

@@ -1,5 +1,5 @@
+use bevy::platform::collections::HashMap;
 use bevy::prelude::*;
-use bevy::utils::HashMap;
 use serde::{Deserialize, Serialize};
 
 use crate::enemy::Mob;
@@ -102,7 +102,10 @@ pub struct BeastiaryPlugin;
 
 impl Plugin for BeastiaryPlugin {
     fn build(&self, app: &mut App) {
-        app.add_system(reset_run_beastiary_on_run_start.in_schedule(OnExit(GameState::MainMenu)));
+        app.add_systems(
+            OnExit(GameState::MainMenu),
+            reset_run_beastiary_on_run_start,
+        );
     }
 }
 

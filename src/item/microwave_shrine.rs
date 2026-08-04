@@ -23,7 +23,7 @@ pub fn handle_microwave_shrine_completion(
     shrines: Query<(Entity, &MicrowaveShrineState)>,
     mut commands: Commands,
     mut game: GameParam,
-    mut minimap_event: EventWriter<UpdateMiniMapEvent>,
+    mut minimap_event: MessageWriter<UpdateMiniMapEvent>,
 ) {
     for (e, shrine) in shrines.iter() {
         if shrine.is_used {
@@ -36,7 +36,7 @@ pub fn handle_microwave_shrine_completion(
 
             game.add_object_to_chunk_cache(shrine.tile_pos, WorldObject::MicrowaveShrineDone);
 
-            minimap_event.send(UpdateMiniMapEvent {
+            minimap_event.write(UpdateMiniMapEvent {
                 pos: Some(shrine.tile_pos),
                 new_tile: Some(WorldObject::MicrowaveShrineDone),
             });
@@ -51,7 +51,7 @@ pub fn handle_microwave_shrine_esc(
     mut commands: Commands,
     curr_ui_state: Res<State<crate::ui::UIState>>,
 ) {
-    if curr_ui_state.0 != crate::ui::UIState::MicrowaveShrine {
+    if *curr_ui_state.get() != crate::ui::UIState::MicrowaveShrine {
         if active.is_some() {
             commands.remove_resource::<crate::ui::microwave_shrine_ui::MicrowaveShrineActive>();
         }

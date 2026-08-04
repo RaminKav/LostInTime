@@ -124,7 +124,7 @@ impl Inventory {
     }
 }
 
-#[derive(Component, Debug, PartialEq, Reflect, FromReflect, Default, Clone, Serialize, Deserialize)]
+#[derive(Component, Debug, PartialEq, Reflect, Default, Clone, Serialize, Deserialize)]
 #[reflect(Default)]
 #[serde(default)]
 pub struct ItemStack {
@@ -213,7 +213,9 @@ impl InventoryItemStack {
         }
 
         let player_state = game.player();
-        let player_e = game.player_query.single().0;
+        let Ok((player_e, ..)) = game.player_query.single() else {
+            panic!("player not found");
+        };
         let obj_data = game.world_obj_data.properties.get(&obj).unwrap();
         let anchor = obj_data.anchor.unwrap_or(Vec2::ZERO);
         let is_facing_left = player_state.direction == FacingDirection::Left;
@@ -227,23 +229,22 @@ impl InventoryItemStack {
         );
         // despawn old held item if it exists
         if let Some(main_hand_data) = &player_state.main_hand_slot {
-            if let Some(mut entity_commands) = commands.get_entity(main_hand_data.entity) {
+            if let Ok(mut entity_commands) = commands.get_entity(main_hand_data.entity) {
                 entity_commands.despawn();
             }
         }
 
         //spawn new item entity
         let item = commands
-            .spawn(SpatialBundle {
-                transform: Transform {
+            .spawn((
+                Transform {
                     translation: position,
                     scale: Vec3::new(1., 1., 1.),
                     // rotation: Quat::from_rotation_z(0.8),
                     ..Default::default()
                 },
-                visibility: Visibility::Visible,
-                ..Default::default()
-            })
+                Visibility::Visible,
+            ))
             .insert(Equipment(*limb))
             .insert(Name::new("EquippedItem"))
             .insert(self.item_stack.attributes.clone())
@@ -434,12 +435,7 @@ impl ItemStack {
         };
 
         let item = commands
-            .spawn(SpriteSheetBundle {
-                sprite,
-                texture_atlas: game.graphics.texture_atlas.as_ref().unwrap().clone(),
-                transform,
-                ..Default::default()
-            })
+            .spawn((sprite.clone(), transform))
             .insert(ItemDrop)
             .insert(Name::new("DropItem"))
             .insert(self.clone())

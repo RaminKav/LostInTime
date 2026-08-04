@@ -1,4 +1,5 @@
-use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
+use bevy::text::Justify;
+use bevy::{camera::visibility::RenderLayers, prelude::*, sprite::Anchor};
 
 use crate::{
     assets::Graphics,
@@ -10,7 +11,10 @@ use crate::{
         skills::{Heirloom, HeirloomChoiceQueue, HeirloomChoiceState, HeirloomRarity},
         time_crystals::TimeCrystals,
     },
-    ui::{game_fonts as gf, ui_helpers::Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND, Interactable, UIState},
+    ui::{
+        game_fonts as gf, ui_helpers::Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND, Interactable,
+        UIState,
+    },
     ScreenResolution,
 };
 
@@ -60,7 +64,10 @@ pub fn spawn_banish_tracker(
 ) -> Entity {
     let root = commands
         .spawn((
-            SpatialBundle::from_transform(banish_tracker_root_transform(resolution.game_width)),
+            (
+                banish_tracker_root_transform(resolution.game_width),
+                Visibility::default(),
+            ),
             RenderLayers::from_layers(&[3]),
             ui_state.clone(),
             BanishTrackerRoot,
@@ -91,28 +98,25 @@ pub fn build_banish_tracker_children(
     root: Entity,
     ui_state: UIState,
 ) {
-    let title_style = gf::SKILL_CHOICE_TRACKER_TITLE.text_style(&asset_server, WHITE);
 
     let mut y: f32 = 0.;
     let title = commands
         .spawn((
-            Text2dBundle {
-                text: Text::from_section("banishes", title_style.clone())
-                    .with_alignment(TextAlignment::Left),
-                text_anchor: Anchor::TopLeft,
-                transform: Transform {
+            gf::SKILL_CHOICE_TRACKER_TITLE
+                .text(&asset_server, "banishes", WHITE)
+                .justify(Justify::Left)
+                .anchor(Anchor::TOP_LEFT)
+                .with_transform(Transform {
                     translation: Vec3::new(0., y, 1.),
                     scale: gf::SKILL_CHOICE_TRACKER_TITLE.transform_scale(),
                     ..default()
-                },
-                ..default()
-            },
+                }),
             RenderLayers::from_layers(&[3]),
             ui_state.clone(),
             Name::new("Banish Tracker Title"),
         ))
         .id();
-    commands.entity(title).set_parent(root);
+    commands.entity(title).insert(ChildOf(root));
     y -= 10.;
 
     for rarity in [
@@ -128,26 +132,27 @@ pub fn build_banish_tracker_children(
             HeirloomRarity::Legendary => ("Legendary", LEGENDARY_TOOLTIP_TITLE),
         };
         let allowed = queue.allowed_banishes_for_rarity(time_crystals, rarity);
-        let heading_style = gf::SKILL_CHOICE_MICRO.text_style(&asset_server, heading_color);
         let heading_e = commands
             .spawn((
-                Text2dBundle {
-                    text: Text::from_section(format!("{} ({})", heading, allowed), heading_style)
-                        .with_alignment(TextAlignment::Left),
-                    text_anchor: Anchor::TopLeft,
-                    transform: Transform {
+                gf::SKILL_CHOICE_MICRO
+                    .text(
+                        &asset_server,
+                        format!("{} ({})", heading, allowed),
+                        heading_color,
+                    )
+                    .justify(Justify::Left)
+                    .anchor(Anchor::TOP_LEFT)
+                    .with_transform(Transform {
                         translation: Vec3::new(0., y, 1.),
                         scale: gf::SKILL_CHOICE_MICRO.transform_scale(),
                         ..default()
-                    },
-                    ..default()
-                },
+                    }),
                 RenderLayers::from_layers(&[3]),
                 ui_state.clone(),
                 Name::new("Banish Tracker Heading"),
             ))
             .id();
-        commands.entity(heading_e).set_parent(root);
+        commands.entity(heading_e).insert(ChildOf(root));
         y -= BANISH_TRACKER_HEADING_TO_ICONS;
 
         let icon_y = y - BANISH_TRACKER_ICON_SIZE * 0.5;
@@ -169,23 +174,16 @@ pub fn build_banish_tracker_children(
                 let icon_x =
                     BANISH_TRACKER_ICON_SIZE * 0.5 + col as f32 * BANISH_TRACKER_ICON_SPACING;
                 let row_icon_y = icon_y - row as f32 * BANISH_TRACKER_ICON_ROW_SPACING;
+                let mut icon_sprite =
+                    graphics.get_heirloom_icon(choice.heirloom.clone());
+                icon_sprite.custom_size = Some(Vec2::new(
+                    BANISH_TRACKER_ICON_SIZE,
+                    BANISH_TRACKER_ICON_SIZE,
+                ));
                 let icon_e = commands
                     .spawn((
-                        SpriteSheetBundle {
-                            sprite: graphics.get_heirloom_icon(choice.heirloom.clone()),
-                            texture_atlas: graphics.texture_atlas.as_ref().unwrap().clone(),
-                            transform: Transform::from_translation(Vec3::new(
-                                icon_x, row_icon_y, 1.,
-                            )),
-                            ..Default::default()
-                        },
-                        Sprite {
-                            custom_size: Some(Vec2::new(
-                                BANISH_TRACKER_ICON_SIZE,
-                                BANISH_TRACKER_ICON_SIZE,
-                            )),
-                            ..Default::default()
-                        },
+                        icon_sprite,
+                        Transform::from_translation(Vec3::new(icon_x, row_icon_y, 1.)),
                         RenderLayers::from_layers(&[3]),
                         ui_state.clone(),
                         Interactable::default(),
@@ -196,7 +194,7 @@ pub fn build_banish_tracker_children(
                         Name::new("Banish Tracker Icon"),
                     ))
                     .id();
-                commands.entity(icon_e).set_parent(root);
+                commands.entity(icon_e).insert(ChildOf(root));
             }
             y -= BANISH_TRACKER_ICON_SIZE
                 + (row_count.saturating_sub(1)) as f32 * BANISH_TRACKER_ICON_ROW_SPACING;
@@ -221,10 +219,11 @@ pub fn handle_banish_tracker_tooltip(
         &BanishTrackerIcon,
         &UIState,
     )>,
-    mut tooltip_requests: EventWriter<HeirloomTooltipRequest>,
+    mut tooltip_requests: MessageWriter<HeirloomTooltipRequest>,
     mut last_hovered: Local<Option<Heirloom>>,
 ) {
-    let hit_entity = super::ui_helpers::pointcast_2d(&cursor_pos, &hit_detection_sprites, None, None);
+    let hit_entity =
+        super::ui_helpers::pointcast_2d(&cursor_pos, &hit_detection_sprites, None, None);
 
     for (entity, _, mut interactable, _, _) in tracker_icons.iter_mut() {
         let is_hit = hit_entity
@@ -241,20 +240,24 @@ pub fn handle_banish_tracker_tooltip(
     let currently_hovered = tracker_icons
         .iter()
         .find(|(_, _, interactable, _, _)| matches!(interactable.current(), Interaction::Hovering))
-        .map(|(_, transform, _, icon, ui_state)| (icon.clone(), transform.translation(), ui_state.clone()));
+        .map(|(_, transform, _, icon, ui_state)| {
+            (icon.clone(), transform.translation(), ui_state.clone())
+        });
 
-    let hovered_heirloom = currently_hovered.as_ref().map(|(i, _, _)| i.heirloom.clone());
+    let hovered_heirloom = currently_hovered
+        .as_ref()
+        .map(|(i, _, _)| i.heirloom.clone());
     if *last_hovered == hovered_heirloom {
         return;
     }
 
     match &currently_hovered {
         None => {
-            tooltip_requests.send(HeirloomTooltipRequest::Clear);
+            tooltip_requests.write(HeirloomTooltipRequest::Clear);
         }
         Some((icon, icon_pos, ui_state)) => {
             let tooltip_pos = Vec3::new(icon_pos.x + 90., icon_pos.y, icon_pos.z + 10.);
-            tooltip_requests.send(HeirloomTooltipRequest::Show(HeirloomTooltipShow {
+            tooltip_requests.write(HeirloomTooltipRequest::Show(HeirloomTooltipShow {
                 heirloom: icon.heirloom.clone(),
                 rarity: icon.rarity,
                 position: tooltip_pos,
@@ -283,7 +286,7 @@ pub fn update_banish_tracker_ui(
     for (root, ui_state) in tracker_roots.iter() {
         if let Ok(kids) = children.get(root) {
             for child in kids.iter() {
-                commands.entity(*child).despawn_recursive();
+                commands.entity(child).despawn();
             }
         }
         build_banish_tracker_children(

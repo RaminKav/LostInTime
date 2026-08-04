@@ -49,7 +49,7 @@ pub fn tick_reload(time: Res<Time>, mut q: Query<&mut Ammo>) {
     for mut ammo in q.iter_mut() {
         if ammo.reloading {
             ammo.reload.tick(time.delta());
-            if ammo.reload.finished() {
+            if ammo.reload.is_finished() {
                 ammo.current = ammo.max;
                 ammo.reloading = false;
             }

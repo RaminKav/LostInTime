@@ -1,5 +1,6 @@
+use bevy::text::Justify;
 use crate::ui::game_fonts as gf;
-use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
+use bevy::{camera::visibility::RenderLayers, prelude::*, sprite::Anchor};
 
 use crate::{
     assets::Graphics,
@@ -8,11 +9,11 @@ use crate::{
     cursor::CursorPos,
     player::{skills::time_crystal_heirlooms, time_crystals::TimeCrystals},
     ui::{
+        focus::FocusInput,
         heirloom_browser_grid::{
             despawn_heirloom_browser_grid_layers, sorted_grid_entries_with_unlock_state,
             spawn_heirloom_grid_overlay, HeirloomBrowserGridLayer, HeirloomGridContext,
         },
-        focus::FocusInput,
         interactions::{Interactable, Interaction},
         inventory_ui::UIState,
         time_crystal_progress_ui::CrystalUnlockIcon,
@@ -124,15 +125,14 @@ pub fn setup_time_crystals_browser_ui(
 
     // Full-screen dim
     commands.spawn((
-        SpriteBundle {
-            sprite: Sprite {
-                color: Color::rgba(0., 0., 0., 0.82),
+        (
+            Sprite {
+                color: Color::srgba(0., 0., 0., 0.82),
                 custom_size: Some(crate::ui::ui_helpers::full_screen_overlay_size(&resolution)),
                 ..Default::default()
             },
-            transform: Transform::from_translation(Vec3::new(0., 0., OVERLAY_Z)),
-            ..Default::default()
-        },
+            Transform::from_translation(Vec3::new(0., 0., OVERLAY_Z)),
+        ),
         RenderLayers::from_layers(&[3]),
         TimeCrystalsBrowserUI,
         UIState::TimeCrystalsBrowser,
@@ -141,15 +141,14 @@ pub fn setup_time_crystals_browser_ui(
 
     // Large inner panel
     commands.spawn((
-        SpriteBundle {
-            sprite: Sprite {
-                color: Color::rgba(0.02, 0.02, 0.04, 0.98),
+        (
+            Sprite {
+                color: Color::srgba(0.02, 0.02, 0.04, 0.98),
                 custom_size: Some(Vec2::new(inner_w, inner_h)),
                 ..Default::default()
             },
-            transform: Transform::from_translation(Vec3::new(0., 0., PANEL_Z)),
-            ..Default::default()
-        },
+            Transform::from_translation(Vec3::new(0., 0., PANEL_Z)),
+        ),
         RenderLayers::from_layers(&[3]),
         TimeCrystalsBrowserUI,
         UIState::TimeCrystalsBrowser,
@@ -160,20 +159,15 @@ pub fn setup_time_crystals_browser_ui(
     let mut y = half_h - 22.;
 
     commands.spawn((
-        Text2dBundle {
-            text: Text::from_section(
-                "Time Crystals",
-                gf::DISPLAY.text_style(&asset_server, WHITE),
-            )
-            .with_alignment(TextAlignment::Center),
-            text_anchor: Anchor::Center,
-            transform: Transform {
+        gf::DISPLAY
+            .text(&asset_server, "Time Crystals", WHITE)
+            .justify(Justify::Center)
+            .anchor(Anchor::CENTER)
+            .with_transform(Transform {
                 translation: Vec3::new(0., y, CONTENT_Z),
                 scale: gf::DISPLAY.transform_scale(),
                 ..Default::default()
-            },
-            ..Default::default()
-        },
+            }),
         RenderLayers::from_layers(&[3]),
         TimeCrystalsBrowserUI,
         UIState::TimeCrystalsBrowser,
@@ -182,20 +176,11 @@ pub fn setup_time_crystals_browser_ui(
 
     y -= 18.;
     commands.spawn((
-        Text2dBundle {
-            text: Text::from_section(
-                "View progress and unlocks for time crystals.\n\nEarn shards in runs to complete more crystals!",
-                gf::BODY.text_style(&asset_server, WHITE),
-            )
-            .with_alignment(TextAlignment::Center),
-            text_anchor: Anchor::Center,
-            transform: Transform {
+        gf::BODY.text(&asset_server, "View progress and unlocks for time crystals.\n\nEarn shards in runs to complete more crystals!", WHITE).justify(Justify::Center).anchor(Anchor::CENTER).with_transform(Transform {
                 translation: Vec3::new(0., y, CONTENT_Z),
                 scale: gf::BODY.transform_scale(),
                 ..Default::default()
-            },
-            ..Default::default()
-        },
+            }),
         RenderLayers::from_layers(&[3]),
         TimeCrystalsBrowserUI,
         UIState::TimeCrystalsBrowser,
@@ -230,24 +215,15 @@ pub fn setup_time_crystals_browser_ui(
                 if complete { " (complete)" } else { "" }
             );
             commands.spawn((
-                Text2dBundle {
-                    text: Text::from_section(
-                        line1,
-                        gf::BODY.text_style(&asset_server, YELLOW_2),
-                    )
-                    .with_alignment(TextAlignment::Center),
-                    text_anchor: Anchor::Center,
-                    transform: Transform {
-                translation: Vec3::new(
-                        col_x,
-                        y_row_header,
-                        CONTENT_Z,
-                    ),
-                scale: gf::BODY.transform_scale(),
-                ..Default::default()
-            },
-                    ..Default::default()
-                },
+                gf::BODY
+                    .text(&asset_server, line1, YELLOW_2)
+                    .justify(Justify::Center)
+                    .anchor(Anchor::CENTER)
+                    .with_transform(Transform {
+                        translation: Vec3::new(col_x, y_row_header, CONTENT_Z),
+                        scale: gf::BODY.transform_scale(),
+                        ..Default::default()
+                    }),
                 RenderLayers::from_layers(&[3]),
                 TimeCrystalsBrowserUI,
                 UIState::TimeCrystalsBrowser,
@@ -262,17 +238,13 @@ pub fn setup_time_crystals_browser_ui(
                 for (i, (heirloom, rarity)) in unlocks.into_iter().enumerate() {
                     let icon_x = start_x + i as f32 * ICON_SPACING;
                     commands.spawn((
-                        SpriteSheetBundle {
-                            sprite: graphics.get_heirloom_icon(heirloom.clone()),
-                            texture_atlas: graphics.texture_atlas.as_ref().unwrap().clone(),
-                            transform: Transform {
-                                translation: Vec3::new(icon_x, sub_y - ICON_SIZE * 0.5, CONTENT_Z),
-                                ..Default::default()
-                            },
-                            ..Default::default()
+                        {
+                            let mut sprite = graphics.get_heirloom_icon(heirloom.clone());
+                            sprite.custom_size = Some(Vec2::new(ICON_SIZE, ICON_SIZE));
+                            sprite
                         },
-                        Sprite {
-                            custom_size: Some(Vec2::new(ICON_SIZE, ICON_SIZE)),
+                        Transform {
+                            translation: Vec3::new(icon_x, sub_y - ICON_SIZE * 0.5, CONTENT_Z),
                             ..Default::default()
                         },
                         RenderLayers::from_layers(&[3]),
@@ -288,24 +260,15 @@ pub fn setup_time_crystals_browser_ui(
                 }
             } else if complete && n_unlocks == 0 {
                 commands.spawn((
-                    Text2dBundle {
-                        text: Text::from_section(
-                            "—",
-                            gf::BODY.text_style(&asset_server, WHITE),
-                        )
-                        .with_alignment(TextAlignment::Center),
-                        text_anchor: Anchor::Center,
-                        transform: Transform {
-                translation: Vec3::new(
-                            col_x,
-                            sub_y - 4.,
-                            CONTENT_Z,
-                        ),
-                scale: gf::BODY.transform_scale(),
-                ..Default::default()
-            },
-                        ..Default::default()
-                    },
+                    gf::BODY
+                        .text(&asset_server, "—", WHITE)
+                        .justify(Justify::Center)
+                        .anchor(Anchor::CENTER)
+                        .with_transform(Transform {
+                            translation: Vec3::new(col_x, sub_y - 4., CONTENT_Z),
+                            scale: gf::BODY.transform_scale(),
+                            ..Default::default()
+                        }),
                     RenderLayers::from_layers(&[3]),
                     TimeCrystalsBrowserUI,
                     UIState::TimeCrystalsBrowser,
@@ -321,24 +284,15 @@ pub fn setup_time_crystals_browser_ui(
                     "—".to_string()
                 };
                 commands.spawn((
-                    Text2dBundle {
-                        text: Text::from_section(
-                            mystery,
-                            gf::DISPLAY.text_style(&asset_server, WHITE),
-                        )
-                        .with_alignment(TextAlignment::Center),
-                        text_anchor: Anchor::Center,
-                        transform: Transform {
-                translation: Vec3::new(
-                            col_x,
-                            sub_y - 6.,
-                            CONTENT_Z,
-                        ),
-                scale: gf::DISPLAY.transform_scale(),
-                ..Default::default()
-            },
-                        ..Default::default()
-                    },
+                    gf::DISPLAY
+                        .text(&asset_server, mystery, WHITE)
+                        .justify(Justify::Center)
+                        .anchor(Anchor::CENTER)
+                        .with_transform(Transform {
+                            translation: Vec3::new(col_x, sub_y - 6., CONTENT_Z),
+                            scale: gf::DISPLAY.transform_scale(),
+                            ..Default::default()
+                        }),
                     RenderLayers::from_layers(&[3]),
                     TimeCrystalsBrowserUI,
                     UIState::TimeCrystalsBrowser,
@@ -352,15 +306,14 @@ pub fn setup_time_crystals_browser_ui(
     let button_y = -half_h + 16.;
     let done_entity = commands
         .spawn((
-            SpriteBundle {
-                texture: graphics.get_ui_element_texture(UIElement::MenuButton),
-                sprite: Sprite {
+            (
+                Sprite {
+                    image: graphics.get_ui_element_texture(UIElement::MenuButton),
                     custom_size: Some(Vec2::new(72., 18.)),
-                    ..Default::default()
+                    ..default()
                 },
-                transform: Transform::from_translation(Vec3::new(-58., button_y, CONTENT_Z)),
-                ..Default::default()
-            },
+                Transform::from_translation(Vec3::new(-58., button_y, CONTENT_Z)),
+            ),
             RenderLayers::from_layers(&[3]),
             UIElement::MenuButton,
             Interactable::default(),
@@ -376,36 +329,32 @@ pub fn setup_time_crystals_browser_ui(
         .id();
 
     commands
-        .spawn(Text2dBundle {
-            text: Text::from_section(
-                "Done",
-                gf::BODY.text_style(&asset_server, crate::colors::WHITE),
-            )
-            .with_alignment(TextAlignment::Center),
-            text_anchor: Anchor::Center,
-            transform: Transform {
-                translation: Vec3::new(0., 0.5, 1.),
-                scale: gf::BODY.transform_scale(),
-                ..Default::default()
-            },
-            ..Default::default()
-        })
+        .spawn(
+            gf::BODY
+                .text(&asset_server, "Done", crate::colors::WHITE)
+                .justify(Justify::Center)
+                .anchor(Anchor::CENTER)
+                .with_transform(Transform {
+                    translation: Vec3::new(0., 0.5, 1.),
+                    scale: gf::BODY.transform_scale(),
+                    ..Default::default()
+                }),
+        )
         .insert(RenderLayers::from_layers(&[3]))
         .insert(UIState::TimeCrystalsBrowser)
-        .insert(Name::new("Time Crystals Browser Done Text"))
-        .set_parent(done_entity);
+        .insert(Name::new("Time Crystals Browser Done Text2d"))
+        .insert(ChildOf(done_entity));
 
     let view_entity = commands
         .spawn((
-            SpriteBundle {
-                texture: graphics.get_ui_element_texture(UIElement::MenuButton),
-                sprite: Sprite {
+            (
+                Sprite {
+                    image: graphics.get_ui_element_texture(UIElement::MenuButton),
                     custom_size: Some(Vec2::new(96., 18.)),
-                    ..Default::default()
+                    ..default()
                 },
-                transform: Transform::from_translation(Vec3::new(58., button_y, CONTENT_Z)),
-                ..Default::default()
-            },
+                Transform::from_translation(Vec3::new(58., button_y, CONTENT_Z)),
+            ),
             RenderLayers::from_layers(&[3]),
             UIElement::MenuButton,
             Interactable::default(),
@@ -421,35 +370,35 @@ pub fn setup_time_crystals_browser_ui(
         .id();
 
     commands
-        .spawn(Text2dBundle {
-            text: Text::from_section(
-                // Trailing space: Bevy 0.10 derives centered-layout pivot from `TextLayoutInfo.size`
-                // (pipeline.rs: glyph positions + advances) but rasterized sprite positions are built
-                // after `GlyphPlacementAdjuster` rounds each glyph's baseline X (glyph_brush.rs).
-                // Those disagree slightly on scale_factor=1; an extra advance widens `size` and fixes
-                // collapsed pairs ("ei", etc.). Harmless visually — NBSP would also work.
-                "View heirlooms ",
-                gf::BODY.text_style(&asset_server, crate::colors::WHITE),
-            )
-            .with_alignment(TextAlignment::Center),
-            text_anchor: Anchor::Center,
-            transform: Transform {
-                translation: Vec3::new(0., 0.5, 1.),
-                scale: gf::BODY.transform_scale(),
-                ..Default::default()
-            },
-            ..Default::default()
-        })
+        .spawn(
+            gf::BODY
+                .text(
+                    &asset_server, // Trailing space: Bevy 0.10 derives centered-layout pivot from `TextLayoutInfo.size`
+                    // (pipeline.rs: glyph positions + advances) but rasterized sprite positions are built
+                    // after `GlyphPlacementAdjuster` rounds each glyph's baseline X (glyph_brush.rs).
+                    // Those disagree slightly on scale_factor=1; an extra advance widens `size` and fixes
+                    // collapsed pairs ("ei", etc.). Harmless visually — NBSP would also work.
+                    "View heirlooms ",
+                    crate::colors::WHITE,
+                )
+                .justify(Justify::Center)
+                .anchor(Anchor::CENTER)
+                .with_transform(Transform {
+                    translation: Vec3::new(0., 0.5, 1.),
+                    scale: gf::BODY.transform_scale(),
+                    ..Default::default()
+                }),
+        )
         .insert(RenderLayers::from_layers(&[3]))
         .insert(UIState::TimeCrystalsBrowser)
-        .insert(Name::new("View Heirlooms Text"))
-        .set_parent(view_entity);
+        .insert(Name::new("View Heirlooms Text2d"))
+        .insert(ChildOf(view_entity));
 }
 
 pub fn handle_time_crystals_view_heirlooms_button(
     mut commands: Commands,
     cursor_pos: Res<CursorPos>,
-    mouse_input: Res<Input<MouseButton>>,
+    mouse_input: Res<ButtonInput<MouseButton>>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     mut buttons: Query<(Entity, &mut Interactable), With<TimeCrystalsViewHeirloomsButton>>,
     mut grid_open: ResMut<TimeCrystalsHeirloomGridOpen>,
@@ -509,7 +458,7 @@ pub fn handle_time_crystals_view_heirlooms_button(
 
 pub fn handle_time_crystals_browser_done_button(
     cursor_pos: Res<CursorPos>,
-    mouse_input: Res<Input<MouseButton>>,
+    mouse_input: Res<ButtonInput<MouseButton>>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     mut buttons: Query<(Entity, &mut Interactable), With<TimeCrystalsBrowserDoneButton>>,
     mut next_ui_state: ResMut<NextState<UIState>>,
@@ -556,9 +505,9 @@ pub fn cleanup_time_crystals_browser_ui(
     grid_open.0 = false;
     despawn_heirloom_browser_grid_layers(&mut commands, &grid_layers);
     for entity in query.iter() {
-        commands.entity(entity).despawn_recursive();
+        commands.entity(entity).despawn();
     }
     for entity in tooltips.iter() {
-        commands.entity(entity).despawn_recursive();
+        commands.entity(entity).despawn();
     }
 }

@@ -90,14 +90,14 @@ pub fn merge_intrinsic_stats_with_consumable_buff_layer(
 pub fn tick_active_consumable_buffs(
     time: Res<Time>,
     mut players: Query<&mut ActiveConsumableBuffs, With<Player>>,
-    mut modify_health: EventWriter<ModifyHealthEvent>,
-    mut attr_events: EventWriter<AttributeChangeEvent>,
+    mut modify_health: MessageWriter<ModifyHealthEvent>,
+    mut attr_events: MessageWriter<AttributeChangeEvent>,
 ) {
     for mut buffs in players.iter_mut() {
         let mut changed_stats = false;
         buffs.entries.retain_mut(|entry| {
             entry.display_timer.tick(time.delta());
-            if entry.display_timer.finished() {
+            if entry.display_timer.is_finished() {
                 if matches!(
                     entry.effect,
                     ConsumableBuffEffect::AttackSpeedAdd(_)
@@ -116,7 +116,7 @@ pub fn tick_active_consumable_buffs(
             {
                 interval.tick(time.delta());
                 if interval.just_finished() {
-                    modify_health.send(ModifyHealthEvent(heal_per_tick));
+                    modify_health.write(ModifyHealthEvent(heal_per_tick));
                 }
             }
 
@@ -124,7 +124,7 @@ pub fn tick_active_consumable_buffs(
         });
 
         if changed_stats {
-            attr_events.send_default();
+            attr_events.write_default();
         }
     }
 }

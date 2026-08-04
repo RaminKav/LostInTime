@@ -1,4 +1,4 @@
-use bevy::{prelude::*, transform::TransformSystem};
+use bevy::{prelude::*, transform::TransformSystems};
 
 use bevy_rapier2d::{
     geometry::Sensor,
@@ -15,8 +15,8 @@ use combat_heirlooms::{
     handle_mana_orb_drops, handle_mana_regen_lightning, handle_mana_regen_poison,
     handle_max_hp_hunt, handle_reaper_soul_spawns, handle_skill_mana_regen,
     handle_skill_power_hunt, handle_summon_ring_state, handle_trigger_summons_on_heal,
-    tick_dodge_crit_buff, tick_stand_still_state, update_ant_farm_ants, update_lob_arcs,
-    update_homing_energy_balls, update_reaper_souls, update_stone_tooth, update_summon_ring,
+    tick_dodge_crit_buff, tick_stand_still_state, update_ant_farm_ants, update_homing_energy_balls,
+    update_lob_arcs, update_reaper_souls, update_stone_tooth, update_summon_ring,
     TriggerSummonsEvent,
 };
 use melee_skills::{
@@ -86,7 +86,7 @@ use crate::{
 };
 use crate::{
     player::{achievements::AchievementsPlugin, skills::PlayerClass},
-    run_once_per_run,
+    run_once_per_run, PetState,
 };
 use skills::*;
 
@@ -96,6 +96,7 @@ use self::{
 };
 pub struct PlayerPlugin;
 
+#[derive(Message)]
 pub struct MovePlayerEvent {
     pub pos: TileMapPosition,
     /// When true, wipe Shadow Step [`rogue_skills::PositionHistory`] so recall
@@ -164,22 +165,23 @@ impl Limb {
 }
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugin(AchievementsPlugin)
+        app.add_plugins(AchievementsPlugin)
             .init_resource::<CoinCurrency>()
             .init_resource::<TimeFragmentCurrency>()
             .init_resource::<skills::HeirloomTriggerCounts>()
             .init_resource::<skills::ManaTrackerResetTimer>()
             .init_resource::<score::RunTimer>()
             .init_resource::<time_crystals::TimeCrystals>()
-            .with_default_schedule(CoreSchedule::FixedUpdate, |app| {
-                app.add_event::<MovePlayerEvent>()
-                    .add_event::<ModifyCurencyEvent>()
-                    .add_event::<ActiveSkillUsedEvent>()
-                    .add_event::<ParrySuccessEvent>()
-                    .add_event::<TriggerSummonsEvent>();
+            .with_default_schedule(FixedUpdate, |app| {
+                app.add_message::<MovePlayerEvent>()
+                    .add_message::<ModifyCurencyEvent>()
+                    .add_message::<ActiveSkillUsedEvent>()
+                    .add_message::<ParrySuccessEvent>()
+                    .add_message::<TriggerSummonsEvent>();
             })
-            .add_system(spawn_player.in_schedule(OnExit(GameState::MainMenu)))
+            .add_systems(OnExit(GameState::MainMenu), spawn_player)
             .add_systems(
+                Update,
                 (
                     handle_sprint_timer
                         .after(player_move_inputs)
@@ -192,15 +194,17 @@ impl Plugin for PlayerPlugin {
                     handle_toggle_sprinting,
                     handle_teleport
                         .run_if(is_not_paused)
+                        .after(crate::inputs::dispatch_active_skill_events)
                         .before(skill_heirlooms::handle_active_skill_event),
                     hide_particles_when_inv_open,
                     tick_just_teleported.run_if(is_not_paused),
                     handle_second_split_attack.after(handle_add_damage_numbers_after_hit),
                     handle_dodge_crit,
                 )
-                    .in_set(OnUpdate(GameState::Main)),
+                    .run_if(in_state(GameState::Main)),
             )
             .add_systems(
+                Update,
                 (
                     handle_ant_farm_state.run_if(is_not_paused),
                     update_ant_farm_ants.run_if(is_not_paused),
@@ -220,9 +224,10 @@ impl Plugin for PlayerPlugin {
                         .run_if(is_not_paused)
                         .before(crate::ai::follow),
                 )
-                    .in_set(OnUpdate(GameState::Main)),
+                    .run_if(in_state(GameState::Main)),
             )
             .add_systems(
+                Update,
                 (
                     handle_crate_break_damage.run_if(is_not_paused),
                     handle_dodge_crit_activation.run_if(is_not_paused),
@@ -246,9 +251,10 @@ impl Plugin for PlayerPlugin {
                     skill_heirlooms::track_enemy_hit_projectiles.run_if(is_not_paused),
                     skill_heirlooms::track_dagger_throw_kills.run_if(is_not_paused),
                 )
-                    .in_set(OnUpdate(GameState::Main)),
+                    .run_if(in_state(GameState::Main)),
             )
             .add_systems(
+                Update,
                 (
                     handle_energy_ball_barrage
                         .run_if(is_not_paused)
@@ -261,9 +267,10 @@ impl Plugin for PlayerPlugin {
                         .after(handle_hits),
                     skill_heirlooms::tick_skill_explosion_buff.run_if(is_not_paused),
                 )
-                    .in_set(OnUpdate(GameState::Main)),
+                    .run_if(in_state(GameState::Main)),
             )
             .add_systems(
+                Update,
                 (
                     handle_lunge.after(player_move_inputs).run_if(is_not_paused),
                     tick_combo_counter.run_if(is_not_paused),
@@ -287,9 +294,10 @@ impl Plugin for PlayerPlugin {
                     skill_heirlooms::handle_fire_pillar_hit_clear.run_if(is_not_paused),
                     skill_heirlooms::handle_laser_beam_hit_clear.run_if(is_not_paused),
                 )
-                    .in_set(OnUpdate(GameState::Main)),
+                    .run_if(in_state(GameState::Main)),
             )
             .add_systems(
+                Update,
                 (
                     skill_heirlooms::update_stealth_color.run_if(is_not_paused),
                     tick_lunge_shadows.run_if(is_not_paused),
@@ -302,15 +310,17 @@ impl Plugin for PlayerPlugin {
                     tick_position_history.run_if(is_not_paused),
                     clear_position_history_on_move.run_if(is_not_paused),
                 )
-                    .in_set(OnUpdate(GameState::Main)),
+                    .run_if(in_state(GameState::Main)),
             )
             .add_systems(
+                Update,
                 (skill_heirlooms::reduce_skill_cooldown_on_crit
                     .after(handle_hits)
                     .run_if(is_not_paused),)
-                    .in_set(OnUpdate(GameState::Main)),
+                    .run_if(in_state(GameState::Main)),
             )
             .add_systems(
+                Update,
                 (
                     skill_heirlooms::tick_arrow_volley.run_if(is_not_paused),
                     skill_heirlooms::tick_pending_dagger_slashes.run_if(is_not_paused),
@@ -325,9 +335,10 @@ impl Plugin for PlayerPlugin {
                         .after(handle_hits)
                         .run_if(is_not_paused),
                 )
-                    .in_set(OnUpdate(GameState::Main)),
+                    .run_if(in_state(GameState::Main)),
             )
             .add_systems(
+                Update,
                 (
                     pause_combo_anim_when_done,
                     handle_parry.run_if(is_not_paused),
@@ -337,26 +348,30 @@ impl Plugin for PlayerPlugin {
                     score::track_mob_kills.after(handle_hits),
                     score::track_item_destruction.after(handle_hits),
                 )
-                    .in_set(OnUpdate(GameState::Main)),
+                    .run_if(in_state(GameState::Main)),
             )
-            .add_system(
-                skill_heirlooms::initialize_class_skill_slots.in_set(OnUpdate(GameState::Main)),
+            .add_systems(
+                Update,
+                skill_heirlooms::initialize_class_skill_slots.run_if(in_state(GameState::Main)),
             )
-            .add_system(
+            .add_systems(
+                Update,
                 handle_spear_pull_delay
                     .after(handle_spear)
                     .run_if(is_not_paused)
-                    .in_set(OnUpdate(GameState::Main)),
+                    .run_if(in_state(GameState::Main)),
             )
-            .add_system(
+            .add_systems(
+                Update,
                 handle_spear_gravity
                     .after(idle)
                     .after(follow)
                     .after(leap_attack)
-                    .in_set(OnUpdate(GameState::Main)),
+                    .run_if(in_state(GameState::Main)),
             )
-            .add_systems((handle_modify_currency,))
+            .add_systems(Update, handle_modify_currency)
             .add_systems(
+                Update,
                 (
                     tick_heirloom_trigger_cooldowns,
                     handle_echo_after_heal
@@ -367,57 +382,53 @@ impl Plugin for PlayerPlugin {
                     handle_trigger_summons_on_heal.after(handle_echo_after_heal),
                     handle_delayed_heirloom_casts,
                 )
-                    .in_set(OnUpdate(GameState::Main)),
+                    .run_if(in_state(GameState::Main)),
             )
-            .add_system(
-                reset_time_fragment_counters
-                    .run_if(run_once_per_run())
-                    .in_schedule(OnEnter(GameState::Main)),
+            .add_systems(
+                OnEnter(GameState::Main),
+                reset_time_fragment_counters.run_if(run_once_per_run()),
             )
-            .add_system(
-                reset_coin_counters
-                    .run_if(run_once_per_run())
-                    .in_schedule(OnEnter(GameState::Main)),
+            .add_systems(
+                OnEnter(GameState::Main),
+                reset_coin_counters.run_if(run_once_per_run()),
             )
-            .add_system(
-                score::reset_run_score
-                    .run_if(run_once_per_run())
-                    .in_schedule(OnEnter(GameState::Main)),
+            .add_systems(
+                OnEnter(GameState::Main),
+                score::reset_run_score.run_if(run_once_per_run()),
             )
-            .add_system(
-                score::reset_run_timer
-                    .run_if(run_once_per_run())
-                    .in_schedule(OnEnter(GameState::Main)),
+            .add_systems(
+                OnEnter(GameState::Main),
+                score::reset_run_timer.run_if(run_once_per_run()),
             )
-            .add_system(
+            .add_systems(
+                Update,
                 score::tick_run_timer
                     .run_if(is_not_paused)
-                    .in_set(OnUpdate(GameState::Main)),
+                    .run_if(in_state(GameState::Main)),
             )
-            .add_system(
-                give_player_starting_items
-                    .run_if(run_once_per_run())
-                    .in_schedule(OnEnter(GameState::Main)),
+            .add_systems(
+                OnEnter(GameState::Main),
+                give_player_starting_items.run_if(run_once_per_run()),
             )
-            .add_system(handle_move_player.before(CustomFlush))
-            .add_system(
+            .add_systems(Update, handle_move_player.before(CustomFlush))
+            .add_systems(
+                Update,
                 handle_player_raw_position
                     .run_if(in_state(GameState::Main))
-                    .after(PhysicsSet::SyncBackendFlush)
-                    .before(TransformSystem::TransformPropagate)
-                    .before(move_camera_with_player)
-                    .in_base_set(CoreSet::PostUpdate),
+                    .after(PhysicsSet::SyncBackend)
+                    .before(TransformSystems::Propagate)
+                    .before(move_camera_with_player),
             );
     }
 }
 pub fn handle_move_player(
     mut player: Query<(&mut RawPosition, &mut Transform), With<Player>>,
-    mut move_events: EventReader<MovePlayerEvent>,
+    mut move_events: MessageReader<MovePlayerEvent>,
 ) {
-    for m in move_events.iter() {
+    for m in move_events.read() {
         let world_pos = tile_pos_to_world_pos(m.pos, false);
 
-        let Ok((mut raw_pos, mut pos)) = player.get_single_mut() else {
+        let Ok((mut raw_pos, mut pos)) = player.single_mut() else {
             continue;
         };
         raw_pos.0 = world_pos;
@@ -434,8 +445,8 @@ pub fn handle_player_raw_position(
     >,
     mut game: GameParam,
 ) {
-    if let Ok((mut raw_pos, mut pos)) = player_pos.get_single_mut() {
-        if let Ok(kcc) = kcc.get_single() {
+    if let Ok((mut raw_pos, mut pos)) = player_pos.single_mut() {
+        if let Ok(kcc) = kcc.single() {
             raw_pos.0 += kcc.effective_translation;
         };
         let delta = raw_pos.0 - pos.translation.truncate();
@@ -449,10 +460,19 @@ pub fn handle_player_raw_position(
 fn spawn_player(
     mut commands: Commands,
     mut game: ResMut<Game>,
-    mut exp_sync_event: EventWriter<FlashExpBarEvent>,
+    mut exp_sync_event: MessageWriter<FlashExpBarEvent>,
     proto: ProtoParam,
     player_class: Option<Res<PlayerClass>>,
+    existing_players: Query<Entity, With<Player>>,
 ) {
+    // Exit-to-menu can leave a player if cleanup raced; a second spawn then makes
+    // `Query::single` fail in the loading screen ("Waiting for player...") forever.
+    for entity in existing_players.iter() {
+        if let Ok(mut entity_commands) = commands.get_entity(entity) {
+            entity_commands.despawn();
+        }
+    }
+
     let cape_stack = proto.get_item_data(WorldObject::GreyCape).unwrap();
     let class = if let Some(class) = player_class {
         class.clone()
@@ -461,7 +481,7 @@ fn spawn_player(
     };
     let p = commands
         .spawn((
-            TransformBundle::from_transform(Transform::from_translation(Vec3::new(0., 0., 1.))),
+            Transform::from_translation(Vec3::new(0., 0., 1.)),
             PlayerAnimation::Idle,
             PlayerAnimationState::new(),
             Player,
@@ -516,7 +536,7 @@ fn spawn_player(
             ..default()
         })
         .insert(CurrentMana(get_max_mana_for_class(class.class.clone())))
-        .insert(VisibilityBundle::default())
+        .insert(Visibility::default())
         .insert(FacingDirection::Down)
         .insert(ActiveEvents::COLLISION_EVENTS)
         .insert(ManaRegenTimer(Timer::from_seconds(3.5, TimerMode::Once)))
@@ -579,7 +599,7 @@ fn spawn_player(
     //     }
     // }
     game.player = p;
-    exp_sync_event.send_default();
+    exp_sync_event.write_default();
 }
 
 fn give_player_starting_items(
@@ -635,6 +655,7 @@ fn give_player_starting_items(
     {
         commands.spawn((
             pet,
+            PetState::default(),
             YSort(0.001),
             // Collider::capsule(Vec2::new(0., -6.), Vec2::new(0., -6.), 5.0),
             Transform::from_xyz(40.0, -40.0, 1.0),
@@ -650,13 +671,7 @@ fn give_player_starting_items(
         }
 
         if upgrades.has_pickaxe() {
-            commands.spawn_item_from_proto(
-                WorldObject::WoodPickaxe,
-                &proto,
-                player_pos,
-                1,
-                None,
-            );
+            commands.spawn_item_from_proto(WorldObject::WoodPickaxe, &proto, player_pos, 1, None);
         }
 
         force_player_autopick(&mut game);
@@ -716,13 +731,9 @@ fn give_player_starting_items(
             });
             force_player_autopick(&mut game);
         }
-    } else if let Some(weapon_entity) = commands.spawn_item_from_proto(
-        starting_weapon,
-        &proto,
-        player_pos,
-        1,
-        Some(1),
-    ) {
+    } else if let Some(weapon_entity) =
+        commands.spawn_item_from_proto(starting_weapon, &proto, player_pos, 1, Some(1))
+    {
         commands.entity(weapon_entity).insert(StartingWeapon {
             rarity: weapon_rarity,
         });

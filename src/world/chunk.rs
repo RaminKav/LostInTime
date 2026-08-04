@@ -1,8 +1,8 @@
 use std::hash::Hash;
 
 use bevy::math::Vec3Swizzles;
+use bevy::platform::collections::HashMap;
 use bevy::prelude::*;
-use bevy::utils::HashMap;
 use bevy_ecs_tilemap::{prelude::*, tiles::TilePos};
 use bevy_rapier2d::prelude::Collider;
 
@@ -19,7 +19,7 @@ use super::y_sort::YSort;
 
 use crate::container::ContainerRegistry;
 use crate::player::{handle_move_player, Player};
-use crate::ui::{ChestContainer, FurnaceContainer};
+use crate::ui::{ChestInventory, FurnaceInventory};
 use crate::world::wall_auto_tile::ChunkWallCache;
 use crate::world::world_helpers::world_pos_to_tile_pos;
 use crate::{
@@ -38,51 +38,57 @@ use super::{
 pub struct ChunkPlugin;
 impl Plugin for ChunkPlugin {
     fn build(&self, app: &mut App) {
-        app.add_event::<SpawnChunkEvent>()
-            .add_event::<DespawnChunkEvent>()
-            .add_event::<CreateChunkEvent>()
-            .add_event::<DoneCreateChunkEvent>()
-            .add_event::<GenerateObjectsEvent>()
-            .add_system(
+        app.add_message::<SpawnChunkEvent>()
+            .add_message::<DespawnChunkEvent>()
+            .add_message::<CreateChunkEvent>()
+            .add_message::<DoneCreateChunkEvent>()
+            .add_message::<GenerateObjectsEvent>()
+            .add_systems(
+                Update,
                 Self::spawn_chunks_around_camera
                     .after(handle_move_player)
                     .run_if(dim_spawned)
                     .run_if(in_state(GameState::Main).or_else(in_state(GameState::Initializing))),
             )
-            .add_system(
+            .add_systems(
+                Update,
                 Self::handle_new_chunk_event
                     .after(Self::startup_chunk_generation)
                     .after(Self::spawn_chunks_around_camera)
                     .run_if(in_state(GameState::Main).or_else(in_state(GameState::Initializing))),
             )
-            .add_system(
+            .add_systems(
+                Update,
                 Self::startup_chunk_generation
                     .run_if(in_state(GameState::Main).or_else(in_state(GameState::Initializing))),
             )
-            .add_system(
+            .add_systems(
+                Update,
                 Self::handle_update_tiles_for_new_chunks
                     .after(CustomFlush)
                     .run_if(in_state(GameState::Main).or_else(in_state(GameState::Initializing))),
             )
-            .add_system(
+            .add_systems(
+                Update,
                 Self::toggle_on_screen_mesh_visibility
                     .before(CustomFlush)
                     .run_if(in_state(GameState::Main).or_else(in_state(GameState::Initializing))),
             )
-            .add_system(
+            .add_systems(
+                Update,
                 Self::mark_outofrange_chunks_for_despawn
-                    .in_base_set(CoreSet::PostUpdate)
                     .run_if(in_state(GameState::Main).or_else(in_state(GameState::Initializing))),
             )
-            .add_system(
+            .add_systems(
+                Update,
                 Self::despawn_pending_chunks
-                    .in_base_set(CoreSet::Last)
                     .run_if(in_state(GameState::Main).or_else(in_state(GameState::Initializing))),
             )
-            .add_system(
-                generate_and_cache_island_chunks.run_if(resource_added::<WorldObjectCache>()),
+            .add_systems(
+                Update,
+                generate_and_cache_island_chunks.run_if(resource_added::<WorldObjectCache>),
             )
-            .add_system(apply_system_buffers.in_set(CustomFlush));
+            .add_systems(Update, ApplyDeferred.in_set(CustomFlush));
     }
 }
 
@@ -102,32 +108,44 @@ pub struct PendingDespawn {
     pub frames_remaining: u8,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Message)]
 pub struct SpawnChunkEvent {
     pub chunk_pos: IVec2,
 }
-#[derive(Clone)]
+#[derive(Clone, Message)]
 pub struct DespawnChunkEvent {
     pub chunk_pos: IVec2,
 }
-#[derive(Clone)]
+#[derive(Clone, Message)]
 pub struct GenerateObjectsEvent {
     pub chunk_pos: IVec2,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Message)]
 pub struct CreateChunkEvent {
     pub chunk_pos: IVec2,
 }
-#[derive(Clone)]
+#[derive(Clone, Message)]
 pub struct DoneCreateChunkEvent;
-#[derive(Component, Reflect, FromReflect, Default, Debug, Clone)]
+#[derive(Component, Reflect, Default, Debug, Clone)]
 #[reflect(Component)]
 pub struct TileEntityCollection {
     pub map: HashMap<ReflectedPos, Entity>,
 }
-#[derive(Component, Reflect, FromReflect, Default, Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Serialize, Deserialize)]
-#[reflect_value(Component, Hash, Serialize, Deserialize)]
+#[derive(
+    Component,
+    Reflect,
+    Default,
+    Clone,
+    Copy,
+    Debug,
+    Hash,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Serialize,
+    Deserialize,
+)]
 pub struct ReflectedPos {
     x: i32,
     y: i32,
@@ -215,13 +233,13 @@ pub fn generate_and_cache_island_chunks(mut game: GameParam, seed: Res<Generatio
 
 impl ChunkPlugin {
     pub fn handle_new_chunk_event(
-        mut cache_events: EventReader<CreateChunkEvent>,
+        mut cache_events: MessageReader<CreateChunkEvent>,
         mut commands: Commands,
         sprite_sheet: Res<ImageAssets>,
         game: GameParam,
         seed: Res<GenerationSeed>,
     ) {
-        for e in cache_events.iter() {
+        for e in cache_events.read() {
             let chunk_pos = e.chunk_pos;
             let era = game.era.current_era.clone();
 
@@ -312,13 +330,16 @@ impl ChunkPlugin {
                         water_colliders.push(
                             commands
                                 .spawn((
-                                    SpatialBundle::from_transform(Transform::from_translation(
-                                        Vec3::new(
-                                            x as f32 * TILE_SIZE.x,
-                                            y as f32 * TILE_SIZE.y,
-                                            0.,
-                                        ) + pos_offset.extend(0.),
-                                    )),
+                                    (
+                                        Transform::from_translation(
+                                            Vec3::new(
+                                                x as f32 * TILE_SIZE.x,
+                                                y as f32 * TILE_SIZE.y,
+                                                0.,
+                                            ) + pos_offset.extend(0.),
+                                        ),
+                                        Visibility::default(),
+                                    ),
                                     Collider::cuboid(TILE_SIZE.x / 2. - 2., TILE_SIZE.y / 2. - 2.),
                                     WaterCollider,
                                     Name::new("WATER"),
@@ -349,23 +370,23 @@ impl ChunkPlugin {
                 .insert(TileEntityCollection { map: tiles })
                 .insert(Chunk { chunk_pos })
                 .insert(Name::new(format!("Pos: {}", chunk_pos)))
-                .push_children(&water_colliders)
+                .add_children(&water_colliders)
                 .id();
             commands.entity(chunk).insert(ChunkWallCache {
                 walls: HashMap::new(),
             });
 
             // game.set_chunk_entity(chunk_pos, chunk);
-            // minimap_update.send(UpdateMiniMapEvent);
+            // minimap_update.write(UpdateMiniMapEvent);
         }
     }
     pub fn handle_update_tiles_for_new_chunks(
-        mut create_events: EventReader<CreateChunkEvent>,
-        mut gen_events: EventWriter<GenerateObjectsEvent>,
+        mut create_events: MessageReader<CreateChunkEvent>,
+        mut gen_events: MessageWriter<GenerateObjectsEvent>,
         mut commands: Commands,
         mut game: GameParam,
     ) {
-        for e in create_events.iter() {
+        for e in create_events.read() {
             let chunk_pos = e.chunk_pos;
             if game.get_chunk_entity(chunk_pos).is_none() {
                 continue;
@@ -414,26 +435,28 @@ impl ChunkPlugin {
                     // }
                 }
             }
-            gen_events.send(GenerateObjectsEvent { chunk_pos });
+            gen_events.write(GenerateObjectsEvent { chunk_pos });
         }
     }
 
     pub fn spawn_chunks_around_camera(
         game: GameParam,
         mut camera_query: Query<&Transform, With<Player>>,
-        mut create_chunk_event: EventWriter<CreateChunkEvent>,
-        _load_chunk_event: EventWriter<SpawnChunkEvent>,
+        mut create_chunk_event: MessageWriter<CreateChunkEvent>,
+        _load_chunk_event: MessageWriter<SpawnChunkEvent>,
         dungeon_check: Query<&Dungeon>,
     ) {
         // Room-asset dungeons have no tile chunks at all.
-        if dungeon_check.get_single().is_ok() {
+        if dungeon_check.single().is_ok() {
             return;
         }
         // only spawn chunks around camera after initial full world generation
-        if !game.is_chunk_generated(IVec2::new(0, 0)) && !dungeon_check.get_single().is_ok() {
+        if !game.is_chunk_generated(IVec2::new(0, 0)) && !dungeon_check.single().is_ok() {
             return;
         }
-        let transform = camera_query.single_mut();
+        let Ok(transform) = camera_query.single_mut() else {
+            return;
+        };
         let camera_chunk_pos = world_helpers::camera_pos_to_chunk_pos(&transform.translation.xy());
         for y in (camera_chunk_pos.y - NUM_CHUNKS_AROUND_CAMERA)
             ..=(camera_chunk_pos.y + NUM_CHUNKS_AROUND_CAMERA)
@@ -444,22 +467,22 @@ impl ChunkPlugin {
                 let chunk_pos = IVec2::new(x, y);
                 if game.get_chunk_entity(chunk_pos).is_none() {
                     // println!("send chunk spawn event {chunk_pos}");
-                    create_chunk_event.send(CreateChunkEvent { chunk_pos });
+                    create_chunk_event.write(CreateChunkEvent { chunk_pos });
                 }
             }
         }
     }
     pub fn startup_chunk_generation(
         game: GameParam,
-        mut create_chunk_event: EventWriter<CreateChunkEvent>,
-        mut done_create_chunk_event: EventWriter<DoneCreateChunkEvent>,
+        mut create_chunk_event: MessageWriter<CreateChunkEvent>,
+        mut done_create_chunk_event: MessageWriter<DoneCreateChunkEvent>,
         new_dim_query: Query<Entity, Added<ActiveDimension>>,
         dungeon_check: Query<&Dungeon>,
     ) {
         if new_dim_query.iter().next().is_none() {
             return;
         }
-        if dungeon_check.get_single().is_ok() {
+        if dungeon_check.single().is_ok() {
             return;
         }
         info!("BEGIN STARTUP CHUNK GENERATION!!");
@@ -474,11 +497,11 @@ impl ChunkPlugin {
             for x in -num_chunks..=num_chunks {
                 let chunk_pos = IVec2::new(x, y);
                 if game.get_chunk_entity(chunk_pos).is_none() {
-                    create_chunk_event.send(CreateChunkEvent { chunk_pos });
+                    create_chunk_event.write(CreateChunkEvent { chunk_pos });
                 }
             }
         }
-        done_create_chunk_event.send(DoneCreateChunkEvent);
+        done_create_chunk_event.write(DoneCreateChunkEvent);
         info!("END STARTUP CHUNK GENERATION!!");
     }
     //TODO: change despawning systems to use playe rpos instead??
@@ -490,8 +513,8 @@ impl ChunkPlugin {
         chunk_query: Query<(&Transform, &Children), (With<Chunk>, Without<PendingDespawn>)>,
         containers: Query<(
             &GlobalTransform,
-            Option<&FurnaceContainer>,
-            Option<&ChestContainer>,
+            Option<&FurnaceInventory>,
+            Option<&ChestInventory>,
         )>,
         mut container_reg: ResMut<ContainerRegistry>,
         dungeon_check: Query<&Dungeon>,
@@ -519,7 +542,7 @@ impl ChunkPlugin {
 
                     // add all containers in this chunk into the registry so their contents are safe
                     for child in children.iter() {
-                        if let Ok((t, furnace_option, chest_option)) = containers.get(*child) {
+                        if let Ok((t, furnace_option, chest_option)) = containers.get(child) {
                             if let Some(furnace) = furnace_option {
                                 debug!(
                                     "furnace: {:?}",
@@ -571,8 +594,8 @@ impl ChunkPlugin {
 
                     debug!("            despawning chunk {x:?},{y:?} (deferred)");
                     // Use safe entity access to prevent race conditions with render extraction
-                    if let Some(entity_commands) = commands.get_entity(chunk_entity) {
-                        entity_commands.despawn_recursive();
+                    if let Ok(mut entity_commands) = commands.get_entity(chunk_entity) {
+                        entity_commands.despawn();
                     }
                     // Note: chunk entity removal from game tracking happens via despawn observer
                 }
@@ -587,7 +610,7 @@ impl ChunkPlugin {
             (With<WorldObject>, Without<Projectile>),
         >,
     ) {
-        let Some(camera_transform) = camera_query.get_single().ok() else {
+        let Some(camera_transform) = camera_query.single().ok() else {
             return;
         };
         let camera_pos = camera_transform.translation.xy();

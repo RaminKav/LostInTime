@@ -3,11 +3,7 @@ use std::{
     io::{BufReader, BufWriter, Read},
 };
 
-use bevy::{
-    math::Vec3Swizzles,
-    prelude::*,
-    utils::{HashMap, Uuid},
-};
+use bevy::{math::Vec3Swizzles, platform::collections::HashMap, prelude::*};
 use bevy_ecs_tilemap::{
     prelude::{
         TilemapGridSize, TilemapId, TilemapSize, TilemapSpacing, TilemapTexture, TilemapTileSize,
@@ -16,8 +12,8 @@ use bevy_ecs_tilemap::{
     tiles::{TileColor, TileFlip, TilePos, TilePosOld, TileStorage, TileTextureIndex, TileVisible},
     FrustumCulling,
 };
-use bevy_save::prelude::*;
 use rand::Rng;
+use uuid::Uuid;
 pub mod analytics;
 pub mod leaderboard;
 use analytics::*;
@@ -52,7 +48,7 @@ use crate::{
     ui::{
         tips::{SeenTips, Tip},
         tutorial_ui::{seen_tutorial_chunks_from_game_data, SeenTutorialChunks},
-        ChestContainer, FurnaceContainer,
+        ChestContainer, ChestInventory, FurnaceContainer, FurnaceInventory,
     },
     vectorize::{vectorize, vectorize_inner},
     world::portal::BossKillTracker,
@@ -79,50 +75,8 @@ pub struct ClientPlugin;
 //TODO: Temp does not work, Save/Load WIP
 impl Plugin for ClientPlugin {
     fn build(&self, app: &mut App) {
-        app.add_event::<GameOverEvent>()
-            .add_state::<ClientState>()
-            .add_plugins(SavePlugins)
-            .register_saveable::<GenerationSeed>()
-            .register_saveable::<Dimension>()
-            .register_saveable::<ActiveDimension>()
-            // register tile bundle types
-            .register_saveable::<TileSpriteData>()
-            .register_saveable::<TilePos>()
-            .register_saveable::<TileTextureIndex>()
-            .register_saveable::<TilemapId>()
-            .register_saveable::<TileVisible>()
-            .register_saveable::<TileFlip>()
-            .register_saveable::<TileColor>()
-            .register_saveable::<TilePosOld>()
-            // register chunk bundle types
-            .register_saveable::<Chunk>()
-            .register_saveable::<TilemapGridSize>()
-            .register_saveable::<TilemapType>()
-            .register_saveable::<TilemapSize>()
-            .register_saveable::<TilemapSpacing>()
-            .register_saveable::<TileStorage>()
-            .register_saveable::<TilemapTexture>()
-            .register_saveable::<TilemapTileSize>()
-            .register_saveable::<FrustumCulling>()
-            .register_saveable::<GlobalTransform>()
-            .register_saveable::<ComputedVisibility>()
-            .register_saveable::<TileEntityCollection>()
-            // register obj types
-            .register_saveable::<WorldObject>()
-            .register_saveable::<Foliage>()
-            .register_saveable::<Wall>()
-            // .register_saveable::<Mesh2dHandle>()
-            // .register_saveable::<Handle<FoliageMaterial>>()
-            // .register_saveable::<Handle<TextureAtlas>>()
-            .register_saveable::<TextureAtlasSprite>()
-            .register_saveable::<CurrentHealth>()
-            .register_saveable::<WallTextureData>()
-            .register_saveable::<YSort>()
-            .register_saveable::<TileMapPosition>()
-            .register_saveable::<ColliderReflect>()
-            .register_saveable::<Name>()
-            .register_saveable::<Parent>()
-            .register_saveable::<Children>()
+        app.add_message::<GameOverEvent>()
+            .init_state::<ClientState>()
             .register_type::<Option<Entity>>()
             .register_type::<Vec<Option<Entity>>>()
             .register_type::<WorldObject>()
@@ -132,38 +86,39 @@ impl Plugin for ClientPlugin {
             .register_type_data::<ReflectedPos, ReflectDeserialize>()
             .register_type::<HashMap<ReflectedPos, Entity>>()
             .register_type::<[WorldObject; 4]>()
-            .insert_resource(AppDespawnMode::new(DespawnMode::None))
-            .insert_resource(AppMappingMode::new(MappingMode::Strict))
             .insert_resource(CurrentRunSaveData::default())
             .insert_resource(SaveTimer {
                 timer: Timer::from_seconds(100., TimerMode::Repeating),
             })
-            .add_plugin(AnalyticsPlugin)
-            .add_plugin(crate::player::beastiary::BeastiaryPlugin)
-            .add_system(
-                load_state
-                    .after(add_analytics_resource_on_start)
-                    .in_schedule(OnExit(GameState::MainMenu)),
-            )
-            .add_system(load_game_data_for_ui.in_schedule(OnEnter(GameState::MainMenu)))
-            .add_system(
-                crate::ui::check_show_name_entry_popup
-                    .after(load_game_data_for_ui)
-                    .in_schedule(OnEnter(GameState::MainMenu)),
+            .add_plugins(AnalyticsPlugin)
+            .add_plugins(crate::player::beastiary::BeastiaryPlugin)
+            .add_systems(
+                OnExit(GameState::MainMenu),
+                load_state.after(add_analytics_resource_on_start),
             )
             .add_systems(
+                OnEnter(GameState::MainMenu),
                 (
-                    // save_state.run_if(resource_exists::<AnalyticsData>()),
+                    load_game_data_for_ui,
+                    ApplyDeferred,
+                    crate::ui::check_show_name_entry_popup,
+                )
+                    .chain(),
+            )
+            .add_systems(
+                Update,
+                (
+                    // save_state.run_if(resource_exists::<AnalyticsData>),
                     // tick_save_timer,
                     persist_run_beastiary_on_game_over,
                     handle_append_run_data_after_death
-                        .run_if(resource_exists::<AnalyticsData>())
+                        .run_if(resource_exists::<AnalyticsData>)
                         .after(check_first_run_achievement)
                         .after(persist_run_beastiary_on_game_over),
                 )
-                    .in_set(OnUpdate(GameState::Main)),
+                    .run_if(in_state(GameState::Main)),
             )
-            .add_system(apply_system_buffers.in_set(CustomFlush));
+            .add_systems(Update, ApplyDeferred.in_set(CustomFlush));
     }
 }
 
@@ -201,7 +156,7 @@ pub struct CurrentRunSaveData {
     pub analytics_data: AnalyticsData,
 }
 
-#[derive(Default)]
+#[derive(Default, Message)]
 pub struct GameOverEvent;
 
 #[derive(Resource, Default)]
@@ -399,9 +354,7 @@ pub struct GameData {
     #[serde(default)]
     pub has_seen_tutorial: bool,
     #[serde(default)]
-    pub seen_tutorial_chunks: std::collections::HashSet<
-        crate::ui::tutorial_ui::TutorialContent,
-    >,
+    pub seen_tutorial_chunks: std::collections::HashSet<crate::ui::tutorial_ui::TutorialContent>,
     #[serde(default)]
     pub beastiary: Beastiary,
     /// Whether the main-menu leaderboard panel is shown (persisted).
@@ -420,13 +373,15 @@ impl GameData {
             .read_to_string(&mut contents)
             .map_err(serde_json::Error::io)?;
         let mut de = serde_json::Deserializer::from_str(&contents);
-        let mut g = GameData::deserialize(&mut de)?;
+        let mut value = serde_json::Value::deserialize(&mut de)?;
         if let Err(err) = de.end() {
             warn!(
                 "game_data.json has trailing data after the first JSON object; \
                  using the first object only: {err}"
             );
         }
+        crate::keybinds::migrate_legacy_keybinding_json(&mut value);
+        let mut g: GameData = serde_json::from_value(value)?;
         g.sanitize_persistent_tips();
         Ok(g)
     }
@@ -438,7 +393,7 @@ impl GameData {
 
 pub fn handle_append_run_data_after_death(
     night: Res<NightTracker>,
-    mut game_over: EventReader<GameOverEvent>,
+    mut game_over: MessageReader<GameOverEvent>,
     mut analytics_data: ResMut<AnalyticsData>,
     all_time_fragments: Query<Entity, With<MoveUIAnimation>>,
     mut commands: Commands,
@@ -454,7 +409,7 @@ pub fn handle_append_run_data_after_death(
     boss_kill_tracker: Option<Res<BossKillTracker>>,
     time_crystals: Option<Res<TimeCrystals>>,
 ) {
-    for _ in game_over.iter() {
+    for _ in game_over.read() {
         info!("GAME OVER! Storing run data in game_data.json...");
         let mut game_data: GameData = GameData::default();
         let game_data_file_path = datafiles::game_data();
@@ -623,9 +578,7 @@ pub fn handle_append_run_data_after_death(
         if shards_earned > 0 {
             info!(
                 "Awarding {} time crystal shard(s) for this run (survived {}s, score {})",
-                shards_earned,
-                run_timer.elapsed_seconds as u64,
-                run_score_value,
+                shards_earned, run_timer.elapsed_seconds as u64, run_score_value,
             );
             crystals.add_shards(shards_earned);
         }
@@ -661,7 +614,7 @@ pub fn handle_append_run_data_after_death(
 
         //despawn ui animations
         for e in all_time_fragments.iter() {
-            commands.entity(e).despawn_recursive();
+            commands.entity(e).despawn();
         }
     }
 }
@@ -674,8 +627,8 @@ pub fn save_state(
         (
             &GlobalTransform,
             &WorldObject,
-            Option<&ChestContainer>,
-            Option<&FurnaceContainer>,
+            Option<&ChestInventory>,
+            Option<&FurnaceInventory>,
         ),
         (Without<ItemStack>, Without<MainHand>, Without<Projectile>),
     >,
@@ -697,14 +650,14 @@ pub fn save_state(
     night_tracker: Res<NightTracker>,
     seed: Res<GenerationSeed>,
     check_open_chest: Option<Res<ChestContainer>>,
-    key_input: ResMut<Input<KeyCode>>,
+    key_input: ResMut<ButtonInput<KeyCode>>,
     skills_queue: Res<HeirloomChoiceQueue>,
     analytics_data: Res<AnalyticsData>,
     chaos_tracker: Option<Res<ChaosTracker>>,
     game: GameParam,
 ) {
     // only save if the timer is done and we are not in a dungeon
-    if dungeon_check.get_single().is_ok() {
+    if dungeon_check.single().is_ok() {
         return;
     }
     if !timer.timer.just_finished() && !key_input.just_pressed(KeyCode::Escape) {
@@ -712,10 +665,15 @@ pub fn save_state(
     }
     timer.timer.reset();
     //PlayerData
-    let (player_txfm, stats, hp, hunger, inv, skills) = player_data.single();
+    let Ok((player_txfm, stats, hp, hunger, inv, skills)) = player_data.single() else {
+        return;
+    };
     save_data.player_transform = player_txfm.translation().xy();
     save_data.player_stats = stats.clone();
-    save_data.player_level = game.player_query.single().2.clone();
+    let Ok((_, _, level)) = game.player_query.single() else {
+        return;
+    };
+    save_data.player_level = level.clone();
     save_data.current_health = *hp;
     save_data.player_hunger = hunger.current;
     save_data.inventory = inv.clone();
@@ -807,7 +765,7 @@ pub fn save_state(
 pub fn load_state(
     mut commands: Commands,
     defs: Res<crate::defs::GameDefs>,
-    mut dim_event: EventWriter<DimensionSpawnEvent>,
+    mut dim_event: MessageWriter<DimensionSpawnEvent>,
     mut game_camera: Query<(&mut Transform, &mut RawPosition), With<TextureCamera>>,
     mut era: ResMut<EraManager>,
 ) {
@@ -912,7 +870,7 @@ pub fn load_state(
         commands.insert_resource(Achievements::default());
     }
 
-    dim_event.send(DimensionSpawnEvent {
+    dim_event.write(DimensionSpawnEvent {
         swap_to_dim_now: true,
         new_era: None,
     });
@@ -959,18 +917,20 @@ pub fn load_game_data_for_ui(mut commands: Commands) {
 /// Runs as a separate small system so [`handle_append_run_data_after_death`]
 /// stays under Bevy's max-system-param limit.
 pub fn persist_run_beastiary_on_game_over(
-    mut game_over: EventReader<GameOverEvent>,
+    mut game_over: MessageReader<GameOverEvent>,
     mut run_beastiary: Option<ResMut<RunBeastiary>>,
     mut beastiary: Option<ResMut<Beastiary>>,
 ) {
     let mut fired = false;
-    for _ in game_over.iter() {
+    for _ in game_over.read() {
         fired = true;
     }
     if !fired {
         return;
     }
-    let Some(ref mut run_b) = run_beastiary else { return };
+    let Some(ref mut run_b) = run_beastiary else {
+        return;
+    };
     if run_b.entries.is_empty() {
         return;
     }
@@ -1010,9 +970,9 @@ pub fn persist_run_beastiary_on_game_over(
                 error!("Failed to persist run beastiary to game_data.json: {err:?}");
             }
         }
-        Err(err) => error!(
-            "Failed to create game_data.json while persisting run beastiary: {err:?}"
-        ),
+        Err(err) => {
+            error!("Failed to create game_data.json while persisting run beastiary: {err:?}")
+        }
     }
 
     // Drain the run resource so the next run starts fresh and we don't
@@ -1047,9 +1007,7 @@ pub fn persist_beastiary_card_pickup(mob: crate::enemy::Mob) {
                 error!("Failed to persist beastiary card pickup to game_data.json: {err:?}");
             }
         }
-        Err(err) => error!(
-            "Failed to create game_data.json while saving beastiary card: {err:?}"
-        ),
+        Err(err) => error!("Failed to create game_data.json while saving beastiary card: {err:?}"),
     }
 }
 
@@ -1077,7 +1035,7 @@ pub fn persist_time_fragments(time_fragments: i32) {
 }
 
 pub fn is_not_paused(state: Res<State<ClientState>>) -> bool {
-    state.0 == ClientState::Unpaused
+    *state == ClientState::Unpaused
 }
 
 /// Calculate class experience based on run performance

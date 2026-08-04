@@ -17,10 +17,8 @@
     Items Consumed: num per item
     Total Items Consumed: num
 
-
-
 */
-use bevy::{prelude::*, utils::HashMap};
+use bevy::{platform::collections::HashMap, prelude::*};
 use serde::{Deserialize, Serialize};
 use tungstenite::{connect, Message};
 
@@ -53,12 +51,16 @@ pub struct AnalyticsPlugin;
 
 impl Plugin for AnalyticsPlugin {
     fn build(&self, app: &mut App) {
-        app.add_event::<AnalyticsUpdateEvent>()
-            .add_system(handle_analytics_update.run_if(resource_exists::<AnalyticsData>()))
-            .add_system(add_analytics_resource_on_start.in_schedule(OnExit(GameState::MainMenu)));
+        app.add_message::<AnalyticsUpdateEvent>()
+            .add_systems(
+                Update,
+                handle_analytics_update.run_if(resource_exists::<AnalyticsData>),
+            )
+            .add_systems(OnExit(GameState::MainMenu), add_analytics_resource_on_start);
     }
 }
 
+#[derive(Message)]
 pub struct AnalyticsUpdateEvent {
     pub update_type: AnalyticsTrigger,
 }
@@ -77,9 +79,9 @@ pub enum AnalyticsTrigger {
 
 pub fn handle_analytics_update(
     mut analytics_data: ResMut<AnalyticsData>,
-    mut events: EventReader<AnalyticsUpdateEvent>,
+    mut events: MessageReader<AnalyticsUpdateEvent>,
 ) {
-    for event in events.iter() {
+    for event in events.read() {
         match event.update_type.clone() {
             AnalyticsTrigger::MobKilled(mob) => {
                 *analytics_data.mobs_killed.entry(mob).or_insert(0) += 1;
@@ -126,7 +128,7 @@ pub fn connect_server(data: AnalyticsData) {
 
     match connect("wss://bevy-analytics.shuttleapp.rs/ws") {
         Ok((mut socket, _response)) => {
-            if let Err(e) = socket.send(Message::Text(json)) {
+            if let Err(e) = socket.write(Message::Text(json)) {
                 error!("failed to send txt {e}");
             }
         }

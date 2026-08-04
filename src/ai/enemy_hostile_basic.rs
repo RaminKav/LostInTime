@@ -9,9 +9,7 @@ use seldom_state::prelude::*;
 use crate::Game;
 use crate::{
     ai::pathfinding::{world_pos_to_AIPos, AIPos_to_world_pos},
-    animations::enemy_sprites::{
-        spawn_attack_warning_aseprite, CharacterAnimationSpriteSheetData, EnemyAnimationState,
-    },
+    animations::enemy_sprites::{spawn_attack_warning_aseprite, EnemyAnimationState},
     attributes::Attack,
     combat::{status_effects::MobStatusEffects, HitEvent},
     enemy::{FollowSpeed, Mob, MobIsAttacking},
@@ -64,23 +62,16 @@ pub fn update_enemy_ai_cache(
 }
 
 /// Cached version of LineOfSight: reads from EnemyAICacheMap (one distance calc per enemy per frame).
-#[derive(Clone, Copy, Reflect)]
-pub struct CachedLineOfSight {
-    pub range_sq: f32,
-}
-
-impl Trigger for CachedLineOfSight {
-    type Param<'w, 's> = Res<'w, EnemyAICacheMap>;
-    type Ok = f32;
-    type Err = f32;
-
-    fn trigger(&self, entity: Entity, cache: Self::Param<'_, '_>) -> Result<f32, f32> {
+pub fn cached_line_of_sight(
+    range_sq: f32,
+) -> impl Fn(In<Entity>, Res<EnemyAICacheMap>) -> Result<f32, f32> + Clone {
+    move |In(entity), cache| {
         let Some(entry) = cache.map.get(&entity) else {
             return Err(0.);
         };
         let d_sq = entry.distance_to_player_sq;
         let d = d_sq.sqrt();
-        if d_sq <= self.range_sq {
+        if d_sq <= range_sq {
             Ok(d)
         } else {
             Err(d)
@@ -89,17 +80,10 @@ impl Trigger for CachedLineOfSight {
 }
 
 /// Cached version of AttackDistance: reads from EnemyAICacheMap (avoids per-transition queries).
-#[derive(Clone, Copy, Reflect)]
-pub struct CachedAttackDistance {
-    pub range_sq: f32,
-}
-
-impl Trigger for CachedAttackDistance {
-    type Param<'w, 's> = Res<'w, EnemyAICacheMap>;
-    type Ok = f32;
-    type Err = f32;
-
-    fn trigger(&self, entity: Entity, cache: Self::Param<'_, '_>) -> Result<f32, f32> {
+pub fn cached_attack_distance(
+    range_sq: f32,
+) -> impl Fn(In<Entity>, Res<EnemyAICacheMap>) -> Result<f32, f32> + Clone {
+    move |In(entity), cache| {
         let Some(entry) = cache.map.get(&entity) else {
             return Err(0.);
         };
@@ -108,7 +92,7 @@ impl Trigger for CachedAttackDistance {
         }
         let d_sq = entry.distance_to_player_sq;
         let d = d_sq.sqrt();
-        if d_sq <= self.range_sq {
+        if d_sq <= range_sq {
             Ok(d)
         } else {
             Err(d)
@@ -117,10 +101,21 @@ impl Trigger for CachedAttackDistance {
 }
 
 // This trigger checks if the enemy is within the the given range of the target
-#[derive(Clone, Copy, Reflect)]
-pub struct LineOfSight {
-    pub target: Entity,
-    pub range: f32,
+pub fn line_of_sight(
+    target: Entity,
+    range: f32,
+) -> impl Fn(In<Entity>, Query<&Transform>) -> Result<f32, f32> + Clone {
+    move |In(entity), transforms| {
+        if let Ok(tfxm) = transforms.get(entity) {
+            let delta = transforms.get(target).unwrap().translation.truncate()
+                - tfxm.translation.truncate();
+
+            let distance = (delta.x * delta.x + delta.y * delta.y).sqrt();
+            (distance <= range).then_some(distance).ok_or(distance)
+        } else {
+            Err(0.)
+        }
+    }
 }
 /// Post-attack cooldown timer inserted on a mob after each attack and removed
 /// when it elapses. Very high churn (every mob, every attack), so stored
@@ -129,101 +124,33 @@ pub struct LineOfSight {
 #[component(storage = "SparseSet")]
 pub struct EnemyAttackCooldown(pub Timer);
 
-impl Trigger for LineOfSight {
-    type Param<'w, 's> = (
-        Query<'w, 's, &'static Transform>,
-        Res<'w, Time>,
-        Res<'w, NightTracker>,
-    );
-    type Ok = f32;
-    type Err = f32;
+pub fn night_time_aggro(night: Res<NightTracker>) -> bool {
+    night.is_night()
+}
 
-    // Return `Ok` to trigger and `Err` to not trigger
-    fn trigger(
-        &self,
-        entity: Entity,
-        (transforms, _time, night_tracker): Self::Param<'_, '_>,
-    ) -> Result<f32, f32> {
-        if let Ok(tfxm) = transforms.get(entity) {
-            let delta = transforms.get(self.target).unwrap().translation.truncate()
-                - tfxm.translation.truncate();
-
-            let distance = (delta.x * delta.x + delta.y * delta.y).sqrt();
-            (distance <= self.range).then_some(distance).ok_or(distance)
-        } else {
-            Err(0.)
+pub fn hurt_by_player(In(entity): In<Entity>, mut hit_events: MessageReader<HitEvent>) -> bool {
+    for hit in hit_events.read() {
+        if hit.hit_entity == entity {
+            return true;
         }
     }
+    false
 }
 
-// This trigger checks if the enemy is within the the given range of the target
-#[derive(Clone, Copy, Reflect)]
-pub struct NightTimeAggro;
-
-impl Trigger for NightTimeAggro {
-    type Param<'w, 's> = Res<'w, NightTracker>;
-    type Ok = f32;
-    type Err = f32;
-
-    // Return `Ok` to trigger and `Err` to not trigger
-    fn trigger(&self, _entity: Entity, night_tracker: Self::Param<'_, '_>) -> Result<f32, f32> {
-        Ok(1.)
-        // if night_tracker.is_night() {
-        // } else {
-        //     Err(0.)
-        // }
-    }
-}
-// This trigger checks if the enemy is within the the given range of the target
-#[derive(Clone, Copy, Reflect)]
-pub struct HurtByPlayer;
-
-impl BoolTrigger for HurtByPlayer {
-    type Param<'w, 's> = EventReader<'w, 's, HitEvent>;
-
-    fn trigger(&self, entity: Entity, mut hit_events: Self::Param<'_, '_>) -> bool {
-        for hit in hit_events.iter() {
-            if hit.hit_entity == entity {
-                return true;
-            }
-        }
-        false
-    }
-}
-// This trigger checks if the enemy is within the the given range of the target
-#[derive(Clone, Copy, Reflect)]
-pub struct AttackDistance {
-    pub target: Entity,
-    pub range: f32,
-}
-
-impl Trigger for AttackDistance {
-    type Param<'w, 's> = (
-        Query<'w, 's, (&'static Transform, Option<&'static EnemyAttackCooldown>)>,
-        Res<'w, Time>,
-    );
-    type Ok = f32;
-    type Err = f32;
-
-    // Return `Ok` to trigger and `Err` to not trigger
-    fn trigger(
-        &self,
-        entity: Entity,
-        (transforms, _time): Self::Param<'_, '_>,
-    ) -> Result<f32, f32> {
+pub fn attack_distance(
+    target: Entity,
+    range: f32,
+) -> impl Fn(In<Entity>, Query<(&Transform, Option<&EnemyAttackCooldown>)>) -> Result<f32, f32> + Clone
+{
+    move |In(entity), transforms| {
         if transforms.get(entity).unwrap().1.is_some() {
             return Err(0.);
         }
-        let delta = transforms
-            .get(self.target)
-            .unwrap()
-            .0
-            .translation
-            .truncate()
+        let delta = transforms.get(target).unwrap().0.translation.truncate()
             - transforms.get(entity).unwrap().0.translation.truncate();
 
         let distance = (delta.x * delta.x + delta.y * delta.y).sqrt();
-        (distance <= self.range).then_some(distance).ok_or(distance)
+        (distance <= range).then_some(distance).ok_or(distance)
     }
 }
 
@@ -337,8 +264,6 @@ pub fn follow(
     mut follows: Query<(
         Entity,
         &mut FollowState,
-        &TextureAtlasSprite,
-        &CharacterAnimationSpriteSheetData,
         &EnemyAnimationState,
         Option<&EnemyAttackCooldown>,
         Option<&MobStatusEffects>,
@@ -349,12 +274,11 @@ pub fn follow(
     time: Res<Time>,
     night_tracker: Res<NightTracker>,
     grid: Res<crate::ai::steering::EnemySpatialGrid>,
+    game: Res<Game>,
 ) {
     for (
         entity,
         mut follow,
-        sprite,
-        anim_data,
         anim_state,
         att_cooldown,
         status_option,
@@ -362,19 +286,43 @@ pub fn follow(
         defiance_frozen_option,
     ) in follows.iter_mut()
     {
+        // Follow owns chase/walk. Attack must not stick here — a cancelled or completed
+        // leap used to leave `EnemyAnimationState::Attack` looping until the next in-range
+        // re-entry. Hit/Death/Dash keep their clips; Idle is forced to Walk.
+        if !matches!(
+            anim_state,
+            EnemyAnimationState::Walk
+                | EnemyAnimationState::Hit
+                | EnemyAnimationState::Death
+                | EnemyAnimationState::Dash
+        ) {
+            if let Ok(mut entity_commands) = commands.get_entity(entity) {
+                entity_commands.try_insert(EnemyAnimationState::Walk);
+            }
+        }
+
         // Skip movement if frozen by Death Defiance or Freeze blessing
         if defiance_frozen_option.is_some() || status_option.map(|s| s.is_frozen()).unwrap_or(false)
         {
             continue;
         }
-        if att_cooldown.is_some() && att_cooldown.unwrap().0.percent() <= 0.5 {
+        if att_cooldown.is_some() && att_cooldown.unwrap().0.fraction() <= 0.5 {
             continue;
         }
         if let Some(_) = parried_option {
             continue;
         }
-        // Get the positions of the follower and target
-        let target_translation = transforms.get(follow.target).unwrap().translation;
+        // Prefer live player entity — FollowState.target is baked at mob spawn.
+        let target = if transforms.get(follow.target).is_ok() {
+            follow.target
+        } else {
+            game.player
+        };
+        follow.target = target;
+        let Ok(target_tf) = transforms.get(target) else {
+            continue;
+        };
+        let target_translation = target_tf.translation;
 
         let follow_transform = &mut transforms.get_mut(entity).unwrap();
         let follow_collider_offset = Vec2::new(0., -3.);
@@ -459,20 +407,14 @@ pub fn follow(
                 ))
                 * follow.speed
                 * PLAYER_MOVE_SPEED
-                * time.delta_seconds()
+                * time.delta_secs()
                 * status_option
                     .map(|s| s.movement_speed_multiplier())
                     .unwrap_or(1.0)
                 * if night_tracker.is_night() { 2. } else { 1. },
         );
-        commands
-            .entity(entity)
-            .insert(FacingDirection::from_translation(delta));
-        if sprite.index == anim_data.get_starting_frame_for_animation(anim_state)
-            && anim_state != &EnemyAnimationState::Hit
-            && anim_state != &EnemyAnimationState::Walk
-        {
-            commands.entity(entity).insert(EnemyAnimationState::Walk);
+        if let Ok(mut entity_commands) = commands.get_entity(entity) {
+            entity_commands.try_insert(FacingDirection::from_translation(delta));
         }
     }
 }
@@ -485,8 +427,6 @@ pub fn leap_attack(
         &mut KinematicCharacterController,
         &mut LeapAttackState,
         &FollowSpeed,
-        &mut TextureAtlasSprite,
-        &CharacterAnimationSpriteSheetData,
         &EnemyAnimationState,
         Option<&MobStatusEffects>,
         Option<&mut Parried>,
@@ -503,8 +443,6 @@ pub fn leap_attack(
         mut kcc,
         mut attack,
         follow_speed,
-        sprite,
-        anim_data,
         anim_state,
         status_option,
         mut parried_option,
@@ -521,13 +459,14 @@ pub fn leap_attack(
         let attack_transform = transforms.get_mut(entity).unwrap();
         let attack_translation = attack_transform.translation();
 
-        if attack.attack_startup_timer.finished() && !attack.attack_duration_timer.finished() {
+        if attack.attack_startup_timer.is_finished() && !attack.attack_duration_timer.is_finished()
+        {
             let delta = target_translation - attack_translation;
             if attack.dir.is_none() {
                 attack.dir = Some(
                     delta.normalize_or_zero().truncate()
                         * attack.speed
-                        * time.delta_seconds()
+                        * time.delta_secs()
                         * status_option
                             .map(|s| 1.0 - s.slow_stacks() as f32 * 0.15)
                             .unwrap_or(1.0),
@@ -536,7 +475,11 @@ pub fn leap_attack(
             if let Some(ref mut parried) = parried_option {
                 if !parried.kb_applied {
                     parried.kb_applied = true;
-                    let mult = if skills.single().has(Heirloom::ParryKnockback) {
+                    let mult = if skills
+                        .single()
+                        .map(|skills| skills.has(Heirloom::ParryKnockback))
+                        .unwrap_or(false)
+                    {
                         1.
                     } else {
                         0.5
@@ -548,34 +491,36 @@ pub fn leap_attack(
             kcc.translation = Some(attack.dir.unwrap());
             attack.attack_duration_timer.tick(time.delta());
             if anim_state != &EnemyAnimationState::Attack {
-                commands
-                    .entity(entity)
-                    .insert(EnemyAnimationState::Attack)
-                    .insert(MobIsAttacking(mob.clone()));
+                if let Ok(mut entity_commands) = commands.get_entity(entity) {
+                    entity_commands
+                        .try_insert(EnemyAnimationState::Attack)
+                        .try_insert(MobIsAttacking(mob.clone()));
+                }
             }
         }
 
-        if attack.attack_duration_timer.finished() {
-            //start attack cooldown timer
+        if attack.attack_duration_timer.is_finished() || parried_option.is_some() {
+            // Finish the cycle when the lunge duration ends. Waiting on the last atlas
+            // frame (`is_done_current_animation`) soft-locked on 0.19 when that one-frame
+            // window was skipped — Attack kept looping until a later in-range re-entry.
             attack.dir = None;
-            if anim_data.is_done_current_animation(sprite.index) || parried_option.is_some() {
+            if let Ok(mut entity_commands) = commands.get_entity(entity) {
                 if follow_speed.0 > 0. {
-                    commands.entity(entity).insert(FollowState {
+                    entity_commands.try_insert(FollowState {
                         target: attack.target,
                         curr_delta: None,
                         curr_path: None,
                         speed: follow_speed.0,
                     });
                 }
-                commands
-                    .entity(entity)
-                    .insert(EnemyAnimationState::Walk)
+                entity_commands
+                    .try_insert(EnemyAnimationState::Walk)
                     .remove::<LeapAttackState>()
                     .remove::<MobIsAttacking>()
-                    .insert(EnemyAttackCooldown(attack.attack_cooldown_timer.clone()));
+                    .try_insert(EnemyAttackCooldown(attack.attack_cooldown_timer.clone()));
             }
         } else {
-            if attack.attack_startup_timer.percent() == 0. {
+            if attack.attack_startup_timer.fraction() == 0. {
                 spawn_attack_warning_aseprite(
                     &mut commands,
                     &asset_server,
@@ -600,7 +545,7 @@ pub fn projectile_attack(
         Option<&crate::player::combat_heirlooms::DeathDefianceFrozen>,
         Option<&MobStatusEffects>,
     )>,
-    mut events: EventWriter<RangedAttackEvent>,
+    mut events: MessageWriter<RangedAttackEvent>,
     time: Res<Time>,
 ) {
     for (
@@ -623,15 +568,19 @@ pub fn projectile_attack(
         let attack_transform = transforms.get_mut(entity).unwrap();
         let attack_translation = attack_transform.translation;
         if anim_state != &EnemyAnimationState::Attack {
-            commands.entity(entity).insert(EnemyAnimationState::Attack);
+            if let Ok(mut entity_commands) = commands.get_entity(entity) {
+                entity_commands.try_insert(EnemyAnimationState::Attack);
+            }
         }
-        if attack.attack_startup_timer.finished() && attack.attack_cooldown_timer.percent() == 0. {
+        if attack.attack_startup_timer.is_finished()
+            && attack.attack_cooldown_timer.fraction() == 0.
+        {
             let delta = target_translation - attack_translation;
             if attack.dir.is_none() {
                 attack.dir = Some(delta.normalize_or_zero().truncate());
             }
 
-            events.send(RangedAttackEvent {
+            events.write(RangedAttackEvent {
                 projectile: attack.projectile.clone(),
                 direction: attack.dir.unwrap(),
                 from_entity: Some(entity),
@@ -643,17 +592,18 @@ pub fn projectile_attack(
                 pos_override: None,
                 spawn_delay: 0.1,
             });
-            commands
-                .entity(entity)
-                .insert(EnemyAnimationState::Walk)
-                .insert(FollowState {
-                    target: attack.target,
-                    curr_delta: None,
-                    curr_path: None,
-                    speed: follow_speed.0,
-                })
-                .remove::<ProjectileAttackState>()
-                .insert(EnemyAttackCooldown(attack.attack_cooldown_timer.clone()));
+            if let Ok(mut entity_commands) = commands.get_entity(entity) {
+                entity_commands
+                    .try_insert(EnemyAnimationState::Walk)
+                    .try_insert(FollowState {
+                        target: attack.target,
+                        curr_delta: None,
+                        curr_path: None,
+                        speed: follow_speed.0,
+                    })
+                    .remove::<ProjectileAttackState>()
+                    .try_insert(EnemyAttackCooldown(attack.attack_cooldown_timer.clone()));
+            }
         }
 
         attack.dir = None;
@@ -684,7 +634,7 @@ pub fn idle(
         idle.walk_timer.tick(time.delta());
         let mut idle_transform = transforms.get_mut(entity).unwrap();
         if !idle.is_stopped {
-            let s = idle.speed * PLAYER_MOVE_SPEED * time.delta_seconds();
+            let s = idle.speed * PLAYER_MOVE_SPEED * time.delta_secs();
             match idle.direction {
                 FacingDirection::Left => idle_transform.translation = Some(Vec2::new(-s, 0.)),
                 FacingDirection::Right => idle_transform.translation = Some(Vec2::new(s, 0.)),
@@ -699,16 +649,18 @@ pub fn idle(
                 .set_duration(Duration::from_secs_f32(rng.gen_range(0.3..3.0)));
             if rng.gen_ratio(1, 2) {
                 idle.is_stopped = true;
-                commands.entity(entity).insert(EnemyAnimationState::Idle);
             } else {
                 idle.is_stopped = false;
 
                 let new_dir = idle.direction.get_next_rand_dir(rand::thread_rng()).clone();
                 idle.direction = new_dir.clone();
-                commands
-                    .entity(entity)
-                    .insert(new_dir)
-                    .insert(EnemyAnimationState::Walk);
+                if let Ok(mut entity_commands) = commands.get_entity(entity) {
+                    entity_commands.try_insert(new_dir);
+                }
+            }
+            // Combat enemies never use the Idle sheet row — keep Walk even when standing still.
+            if let Ok(mut entity_commands) = commands.get_entity(entity) {
+                entity_commands.try_insert(EnemyAnimationState::Walk);
             }
         }
     }
@@ -720,8 +672,10 @@ pub fn tick_enemy_attack_cooldowns(
 ) {
     for (e, mut attack) in attacks.iter_mut() {
         attack.0.tick(time.delta());
-        if attack.0.finished() {
-            commands.entity(e).remove::<EnemyAttackCooldown>();
+        if attack.0.is_finished() {
+            if let Ok(mut entity_commands) = commands.get_entity(e) {
+                entity_commands.remove::<EnemyAttackCooldown>();
+            }
         }
     }
 }

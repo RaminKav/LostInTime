@@ -12,58 +12,61 @@ use class_selection::*;
 use class_selection::{ClassUnlockConfirmState, ClassUnlockHoverState, SkillUnlockConfirmState};
 use guide_hud::*;
 use item_chest::*;
-pub mod ui_container_param;
 pub mod tips;
+pub mod ui_container_param;
 use tips::*;
 pub mod tip_highlight;
 use tip_highlight::TipHighlightPlugin;
 pub mod tutorial_ui;
-use bevy::{render::view::RenderLayers, sprite::Material2dPlugin};
+use bevy::prelude::*;
+use bevy::{camera::visibility::RenderLayers, sprite_render::Material2dPlugin};
 use damage_numbers::FloatingTextQueue;
+pub use interactions::Interaction;
 use scrapper_ui::{
     add_inv_to_new_scrapper_objs, change_ui_state_to_scrapper_when_resource_added,
-    handle_scrap_items_in_scrapper, setup_scrapper_slots_ui, ScrapperContainer, ScrapperEvent,
+    handle_scrap_items_in_scrapper, setup_scrapper_slots_ui,
 };
+pub use scrapper_ui::{ScrapperContainer, ScrapperEvent, ScrapperInventory};
 use screen_effects::{handle_screen_effects, setup_screen_effects, ScreenEffectMaterial};
 pub use ui_container_param::*;
 pub mod boss_health_bar;
 mod enemy_health_bar;
 mod fps_text;
 
-pub mod game_fonts;
 pub mod font_atlas_sampler;
-pub mod layout_sync;
+pub mod game_fonts;
 pub mod key_input_guide;
+pub mod layout_sync;
 use key_input_guide::*;
 pub mod intro_guide;
 use intro_guide::IntroGuidePlugin;
+pub mod desc_spans;
 pub mod furnace_ui;
 mod heirloom_tooltip;
 pub mod tooltip_info_boxes;
+pub use desc_spans::{DescLine, DescSpan};
 pub use heirloom_tooltip::{
     process_heirloom_tooltip_requests, HeirloomDynamicTooltip, HeirloomTooltipRequest,
     HeirloomTooltipShow,
 };
-pub use tooltip_info_boxes::{
-   HeirloomDescLine, HeirloomDescLineKind, TooltipDefinition
-};
 pub use skill_choice_ui::*;
+pub use tooltip_info_boxes::{HeirloomDescLine, HeirloomDescLineKind, TooltipDefinition};
 mod achievement_banner;
 mod active_skill_shrine_ui;
 pub mod focus;
 pub use focus::*;
 pub mod selection_glow;
 pub use selection_glow::*;
+pub mod banish_tracker_ui;
+pub mod hud_bar_fill;
 mod interactions;
 mod inventory_ui;
-pub mod upgrade_drag;
-pub mod minimap;
 pub mod map_markers;
-pub mod hud_bar_fill;
+pub mod minimap;
 pub mod player_hud;
 mod player_movement_cooldown_bar;
 mod skill_choice_ui;
-pub mod banish_tracker_ui;
+pub mod upgrade_drag;
 pub use banish_tracker_ui::*;
 pub mod stats_ui;
 pub use active_skill_shrine_ui::*;
@@ -86,8 +89,8 @@ pub use player_hud::*;
 pub use player_movement_cooldown_bar::*;
 pub use tooltips::*;
 mod main_menu;
-pub use main_menu::*;
 pub use loading_screen::{cleanup_loading_screen, spawn_loading_overlay};
+pub use main_menu::*;
 mod essence_ui;
 pub use essence_ui::*;
 mod unlocks_ui;
@@ -117,8 +120,8 @@ use crate::ui::damage_numbers::{
     handle_clamp_screen_locked_icons_worldpos, BeaconGuidanceRegistry,
 };
 use crate::ui::global_text_message::{
-    handle_global_text_message_events, show_pending_era_announcement,
-    tick_global_text_messages, GlobalTextMessageEvent,
+    handle_global_text_message_events, show_pending_era_announcement, tick_global_text_messages,
+    GlobalTextMessageEvent,
 };
 pub use achievements_ui::*;
 
@@ -139,7 +142,10 @@ use loading_screen::*;
 
 use crate::{
     attributes::clamp_health,
-    client::{is_not_paused, leaderboard::auto_fetch_leaderboard_on_menu, load_game_data_for_ui, load_state, ClientState},
+    client::{
+        is_not_paused, leaderboard::auto_fetch_leaderboard_on_menu, load_game_data_for_ui,
+        load_state, ClientState,
+    },
     combat::InvincibilityTimer,
     handle_hits,
     inventory::{try_auto_equip_from_upgrade_slot, Inventory},
@@ -289,7 +295,7 @@ pub const HUD_ACTION_ROW_Y_FROM_BOTTOM: f32 = 19.0;
 pub const KEYBIND_BADGE_SIZE: Vec2 = Vec2::new(19., 9.);
 
 /// Grey keybind badge fill (`KEYBIND_BADGE_SIZE`).
-pub const KEYBIND_BADGE_COLOR: Color = Color::rgba(62./255., 58./255., 58./255., 0.85);
+pub const KEYBIND_BADGE_COLOR: Color = Color::srgba(62. / 255., 58. / 255., 58. / 255., 0.85);
 
 /// Gap between the bottom screen edge and the bottom of a HUD keybind badge.
 pub const KEYBIND_BADGE_BOTTOM_INSET: f32 = 1.0;
@@ -356,19 +362,19 @@ pub const HUD_TIMELINE_ARROWS_SIZE: Vec2 = Vec2::new(10., 22.);
 
 /// Local X for timeline arrows: `0` = left edge, `1` = right edge of the bar.
 pub fn hud_timeline_arrow_local_x(progress: f32) -> f32 {
-    (progress.clamp(0., 1.) - 0.5) * (HUD_TIMELINE_SIZE.x -2.0)
+    (progress.clamp(0., 1.) - 0.5) * (HUD_TIMELINE_SIZE.x - 2.0)
 }
 
 /// First (time fragment) currency background center X from the left screen edge.
 pub fn hud_currency_first_center_x(game_width: f32) -> f32 {
-    -game_width * 0.5
-        + CURRENCY_BACKGROUND_SIZE.x * 0.5
-        + HUD_CURRENCY_LEFT_PADDING
+    -game_width * 0.5 + CURRENCY_BACKGROUND_SIZE.x * 0.5 + HUD_CURRENCY_LEFT_PADDING
 }
 
 /// Second (coin) currency background center X.
 pub fn hud_currency_second_center_x(game_width: f32) -> f32 {
-    hud_currency_first_center_x(game_width) + CURRENCY_BACKGROUND_SIZE.x + HUD_CURRENCY_BACKGROUND_GAP
+    hud_currency_first_center_x(game_width)
+        + CURRENCY_BACKGROUND_SIZE.x
+        + HUD_CURRENCY_BACKGROUND_GAP
 }
 
 /// Era timeline center X — anchored to the screen center so the timeline sits in the middle
@@ -395,8 +401,7 @@ pub fn hud_timeline_side_padding(game_width: f32) -> f32 {
 /// Score / chaos progress bar center X — placed to the right of the centered timeline using the
 /// same padding as the gap between the currency block and the timeline on the left side.
 pub fn hud_progress_bar_center_x(res: &ScreenResolution) -> f32 {
-    let timeline_right_edge =
-        hud_timeline_center_x(res.game_width) + HUD_TIMELINE_SIZE.x * 0.5;
+    let timeline_right_edge = hud_timeline_center_x(res.game_width) + HUD_TIMELINE_SIZE.x * 0.5;
     let minimap_left_edge = minimap::hud_minimap_left_edge_x_from_res(res);
     (timeline_right_edge + minimap_left_edge) * 0.5
 }
@@ -452,8 +457,7 @@ pub const HUD_HEIRLOOM_MINIMAP_PADDING: f32 = 6.0;
 pub fn hud_heirloom_max_per_row(res: &ScreenResolution) -> usize {
     let first_x = hud_heirloom_first_icon_x(res.game_width);
     let minimap_left_edge = minimap::hud_minimap_left_edge_x_from_res(res);
-    let max_center_x =
-        minimap_left_edge - HUD_HEIRLOOM_MINIMAP_PADDING - HUD_HEIRLOOM_ICON_HALF;
+    let max_center_x = minimap_left_edge - HUD_HEIRLOOM_MINIMAP_PADDING - HUD_HEIRLOOM_ICON_HALF;
     if max_center_x <= first_x {
         return 1;
     }
@@ -523,7 +527,7 @@ pub fn reset_blueprints_pagination_on_open(
 ) {
     pagination.page = 0;
 }
-    
+
 pub(crate) fn snap_world_to_pixel_grid(value: f32, scale: u32) -> f32 {
     let s = scale as f32;
     (value * s).round() / s
@@ -535,15 +539,20 @@ pub(crate) fn snap_layer3_visuals_to_pixel_grid(
     resolution: Res<ScreenResolution>,
     mut ui_visuals: Query<
         (&mut Transform, &RenderLayers),
-        (Or<(With<Text>, With<Sprite>, With<TextureAtlasSprite>)>, Without<Camera>),
+        (
+            Or<(With<Text2d>, With<Sprite>)>,
+            Without<Camera>,
+        ),
     >,
 ) {
     for (mut transform, layers) in ui_visuals.iter_mut() {
         if !layers.intersects(&RenderLayers::layer(3)) {
             continue;
         }
-        transform.translation.x = snap_world_to_pixel_grid(transform.translation.x, resolution.scale);
-        transform.translation.y = snap_world_to_pixel_grid(transform.translation.y, resolution.scale);
+        transform.translation.x =
+            snap_world_to_pixel_grid(transform.translation.x, resolution.scale);
+        transform.translation.y =
+            snap_world_to_pixel_grid(transform.translation.y, resolution.scale);
     }
 }
 
@@ -551,9 +560,9 @@ pub struct UIPlugin;
 //TODO: extract out ui darken overlay into a helper function
 impl Plugin for UIPlugin {
     fn build(&self, app: &mut App) {
-        app.add_state::<UIState>()
-            .add_plugin(FocusPlugin)
-            .add_plugin(SelectionGlowPlugin)
+        app.init_state::<UIState>()
+            .add_plugins(FocusPlugin)
+            .add_plugins(SelectionGlowPlugin)
             .insert_resource(InventoryState::default())
             .init_resource::<SelectedCraftingRecipe>()
             .init_resource::<crate::ui::inventory_ui::BlueprintsPagination>()
@@ -578,15 +587,15 @@ impl Plugin for UIPlugin {
                 timer: Timer::from_seconds(0.7, TimerMode::Once),
                 stats_respawn_delay: None,
             })
-            .add_event::<ActionSuccessEvent>()
-            .add_event::<ScrapperEvent>()
-            .add_event::<FlashExpBarEvent>()
-            .add_event::<ItemChestAnimChangeEvent>()
-            .add_event::<DropOnSlotEvent>()
-            .add_event::<DodgeEvent>()
-            .add_event::<GlobalTextMessageEvent>()
-            .add_event::<RemoveFromSlotEvent>()
-            .add_event::<ToolTipUpdateEvent>()
+            .add_message::<ActionSuccessEvent>()
+            .add_message::<ScrapperEvent>()
+            .add_message::<FlashExpBarEvent>()
+            .add_message::<ItemChestAnimChangeEvent>()
+            .add_message::<DropOnSlotEvent>()
+            .add_message::<DodgeEvent>()
+            .add_message::<GlobalTextMessageEvent>()
+            .add_message::<RemoveFromSlotEvent>()
+            .add_message::<ToolTipUpdateEvent>()
             .init_resource::<crate::ui::interactions::ControllerCarry>()
             .init_resource::<BeaconGuidanceRegistry>()
             .init_resource::<BlacksmithPurchaseTracker>()
@@ -599,180 +608,180 @@ impl Plugin for UIPlugin {
             .init_resource::<SelectedBeastiaryMob>()
             .init_resource::<BeastiaryPagination>()
             .init_resource::<MainMenuLeaderboardVisible>()
-            .add_event::<TooltipTeardownEvent>()
-            .add_event::<ShowInvPlayerStatsEvent>()
-            .add_event::<DamageTrackerRefreshEvent>()
-            .add_event::<SubmitMerchantPurchase>()
-            .add_event::<MerchantCategoryRerollEvent>()
-            .add_event::<DropInWorldEvent>()
-            .add_event::<MenuButtonClickEvent>()
-            .add_event::<GrantHeirloomDevEvent>()
-            .add_event::<RevokeHeirloomDevEvent>()
-            .add_event::<GrantSkillDevEvent>()
-            .add_event::<HeirloomTooltipRequest>()
-            .add_plugin(Material2dPlugin::<ScreenEffectMaterial>::default())
-            .add_plugin(Material2dPlugin::<ui_helpers::RadialOverlayMaterial>::default())
+            .add_message::<TooltipTeardownEvent>()
+            .add_message::<ShowInvPlayerStatsEvent>()
+            .add_message::<DamageTrackerRefreshEvent>()
+            .add_message::<SubmitMerchantPurchase>()
+            .add_message::<MerchantCategoryRerollEvent>()
+            .add_message::<DropInWorldEvent>()
+            .add_message::<MenuButtonClickEvent>()
+            .add_message::<GrantHeirloomDevEvent>()
+            .add_message::<RevokeHeirloomDevEvent>()
+            .add_message::<GrantSkillDevEvent>()
+            .add_message::<HeirloomTooltipRequest>()
+            .add_plugins(Material2dPlugin::<ScreenEffectMaterial>::default())
+            .add_plugins(Material2dPlugin::<ui_helpers::RadialOverlayMaterial>::default())
             .init_resource::<ui_helpers::RadialOverlayMeshCache>()
             .init_resource::<ui_helpers::RadialOverlayMaterialCache>()
             .init_resource::<OptionsUiLayoutRevision>()
             .init_resource::<ActiveOptionsTab>()
             .init_resource::<layout_sync::UiLayoutSyncState>()
-            .add_plugin(hud_bar_fill::HudBarFillPlugin)
+            .add_plugins(hud_bar_fill::HudBarFillPlugin)
             .register_type::<InventorySlotState>()
-            .add_plugin(MinimapPlugin)
-            .add_plugin(map_markers::MapMarkerPlugin)
-            .add_plugin(TipPlugin)
-            .add_plugin(TipHighlightPlugin)
-            .add_plugin(IntroGuidePlugin)
-            .add_plugin(tutorial_ui::TutorialPlugin)
-            .add_system(setup_loading_screen.in_schedule(OnEnter(GameState::Initializing)))
-            .add_system(
+            .add_plugins(MinimapPlugin)
+            .add_plugins(map_markers::MapMarkerPlugin)
+            .add_plugins(TipPlugin)
+            .add_plugins(TipHighlightPlugin)
+            .add_plugins(IntroGuidePlugin)
+            .add_plugins(tutorial_ui::TutorialPlugin)
+            .add_systems(OnEnter(GameState::Initializing), setup_loading_screen)
+            .add_systems(Update, 
                 check_initialization_complete
                     .run_if(in_state(GameState::Initializing)),
             )
-            .add_system(spawn_fps_text.run_if(run_once_per_run()).in_schedule(OnEnter(GameState::Main)))
-            .add_system(
+            .add_systems(OnEnter(GameState::Main), spawn_fps_text.run_if(run_once_per_run()))
+            .add_systems(Update, 
                 phase1_fps_text_viewport_diag
-                    .in_base_set(CoreSet::PostUpdate)
+                    
                     .run_if(in_state(GameState::Main)),
             )
-            .add_system(
+            .add_systems(Update, 
                 fps_text::phase2_fps_text_layout_diag
-                    .in_base_set(CoreSet::PostUpdate)
+                    
                     .run_if(in_state(GameState::Main)),
             )
-            .add_system(
+            .add_systems(Update, 
                 fps_text::phase3_fps_atlas_dump
-                    .in_base_set(CoreSet::PostUpdate)
+                    
                     .run_if(in_state(GameState::Main)),
             )
-            .add_system(
-                layout_sync::bump_options_ui_revision_on_ui_layout_change
-                    .after(crate::update_pixel_perfect_viewport),
+            .add_systems(Update, 
+                layout_sync::bump_options_ui_revision_on_ui_layout_change,
             )
-            .add_system(
-                player_hud::sync_player_hud_layout_to_resolution
-                    .after(crate::update_pixel_perfect_viewport),
+            .add_systems(Update, 
+                player_hud::sync_player_hud_layout_to_resolution,
             )
-            .add_system(
+            .add_systems(Update, 
                 player_hud::sync_player_hud_progress_layout_to_resolution
                     .after(player_hud::sync_player_hud_layout_to_resolution),
             )
-            .add_system(
+            .add_systems(Update, 
                 player_hud::sync_player_hud_slots_layout_to_resolution
                     .after(player_hud::sync_player_hud_progress_layout_to_resolution),
             )
-            .add_system(
+            .add_systems(Update, 
                 minimap::sync_hud_minimap_layout_to_resolution
                     .after(player_hud::sync_player_hud_slots_layout_to_resolution),
             )
-            .add_system(
+            .add_systems(Update, 
                 layout_sync::commit_ui_layout_sync_system
                     .after(minimap::sync_hud_minimap_layout_to_resolution),
             )
-            .add_system(
+            // Was CoreSet::PostUpdate; wrongly migrated to OnEnter(MainMenu).
+            .add_systems(Update, 
                 snap_layer3_visuals_to_pixel_grid
-                    .in_base_set(CoreSet::PostUpdate)
                     .run_if(not(in_state(GameState::Initializing))),
             )
-            .add_system(
+            .add_systems(
+                PostUpdate,
                 font_atlas_sampler::ensure_font_atlas_linear_sampling
-                    .in_base_set(CoreSet::PostUpdate)
-                    .after(bevy::text::update_text2d_layout),
+                    .after(bevy::sprite::update_text2d_layout),
             )
-            .add_system(
+            .add_systems(OnEnter(GameState::MainMenu), 
                 init_main_menu_leaderboard_visibility
-                    .in_schedule(OnEnter(GameState::MainMenu))
                     .after(load_game_data_for_ui),
             )
-            .add_system(
+            .add_systems(OnEnter(GameState::MainMenu), 
                 sync_main_menu_leaderboard_ui
-                    .in_schedule(OnEnter(GameState::MainMenu))
                     .after(init_main_menu_leaderboard_visibility)
                     .after(auto_fetch_leaderboard_on_menu),
             )
-            .add_system(cleanup_leaderboard_ui.in_schedule(OnExit(GameState::MainMenu)))
-            .add_system(reset_blacksmith_tracker.in_schedule(OnEnter(GameState::MainMenu)))
-            .add_system(reset_microwave_shrine_usages.in_schedule(OnEnter(GameState::MainMenu)))
-            .add_system(reset_break_drop_filter.in_schedule(OnEnter(GameState::MainMenu)))
-            .add_system(cleanup_run_state.in_base_set(CoreSet::PreUpdate).run_if(not(in_state(GameState::MainMenu))))
-            .add_systems((
-                // Clean up leaderboard when entering other UI states to avoid duplicates
+            .add_systems(OnExit(GameState::MainMenu), cleanup_leaderboard_ui)
+            .add_systems(OnEnter(GameState::MainMenu), reset_blacksmith_tracker)
+            .add_systems(OnEnter(GameState::MainMenu), reset_microwave_shrine_usages)
+            .add_systems(OnEnter(GameState::MainMenu), reset_break_drop_filter)
+            // Must run in PreUpdate: OptionsExit writes CleanUpRunStateEvent and MainMenu in
+            // the same Update. Bevy 0.19 applies StateTransition before the next Update, so
+            // an Update cleanup with `not(MainMenu)` would skip forever and leave the HUD up.
+            .add_systems(
+                PreUpdate,
+                cleanup_run_state.run_if(not(in_state(GameState::MainMenu))),
+            )
+            .add_systems(Update, (
                 cleanup_leaderboard_ui
                     .run_if(in_state(GameState::MainMenu)
-                        .and_then(state_changed::<UIState>())
+                        .and_then(state_changed::<UIState>)
                         .and_then(not(in_state(UIState::Closed)))),
-                // Recreate leaderboard when returning to main menu view (but not on initial entry)
                 sync_main_menu_leaderboard_ui
-                    .after(cleanup_leaderboard_ui)
                     .run_if(in_state(GameState::MainMenu)
-                        .and_then(state_changed::<UIState>())
+                        .and_then(state_changed::<UIState>)
                         .and_then(in_state(UIState::Closed))),
-            ))
-            .add_system(
+            ).chain())
+            .add_systems(Update, 
                 sync_main_menu_leaderboard_ui
                     .run_if(in_state(GameState::MainMenu))
                     .run_if(in_state(UIState::Closed))
-                    .run_if(resource_exists::<MainMenuLeaderboardVisible>())
-                    .run_if(resource_changed::<MainMenuLeaderboardVisible>()),
+                    .run_if(resource_exists::<MainMenuLeaderboardVisible>)
+                    .run_if(resource_changed::<MainMenuLeaderboardVisible>),
             )
-            .add_systems((
+            .add_systems(Update, (
                 update_leaderboard_display
                     .run_if(in_state(GameState::MainMenu))
                     .run_if(in_state(UIState::Closed))
-                    .run_if(resource_exists::<MainMenuLeaderboardVisible>())
+                    .run_if(resource_exists::<MainMenuLeaderboardVisible>)
                     .run_if(|visible: Res<MainMenuLeaderboardVisible>| visible.0),
                 ensure_leaderboard_entries
                     .run_if(in_state(GameState::MainMenu))
                     .run_if(in_state(UIState::Closed))
-                    .run_if(resource_exists::<MainMenuLeaderboardVisible>())
+                    .run_if(resource_exists::<MainMenuLeaderboardVisible>)
                     .run_if(|visible: Res<MainMenuLeaderboardVisible>| visible.0),
             ))
-            .add_systems((
+            .add_systems(Update, (
                 setup_inv_ui
                     .before(CustomFlush)
-                    .run_if(state_changed::<UIState>().and_then(in_state(UIState::Inventory))),
+                    .run_if(state_changed::<UIState>.and_then(in_state(UIState::Inventory))),
                 cleanup_dev_heirloom_grid_on_inv_close
-                    .run_if(state_changed::<UIState>().and_then(not(in_state(UIState::Inventory)))),
+                    .run_if(state_changed::<UIState>.and_then(not(in_state(UIState::Inventory)))),
                 cleanup_dev_skill_grid_on_inv_close
-                    .run_if(state_changed::<UIState>().and_then(not(in_state(UIState::Inventory)))),
+                    .run_if(state_changed::<UIState>.and_then(not(in_state(UIState::Inventory)))),
                 reset_blueprints_pagination_on_open
                     .before(CustomFlush)
-                    .run_if(state_changed::<UIState>().and_then(in_state(UIState::InventoryCrafting))),
+                    .run_if(state_changed::<UIState>.and_then(in_state(UIState::InventoryCrafting))),
                 setup_inv_ui
                     .before(CustomFlush)
                     .after(reset_blueprints_pagination_on_open)
-                    .run_if(state_changed::<UIState>().and_then(in_state(UIState::InventoryCrafting))),
+                    .run_if(state_changed::<UIState>.and_then(in_state(UIState::InventoryCrafting))),
                 setup_inv_ui
                     .before(CustomFlush)
-                    .run_if(state_changed::<UIState>().and_then(in_state(UIState::Chest))),
+                    .run_if(state_changed::<UIState>.and_then(in_state(UIState::Chest))),
                 setup_inv_ui
                     .before(CustomFlush)
-                    .run_if(state_changed::<UIState>().and_then(in_state(UIState::Scrapper))),
+                    .run_if(state_changed::<UIState>.and_then(in_state(UIState::Scrapper))),
                 setup_inv_ui
                     .before(CustomFlush)
-                    .run_if(state_changed::<UIState>().and_then(in_state(UIState::Crafting))),
+                    .run_if(state_changed::<UIState>.and_then(in_state(UIState::Crafting))),
                 setup_inv_ui
                     .before(CustomFlush)
-                    .run_if(state_changed::<UIState>().and_then(in_state(UIState::Furnace))),
+                    .run_if(state_changed::<UIState>.and_then(in_state(UIState::Furnace))),
             ))
             // Check for pending level-up rewards when any menu closes during gameplay
-            .add_system(
+            .add_systems(Update, 
                 check_pending_levelup_rewards_on_menu_close
-                    .in_set(OnUpdate(GameState::Main))
                     .run_if(in_state(GameState::Main))
-                    .run_if(state_changed::<UIState>())
+                    .run_if(in_state(GameState::Main))
+                    .run_if(state_changed::<UIState>)
                     .run_if(in_state(UIState::Closed)),
             )
-            .add_system(
+            .add_systems(Update, 
                 grant_iframes_after_chest_or_levelup_ui_close
-                    .in_set(OnUpdate(GameState::Main))
+                    .run_if(in_state(GameState::Main))
                     .before(handle_hits)
                     .run_if(in_state(GameState::Main))
-                    .run_if(state_changed::<UIState>())
+                    .run_if(state_changed::<UIState>)
                     .after(check_pending_levelup_rewards_on_menu_close),
             )
             .add_systems(
+                OnEnter(GameState::Main),
                 (
                     setup_bars_ui.after(load_state).run_if(run_once_per_run()),
                     setup_hotbar_hud
@@ -783,25 +792,31 @@ impl Plugin for UIPlugin {
                     setup_timeline_hud.run_if(run_once_per_run()),
                     setup_era_timer_hud.run_if(run_once_per_run()),
                     setup_chaos_ui.run_if(run_once_per_run()),
-                )
-                    .in_schedule(OnEnter(GameState::Main)),
+                ),
             )
-            .add_system(
-                setup_screen_effects
-                    .in_set(OnUpdate(GameState::Main))
-                    .before(handle_screen_effects),
-            )
-            .add_system(handle_screen_effects.in_set(OnUpdate(GameState::Main)))
-            .add_system(ui_helpers::attach_radial_overlay_visuals.before(CustomFlush))
             .add_systems(
-                (
+                Update,
+                setup_screen_effects.run_if(in_state(GameState::Main)),
+            )
+            .add_systems(
+                Update,
+                handle_screen_effects.run_if(in_state(GameState::Main)),
+            )
+            // Must run *after* CustomFlush: UI setups spawn `PendingRadialOverlay` before
+            // the flush, and attaching mesh/material before that flush leaves the overlay
+            // empty for one frame.
+            .add_systems(
+                Update,
+                ui_helpers::attach_radial_overlay_visuals.after(CustomFlush),
+            )
+            .add_systems(Update, (
                     add_previous_health,
                     handle_flash_bars,
-                    update_xp_bar_rainbow.before(update_xp_bar),
+                    update_xp_bar_rainbow,
                     update_xp_bar,
-                    player_hud::drain_pending_xp.after(update_xp_bar),
-                    update_decorative_xp_shards.after(update_xp_bar_rainbow),
-                    handle_skill_choice_ui_close.after(update_xp_bar),
+                    update_decorative_xp_shards,
+                    player_hud::drain_pending_xp,
+                    handle_skill_choice_ui_close,
                     handle_enemy_health_bar_change,
                     add_ui_icon_for_elite_mobs,
                     spawn_player_movement_cooldown_bar,
@@ -810,48 +825,56 @@ impl Plugin for UIPlugin {
                     boss_health_bar::update_boss_health_bar,
                     boss_health_bar::cleanup_boss_health_bar_on_despawn,
                 )
-                    .in_set(OnUpdate(GameState::Main)),
-            )
-            .add_systems((
-                show_pending_era_announcement
-                    .run_if(in_state(GameState::Main))
-                    .run_if(resource_exists::<global_text_message::PendingEraAnnouncement>())
-                    .before(handle_global_text_message_events),
-                handle_queued_floating_texts
-                    .run_if(in_state(GameState::Main).or_else(in_state(GameState::BlessingChoice))),
-                tick_damage_numbers
-                    .run_if(in_state(GameState::Main).or_else(in_state(GameState::BlessingChoice))),
-                handle_global_text_message_events
-                    .run_if(in_state(GameState::Main).or_else(in_state(GameState::BlessingChoice))),
-                tick_global_text_messages
-                    .run_if(in_state(GameState::Main).or_else(in_state(GameState::BlessingChoice))),
-            ))
-            .add_system(
-                handle_add_damage_numbers_after_hit
-                    .before(handle_hits)
-                    .in_set(OnUpdate(GameState::Main))
-                    .run_if(resource_exists::<Game>()),
+                    .chain()
+                    .run_if(in_state(GameState::Main)),
             )
             .add_systems(
+                Update,
+                show_pending_era_announcement
+                    .run_if(in_state(GameState::Main))
+                    .run_if(resource_exists::<global_text_message::PendingEraAnnouncement>)
+                    .before(handle_global_text_message_events),
+            )
+            .add_systems(
+                Update,
                 (
+                    handle_queued_floating_texts,
+                    tick_damage_numbers,
+                    handle_global_text_message_events,
+                    tick_global_text_messages,
+                )
+                    .chain()
+                    .run_if(in_state(GameState::Main).or_else(in_state(GameState::BlessingChoice))),
+            )
+            .add_systems(Update, 
+                // Must run *after* handle_hits: Bevy 0.19 auto-inserts ApplyDeferred on
+                // `.after(handle_hits)` edges, so MarkedForDeath is applied and cleanup can
+                // despawn the mob in the same frame. Next-frame (`.before(handle_hits)`)
+                // numbers never see the kill. Running after hits also sees flushed crit flags.
+                handle_add_damage_numbers_after_hit
+                    .after(handle_hits)
+                    .before(crate::combat::cleanup_marked_for_death_entities)
+                    .run_if(in_state(GameState::Main))
+                    .run_if(resource_exists::<Game>),
+            )
+            // Order must match the before/after edges used by inventory focus systems
+            // (interaction → focus → item_drop). Chaining item_drop *before* interaction
+            // (Bevy 0.10 was laxer) creates a schedule cycle on 0.19.
+            .add_systems(Update, (
+                    crate::ui::interactions::handle_inventory_consumable_right_click
+                        .before(crate::item::item_actions::handle_item_action_success)
+                        .run_if(not(in_state(UIState::Closed))),
+                    handle_interaction_clicks
+                        .run_if(not(in_state(UIState::Closed))),
+                    upgrade_drag::handle_drag_upgrade_material_on_equipment
+                        .run_if(not(in_state(UIState::Closed))),
                     handle_item_drop_clicks,
                     handle_drop_dragged_items_on_inv_close,
                     handle_dragging,
                     update_dragged_item_stack_count_text,
-                    handle_drop_on_slot_events.after(handle_item_drop_clicks),
-                    handle_drop_in_world_events.after(handle_item_drop_clicks),
-                    crate::ui::interactions::handle_inventory_consumable_right_click
-                        .before(handle_interaction_clicks)
-                        .before(crate::item::item_actions::handle_item_action_success)
-                        .run_if(not(in_state(UIState::Closed))),
-                    handle_interaction_clicks
-                        .before(handle_item_drop_clicks)
-                        .run_if(not(in_state(UIState::Closed))),
-                    upgrade_drag::handle_drag_upgrade_material_on_equipment
-                        .before(handle_item_drop_clicks)
-                        .run_if(not(in_state(UIState::Closed))),
+                    handle_drop_on_slot_events,
+                    handle_drop_in_world_events,
                     handle_icon_hover_tooltips
-                        .after(handle_interaction_clicks)
                         .after(handle_sort_inventory_button_click)
                         .after(handle_material_drops_toggle_button_click)
                         .after(handle_material_drop_filter_menu_click)
@@ -860,10 +883,10 @@ impl Plugin for UIPlugin {
                     update_inventory_ui.after(CustomFlush),
                     handle_update_inv_item_entities,
                 )
-                    .in_set(OnUpdate(GameState::Main)),
+                    .chain()
+                    .run_if(in_state(GameState::Main)),
             )
-            .add_systems(
-                (
+            .add_systems(Update, (
                     crate::ui::interactions::sync_inventory_focus_hover
                         .after(handle_interaction_clicks)
                         .after(handle_sort_inventory_button_click)
@@ -889,158 +912,162 @@ impl Plugin for UIPlugin {
                         .after(handle_dragging)
                         .run_if(not(in_state(UIState::Closed))),
                 )
-                    .in_set(OnUpdate(GameState::Main)),
+                    .chain()
+                    .run_if(in_state(GameState::Main)),
             )
-            .add_systems(
-                (
+            .add_systems(Update, (
                     change_ui_state_to_chest_when_resource_added
                         .before(CustomFlush)
-                        .run_if(resource_added::<ChestContainer>()),
+                        .run_if(resource_added::<ChestContainer>)
+                        .run_if(in_state(GameState::Main)),
                     change_ui_state_to_scrapper_when_resource_added
                         .before(CustomFlush)
-                        .run_if(resource_added::<ScrapperContainer>()),
-                    handle_scrap_items_in_scrapper.run_if(in_state(UIState::Scrapper)),
+                        .run_if(resource_added::<ScrapperContainer>)
+                        .run_if(in_state(GameState::Main)),
+                    handle_scrap_items_in_scrapper
+                        .run_if(in_state(UIState::Scrapper))
+                        .run_if(in_state(GameState::Main)),
+                    change_ui_state_to_crafting_when_resource_added
+                        .before(CustomFlush)
+                        .run_if(resource_added::<CraftingContainer>)
+                        .run_if(in_state(GameState::Main)),
+                    change_ui_state_to_furnace_when_resource_added
+                        .before(CustomFlush)
+                        .run_if(resource_added::<FurnaceContainer>)
+                        .run_if(in_state(GameState::Main)),
+                    handle_update_era_timer_hud
+                        .run_if(resource_exists::<crate::night::EraTimer>)
+                        .run_if(in_state(GameState::Main)),
+                ))
+            .add_systems(Update, (
                     text_update_system,
                     add_inv_to_new_scrapper_objs,
                     add_container_to_new_furnace_objs,
                     update_healthbar,
-                    change_ui_state_to_crafting_when_resource_added
-                        .before(CustomFlush)
-                        .run_if(resource_added::<CraftingContainer>()),
-                    change_ui_state_to_furnace_when_resource_added
-                        .before(CustomFlush)
-                        .run_if(resource_added::<FurnaceContainer>()),
-                    handle_update_era_timer_hud.run_if(
-                        resource_exists::<crate::night::EraTimer>(),
-                    ),
                 )
-                    .in_set(OnUpdate(GameState::Main)),
-            )
-            .add_system(
-                add_inv_to_new_chest_objs
-                    .in_base_set(CoreSet::PreUpdate)
+                    .chain()
                     .run_if(in_state(GameState::Main)),
             )
-            .add_system(handle_spawn_inv_player_stats.in_base_set(CoreSet::PostUpdate))
-            .add_system(
-                spawn_damage_tracker_in_inventory
-                    .in_base_set(CoreSet::PostUpdate),
+            .add_systems(Update, 
+                add_inv_to_new_chest_objs
+                    
+                    .run_if(in_state(GameState::Main)),
             )
-            .add_systems(
-                (
+            .add_systems(Update, handle_spawn_inv_player_stats)
+            .add_systems(Update, 
+                spawn_damage_tracker_in_inventory
+                    ,
+            )
+            .add_systems(Update, (
                     setup_unlocks_ui
                         .before(CustomFlush)
-                        .run_if(state_changed::<UIState>().and_then(in_state(UIState::Unlocks))),
+                        .run_if(state_changed::<UIState>.and_then(in_state(UIState::Unlocks))),
                     cleanup_unlocks_ui
-                        .run_if(state_changed::<UIState>().and_then(not(in_state(UIState::Unlocks)))),
+                        .run_if(state_changed::<UIState>.and_then(not(in_state(UIState::Unlocks)))),
                     update_unlocks_currency_text.run_if(in_state(UIState::Unlocks)),
                     refresh_unlock_button_states.run_if(in_state(UIState::Unlocks)),
                     
                     setup_achievements_ui
                         .before(CustomFlush)
-                        .run_if(state_changed::<UIState>().and_then(in_state(UIState::Achievements))),
+                        .run_if(state_changed::<UIState>.and_then(in_state(UIState::Achievements))),
                     cleanup_achievements_ui
-                        .run_if(state_changed::<UIState>().and_then(not(in_state(UIState::Achievements)))),
+                        .run_if(state_changed::<UIState>.and_then(not(in_state(UIState::Achievements)))),
                     update_achievements_page_display
-                        .after(CustomFlush)
                         .run_if(in_state(UIState::Achievements).and_then(
-                            state_changed::<UIState>()
-                                .or_else(resource_changed::<AchievementsPagination>())
-                                .or_else(resource_changed::<crate::player::achievements::Achievements>())
+                            state_changed::<UIState>
+                                .or_else(resource_changed::<AchievementsPagination>)
+                                .or_else(resource_changed::<crate::player::achievements::Achievements>)
                         )),
                     update_achievements_navigation_buttons
                         .run_if(in_state(UIState::Achievements)),
                     setup_archives_ui
                         .before(CustomFlush)
-                        .run_if(state_changed::<UIState>().and_then(in_state(UIState::Archives))),
+                        .run_if(state_changed::<UIState>.and_then(in_state(UIState::Archives))),
                     cleanup_archives_ui
-                        .run_if(state_changed::<UIState>().and_then(not(in_state(UIState::Archives)))),
+                        .run_if(state_changed::<UIState>.and_then(not(in_state(UIState::Archives)))),
                 )
-                    .in_set(OnUpdate(GameState::MainMenu)),
+                    .chain()
+                    .run_if(in_state(GameState::MainMenu)),
             )
-            .add_systems(
-                (
+            .add_systems(Update, (
                     cleanup_options_ui.run_if(
-                        state_changed::<UIState>()
+                        state_changed::<UIState>
                             .and_then(not(in_state(UIState::Options)))
                             .or_else(
                                 in_state(UIState::Options)
-                                    .and_then(resource_changed::<OptionsUiLayoutRevision>()),
+                                    .and_then(resource_changed::<OptionsUiLayoutRevision>),
                             ),
                     ),
                     setup_options_ui
                         .before(CustomFlush)
                         .run_if(
-                            state_changed::<UIState>()
+                            state_changed::<UIState>
                                 .and_then(in_state(UIState::Options))
                                 .or_else(
                                     in_state(UIState::Options)
-                                        .and_then(resource_changed::<OptionsUiLayoutRevision>()),
+                                        .and_then(resource_changed::<OptionsUiLayoutRevision>),
                                 ),
                         ),
                 )
                     .chain()
                     .after(layout_sync::bump_options_ui_revision_on_ui_layout_change)
-                    .in_set(OnUpdate(GameState::MainMenu)),
+                    .run_if(in_state(GameState::MainMenu)),
             )
-            .add_systems(
-                (
+            .add_systems(Update, (
                     setup_unlocks_ui
                         .before(CustomFlush)
-                        .run_if(state_changed::<UIState>().and_then(in_state(UIState::Unlocks))),
+                        .run_if(state_changed::<UIState>.and_then(in_state(UIState::Unlocks))),
                     cleanup_unlocks_ui
-                        .run_if(state_changed::<UIState>().and_then(not(in_state(UIState::Unlocks)))),
+                        .run_if(state_changed::<UIState>.and_then(not(in_state(UIState::Unlocks)))),
                    
                     setup_achievements_ui
                         .before(CustomFlush)
-                        .run_if(state_changed::<UIState>().and_then(in_state(UIState::Achievements))),
+                        .run_if(state_changed::<UIState>.and_then(in_state(UIState::Achievements))),
                     cleanup_achievements_ui
-                        .run_if(state_changed::<UIState>().and_then(not(in_state(UIState::Achievements)))),
+                        .run_if(state_changed::<UIState>.and_then(not(in_state(UIState::Achievements)))),
                     update_achievements_page_display
-                        .after(CustomFlush)
                         .run_if(in_state(UIState::Achievements).and_then(
-                            state_changed::<UIState>()
-                                .or_else(resource_changed::<AchievementsPagination>())
-                                .or_else(resource_changed::<crate::player::achievements::Achievements>())
+                            state_changed::<UIState>
+                                .or_else(resource_changed::<AchievementsPagination>)
+                                .or_else(resource_changed::<crate::player::achievements::Achievements>)
                         )),
                     update_achievements_navigation_buttons
                         .run_if(in_state(UIState::Achievements)),
                     
                 )
-                    .in_set(OnUpdate(GameState::Main)),
+                    .chain()
+                    .run_if(in_state(GameState::Main)),
             )
-            .add_systems(
-                (
+            .add_systems(Update, (
                     cleanup_options_ui.run_if(
-                        state_changed::<UIState>()
+                        state_changed::<UIState>
                             .and_then(not(in_state(UIState::Options)))
                             .or_else(
                                 in_state(UIState::Options)
-                                    .and_then(resource_changed::<OptionsUiLayoutRevision>()),
+                                    .and_then(resource_changed::<OptionsUiLayoutRevision>),
                             ),
                     ),
                     setup_options_ui
                         .before(CustomFlush)
                         .run_if(
-                            state_changed::<UIState>()
+                            state_changed::<UIState>
                                 .and_then(in_state(UIState::Options))
                                 .or_else(
                                     in_state(UIState::Options)
-                                        .and_then(resource_changed::<OptionsUiLayoutRevision>()),
+                                        .and_then(resource_changed::<OptionsUiLayoutRevision>),
                                 ),
                         ),
                 )
                     .chain()
                     .after(layout_sync::bump_options_ui_revision_on_ui_layout_change)
-                    .in_set(OnUpdate(GameState::Main)),
+                    .run_if(in_state(GameState::Main)),
             )
-            .add_systems(
-                (
-                    setup_name_entry_ui
-                        .before(CustomFlush)
-                        .run_if(state_changed::<UIState>().and_then(in_state(UIState::EnterName))),
-                    cleanup_name_entry_ui
-                        .run_if(state_changed::<UIState>().and_then(not(in_state(UIState::EnterName)))),
+            // Spawn/teardown on the UIState edge — not `state_changed` in a MainMenu-only Update
+            // chain. The old path could set EnterName during Loading (check ran every frame while
+            // Closed); setup then missed its one `state_changed` frame and never ran on MainMenu.
+            .add_systems(OnEnter(UIState::EnterName), setup_name_entry_ui)
+            .add_systems(OnExit(UIState::EnterName), cleanup_name_entry_ui)
+            .add_systems(Update, (
                     handle_name_entry_input
                         .run_if(in_state(UIState::EnterName)),
                     update_name_entry_text
@@ -1051,9 +1078,9 @@ impl Plugin for UIPlugin {
                         .run_if(in_state(UIState::EnterName)),
                     setup_time_crystal_progress_ui
                         .before(CustomFlush)
-                        .run_if(state_changed::<UIState>().and_then(in_state(UIState::TimeCrystalProgress))),
+                        .run_if(state_changed::<UIState>.and_then(in_state(UIState::TimeCrystalProgress))),
                     cleanup_time_crystal_progress_ui
-                        .run_if(state_changed::<UIState>().and_then(not(in_state(UIState::TimeCrystalProgress)))),
+                        .run_if(state_changed::<UIState>.and_then(not(in_state(UIState::TimeCrystalProgress)))),
                     handle_time_crystal_progress_ok_button
                         .run_if(in_state(UIState::TimeCrystalProgress)),
                     handle_time_crystal_unlock_hover_tooltip
@@ -1063,26 +1090,24 @@ impl Plugin for UIPlugin {
                         ),
                     setup_time_crystals_browser_ui
                         .before(CustomFlush)
-                        .run_if(state_changed::<UIState>().and_then(in_state(UIState::TimeCrystalsBrowser))),
+                        .run_if(state_changed::<UIState>.and_then(in_state(UIState::TimeCrystalsBrowser))),
                     cleanup_time_crystals_browser_ui
-                        .run_if(state_changed::<UIState>().and_then(not(in_state(UIState::TimeCrystalsBrowser)))),
+                        .run_if(state_changed::<UIState>.and_then(not(in_state(UIState::TimeCrystalsBrowser)))),
                     handle_time_crystals_browser_done_button
                         .run_if(in_state(UIState::TimeCrystalsBrowser)),
                     handle_time_crystals_view_heirlooms_button
                         .run_if(in_state(UIState::TimeCrystalsBrowser)),
                 )
-                    .in_set(OnUpdate(GameState::MainMenu)),
+                    .chain()
+                    .run_if(in_state(GameState::MainMenu)),
             )
-            .add_systems(
-                (
+            .add_systems(Update, (
                     setup_beastiary_browser_ui
-                        .before(refresh_beastiary_grid_on_pagination_change)
                         .before(CustomFlush)
-                        .run_if(state_changed::<UIState>().and_then(in_state(UIState::BeastiaryBrowser))),
+                        .run_if(state_changed::<UIState>.and_then(in_state(UIState::BeastiaryBrowser))),
                     cleanup_beastiary_browser_ui
-                        .run_if(state_changed::<UIState>().and_then(not(in_state(UIState::BeastiaryBrowser)))),
+                        .run_if(state_changed::<UIState>.and_then(not(in_state(UIState::BeastiaryBrowser)))),
                     handle_beastiary_pagination_clicks
-                        .before(refresh_beastiary_grid_on_pagination_change)
                         .run_if(in_state(UIState::BeastiaryBrowser)),
                     refresh_beastiary_grid_on_pagination_change
                         .run_if(in_state(UIState::BeastiaryBrowser)),
@@ -1091,20 +1116,20 @@ impl Plugin for UIPlugin {
                     crate::ui::beastiary_browser_ui::animate_beastiary_previews
                         .run_if(in_state(UIState::BeastiaryBrowser)),
                 )
-                    .in_set(OnUpdate(GameState::MainMenu)),
+                    .chain()
+                    .run_if(in_state(GameState::MainMenu)),
             )
-            .add_system(
+            .add_systems(OnEnter(GameState::MainMenu), 
                 check_show_time_crystal_progress_popup
                     .after(crate::ui::check_show_name_entry_popup)
-                    .in_schedule(OnEnter(GameState::MainMenu)),
+                    ,
             )
-            .add_systems((
+            .add_systems(Update, (
                     handle_unlocks_clicks.run_if(in_state(UIState::Unlocks)),
                     update_unlocks_currency_text.run_if(in_state(UIState::Unlocks)),
                     refresh_unlock_button_states.run_if(in_state(UIState::Unlocks)),
                 ))
-            .add_systems(
-                (
+            .add_systems(Update, (
                     handle_options_clicks.run_if(in_state(UIState::Options)),
                     handle_key_rebind_input.run_if(in_state(UIState::Options)),
                     update_keybind_text
@@ -1122,23 +1147,20 @@ impl Plugin for UIPlugin {
                     handle_damage_text_size_button_click.run_if(in_state(UIState::Options)),
                     update_damage_text_size_text.run_if(in_state(UIState::Options)),
                     handle_scale_button_click
-                        .run_if(in_state(UIState::Options))
-                        .before(crate::update_pixel_perfect_viewport),
+                        .run_if(in_state(UIState::Options)),
                     update_scale_text.run_if(in_state(UIState::Options)),
                     handle_cursor_color_button_click.run_if(in_state(UIState::Options)),
                     update_cursor_color_preview.run_if(in_state(UIState::Options)),
                 )
                     .after(crate::ui::focus::FocusConfirmSet),
             )
-            .add_systems(
-                (
+            .add_systems(Update, (
                     handle_achievement_row_hover.run_if(in_state(UIState::Achievements)),
                     handle_achievement_row_clicks.run_if(in_state(UIState::Achievements)),
                 )
                     .after(crate::ui::focus::FocusConfirmSet),
             )
-            .add_systems(
-                (
+            .add_systems(Update, (
                     handle_options_tab_buttons.run_if(in_state(UIState::Options)),
                     sync_options_tab_visibility.run_if(in_state(UIState::Options)),
                     update_options_row_label_colors.run_if(in_state(UIState::Options)),
@@ -1148,19 +1170,18 @@ impl Plugin for UIPlugin {
                 )
                     .after(crate::ui::focus::FocusConfirmSet),
             )
-            .add_system(
+            .add_systems(Update, 
                 handle_options_focus_row_input
                     .after(crate::ui::focus::reset_focus_nav_blocked)
                     .before(crate::ui::focus::FocusNavSet)
                     .run_if(in_state(UIState::Options)),
             )
-            .add_system(
+            .add_systems(Update, 
                 handle_tooltip_teardown
-                    .in_base_set(CoreSet::PreUpdate)
+                    
                     .run_if(in_state(GameState::Main)),
             )
-            .add_systems(
-                (
+            .add_systems(Update, (
                     setup_inv_slots_ui,
                     setup_chest_slots_ui.run_if(in_state(UIState::Chest)),
                     setup_scrapper_slots_ui.run_if(in_state(UIState::Scrapper)),
@@ -1168,34 +1189,41 @@ impl Plugin for UIPlugin {
                     handle_populate_essence_shop_on_new_spawn,
                     handle_cursor_skills_buttons.run_if(in_state(UIState::Skills)),
                     update_furnace_bar,
+                    handle_heirloom_shrine_ui_setup
+                        .run_if(state_changed::<UIState>.and_then(in_state(UIState::Skills))),
                     setup_skill_choice_ui
                         .before(CustomFlush)
-                        .run_if(state_changed::<UIState>().and_then(in_state(UIState::Skills))),
-                    handle_heirloom_shrine_ui_setup
-                        .before(setup_skill_choice_ui)
-                        .run_if(state_changed::<UIState>().and_then(in_state(UIState::Skills))),
+                        .run_if(state_changed::<UIState>.and_then(in_state(UIState::Skills))),
                     setup_item_chest_ui
                         .before(CustomFlush)
-                        .run_if(state_changed::<UIState>().and_then(in_state(UIState::ItemChest))),
+                        .run_if(state_changed::<UIState>.and_then(in_state(UIState::ItemChest)))
+                        .run_if(resource_exists::<ItemChestState>),
 
-                    handle_cursor_item_chest_button.run_if(in_state(UIState::ItemChest)),
+                    // Take/banish removes `ItemChestState` while `UIState` may still be
+                    // ItemChest until StateTransition — Bevy 0.19 panics on bare ResMut.
+                    handle_cursor_item_chest_button
+                        .run_if(in_state(UIState::ItemChest))
+                        .run_if(resource_exists::<ItemChestState>),
                     interactions::handle_cursor_heirloom_chest_button
-                        .run_if(in_state(UIState::ItemChest)),
-                    handle_heirloom_chest_reroll_button.run_if(in_state(UIState::ItemChest)),
+                        .run_if(in_state(UIState::ItemChest))
+                        .run_if(resource_exists::<ItemChestState>),
+                    handle_heirloom_chest_reroll_button
+                        .run_if(in_state(UIState::ItemChest))
+                        .run_if(resource_exists::<ItemChestState>),
                     setup_essence_ui
                         .before(CustomFlush)
                         .run_if(
                             in_state(UIState::Essence)
-                                .and_then(resource_exists::<EssenceShopChoices>()),
+                                .and_then(resource_exists::<EssenceShopChoices>),
                         ),
-                    tick_merchant_shop_open_lock.in_set(OnUpdate(GameState::Main)),
+                    tick_merchant_shop_open_lock.run_if(in_state(GameState::Main)),
                 )
-                    .in_set(OnUpdate(GameState::Main)),
+                    .chain()
+                    .run_if(in_state(GameState::Main)),
             )
-            .add_systems(
-                (
+            .add_systems(Update, (
                     handle_submit_merchant_purchase
-                        .run_if(resource_exists::<EssenceShopChoices>()),
+                        .run_if(resource_exists::<EssenceShopChoices>),
                     handle_merchant_shop_interactions.run_if(in_state(UIState::Essence)),
                     update_merchant_track_info_box_label.run_if(in_state(UIState::Essence)),
                     handle_merchant_done_button.run_if(in_state(UIState::Essence)),
@@ -1205,44 +1233,43 @@ impl Plugin for UIPlugin {
                     sync_merchant_marker_overlay.run_if(in_state(UIState::Essence)),
                     update_chest_button_label_hover.run_if(in_state(UIState::Essence)),
                 )
-                    .in_set(OnUpdate(GameState::Main)),
+                    .chain()
+                    .run_if(in_state(GameState::Main)),
             )
-            .add_systems(
-                (
+            .add_systems(Update, (
                     sync_merchant_world_marker_displays,
                     update_merchant_world_marker_price_colors,
                     refresh_merchant_prices_on_timer.run_if(is_not_paused),
                 )
-                    .in_set(OnUpdate(GameState::Main)),
+                    .run_if(in_state(GameState::Main)),
             )
-            .add_system(
+            .add_systems(Update, 
                 update_blacksmith_coin_display
-                    .in_set(OnUpdate(GameState::Main))
+                    .run_if(in_state(GameState::Main))
                     .run_if(in_state(UIState::Essence)),
             )
-            .add_system(
+            .add_systems(Update, 
                 update_blacksmith_reroll_display
-                    .in_set(OnUpdate(GameState::Main))
+                    .run_if(in_state(GameState::Main))
                     .run_if(in_state(UIState::Essence)),
             )
-            .add_system(
+            .add_systems(Update, 
                 update_merchant_reroll_button_states
-                    .in_set(OnUpdate(GameState::Main))
+                    .run_if(in_state(GameState::Main))
                     .run_if(in_state(UIState::Essence)),
             )
-            .add_system(
+            .add_systems(Update, 
                 update_merchant_price_text_colors
-                    .in_set(OnUpdate(GameState::Main))
+                    .run_if(in_state(GameState::Main))
                     .run_if(in_state(UIState::Essence)),
             )
-            .add_system(
+            .add_systems(Update, 
                     handle_update_player_skills
                         .after(clamp_health)
                         .after(crate::player::skill_heirlooms::initialize_class_skill_slots)
                         .run_if(in_state(GameState::Main).or_else(in_state(GameState::BlessingChoice))),
             )
-            .add_systems(
-                (
+            .add_systems(Update, (
                     player_hud::sync_consumable_buff_hud,
                     player_hud::sync_heirloom_hud_depth,
                     player_hud::tick_consumable_buff_hud_overlays.run_if(is_not_paused),
@@ -1255,89 +1282,91 @@ impl Plugin for UIPlugin {
                     player_hud::update_pet_skill_tooltip_cooldown
                         .after(player_hud::handle_pet_skill_hud_tooltip),
                 )
-                    .in_set(OnUpdate(GameState::Main)),
+                    .run_if(in_state(GameState::Main)),
             )
             // PostUpdate: `update_cursor_pos` runs here; ordering drag-drop after it from
             // `OnUpdate` would create an Update ↔ PostUpdate cycle (UpdateFlush → physics →
             // cursor → drag → UpdateFlush).
-            .add_system(
+            .add_systems(Update, 
                 player_hud::handle_active_skill_slot_drag_drop
                     .after(crate::cursor::update_cursor_pos)
                     .run_if(in_state(GameState::Main))
-                    .in_base_set(CoreSet::PostUpdate),
+                    ,
             )
-            .add_systems(
-                (
+            .add_systems(Update, (
                     handle_heirloom_hud_tooltip,
                     player_hud::sync_heirloom_hud_depth,
                     process_heirloom_tooltip_requests,
                 )
-                    .in_set(OnUpdate(GameState::GameOver)),
+                    .run_if(in_state(GameState::GameOver)),
             )
-            .add_system(
-                player_hud::hide_xp_bar_in_game_over.in_set(OnUpdate(GameState::Main)),
+            .add_systems(Update, 
+                player_hud::hide_xp_bar_in_game_over.run_if(in_state(GameState::Main)),
             )
-            .add_system(
-                player_hud::hide_xp_bar_in_game_over.in_set(OnUpdate(GameState::GameOver)),
-            )
-            .add_system(
-                player_hud::cancel_active_skill_drag_on_state_exit
-                    .in_schedule(OnExit(GameState::Main)),
-            )
-            .add_system(
-                update_options_keybind_text
-                    .in_set(OnUpdate(GameState::Main)),
-            )
-            .add_system(
-                update_active_skill_keybind_text
-                    .after(handle_update_player_skills)
-                    .in_set(OnUpdate(GameState::Main)),
-            )
-            .add_system(
-                update_inventory_keybind_text
-                    .in_set(OnUpdate(GameState::Main)),
-            )
-            .add_system(
-                update_minimap_keybind_text
-                    .in_set(OnUpdate(GameState::Main)),
-            )
-            .add_system(
-                update_hotbar_keybind_text
-                    .in_set(OnUpdate(GameState::Main)),
-            )
-            .add_system(
-                update_interact_guide_keybind_text
-                    .in_set(OnUpdate(GameState::Main)),
-            )
-            .add_system(
-                handle_essence_heirloom_tooltip
-                    .in_set(OnUpdate(GameState::Main))
-                    .after(handle_merchant_shop_interactions)
-                    .run_if(in_state(UIState::Essence)),
-            )
-            .add_system(
-                handle_merchant_item_tooltip
-                    .in_set(OnUpdate(GameState::Main))
-                    .after(handle_merchant_shop_interactions)
-                    .run_if(in_state(UIState::Essence)),
-            )
-            .add_system(
-                handle_item_chest_final_item_hover
-                    .run_if(in_state(UIState::ItemChest))
-                    .in_set(OnUpdate(GameState::Main)),
-            )
-            .add_system(
-                handle_heirloom_chest_final_item_hover
-                    .run_if(in_state(UIState::ItemChest))
-                    .in_set(OnUpdate(GameState::Main)),
+            .add_systems(Update, 
+                player_hud::hide_xp_bar_in_game_over.run_if(in_state(GameState::GameOver)),
             )
             .add_systems(
-                (
+                OnExit(GameState::Main),
+                player_hud::cancel_active_skill_drag_on_state_exit,
+            )
+            .add_systems(Update, 
+                update_options_keybind_text
+                    .run_if(in_state(GameState::Main)),
+            )
+            .add_systems(Update, 
+                update_active_skill_keybind_text
+                    .after(handle_update_player_skills)
+                    .run_if(in_state(GameState::Main)),
+            )
+            .add_systems(Update, 
+                update_inventory_keybind_text
+                    .run_if(in_state(GameState::Main)),
+            )
+            .add_systems(Update, 
+                update_minimap_keybind_text
+                    .run_if(in_state(GameState::Main)),
+            )
+            .add_systems(Update, 
+                update_hotbar_keybind_text
+                    .run_if(in_state(GameState::Main)),
+            )
+            .add_systems(Update, 
+                update_interact_guide_keybind_text
+                    .run_if(in_state(GameState::Main)),
+            )
+            .add_systems(Update, 
+                handle_essence_heirloom_tooltip
+                    .run_if(in_state(GameState::Main))
+                    .after(handle_merchant_shop_interactions)
+                    .run_if(in_state(UIState::Essence)),
+            )
+            .add_systems(Update, 
+                handle_merchant_item_tooltip
+                    .run_if(in_state(GameState::Main))
+                    .after(handle_merchant_shop_interactions)
+                    .run_if(in_state(UIState::Essence)),
+            )
+            .add_systems(Update, 
+                handle_item_chest_final_item_hover
+                    .run_if(in_state(UIState::ItemChest))
+                    .run_if(in_state(GameState::Main)),
+            )
+            .add_systems(Update, 
+                handle_heirloom_chest_final_item_hover
+                    .run_if(in_state(UIState::ItemChest))
+                    .run_if(in_state(GameState::Main)),
+            )
+            .add_systems(Update, (
                     setup_active_skill_shrine_ui.before(CustomFlush).run_if(
-                        state_changed::<UIState>().and_then(in_state(UIState::ActiveSkillShrine)),
+                        state_changed::<UIState>
+                            .and_then(in_state(UIState::ActiveSkillShrine))
+                            .and_then(resource_exists::<
+                                crate::item::active_skill_shrine::ActiveSkillShrineSelection,
+                            >),
                     ),
                     setup_microwave_shrine_ui.before(CustomFlush).run_if(
-                        state_changed::<UIState>().and_then(in_state(UIState::MicrowaveShrine)),
+                        state_changed::<UIState>.and_then(in_state(UIState::MicrowaveShrine)),
                     ),
                     tick_active_skill_shrine_ui_interaction_lock_timers
                         .run_if(in_state(UIState::ActiveSkillShrine)),
@@ -1346,12 +1375,19 @@ impl Plugin for UIPlugin {
                     handle_microwave_shrine_heirloom_click
                         .run_if(in_state(UIState::MicrowaveShrine)),
                     handle_microwave_shrine_heirloom_tooltip
-                        .after(handle_microwave_shrine_heirloom_click)
                         .run_if(in_state(UIState::MicrowaveShrine)),
-                    handle_active_skill_shrine_ui_interaction
-                        .run_if(in_state(UIState::ActiveSkillShrine)),
-                    handle_active_skill_shrine_reroll_button
-                        .run_if(in_state(UIState::ActiveSkillShrine)),
+                    // Selection is removed on pick; CustomFlush can apply that between
+                    // chained systems — skip when the resource is already gone.
+                    handle_active_skill_shrine_ui_interaction.run_if(
+                        in_state(UIState::ActiveSkillShrine).and_then(resource_exists::<
+                            crate::item::active_skill_shrine::ActiveSkillShrineSelection,
+                        >),
+                    ),
+                    handle_active_skill_shrine_reroll_button.run_if(
+                        in_state(UIState::ActiveSkillShrine).and_then(resource_exists::<
+                            crate::item::active_skill_shrine::ActiveSkillShrineSelection,
+                        >),
+                    ),
                     update_active_skill_shrine_reroll_button_state
                         .run_if(in_state(UIState::ActiveSkillShrine)),
                     update_active_skill_shrine_reroll_count_text
@@ -1361,12 +1397,12 @@ impl Plugin for UIPlugin {
                     handle_active_skill_shrine_overwrite_interaction
                         .run_if(in_state(UIState::ActiveSkills)),
                 )
-                    .in_set(OnUpdate(GameState::Main)),
+                    .chain()
+                    .run_if(in_state(GameState::Main)),
             )
-            .add_systems(
-                (
+            .add_systems(Update, (
                     setup_well_shrine_ui.before(CustomFlush).run_if(
-                        state_changed::<UIState>().and_then(in_state(UIState::WellShrine)),
+                        state_changed::<UIState>.and_then(in_state(UIState::WellShrine)),
                     ),
                     handle_well_equipment_click.run_if(in_state(UIState::WellShrine)),
                     handle_well_salvage_slot_click.run_if(in_state(UIState::WellShrine)),
@@ -1389,39 +1425,40 @@ impl Plugin for UIPlugin {
                         .run_if(in_state(UIState::WellShrine)),
                     cleanup_well_shrine_selection,
                 )
-                    .in_set(OnUpdate(GameState::Main)),
+                    .run_if(in_state(GameState::Main)),
             )
-            .add_system(
+            .add_systems(Update, 
                 active_skill_shrine_ui::setup_active_skill_shrine_overwrite_ui
                     .before(CustomFlush)
                     .run_if(
-                        state_changed::<UIState>()
+                        state_changed::<UIState>
                             .and_then(in_state(UIState::ActiveSkills))
-                            .and_then(resource_exists::<ActiveSkillShrineOverwrite>()),
+                            .and_then(resource_exists::<ActiveSkillShrineOverwrite>),
                     )
-                    .in_set(OnUpdate(GameState::Main)),
+                    .chain()
+                    .run_if(in_state(GameState::Main)),
             )
-            .add_systems((setup_class_selection_ui
+            .add_systems(Update, (setup_class_selection_ui
                 .before(CustomFlush)
-                .run_if(state_changed::<UIState>().and_then(in_state(UIState::ClassSelection))),
+                .run_if(state_changed::<UIState>.and_then(in_state(UIState::ClassSelection))),
                 update_class_unlock_warnings
                     .run_if(in_state(UIState::ClassSelection).and_then(
-                        resource_changed::<crate::player::achievements::Achievements>()
-                            .or_else(resource_changed::<crate::player::UnlockedClasses>())
+                        resource_changed::<crate::player::achievements::Achievements>
+                            .or_else(resource_changed::<crate::player::UnlockedClasses>)
                     )),))
-            .add_systems(
-                (
-                    handle_anim_events.run_if(in_state(UIState::ItemChest)),
+            .add_systems(Update, (
+                    handle_anim_events
+                        .run_if(in_state(UIState::ItemChest))
+                        .run_if(resource_exists::<ItemChestState>),
                     update_chest_button_label_hover.run_if(in_state(UIState::ItemChest)),
                     tick_skill_choice_interaction_lock_timers,
                 )
-                    .in_set(OnUpdate(GameState::Main)),
+                    .chain()
+                    .run_if(in_state(GameState::Main)),
             )
-            .add_systems(
-                (
+            .add_systems(Update, (
                     tick_skill_cooldown_overlays,
-                    update_player_movement_cooldown_bar
-                        .after(tick_skill_cooldown_overlays),
+                    update_player_movement_cooldown_bar,
                     player_hud::handle_active_skill_event
                         .run_if(is_not_paused)
                         .after(crate::player::skill_heirlooms::handle_active_skill_event),
@@ -1432,27 +1469,27 @@ impl Plugin for UIPlugin {
                     handle_clamp_screen_locked_icons_worldpos,
                     add_guide_to_unique_objs,
                     toggle_skills_visibility,
-                    toggle_item_chest_visibility.run_if(resource_exists::<ItemChestState>()),
+                    toggle_item_chest_visibility.run_if(resource_exists::<ItemChestState>),
                     update_mana_bar,
                     player_hud::update_pet_skill_hud_slot,
                     player_hud::tick_pet_skill_cooldown_overlay,
-                    player_hud::handle_pet_skill_hud_tooltip
-                        .after(player_hud::update_pet_skill_hud_slot),
+                    player_hud::handle_pet_skill_hud_tooltip,
                     spawn_tile_hover_on_cursor_move,
                 )
-                    .in_set(OnUpdate(GameState::Main)),
+                    .chain()
+                    .run_if(in_state(GameState::Main)),
             )
-            .add_systems(
-                (
-                    refresh_interact_guide_on_shrine_repair
-                        .before(spawn_shrine_interact_key_guide),
+            .add_systems(Update, (
+                    refresh_interact_guide_on_shrine_repair,
                     spawn_shrine_interact_key_guide,
                 )
-                    .in_set(OnUpdate(GameState::Main)),
+                    .chain()
+                    .run_if(in_state(GameState::Main)),
             )
-            .add_systems(
-                (
-                    shuffle_items.run_if(in_state(UIState::ItemChest)),
+            .add_systems(Update, (
+                    shuffle_items
+                        .run_if(in_state(UIState::ItemChest))
+                        .run_if(resource_exists::<ItemChestState>),
                     handle_skill_reroll_after_flash.run_if(in_state(UIState::Skills)),
                     handle_cursor_reroll_dice_buttons.run_if(in_state(UIState::Skills)),
                     handle_cursor_banish_buttons.run_if(in_state(UIState::Skills)),
@@ -1475,10 +1512,10 @@ impl Plugin for UIPlugin {
                         .before(handle_item_drop_clicks)
                         .run_if(in_state(UIState::InventoryCrafting)),
                 )
-                    .in_set(OnUpdate(GameState::Main)),
+                    .chain()
+                    .run_if(in_state(GameState::Main)),
             )
-            .add_systems(
-                (
+            .add_systems(Update, (
                     handle_dev_heirloom_picker_toggle.run_if(in_state(UIState::Inventory)),
                     handle_dev_heirloom_picker_clicks.run_if(in_state(UIState::Inventory)),
                     handle_dev_skill_picker_toggle.run_if(in_state(UIState::Inventory)),
@@ -1489,19 +1526,19 @@ impl Plugin for UIPlugin {
                     apply_revoke_heirloom_dev.run_if(in_state(UIState::Inventory)),
                     apply_grant_skill_dev.run_if(in_state(UIState::Inventory)),
                 )
-                    .in_set(OnUpdate(GameState::Main)),
+                    .chain()
+                    .run_if(in_state(GameState::Main)),
             )
-            .add_systems(
-                (
+            .add_systems(Update, (
                     crate::ui::inventory_ui::handle_blueprint_pagination_clicks
                         .run_if(in_state(UIState::InventoryCrafting)),
                     crate::ui::inventory_ui::refresh_blueprints_on_pagination_change
                         .run_if(in_state(UIState::InventoryCrafting)),
                 )
-                    .in_set(OnUpdate(GameState::Main)),
+                    .chain()
+                    .run_if(in_state(GameState::Main)),
             )
-            .add_systems(
-                (
+            .add_systems(Update, (
                     update_banish_tracker_ui
                         .run_if(in_state(UIState::Skills).or_else(in_state(UIState::ItemChest))),
                     handle_banish_tracker_tooltip
@@ -1511,22 +1548,23 @@ impl Plugin for UIPlugin {
                         .after(handle_cursor_skills_buttons),
                     process_heirloom_tooltip_requests,
                 )
-                    .in_set(OnUpdate(GameState::Main)),
+                    .run_if(in_state(GameState::Main)),
             )
-            .add_system(
-                process_heirloom_tooltip_requests.in_set(OnUpdate(GameState::MainMenu)),
+            .add_systems(Update, 
+                process_heirloom_tooltip_requests.run_if(in_state(GameState::MainMenu)),
             )
-            .add_systems((
-                auto_equip_upgrade_slot_on_inv_close
-                    .before(handle_new_ui_state)
-                    .in_base_set(CoreSet::PostUpdate),
-                handle_new_ui_state.in_base_set(CoreSet::PostUpdate),
+            // Must run in PostUpdate: click handlers set NextState in Update, and
+            // StateTransition clears Pending before the next Update. Pre-0.19 this
+            // lived in CoreSet::PostUpdate; migrating it to Update left skill/heirloom
+            // choice UI stuck on screen after Close.
+            .add_systems(PostUpdate, (
+                auto_equip_upgrade_slot_on_inv_close.before(handle_new_ui_state),
+                handle_new_ui_state,
                 sync_client_pause_with_modal_overlays
                     .after(handle_new_ui_state)
-                    .in_base_set(CoreSet::PostUpdate)
                     .run_if(in_state(GameState::Main)),
             ))
-            .add_systems((
+            .add_systems(Update, (
                 handle_class_selection.run_if(in_state(UIState::ClassSelection)),
                 handle_slot_deselection.run_if(in_state(UIState::ClassSelection)),
                 update_preview_sprites.run_if(in_state(UIState::ClassSelection)),
@@ -1541,92 +1579,101 @@ impl Plugin for UIPlugin {
                 update_skill_unlock_confirm_panel.run_if(in_state(UIState::ClassSelection)),
                 handle_portal_animation.run_if(in_state(UIState::ClassSelection)),
             ))
-            .add_system(
+            .add_systems(OnEnter(GameState::Main), 
                 init_goal_state
                     .after(setup_currency_ui)
                     .run_if(run_once_per_run())
-                    .in_schedule(OnEnter(GameState::Main)),
+                    ,
             )
-            .add_system(
+            .add_systems(OnEnter(GameState::Main), 
                 display_goal_text
                     .after(setup_currency_ui)
-                    .run_if(resource_added::<GoalState>())
-                    .in_schedule(OnEnter(GameState::Main)),
+                    .run_if(resource_added::<GoalState>)
+                    ,
             )
-            .add_systems(
-                (
+            .add_systems(Update, (
                     handle_goal_state_updates,
                     handle_goal_reset_on_era_change,
                     display_goal_text.after(setup_currency_ui),
                 )
-                    .in_set(OnUpdate(GameState::Main)),
+                    .run_if(in_state(GameState::Main)),
             )
-            .add_system(
+            .add_systems(Update, 
                 handle_sort_inventory_button_click
                     .run_if(
                         in_state(UIState::Inventory)
                             .or_else(in_state(UIState::InventoryCrafting))
                             .or_else(in_state(UIState::Crafting)),
                     )
-                    .in_set(OnUpdate(GameState::Main)),
+                    .run_if(in_state(GameState::Main)),
             )
-            .add_system(
+            .add_systems(Update, 
                 handle_material_drops_toggle_button_click
                     .run_if(
                         in_state(UIState::Inventory)
                             .or_else(in_state(UIState::InventoryCrafting))
                             .or_else(in_state(UIState::Crafting)),
                     )
-                    .in_set(OnUpdate(GameState::Main)),
+                    .run_if(in_state(GameState::Main)),
             )
-            .add_system(
+            .add_systems(Update, 
                 handle_damage_tracker_toggle_button_click
                     .run_if(
                         in_state(UIState::Inventory)
                             .or_else(in_state(UIState::InventoryCrafting)),
                     )
-                    .in_set(OnUpdate(GameState::Main)),
+                    .run_if(in_state(GameState::Main)),
             )
-            .add_system(
+            .add_systems(Update, 
                 handle_material_drop_filter_menu_click
                     .run_if(
                         in_state(UIState::Inventory)
                             .or_else(in_state(UIState::InventoryCrafting))
                             .or_else(in_state(UIState::Crafting)),
                     )
-                    .in_set(OnUpdate(GameState::Main)),
+                    .run_if(in_state(GameState::Main)),
             )
-            .add_system(handle_hovering.run_if(ui_hover_interactions_condition).after(crate::ui::inventory_ui::update_inventory_ui))
-            .add_system(
+            .add_systems(Update, handle_hovering.run_if(ui_hover_interactions_condition).after(crate::ui::inventory_ui::update_inventory_ui))
+            .add_systems(Update, 
                 handle_crafting_ingredient_tooltip_hover
                     .run_if(in_state(UIState::InventoryCrafting))
-                    .in_set(OnUpdate(GameState::Main)),
+                    .run_if(in_state(GameState::Main)),
             )
-            .add_system(handle_cursor_main_menu_buttons)
-            .add_system(
+            .add_systems(Update, handle_cursor_main_menu_buttons)
+            .add_systems(Update, 
                 handle_main_menu_icon_tooltips.run_if(in_state(GameState::MainMenu)),
             )
-            .add_system(update_achievements_notification_icon.run_if(in_state(GameState::MainMenu)));
+            .add_systems(Update, update_achievements_notification_icon.run_if(in_state(GameState::MainMenu)));
 
         app.add_systems(
+            Update,
             (
                 debug_trigger_achievement_banner,
                 handle_achievement_banner_events,
                 update_achievement_banners,
             )
-                .in_set(OnUpdate(GameState::Main)),
+                .run_if(in_state(GameState::Main)),
         );
 
-        app.add_system(update_currency_text.run_if(in_state(GameState::Main)))
-            .add_system(update_chaos_ui.run_if(in_state(GameState::Main)))
-            .add_system(update_score_text.run_if(resource_changed::<RunScore>()))
-            .add_system(player_hud::update_skill_charge_text.run_if(in_state(GameState::Main)))
-            .add_system(apply_system_buffers.in_set(CustomFlush));
+        app.add_systems(
+            Update,
+            update_currency_text.run_if(in_state(GameState::Main)),
+        )
+        .add_systems(Update, update_chaos_ui.run_if(in_state(GameState::Main)))
+        .add_systems(
+            Update,
+            update_score_text.run_if(resource_changed::<RunScore>),
+        )
+        .add_systems(
+            Update,
+            player_hud::update_skill_charge_text.run_if(in_state(GameState::Main)),
+        )
+        .add_systems(Update, ApplyDeferred.in_set(CustomFlush));
     }
 }
 
 fn ui_hover_interactions_condition(state: Res<State<GameState>>) -> bool {
-    state.0 == GameState::Main || state.0 == GameState::MainMenu
+    *state == GameState::Main || *state == GameState::MainMenu
 }
 
 /// Runs just before [`handle_new_ui_state`] in `PostUpdate`. When the main inventory is being
@@ -1641,16 +1688,17 @@ pub fn auto_equip_upgrade_slot_on_inv_close(
     mut inv_slots: Query<&mut InventorySlotState>,
     proto: ProtoParam,
 ) {
-    if !curr_ui_state.0.is_main_inventory() {
+    if !curr_ui_state.get().is_main_inventory() {
         return;
     }
-    let Some(next_ui) = &next_ui_state.0 else {
-        return;
+    let next_ui = match &*next_ui_state {
+        NextState::Pending(s) | NextState::PendingIfNeq(s) => s,
+        NextState::Unchanged => return,
     };
-    if !matches!(next_ui, UIState::Closed) && *next_ui != curr_ui_state.0 {
+    if !matches!(next_ui, UIState::Closed) && next_ui != curr_ui_state.get() {
         return;
     }
-    if let Ok(mut inv) = inv.get_single_mut() {
+    if let Ok(mut inv) = inv.single_mut() {
         try_auto_equip_from_upgrade_slot(&mut inv, &proto, &mut inv_slots);
     }
 }
@@ -1666,7 +1714,7 @@ pub fn sync_client_pause_with_modal_overlays(
     tutorial_replay_pending: Option<Res<tutorial_ui::TutorialReplayRequested>>,
     mut next_client_state: ResMut<NextState<ClientState>>,
 ) {
-    let should_pause = ui_state.0 != UIState::Closed
+    let should_pause = *ui_state != UIState::Closed
         || !tip_boxes.is_empty()
         || minimap_open.0
         || !tutorial_ui.is_empty()
@@ -1695,21 +1743,25 @@ pub fn handle_new_ui_state(
     shop: Option<Res<EssenceShopChoices>>,
     mut shop_cache: ResMut<EssenceShopCache>,
 ) {
-    if next_ui_state.0.is_none() {
+    if matches!(&*next_ui_state, NextState::Unchanged) {
         return;
     }
-    let next_ui = next_ui_state.0.as_ref().unwrap().clone();
+    let next_ui = match &*next_ui_state {
+        NextState::Pending(s) | NextState::PendingIfNeq(s) => s.clone(),
+        NextState::Unchanged => return,
+    };
 
     let mut should_close_self = false;
     let should_reset_crafting_container =
-        next_ui != curr_ui_state.0 && curr_ui_state.0.is_inv_open();
+        next_ui != *curr_ui_state.get() && curr_ui_state.get().is_inv_open();
     if *DEBUG {
         debug!(
             "UI State Changed: {:?} -> {:?} | should reset: {should_reset_crafting_container:?}",
-            curr_ui_state.0, next_ui
+            *curr_ui_state.get(),
+            next_ui
         );
     }
-    if next_ui == curr_ui_state.0 {
+    if next_ui == *curr_ui_state.get() {
         next_ui_state.set(UIState::Closed);
         should_close_self = true;
     }
@@ -1726,43 +1778,47 @@ pub fn handle_new_ui_state(
     // time setup_inv_ui spawns the panel it starts off-screen and the filter button reflects
     // the closed state.
     let leaving_inventory = should_close_self
-        || (curr_ui_state.0 == UIState::Inventory && next_ui != UIState::Inventory);
+        || (*curr_ui_state.get() == UIState::Inventory && next_ui != UIState::Inventory);
     if leaving_inventory && drop_filter_menu_open.0 {
         drop_filter_menu_open.0 = false;
     }
-    if should_close_self || curr_ui_state.0 != next_ui {
+    if should_close_self || *curr_ui_state.get() != next_ui {
         for e in item_tooltips.iter() {
-            if let Some(ec) = commands.get_entity(e) {
-                ec.despawn_recursive();
+            if let Ok(mut ec) = commands.get_entity(e) {
+                ec.despawn();
             }
         }
     }
     for (e, ui) in old_ui.iter() {
         if *ui != next_ui || should_close_self {
-            if let Some(entity_commands) = commands.get_entity(e) {
-                entity_commands.despawn_recursive();
+            if let Ok(mut entity_commands) = commands.get_entity(e) {
+                entity_commands.despawn();
             }
         }
     }
     if let Some(chest) = chest_option {
-        if let Some(mut chest_parent) = commands.get_entity(chest.parent) {
-            chest_parent.insert(chest.to_owned());
+        if let Ok(mut chest_parent) = commands.get_entity(chest.parent) {
+            chest_parent.insert(ChestInventory {
+                items: chest.items.clone(),
+            });
         }
         if next_ui != UIState::Chest {
             commands.remove_resource::<ChestContainer>();
         }
     }
     if let Some(scrapper) = scrapper_option {
-        if let Some(mut scrapper_parent) = commands.get_entity(scrapper.parent) {
-            scrapper_parent.insert(scrapper.to_owned());
+        if let Ok(mut scrapper_parent) = commands.get_entity(scrapper.parent) {
+            scrapper_parent.insert(ScrapperInventory {
+                items: scrapper.items.clone(),
+            });
         }
         if next_ui != UIState::Scrapper {
             commands.remove_resource::<ScrapperContainer>();
         }
     }
     if let Some(furnace) = furnace_option {
-        if let Some(mut furnace_parent) = commands.get_entity(furnace.parent) {
-            furnace_parent.insert(furnace.to_owned());
+        if let Ok(mut furnace_parent) = commands.get_entity(furnace.parent) {
+            furnace_parent.insert(furnace.to_inventory());
         }
         if next_ui != UIState::Furnace {
             commands.remove_resource::<FurnaceContainer>();
@@ -1772,37 +1828,49 @@ pub fn handle_new_ui_state(
         commands.remove_resource::<CraftingContainer>();
     }
     if next_ui != UIState::Essence {
-        if curr_ui_state.0 == UIState::Essence {
+        if curr_ui_state.get() == &UIState::Essence {
             if let Some(shop) = shop.as_ref() {
                 sync_merchant_shop_to_world(shop, &mut commands, &mut shop_cache);
             }
         }
         commands.remove_resource::<EssenceShopChoices>();
     }
-    if let Some(next_ui) = &next_ui_state.0 {
+    // Tear down chest state with the UI (not on Take click) so ItemChest systems
+    // never see UIState::ItemChest without ItemChestState under Bevy 0.19.
+    if next_ui != UIState::ItemChest || should_close_self {
+        commands.remove_resource::<ItemChestState>();
+    }
+    if matches!(
+        &*next_ui_state,
+        NextState::Pending(next_ui) | NextState::PendingIfNeq(next_ui)
+            if next_ui.is_inv_open()
+    ) {
         for (entity, mut hbv, mut state) in hotbar_slots.iter_mut() {
             if !state.r#type.is_hotbar() {
                 continue;
             }
-            if !next_ui.is_inv_open() {
-                state.dirty = true;
-            }
             commands.entity(entity).remove::<Focusable>();
-            *hbv = if next_ui.is_inv_open() {
-                Visibility::Hidden
-            } else {
-                Visibility::Inherited
-            };
+            *hbv = Visibility::Hidden;
+        }
+    } else if matches!(
+        &*next_ui_state,
+        NextState::Pending(next_ui) | NextState::PendingIfNeq(next_ui)
+            if !next_ui.is_inv_open()
+    ) {
+        for (entity, mut hbv, mut state) in hotbar_slots.iter_mut() {
+            if !state.r#type.is_hotbar() {
+                continue;
+            }
+            state.dirty = true;
+            commands.entity(entity).remove::<Focusable>();
+            *hbv = Visibility::Inherited;
         }
     }
     info!("{:?}", next_ui);
     let has_tip_boxes = !tip_boxes.is_empty();
     let minimap_is_open = minimap_open.0;
 
-    if next_ui_state.0.as_ref().unwrap() != &UIState::Closed
-        || has_tip_boxes
-        || minimap_is_open
-    {
+    if next_ui != UIState::Closed || has_tip_boxes || minimap_is_open {
         next_client_state.set(ClientState::Paused);
     } else {
         next_client_state.set(ClientState::Unpaused);
@@ -1840,27 +1908,21 @@ pub fn grant_iframes_after_chest_or_levelup_ui_close(
     player: Query<Entity, With<Player>>,
 ) {
     let prev = prev_ui_state.clone();
-    *prev_ui_state = curr_ui_state.0.clone();
+    *prev_ui_state = curr_ui_state.get().clone();
 
-    if curr_ui_state.0 == prev || curr_ui_state.0 != UIState::Closed {
+    if *curr_ui_state.get() == prev || *curr_ui_state.get() != UIState::Closed {
         return;
     }
 
-    let was_reward_ui = !matches!(
-        prev,
-        UIState::Inventory | UIState::Options
-    );
+    let was_reward_ui = !matches!(prev, UIState::Inventory | UIState::Options);
     if !was_reward_ui {
         return;
     }
 
-    let Ok(player_e) = player.get_single() else {
+    let Ok(player_e) = player.single() else {
         return;
     };
     commands
         .entity(player_e)
-        .insert(InvincibilityTimer(Timer::from_seconds(
-            1.,
-            TimerMode::Once,
-        )));
+        .insert(InvincibilityTimer(Timer::from_seconds(1., TimerMode::Once)));
 }

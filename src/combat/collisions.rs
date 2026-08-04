@@ -1,4 +1,5 @@
 use super::{try_add_slow_stacks, HitEvent, HitMarker, InvincibilityTimer, StatusEffectEvent};
+use crate::aseprite_helpers::start;
 use crate::blessings::OwnedBlessings;
 use crate::client::is_not_paused;
 use crate::combat::LifestealEvent;
@@ -45,7 +46,9 @@ use crate::{
     ui::{damage_numbers::FloatingTextQueue, global_text_message::GlobalTextMessageEvent},
 };
 use bevy::prelude::*;
-use bevy_rapier2d::prelude::{Collider, CollisionEvent, RapierContext};
+use bevy_rapier2d::prelude::{
+    Collider, CollisionEvent, RapierContext, ReadRapierContext, WriteRapierContext,
+};
 use rand::Rng;
 
 use crate::pets::state::Pet;
@@ -56,8 +59,9 @@ pub struct CollisionPlugion;
 impl Plugin for CollisionPlugion {
     fn build(&self, app: &mut App) {
         app.add_systems(
+            Update,
             (
-                add_contact_damage_to_cactuses.in_set(OnUpdate(GameState::Main)),
+                add_contact_damage_to_cactuses.run_if(in_state(GameState::Main)),
                 check_melee_hit_collisions.run_if(is_not_paused),
                 check_boss_to_objects_collisions.run_if(is_not_paused),
                 check_mob_to_player_collisions.run_if(is_not_paused),
@@ -75,9 +79,10 @@ impl Plugin for CollisionPlugion {
                 attach_chest_pickup_delay,
                 tick_chest_pickup_delay.run_if(is_not_paused),
             )
-                .in_set(OnUpdate(GameState::Main)),
+                .run_if(in_state(GameState::Main)),
         )
-        .add_system(
+        .add_systems(
+            Update,
             check_item_drop_collisions
                 .after(CustomFlush)
                 .run_if(in_state(GameState::Main).or_else(in_state(GameState::Initializing))),
@@ -108,14 +113,17 @@ fn add_contact_damage_to_cactuses(
 fn check_contact_damage_collisions(
     player: Query<(Entity, &GlobalTransform, &Defence), With<Player>>,
     hazards: Query<(&ContactDamage, &GlobalTransform)>,
-    rapier_context: Res<RapierContext>,
-    mut hit_event: EventWriter<HitEvent>,
+    rapier_context: ReadRapierContext,
+    mut hit_event: MessageWriter<HitEvent>,
     in_i_frame: Query<&InvincibilityTimer>,
 ) {
-    let Ok((player_e, player_txfm, defence)) = player.get_single() else {
+    let Ok(rapier_context) = rapier_context.single() else {
         return;
     };
-    for (e1, e2, _) in rapier_context.intersections_with(player_e) {
+    let Ok((player_e, player_txfm, defence)) = player.single() else {
+        return;
+    };
+    for (e1, e2, _) in rapier_context.intersection_pairs_with(player_e) {
         if e1 != player_e {
             continue;
         }
@@ -129,7 +137,7 @@ fn check_contact_damage_collisions(
         let hazard_pos = hazard_txfm.translation().truncate();
         let dir = (player_pos - hazard_pos).normalize_or_zero();
         let damage = defence.apply_to_damage(contact_damage.0);
-        hit_event.send(HitEvent {
+        hit_event.write(HitEvent {
             hit_entity: player_e,
             damage,
             dir,
@@ -149,12 +157,12 @@ fn check_contact_damage_collisions(
 
 fn check_melee_hit_collisions(
     mut commands: Commands,
-    context: ResMut<RapierContext>,
+    context: ReadRapierContext,
     weapons: Query<
-        (Entity, &Parent, &GlobalTransform, &WorldObject),
+        (Entity, &ChildOf, &GlobalTransform, &WorldObject),
         (Without<HitMarker>, With<MainHand>),
     >,
-    mut hit_event: EventWriter<HitEvent>,
+    mut hit_event: MessageWriter<HitEvent>,
     game: GameParam,
     world_obj: Query<Entity, (With<WorldObject>, Without<MainHand>)>,
     mobs: Query<
@@ -167,14 +175,19 @@ fn check_melee_hit_collisions(
     anim: Query<&PlayerAnimation>,
     mut hit_tracker: Local<Vec<Entity>>,
 ) {
-    let anim = anim.single();
+    let Ok(context) = context.single() else {
+        return;
+    };
+    let Ok(anim) = anim.single() else {
+        return;
+    };
     if !anim.is_an_attack() {
         hit_tracker.clear();
     }
-    if let Ok((weapon_e, weapon_parent, weapon_t, weapon_obj)) = weapons.get_single() {
-        let hits_this_frame = context.intersection_pairs().filter(|c| {
-            (c.0 == weapon_e && c.1 != weapon_parent.get())
-                || (c.1 == weapon_e && c.0 != weapon_parent.get())
+    if let Ok((weapon_e, weapon_parent, weapon_t, weapon_obj)) = weapons.single() {
+        let hits_this_frame = context.intersection_pairs_with(weapon_e).filter(|c| {
+            (c.0 == weapon_e && c.1 != weapon_parent.parent())
+                || (c.1 == weapon_e && c.0 != weapon_parent.parent())
         });
         for hit in hits_this_frame {
             let hit_entity = if hit.0 == weapon_e { hit.1 } else { hit.0 };
@@ -204,7 +217,7 @@ fn check_melee_hit_collisions(
             }
             let delta = weapon_t.translation() - mob_txfm.translation();
 
-            hit_event.send(HitEvent {
+            hit_event.write(HitEvent {
                 hit_entity,
                 hit_by_pet: None,
                 damage: damage as i32,
@@ -266,8 +279,8 @@ fn check_projectile_hit_mob_collisions(
             Without<WaterCollider>, // Don't hit water tile colliders
         ),
     >,
-    mut hit_event: EventWriter<HitEvent>,
-    mut collisions: EventReader<CollisionEvent>,
+    mut hit_event: MessageWriter<HitEvent>,
+    mut collisions: MessageReader<CollisionEvent>,
     mut projectiles: Query<
         (
             Entity,
@@ -280,17 +293,17 @@ fn check_projectile_hit_mob_collisions(
         Without<EnemyProjectile>,
     >,
     proj_transforms: Query<&GlobalTransform, Without<EnemyProjectile>>,
-    mut children: Query<&Parent>,
+    mut children: Query<&ChildOf>,
     mut status_check: Query<&mut crate::combat::status_effects::MobStatusEffects>,
     nearby_mobs: Query<(Entity, &GlobalTransform), With<Mob>>,
     mut game: GameParam,
-    mut status_event: EventWriter<StatusEffectEvent>,
+    mut status_event: MessageWriter<StatusEffectEvent>,
     pet_check: Query<Entity, With<PetProjectileMarker>>,
     from_active_skill_q: Query<(), With<FromActiveSkill>>,
     player_skills: Query<&PlayerSkills, With<Player>>,
-    mut lifesteal_events: EventWriter<LifestealEvent>,
+    mut lifesteal_events: MessageWriter<LifestealEvent>,
 ) {
-    for evt in collisions.iter() {
+    for evt in collisions.read() {
         let CollisionEvent::Started(e1, e2, _) = evt else {
             continue;
         };
@@ -299,7 +312,7 @@ fn check_projectile_hit_mob_collisions(
             let (proj_entity, mut state, proj, att, ice_aoe, spear_att) =
                 if let Ok(parent_e) = children.get_mut(*e1) {
                     if let Ok((proj_entity, state, proj, att, ice_aoe, spear_att)) =
-                        projectiles.get_mut(parent_e.get())
+                        projectiles.get_mut(parent_e.parent())
                     {
                         //collider is on the child, proj data on the parent
                         (proj_entity, state, proj, att, ice_aoe, spear_att)
@@ -319,7 +332,7 @@ fn check_projectile_hit_mob_collisions(
                 } else {
                     continue;
                 };
-            let Ok((player_e, children)) = player_attack.get_single() else {
+            let Ok((player_e, children)) = player_attack.single() else {
                 continue;
             };
             if player_e == *e2 || children.contains(e2) || !allowed_targets.contains(*e2) {
@@ -354,7 +367,7 @@ fn check_projectile_hit_mob_collisions(
             // current crit chance (e.g. 50% crit chance => +50% crit damage on volley arrows).
             let bonus_crit_damage = if *proj == Projectile::ArrowVolleyShot {
                 game.player_stats
-                    .get_single()
+                    .single()
                     .map(|stats| stats.3 .0)
                     .unwrap_or(0)
             } else {
@@ -416,12 +429,12 @@ fn check_projectile_hit_mob_collisions(
             // ThornsLifesteal: Apply lifesteal for ThornsProjectile hits
             let is_thorns_projectile = *proj == Projectile::ThornsProjectile;
             if is_thorns_projectile {
-                if let Ok(skills) = player_skills.get_single() {
+                if let Ok(skills) = player_skills.single() {
                     let thorns_lifesteal_stacks = skills.get_count(Heirloom::ThornsLifesteal);
                     if thorns_lifesteal_stacks > 0 {
                         game.heirloom_trigger_counts
                             .increment(Heirloom::ThornsLifesteal);
-                        lifesteal_events.send(LifestealEvent {
+                        lifesteal_events.write(LifestealEvent {
                             thorns_lifesteal_stacks,
                             is_direct_player_damage: false,
                         });
@@ -429,7 +442,7 @@ fn check_projectile_hit_mob_collisions(
                 }
             }
 
-            hit_event.send(HitEvent {
+            hit_event.write(HitEvent {
                 hit_by_pet: pet_check.get(*e1).ok(),
                 hit_entity: *e2,
                 damage: damage as i32,
@@ -450,7 +463,7 @@ fn check_projectile_hit_mob_collisions(
             {
                 state.world_object_pierce_count += 1;
                 if state.world_object_pierce_count >= ARROW_MAX_WORLD_OBJECT_PIERCES {
-                    commands.entity(proj_entity).despawn_recursive();
+                    commands.entity(proj_entity).despawn();
                     continue;
                 }
             }
@@ -472,7 +485,7 @@ fn check_projectile_hit_mob_collisions(
 
             //non-animating sprites are despawned immediately
             if state.despawn_on_hit {
-                commands.entity(proj_entity).despawn_recursive();
+                commands.entity(proj_entity).despawn();
             }
         }
     }
@@ -493,8 +506,8 @@ fn check_multihit_projectile_ongoing_collisions(
             Without<WaterCollider>, // Don't hit water tile colliders
         ),
     >,
-    mut hit_event: EventWriter<HitEvent>,
-    rapier_context: Res<RapierContext>,
+    mut hit_event: MessageWriter<HitEvent>,
+    rapier_context: ReadRapierContext,
     mut projectiles: Query<
         (
             Entity,
@@ -511,10 +524,13 @@ fn check_multihit_projectile_ongoing_collisions(
     mut status_check: Query<&mut crate::combat::status_effects::MobStatusEffects>,
     nearby_mobs: Query<(Entity, &GlobalTransform), With<Mob>>,
     game: GameParam,
-    mut status_event: EventWriter<StatusEffectEvent>,
+    mut status_event: MessageWriter<StatusEffectEvent>,
     pet_check: Query<Entity, With<PetProjectileMarker>>,
     from_active_skill_q: Query<(), With<FromActiveSkill>>,
 ) {
+    let Ok(rapier_context) = rapier_context.single() else {
+        return;
+    };
     // Only process multi-hit projectiles (FireRing, LaserBeam)
     for (proj_entity, mut state, proj, att, ice_aoe, spear_att) in projectiles.iter_mut() {
         if *proj != Projectile::FireRing && *proj != Projectile::LaserBeam {
@@ -532,7 +548,7 @@ fn check_multihit_projectile_ongoing_collisions(
         };
 
         for collider_entity in entities_to_check {
-            for (e1, e2, _) in rapier_context.intersections_with(collider_entity) {
+            for (e1, e2, _) in rapier_context.intersection_pairs_with(collider_entity) {
                 for (e1, e2) in [(e1, e2), (e2, e1)] {
                     // Find which entity is the projectile/collider and which is the target
                     let target_e = if e1 == collider_entity {
@@ -543,7 +559,7 @@ fn check_multihit_projectile_ongoing_collisions(
                         continue;
                     };
 
-                    let Ok((player_e, player_children)) = player_attack.get_single() else {
+                    let Ok((player_e, player_children)) = player_attack.single() else {
                         continue;
                     };
                     if player_e == target_e
@@ -626,7 +642,7 @@ fn check_multihit_projectile_ongoing_collisions(
                         _ => None,
                     };
 
-                    hit_event.send(HitEvent {
+                    hit_event.write(HitEvent {
                         hit_by_pet: pet_check.get(collider_entity).ok(),
                         hit_entity: target_e,
                         damage: damage as i32,
@@ -673,8 +689,8 @@ fn check_projectile_hit_player_collisions(
         ),
     >,
     lunge_states: Query<&LungeState, With<Player>>,
-    mut hit_event: EventWriter<HitEvent>,
-    mut collisions: EventReader<CollisionEvent>,
+    mut hit_event: MessageWriter<HitEvent>,
+    mut collisions: MessageReader<CollisionEvent>,
     mut projectiles: Query<
         (
             Entity,
@@ -685,11 +701,11 @@ fn check_projectile_hit_player_collisions(
         ),
         With<EnemyProjectile>,
     >,
-    mut parry_events: EventWriter<ParrySuccessEvent>,
-    mut ranged_attack_event: EventWriter<RangedAttackEvent>,
-    mut children: Query<&Parent>,
+    mut parry_events: MessageWriter<ParrySuccessEvent>,
+    mut ranged_attack_event: MessageWriter<RangedAttackEvent>,
+    mut children: Query<&ChildOf>,
 ) {
-    for evt in collisions.iter() {
+    for evt in collisions.read() {
         let CollisionEvent::Started(e1, e2, _) = evt else {
             continue;
         };
@@ -698,7 +714,7 @@ fn check_projectile_hit_player_collisions(
                 children.get_mut(*e1)
             {
                 if let Ok((proj_entity, state, proj, att, enemy_proj)) =
-                    projectiles.get_mut(e.get())
+                    projectiles.get_mut(e.parent())
                 {
                     (proj_entity, state, proj, att, enemy_proj)
                 } else {
@@ -747,14 +763,14 @@ fn check_projectile_hit_player_collisions(
             // Ignore projectile hits if lunging (lunge duration is active)
             // Check if lunge has started (percent > 0) but not finished (percent < 1.0)
             if let Ok(lunge_state) = lunge_states.get(*e2) {
-                let lunge_percent = lunge_state.lunge_duration.percent();
+                let lunge_percent = lunge_state.lunge_duration.fraction();
                 if lunge_percent > 0.0 && lunge_percent < 1.0 {
                     continue;
                 }
             }
             if let Some(ref mut parry) = parry_option {
                 if parry.active && !parry.success {
-                    parry_events.send(ParrySuccessEvent(*e1));
+                    parry_events.write(ParrySuccessEvent(*e1));
                     hit_successful = false;
                     parry.success = true;
 
@@ -767,7 +783,7 @@ fn check_projectile_hit_player_collisions(
                         .insert(PlayerAnimation::ParryHit);
 
                     //deflected proj
-                    ranged_attack_event.send(RangedAttackEvent {
+                    ranged_attack_event.write(RangedAttackEvent {
                         projectile: proj.clone(),
                         direction: -state.direction,
                         from_enemy: false,
@@ -778,7 +794,7 @@ fn check_projectile_hit_player_collisions(
                         dmg_override: Some(p_attack.unwrap().0),
                         pos_override: None,
                         spawn_delay: 0.,
-                    })
+                    });
                 }
             }
             if hit_successful {
@@ -789,7 +805,7 @@ fn check_projectile_hit_player_collisions(
                     att.0
                 };
 
-                hit_event.send(HitEvent {
+                hit_event.write(HitEvent {
                     hit_by_pet: None,
                     hit_entity: *e2,
                     damage: final_damage,
@@ -805,7 +821,7 @@ fn check_projectile_hit_player_collisions(
                 });
             }
             if state.despawn_on_hit {
-                commands.entity(proj_entity).despawn_recursive();
+                commands.entity(proj_entity).despawn();
             }
         }
     }
@@ -828,18 +844,20 @@ pub fn check_item_drop_collisions(
     >,
     mut game: GameParam,
     mut inv: Query<&mut Inventory>,
-    mut analytics: EventWriter<AnalyticsUpdateEvent>,
-    mut modify_mana_event: EventWriter<ModifyManaEvent>,
+    mut analytics: MessageWriter<AnalyticsUpdateEvent>,
+    mut modify_mana_event: MessageWriter<ModifyManaEvent>,
     mut text_timer: ResMut<FloatingTextQueue>,
     resolution: Res<ScreenResolution>,
     mut chaos_tracker: ResMut<ChaosTracker>,
-    mut flash_event: EventWriter<FlashExpBarEvent>,
-    mut global_text_events: EventWriter<GlobalTextMessageEvent>,
+    mut flash_event: MessageWriter<FlashExpBarEvent>,
+    mut global_text_events: MessageWriter<GlobalTextMessageEvent>,
     proto: ProtoParam,
     mut beastiary: ResMut<crate::player::beastiary::Beastiary>,
     break_drop_filter: Res<BreakDropFilter>,
 ) {
-    let player_txfm = player.single();
+    let Ok(player_txfm) = player.single() else {
+        return;
+    };
     let player_pos = player_txfm.translation.truncate();
 
     for (e2, item_txfm, item_stack) in item_drops.iter() {
@@ -850,7 +868,7 @@ pub fn check_item_drop_collisions(
         let item_stack = item_stack.clone();
         let obj = item_stack.obj_type;
         if break_drop_filter.blocks_ground_pickup(obj) {
-            commands.entity(e2).despawn_recursive();
+            commands.entity(e2).despawn();
             continue;
         }
         // Bestiary mob cards: never enter inventory, just bump the persistent
@@ -862,7 +880,7 @@ pub fn check_item_drop_collisions(
                 .or_default()
                 .cards_collected += 1;
             crate::client::persist_beastiary_card_pickup(mob.clone());
-            commands.entity(e2).despawn_recursive();
+            commands.entity(e2).despawn();
             commands.spawn(SoundSpawner::new(AudioSoundEffect::ItemPickup, 0.15));
             let item_rarity = proto
                 .get_item_data(obj)
@@ -873,7 +891,7 @@ pub fn check_item_drop_collisions(
             } else {
                 item_rarity.get_color()
             };
-            global_text_events.send(
+            global_text_events.write(
                 GlobalTextMessageEvent::new(
                     format!("{} Card Obtained!", mob_display_name(&mob)),
                     text_color,
@@ -900,8 +918,8 @@ pub fn check_item_drop_collisions(
                 item_stack.clone(),
                 true,
             ));
-            commands.entity(e2).despawn_recursive();
-            analytics.send(AnalyticsUpdateEvent {
+            commands.entity(e2).despawn();
+            analytics.write(AnalyticsUpdateEvent {
                 update_type: AnalyticsTrigger::ItemCollected(obj),
             });
             text_timer.add_item(obj);
@@ -909,14 +927,14 @@ pub fn check_item_drop_collisions(
         } else if obj == WorldObject::ManaOrb {
             let player_skills = game.get_player_skills();
             let mana_from_orb = 10 + player_skills.get_count(Heirloom::ManaOrbs) as i32 * 5;
-            modify_mana_event.send(ModifyManaEvent::gain(
+            modify_mana_event.write(ModifyManaEvent::gain(
                 mana_from_orb,
                 ManaGainSource::ManaOrbs,
             ));
-            analytics.send(AnalyticsUpdateEvent {
+            analytics.write(AnalyticsUpdateEvent {
                 update_type: AnalyticsTrigger::ItemCollected(obj),
             });
-            commands.entity(e2).despawn_recursive();
+            commands.entity(e2).despawn();
             commands.spawn(SoundSpawner::new(AudioSoundEffect::ItemPickup, 0.15));
             continue;
         } else if obj == WorldObject::XPShard
@@ -937,21 +955,24 @@ pub fn check_item_drop_collisions(
             let (did_level, gained_xp) =
                 player_level.add_xp(xp_amount, xp_rate_bonus, &mut chaos_tracker);
 
-            flash_event.send(FlashExpBarEvent {
+            flash_event.write(FlashExpBarEvent {
                 amount: gained_xp,
                 did_level,
             });
 
-            analytics.send(AnalyticsUpdateEvent {
+            analytics.write(AnalyticsUpdateEvent {
                 update_type: AnalyticsTrigger::ItemCollected(obj),
             });
-            commands.entity(e2).despawn_recursive();
+            commands.entity(e2).despawn();
             commands.spawn(SoundSpawner::new(AudioSoundEffect::ItemPickup, 0.15));
             continue;
         }
         let player_has_pet = pets.iter().next().is_some();
-        if !can_auto_equip_weapon_on_pickup(&item_stack, inv.single(), player_has_pet) {
-            let inv_container = inv.single().items.clone();
+        let Ok(inv_ref) = inv.single() else {
+            return;
+        };
+        if !can_auto_equip_weapon_on_pickup(&item_stack, inv_ref, player_has_pet) {
+            let inv_container = inv_ref.items.clone();
             if inv_container
                 .get_first_empty_player_slot_for_pickup(&item_stack, &proto)
                 .is_none()
@@ -963,7 +984,9 @@ pub fn check_item_drop_collisions(
             }
         }
 
-        let mut inv_mut = inv.single_mut();
+        let Ok(mut inv_mut) = inv.single_mut() else {
+            return;
+        };
         if !try_auto_equip_weapon_on_pickup(
             item_stack.clone(),
             &mut inv_mut,
@@ -983,8 +1006,8 @@ pub fn check_item_drop_collisions(
             text_timer.add_item(obj);
         }
 
-        commands.entity(e2).despawn_recursive();
-        analytics.send(AnalyticsUpdateEvent {
+        commands.entity(e2).despawn();
+        analytics.write(AnalyticsUpdateEvent {
             update_type: AnalyticsTrigger::ItemCollected(obj),
         });
         commands.spawn(SoundSpawner::new(AudioSoundEffect::ItemPickup, 0.15));
@@ -1013,17 +1036,18 @@ pub fn check_object_trigger_collisions(
             Without<Collider>,
         ),
     >,
-    rapier_context: Res<RapierContext>,
+    rapier_context: ReadRapierContext,
     items_query: Query<&TouchTriggerObjectAction>,
     chest_delays: Query<&ChestPickupDelay>,
     item_chest_state: Option<Res<ItemChestState>>,
     game: GameParam,
     mut item_action_param: ItemActionParam,
-    mut flower_anim_query: Query<
-        &mut bevy_aseprite::anim::AsepriteAnimation,
-        (With<WorldObject>, Without<Player>),
-    >,
 ) {
+    // Use `item_action_param.aseprite_anims` for flower bounce — a second
+    // `Query<&mut AseAnimation>` here conflicts with ItemActionParam (B0001).
+    let Ok(rapier_context) = rapier_context.single() else {
+        return;
+    };
     if !game.player().is_moving {
         return;
     }
@@ -1031,8 +1055,13 @@ pub fn check_object_trigger_collisions(
     if item_chest_state.is_some() {
         return;
     }
-    let player_e = player.single();
-    let player_pos = player_txfm.single().translation.truncate();
+    let Ok(player_e) = player.single() else {
+        return;
+    };
+    let player_pos = player_txfm
+        .single()
+        .map(|t| t.translation.truncate())
+        .unwrap_or(Vec2::ZERO);
     let mut opened_chest = false;
 
     let chest_ready = |entity: Entity| -> bool {
@@ -1043,7 +1072,7 @@ pub fn check_object_trigger_collisions(
     };
 
     // Collider-backed triggers (chest drops, PinkFlower, etc.): Rapier overlap matches sensor position.
-    'collider_triggers: for (e1, e2, _) in rapier_context.intersections_with(player_e) {
+    'collider_triggers: for (e1, e2, _) in rapier_context.intersection_pairs_with(player_e) {
         for (e1, e2) in [(e1, e2), (e2, e1)] {
             let Ok(_) = player.get(e1) else { continue };
             if !allowed_targets_with_collider.contains(e2) {
@@ -1056,8 +1085,8 @@ pub fn check_object_trigger_collisions(
             }
 
             if matches!(action, TouchTriggerObjectAction::Bounce) {
-                if let Ok(mut anim) = flower_anim_query.get_mut(e2) {
-                    anim.play();
+                if let Ok(mut anim) = item_action_param.aseprite_anims.get_mut(e2) {
+                    start(&mut anim);
                 }
             }
 
@@ -1086,8 +1115,8 @@ pub fn check_object_trigger_collisions(
         }
 
         if matches!(action, TouchTriggerObjectAction::Bounce) {
-            if let Ok(mut anim) = flower_anim_query.get_mut(entity) {
-                anim.play();
+            if let Ok(mut anim) = item_action_param.aseprite_anims.get_mut(entity) {
+                start(&mut anim);
             }
         }
 
@@ -1122,16 +1151,19 @@ fn check_mob_to_player_collisions(
         (&Transform, &Attack, Option<&MobIsAttacking>),
         (Without<Player>, Without<PlayerAttackCollider>),
     >,
-    rapier_context: Res<RapierContext>,
-    mut hit_event: EventWriter<HitEvent>,
-    mut dodge_event: EventWriter<DodgeEvent>,
+    rapier_context: ReadRapierContext,
+    mut hit_event: MessageWriter<HitEvent>,
+    mut dodge_event: MessageWriter<DodgeEvent>,
     in_i_frame: Query<&InvincibilityTimer>,
-    mut parry_events: EventWriter<ParrySuccessEvent>,
-    mut ranged_attack_event: EventWriter<RangedAttackEvent>,
-    mut lifesteal_events: EventWriter<LifestealEvent>,
+    mut parry_events: MessageWriter<ParrySuccessEvent>,
+    mut ranged_attack_event: MessageWriter<RangedAttackEvent>,
+    mut lifesteal_events: MessageWriter<LifestealEvent>,
     mut trigger_counts: ResMut<crate::player::skills::HeirloomTriggerCounts>,
 ) {
-    let (
+    let Ok(rapier_context) = rapier_context.single() else {
+        return;
+    };
+    let Ok((
         player_e,
         player_txfm,
         thorns,
@@ -1145,9 +1177,12 @@ fn check_mob_to_player_collisions(
         owned_blessings,
         player_skills,
         mut thorns_tracker_opt,
-    ) = player.single_mut();
+    )) = player.single_mut()
+    else {
+        return;
+    };
     let mut hit_this_frame = false;
-    for (e1, e2, _) in rapier_context.intersections_with(player_e) {
+    for (e1, e2, _) in rapier_context.intersection_pairs_with(player_e) {
         for (e1, e2) in [(e1, e2), (e2, e1)] {
             if hit_this_frame {
                 continue;
@@ -1177,7 +1212,7 @@ fn check_mob_to_player_collisions(
             // Ignore hits when lunging (lunge duration is active)
             // Check if lunge has started (percent > 0) but not finished (percent < 1.0)
             if let Some(lunge_state) = lunge_opt {
-                let lunge_percent = lunge_state.lunge_duration.percent();
+                let lunge_percent = lunge_state.lunge_duration.fraction();
                 if lunge_percent > 0.0 && lunge_percent < 1.0 {
                     continue;
                 }
@@ -1186,12 +1221,12 @@ fn check_mob_to_player_collisions(
             let already_iframed = in_i_frame.contains(e1);
             let dodged = !already_iframed && rng.gen_ratio(dodge.0.try_into().unwrap_or(0), 100);
             if dodged {
-                dodge_event.send(DodgeEvent { entity: e1 });
+                dodge_event.write(DodgeEvent { entity: e1 });
             } else {
                 let mut hit_successful = true;
                 if let Some(ref mut parry) = parry_option {
                     if parry.active && !parry.success {
-                        parry_events.send(ParrySuccessEvent(e2));
+                        parry_events.write(ParrySuccessEvent(e2));
                         hit_successful = false;
                         parry.success = true;
 
@@ -1210,7 +1245,7 @@ fn check_mob_to_player_collisions(
                     }
                 }
                 if hit_successful {
-                    hit_event.send(HitEvent {
+                    hit_event.write(HitEvent {
                         hit_by_pet: None,
                         hit_entity: e1,
                         damage: defence.apply_to_damage(attack.0),
@@ -1238,13 +1273,13 @@ fn check_mob_to_player_collisions(
                 let thorns_lifesteal_stacks = player_skills.get_count(Heirloom::ThornsLifesteal);
                 if thorns_lifesteal_stacks > 0 {
                     trigger_counts.increment(Heirloom::ThornsLifesteal);
-                    lifesteal_events.send(LifestealEvent {
+                    lifesteal_events.write(LifestealEvent {
                         thorns_lifesteal_stacks,
                         is_direct_player_damage: false,
                     });
                 }
 
-                hit_event.send(HitEvent {
+                hit_event.write(HitEvent {
                     hit_by_pet: None,
                     hit_entity: e2,
                     damage: thorns_damage,
@@ -1293,12 +1328,15 @@ fn check_boss_to_objects_collisions(
         (Entity, &Transform, &Attack, Option<&MobIsAttacking>),
         With<DamagesWorldObjects>,
     >,
-    rapier_context: Res<RapierContext>,
-    mut hit_event: EventWriter<HitEvent>,
+    rapier_context: ReadRapierContext,
+    mut hit_event: MessageWriter<HitEvent>,
 ) {
+    let Ok(rapier_context) = rapier_context.single() else {
+        return;
+    };
     for (world_destroyer, world_destroyer_txfm, attack, is_attacking) in dmg_source.iter() {
         let mut hit_this_frame = vec![];
-        'inner: for (e1, e2, _) in rapier_context.intersections_with(world_destroyer) {
+        'inner: for (e1, e2, _) in rapier_context.intersection_pairs_with(world_destroyer) {
             for (e1, e2) in [(e1, e2), (e2, e1)] {
                 let target = if e1 == world_destroyer { e2 } else { e1 };
                 if hit_this_frame.contains(&target) {
@@ -1318,7 +1356,7 @@ fn check_boss_to_objects_collisions(
 
                 let delta = obj_txfm.translation - world_destroyer_txfm.translation;
 
-                hit_event.send(HitEvent {
+                hit_event.write(HitEvent {
                     hit_by_pet: None,
                     hit_entity: obj_e,
                     damage: f32::round(attack.0 as f32) as i32,

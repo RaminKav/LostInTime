@@ -55,7 +55,7 @@ pub fn bump_options_ui_revision_on_ui_layout_change(
     }
     let had_previous = last_key.is_some();
     *last_key = Some(key);
-    if had_previous && ui_state.0 == UIState::Options {
+    if had_previous && *ui_state == UIState::Options {
         revision.0 = revision.0.wrapping_add(1);
     }
 }

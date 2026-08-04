@@ -1,6 +1,11 @@
+use bevy::text::Justify;
+use crate::aseprite_assets::UIPortal;
+use crate::aseprite_assets::{FairyPetSprite, SlimePetSprite};
+use crate::aseprite_helpers::{aseprite_bundle, play_loop};
 use bevy::prelude::*;
 use bevy::sprite::Anchor;
-use bevy_aseprite::{anim::AsepriteAnimation, AsepriteBundle};
+use bevy_aseprite_ultra::prelude::AnimationState as AsepriteAnimationState;
+use bevy_aseprite_ultra::prelude::AseAnimation;
 use strum::IntoEnumIterator;
 
 use crate::{
@@ -41,8 +46,8 @@ use crate::{
         ui_helpers::{spawn_full_screen_ui_overlay_tuned_colored, RADIAL_OVERLAY_DEFAULT_COLOR},
         Focusable, MenuButton, UIElement, UIState,
     },
-    world::{dimension::EraManager, portal::UIPortal},
-    FairyPetSprite, Pet, RenderLayers, ScreenResolution, SlimePetSprite,
+    world::dimension::EraManager,
+    Pet, RenderLayers, ScreenResolution,
 };
 
 use super::{
@@ -232,15 +237,16 @@ pub fn setup_class_selection_ui(
         0.95,
         0.99,
         9.,
-        // Color::rgba(3. / 255., 6. / 255., 6. / 255., 1.),
+        // Color::srgba(3. / 255., 6. / 255., 6. / 255., 1.),
         RADIAL_OVERLAY_DEFAULT_COLOR,
         0.45,
     );
 
     let currency_text = commands
         .spawn((
-            Text2dBundle {
-                text: Text::from_section(
+            gf::DISPLAY
+                .text(
+                    &asset_server,
                     format!(
                         "{}",
                         unlock_currency
@@ -248,24 +254,22 @@ pub fn setup_class_selection_ui(
                             .map(|c| c.time_fragments.max(0))
                             .unwrap_or(0)
                     ),
-                    gf::DISPLAY.text_style(&asset_server, Color::WHITE),
+                    Color::WHITE,
                 )
-                .with_alignment(TextAlignment::Left),
-                text_anchor: Anchor::CenterLeft,
-                transform: Transform {
+                .justify(Justify::Left)
+                .anchor(Anchor::CENTER_LEFT)
+                .with_transform(Transform {
                     translation: Vec3::new(270., 166., 11.),
                     scale: gf::DISPLAY.transform_scale(),
                     ..Default::default()
-                },
-                ..Default::default()
-            },
+                }),
             RenderLayers::from_layers(&[3]),
             ClassSelectionUI,
             UIState::ClassSelection,
             ClassUnlockCurrencyText,
             Name::new("CLASS UNLOCK CURRENCY TEXT"),
         ))
-        .set_parent(overlay)
+        .insert(ChildOf(overlay))
         .id();
     let currency_stack = spawn_item_stack_icon(
         &mut commands,
@@ -276,20 +280,23 @@ pub fn setup_class_selection_ui(
         Vec2::new(0., 0.),
         3,
     );
-    commands.entity(currency_stack).set_parent(currency_text);
+    commands
+        .entity(currency_stack)
+        .insert(ChildOf(currency_text));
 
     //===== PORTAL =====
     let _portal = commands
-        .spawn(AsepriteBundle {
-            aseprite: graphics.ui_portal_ase.as_ref().unwrap().clone(),
-            animation: AsepriteAnimation::from(UIPortal::tags::IDLE),
-            transform: Transform {
+        .spawn(aseprite_bundle(
+            graphics.ui_portal_ase.as_ref().unwrap().clone(),
+            UIPortal::tags::IDLE,
+            Transform {
                 translation: Vec3::new(186., -10. + CLASS_SELECTION_PANEL_Y, 10.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
-            ..Default::default()
-        })
+            Visibility::Inherited,
+            false,
+        ))
         .insert(UIState::ClassSelection)
         .insert(ClassSelectionUI)
         .insert(RenderLayers::from_layers(&[3]))
@@ -300,40 +307,33 @@ pub fn setup_class_selection_ui(
         .insert(Name::new("PORTAL"))
         .id();
     spawn_class_unlock_info_ui(&mut commands, &asset_server);
-    spawn_class_unlock_confirm_ui(&mut commands, &asset_server);
+    spawn_class_unlock_confirm_ui(&mut commands, &asset_server, &graphics);
     spawn_skill_unlock_confirm_ui(&mut commands, &asset_server);
 
     // Title
     commands.spawn((
-        Text2dBundle {
-            text: Text::from_section("", gf::DISPLAY_LARGE.text_style(&asset_server, WHITE)),
-            text_anchor: Anchor::Center,
-            transform: Transform {
+        gf::DISPLAY_LARGE
+            .text(&asset_server, "", WHITE)
+            .anchor(Anchor::CENTER)
+            .with_transform(Transform {
                 translation: Vec3::new(0., res.game_height / 2. - 20., 10.),
                 scale: gf::DISPLAY_LARGE.transform_scale(),
                 ..Default::default()
-            },
-            ..default()
-        },
+            }),
         RenderLayers::from_layers(&[3]),
         ClassSelectionUI,
         UIState::ClassSelection,
         Name::new("CLASS TITLE"),
     ));
     commands.spawn((
-        Text2dBundle {
-            text: Text::from_section(
-                "Pets",
-                gf::DISPLAY.text_style(&asset_server, DARK_WOOD_BROWN),
-            ),
-            text_anchor: Anchor::Center,
-            transform: Transform {
+        gf::DISPLAY
+            .text(&asset_server, "Pets", DARK_WOOD_BROWN)
+            .anchor(Anchor::CENTER)
+            .with_transform(Transform {
                 translation: Vec3::new(8., 70. + CLASS_SELECTION_PANEL_Y, 12.),
                 scale: gf::DISPLAY.transform_scale(),
                 ..Default::default()
-            },
-            ..default()
-        },
+            }),
         RenderLayers::from_layers(&[3]),
         ClassSelectionUI,
         UIState::ClassSelection,
@@ -360,21 +360,20 @@ pub fn setup_class_selection_ui(
     });
 
     let _class_select_bg = commands
-        .spawn(SpriteBundle {
-            texture: graphics
-                .get_ui_element_texture(UIElement::PlayerSelect)
-                .clone(),
-            sprite: Sprite {
+        .spawn((
+            Sprite {
+                image: graphics
+                    .get_ui_element_texture(UIElement::PlayerSelect)
+                    .clone(),
                 custom_size: Some(Vec2::new(620., 360.)),
                 ..Default::default()
             },
-            transform: Transform {
+            Transform {
                 translation: Vec3::new(0., 0., 10.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
-            ..Default::default()
-        })
+        ))
         .insert(UIState::ClassSelection)
         .insert(ClassSelectionUI)
         .insert(RenderLayers::from_layers(&[3]))
@@ -393,15 +392,15 @@ pub fn setup_class_selection_ui(
         // Class slot background
         let icon_slot = commands
             .spawn((
-                SpriteBundle {
-                    texture: graphics
-                        .get_ui_element_texture(UIElement::PlayerSelectSlot)
-                        .clone(),
-                    sprite: Sprite {
+                (
+                    Sprite {
+                        image: graphics
+                            .get_ui_element_texture(UIElement::PlayerSelectSlot)
+                            .clone(),
                         custom_size: Some(Vec2::new(44., 60.)),
                         ..Default::default()
                     },
-                    transform: Transform {
+                    Transform {
                         translation: Vec3::new(
                             x_offset,
                             118. + y_offset + CLASS_SELECTION_PANEL_Y,
@@ -410,8 +409,7 @@ pub fn setup_class_selection_ui(
                         scale: Vec3::new(1., 1., 1.),
                         ..Default::default()
                     },
-                    ..Default::default()
-                },
+                ),
                 UIState::ClassSelection,
                 ClassSelectionUI,
                 ClassOption,
@@ -438,24 +436,23 @@ pub fn setup_class_selection_ui(
             .clone();
 
         let mut icon_entity_commands = commands.spawn((
-            SpriteBundle {
-                texture: icon_handle,
-                visibility: if class_unlocked {
-                    Visibility::Inherited
-                } else {
-                    Visibility::Hidden
-                },
-                sprite: Sprite {
+            (
+                Sprite {
+                    image: icon_handle,
                     custom_size: Some(Vec2::new(44., 60.)),
                     ..Default::default()
                 },
-                transform: Transform {
+                Transform {
                     translation: Vec3::new(0., 0., 1.),
                     scale: Vec3::new(1., 1., 1.),
                     ..Default::default()
                 },
-                ..Default::default()
-            },
+                if class_unlocked {
+                    Visibility::Inherited
+                } else {
+                    Visibility::Hidden
+                },
+            ),
             UIState::ClassSelection,
             ClassSelectionUI,
             ClassOption,
@@ -466,32 +463,31 @@ pub fn setup_class_selection_ui(
             Name::new("CLASS OPTION"),
         ));
 
-        icon_entity_commands.set_parent(icon_slot);
+        icon_entity_commands.insert(ChildOf(icon_slot));
 
         if !class_unlocked {
             commands
                 .spawn((
-                    SpriteBundle {
-                        texture: graphics
-                            .get_ui_element_texture(UIElement::LockedClass)
-                            .clone(),
-                        sprite: Sprite {
+                    (
+                        Sprite {
+                            image: graphics
+                                .get_ui_element_texture(UIElement::LockedClass)
+                                .clone(),
                             custom_size: Some(Vec2::new(53., 47.)),
                             ..Default::default()
                         },
-                        transform: Transform {
+                        Transform {
                             translation: Vec3::new(0., 0., 2.),
                             ..Default::default()
                         },
-                        ..Default::default()
-                    },
+                    ),
                     UIState::ClassSelection,
                     ClassSelectionUI,
                     LockedClassOverlay,
                     RenderLayers::from_layers(&[3]),
                     Name::new("LOCKED CLASS OVERLAY"),
                 ))
-                .set_parent(icon_slot);
+                .insert(ChildOf(icon_slot));
         }
 
         // Spawn warning animation for locked classes that have all achievements met
@@ -539,21 +535,20 @@ pub fn setup_class_selection_ui(
         let col = (i as f32 % 2.).trunc();
         let x_offset = col * 40.0 - 13.;
         let y_offset = row * -44.0 + 33.;
-        let mut slot_entity_commands = commands.spawn(SpriteBundle {
-            texture: graphics
-                .get_ui_element_texture(UIElement::PetSelectSlot)
-                .clone(),
-            sprite: Sprite {
+        let mut slot_entity_commands = commands.spawn((
+            Sprite {
+                image: graphics
+                    .get_ui_element_texture(UIElement::PetSelectSlot)
+                    .clone(),
                 custom_size: Some(Vec2::new(36., 40.)),
                 ..Default::default()
             },
-            transform: Transform {
+            Transform {
                 translation: Vec3::new(x_offset, y_offset + CLASS_SELECTION_PANEL_Y, 11.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
-            ..Default::default()
-        });
+        ));
 
         slot_entity_commands
             .insert(UIState::ClassSelection)
@@ -581,20 +576,19 @@ pub fn setup_class_selection_ui(
             .get_ui_element_texture(pet_data.pet_icon.clone())
             .clone();
 
-        let mut icon_entity_commands = commands.spawn(SpriteBundle {
-            texture: icon_texture,
-            sprite: Sprite {
+        let mut icon_entity_commands = commands.spawn((
+            Sprite {
+                image: icon_texture,
                 custom_size: Some(Vec2::new(22., 22.)),
                 color: Color::WHITE,
                 ..Default::default()
             },
-            transform: Transform {
+            Transform {
                 translation: Vec3::new(0., 0., 1.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
-            ..Default::default()
-        });
+        ));
 
         icon_entity_commands
             .insert(UIState::ClassSelection)
@@ -603,9 +597,10 @@ pub fn setup_class_selection_ui(
             .insert(RenderLayers::from_layers(&[3]))
             .insert(Name::new("PET OPTION ICON"));
 
-        icon_entity_commands.insert(super::Interactable::default());
-
-        icon_entity_commands.set_parent(icon_slot);
+        // Do not add Interactable on the icon. `pointcast_2d` prefers the highest-z
+        // hit; this child sits above the slot and would steal center clicks while
+        // lacking `PetSelectSlot`, so only the slot border would respond.
+        icon_entity_commands.insert(ChildOf(icon_slot));
     }
 
     let button_y = -res.game_height / 2. + 16.;
@@ -613,17 +608,16 @@ pub fn setup_class_selection_ui(
 
     let begin_button = commands
         .spawn((
-            SpriteBundle {
-                texture: graphics
-                    .get_ui_element_texture(UIElement::StartGameButton)
-                    .clone(),
-                sprite: Sprite {
+            (
+                Sprite {
+                    image: graphics
+                        .get_ui_element_texture(UIElement::StartGameButton)
+                        .clone(),
                     custom_size: Some(Vec2::new(170., 26.)),
                     ..Default::default()
                 },
-                transform: Transform::from_translation(Vec3::new(0., button_y, 11.)),
-                ..Default::default()
-            },
+                Transform::from_translation(Vec3::new(0., button_y, 11.)),
+            ),
             super::Interactable::default(),
             UIElement::StartGameButton,
             MenuButton::Begin,
@@ -641,17 +635,16 @@ pub fn setup_class_selection_ui(
 
     let back_button = commands
         .spawn((
-            SpriteBundle {
-                texture: graphics
-                    .get_ui_element_texture(UIElement::BackButton2)
-                    .clone(),
-                sprite: Sprite {
+            (
+                Sprite {
+                    image: graphics
+                        .get_ui_element_texture(UIElement::BackButton2)
+                        .clone(),
                     custom_size: Some(Vec2::new(60., 26.)),
                     ..Default::default()
                 },
-                transform: Transform::from_translation(Vec3::new(back_button_x, button_y, 11.)),
-                ..Default::default()
-            },
+                Transform::from_translation(Vec3::new(back_button_x, button_y, 11.)),
+            ),
             super::Interactable::default(),
             UIElement::BackButton2,
             MenuButton::Back,
@@ -723,7 +716,7 @@ pub fn update_class_unlock_warnings(
             };
 
         if !should_have_warning {
-            commands.entity(*entity).despawn_recursive();
+            commands.entity(*entity).despawn();
         }
     }
 }
@@ -731,16 +724,15 @@ pub fn update_class_unlock_warnings(
 fn spawn_class_unlock_info_ui(commands: &mut Commands, asset_server: &AssetServer) {
     let panel_entity = commands
         .spawn((
-            SpriteBundle {
-                sprite: Sprite {
-                    color: Color::rgba(0.08, 0.08, 0.08, 0.98),
+            (
+                Sprite {
+                    color: Color::srgba(0.08, 0.08, 0.08, 0.98),
                     custom_size: Some(Vec2::new(110., 110.)),
                     ..Default::default()
                 },
-                transform: Transform::from_translation(Vec3::new(0., 0., 30.)),
-                visibility: Visibility::Hidden,
-                ..Default::default()
-            },
+                Transform::from_translation(Vec3::new(0., 0., 30.)),
+                Visibility::Hidden,
+            ),
             UIState::ClassSelection,
             ClassSelectionUI,
             ClassUnlockInfoPanel,
@@ -780,45 +772,43 @@ fn spawn_class_unlock_info_ui(commands: &mut Commands, asset_server: &AssetServe
     for (kind, offset, font_style) in text_entries.into_iter() {
         commands
             .spawn((
-                Text2dBundle {
-                    text: Text::from_section(
-                        "",
-                        font_style.text_style(&asset_server, Color::WHITE),
-                    )
-                    .with_alignment(TextAlignment::Left),
-                    text_anchor: Anchor::CenterLeft,
-                    transform: Transform {
+                font_style
+                    .text(&asset_server, "", Color::WHITE)
+                    .justify(Justify::Left)
+                    .anchor(Anchor::CENTER_LEFT)
+                    .with_transform(Transform {
                         translation: offset,
                         scale: font_style.transform_scale(),
                         ..Default::default()
-                    },
-                    ..Default::default()
-                },
+                    }),
                 RenderLayers::from_layers(&[3]),
                 ClassUnlockInfoText,
                 kind,
                 UIState::ClassSelection,
                 ClassSelectionUI,
-                Name::new("Class Unlock Info Text"),
+                Name::new("Class Unlock Info Text2d"),
             ))
-            .set_parent(panel_entity);
+            .insert(ChildOf(panel_entity));
     }
 }
 
-fn spawn_class_unlock_confirm_ui(commands: &mut Commands, asset_server: &AssetServer) {
+fn spawn_class_unlock_confirm_ui(
+    commands: &mut Commands,
+    asset_server: &AssetServer,
+    graphics: &Graphics,
+) {
     let panel_entity = commands
         .spawn((
-            SpriteBundle {
-                // texture: graphics.get_ui_element_texture(UIElement::MenuButton),
-                sprite: Sprite {
-                    color: Color::rgba(0.05, 0.05, 0.05, 0.93),
+            (
+                Sprite {
+                    image: graphics.get_ui_element_texture(UIElement::MenuButton),
+                    color: Color::srgba(0.05, 0.05, 0.05, 0.93),
                     custom_size: Some(Vec2::new(140., 70.)),
                     ..Default::default()
                 },
-                transform: Transform::from_translation(Vec3::new(0., 0., 30.)),
-                visibility: Visibility::Hidden,
-                ..Default::default()
-            },
+                Transform::from_translation(Vec3::new(0., 0., 30.)),
+                Visibility::Hidden,
+            ),
             UIState::ClassSelection,
             ClassSelectionUI,
             ClassUnlockConfirmPanel,
@@ -829,26 +819,24 @@ fn spawn_class_unlock_confirm_ui(commands: &mut Commands, asset_server: &AssetSe
 
     let text_entity = commands
         .spawn((
-            Text2dBundle {
-                text: Text::from_section("", gf::BODY.text_style(&asset_server, Color::WHITE))
-                    .with_alignment(TextAlignment::Center),
-                text_anchor: Anchor::Center,
-                transform: Transform {
+            gf::BODY
+                .text(&asset_server, "", Color::WHITE)
+                .justify(Justify::Center)
+                .anchor(Anchor::CENTER)
+                .with_transform(Transform {
                     translation: Vec3::new(0., 10., 1.),
                     scale: gf::BODY.transform_scale(),
                     ..Default::default()
-                },
-                ..Default::default()
-            },
+                }),
             RenderLayers::from_layers(&[3]),
             ClassUnlockConfirmText,
             UIState::ClassSelection,
             ClassSelectionUI,
-            Name::new("Class Unlock Confirm Text"),
+            Name::new("Class Unlock Confirm Text2d"),
         ))
         .id();
 
-    commands.entity(text_entity).set_parent(panel_entity);
+    commands.entity(text_entity).insert(ChildOf(panel_entity));
 
     // Don't spawn buttons here - they'll be spawned/despawned dynamically in update_class_unlock_confirm_panel
 }
@@ -858,16 +846,15 @@ fn spawn_class_unlock_confirm_ui(commands: &mut Commands, asset_server: &AssetSe
 fn spawn_skill_unlock_confirm_ui(commands: &mut Commands, asset_server: &AssetServer) {
     let panel_entity = commands
         .spawn((
-            SpriteBundle {
-                sprite: Sprite {
-                    color: Color::rgba(0.05, 0.05, 0.05, 0.99),
+            (
+                Sprite {
+                    color: Color::srgba(0.05, 0.05, 0.05, 0.99),
                     custom_size: Some(Vec2::new(140., 70.)),
                     ..Default::default()
                 },
-                transform: Transform::from_translation(Vec3::new(0., 0., 30.)),
-                visibility: Visibility::Hidden,
-                ..Default::default()
-            },
+                Transform::from_translation(Vec3::new(0., 0., 30.)),
+                Visibility::Hidden,
+            ),
             UIState::ClassSelection,
             ClassSelectionUI,
             SkillUnlockConfirmPanel,
@@ -878,30 +865,28 @@ fn spawn_skill_unlock_confirm_ui(commands: &mut Commands, asset_server: &AssetSe
 
     let text_entity = commands
         .spawn((
-            Text2dBundle {
-                text: Text::from_section("", gf::BODY.text_style(&asset_server, Color::WHITE))
-                    .with_alignment(TextAlignment::Center),
-                text_anchor: Anchor::Center,
-                transform: Transform {
+            gf::BODY
+                .text(&asset_server, "", Color::WHITE)
+                .justify(Justify::Center)
+                .anchor(Anchor::CENTER)
+                .with_transform(Transform {
                     translation: Vec3::new(0., 10., 1.),
                     scale: gf::BODY.transform_scale(),
                     ..Default::default()
-                },
-                ..Default::default()
-            },
+                }),
             RenderLayers::from_layers(&[3]),
             SkillUnlockConfirmText,
             UIState::ClassSelection,
             ClassSelectionUI,
-            Name::new("Skill Unlock Confirm Text"),
+            Name::new("Skill Unlock Confirm Text2d"),
         ))
         .id();
-    commands.entity(text_entity).set_parent(panel_entity);
+    commands.entity(text_entity).insert(ChildOf(panel_entity));
 }
 
 pub fn handle_class_selection(
     cursor_pos: Res<CursorPos>,
-    mouse_input: Res<Input<MouseButton>>,
+    mouse_input: Res<ButtonInput<MouseButton>>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     mut class_options: Query<(
         Entity,
@@ -1082,18 +1067,21 @@ pub fn update_class_unlock_panel(
     unlock_currency: Option<Res<TimeFragmentCurrency>>,
     graphics: Res<Graphics>,
     mut panel_query: Query<(&mut Visibility, &mut Transform), With<ClassUnlockInfoPanel>>,
-    mut text_query: Query<(&ClassUnlockInfoTextKind, &mut Text), With<ClassUnlockInfoText>>,
+    mut text_query: Query<
+        (&ClassUnlockInfoTextKind, &mut Text2d, &mut TextColor),
+        With<ClassUnlockInfoText>,
+    >,
     cheat_settings: Res<CheatSettings>,
 ) {
     let Some(class) = hover_state.hovered_class.clone() else {
-        if let Ok((mut vis, _)) = panel_query.get_single_mut() {
+        if let Ok((mut vis, _)) = panel_query.single_mut() {
             *vis = Visibility::Hidden;
         }
         return;
     };
 
     if cheat_settings.bypass_class_unlocks || unlocked_classes.contains(&class) {
-        if let Ok((mut vis, _)) = panel_query.get_single_mut() {
+        if let Ok((mut vis, _)) = panel_query.single_mut() {
             *vis = Visibility::Hidden;
         }
         return;
@@ -1121,7 +1109,7 @@ pub fn update_class_unlock_panel(
             .collect();
     }
 
-    if let Ok((mut visibility, mut transform)) = panel_query.get_single_mut() {
+    if let Ok((mut visibility, mut transform)) = panel_query.single_mut() {
         *visibility = Visibility::Visible;
         let offset = Vec3::new(86., -20.5, 0.);
         transform.translation = Vec3::new(
@@ -1131,37 +1119,37 @@ pub fn update_class_unlock_panel(
         );
     }
 
-    for (kind, mut text) in text_query.iter_mut() {
+    for (kind, mut text, mut text_color) in text_query.iter_mut() {
         match kind {
             ClassUnlockInfoTextKind::Title => {
-                text.sections[0].value = format!("{}", class_data.name.clone());
-                text.sections[0].style.color = Color::WHITE;
+                text.0 = format!("{}", class_data.name.clone());
+                text_color.0 = Color::WHITE;
             }
             ClassUnlockInfoTextKind::Achievement(idx) => {
                 if let Some((line, done)) = achievement_rows.get(*idx) {
-                    text.sections[0].value = line.clone();
-                    text.sections[0].style.color = if *done {
-                        Color::rgb(0.4, 0.9, 0.4)
+                    text.0 = line.clone();
+                    text_color.0 = if *done {
+                        Color::srgb(0.4, 0.9, 0.4)
                     } else {
-                        Color::rgb(1.0, 0.4, 0.4)
+                        Color::srgb(1.0, 0.4, 0.4)
                     };
                 } else {
-                    text.sections[0].value.clear();
-                    text.sections[0].style.color = Color::WHITE;
+                    text.0.clear();
+                    text_color.0 = Color::WHITE;
                 }
             }
             ClassUnlockInfoTextKind::Cost => {
                 if let Some(_entry) = unlock_entry {
-                    text.sections[0].value = format!("Cost: {}", cost);
-                    text.sections[0].style.color =
+                    text.0 = format!("Cost: {}", cost);
+                    text_color.0 =
                         if currency_ref.map(|c| c.can_spend(cost)).unwrap_or(false) {
                             Color::WHITE
                         } else {
-                            Color::rgb(1.0, 0.4, 0.4)
+                            Color::srgb(1.0, 0.4, 0.4)
                         };
                 } else {
-                    text.sections[0].value.clear();
-                    text.sections[0].style.color = Color::WHITE;
+                    text.0.clear();
+                    text_color.0 = Color::WHITE;
                 }
             }
         }
@@ -1170,7 +1158,7 @@ pub fn update_class_unlock_panel(
 
 pub fn update_unlock_currency_text(
     unlock_currency: Option<Res<TimeFragmentCurrency>>,
-    mut query: Query<&mut Text, With<ClassUnlockCurrencyText>>,
+    mut query: Query<&mut Text2d, With<ClassUnlockCurrencyText>>,
 ) {
     let Some(unlock_currency) = unlock_currency else {
         return;
@@ -1181,7 +1169,7 @@ pub fn update_unlock_currency_text(
     }
 
     for mut text in query.iter_mut() {
-        text.sections[0].value = format!("{}", unlock_currency.time_fragments.max(0));
+        text.0 = format!("{}", unlock_currency.time_fragments.max(0));
     }
 }
 
@@ -1194,13 +1182,13 @@ pub fn update_class_unlock_confirm_panel(
         Query<Entity, With<ClassUnlockConfirmPanel>>,
         Query<Entity, With<ClassUnlockConfirmButton>>,
     )>,
-    mut text_query: Query<&mut Text, With<ClassUnlockConfirmText>>,
+    mut text_query: Query<&mut Text2d, With<ClassUnlockConfirmText>>,
     mut panel_vis_query: Query<&mut Visibility, With<ClassUnlockConfirmPanel>>,
 ) {
     let active = confirm_state.active;
 
     // Update panel visibility
-    if let Ok(mut panel_vis) = panel_vis_query.get_single_mut() {
+    if let Ok(mut panel_vis) = panel_vis_query.single_mut() {
         *panel_vis = if active {
             Visibility::Visible
         } else {
@@ -1209,13 +1197,13 @@ pub fn update_class_unlock_confirm_panel(
     }
 
     // Get panel entity for parenting buttons
-    let panel_entity = param_set.p0().get_single().ok();
+    let panel_entity = param_set.p0().single().ok();
 
     // Despawn buttons when not active
     if !active {
         let button_query = param_set.p1();
         for button_entity in button_query.iter() {
-            commands.entity(button_entity).despawn_recursive();
+            commands.entity(button_entity).despawn();
         }
         return;
     }
@@ -1229,15 +1217,14 @@ pub fn update_class_unlock_confirm_panel(
         if let Some(panel) = panel_entity {
             let yes_button = commands
                 .spawn((
-                    SpriteBundle {
-                        texture: graphics.get_ui_element_texture(UIElement::BackButton),
-                        sprite: Sprite {
+                    (
+                        Sprite {
+                            image: graphics.get_ui_element_texture(UIElement::BackButton),
                             custom_size: Some(Vec2::new(48., 18.)),
                             ..Default::default()
                         },
-                        transform: Transform::from_translation(Vec3::new(28., -20., 1.)),
-                        ..Default::default()
-                    },
+                        Transform::from_translation(Vec3::new(28., -20., 1.)),
+                    ),
                     RenderLayers::from_layers(&[3]),
                     ClassUnlockConfirmButton::Yes,
                     Interactable::default(),
@@ -1251,15 +1238,14 @@ pub fn update_class_unlock_confirm_panel(
 
             let no_button = commands
                 .spawn((
-                    SpriteBundle {
-                        texture: graphics.get_ui_element_texture(UIElement::BackButton),
-                        sprite: Sprite {
+                    (
+                        Sprite {
+                            image: graphics.get_ui_element_texture(UIElement::BackButton),
                             custom_size: Some(Vec2::new(48., 18.)),
                             ..Default::default()
                         },
-                        transform: Transform::from_translation(Vec3::new(-30., -20., 1.)),
-                        ..Default::default()
-                    },
+                        Transform::from_translation(Vec3::new(-30., -20., 1.)),
+                    ),
                     RenderLayers::from_layers(&[3]),
                     ClassUnlockConfirmButton::No,
                     Interactable::default(),
@@ -1271,8 +1257,8 @@ pub fn update_class_unlock_confirm_panel(
                 ))
                 .id();
 
-            commands.entity(yes_button).set_parent(panel);
-            commands.entity(no_button).set_parent(panel);
+            commands.entity(yes_button).insert(ChildOf(panel));
+            commands.entity(no_button).insert(ChildOf(panel));
             commands
                 .entity(no_button)
                 .insert(ModalFocusable { index: 0 });
@@ -1282,49 +1268,49 @@ pub fn update_class_unlock_confirm_panel(
 
             // Add button text
             commands
-                .spawn(Text2dBundle {
-                    text: Text::from_section("Yes", gf::DISPLAY.text_style(&asset_server, WHITE))
-                        .with_alignment(TextAlignment::Center),
-                    text_anchor: Anchor::Center,
-                    transform: Transform {
-                        translation: Vec3::new(0., -1., 1.),
-                        scale: gf::DISPLAY.transform_scale(),
-                        ..Default::default()
-                    },
-                    ..Default::default()
-                })
+                .spawn(
+                    gf::DISPLAY
+                        .text(&asset_server, "Yes", WHITE)
+                        .justify(Justify::Center)
+                        .anchor(Anchor::CENTER)
+                        .with_transform(Transform {
+                            translation: Vec3::new(0., -1., 1.),
+                            scale: gf::DISPLAY.transform_scale(),
+                            ..Default::default()
+                        }),
+                )
                 .insert(RenderLayers::from_layers(&[3]))
-                .set_parent(yes_button);
+                .insert(ChildOf(yes_button));
 
             commands
-                .spawn(Text2dBundle {
-                    text: Text::from_section("No", gf::DISPLAY.text_style(&asset_server, WHITE))
-                        .with_alignment(TextAlignment::Center),
-                    text_anchor: Anchor::Center,
-                    transform: Transform {
-                        translation: Vec3::new(0., -1., 1.),
-                        scale: gf::DISPLAY.transform_scale(),
-                        ..Default::default()
-                    },
-                    ..Default::default()
-                })
+                .spawn(
+                    gf::DISPLAY
+                        .text(&asset_server, "No", WHITE)
+                        .justify(Justify::Center)
+                        .anchor(Anchor::CENTER)
+                        .with_transform(Transform {
+                            translation: Vec3::new(0., -1., 1.),
+                            scale: gf::DISPLAY.transform_scale(),
+                            ..Default::default()
+                        }),
+                )
                 .insert(RenderLayers::from_layers(&[3]))
-                .set_parent(no_button);
+                .insert(ChildOf(no_button));
         }
     }
 
     // Update text
-    if let Ok(mut text) = text_query.get_single_mut() {
+    if let Ok(mut text) = text_query.single_mut() {
         if let Some(class) = confirm_state.class.clone() {
             let class_data = graphics.get_class_data(class.clone());
             let cost = confirm_state.cost;
-            text.sections[0].value = if cost > 0 {
+            text.0 = if cost > 0 {
                 format!("Unlock {}\n\n\n{} currency?", class_data.name, cost)
             } else {
                 format!("Unlock {} for free?", class_data.name)
             };
         } else {
-            text.sections[0].value.clear();
+            text.0.clear();
         }
     }
 }
@@ -1334,7 +1320,7 @@ pub fn update_class_unlock_confirm_panel(
 /// `handle_class_selection` flow for class unlocks but operates on skill rows.
 pub fn handle_locked_skill_selection(
     cursor_pos: Res<CursorPos>,
-    mouse_input: Res<Input<MouseButton>>,
+    mouse_input: Res<ButtonInput<MouseButton>>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     mut locked_slots: Query<(
         Entity,
@@ -1402,12 +1388,12 @@ pub fn update_skill_unlock_confirm_panel(
         Query<(Entity, &mut Transform), With<SkillUnlockConfirmPanel>>,
         Query<Entity, With<SkillUnlockConfirmButton>>,
     )>,
-    mut text_query: Query<&mut Text, With<SkillUnlockConfirmText>>,
+    mut text_query: Query<&mut Text2d, With<SkillUnlockConfirmText>>,
     mut panel_vis_query: Query<&mut Visibility, With<SkillUnlockConfirmPanel>>,
 ) {
     let active = confirm_state.active;
 
-    if let Ok(mut panel_vis) = panel_vis_query.get_single_mut() {
+    if let Ok(mut panel_vis) = panel_vis_query.single_mut() {
         *panel_vis = if active {
             Visibility::Visible
         } else {
@@ -1415,7 +1401,7 @@ pub fn update_skill_unlock_confirm_panel(
         };
     }
 
-    let panel_entity = if let Ok((e, mut transform)) = param_set.p0().get_single_mut() {
+    let panel_entity = if let Ok((e, mut transform)) = param_set.p0().single_mut() {
         if active {
             transform.translation = Vec3::new(
                 confirm_state.anchor_position.x + 96.,
@@ -1431,7 +1417,7 @@ pub fn update_skill_unlock_confirm_panel(
     if !active {
         let button_query = param_set.p1();
         for button_entity in button_query.iter() {
-            commands.entity(button_entity).despawn_recursive();
+            commands.entity(button_entity).despawn();
         }
         return;
     }
@@ -1442,15 +1428,14 @@ pub fn update_skill_unlock_confirm_panel(
         if let Some(panel) = panel_entity {
             let yes_button = commands
                 .spawn((
-                    SpriteBundle {
-                        texture: graphics.get_ui_element_texture(UIElement::BackButton),
-                        sprite: Sprite {
+                    (
+                        Sprite {
+                            image: graphics.get_ui_element_texture(UIElement::BackButton),
                             custom_size: Some(Vec2::new(48., 18.)),
                             ..Default::default()
                         },
-                        transform: Transform::from_translation(Vec3::new(-30., -20., 1.)),
-                        ..Default::default()
-                    },
+                        Transform::from_translation(Vec3::new(-30., -20., 1.)),
+                    ),
                     RenderLayers::from_layers(&[3]),
                     SkillUnlockConfirmButton::Yes,
                     Interactable::default(),
@@ -1463,15 +1448,14 @@ pub fn update_skill_unlock_confirm_panel(
                 .id();
             let no_button = commands
                 .spawn((
-                    SpriteBundle {
-                        texture: graphics.get_ui_element_texture(UIElement::BackButton),
-                        sprite: Sprite {
+                    (
+                        Sprite {
+                            image: graphics.get_ui_element_texture(UIElement::BackButton),
                             custom_size: Some(Vec2::new(48., 18.)),
                             ..Default::default()
                         },
-                        transform: Transform::from_translation(Vec3::new(28., -20., 1.)),
-                        ..Default::default()
-                    },
+                        Transform::from_translation(Vec3::new(28., -20., 1.)),
+                    ),
                     RenderLayers::from_layers(&[3]),
                     SkillUnlockConfirmButton::No,
                     Interactable::default(),
@@ -1482,8 +1466,8 @@ pub fn update_skill_unlock_confirm_panel(
                     Name::new("SKILL UNLOCK NO BUTTON"),
                 ))
                 .id();
-            commands.entity(yes_button).set_parent(panel);
-            commands.entity(no_button).set_parent(panel);
+            commands.entity(yes_button).insert(ChildOf(panel));
+            commands.entity(no_button).insert(ChildOf(panel));
             commands
                 .entity(no_button)
                 .insert(ModalFocusable { index: 0 });
@@ -1492,43 +1476,43 @@ pub fn update_skill_unlock_confirm_panel(
                 .insert(ModalFocusable { index: 1 });
 
             commands
-                .spawn(Text2dBundle {
-                    text: Text::from_section("Yes", gf::DISPLAY.text_style(&asset_server, WHITE))
-                        .with_alignment(TextAlignment::Center),
-                    text_anchor: Anchor::Center,
-                    transform: Transform {
-                        translation: Vec3::new(0., -1., 1.),
-                        scale: gf::DISPLAY.transform_scale(),
-                        ..Default::default()
-                    },
-                    ..Default::default()
-                })
+                .spawn(
+                    gf::DISPLAY
+                        .text(&asset_server, "Yes", WHITE)
+                        .justify(Justify::Center)
+                        .anchor(Anchor::CENTER)
+                        .with_transform(Transform {
+                            translation: Vec3::new(0., -1., 1.),
+                            scale: gf::DISPLAY.transform_scale(),
+                            ..Default::default()
+                        }),
+                )
                 .insert(RenderLayers::from_layers(&[3]))
-                .set_parent(yes_button);
+                .insert(ChildOf(yes_button));
             commands
-                .spawn(Text2dBundle {
-                    text: Text::from_section("No", gf::DISPLAY.text_style(&asset_server, WHITE))
-                        .with_alignment(TextAlignment::Center),
-                    text_anchor: Anchor::Center,
-                    transform: Transform {
-                        translation: Vec3::new(0., -1., 1.),
-                        scale: gf::DISPLAY.transform_scale(),
-                        ..Default::default()
-                    },
-                    ..Default::default()
-                })
+                .spawn(
+                    gf::DISPLAY
+                        .text(&asset_server, "No", WHITE)
+                        .justify(Justify::Center)
+                        .anchor(Anchor::CENTER)
+                        .with_transform(Transform {
+                            translation: Vec3::new(0., -1., 1.),
+                            scale: gf::DISPLAY.transform_scale(),
+                            ..Default::default()
+                        }),
+                )
                 .insert(RenderLayers::from_layers(&[3]))
-                .set_parent(no_button);
+                .insert(ChildOf(no_button));
         }
     }
 
-    if let Ok(mut text) = text_query.get_single_mut() {
+    if let Ok(mut text) = text_query.single_mut() {
         let ordinal = match confirm_state.slot_index {
             2 => "3rd",
             3 => "4th",
             _ => "Nth",
         };
-        text.sections[0].value = format!(
+        text.0 = format!(
             "Unlock {} Skill\n\n\nfor {} Time Fragments?",
             ordinal, confirm_state.cost
         );
@@ -1594,48 +1578,48 @@ fn spawn_player_preview(
             RenderLayers::from_layers(&[3]),
             Name::new("PLAYER PREVIEW CONTAINER"),
         ))
-        .insert(SpatialBundle::from_transform(Transform {
-            translation: Vec3::new(-237., 68. + CLASS_SELECTION_PANEL_Y, 12.),
-            scale: Vec3::new(1., 1., 1.),
-            ..Default::default()
-        }))
+        .insert((
+            Transform {
+                translation: Vec3::new(-237., 68. + CLASS_SELECTION_PANEL_Y, 12.),
+                scale: Vec3::new(1., 1., 1.),
+                ..Default::default()
+            },
+            Visibility::default(),
+        ))
         .id();
 
     // Spawn class title text above the player
     let _title_text = commands
-        .spawn(Text2dBundle {
-            text: Text::from_section(
-                class_name,
-                gf::DISPLAY.text_style(&asset_server, DARK_WOOD_BROWN),
-            ),
-            text_anchor: Anchor::Center,
-            transform: Transform {
-                translation: Vec3::new(TITLE_X_OFFSET, TITLE_Y_OFFSET, 1.),
-                scale: gf::DISPLAY.transform_scale(),
-                ..Default::default()
-            },
-            ..default()
-        })
+        .spawn(
+            gf::DISPLAY
+                .text(&asset_server, class_name, DARK_WOOD_BROWN)
+                .anchor(Anchor::CENTER)
+                .with_transform(Transform {
+                    translation: Vec3::new(TITLE_X_OFFSET, TITLE_Y_OFFSET, 1.),
+                    scale: gf::DISPLAY.transform_scale(),
+                    ..Default::default()
+                }),
+        )
         .insert(RenderLayers::from_layers(&[3]))
         .insert(Name::new("CLASS TITLE"))
-        .set_parent(player_container)
+        .insert(ChildOf(player_container))
         .id();
 
     // Spawn rank information
     let _rank_text = commands
-        .spawn(Text2dBundle {
-            text: Text::from_section(rank_text, gf::BODY.text_style(&asset_server, WHITE)),
-            text_anchor: Anchor::CenterLeft,
-            transform: Transform {
-                translation: Vec3::new(-42., TITLE_Y_OFFSET - 14., 1.),
-                scale: gf::BODY.transform_scale(),
-                ..Default::default()
-            },
-            ..default()
-        })
+        .spawn(
+            gf::BODY
+                .text(&asset_server, rank_text, WHITE)
+                .anchor(Anchor::CENTER_LEFT)
+                .with_transform(Transform {
+                    translation: Vec3::new(-42., TITLE_Y_OFFSET - 14., 1.),
+                    scale: gf::BODY.transform_scale(),
+                    ..Default::default()
+                }),
+        )
         .insert(RenderLayers::from_layers(&[3]))
         .insert(Name::new("CLASS RANK"))
-        .set_parent(player_container)
+        .insert(ChildOf(player_container))
         .id();
 
     // Highest score for this class (top-right corner display)
@@ -1644,38 +1628,39 @@ fn spawn_player_preview(
         .unwrap_or(0);
     let high_score_text = format!("Best: {}", class_high_score);
     let _high_score = commands
-        .spawn(Text2dBundle {
-            text: Text::from_section(high_score_text, gf::BODY.text_style(&asset_server, WHITE)),
-            text_anchor: Anchor::CenterLeft,
-            transform: Transform {
-                translation: Vec3::new(112., TITLE_Y_OFFSET - 14., 1.),
-                scale: gf::BODY.transform_scale(),
-                ..Default::default()
-            },
-            ..default()
-        })
+        .spawn(
+            gf::BODY
+                .text(&asset_server, high_score_text, WHITE)
+                .anchor(Anchor::CENTER_LEFT)
+                .with_transform(Transform {
+                    translation: Vec3::new(112., TITLE_Y_OFFSET - 14., 1.),
+                    scale: gf::BODY.transform_scale(),
+                    ..Default::default()
+                }),
+        )
         .insert(RenderLayers::from_layers(&[3]))
         .insert(Name::new("CLASS HIGH SCORE"))
-        .set_parent(player_container)
+        .insert(ChildOf(player_container))
         .id();
 
     // Spawn the player sprite
     let _player_sprite = commands
-        .spawn(AsepriteBundle {
-            aseprite: aseprite_path,
-            animation: AsepriteAnimation::from(animation_tag),
-            transform: Transform {
+        .spawn(aseprite_bundle(
+            aseprite_path,
+            animation_tag,
+            Transform {
                 translation: Vec3::new(434., -48., 1.),
                 scale: Vec3::new(2., 2., 2.),
                 ..Default::default()
             },
-            ..Default::default()
-        })
+            Visibility::Inherited,
+            false,
+        ))
         .insert(UIState::ClassSelection)
         .insert(ClassSelectionUI)
         .insert(RenderLayers::from_layers(&[3]))
         .insert(Name::new("CLASS PREVIEW"))
-        .set_parent(player_container)
+        .insert(ChildOf(player_container))
         .id();
 
     // Spawn starting weapon to the right of the player
@@ -1704,152 +1689,147 @@ fn spawn_player_preview(
     // Note: spawn_item_stack_icon automatically adds rarity glows based on item_stack.rarity
     // power icon
     let _wep_icon_slot = commands
-        .spawn(SpriteBundle {
-            texture: graphics
-                .get_ui_element_texture(UIElement::ClassWeaponSlot)
-                .clone(),
-            sprite: Sprite {
+        .spawn((
+            Sprite {
+                image: graphics
+                    .get_ui_element_texture(UIElement::ClassWeaponSlot)
+                    .clone(),
                 custom_size: Some(CLASS_PREVIEW_ICON_SIZE),
                 ..Default::default()
             },
-            transform: Transform {
+            Transform {
                 translation: Vec3::new(0., 0., -1.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
-            ..Default::default()
-        })
+        ))
         .insert(RenderLayers::from_layers(&[3]))
         .insert(Name::new("POWER ICON"))
-        .set_parent(weapon_sprite)
+        .insert(ChildOf(weapon_sprite))
         .id();
 
     // Set the weapon as a child of the player container
-    commands.entity(weapon_sprite).set_parent(player_container);
+    commands
+        .entity(weapon_sprite)
+        .insert(ChildOf(player_container));
 
     let _weapon_title_text = commands
-        .spawn(Text2dBundle {
-            text: Text::from_section(
-                "Starting Weapon",
-                gf::BODY.text_style(&asset_server, YELLOW_2),
-            )
-            .with_alignment(TextAlignment::Left),
-            text_anchor: Anchor::TopLeft,
-            transform: Transform {
-                translation: Vec3::new(DESC_TEXT_X, ICONS_Y_OFFSET + TEXT_Y_OFFSET + 2., 1.),
-                scale: gf::BODY.transform_scale(),
-                ..Default::default()
-            },
-            ..default()
-        })
+        .spawn(
+            gf::BODY
+                .text(&asset_server, "Starting Weapon", YELLOW_2)
+                .justify(Justify::Left)
+                .anchor(Anchor::TOP_LEFT)
+                .with_transform(Transform {
+                    translation: Vec3::new(DESC_TEXT_X, ICONS_Y_OFFSET + TEXT_Y_OFFSET + 2., 1.),
+                    scale: gf::BODY.transform_scale(),
+                    ..Default::default()
+                }),
+        )
         .insert(RenderLayers::from_layers(&[3]))
         .insert(Name::new("WEAPON TITLE"))
-        .set_parent(player_container)
+        .insert(ChildOf(player_container))
         .id();
     // Spawn weapon description text
     let _weapon_description_text = commands
-        .spawn(Text2dBundle {
-            text: Text::from_section(
-                format!("{} {}", weapon_rarity, weapon_description),
-                gf::BODY.text_style(
+        .spawn(
+            gf::BODY
+                .text(
                     &asset_server,
+                    format!("{} {}", weapon_rarity, weapon_description),
                     if weapon_rarity == ItemRarity::Common {
                         WHITE
                     } else {
                         weapon_rarity.get_color()
                     },
-                ),
-            )
-            .with_alignment(TextAlignment::Left),
-            text_anchor: Anchor::TopLeft,
-            transform: Transform {
-                translation: Vec3::new(DESC_TEXT_X, ICONS_Y_OFFSET + TEXT_Y_OFFSET - 8., 1.),
-                scale: gf::BODY.transform_scale(),
-                ..Default::default()
-            },
-            ..default()
-        })
+                )
+                .justify(Justify::Left)
+                .anchor(Anchor::TOP_LEFT)
+                .with_transform(Transform {
+                    translation: Vec3::new(DESC_TEXT_X, ICONS_Y_OFFSET + TEXT_Y_OFFSET - 8., 1.),
+                    scale: gf::BODY.transform_scale(),
+                    ..Default::default()
+                }),
+        )
         .insert(RenderLayers::from_layers(&[3]))
         .insert(Name::new("WEAPON DESCRIPTION"))
-        .set_parent(player_container)
+        .insert(ChildOf(player_container))
         .id();
 
     // power icon
     let _power_icon_slot = commands
-        .spawn(SpriteBundle {
-            texture: power_icon,
-            sprite: Sprite {
+        .spawn((
+            Sprite {
+                image: power_icon,
                 custom_size: Some(CLASS_PREVIEW_ICON_SIZE),
                 ..Default::default()
             },
-            transform: Transform {
+            Transform {
                 translation: Vec3::new(ICONS_X_OFFSET, ICONS_Y_OFFSET + ICON_Y_SPACING + 7., 11.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
-            ..Default::default()
-        })
+        ))
         .insert(RenderLayers::from_layers(&[3]))
         .insert(Name::new("POWER ICON"))
-        .set_parent(player_container)
+        .insert(ChildOf(player_container))
         .id();
 
     let _power_title_text = commands
-        .spawn(Text2dBundle {
-            text: Text::from_section(
-                "Class Passive",
-                gf::BODY.text_style(&asset_server, YELLOW_2),
-            )
-            .with_alignment(TextAlignment::Left),
-            text_anchor: Anchor::TopLeft,
-            transform: Transform {
-                translation: Vec3::new(
-                    DESC_TEXT_X,
-                    ICONS_Y_OFFSET + ICON_Y_SPACING + TEXT_Y_OFFSET + 11.,
-                    1.,
-                ),
-                scale: gf::BODY.transform_scale(),
-                ..Default::default()
-            },
-            ..default()
-        })
+        .spawn(
+            gf::BODY
+                .text(&asset_server, "Class Passive", YELLOW_2)
+                .justify(Justify::Left)
+                .anchor(Anchor::TOP_LEFT)
+                .with_transform(Transform {
+                    translation: Vec3::new(
+                        DESC_TEXT_X,
+                        ICONS_Y_OFFSET + ICON_Y_SPACING + TEXT_Y_OFFSET + 11.,
+                        1.,
+                    ),
+                    scale: gf::BODY.transform_scale(),
+                    ..Default::default()
+                }),
+        )
         .insert(RenderLayers::from_layers(&[3]))
         .insert(Name::new("STAT DESCRIPTION"))
-        .set_parent(player_container)
+        .insert(ChildOf(player_container))
         .id();
     // Spawn stat description text
     let _power_description_text = commands
-        .spawn(Text2dBundle {
-            text: Text::from_section(stat_description, gf::BODY.text_style(&asset_server, WHITE))
-                .with_alignment(TextAlignment::Left),
-            text_anchor: Anchor::TopLeft,
-            transform: Transform {
-                translation: Vec3::new(
-                    DESC_TEXT_X,
-                    ICONS_Y_OFFSET + ICON_Y_SPACING + TEXT_Y_OFFSET,
-                    1.,
-                ),
-                scale: gf::BODY.transform_scale(),
-                ..Default::default()
-            },
-            ..default()
-        })
+        .spawn(
+            gf::BODY
+                .text(&asset_server, stat_description, WHITE)
+                .justify(Justify::Left)
+                .anchor(Anchor::TOP_LEFT)
+                .with_transform(Transform {
+                    translation: Vec3::new(
+                        DESC_TEXT_X,
+                        ICONS_Y_OFFSET + ICON_Y_SPACING + TEXT_Y_OFFSET,
+                        1.,
+                    ),
+                    scale: gf::BODY.transform_scale(),
+                    ..Default::default()
+                }),
+        )
         .insert(RenderLayers::from_layers(&[3]))
         .insert(Name::new("STAT DESCRIPTION"))
-        .set_parent(player_container)
+        .insert(ChildOf(player_container))
         .id();
 
     for skill_index in 0..VISIBLE_CLASS_SKILL_COUNT {
         let skill_container = commands
-            .spawn(SpatialBundle::from_transform(Transform {
-                translation: Vec3::new(0., -112., 0.),
-                scale: Vec3::new(1., 1., 1.),
-                ..Default::default()
-            }))
+            .spawn((
+                Transform {
+                    translation: Vec3::new(0., -112., 0.),
+                    scale: Vec3::new(1., 1., 1.),
+                    ..Default::default()
+                },
+                Visibility::default(),
+            ))
             .insert(RenderLayers::from_layers(&[3]))
             .insert(ClassPreviewSkillEntry)
             .insert(Name::new(format!("SKILL CONTAINER {}", skill_index)))
-            .set_parent(player_container)
+            .insert(ChildOf(player_container))
             .id();
 
         if skill_index == 0 {
@@ -1910,156 +1890,159 @@ fn spawn_pet_preview(
             RenderLayers::from_layers(&[3]),
             Name::new("PET PREVIEW CONTAINER"),
         ))
-        .insert(SpatialBundle::from_transform(Transform {
-            translation: Vec3::new(120., -60. + CLASS_SELECTION_PANEL_Y, 12.),
-            scale: Vec3::new(1., 1., 1.),
-            ..Default::default()
-        }))
+        .insert((
+            Transform {
+                translation: Vec3::new(120., -60. + CLASS_SELECTION_PANEL_Y, 12.),
+                scale: Vec3::new(1., 1., 1.),
+                ..Default::default()
+            },
+            Visibility::default(),
+        ))
         .id();
 
     // Spawn pet title text above the pet
     let _title_text = commands
-        .spawn(Text2dBundle {
-            text: Text::from_section(
-                pet_name,
-                gf::DISPLAY.text_style(&asset_server, DARK_WOOD_BROWN),
-            ),
-            text_anchor: Anchor::Center,
-            transform: Transform {
-                translation: Vec3::new(69., 41., 1.),
-                scale: gf::DISPLAY.transform_scale(),
-                ..Default::default()
-            },
-            ..default()
-        })
+        .spawn(
+            gf::DISPLAY
+                .text(&asset_server, pet_name, DARK_WOOD_BROWN)
+                .anchor(Anchor::CENTER)
+                .with_transform(Transform {
+                    translation: Vec3::new(69., 41., 1.),
+                    scale: gf::DISPLAY.transform_scale(),
+                    ..Default::default()
+                }),
+        )
         .insert(RenderLayers::from_layers(&[3]))
         .insert(Name::new("PET TITLE"))
-        .set_parent(pet_container)
+        .insert(ChildOf(pet_container))
         .id();
 
     // Spawn the pet sprite
     let _pet_sprite = commands
-        .spawn(AsepriteBundle {
-            aseprite: aseprite_path,
-            animation: AsepriteAnimation::from(animation_tag),
-            transform: Transform {
+        .spawn(aseprite_bundle(
+            aseprite_path,
+            animation_tag,
+            Transform {
                 translation: Vec3::new(36., 90., 1.),
                 scale: Vec3::new(2., 2., 2.),
                 ..Default::default()
             },
-            ..Default::default()
-        })
+            Visibility::Inherited,
+            false,
+        ))
         .insert(UIState::ClassSelection)
         .insert(ClassSelectionUI)
         .insert(RenderLayers::from_layers(&[3]))
         .insert(Name::new("PET PREVIEW"))
-        .set_parent(pet_container)
+        .insert(ChildOf(pet_container))
         .id();
 
     // power icon
     let _icon_slot = commands
-        .spawn(SpriteBundle {
-            texture: power_icon,
-            sprite: Sprite {
+        .spawn((
+            Sprite {
+                image: power_icon,
                 custom_size: Some(CLASS_PREVIEW_ICON_SIZE),
                 ..Default::default()
             },
-            transform: Transform {
+            Transform {
                 translation: Vec3::new(ICON_X, ICON_Y + Y_OFFSET, 11.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
-            ..Default::default()
-        })
+        ))
         .insert(RenderLayers::from_layers(&[3]))
         .insert(Name::new("POWER ICON"))
-        .set_parent(pet_container)
+        .insert(ChildOf(pet_container))
         .id();
 
     // Spawn pet description text to the right
     let _power_title_text = commands
-        .spawn(Text2dBundle {
-            text: Text::from_section(pet_skill_name, gf::BODY.text_style(&asset_server, YELLOW_2))
-                .with_alignment(TextAlignment::Left),
-            text_anchor: Anchor::TopLeft,
-            transform: Transform {
-                translation: Vec3::new(TEXT_X_OFFSET, ICON_Y + Y_OFFSET + TEXT_Y_OFFSET, 1.),
-                scale: gf::BODY.transform_scale(),
-                ..Default::default()
-            },
-            ..default()
-        })
+        .spawn(
+            gf::BODY
+                .text(&asset_server, pet_skill_name, YELLOW_2)
+                .justify(Justify::Left)
+                .anchor(Anchor::TOP_LEFT)
+                .with_transform(Transform {
+                    translation: Vec3::new(TEXT_X_OFFSET, ICON_Y + Y_OFFSET + TEXT_Y_OFFSET, 1.),
+                    scale: gf::BODY.transform_scale(),
+                    ..Default::default()
+                }),
+        )
         .insert(RenderLayers::from_layers(&[3]))
         .insert(Name::new("PET DESCRIPTION"))
-        .set_parent(pet_container)
+        .insert(ChildOf(pet_container))
         .id();
     let _skill_description_text = commands
-        .spawn(Text2dBundle {
-            text: Text::from_section(pet_skill_desc, gf::BODY.text_style(&asset_server, WHITE))
-                .with_alignment(TextAlignment::Left),
-            text_anchor: Anchor::TopLeft,
-            transform: Transform {
-                translation: Vec3::new(TEXT_X_OFFSET, -9. + Y_OFFSET + TEXT_Y_OFFSET + ICON_Y, 1.),
-                scale: gf::BODY.transform_scale(),
-                ..Default::default()
-            },
-            ..default()
-        })
+        .spawn(
+            gf::BODY
+                .text(&asset_server, pet_skill_desc, WHITE)
+                .justify(Justify::Left)
+                .anchor(Anchor::TOP_LEFT)
+                .with_transform(Transform {
+                    translation: Vec3::new(
+                        TEXT_X_OFFSET,
+                        -9. + Y_OFFSET + TEXT_Y_OFFSET + ICON_Y,
+                        1.,
+                    ),
+                    scale: gf::BODY.transform_scale(),
+                    ..Default::default()
+                }),
+        )
         .insert(RenderLayers::from_layers(&[3]))
         .insert(Name::new("PET DESCRIPTION"))
-        .set_parent(pet_container)
+        .insert(ChildOf(pet_container))
         .id();
 
     // power icon
     let _icon_slot = commands
-        .spawn(SpriteBundle {
-            texture: passive_icon,
-            sprite: Sprite {
+        .spawn((
+            Sprite {
+                image: passive_icon,
                 custom_size: Some(CLASS_PREVIEW_ICON_SIZE),
                 ..Default::default()
             },
-            transform: Transform {
+            Transform {
                 translation: Vec3::new(ICON_X, ICON_Y + Y_OFFSET - 61., 11.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
-            ..Default::default()
-        })
+        ))
         .insert(RenderLayers::from_layers(&[3]))
         .insert(Name::new("POWER ICON"))
-        .set_parent(pet_container)
+        .insert(ChildOf(pet_container))
         .id();
     let _passive_title_text = commands
-        .spawn(Text2dBundle {
-            text: Text::from_section("Passive Buff", gf::BODY.text_style(&asset_server, YELLOW_2))
-                .with_alignment(TextAlignment::Left),
-            text_anchor: Anchor::TopLeft,
-            transform: Transform {
-                translation: Vec3::new(TEXT_X_OFFSET, -40. + Y_OFFSET, 1.),
-                scale: gf::BODY.transform_scale(),
-                ..Default::default()
-            },
-            ..default()
-        })
+        .spawn(
+            gf::BODY
+                .text(&asset_server, "Passive Buff", YELLOW_2)
+                .justify(Justify::Left)
+                .anchor(Anchor::TOP_LEFT)
+                .with_transform(Transform {
+                    translation: Vec3::new(TEXT_X_OFFSET, -40. + Y_OFFSET, 1.),
+                    scale: gf::BODY.transform_scale(),
+                    ..Default::default()
+                }),
+        )
         .insert(RenderLayers::from_layers(&[3]))
         .insert(Name::new("PET DESCRIPTION"))
-        .set_parent(pet_container)
+        .insert(ChildOf(pet_container))
         .id();
     let _passive_text = commands
-        .spawn(Text2dBundle {
-            text: Text::from_section(pet_passive, gf::BODY.text_style(&asset_server, WHITE))
-                .with_alignment(TextAlignment::Left),
-            text_anchor: Anchor::TopLeft,
-            transform: Transform {
-                translation: Vec3::new(TEXT_X_OFFSET, -50. + Y_OFFSET, 1.),
-                scale: gf::BODY.transform_scale(),
-                ..Default::default()
-            },
-            ..default()
-        })
+        .spawn(
+            gf::BODY
+                .text(&asset_server, pet_passive, WHITE)
+                .justify(Justify::Left)
+                .anchor(Anchor::TOP_LEFT)
+                .with_transform(Transform {
+                    translation: Vec3::new(TEXT_X_OFFSET, -50. + Y_OFFSET, 1.),
+                    scale: gf::BODY.transform_scale(),
+                    ..Default::default()
+                }),
+        )
         .insert(RenderLayers::from_layers(&[3]))
         .insert(Name::new("PET DESCRIPTION"))
-        .set_parent(pet_container)
+        .insert(ChildOf(pet_container))
         .id();
 
     pet_container
@@ -2083,12 +2066,12 @@ pub fn update_preview_sprites(
 
     // Despawn existing class previews (including their containers)
     for entity in class_previews.iter() {
-        commands.entity(entity).despawn_recursive();
+        commands.entity(entity).despawn();
     }
 
     // Despawn existing pet previews
     for entity in pet_previews.iter() {
-        commands.entity(entity).despawn_recursive();
+        commands.entity(entity).despawn();
     }
 
     // Recreate class preview using helper function
@@ -2120,7 +2103,7 @@ pub fn update_preview_sprites(
 
 pub fn update_slot_visuals(
     mut class_slots: Query<
-        (&mut Handle<Image>, &PlayerSelectSlot),
+        (&mut Sprite, &PlayerSelectSlot),
         (
             With<ClassOption>,
             Without<PetOption>,
@@ -2129,7 +2112,7 @@ pub fn update_slot_visuals(
         ),
     >,
     mut pet_slots: Query<
-        (&mut Handle<Image>, &PetSelectSlot),
+        (&mut Sprite, &PetSelectSlot),
         (
             With<PetOption>,
             Without<ClassOption>,
@@ -2143,11 +2126,11 @@ pub fn update_slot_visuals(
     // Update class slot visuals. Hover (mouse-over or keyboard/gamepad focus) always wins
     // over Selected so the player can tell what they're about to confirm; the Selected art
     // (plus its glow, see `selection_glow.rs`) is what shows the rest of the time.
-    for (mut texture, slot) in class_slots.iter_mut() {
+    for (mut sprite, slot) in class_slots.iter_mut() {
         let is_locked =
             !cheat_settings.bypass_class_unlocks && !unlocked_classes.contains(&slot.class);
         if is_locked {
-            *texture = graphics
+            sprite.image = graphics
                 .get_ui_element_texture(if slot.is_hovered {
                     UIElement::PlayerSelectSlotHover
                 } else {
@@ -2155,32 +2138,32 @@ pub fn update_slot_visuals(
                 })
                 .clone();
         } else if slot.is_hovered {
-            *texture = graphics
+            sprite.image = graphics
                 .get_ui_element_texture(UIElement::PlayerSelectSlotHover)
                 .clone();
         } else if slot.is_selected {
-            *texture = graphics
+            sprite.image = graphics
                 .get_ui_element_texture(UIElement::PlayerSelectSlotSelected)
                 .clone();
         } else {
-            *texture = graphics
+            sprite.image = graphics
                 .get_ui_element_texture(UIElement::PlayerSelectSlot)
                 .clone();
         }
     }
 
     // Update pet slot visuals (same Hover > Selected > Normal priority as class slots).
-    for (mut texture, slot) in pet_slots.iter_mut() {
+    for (mut sprite, slot) in pet_slots.iter_mut() {
         if slot.is_hovered {
-            *texture = graphics
+            sprite.image = graphics
                 .get_ui_element_texture(UIElement::PetSelectSlotHover)
                 .clone();
         } else if slot.is_selected {
-            *texture = graphics
+            sprite.image = graphics
                 .get_ui_element_texture(UIElement::PetSelectSlotSelected)
                 .clone();
         } else {
-            *texture = graphics
+            sprite.image = graphics
                 .get_ui_element_texture(UIElement::PetSelectSlot)
                 .clone();
         }
@@ -2189,13 +2172,13 @@ pub fn update_slot_visuals(
 
 pub fn update_locked_class_overlays(
     slots: Query<&PlayerSelectSlot>,
-    mut overlays: Query<(&Parent, &mut Handle<Image>, &mut Visibility), With<LockedClassOverlay>>,
+    mut overlays: Query<(&ChildOf, &mut Sprite, &mut Visibility), With<LockedClassOverlay>>,
     unlocked_classes: Res<UnlockedClasses>,
     cheat_settings: Res<CheatSettings>,
     graphics: Res<Graphics>,
 ) {
-    for (parent, mut texture, mut visibility) in overlays.iter_mut() {
-        let Ok(slot) = slots.get(parent.get()) else {
+    for (parent, mut sprite, mut visibility) in overlays.iter_mut() {
+        let Ok(slot) = slots.get(parent.parent()) else {
             continue;
         };
 
@@ -2203,7 +2186,7 @@ pub fn update_locked_class_overlays(
             !cheat_settings.bypass_class_unlocks && !unlocked_classes.contains(&slot.class);
         if is_locked {
             *visibility = Visibility::Inherited;
-            *texture = graphics
+            sprite.image = graphics
                 .get_ui_element_texture(if slot.is_hovered {
                     UIElement::LockedClassHover
                 } else {
@@ -2219,18 +2202,18 @@ pub fn update_locked_class_overlays(
 pub fn update_class_option_icons(
     unlocked_classes: Res<UnlockedClasses>,
     graphics: Res<Graphics>,
-    mut class_icons: Query<(&ClassIcon, &mut Handle<Image>, &mut Visibility)>,
+    mut class_icons: Query<(&ClassIcon, &mut Sprite, &mut Visibility)>,
     cheat_settings: Res<CheatSettings>,
 ) {
     if !unlocked_classes.is_changed() && !cheat_settings.is_changed() {
         return;
     }
 
-    for (class_icon, mut texture, mut visibility) in class_icons.iter_mut() {
+    for (class_icon, mut sprite, mut visibility) in class_icons.iter_mut() {
         let class_data = graphics.get_class_data(class_icon.class.clone());
         if cheat_settings.bypass_class_unlocks || unlocked_classes.contains(&class_icon.class) {
             *visibility = Visibility::Inherited;
-            *texture = graphics
+            sprite.image = graphics
                 .get_ui_element_texture(class_data.class_icon.clone())
                 .clone();
         } else {
@@ -2253,7 +2236,8 @@ pub fn handle_portal_animation(
     mut portal_query: Query<(
         Entity,
         &mut PortalAnimationState,
-        &mut bevy_aseprite::anim::AsepriteAnimation,
+        &mut AseAnimation,
+        &AsepriteAnimationState,
     )>,
     pending_game_start: Option<ResMut<PendingGameStart>>,
     mut next_state: ResMut<NextState<crate::GameState>>,
@@ -2266,14 +2250,16 @@ pub fn handle_portal_animation(
     cheat_settings: Res<CheatSettings>,
     game_data: Option<Res<GameData>>,
 ) {
-    for (_portal_entity, mut anim_state, mut anim) in portal_query.iter_mut() {
+    for (_portal_entity, mut anim_state, mut anim, ase_state) in portal_query.iter_mut() {
+        let current_frame = usize::from(ase_state.current_frame());
+
         // Check if we have a pending game start resource and are still in Idle state
         if let Some(pending) = pending_game_start.as_deref() {
-            if matches!(anim_state.state, PortalAnimState::Idle) && anim.current_frame() == 0 {
-                // Start the TRANSITION animation
+            if matches!(anim_state.state, PortalAnimState::Idle) {
+                // Start the TRANSITION animation (preserve aseprite handle — do not replace component)
                 anim_state.state = PortalAnimState::Transition;
                 anim_state.pending_game_start = Some(pending.clone());
-                *anim = bevy_aseprite::anim::AsepriteAnimation::from(UIPortal::tags::TRANSITION);
+                play_loop(&mut anim, UIPortal::tags::TRANSITION);
                 // Remove the resource so we don't trigger this again
                 commands.remove_resource::<PendingGameStart>();
             }
@@ -2282,14 +2268,14 @@ pub fn handle_portal_animation(
         match anim_state.state {
             PortalAnimState::Transition => {
                 // Check if we've reached frame 17, then switch to ERA1
-                if anim.current_frame() >= 17 {
+                if current_frame >= 17 {
                     anim_state.state = PortalAnimState::Era1;
-                    *anim = bevy_aseprite::anim::AsepriteAnimation::from(UIPortal::tags::ERA1);
+                    play_loop(&mut anim, UIPortal::tags::ERA1);
                 }
             }
             PortalAnimState::Era1 => {
                 // Check if we've reached frame 26, then transition to game
-                if anim.current_frame() >= 26 {
+                if current_frame >= 26 {
                     // Now we can actually start the game
                     if let Some(pending) = anim_state.pending_game_start.take() {
                         // Close the class selection UI and transition to loading state
@@ -2333,19 +2319,18 @@ pub fn handle_portal_animation(
 
                         // Start the game with fade-in overlay
                         commands
-                            .spawn(SpriteBundle {
-                                sprite: Sprite {
-                                    color: Color::rgba(0., 0., 0., 0.),
+                            .spawn((
+                                Sprite {
+                                    color: Color::srgba(0., 0., 0., 0.),
                                     custom_size: Some(full_screen_overlay_size(&screen_res)),
                                     ..default()
                                 },
-                                transform: Transform {
+                                Transform {
                                     translation: Vec3::new(0., 0., 10.),
                                     scale: Vec3::new(1., 1., 1.),
                                     ..Default::default()
                                 },
-                                ..default()
-                            })
+                            ))
                             .insert(RenderLayers::from_layers(&[3]))
                             .insert(Name::new("overlay"))
                             .insert(GameStartFadein(Timer::from_seconds(3.0, TimerMode::Once)));

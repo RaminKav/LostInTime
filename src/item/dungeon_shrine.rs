@@ -1,5 +1,11 @@
+use crate::aseprite_assets::{
+    AccessoryShrineAnim, ArmorShrineAnim, CombatShrineAnim, WeaponShrineAnim,
+};
+use crate::aseprite_helpers::{
+    ase_animation, aseprite_bundle, collect_finished, is_paused, pause, play_loop, play_once, start,
+};
 use bevy::prelude::*;
-use bevy_aseprite::{anim::AsepriteAnimation, aseprite, AsepriteBundle};
+use bevy_aseprite_ultra::prelude::{AnimationState, AseAnimation, Aseprite};
 use rand::{seq::IteratorRandom, Rng};
 use strum::IntoEnumIterator;
 
@@ -7,9 +13,7 @@ use crate::{
     assets::{Graphics, SpriteAnchor},
     custom_commands::CommandsExt,
     enemy::{spawn_helpers::can_spawn_mob_here, CombatAlignment, EliteMob, Mob},
-    item::{
-        combat_shrine::CombatShrineAnim, object_actions::ObjectAction, LootTable, PlaceItemEvent,
-    },
+    item::{object_actions::ObjectAction, LootTable, PlaceItemEvent},
     proto::proto_param::ProtoParam,
     ui::minimap::UpdateMiniMapEvent,
     world::{world_helpers::world_pos_to_tile_pos, TileMapPosition, TILE_SIZE},
@@ -39,11 +43,9 @@ pub enum DungeonShrineType {
     Accessory,
 }
 
+#[derive(Message)]
 pub struct DungeonShrineMobDeathEvent(pub Entity);
 
-aseprite!(pub WeaponShrineAnim, "textures/dungeon_shrines/dungeon_weapon_shrine.ase");
-aseprite!(pub ArmorShrineAnim, "textures/dungeon_shrines/dungeon_armor_shrine.ase");
-aseprite!(pub AccessoryShrineAnim, "textures/dungeon_shrines/dungeon_accessory_shrine.ase");
 pub const NUM_DUNGEON_SHRINE_MOBS: usize = 15;
 pub const DUNGEON_ELITE_SPAWN_RATE: f32 = 0.30;
 
@@ -63,16 +65,17 @@ pub fn handle_dungeon_shrine_activation(
         Entity,
         &GlobalTransform,
         &mut DungeonShrine,
-        &mut AsepriteAnimation,
+        &mut AseAnimation,
+        &AnimationState,
     )>,
     mut proto_param: ProtoParam,
     mut commands: Commands,
     game: GameParam,
 ) {
-    for (e, t, mut shrine, mut anim) in shrines.iter_mut() {
-        if !shrine.is_activated && anim.current_frame() == 55 {
+    for (e, t, mut shrine, mut anim, state) in shrines.iter_mut() {
+        if !shrine.is_activated && usize::from(state.current_frame()) == 55 {
             shrine.is_activated = true;
-            *anim = AsepriteAnimation::from(CombatShrineAnim::tags::DONE);
+            play_loop(&mut anim, CombatShrineAnim::tags::DONE);
 
             // Spawn mobs when shrine is activated
             let mut num_to_spawn = NUM_DUNGEON_SHRINE_MOBS; // Total mobs to spawn
@@ -92,11 +95,9 @@ pub fn handle_dungeon_shrine_activation(
                     } else {
                         possible_spawns[choice_mob].clone()
                     };
-                    if let Some(mob_e) = commands.spawn_from_proto(
-                        spawned_mob.clone(),
-                        &proto_param.defs,
-                        spawn_pos,
-                    ) {
+                    if let Some(mob_e) =
+                        commands.spawn_from_proto(spawned_mob.clone(), &proto_param.defs, spawn_pos)
+                    {
                         if roll_dungeon_elite(&spawned_mob, &proto_param, &mut rng) {
                             commands.entity(mob_e).insert(EliteMob);
                         }
@@ -133,22 +134,22 @@ pub fn handle_dungeon_shrine_activation(
 }
 
 pub fn handle_dungeon_shrine_rewards(
-    mut shrine_mob_event: EventReader<DungeonShrineMobDeathEvent>,
+    mut shrine_mob_event: MessageReader<DungeonShrineMobDeathEvent>,
     mut shrines: Query<(
         Entity,
         &GlobalTransform,
         &mut DungeonShrine,
-        &mut AsepriteAnimation,
+        &mut AseAnimation,
     )>,
     proto: ProtoParam,
     mut commands: Commands,
     mut game: GameParam,
-    mut place_item_event: EventWriter<PlaceItemEvent>,
-    mut minimap_event: EventWriter<UpdateMiniMapEvent>,
+    mut place_item_event: MessageWriter<PlaceItemEvent>,
+    mut minimap_event: MessageWriter<UpdateMiniMapEvent>,
     objs: Query<(Entity, &WorldObject)>,
 ) {
     let mut is_done = false;
-    for event in shrine_mob_event.iter() {
+    for event in shrine_mob_event.read() {
         if let Ok((e, t, mut shrine, _anim)) = shrines.get_mut(event.0) {
             shrine.num_mobs_left -= 1;
 
@@ -191,12 +192,12 @@ pub fn handle_dungeon_shrine_rewards(
                 game.add_object_to_chunk_cache(shrine.tile_pos, done_object);
 
                 // Update minimap to reflect the shrine is now "Done"
-                minimap_event.send(UpdateMiniMapEvent {
+                minimap_event.write(UpdateMiniMapEvent {
                     pos: Some(shrine.tile_pos),
                     new_tile: Some(done_object),
                 });
 
-                place_item_event.send(PlaceItemEvent {
+                place_item_event.write(PlaceItemEvent {
                     obj: WorldObject::DungeonExit,
                     pos: t.translation().truncate() + Vec2::new(0., -36.),
                     placed_by_player: false,
@@ -264,6 +265,7 @@ pub fn add_dungeon_shrine_visuals_on_spawn(
         (Entity, &WorldObject, &Transform),
         Or<(Added<WorldObject>, Changed<WorldObject>)>,
     >,
+    mut done_anims: Query<&mut AseAnimation>,
     graphics: Res<Graphics>,
 ) {
     for (e, obj, t) in new_shrines.iter() {
@@ -271,43 +273,54 @@ pub fn add_dungeon_shrine_visuals_on_spawn(
             WorldObject::WeaponShrine => {
                 commands
                     .entity(e)
-                    .insert(AsepriteBundle {
-                        transform: *t,
-                        animation: AsepriteAnimation::from(WeaponShrineAnim::tags::IDLE),
-                        aseprite: graphics.weapon_shrine_anim.as_ref().unwrap().clone(),
-                        ..default()
-                    })
+                    .insert(aseprite_bundle(
+                        graphics.weapon_shrine_anim.as_ref().unwrap().clone(),
+                        WeaponShrineAnim::tags::IDLE,
+                        *t,
+                        Visibility::Inherited,
+                        false,
+                    ))
                     .insert(Name::new("WEAPON_SHRINE"));
             }
             WorldObject::ArmorShrine => {
                 commands
                     .entity(e)
-                    .insert(AsepriteBundle {
-                        transform: *t,
-                        animation: AsepriteAnimation::from(ArmorShrineAnim::tags::IDLE),
-                        aseprite: graphics.armor_shrine_anim.as_ref().unwrap().clone(),
-                        ..default()
-                    })
+                    .insert(aseprite_bundle(
+                        graphics.armor_shrine_anim.as_ref().unwrap().clone(),
+                        ArmorShrineAnim::tags::IDLE,
+                        *t,
+                        Visibility::Inherited,
+                        false,
+                    ))
                     .insert(Name::new("ARMOR_SHRINE"));
             }
             WorldObject::AccessoryShrine => {
                 commands
                     .entity(e)
-                    .insert(AsepriteBundle {
-                        transform: *t,
-                        animation: AsepriteAnimation::from(AccessoryShrineAnim::tags::IDLE),
-                        aseprite: graphics.accessory_shrine_anim.as_ref().unwrap().clone(),
-                        ..default()
-                    })
+                    .insert(aseprite_bundle(
+                        graphics.accessory_shrine_anim.as_ref().unwrap().clone(),
+                        AccessoryShrineAnim::tags::IDLE,
+                        *t,
+                        Visibility::Inherited,
+                        false,
+                    ))
                     .insert(Name::new("ACCESSORY_SHRINE"));
             }
             WorldObject::WeaponShrineDone
             | WorldObject::ArmorShrineDone
             | WorldObject::AccessoryShrineDone => {
-                commands
-                    .entity(e)
-                    .insert(AsepriteAnimation::from(CombatShrineAnim::tags::DONE))
-                    .insert(Name::new("DUNGEON_SHRINE_DONE"));
+                if let Ok(mut anim) = done_anims.get_mut(e) {
+                    play_loop(&mut anim, CombatShrineAnim::tags::DONE);
+                } else {
+                    commands.entity(e).insert(aseprite_bundle(
+                        graphics.weapon_shrine_anim.as_ref().unwrap().clone(),
+                        CombatShrineAnim::tags::DONE,
+                        *t,
+                        Visibility::Inherited,
+                        false,
+                    ));
+                }
+                commands.entity(e).insert(Name::new("DUNGEON_SHRINE_DONE"));
             }
             _ => {}
         }

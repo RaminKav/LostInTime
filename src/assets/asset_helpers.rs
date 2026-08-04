@@ -1,4 +1,4 @@
-use bevy::{prelude::*, render::view::RenderLayers};
+use bevy::{camera::visibility::RenderLayers, prelude::*};
 pub fn spawn_sprite(
     commands: &mut Commands,
     translation: Vec3,
@@ -6,18 +6,18 @@ pub fn spawn_sprite(
     render_layer: u8,
 ) -> Entity {
     commands
-        .spawn(SpriteBundle {
-            texture: icon,
-            sprite: Sprite {
-                ..Default::default()
+        .spawn((
+            Sprite {
+                image: icon,
+
+                ..default()
             },
-            transform: Transform {
+            Transform {
                 translation,
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
-            ..Default::default()
-        })
-        .insert(RenderLayers::from_layers(&[render_layer]))
+        ))
+        .insert(RenderLayers::from_layers(&[render_layer as usize]))
         .id()
 }

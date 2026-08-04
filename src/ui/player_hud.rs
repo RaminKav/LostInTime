@@ -1,8 +1,13 @@
-use bevy::{ecs::system::SystemParam, prelude::*, render::view::RenderLayers, sprite::Anchor};
+use bevy::text::Justify;
+use bevy::color::Alpha;
+use bevy::{
+    camera::visibility::RenderLayers, ecs::system::SystemParam, prelude::*, sprite::Anchor,
+};
 use rand::Rng;
 use std::collections::HashMap;
 
 use super::{
+    desc_spans::{skill_desc_line, spawn_desc_line},
     focus::{Focusable, UiFocus},
     heirloom_tooltip::{
         heirloom_hud_hover_tooltip_position, HeirloomTooltipRequest, HeirloomTooltipShow,
@@ -44,8 +49,8 @@ use crate::{
     },
     cursor::CursorPos,
     gamepad_bindings::{
-        binding_labels_dirty, format_binding_label, format_pause_options_label, BindingLabel,
-        GamepadMappings,
+        binding_labels_dirty, format_binding_label, format_pause_options_label, gamepad_connected,
+        BindingLabel, ConnectedGamepads, GamepadMappings,
     },
     inventory::{Inventory, ItemStack},
     item::item_drop_outline::{HeirloomIconOutline, HeirloomIconOutlineStyle, UiShadow},
@@ -72,7 +77,7 @@ use crate::{
     ui::{game_fonts as gf, CheatSettings, Interactable, SKILL_TOOLTIP_SIZE},
     GameState, InputMappings, Pet, ScreenResolution,
 };
-use bevy::utils::Duration;
+use std::time::Duration;
 #[derive(Component)]
 pub struct HealthBar;
 #[derive(Component)]
@@ -234,10 +239,10 @@ pub struct ActiveSkillKeybindText {
 
 /// Keyboard + gamepad resources for HUD binding label text.
 #[derive(SystemParam)]
-pub struct HudBindingDisplay<'w> {
+pub struct HudBindingDisplay<'w, 's> {
     pub keybinds: Res<'w, crate::keybinds::InputMappings>,
     pub gamepad_mappings: Res<'w, GamepadMappings>,
-    pub gamepads: Res<'w, Gamepads>,
+    pub gamepads: ConnectedGamepads<'w, 's>,
 }
 
 #[derive(Component)]
@@ -319,11 +324,11 @@ pub struct ChaosBar;
 /// Helper function to blend two colors
 fn lerp_color(a: Color, b: Color, t: f32) -> Color {
     let t = t.clamp(0.0, 1.0);
-    Color::rgba(
-        a.r() + (b.r() - a.r()) * t,
-        a.g() + (b.g() - a.g()) * t,
-        a.b() + (b.b() - a.b()) * t,
-        a.a() + (b.a() - a.a()) * t,
+    Color::srgba(
+        a.to_srgba().red + (b.to_srgba().red - a.to_srgba().red) * t,
+        a.to_srgba().green + (b.to_srgba().green - a.to_srgba().green) * t,
+        a.to_srgba().blue + (b.to_srgba().blue - a.to_srgba().blue) * t,
+        a.to_srgba().alpha + (b.to_srgba().alpha - a.to_srgba().alpha) * t,
     )
 }
 
@@ -362,7 +367,7 @@ pub struct BarFlashTimer {
     pub flash_color: Color,
     pub color: Color,
 }
-#[derive(Default)]
+#[derive(Default, Message)]
 pub struct FlashExpBarEvent {
     pub amount: u32,
     pub did_level: bool,
@@ -386,27 +391,24 @@ pub fn setup_bars_ui(
     player_stats: Query<(&CurrentHealth, &CurrentMana), With<Player>>,
 ) {
     use crate::ui::hud_bar_fill::HudBarFillMaterial;
-    use bevy::sprite::{MaterialMesh2dBundle, Mesh2dHandle};
+    use bevy::mesh::Mesh2d;
+    use bevy::sprite_render::MeshMaterial2d;
 
     let row_y = -res.game_height * 0.5 + HUD_FRAME_Y_FROM_BOTTOM;
-    let bar_label_style = gf::HUD_CURRENCY_COUNT.text_style(&asset_server, WHITE);
     let (hp_amount, mana_amount) = player_stats
-        .get_single()
+        .single()
         .map(|(hp, mana)| (hp.0, mana.0))
         .unwrap_or((0, 0));
 
     let hud_bar_frame = commands
-        .spawn(SpriteBundle {
-            texture: graphics.get_ui_element_texture(UIElement::HudBar),
-            sprite: Sprite {
+        .spawn((
+            Sprite {
+                image: graphics.get_ui_element_texture(UIElement::HudBar),
                 custom_size: Some(HUD_FRAME_SIZE),
-                ..Default::default()
+                ..default()
             },
-            // Z below `Z_DEPTH_HUD_ACTIVE_SKILLS` (4.0) so the hotbar / skill slot
-            // backgrounds and their icons render on top of the frame.
-            transform: Transform::from_translation(Vec3::new(0., row_y, 1.)),
-            ..Default::default()
-        })
+            Transform::from_translation(Vec3::new(0., row_y, 1.)),
+        ))
         .insert(Name::new("HUD FRAME"))
         .insert(HudFrame)
         .insert(RenderLayers::from_layers(&[3]))
@@ -415,115 +417,113 @@ pub fn setup_bars_ui(
 
     // Shader-driven HP/mana fills sitting inside the two semicircular caps.
     // Z is slightly above the frame so the liquid renders on top of the dark cap interior.
-    let hp_mesh: Mesh2dHandle = meshes
-        .add(Mesh::from(shape::Quad::new(HUD_FILL_PIXEL_SIZE)))
-        .into();
+    let hp_mesh = Mesh2d(meshes.add(Mesh::from(Rectangle::new(
+        HUD_FILL_PIXEL_SIZE.x,
+        HUD_FILL_PIXEL_SIZE.y,
+    ))));
     let hp_material = materials.add(HudBarFillMaterial::new(
         asset_server.load("ui/HpBarFill.png"),
         1.0,
         HUD_FILL_PIXEL_SIZE.y as u32,
     ));
     let hp_fill = commands
-        .spawn(MaterialMesh2dBundle {
-            mesh: hp_mesh,
-            material: hp_material,
-            transform: Transform::from_translation(Vec3::new(-HUD_FILL_X_OFFSET + 1., -3.0, 1.0)),
-            ..default()
-        })
+        .spawn((
+            hp_mesh,
+            MeshMaterial2d(hp_material),
+            Transform::from_translation(Vec3::new(-HUD_FILL_X_OFFSET + 1., -3.0, 1.0)),
+        ))
         .insert(RenderLayers::from_layers(&[3]))
         .insert(HealthBar)
         .insert(Name::new("HUD HP FILL"))
         .id();
     commands
-        .spawn(Text2dBundle {
-            text: Text::from_section(format!("{hp_amount}"), bar_label_style.clone()),
-            text_anchor: Anchor::Center,
-            transform: Transform {
-                translation: Vec3::new(0., 0., 2.),
-                scale: gf::HUD_CURRENCY_COUNT.transform_scale(),
-                ..default()
-            },
-            ..default()
-        })
+        .spawn(
+            gf::HUD_CURRENCY_COUNT
+                .text(&asset_server, format!("{hp_amount}"), WHITE)
+                .anchor(Anchor::CENTER)
+                .with_transform(Transform {
+                    translation: Vec3::new(0., 0., 2.),
+                    scale: gf::HUD_CURRENCY_COUNT.transform_scale(),
+                    ..default()
+                }),
+        )
         .insert(RenderLayers::from_layers(&[3]))
         .insert(HealthBarText)
         .insert(Name::new("HUD HP TEXT"))
-        .set_parent(hp_fill);
+        .insert(ChildOf(hp_fill));
 
     commands
-        .spawn(SpriteBundle {
-            sprite: Sprite {
-                color: Color::rgba(0., 0., 0., 0.),
+        .spawn((
+            Sprite {
+                color: Color::srgba(0., 0., 0., 0.),
                 custom_size: Some(HUD_FILL_PIXEL_SIZE),
                 ..default()
             },
-            transform: Transform::from_translation(Vec3::new(0., 0., 3.)),
-            ..default()
-        })
+            Transform::from_translation(Vec3::new(0., 0., 3.)),
+        ))
         .insert(RenderLayers::from_layers(&[3]))
         .insert(HealthOrbHudHover)
         .insert(Interactable::default())
         .insert(Name::new("HUD HP HOVER"))
-        .set_parent(hp_fill);
+        .insert(ChildOf(hp_fill));
 
-    let mana_mesh: Mesh2dHandle = meshes
-        .add(Mesh::from(shape::Quad::new(HUD_FILL_PIXEL_SIZE)))
-        .into();
+    let mana_mesh = Mesh2d(meshes.add(Mesh::from(Rectangle::new(
+        HUD_FILL_PIXEL_SIZE.x,
+        HUD_FILL_PIXEL_SIZE.y,
+    ))));
     let mana_material = materials.add(HudBarFillMaterial::new(
         asset_server.load("ui/ManaBarFill.png"),
         1.0,
         HUD_FILL_PIXEL_SIZE.y as u32,
     ));
     let mana_fill = commands
-        .spawn(MaterialMesh2dBundle {
-            mesh: mana_mesh,
-            material: mana_material,
-            transform: Transform::from_translation(Vec3::new(
+        .spawn((
+            mana_mesh,
+            MeshMaterial2d(mana_material),
+            Transform::from_translation(Vec3::new(
                 HUD_MANA_FILL_LOCAL_X,
                 HUD_MANA_FILL_LOCAL_Y,
                 1.0,
             )),
-            ..default()
-        })
+        ))
         .insert(RenderLayers::from_layers(&[3]))
         .insert(ManaBar)
         .insert(Name::new("HUD MANA FILL"))
         .id();
     commands
-        .spawn(Text2dBundle {
-            text: Text::from_section(format!("{mana_amount}"), bar_label_style),
-            text_anchor: Anchor::Center,
-            transform: Transform {
-                translation: Vec3::new(1., 0., 2.),
-                scale: gf::HUD_CURRENCY_COUNT.transform_scale(),
-                ..default()
-            },
-            ..default()
-        })
+        .spawn(
+            gf::HUD_CURRENCY_COUNT
+                .text(&asset_server, format!("{mana_amount}"), WHITE)
+                .anchor(Anchor::CENTER)
+                .with_transform(Transform {
+                    translation: Vec3::new(1., 0., 2.),
+                    scale: gf::HUD_CURRENCY_COUNT.transform_scale(),
+                    ..default()
+                }),
+        )
         .insert(RenderLayers::from_layers(&[3]))
         .insert(ManaBarText)
         .insert(Name::new("HUD MANA TEXT"))
-        .set_parent(mana_fill);
+        .insert(ChildOf(mana_fill));
 
     commands
-        .spawn(SpriteBundle {
-            sprite: Sprite {
-                color: Color::rgba(0., 0., 0., 0.),
+        .spawn((
+            Sprite {
+                color: Color::srgba(0., 0., 0., 0.),
                 custom_size: Some(HUD_FILL_PIXEL_SIZE),
                 ..default()
             },
-            transform: Transform::from_translation(Vec3::new(0., 0., 3.)),
-            ..default()
-        })
+            Transform::from_translation(Vec3::new(0., 0., 3.)),
+        ))
         .insert(RenderLayers::from_layers(&[3]))
         .insert(ManaOrbHudHover)
         .insert(Interactable::default())
         .insert(Name::new("HUD MANA HOVER"))
-        .set_parent(mana_fill);
+        .insert(ChildOf(mana_fill));
 
     commands
         .entity(hud_bar_frame)
-        .push_children(&[hp_fill, mana_fill]);
+        .add_children(&[hp_fill, mana_fill]);
 }
 
 pub fn setup_xp_bar_ui(
@@ -533,20 +533,18 @@ pub fn setup_xp_bar_ui(
     res: Res<ScreenResolution>,
 ) {
     let _inner_xp_prog = commands
-        .spawn(SpriteBundle {
-            sprite: Sprite {
+        .spawn((
+            Sprite {
                 color: overwrite_alpha(LEVEL_BLUE, 0.),
                 custom_size: Some(Vec2::new(0., 6.)), // Initialize to 0 width (0 XP at start)
-                anchor: Anchor::CenterLeft,
                 ..default()
             },
-            transform: Transform {
+            Transform {
                 translation: Vec3::new(-res.game_width / 2., res.game_height / 2. - 3., 11.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
-            ..default()
-        })
+        ))
         .insert(BarFlashTimer {
             timer: Timer::from_seconds(0.2, TimerMode::Once),
             flash_color: WHITE,
@@ -555,58 +553,52 @@ pub fn setup_xp_bar_ui(
         .insert(RenderLayers::from_layers(&[3]))
         .insert(XPBar)
         .insert(PendingXP::default())
+        .insert(Anchor::CENTER_LEFT)
         .insert(Name::new("inner xp bar"))
         .id();
     let _inner_xp_bg = commands
-        .spawn(SpriteBundle {
-            sprite: Sprite {
-                color: overwrite_alpha(*LEVEL_DARK_BLUE.clone().set_a(0.85), 0.),
+        .spawn((
+            Sprite {
+                color: overwrite_alpha(LEVEL_DARK_BLUE.with_alpha(0.85), 0.),
                 custom_size: Some(Vec2::new(res.game_width, 6.)), // Initialize to 0 width (0 XP at start)
-                anchor: Anchor::CenterLeft,
                 ..default()
             },
-            transform: Transform {
+            Transform {
                 translation: Vec3::new(-res.game_width / 2., res.game_height / 2. - 3., 10.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
-            ..default()
-        })
+        ))
         .insert(RenderLayers::from_layers(&[3]))
         .insert(XPBarBg)
+        .insert(Anchor::CENTER_LEFT)
         .insert(Name::new("inner xp bar"))
         .id();
     let level_frame = commands
-        .spawn(SpriteBundle {
-            sprite: Sprite {
-                color: overwrite_alpha(Color::rgba(0.1, 0.1, 0.1, 0.0), 0.),
+        .spawn((
+            Sprite {
+                color: overwrite_alpha(Color::srgba(0.1, 0.1, 0.1, 0.0), 0.),
                 custom_size: Some(Vec2::new(46., 11.)),
                 ..default()
             },
-            transform: Transform {
+            Transform {
                 translation: Vec3::new(0., 0., -1.),
                 ..Default::default()
             },
-            ..default()
-        })
+        ))
         .insert(RenderLayers::from_layers(&[3]))
         .insert(XPBarLevelFrame)
         .id();
     let _text = commands
         .spawn((
-            Text2dBundle {
-                text: Text::from_section(
-                    "Level 1",
-                    gf::HUD_MICRO.text_style(&asset_server, overwrite_alpha(WHITE, 0.)),
-                ),
-                text_anchor: Anchor::Center,
-                transform: Transform {
+            gf::HUD_MICRO
+                .text(&asset_server, "Level 1", overwrite_alpha(WHITE, 0.))
+                .anchor(Anchor::CENTER)
+                .with_transform(Transform {
                     translation: Vec3::new(0., res.game_height / 2. - 3., 12.),
                     scale: gf::HUD_MICRO.transform_scale(),
                     ..default()
-                },
-                ..default()
-            },
+                }),
             Name::new("XP TEXT"),
             XPBarText,
             RenderLayers::from_layers(&[3]),
@@ -615,7 +607,7 @@ pub fn setup_xp_bar_ui(
         .id();
     // commands
     //     .entity(xp_bar_frame)
-    //     .push_children(&[inner_xp_prog, text]);
+    //     .add_children(&[inner_xp_prog, text]);
 }
 /// Spawns the HUD row just below the XP bar: two currency backgrounds (time fragments +
 /// coins) on the left, and the compact centered progress background (score + chaos only).
@@ -630,11 +622,9 @@ pub fn setup_currency_ui(
     infinite_mode: Res<InfiniteMode>,
     keybinds: Res<InputMappings>,
     gamepad_mappings: Res<GamepadMappings>,
-    gamepads: Res<Gamepads>,
+    gamepads: ConnectedGamepads,
 ) {
     let row_y = hud_row_below_xp_y(res.game_height);
-    let currency_style = gf::HUD_CURRENCY_COUNT.text_style(&asset_server, WHITE);
-    let progress_stat_style = gf::HUD_PROGRESS_STAT.text_style(&asset_server, WHITE);
 
     let first_center_x = hud_currency_first_center_x(res.game_width);
     let second_center_x = hud_currency_second_center_x(res.game_width);
@@ -643,15 +633,14 @@ pub fn setup_currency_ui(
     // Time fragments slot
     {
         let bg = commands
-            .spawn(SpriteBundle {
-                texture: graphics.get_ui_element_texture(UIElement::CurrencyBackground),
-                sprite: Sprite {
+            .spawn((
+                Sprite {
+                    image: graphics.get_ui_element_texture(UIElement::CurrencyBackground),
                     custom_size: Some(CURRENCY_BACKGROUND_SIZE),
                     ..default()
                 },
-                transform: Transform::from_translation(Vec3::new(first_center_x, row_y, 3.)),
-                ..default()
-            })
+                Transform::from_translation(Vec3::new(first_center_x, row_y, 3.)),
+            ))
             .insert(RenderLayers::from_layers(&[3]))
             .insert(CurrencyHudBackground)
             .insert(CurrencyHudSlotIndex(0))
@@ -661,20 +650,19 @@ pub fn setup_currency_ui(
 
         let text = commands
             .spawn((
-                Text2dBundle {
-                    text: Text::from_section(
+                gf::HUD_CURRENCY_COUNT
+                    .text(
+                        &asset_server,
                         format!("{}", currency.time_fragments.max(0)),
-                        currency_style.clone(),
+                        WHITE,
                     )
-                    .with_alignment(TextAlignment::Center),
-                    text_anchor: Anchor::CenterLeft,
-                    transform: Transform {
+                    .justify(Justify::Center)
+                    .anchor(Anchor::CENTER_LEFT)
+                    .with_transform(Transform {
                         translation: Vec3::new(-12., 0., 2.),
                         scale: gf::HUD_CURRENCY_COUNT.transform_scale(),
                         ..default()
-                    },
-                    ..default()
-                },
+                    }),
                 Name::new("TIME FRAGMENTS TEXT"),
                 CurrencyText,
                 TimeFragmentText,
@@ -693,22 +681,21 @@ pub fn setup_currency_ui(
         commands
             .entity(stack)
             .insert(TimeFragmentIcon)
-            .set_parent(text);
-        commands.entity(text).set_parent(bg);
+            .insert(ChildOf(text));
+        commands.entity(text).insert(ChildOf(bg));
     }
 
     // Coins slot
     {
         let bg = commands
-            .spawn(SpriteBundle {
-                texture: graphics.get_ui_element_texture(UIElement::CurrencyBackground),
-                sprite: Sprite {
+            .spawn((
+                Sprite {
+                    image: graphics.get_ui_element_texture(UIElement::CurrencyBackground),
                     custom_size: Some(CURRENCY_BACKGROUND_SIZE),
                     ..default()
                 },
-                transform: Transform::from_translation(Vec3::new(second_center_x, row_y, 3.)),
-                ..default()
-            })
+                Transform::from_translation(Vec3::new(second_center_x, row_y, 3.)),
+            ))
             .insert(RenderLayers::from_layers(&[3]))
             .insert(CurrencyHudBackground)
             .insert(CurrencyHudSlotIndex(1))
@@ -718,17 +705,15 @@ pub fn setup_currency_ui(
 
         let coin_text = commands
             .spawn((
-                Text2dBundle {
-                    text: Text::from_section(format!("{}", coins.coins), currency_style)
-                        .with_alignment(TextAlignment::Center),
-                    text_anchor: Anchor::CenterLeft,
-                    transform: Transform {
+                gf::HUD_CURRENCY_COUNT
+                    .text(&asset_server, format!("{}", coins.coins), WHITE)
+                    .justify(Justify::Center)
+                    .anchor(Anchor::CENTER_LEFT)
+                    .with_transform(Transform {
                         translation: Vec3::new(-12., 0., 2.),
                         scale: gf::HUD_CURRENCY_COUNT.transform_scale(),
                         ..default()
-                    },
-                    ..default()
-                },
+                    }),
                 Name::new("COIN TEXT"),
                 CurrencyText,
                 CoinText,
@@ -747,21 +732,20 @@ pub fn setup_currency_ui(
         commands
             .entity(coin_stack)
             .insert(CoinIcon)
-            .set_parent(coin_text);
-        commands.entity(coin_text).set_parent(bg);
+            .insert(ChildOf(coin_text));
+        commands.entity(coin_text).insert(ChildOf(bg));
     }
 
     // Compact center progress bar (102×24): score + chaos only.
     let progress_bar = commands
-        .spawn(SpriteBundle {
-            texture: graphics.get_ui_element_texture(UIElement::ProgressBackground),
-            sprite: Sprite {
+        .spawn((
+            Sprite {
+                image: graphics.get_ui_element_texture(UIElement::ProgressBackground),
                 custom_size: Some(PROGRESS_BACKGROUND_SIZE),
                 ..default()
             },
-            transform: Transform::from_translation(Vec3::new(progress_center_x, row_y + 1., 7.)),
-            ..default()
-        })
+            Transform::from_translation(Vec3::new(progress_center_x, row_y + 1., 7.)),
+        ))
         .insert(RenderLayers::from_layers(&[3]))
         .insert(ProgressHudBar)
         .insert(UiShadow::hud())
@@ -772,41 +756,37 @@ pub fn setup_currency_ui(
 
     commands
         .spawn((
-            Text2dBundle {
-                text: Text::from_section("Score: 0", progress_stat_style.clone())
-                    .with_alignment(TextAlignment::Center),
-                text_anchor: Anchor::Center,
-                transform: Transform {
+            gf::HUD_PROGRESS_STAT
+                .text(&asset_server, "Score: 0", WHITE)
+                .justify(Justify::Center)
+                .anchor(Anchor::CENTER)
+                .with_transform(Transform {
                     translation: Vec3::new(0., 4., 2.),
                     scale: gf::HUD_PROGRESS_STAT.transform_scale(),
                     ..default()
-                },
-                ..default()
-            },
+                }),
             Name::new("SCORE TEXT"),
             ScoreText,
             RenderLayers::from_layers(&[3]),
         ))
-        .set_parent(progress_bar);
+        .insert(ChildOf(progress_bar));
 
     commands
         .spawn((
-            Text2dBundle {
-                text: Text::from_section(format!("Chaos: {:.1}", chaos_value), progress_stat_style)
-                    .with_alignment(TextAlignment::Center),
-                text_anchor: Anchor::Center,
-                transform: Transform {
+            gf::HUD_PROGRESS_STAT
+                .text(&asset_server, format!("Chaos: {:.1}", chaos_value), WHITE)
+                .justify(Justify::Center)
+                .anchor(Anchor::CENTER)
+                .with_transform(Transform {
                     translation: Vec3::new(0., -5., 2.),
                     scale: gf::HUD_PROGRESS_STAT.transform_scale(),
                     ..default()
-                },
-                ..default()
-            },
+                }),
             ChaosText,
             RenderLayers::from_layers(&[3]),
             Name::new("CHAOS TEXT"),
         ))
-        .set_parent(progress_bar);
+        .insert(ChildOf(progress_bar));
 
     // Minimap + inventory + options icons (bottom-left HUD corner).
     let corner_y = hud_bottom_corner_icon_row_y(res.game_height);
@@ -815,15 +795,14 @@ pub fn setup_currency_ui(
     let settings_x = bag_x + HUD_CORNER_ICON_SPACING;
 
     let map_icon = commands
-        .spawn(SpriteBundle {
-            texture: graphics.get_ui_element_texture(UIElement::MapIcon),
-            sprite: Sprite {
+        .spawn((
+            Sprite {
+                image: graphics.get_ui_element_texture(UIElement::MapIcon),
                 custom_size: Some(HUD_CORNER_ICON_SIZE),
                 ..default()
             },
-            transform: Transform::from_translation(Vec3::new(map_x, corner_y, 6.)),
-            ..default()
-        })
+            Transform::from_translation(Vec3::new(map_x, corner_y, 6.)),
+        ))
         .insert(RenderLayers::from_layers(&[3]))
         .insert(HudBottomCornerIcon::Minimap)
         .insert(Name::new("MINIMAP HUD ICON"))
@@ -833,7 +812,7 @@ pub fn setup_currency_ui(
         BindingLabel::Minimap,
         &keybinds,
         &gamepad_mappings,
-        &gamepads,
+        gamepad_connected(&gamepads),
     );
     let (map_key_bg, map_key_text) = spawn_keybind_badge(
         &mut commands,
@@ -847,15 +826,14 @@ pub fn setup_currency_ui(
     commands.entity(map_key_text).insert(MinimapKeybindText);
 
     let bag_icon = commands
-        .spawn(SpriteBundle {
-            texture: graphics.get_ui_element_texture(UIElement::InventoryIcon),
-            sprite: Sprite {
+        .spawn((
+            Sprite {
+                image: graphics.get_ui_element_texture(UIElement::InventoryIcon),
                 custom_size: Some(HUD_CORNER_ICON_SIZE),
                 ..default()
             },
-            transform: Transform::from_translation(Vec3::new(bag_x, corner_y, 6.)),
-            ..default()
-        })
+            Transform::from_translation(Vec3::new(bag_x, corner_y, 6.)),
+        ))
         .insert(RenderLayers::from_layers(&[3]))
         .insert(HudBottomCornerIcon::Inventory)
         .insert(Name::new("INVENTORY HUD ICON"))
@@ -865,7 +843,7 @@ pub fn setup_currency_ui(
         BindingLabel::Inventory,
         &keybinds,
         &gamepad_mappings,
-        &gamepads,
+        gamepad_connected(&gamepads),
     );
     let (key_bg, key_text) = spawn_keybind_badge(
         &mut commands,
@@ -879,21 +857,20 @@ pub fn setup_currency_ui(
     commands.entity(key_text).insert(InventoryKeybindText);
 
     let settings_icon = commands
-        .spawn(SpriteBundle {
-            texture: graphics.get_ui_element_texture(UIElement::SettingsIcon),
-            sprite: Sprite {
+        .spawn((
+            Sprite {
+                image: graphics.get_ui_element_texture(UIElement::SettingsIcon),
                 custom_size: Some(Vec2::new(26., 27.)),
                 ..default()
             },
-            transform: Transform::from_translation(Vec3::new(settings_x, corner_y, 6.)),
-            ..default()
-        })
+            Transform::from_translation(Vec3::new(settings_x, corner_y, 6.)),
+        ))
         .insert(RenderLayers::from_layers(&[3]))
         .insert(HudBottomCornerIcon::Settings)
         .insert(Name::new("OPTIONS HUD ICON"))
         .id();
 
-    let options_key = format_pause_options_label(&gamepads);
+    let options_key = format_pause_options_label(gamepad_connected(&gamepads));
     let (settings_key_bg, settings_key_text) = spawn_keybind_badge(
         &mut commands,
         &asset_server,
@@ -917,7 +894,7 @@ pub fn setup_chaos_ui() {}
 pub fn update_chaos_ui(
     chaos_tracker: Res<ChaosTracker>,
     infinite_chaos: Res<InfiniteMode>,
-    mut chaos_text_query: Query<&mut Text, With<ChaosText>>,
+    mut chaos_text_query: Query<&mut Text2d, With<ChaosText>>,
 ) {
     if !chaos_tracker.is_changed() && !infinite_chaos.is_changed() {
         return;
@@ -925,54 +902,54 @@ pub fn update_chaos_ui(
 
     let chaos_value = chaos_tracker.get_chaos() + infinite_chaos.get_chaos_bonus();
     for mut text in chaos_text_query.iter_mut() {
-        text.sections[0].value = format!("Chaos: {:.1}", chaos_value);
+        text.0 = format!("Chaos: {:.1}", chaos_value);
     }
 }
 
 pub fn update_currency_text(
     time_fragments: Res<TimeFragmentCurrency>,
     coins: Res<CoinCurrency>,
-    mut time_fragment_text_query: Query<&mut Text, (With<TimeFragmentText>, Without<CoinText>)>,
-    mut coin_text_query: Query<&mut Text, (With<CoinText>, Without<TimeFragmentText>)>,
+    mut time_fragment_text_query: Query<&mut Text2d, (With<TimeFragmentText>, Without<CoinText>)>,
+    mut coin_text_query: Query<&mut Text2d, (With<CoinText>, Without<TimeFragmentText>)>,
     time_fragment_icon: Query<Entity, (With<TimeFragmentIcon>, Without<CoinIcon>)>,
     coin_icon: Query<Entity, (With<CoinIcon>, Without<TimeFragmentIcon>)>,
     mut commands: Commands,
     game_state: Res<State<GameState>>,
 ) {
     if time_fragments.is_changed() {
-        if game_state.0 != GameState::GameOver {
-            if let Ok(icon_e) = time_fragment_icon.get_single() {
+        if *game_state != GameState::GameOver {
+            if let Ok(icon_e) = time_fragment_icon.single() {
                 // Check if entity still exists before inserting components
-                if let Some(mut entity_commands) = commands.get_entity(icon_e) {
+                if let Ok(mut entity_commands) = commands.get_entity(icon_e) {
                     entity_commands.insert(BounceOnHit::new());
                 }
             }
         }
 
         for mut text in time_fragment_text_query.iter_mut() {
-            text.sections[0].value = format!("{}", time_fragments.time_fragments.max(0));
+            text.0 = format!("{}", time_fragments.time_fragments.max(0));
         }
     }
 
     if coins.is_changed() {
-        if game_state.0 != GameState::GameOver {
-            if let Ok(icon_e) = coin_icon.get_single() {
+        if *game_state != GameState::GameOver {
+            if let Ok(icon_e) = coin_icon.single() {
                 // Check if entity still exists before inserting components
-                if let Some(mut entity_commands) = commands.get_entity(icon_e) {
+                if let Ok(mut entity_commands) = commands.get_entity(icon_e) {
                     entity_commands.insert(BounceOnHit::new());
                 }
             }
         }
 
         for mut text in coin_text_query.iter_mut() {
-            text.sections[0].value = format!("{}", coins.coins);
+            text.0 = format!("{}", coins.coins);
         }
     }
 }
-pub fn update_score_text(score: Res<RunScore>, mut text_query: Query<&mut Text, With<ScoreText>>) {
+pub fn update_score_text(score: Res<RunScore>, mut text_query: Query<&mut Text2d, With<ScoreText>>) {
     // handles different text for two different UI elements, game end count and normal in-game
     for mut text in text_query.iter_mut() {
-        text.sections[0].value = format!("Score: {:}", score.score);
+        text.0 = format!("Score: {:}", score.score);
     }
 }
 pub fn update_healthbar(
@@ -983,22 +960,26 @@ pub fn update_healthbar(
             With<Player>,
         ),
     >,
-    health_bar_query: Query<&Handle<crate::ui::hud_bar_fill::HudBarFillMaterial>, With<HealthBar>>,
-    mut health_text: Query<&mut Text, With<HealthBarText>>,
+    health_bar_query: Query<
+        &MeshMaterial2d<crate::ui::hud_bar_fill::HudBarFillMaterial>,
+        With<HealthBar>,
+    >,
+    mut health_text: Query<&mut Text2d, With<HealthBarText>>,
     mut materials: ResMut<Assets<crate::ui::hud_bar_fill::HudBarFillMaterial>>,
 ) {
-    let Ok((player_health, player_max_health)) = player_health_query.get_single() else {
+    use bevy::sprite_render::MeshMaterial2d;
+    let Ok((player_health, player_max_health)) = player_health_query.single() else {
         return;
     };
-    let Ok(handle) = health_bar_query.get_single() else {
+    let Ok(material_handle) = health_bar_query.single() else {
         return;
     };
-    if let Some(material) = materials.get_mut(handle) {
+    if let Some(mut material) = materials.get_mut(&material_handle.0) {
         material.fill =
             (player_health.0 as f32 / player_max_health.0.max(1) as f32).clamp(0.0, 1.0);
     }
-    if let Ok(mut text) = health_text.get_single_mut() {
-        text.sections[0].value = format!("{}", player_health.0);
+    if let Ok(mut text) = health_text.single_mut() {
+        text.0 = format!("{}", player_health.0);
     }
 }
 /// Hide the XP bar (progress, background, level text) when in GameOver; show it again in Main.
@@ -1007,7 +988,7 @@ pub fn hide_xp_bar_in_game_over(
     mut commands: Commands,
     xp_bar_parts: Query<Entity, Or<(With<XPBar>, With<XPBarText>, With<XPBarBg>)>>,
 ) {
-    let visibility = if game_state.0 == GameState::GameOver {
+    let visibility = if *game_state == GameState::GameOver {
         Visibility::Hidden
     } else {
         Visibility::Inherited
@@ -1024,25 +1005,23 @@ pub fn tick_xp_bar_fade_in(
     fade: Option<ResMut<XpBarFadeIn>>,
     mut xp_bar: Query<&mut Sprite, (With<XPBar>, Without<XPBarBg>, Without<XPBarLevelFrame>)>,
     mut xp_bar_bg: Query<&mut Sprite, (With<XPBarBg>, Without<XPBar>, Without<XPBarLevelFrame>)>,
-    mut xp_bar_text: Query<&mut Text, With<XPBarText>>,
+    mut xp_bar_text: Query<&mut TextColor, With<XPBarText>>,
     mut xp_bar_frame: Query<&mut Sprite, (With<XPBarLevelFrame>, Without<XPBar>, Without<XPBarBg>)>,
 ) {
     let Some(mut fade) = fade else {
         return;
     };
     fade.0.tick(time.delta());
-    let t = fade.0.percent();
-    if fade.0.finished() {
+    let t = fade.0.fraction();
+    if fade.0.is_finished() {
         for mut sprite in xp_bar.iter_mut() {
             sprite.color = overwrite_alpha(sprite.color, 1.);
         }
         for mut sprite in xp_bar_bg.iter_mut() {
             sprite.color = overwrite_alpha(sprite.color, 0.85);
         }
-        for mut text in xp_bar_text.iter_mut() {
-            for section in text.sections.iter_mut() {
-                section.style.color = overwrite_alpha(section.style.color, 1.);
-            }
+        for mut text_color in xp_bar_text.iter_mut() {
+            text_color.0 = overwrite_alpha(text_color.0, 1.);
         }
         for mut sprite in xp_bar_frame.iter_mut() {
             // sprite.color = overwrite_alpha(sprite.color, 0.85);
@@ -1056,10 +1035,8 @@ pub fn tick_xp_bar_fade_in(
     for mut sprite in xp_bar_bg.iter_mut() {
         sprite.color = overwrite_alpha(sprite.color, 0.85 * t);
     }
-    for mut text in xp_bar_text.iter_mut() {
-        for section in text.sections.iter_mut() {
-            section.style.color = overwrite_alpha(section.style.color, t);
-        }
+    for mut text_color in xp_bar_text.iter_mut() {
+        text_color.0 = overwrite_alpha(text_color.0, t);
     }
     for mut sprite in xp_bar_frame.iter_mut() {
         // sprite.color = overwrite_alpha(sprite.color, 0.7 * t);
@@ -1069,26 +1046,32 @@ pub fn tick_xp_bar_fade_in(
 pub fn update_xp_bar(
     player_xp_query: Query<&PlayerLevel, With<Player>>,
     mut xp_bar_query: Query<(&mut PendingXP, &mut BarFlashTimer), With<XPBar>>,
-    mut xp_bar_text_query: Query<&mut Text, With<XPBarText>>,
-    mut flash_event: EventReader<FlashExpBarEvent>,
+    mut xp_bar_text_query: Query<&mut Text2d, With<XPBarText>>,
+    mut flash_event: MessageReader<FlashExpBarEvent>,
     mut commands: Commands,
     _res: Res<ScreenResolution>,
     ui_state: Res<State<UIState>>,
 ) {
     // If we're in the skill choice UI, don't update the bar (keep it full)
-    if ui_state.0 == UIState::Skills {
+    if *ui_state.get() == UIState::Skills {
         return;
     }
 
-    for event in flash_event.iter() {
-        let level = player_xp_query.single();
+    for event in flash_event.read() {
+        let Ok(level) = player_xp_query.single() else {
+            return;
+        };
 
-        let (mut pending_xp, _flash) = xp_bar_query.single_mut();
+        let Ok((mut pending_xp, _flash)) = xp_bar_query.single_mut() else {
+            return;
+        };
 
         pending_xp.stored += event.amount as f32;
 
-        let mut text = xp_bar_text_query.single_mut();
-        text.sections[0].value = format!("Level {:}", level.level);
+        let Ok(mut text) = xp_bar_text_query.single_mut() else {
+            return;
+        };
+        text.0 = format!("Level {:}", level.level);
         if event.did_level {
             commands.spawn(SoundSpawner::new(AudioSoundEffect::LevelUp, 0.35));
             pending_xp.displayed = level.xp as f32;
@@ -1116,15 +1099,15 @@ pub fn drain_pending_xp(
     time: Res<Time>,
     ui_state: Res<State<UIState>>,
 ) {
-    if ui_state.0 == UIState::Skills {
+    if *ui_state.get() == UIState::Skills {
         return;
     }
 
-    let Ok(level) = player_xp_query.get_single() else {
+    let Ok(level) = player_xp_query.single() else {
         return;
     };
 
-    let Ok((mut pending_xp, mut sprite)) = xp_bar_query.get_single_mut() else {
+    let Ok((mut pending_xp, mut sprite)) = xp_bar_query.single_mut() else {
         return;
     };
 
@@ -1159,10 +1142,10 @@ pub fn drain_pending_xp(
 
 pub fn handle_flash_bars(mut query: Query<(&mut Sprite, &mut BarFlashTimer)>, time: Res<Time>) {
     for (mut sprite, mut flash) in query.iter_mut() {
-        if flash.timer.finished() {
+        if flash.timer.is_finished() {
             sprite.color = flash.color;
             flash.timer.reset();
-        } else if flash.timer.percent() != 0. {
+        } else if flash.timer.fraction() != 0. {
             sprite.color = WHITE;
             flash.timer.tick(time.delta());
         }
@@ -1180,10 +1163,10 @@ pub fn update_xp_bar_rainbow(
     mut spawn_timer: Local<Timer>,
     existing_shards: Query<Entity, With<DecorativeXPShard>>,
 ) {
-    if ui_state.0 != UIState::Skills {
+    if *ui_state != UIState::Skills {
         // Clean up any remaining decorative shards when not in Skills UI
         for shard_e in existing_shards.iter() {
-            commands.entity(shard_e).despawn_recursive();
+            commands.entity(shard_e).despawn();
         }
         return;
     }
@@ -1217,9 +1200,9 @@ pub fn update_xp_bar_rainbow(
         let Some(spritesheet_map) = graphics.spritesheet_map.as_ref() else {
             return;
         };
-        let Some(texture_atlas) = graphics.texture_atlas.as_ref() else {
+        if graphics.texture_atlas_layout.is_none() || graphics.texture_atlas_image.is_none() {
             return;
-        };
+        }
 
         let mut rng = rand::thread_rng();
 
@@ -1248,12 +1231,10 @@ pub fn update_xp_bar_rainbow(
             let fall_speed = rng.gen_range(50.0..150.0);
 
             commands
-                .spawn(SpriteSheetBundle {
-                    sprite,
-                    texture_atlas: texture_atlas.clone(),
-                    transform: Transform::from_translation(Vec3::new(x_pos, start_y, z_pos)),
-                    ..Default::default()
-                })
+                .spawn((
+                    sprite.clone(),
+                    Transform::from_translation(Vec3::new(x_pos, start_y, z_pos)),
+                ))
                 .insert(DecorativeXPShard {
                     fall_speed,
                     start_y,
@@ -1267,12 +1248,7 @@ pub fn update_xp_bar_rainbow(
 /// Updates decorative XP shards to fall down and fade out
 pub fn update_decorative_xp_shards(
     mut shards: Query<
-        (
-            Entity,
-            &mut Transform,
-            &mut TextureAtlasSprite,
-            &DecorativeXPShard,
-        ),
+        (Entity, &mut Transform, &mut Sprite, &DecorativeXPShard),
         With<DecorativeXPShard>,
     >,
     time: Res<Time>,
@@ -1289,27 +1265,27 @@ pub fn update_decorative_xp_shards(
         // Start at full opacity, fade to 0 as it approaches bottom of screen
         let distance_fallen = shard.start_y - transform.translation.y;
         let total_distance = shard.start_y - screen_bottom;
-        let alpha = (1.0 - (distance_fallen / total_distance).min(1.0)).max(0.0);
+        let alpha = (1.0_f32 - (distance_fallen / total_distance).min(1.0)).max(0.0);
 
         // Update sprite color with fading alpha
         let current_color = sprite.color;
-        sprite.color = Color::rgba(
-            current_color.r(),
-            current_color.g(),
-            current_color.b(),
+        sprite.color = Color::srgba(
+            current_color.to_srgba().red,
+            current_color.to_srgba().green,
+            current_color.to_srgba().blue,
             alpha,
         );
 
         // Despawn when off screen or fully transparent
         if transform.translation.y < screen_bottom - 20.0 || alpha <= 0.0 {
-            commands.entity(entity).despawn_recursive();
+            commands.entity(entity).despawn();
         }
     }
 }
 
 /// Detects when skill choice UI closes and sends FlashExpBarEvent to update the bar
 pub fn handle_skill_choice_ui_close(
-    mut flash_event: EventWriter<FlashExpBarEvent>,
+    mut flash_event: MessageWriter<FlashExpBarEvent>,
     ui_state: Res<State<UIState>>,
     mut prev_state: Local<UIState>,
     player_xp_query: Query<&PlayerLevel, With<Player>>,
@@ -1317,11 +1293,13 @@ pub fn handle_skill_choice_ui_close(
     decorative_shards: Query<Entity, With<DecorativeXPShard>>,
     mut commands: Commands,
 ) {
-    let current_state = ui_state.0.clone();
+    let current_state = ui_state.get().clone();
 
     // If we just transitioned from Skills to something else, send update event and reset color
     if *prev_state == UIState::Skills && current_state != UIState::Skills {
-        let level = player_xp_query.single();
+        let Ok(level) = player_xp_query.single() else {
+            return;
+        };
 
         // Reset bar color to default and sync pending XP
         for (mut sprite, mut pending_xp) in xp_bar_query.iter_mut() {
@@ -1332,10 +1310,10 @@ pub fn handle_skill_choice_ui_close(
 
         // Clean up all decorative shards
         for shard_e in decorative_shards.iter() {
-            commands.entity(shard_e).despawn_recursive();
+            commands.entity(shard_e).despawn();
         }
 
-        flash_event.send(FlashExpBarEvent {
+        flash_event.write(FlashExpBarEvent {
             amount: 0, // No new XP, just syncing
             did_level: false,
         });
@@ -1402,7 +1380,7 @@ pub struct SkillTooltipContent {
 
 /// System to handle tooltips for heirloom icons in the HUD
 pub fn handle_heirloom_hud_tooltip(
-    mut tooltip_requests: EventWriter<HeirloomTooltipRequest>,
+    mut tooltip_requests: MessageWriter<HeirloomTooltipRequest>,
     cursor_pos: Res<crate::cursor::CursorPos>,
     hit_detection_sprites: Query<
         (Entity, &Sprite, &GlobalTransform),
@@ -1476,7 +1454,9 @@ pub fn handle_heirloom_hud_tooltip(
     }
 
     match &currently_hovered {
-        None => tooltip_requests.send(HeirloomTooltipRequest::Clear),
+        None => {
+            let _ = tooltip_requests.write(HeirloomTooltipRequest::Clear);
+        }
         Some((heirloom, icon_pos)) => {
             let Ok((
                 skills,
@@ -1488,7 +1468,7 @@ pub fn handle_heirloom_hud_tooltip(
                 skill_power_hunt_tracker,
                 energy_ball_tracker,
                 pickup_range,
-            )) = player_query.get_single()
+            )) = player_query.single()
             else {
                 *last_hovered = hovered_heirloom;
                 return;
@@ -1525,10 +1505,10 @@ pub fn handle_heirloom_hud_tooltip(
             );
             // Controller/mouseless pause focus sits the card slightly lower so it clears the
             // HUD focus indicator and reads as "under" the selected icon.
-            if ui_state.0 == UIState::Pause {
+            if *ui_state.get() == UIState::Pause {
                 tooltip_pos.y -= 10.;
             }
-            tooltip_requests.send(HeirloomTooltipRequest::Show(HeirloomTooltipShow {
+            tooltip_requests.write(HeirloomTooltipRequest::Show(HeirloomTooltipShow {
                 heirloom: heirloom.clone(),
                 rarity,
                 position: tooltip_pos,
@@ -1591,24 +1571,26 @@ pub fn spawn_skill_tooltip_shell(
     let container = commands
         .spawn((
             RenderLayers::from_layers(&[3]),
-            SpatialBundle::from_transform(Transform::from_translation(tooltip_pos)),
+            (
+                Transform::from_translation(tooltip_pos),
+                Visibility::default(),
+            ),
         ))
         .id();
 
     let bg = commands
-        .spawn(SpriteBundle {
-            texture: graphics.get_ui_element_texture(UIElement::SkillTooltip),
-            sprite: Sprite {
+        .spawn((
+            Sprite {
+                image: graphics.get_ui_element_texture(UIElement::SkillTooltip),
                 custom_size: Some(SKILL_TOOLTIP_SIZE),
-                ..Default::default()
+                ..default()
             },
-            transform: Transform::from_translation(SKILL_TOOLTIP_BG_LOCAL),
-            ..Default::default()
-        })
+            Transform::from_translation(SKILL_TOOLTIP_BG_LOCAL),
+        ))
         .insert(RenderLayers::from_layers(&[3]))
         .insert(Name::new(bg_name))
         .insert(UiShadow::hud())
-        .set_parent(container)
+        .insert(ChildOf(container))
         .id();
 
     (container, bg)
@@ -1627,61 +1609,51 @@ pub fn spawn_skill_tooltip_layout(
     const COOLDOWN_TEXT_X: f32 = 158.;
     const TITLE_Y: f32 = TEXT_Y_OFFSET + 10.;
 
-    let desc_body_style = gf::SKILL_PANEL_BODY.text_style(&asset_server, content.body_color);
 
     commands
-        .spawn(SpriteBundle {
-            texture: content.icon.clone(),
-            sprite: Sprite {
+        .spawn((
+            Sprite {
+                image: content.icon.clone(),
                 custom_size: Some(content.icon_size),
-                ..Default::default()
+                ..default()
             },
-            transform: Transform {
+            Transform {
                 translation: Vec3::new(ICONS_X_OFFSET, 0., 2.),
                 scale: Vec3::ONE,
                 ..Default::default()
             },
-            ..default()
-        })
+        ))
         .insert(RenderLayers::from_layers(&[3]))
         .insert(Name::new("SKILL TOOLTIP ICON"))
-        .set_parent(parent_entity);
+        .insert(ChildOf(parent_entity));
 
     commands
-        .spawn(Text2dBundle {
-            text: Text::from_section(
-                content.title.as_str(),
-                gf::SKILL_PANEL_TITLE_BOLD.text_style(&asset_server, content.title_color),
-            )
-            .with_alignment(TextAlignment::Left),
-            text_anchor: Anchor::TopLeft,
-            transform: Transform {
-                translation: Vec3::new(DESC_TEXT_X, TITLE_Y, 2.),
-                scale: gf::SKILL_PANEL_TITLE_BOLD.transform_scale(),
-                ..default()
-            },
-            ..default()
-        })
+        .spawn(
+            gf::SKILL_PANEL_TITLE_BOLD
+                .text(&asset_server, content.title.as_str(), content.title_color)
+                .justify(Justify::Left)
+                .anchor(Anchor::TOP_LEFT)
+                .with_transform(Transform {
+                    translation: Vec3::new(DESC_TEXT_X, TITLE_Y, 2.),
+                    scale: gf::SKILL_PANEL_TITLE_BOLD.transform_scale(),
+                    ..default()
+                }),
+        )
         .insert(RenderLayers::from_layers(&[3]))
         .insert(Name::new("SKILL TOOLTIP NAME"))
-        .set_parent(parent_entity);
+        .insert(ChildOf(parent_entity));
 
     if let Some(marker) = content.cooldown_marker {
         let mut cooldown = commands.spawn((
-            Text2dBundle {
-                text: Text::from_section(
-                    "",
-                    gf::SKILL_PANEL_BODY.text_style(&asset_server, LIGHT_GREY),
-                )
-                .with_alignment(TextAlignment::Right),
-                text_anchor: Anchor::TopRight,
-                transform: Transform {
+            gf::SKILL_PANEL_BODY
+                .text(&asset_server, "", LIGHT_GREY)
+                .justify(Justify::Right)
+                .anchor(Anchor::TOP_RIGHT)
+                .with_transform(Transform {
                     translation: Vec3::new(COOLDOWN_TEXT_X, TITLE_Y, 2.),
                     scale: gf::SKILL_PANEL_BODY.transform_scale(),
                     ..default()
-                },
-                ..default()
-            },
+                }),
             RenderLayers::from_layers(&[3]),
             Name::new("SKILL TOOLTIP COOLDOWN"),
         ));
@@ -1693,29 +1665,26 @@ pub fn spawn_skill_tooltip_layout(
                 cooldown.insert(PetSkillTooltipCooldownText);
             }
         }
-        cooldown.set_parent(parent_entity);
+        cooldown.insert(ChildOf(parent_entity));
     }
 
     for (j, line) in content.description_lines.iter().enumerate() {
-        commands
-            .spawn(Text2dBundle {
-                text: Text::from_section(line.as_str(), desc_body_style.clone())
-                    .with_alignment(TextAlignment::Left),
-                text_anchor: Anchor::TopLeft,
-                transform: Transform {
-                    translation: Vec3::new(
-                        DESC_TEXT_X,
-                        (TEXT_Y_OFFSET - 2.) - j as f32 * gf::SKILL_TOOLTIP_DESC_LINE_STEP,
-                        2.,
-                    ),
-                    scale: gf::SKILL_PANEL_BODY.transform_scale(),
-                    ..default()
-                },
-                ..default()
-            })
-            .insert(RenderLayers::from_layers(&[3]))
-            .insert(Name::new("SKILL TOOLTIP DESCRIPTION LINE"))
-            .set_parent(parent_entity);
+        spawn_desc_line(
+            commands,
+            asset_server,
+            gf::SKILL_PANEL_BODY,
+            &skill_desc_line(line),
+            content.body_color,
+            Vec3::new(
+                DESC_TEXT_X,
+                (TEXT_Y_OFFSET - 2.) - j as f32 * gf::SKILL_TOOLTIP_DESC_LINE_STEP,
+                2.,
+            ),
+            Anchor::TOP_LEFT,
+            Justify::Left,
+            3,
+            parent_entity,
+        );
     }
 }
 
@@ -1813,7 +1782,7 @@ pub fn active_skill_tooltip_params_from_player(
     meteor_shower_state: &Query<&crate::player::skills::MeteorShowerSkillState, With<Player>>,
 ) -> ActiveSkillTooltipParams {
     let Ok((skill_power, blessings, max_mana, max_health, bonus_as, attack_speed, crit, spd, size)) =
-        skill_power.get_single()
+        skill_power.single()
     else {
         return ActiveSkillTooltipParams::preview();
     };
@@ -1830,7 +1799,7 @@ pub fn active_skill_tooltip_params_from_player(
         speed: spd.0,
         size: size.0,
         meteor_count: meteor_shower_state
-            .get_single()
+            .single()
             .map(|s| s.meteor_count)
             .unwrap_or(METEOR_SHOWER_BASE_COUNT),
     }
@@ -1912,12 +1881,12 @@ pub fn handle_active_skill_hud_tooltip(
 
     // Despawn all existing tooltips
     for tooltip_e in existing_tooltips.iter() {
-        commands.entity(tooltip_e).despawn_recursive();
+        commands.entity(tooltip_e).despawn();
     }
 
     // Spawn new tooltip if hovering
     if let Some((skill, slot_index, icon_pos)) = currently_hovered {
-        // The container is a rootless `SpatialBundle` (no `Sprite`/`Text`), so it is skipped by
+        // The container is a rootless `SpatialBundle` (no `Sprite`/`Text2d`), so it is skipped by
         // `snap_layer3_visuals_to_pixel_grid`. Snap onto the physical pixel grid so anchored
         // tooltip text lands on-grid (see `hud_skill_tooltip_world_position`).
         let (container, _) = spawn_skill_tooltip_shell(
@@ -1926,7 +1895,7 @@ pub fn handle_active_skill_hud_tooltip(
             hud_skill_tooltip_world_position(
                 icon_pos,
                 res.scale,
-                ui_state.0 == UIState::Pause,
+                *ui_state.get() == UIState::Pause,
             ),
             "ACTIVE SKILL TOOLTIP",
         );
@@ -2014,22 +1983,19 @@ fn spawn_orb_tracker_rate_line_at(
     y: f32,
 ) {
     commands
-        .spawn(Text2dBundle {
-            text: Text::from_section(
-                format!("{label}: {rate:.1}/s"),
-                gf::HUD_MICRO.text_style(&asset_server, LIGHT_GREY),
-            )
-            .with_alignment(TextAlignment::Center),
-            text_anchor: Anchor::Center,
-            transform: Transform {
-                translation: Vec3::new(0., y, 1.),
-                scale: gf::HUD_MICRO.transform_scale(),
-                ..default()
-            },
-            ..default()
-        })
+        .spawn(
+            gf::HUD_MICRO
+                .text(&asset_server, format!("{label}: {rate:.1}/s"), LIGHT_GREY)
+                .justify(Justify::Center)
+                .anchor(Anchor::CENTER)
+                .with_transform(Transform {
+                    translation: Vec3::new(0., y, 1.),
+                    scale: gf::HUD_MICRO.transform_scale(),
+                    ..default()
+                }),
+        )
         .insert(RenderLayers::from_layers(&[3]))
-        .set_parent(parent);
+        .insert(ChildOf(parent));
 }
 
 /// Spawns a single mana-gain entry (icon or text label + percentage) at the given local pos.
@@ -2037,7 +2003,6 @@ fn spawn_mana_gain_entry(
     commands: &mut Commands,
     graphics: &Graphics,
     asset_server: &AssetServer,
-    texture_atlas: &Handle<TextureAtlas>,
     parent: Entity,
     x: f32,
     y: f32,
@@ -2045,11 +2010,12 @@ fn spawn_mana_gain_entry(
     pct: u32,
 ) {
     let row_root = commands
-        .spawn(SpatialBundle::from_transform(Transform::from_translation(
-            Vec3::new(x, y, 1.),
-        )))
+        .spawn((
+            Transform::from_translation(Vec3::new(x, y, 1.)),
+            Visibility::default(),
+        ))
         .insert(RenderLayers::from_layers(&[3]))
-        .set_parent(parent)
+        .insert(ChildOf(parent))
         .id();
 
     // Pick an icon: heirloom sprite, the mana orb sprite, or fall back to a text label.
@@ -2070,40 +2036,35 @@ fn spawn_mana_gain_entry(
     let is_icon = icon_sprite.is_some();
     if let Some(sprite) = icon_sprite {
         commands
-            .spawn(SpriteSheetBundle {
-                texture_atlas: texture_atlas.clone(),
-                sprite,
-                transform: Transform::from_translation(Vec3::new(
+            .spawn((
+                {
+                    let mut atlas_sprite = sprite.clone();
+                    atlas_sprite.custom_size = Some(Vec2::splat(ORB_TRACKER_ICON_SIZE));
+                    atlas_sprite
+                },
+                Transform::from_translation(Vec3::new(
                     -ORB_TRACKER_COL_WIDTH * 0.5 + ORB_TRACKER_ICON_SIZE * 0.5 + 2.,
                     0.,
                     1.,
                 )),
-                ..default()
-            })
-            .insert(Sprite {
-                custom_size: Some(Vec2::splat(ORB_TRACKER_ICON_SIZE)),
-                ..default()
-            })
+            ))
             .insert(RenderLayers::from_layers(&[3]))
-            .set_parent(row_root);
+            .insert(ChildOf(row_root));
     } else {
         commands
-            .spawn(Text2dBundle {
-                text: Text::from_section(
-                    source.label(),
-                    gf::HUD_MICRO.text_style(&asset_server, WHITE),
-                )
-                .with_alignment(TextAlignment::Center),
-                text_anchor: Anchor::CenterLeft,
-                transform: Transform {
-                    translation: Vec3::new(-ORB_TRACKER_COL_WIDTH * 0.5 + 2., 0., 1.),
-                    scale: gf::HUD_MICRO.transform_scale(),
-                    ..default()
-                },
-                ..default()
-            })
+            .spawn(
+                gf::HUD_MICRO
+                    .text(&asset_server, source.label(), WHITE)
+                    .justify(Justify::Center)
+                    .anchor(Anchor::CENTER_LEFT)
+                    .with_transform(Transform {
+                        translation: Vec3::new(-ORB_TRACKER_COL_WIDTH * 0.5 + 2., 0., 1.),
+                        scale: gf::HUD_MICRO.transform_scale(),
+                        ..default()
+                    }),
+            )
             .insert(RenderLayers::from_layers(&[3]))
-            .set_parent(row_root);
+            .insert(ChildOf(row_root));
     }
 
     let x_offset = if is_icon {
@@ -2112,26 +2073,23 @@ fn spawn_mana_gain_entry(
         (source.label().len().saturating_sub(5)) as f32 * 4. + 12.
     };
     commands
-        .spawn(Text2dBundle {
-            text: Text::from_section(
-                format!("{pct}%"),
-                gf::HUD_MICRO.text_style(&asset_server, WHITE),
-            )
-            .with_alignment(TextAlignment::Center),
-            text_anchor: Anchor::CenterLeft,
-            transform: Transform {
-                translation: Vec3::new(
-                    -ORB_TRACKER_COL_WIDTH * 0.5 + ORB_TRACKER_ICON_SIZE + 6. + x_offset,
-                    0.,
-                    2.,
-                ),
-                scale: gf::HUD_MICRO.transform_scale(),
-                ..default()
-            },
-            ..default()
-        })
+        .spawn(
+            gf::HUD_MICRO
+                .text(&asset_server, format!("{pct}%"), WHITE)
+                .justify(Justify::Center)
+                .anchor(Anchor::CENTER_LEFT)
+                .with_transform(Transform {
+                    translation: Vec3::new(
+                        -ORB_TRACKER_COL_WIDTH * 0.5 + ORB_TRACKER_ICON_SIZE + 6. + x_offset,
+                        0.,
+                        2.,
+                    ),
+                    scale: gf::HUD_MICRO.transform_scale(),
+                    ..default()
+                }),
+        )
         .insert(RenderLayers::from_layers(&[3]))
-        .set_parent(row_root);
+        .insert(ChildOf(row_root));
 }
 
 fn spawn_mana_tracker_tooltip(
@@ -2155,7 +2113,10 @@ fn spawn_mana_tracker_tooltip(
 
     let root = commands
         .spawn((
-            SpatialBundle::from_transform(Transform::from_translation(tooltip_pos)),
+            (
+                Transform::from_translation(tooltip_pos),
+                Visibility::default(),
+            ),
             RenderLayers::from_layers(&[3]),
             ManaTrackerHudTooltip,
             Name::new("MANA TRACKER TOOLTIP"),
@@ -2163,37 +2124,36 @@ fn spawn_mana_tracker_tooltip(
         .id();
 
     commands
-        .spawn(SpriteBundle {
-            sprite: Sprite {
+        .spawn((
+            Sprite {
                 color: ICON_HOVER_TOOLTIP_BG_COLOR,
                 custom_size: Some(size),
                 ..default()
             },
-            ..default()
-        })
+            Transform::default(),
+        ))
         .insert(RenderLayers::from_layers(&[3]))
-        .set_parent(root);
+        .insert(ChildOf(root));
 
     let title_y = size.y * 0.5 - ORB_TRACKER_PAD - ORB_TRACKER_TITLE_HEIGHT * 0.5;
     commands
-        .spawn(Text2dBundle {
-            text: Text::from_section(
-                "Mana Tracker",
-                gf::ICON_HOVER_TOOLTIP.text_style(&asset_server, LIGHT_BLUE),
-            )
-            .with_alignment(TextAlignment::Center),
-            text_anchor: Anchor::Center,
-            transform: Transform {
-                translation: Vec3::new(0., title_y, 1.),
-                scale: gf::ICON_HOVER_TOOLTIP.transform_scale(),
-                ..default()
-            },
-            ..default()
-        })
+        .spawn(
+            gf::ICON_HOVER_TOOLTIP
+                .text(&asset_server, "Mana Tracker", LIGHT_BLUE)
+                .justify(Justify::Center)
+                .anchor(Anchor::CENTER)
+                .with_transform(Transform {
+                    translation: Vec3::new(0., title_y, 1.),
+                    scale: gf::ICON_HOVER_TOOLTIP.transform_scale(),
+                    ..default()
+                }),
+        )
         .insert(RenderLayers::from_layers(&[3]))
-        .set_parent(root);
+        .insert(ChildOf(root));
 
-    let texture_atlas = graphics.texture_atlas.as_ref().unwrap().clone();
+    if graphics.texture_atlas_layout.is_none() || graphics.texture_atlas_image.is_none() {
+        return root;
+    }
     let left_x = -size.x * 0.5 + ORB_TRACKER_PAD + ORB_TRACKER_COL_WIDTH * 0.5;
 
     // Running vertical cursor that walks down from just below the title.
@@ -2203,22 +2163,19 @@ fn spawn_mana_tracker_tooltip(
     let consume_grid_top = section_top - ORB_TRACKER_ROW_HEIGHT * 0.5;
     if consume_count == 0 {
         commands
-            .spawn(Text2dBundle {
-                text: Text::from_section(
-                    "No mana spent yet",
-                    gf::HUD_MICRO.text_style(&asset_server, LIGHT_GREY),
-                )
-                .with_alignment(TextAlignment::Center),
-                text_anchor: Anchor::Center,
-                transform: Transform {
-                    translation: Vec3::new(0., consume_grid_top, 1.),
-                    scale: gf::HUD_MICRO.transform_scale(),
-                    ..default()
-                },
-                ..default()
-            })
+            .spawn(
+                gf::HUD_MICRO
+                    .text(&asset_server, "No mana spent yet", LIGHT_GREY)
+                    .justify(Justify::Center)
+                    .anchor(Anchor::CENTER)
+                    .with_transform(Transform {
+                        translation: Vec3::new(0., consume_grid_top, 1.),
+                        scale: gf::HUD_MICRO.transform_scale(),
+                        ..default()
+                    }),
+            )
             .insert(RenderLayers::from_layers(&[3]))
-            .set_parent(root);
+            .insert(ChildOf(root));
     } else {
         let mut consume_index = 0usize;
         for (heirloom, _amount) in &consume_heirlooms {
@@ -2229,52 +2186,49 @@ fn spawn_mana_tracker_tooltip(
             let pct = tracker.mana_consumed_percentage(heirloom);
 
             let row_root = commands
-                .spawn(SpatialBundle::from_transform(Transform::from_translation(
-                    Vec3::new(x, y, 1.),
-                )))
+                .spawn((
+                    Transform::from_translation(Vec3::new(x, y, 1.)),
+                    Visibility::default(),
+                ))
                 .insert(RenderLayers::from_layers(&[3]))
-                .set_parent(root)
+                .insert(ChildOf(root))
                 .id();
 
             commands
-                .spawn(SpriteSheetBundle {
-                    texture_atlas: texture_atlas.clone(),
-                    sprite: graphics.get_heirloom_icon(heirloom.clone()),
-                    transform: Transform::from_translation(Vec3::new(
+                .spawn((
+                    {
+                        let mut sprite =
+                            graphics.get_heirloom_icon(heirloom.clone());
+                        sprite.custom_size = Some(Vec2::splat(ORB_TRACKER_ICON_SIZE));
+                        sprite
+                    },
+                    Transform::from_translation(Vec3::new(
                         -ORB_TRACKER_COL_WIDTH * 0.5 + ORB_TRACKER_ICON_SIZE * 0.5 + 2.,
                         0.,
                         1.,
                     )),
-                    ..default()
-                })
-                .insert(Sprite {
-                    custom_size: Some(Vec2::splat(ORB_TRACKER_ICON_SIZE)),
-                    ..default()
-                })
+                ))
                 .insert(RenderLayers::from_layers(&[3]))
-                .set_parent(row_root);
+                .insert(ChildOf(row_root));
 
             commands
-                .spawn(Text2dBundle {
-                    text: Text::from_section(
-                        format!("{pct}%"),
-                        gf::HUD_MICRO.text_style(&asset_server, WHITE),
-                    )
-                    .with_alignment(TextAlignment::Center),
-                    text_anchor: Anchor::CenterLeft,
-                    transform: Transform {
-                        translation: Vec3::new(
-                            -ORB_TRACKER_COL_WIDTH * 0.5 + ORB_TRACKER_ICON_SIZE + 6.,
-                            0.,
-                            2.,
-                        ),
-                        scale: gf::HUD_MICRO.transform_scale(),
-                        ..default()
-                    },
-                    ..default()
-                })
+                .spawn(
+                    gf::HUD_MICRO
+                        .text(&asset_server, format!("{pct}%"), WHITE)
+                        .justify(Justify::Center)
+                        .anchor(Anchor::CENTER_LEFT)
+                        .with_transform(Transform {
+                            translation: Vec3::new(
+                                -ORB_TRACKER_COL_WIDTH * 0.5 + ORB_TRACKER_ICON_SIZE + 6.,
+                                0.,
+                                2.,
+                            ),
+                            scale: gf::HUD_MICRO.transform_scale(),
+                            ..default()
+                        }),
+                )
                 .insert(RenderLayers::from_layers(&[3]))
-                .set_parent(row_root);
+                .insert(ChildOf(row_root));
             consume_index += 1;
         }
         for (weapon, _amount) in &consume_weapons {
@@ -2285,11 +2239,12 @@ fn spawn_mana_tracker_tooltip(
             let pct = tracker.weapon_mana_consumed_percentage(weapon);
 
             let row_root = commands
-                .spawn(SpatialBundle::from_transform(Transform::from_translation(
-                    Vec3::new(x, y, 1.),
-                )))
+                .spawn((
+                    Transform::from_translation(Vec3::new(x, y, 1.)),
+                    Visibility::default(),
+                ))
                 .insert(RenderLayers::from_layers(&[3]))
-                .set_parent(root)
+                .insert(ChildOf(root))
                 .id();
 
             if let Some(sprite) = graphics
@@ -2298,45 +2253,40 @@ fn spawn_mana_tracker_tooltip(
                 .and_then(|m| m.get(weapon).cloned())
             {
                 commands
-                    .spawn(SpriteSheetBundle {
-                        texture_atlas: texture_atlas.clone(),
-                        sprite,
-                        transform: Transform::from_translation(Vec3::new(
+                    .spawn((
+                        {
+                            let mut atlas_sprite = sprite.clone();
+                            atlas_sprite.custom_size = Some(Vec2::splat(ORB_TRACKER_ICON_SIZE));
+                            atlas_sprite
+                        },
+                        Transform::from_translation(Vec3::new(
                             -ORB_TRACKER_COL_WIDTH * 0.5 + ORB_TRACKER_ICON_SIZE * 0.5 + 2.,
                             0.,
                             1.,
                         )),
-                        ..default()
-                    })
-                    .insert(Sprite {
-                        custom_size: Some(Vec2::splat(ORB_TRACKER_ICON_SIZE)),
-                        ..default()
-                    })
+                    ))
                     .insert(RenderLayers::from_layers(&[3]))
-                    .set_parent(row_root);
+                    .insert(ChildOf(row_root));
             }
 
             commands
-                .spawn(Text2dBundle {
-                    text: Text::from_section(
-                        format!("{pct}%"),
-                        gf::HUD_MICRO.text_style(&asset_server, WHITE),
-                    )
-                    .with_alignment(TextAlignment::Center),
-                    text_anchor: Anchor::CenterLeft,
-                    transform: Transform {
-                        translation: Vec3::new(
-                            -ORB_TRACKER_COL_WIDTH * 0.5 + ORB_TRACKER_ICON_SIZE + 6.,
-                            0.,
-                            2.,
-                        ),
-                        scale: gf::HUD_MICRO.transform_scale(),
-                        ..default()
-                    },
-                    ..default()
-                })
+                .spawn(
+                    gf::HUD_MICRO
+                        .text(&asset_server, format!("{pct}%"), WHITE)
+                        .justify(Justify::Center)
+                        .anchor(Anchor::CENTER_LEFT)
+                        .with_transform(Transform {
+                            translation: Vec3::new(
+                                -ORB_TRACKER_COL_WIDTH * 0.5 + ORB_TRACKER_ICON_SIZE + 6.,
+                                0.,
+                                2.,
+                            ),
+                            scale: gf::HUD_MICRO.transform_scale(),
+                            ..default()
+                        }),
+                )
                 .insert(RenderLayers::from_layers(&[3]))
-                .set_parent(row_root);
+                .insert(ChildOf(row_root));
             consume_index += 1;
         }
     }
@@ -2358,22 +2308,19 @@ fn spawn_mana_tracker_tooltip(
     let gain_grid_top = section_top - ORB_TRACKER_ROW_HEIGHT * 0.5;
     if gain_entries.is_empty() {
         commands
-            .spawn(Text2dBundle {
-                text: Text::from_section(
-                    "No mana gained yet",
-                    gf::HUD_MICRO.text_style(&asset_server, LIGHT_GREY),
-                )
-                .with_alignment(TextAlignment::Center),
-                text_anchor: Anchor::Center,
-                transform: Transform {
-                    translation: Vec3::new(0., gain_grid_top, 1.),
-                    scale: gf::HUD_MICRO.transform_scale(),
-                    ..default()
-                },
-                ..default()
-            })
+            .spawn(
+                gf::HUD_MICRO
+                    .text(&asset_server, "No mana gained yet", LIGHT_GREY)
+                    .justify(Justify::Center)
+                    .anchor(Anchor::CENTER)
+                    .with_transform(Transform {
+                        translation: Vec3::new(0., gain_grid_top, 1.),
+                        scale: gf::HUD_MICRO.transform_scale(),
+                        ..default()
+                    }),
+            )
             .insert(RenderLayers::from_layers(&[3]))
-            .set_parent(root);
+            .insert(ChildOf(root));
     } else {
         for (index, (source, _amount)) in gain_entries.iter().enumerate() {
             let col = index % ORB_TRACKER_COLUMNS;
@@ -2381,17 +2328,7 @@ fn spawn_mana_tracker_tooltip(
             let x = left_x + col as f32 * ORB_TRACKER_COL_WIDTH;
             let y = gain_grid_top - row as f32 * ORB_TRACKER_ROW_HEIGHT;
             let pct = tracker.mana_gained_percentage(source);
-            spawn_mana_gain_entry(
-                commands,
-                graphics,
-                asset_server,
-                &texture_atlas,
-                root,
-                x,
-                y,
-                source,
-                pct,
-            );
+            spawn_mana_gain_entry(commands, graphics, asset_server, root, x, y, source, pct);
         }
     }
     let gain_rows = gain_entries.len().div_ceil(ORB_TRACKER_COLUMNS).max(1) as f32;
@@ -2428,7 +2365,10 @@ fn spawn_health_tracker_tooltip(
 
     let root = commands
         .spawn((
-            SpatialBundle::from_transform(Transform::from_translation(tooltip_pos)),
+            (
+                Transform::from_translation(tooltip_pos),
+                Visibility::default(),
+            ),
             RenderLayers::from_layers(&[3]),
             HealthTrackerHudTooltip,
             Name::new("HEALTH TRACKER TOOLTIP"),
@@ -2436,59 +2376,55 @@ fn spawn_health_tracker_tooltip(
         .id();
 
     commands
-        .spawn(SpriteBundle {
-            sprite: Sprite {
+        .spawn((
+            Sprite {
                 color: ICON_HOVER_TOOLTIP_BG_COLOR,
                 custom_size: Some(size),
                 ..default()
             },
-            ..default()
-        })
+            Transform::default(),
+        ))
         .insert(RenderLayers::from_layers(&[3]))
-        .set_parent(root);
+        .insert(ChildOf(root));
 
     let title_y = size.y * 0.5 - ORB_TRACKER_PAD - ORB_TRACKER_TITLE_HEIGHT * 0.5;
     commands
-        .spawn(Text2dBundle {
-            text: Text::from_section(
-                "Health Tracker",
-                gf::ICON_HOVER_TOOLTIP.text_style(&asset_server, LIGHT_RED),
-            )
-            .with_alignment(TextAlignment::Center),
-            text_anchor: Anchor::Center,
-            transform: Transform {
-                translation: Vec3::new(0., title_y, 1.),
-                scale: gf::ICON_HOVER_TOOLTIP.transform_scale(),
-                ..default()
-            },
-            ..default()
-        })
+        .spawn(
+            gf::ICON_HOVER_TOOLTIP
+                .text(&asset_server, "Health Tracker", LIGHT_RED)
+                .justify(Justify::Center)
+                .anchor(Anchor::CENTER)
+                .with_transform(Transform {
+                    translation: Vec3::new(0., title_y, 1.),
+                    scale: gf::ICON_HOVER_TOOLTIP.transform_scale(),
+                    ..default()
+                }),
+        )
         .insert(RenderLayers::from_layers(&[3]))
-        .set_parent(root);
+        .insert(ChildOf(root));
 
     let grid_top = title_y - ORB_TRACKER_TITLE_HEIGHT * 0.5 - ORB_TRACKER_ROW_HEIGHT * 0.5;
     let left_x = -size.x * 0.5 + ORB_TRACKER_PAD + ORB_TRACKER_COL_WIDTH * 0.5;
 
     if entries.is_empty() {
         commands
-            .spawn(Text2dBundle {
-                text: Text::from_section(
-                    "No health gained yet",
-                    gf::HUD_MICRO.text_style(&asset_server, LIGHT_GREY),
-                )
-                .with_alignment(TextAlignment::Center),
-                text_anchor: Anchor::Center,
-                transform: Transform {
-                    translation: Vec3::new(0., grid_top, 1.),
-                    scale: gf::HUD_MICRO.transform_scale(),
-                    ..default()
-                },
-                ..default()
-            })
+            .spawn(
+                gf::HUD_MICRO
+                    .text(&asset_server, "No health gained yet", LIGHT_GREY)
+                    .justify(Justify::Center)
+                    .anchor(Anchor::CENTER)
+                    .with_transform(Transform {
+                        translation: Vec3::new(0., grid_top, 1.),
+                        scale: gf::HUD_MICRO.transform_scale(),
+                        ..default()
+                    }),
+            )
             .insert(RenderLayers::from_layers(&[3]))
-            .set_parent(root);
+            .insert(ChildOf(root));
     } else {
-        let texture_atlas = graphics.texture_atlas.as_ref().unwrap().clone();
+        if graphics.texture_atlas_layout.is_none() || graphics.texture_atlas_image.is_none() {
+            return root;
+        }
         for (index, (source, _amount)) in entries.iter().enumerate() {
             let col = index % ORB_TRACKER_COLUMNS;
             let row = index / ORB_TRACKER_COLUMNS;
@@ -2497,50 +2433,47 @@ fn spawn_health_tracker_tooltip(
             let pct = tracker.health_gained_percentage(source);
 
             let row_root = commands
-                .spawn(SpatialBundle::from_transform(Transform::from_translation(
-                    Vec3::new(x, y, 1.),
-                )))
+                .spawn((
+                    Transform::from_translation(Vec3::new(x, y, 1.)),
+                    Visibility::default(),
+                ))
                 .insert(RenderLayers::from_layers(&[3]))
-                .set_parent(root)
+                .insert(ChildOf(root))
                 .id();
             let mut is_icon = false;
             if let Some(heirloom) = source.heirloom_icon() {
                 is_icon = true;
                 commands
-                    .spawn(SpriteSheetBundle {
-                        texture_atlas: texture_atlas.clone(),
-                        sprite: graphics.get_heirloom_icon(heirloom),
-                        transform: Transform::from_translation(Vec3::new(
+                    .spawn((
+                        {
+                            let mut sprite =
+                                graphics.get_heirloom_icon(heirloom);
+                            sprite.custom_size = Some(Vec2::splat(ORB_TRACKER_ICON_SIZE));
+                            sprite
+                        },
+                        Transform::from_translation(Vec3::new(
                             -ORB_TRACKER_COL_WIDTH * 0.5 + ORB_TRACKER_ICON_SIZE * 0.5 + 2.,
                             0.,
                             1.,
                         )),
-                        ..default()
-                    })
-                    .insert(Sprite {
-                        custom_size: Some(Vec2::splat(ORB_TRACKER_ICON_SIZE)),
-                        ..default()
-                    })
+                    ))
                     .insert(RenderLayers::from_layers(&[3]))
-                    .set_parent(row_root);
+                    .insert(ChildOf(row_root));
             } else {
                 commands
-                    .spawn(Text2dBundle {
-                        text: Text::from_section(
-                            source.label(),
-                            gf::HUD_MICRO.text_style(&asset_server, WHITE),
-                        )
-                        .with_alignment(TextAlignment::Center),
-                        text_anchor: Anchor::CenterLeft,
-                        transform: Transform {
-                            translation: Vec3::new(-ORB_TRACKER_COL_WIDTH * 0.5 + 2., 0., 1.),
-                            scale: gf::HUD_MICRO.transform_scale(),
-                            ..default()
-                        },
-                        ..default()
-                    })
+                    .spawn(
+                        gf::HUD_MICRO
+                            .text(&asset_server, source.label(), WHITE)
+                            .justify(Justify::Center)
+                            .anchor(Anchor::CENTER_LEFT)
+                            .with_transform(Transform {
+                                translation: Vec3::new(-ORB_TRACKER_COL_WIDTH * 0.5 + 2., 0., 1.),
+                                scale: gf::HUD_MICRO.transform_scale(),
+                                ..default()
+                            }),
+                    )
                     .insert(RenderLayers::from_layers(&[3]))
-                    .set_parent(row_root);
+                    .insert(ChildOf(row_root));
             }
             let x_offset = if is_icon {
                 0.
@@ -2548,26 +2481,26 @@ fn spawn_health_tracker_tooltip(
                 (source.label().len() - 5) as f32 * 4. + 12.
             };
             commands
-                .spawn(Text2dBundle {
-                    text: Text::from_section(
-                        format!("{pct}%"),
-                        gf::HUD_MICRO.text_style(&asset_server, WHITE),
-                    )
-                    .with_alignment(TextAlignment::Center),
-                    text_anchor: Anchor::CenterLeft,
-                    transform: Transform {
-                        translation: Vec3::new(
-                            -ORB_TRACKER_COL_WIDTH * 0.5 + ORB_TRACKER_ICON_SIZE + 6. + x_offset,
-                            0.,
-                            2.,
-                        ),
-                        scale: gf::HUD_MICRO.transform_scale(),
-                        ..default()
-                    },
-                    ..default()
-                })
+                .spawn(
+                    gf::HUD_MICRO
+                        .text(&asset_server, format!("{pct}%"), WHITE)
+                        .justify(Justify::Center)
+                        .anchor(Anchor::CENTER_LEFT)
+                        .with_transform(Transform {
+                            translation: Vec3::new(
+                                -ORB_TRACKER_COL_WIDTH * 0.5
+                                    + ORB_TRACKER_ICON_SIZE
+                                    + 6.
+                                    + x_offset,
+                                0.,
+                                2.,
+                            ),
+                            scale: gf::HUD_MICRO.transform_scale(),
+                            ..default()
+                        }),
+                )
                 .insert(RenderLayers::from_layers(&[3]))
-                .set_parent(row_root);
+                .insert(ChildOf(row_root));
         }
     }
 
@@ -2619,7 +2552,7 @@ pub fn handle_mana_tracker_hud_tooltip(
         }
     }
 
-    let force_open = ui_state.0 == UIState::Pause;
+    let force_open = *ui_state.get() == UIState::Pause;
     let hovering = force_open
         || hover_targets
             .iter()
@@ -2636,7 +2569,7 @@ pub fn handle_mana_tracker_hud_tooltip(
     *last_snapshot = snapshot;
 
     for tooltip_e in existing_tooltips.iter() {
-        commands.entity(tooltip_e).despawn_recursive();
+        commands.entity(tooltip_e).despawn();
     }
 
     if hovering {
@@ -2695,7 +2628,7 @@ pub fn handle_health_tracker_hud_tooltip(
         }
     }
 
-    let force_open = ui_state.0 == UIState::Pause;
+    let force_open = *ui_state.get() == UIState::Pause;
     let hovering = force_open
         || hover_targets
             .iter()
@@ -2709,7 +2642,7 @@ pub fn handle_health_tracker_hud_tooltip(
     *last_snapshot = snapshot;
 
     for tooltip_e in existing_tooltips.iter() {
-        commands.entity(tooltip_e).despawn_recursive();
+        commands.entity(tooltip_e).despawn();
     }
 
     if hovering {
@@ -2865,12 +2798,12 @@ pub fn handle_update_player_skills(
     graphics: Res<Graphics>,
     mut prev_icons_tracker: Local<Vec<(Heirloom, i32)>>, // Track (heirloom, count) pairs
     res: Res<ScreenResolution>,
-    // mut skill_class_text: Query<&mut Text, With<SkillClassText>>,
-    game_over: EventReader<GameOverEvent>,
+    // mut skill_class_text: Query<&mut Text2d, With<SkillClassText>>,
+    game_over: MessageReader<GameOverEvent>,
     asset_server: Res<AssetServer>,
     prev_active_skill_icons: Query<Entity, With<ActiveSkillIcon>>,
     existing_heirloom_icons: Query<(Entity, &SkillHudIcon)>, // Query existing heirloom icons
-    _counter_texts: Query<&mut Text, With<HeirloomCounterText>>, // Query counter texts to update
+    _counter_texts: Query<&mut Text2d, With<HeirloomCounterText>>, // Query counter texts to update
     existing_cooldown_overlays: Query<(Entity, &SkillCooldownOverlay)>, // Query existing cooldown overlays to preserve state
     existing_skill_keybinds: Query<Entity, With<ActiveSkillKeyBackground>>,
     bindings: HudBindingDisplay,
@@ -2881,7 +2814,7 @@ pub fn handle_update_player_skills(
         prev_icons_tracker.clear();
     }
 
-    if let Ok(new_skills) = player_skills.get_single() {
+    if let Ok(new_skills) = player_skills.single() {
         // Group heirlooms by type and count them
         let mut heirloom_counts: HashMap<Heirloom, (i32, HeirloomRarity)> = HashMap::new();
 
@@ -2906,8 +2839,8 @@ pub fn handle_update_player_skills(
 
         if needs_update {
             // Despawn existing icons only when we need to update
-            existing_heirloom_icons.for_each(|(e, _)| {
-                commands.entity(e).despawn_recursive();
+            existing_heirloom_icons.iter().for_each(|(e, _)| {
+                commands.entity(e).despawn();
             });
 
             // Create a consolidated list of heirlooms in the correct order
@@ -2961,22 +2894,22 @@ pub fn handle_update_player_skills(
                     .map(|(_, rarity)| *rarity)
                     .unwrap_or(HeirloomRarity::Common);
 
-                // Create the main icon with interactability directly attached
+                // Create the main icon with interactability directly attached.
+                // Mutate custom_size on the sheet sprite — do not insert a second
+                // `Sprite { ..Default }` (0.19 merges atlas into Sprite; that wipe
+                // left a white quad and broke outline UVs).
+                let mut icon_sprite =
+                    graphics.get_heirloom_icon(heirloom.clone());
+                icon_sprite.custom_size = Some(Vec2::new(16., 16.));
                 let icon = commands
-                    .spawn(SpriteSheetBundle {
-                        sprite: graphics.get_heirloom_icon(heirloom.clone()),
-                        texture_atlas: graphics.texture_atlas.as_ref().unwrap().clone(),
-                        transform: Transform {
+                    .spawn((
+                        icon_sprite,
+                        Transform {
                             translation: offset.extend(Z_DEPTH_HUD_HEIRLOOM_ICONS),
                             scale: Vec3::new(1., 1., 1.),
                             ..Default::default()
                         },
-                        ..Default::default()
-                    })
-                    .insert(Sprite {
-                        custom_size: Some(Vec2::new(16., 16.)),
-                        ..Default::default()
-                    })
+                    ))
                     .insert(RenderLayers::from_layers(&[3]))
                     .insert(SkillHudIcon(heirloom.clone()))
                     .insert(HeirloomIconOutline::new(
@@ -2995,23 +2928,20 @@ pub fn handle_update_player_skills(
                 // Add counter text if count > 1
                 if *count > 1 {
                     let _counter_text = commands
-                        .spawn(Text2dBundle {
-                            text: Text::from_section(
-                                count.to_string(),
-                                gf::HUD_MICRO.text_style(&asset_server, WHITE),
-                            ),
-                            text_anchor: Anchor::BottomRight,
-                            transform: Transform {
-                                translation: Vec3::new(8., -8., 2.), // Bottom right of icon
-                                scale: gf::HUD_MICRO.transform_scale(),
-                                ..default()
-                            },
-                            ..default()
-                        })
+                        .spawn(
+                            gf::HUD_MICRO
+                                .text(&asset_server, count.to_string(), WHITE)
+                                .anchor(Anchor::BOTTOM_RIGHT)
+                                .with_transform(Transform {
+                                    translation: Vec3::new(8., -8., 2.), // Bottom right of icon
+                                    scale: gf::HUD_MICRO.transform_scale(),
+                                    ..default()
+                                }),
+                        )
                         .insert(RenderLayers::from_layers(&[3]))
                         .insert(HeirloomCounterText)
                         .insert(Name::new("HEIRLOOM COUNTER"))
-                        .set_parent(icon)
+                        .insert(ChildOf(icon))
                         .id();
                 }
             }
@@ -3022,7 +2952,7 @@ pub fn handle_update_player_skills(
         }
 
         // let mut text = skill_class_text.single_mut();
-        // text.sections[0].value = format!(
+        // text.0 = format!(
         //     "  {:}     {:?}     {:?}",
         //     0, // melee_skill_count - removed
         //     0, // rogue_skill_count - removed
@@ -3078,11 +3008,11 @@ pub fn handle_update_player_skills(
         }
 
         for e in existing_skill_keybinds.iter() {
-            commands.entity(e).despawn_recursive();
+            commands.entity(e).despawn();
         }
 
-        prev_active_skill_icons.for_each(|e| {
-            commands.entity(e).despawn_recursive();
+        prev_active_skill_icons.iter().for_each(|e| {
+            commands.entity(e).despawn();
         });
 
         // Update prev_active_skills for next time
@@ -3101,13 +3031,14 @@ pub fn handle_update_player_skills(
         let skill_half_span = (num_skills - 1.0) * 0.5;
         for (i, (active_skill_option, slot_index)) in active_skill_slots.iter().enumerate() {
             let icon_bg = commands
-                .spawn(SpatialBundle::from_transform(Transform::from_translation(
-                    Vec3::new(
+                .spawn((
+                    Transform::from_translation(Vec3::new(
                         HUD_SKILLS_CENTER_X + (i as f32 - skill_half_span) * HUD_SKILL_SPACING_X,
                         -res.game_height / 2. + HUD_ACTION_ROW_Y_FROM_BOTTOM,
                         Z_DEPTH_HUD_ACTIVE_SKILLS,
-                    ),
-                )))
+                    )),
+                    Visibility::default(),
+                ))
                 .insert(RenderLayers::from_layers(&[3]))
                 .insert(ActiveSkillIcon {
                     skill: active_skill_option
@@ -3126,7 +3057,7 @@ pub fn handle_update_player_skills(
                 BindingLabel::ActiveSkill(*slot_index),
                 &bindings.keybinds,
                 &bindings.gamepad_mappings,
-                &bindings.gamepads,
+                gamepad_connected(&bindings.gamepads),
             );
             let (key_bg, key_text) = spawn_keybind_badge(
                 &mut commands,
@@ -3149,36 +3080,35 @@ pub fn handle_update_player_skills(
             let slot_locked = slot_unlock_state.is_slot_locked(*slot_index);
             if slot_locked {
                 commands
-                    .spawn(SpriteBundle {
-                        texture: asset_server.load(ACTIVE_SKILL_LOCK_ICON_PATH),
-                        sprite: Sprite {
+                    .spawn((
+                        Sprite {
+                            image: asset_server.load(ACTIVE_SKILL_LOCK_ICON_PATH),
                             custom_size: Some(ACTIVE_SKILL_LOCK_ICON_SIZE),
-                            ..Default::default()
+                            ..default()
                         },
-                        transform: Transform::from_translation(Vec3::new(0., 0., 1.)),
-                        ..Default::default()
-                    })
+                        Transform::from_translation(Vec3::new(0., 0., 1.)),
+                    ))
                     .insert(RenderLayers::from_layers(&[3]))
                     .insert(ActiveSkillLockIcon {
                         slot_index: *slot_index,
                     })
                     .insert(Name::new("HUD SKILL LOCK"))
-                    .set_parent(icon_bg);
+                    .insert(ChildOf(icon_bg));
             } else if let Some(active_skill) = active_skill_option.clone() {
                 commands
-                    .spawn(SpriteBundle {
-                        texture: graphics.get_active_skill_icon(active_skill.active_skill.clone()),
-                        sprite: Sprite {
+                    .spawn((
+                        Sprite {
+                            image: graphics
+                                .get_active_skill_icon(active_skill.active_skill.clone()),
                             custom_size: Some(Vec2::new(16., 16.)),
-                            ..Default::default()
+                            ..default()
                         },
-                        transform: Transform {
+                        Transform {
                             translation: Vec3::new(0., 0., 1.),
                             scale: Vec3::new(1., 1., 1.),
                             ..Default::default()
                         },
-                        ..Default::default()
-                    })
+                    ))
                     .insert(RenderLayers::from_layers(&[3]))
                     .insert(ActiveSkillIcon {
                         skill: active_skill.active_skill.clone(),
@@ -3194,7 +3124,7 @@ pub fn handle_update_player_skills(
                         index: 1000 + *slot_index as u32,
                     })
                     .insert(Name::new("HUD ICON!!"))
-                    .set_parent(icon_bg);
+                    .insert(ChildOf(icon_bg));
             }
 
             // Preserve cooldown state if it exists for this slot (we already filtered out changed slots)
@@ -3238,23 +3168,20 @@ pub fn handle_update_player_skills(
                 // Query for charge tracker to get current charges
                 // We'll update this in a separate system that runs after this
                 let _charge_text = commands
-                    .spawn(Text2dBundle {
-                        text: Text::from_section(
-                            "",
-                            gf::HUD_MICRO.text_style(&asset_server, WHITE),
-                        ),
-                        text_anchor: Anchor::Center,
-                        transform: Transform {
-                            translation: Vec3::new(1., 10., 4.), // Center bottom of icon
-                            scale: gf::HUD_MICRO.transform_scale(),
-                            ..default()
-                        },
-                        ..default()
-                    })
+                    .spawn(
+                        gf::HUD_MICRO
+                            .text(&asset_server, "", WHITE)
+                            .anchor(Anchor::CENTER)
+                            .with_transform(Transform {
+                                translation: Vec3::new(1., 10., 4.), // Center bottom of icon
+                                scale: gf::HUD_MICRO.transform_scale(),
+                                ..default()
+                            }),
+                    )
                     .insert(RenderLayers::from_layers(&[3]))
                     .insert(SkillChargeText { slot: *slot_index })
                     .insert(Name::new("SKILL CHARGE TEXT"))
-                    .set_parent(icon_bg)
+                    .insert(ChildOf(icon_bg))
                     .id();
             }
         }
@@ -3264,9 +3191,9 @@ pub fn handle_update_player_skills(
 /// Updates skill charge text display for slots 1-4
 pub fn update_skill_charge_text(
     class_slots: Query<&ClassSkillSlots, With<Player>>,
-    mut charge_texts: Query<(&SkillChargeText, &mut Text)>,
+    mut charge_texts: Query<(&SkillChargeText, &mut Text2d)>,
 ) {
-    let Ok(slots) = class_slots.get_single() else {
+    let Ok(slots) = class_slots.single() else {
         return;
     };
     for (charge_text, mut text) in charge_texts.iter_mut() {
@@ -3274,13 +3201,13 @@ pub fn update_skill_charge_text(
             let tracker = &slots.0[charge_text.slot];
             // Only show text if max charges > 1
             if tracker.max_charges > 1 {
-                text.sections[0].value = format!("{}", tracker.current_charges);
+                text.0 = format!("{}", tracker.current_charges);
             } else {
-                text.sections[0].value = String::new();
+                text.0 = String::new();
             }
         } else {
             // No tracker for this slot, hide text
-            text.sections[0].value = String::new();
+            text.0 = String::new();
         }
     }
 }
@@ -3309,7 +3236,7 @@ const ACTIVE_SKILL_DRAG_PREVIEW_Z: f32 = 998.;
 pub fn handle_active_skill_slot_drag_drop(
     mut commands: Commands,
     cursor_pos: Res<CursorPos>,
-    mouse_input: Res<Input<MouseButton>>,
+    mouse_input: Res<ButtonInput<MouseButton>>,
     mut drag_state: ResMut<ActiveSkillDragState>,
     mut skill_icons: Query<
         (
@@ -3357,7 +3284,7 @@ pub fn handle_active_skill_slot_drag_drop(
             if !matches!(interactable.current(), Interaction::Hovering) {
                 continue;
             }
-            if let Ok(skills) = player_skills.get_single() {
+            if let Ok(skills) = player_skills.single() {
                 if let Some(skill) = skills.get_active_skill_in_slot(icon.slot_index) {
                     start = Some((icon.slot_index, skill));
                     break;
@@ -3367,20 +3294,19 @@ pub fn handle_active_skill_slot_drag_drop(
 
         if let Some((slot_index, skill)) = start {
             let drag_e = commands
-                .spawn(SpriteBundle {
-                    texture: graphics.get_active_skill_icon(skill),
-                    sprite: Sprite {
+                .spawn((
+                    Sprite {
+                        image: graphics.get_active_skill_icon(skill),
                         custom_size: Some(Vec2::new(16., 16.)),
-                        color: Color::rgba(1., 1., 1., 0.7),
+                        color: Color::srgba(1., 1., 1., 0.7),
                         ..default()
                     },
-                    transform: Transform::from_translation(Vec3::new(
+                    Transform::from_translation(Vec3::new(
                         cursor.x,
                         cursor.y,
                         ACTIVE_SKILL_DRAG_PREVIEW_Z,
                     )),
-                    ..default()
-                })
+                ))
                 .insert(RenderLayers::from_layers(&[3]))
                 .insert(ActiveSkillDragIcon)
                 .insert(Name::new("ACTIVE SKILL DRAG ICON"))
@@ -3403,13 +3329,13 @@ pub fn handle_active_skill_slot_drag_drop(
 
     for (_, icon, ui_elem, mut sprite, _) in skill_icons.iter_mut() {
         if *ui_elem == UIElement::HeirloomHudIcon && icon.slot_index == origin {
-            sprite.color = Color::rgba(1., 1., 1., 0.4);
+            sprite.color = Color::srgba(1., 1., 1., 0.4);
         }
     }
 
     if mouse_input.just_released(MouseButton::Left) {
         if let Some(drag_e) = drag_state.drag_icon_entity {
-            commands.entity(drag_e).despawn_recursive();
+            commands.entity(drag_e).despawn();
         }
 
         for (_, icon, ui_elem, mut sprite, _) in skill_icons.iter_mut() {
@@ -3420,14 +3346,14 @@ pub fn handle_active_skill_slot_drag_drop(
 
         if let Some(target) = hovered_slot {
             if target != origin {
-                if let Ok(mut skills) = player_skills.get_single_mut() {
+                if let Ok(mut skills) = player_skills.single_mut() {
                     let from = skills.get_active_skill_choice_in_slot(origin).cloned();
                     let to = skills.get_active_skill_choice_in_slot(target).cloned();
                     set_skill_slot(&mut skills, origin, to);
                     set_skill_slot(&mut skills, target, from);
                 }
                 if origin < 4 && target < 4 {
-                    if let Ok(mut runtime) = class_slots_q.get_single_mut() {
+                    if let Ok(mut runtime) = class_slots_q.single_mut() {
                         runtime.0.swap(origin, target);
                     }
                 }
@@ -3462,8 +3388,8 @@ pub fn cancel_active_skill_drag_on_state_exit(
     mut skill_icons: Query<(&ActiveSkillIcon, &UIElement, &mut Sprite)>,
 ) {
     if let Some(drag_e) = drag_state.drag_icon_entity.take() {
-        if let Some(ec) = commands.get_entity(drag_e) {
-            ec.despawn_recursive();
+        if let Ok(mut ec) = commands.get_entity(drag_e) {
+            ec.despawn();
         }
     }
     if let Some(origin) = drag_state.origin_slot.take() {
@@ -3486,7 +3412,7 @@ pub fn spawn_hotbar_keybind_badge_for_slot(
     asset_server: &AssetServer,
     keybinds: &crate::keybinds::InputMappings,
     gamepad_mappings: &GamepadMappings,
-    gamepads: &Gamepads,
+    gamepad_connected: bool,
     slot: usize,
     game_height: f32,
 ) {
@@ -3494,7 +3420,7 @@ pub fn spawn_hotbar_keybind_badge_for_slot(
         BindingLabel::Hotbar(slot),
         keybinds,
         gamepad_mappings,
-        gamepads,
+        gamepad_connected,
     );
     let (bg_entity, text_entity) = spawn_keybind_badge(
         commands,
@@ -3530,17 +3456,13 @@ pub fn setup_hotbar_hud(
     inv_ui_state: Res<State<UIState>>,
     keybinds: Res<crate::keybinds::InputMappings>,
     gamepad_mappings: Res<GamepadMappings>,
-    gamepads: Res<Gamepads>,
+    gamepads: ConnectedGamepads,
     resolution: Res<ScreenResolution>,
 ) {
-    for (slot_index, item) in inv
-        .single_mut()
-        .items
-        .items
-        .iter()
-        .take(HUD_HOTBAR_SLOTS)
-        .enumerate()
-    {
+    let Ok(mut inv) = inv.single_mut() else {
+        return;
+    };
+    for (slot_index, item) in inv.items.items.iter().take(HUD_HOTBAR_SLOTS).enumerate() {
         let _slot_entity = spawn_inv_slot(
             &mut commands,
             &inv_ui_state,
@@ -3560,7 +3482,7 @@ pub fn setup_hotbar_hud(
             &asset_server,
             &keybinds,
             &gamepad_mappings,
-            &gamepads,
+            gamepad_connected(&gamepads),
             slot_index,
             resolution.game_height,
         );
@@ -3572,21 +3494,25 @@ pub fn update_mana_bar(
         (&CurrentMana, &MaxMana),
         (Or<(Changed<CurrentMana>, Changed<MaxMana>)>, With<Player>),
     >,
-    mana_bar_query: Query<&Handle<crate::ui::hud_bar_fill::HudBarFillMaterial>, With<ManaBar>>,
-    mut mana_text: Query<&mut Text, With<ManaBarText>>,
+    mana_bar_query: Query<
+        &MeshMaterial2d<crate::ui::hud_bar_fill::HudBarFillMaterial>,
+        With<ManaBar>,
+    >,
+    mut mana_text: Query<&mut Text2d, With<ManaBarText>>,
     mut materials: ResMut<Assets<crate::ui::hud_bar_fill::HudBarFillMaterial>>,
 ) {
-    let Ok((current_mana, max_mana)) = player_mana.get_single() else {
+    use bevy::sprite_render::MeshMaterial2d;
+    let Ok((current_mana, max_mana)) = player_mana.single() else {
         return;
     };
-    let Ok(handle) = mana_bar_query.get_single() else {
+    let Ok(material_handle) = mana_bar_query.single() else {
         return;
     };
-    if let Some(material) = materials.get_mut(handle) {
+    if let Some(mut material) = materials.get_mut(&material_handle.0) {
         material.fill = (current_mana.0 as f32 / max_mana.0.max(1) as f32).clamp(0.0, 1.0);
     }
-    if let Ok(mut text) = mana_text.get_single_mut() {
-        text.sections[0].value = format!("{}", current_mana.0);
+    if let Ok(mut text) = mana_text.single_mut() {
+        text.0 = format!("{}", current_mana.0);
     }
 }
 
@@ -3600,15 +3526,14 @@ pub fn setup_timeline_hud(
     let timeline_x = hud_timeline_center_x(res.game_width);
 
     let timeline = commands
-        .spawn(SpriteBundle {
-            texture: graphics.get_ui_element_texture(UIElement::Timeline),
-            sprite: Sprite {
+        .spawn((
+            Sprite {
+                image: graphics.get_ui_element_texture(UIElement::Timeline),
                 custom_size: Some(HUD_TIMELINE_SIZE),
                 ..default()
             },
-            transform: Transform::from_translation(Vec3::new(timeline_x, row_y, 6.)),
-            ..default()
-        })
+            Transform::from_translation(Vec3::new(timeline_x, row_y, 6.)),
+        ))
         .insert(RenderLayers::from_layers(&[3]))
         .insert(TimelineHUD)
         .insert(UiShadow::hud())
@@ -3616,23 +3541,18 @@ pub fn setup_timeline_hud(
         .id();
 
     commands
-        .spawn(SpriteBundle {
-            texture: graphics.get_ui_element_texture(UIElement::TimelineArrows),
-            sprite: Sprite {
+        .spawn((
+            Sprite {
+                image: graphics.get_ui_element_texture(UIElement::TimelineArrows),
                 custom_size: Some(HUD_TIMELINE_ARROWS_SIZE),
                 ..default()
             },
-            transform: Transform::from_translation(Vec3::new(
-                hud_timeline_arrow_local_x(0.),
-                0.,
-                1.,
-            )),
-            ..default()
-        })
+            Transform::from_translation(Vec3::new(hud_timeline_arrow_local_x(0.), 0., 1.)),
+        ))
         .insert(RenderLayers::from_layers(&[3]))
         .insert(TimelineProgressArrows)
         .insert(Name::new("TIMELINE ARROWS"))
-        .set_parent(timeline);
+        .insert(ChildOf(timeline));
 }
 
 fn era_timeline_progress(era_timer: &EraTimer, infinite_mode: &InfiniteMode) -> f32 {
@@ -3660,19 +3580,18 @@ pub fn setup_era_timer_hud(
 
     let era_timer_frame = commands
         .spawn((
-            SpriteBundle {
-                sprite: Sprite {
-                    color: Color::rgba(0.4, 0.1, 0.1, 0.8),
+            (
+                Sprite {
+                    color: Color::srgba(0.4, 0.1, 0.1, 0.8),
                     custom_size: Some(Vec2::new(timer_width, 24.)),
                     ..default()
                 },
-                transform: Transform {
+                Transform {
                     translation: Vec3::new(timer_x, row_y, 5.),
                     ..Default::default()
                 },
-                visibility: Visibility::Hidden,
-                ..default()
-            },
+                Visibility::Hidden,
+            ),
             Name::new("ERA TIMER HUD"),
             RenderLayers::from_layers(&[3]),
             EraTimerHUD,
@@ -3681,50 +3600,46 @@ pub fn setup_era_timer_hud(
 
     let _timer_text = commands
         .spawn((
-            Text2dBundle {
-                text: Text::from_section(
-                    "ENDLESS",
-                    gf::HUD_OBJECTIVE.text_style(&asset_server, RED),
-                ),
-                transform: Transform {
+            gf::HUD_OBJECTIVE
+                .text(&asset_server, "ENDLESS", RED)
+                .with_transform(Transform {
                     translation: Vec3::new(0., -2., 1.),
                     scale: gf::HUD_OBJECTIVE.transform_scale(),
                     ..default()
-                },
-                ..default()
-            },
+                }),
             EraTimerText,
             RenderLayers::from_layers(&[3]),
         ))
-        .set_parent(era_timer_frame);
+        .insert(ChildOf(era_timer_frame));
 
     // Spawn the endless elapsed timer (hidden initially, shown only during endless mode)
     let _endless_elapsed_text = commands
         .spawn((
-            Text2dBundle {
-                text: Text::from_section(
-                    "00:00",
-                    gf::HUD_MICRO.text_style(&asset_server, WHITE.with_a(0.)), // Hidden initially
-                ),
-                transform: Transform {
+            gf::HUD_MICRO
+                .text(&asset_server, "00:00", WHITE.with_alpha(0.))
+                .with_transform(Transform {
                     translation: Vec3::new(0., -10., 1.), // Below the ENDLESS text
                     scale: gf::HUD_MICRO.transform_scale(),
                     ..default()
-                },
-                ..default()
-            },
+                }),
             EndlessElapsedText,
             RenderLayers::from_layers(&[3]),
         ))
-        .set_parent(era_timer_frame);
+        .insert(ChildOf(era_timer_frame));
 }
 
 /// Update era timer HUD text
 pub fn handle_update_era_timer_hud(
     era_timer: Res<crate::night::EraTimer>,
     infinite_mode: Res<crate::night::InfiniteMode>,
-    mut timer_text: Query<&mut Text, (With<EraTimerText>, Without<EndlessElapsedText>)>,
-    mut elapsed_text: Query<&mut Text, (With<EndlessElapsedText>, Without<EraTimerText>)>,
+    mut timer_text: Query<
+        (&mut Text2d, &mut TextColor),
+        (With<EraTimerText>, Without<EndlessElapsedText>),
+    >,
+    mut elapsed_text: Query<
+        (&mut Text2d, &mut TextColor),
+        (With<EndlessElapsedText>, Without<EraTimerText>),
+    >,
     mut hud_transforms: ParamSet<(
         Query<(&mut Sprite, &mut Transform, &mut Visibility), With<EraTimerHUD>>,
         Query<&mut Transform, With<TimelineHUD>>,
@@ -3736,21 +3651,21 @@ pub fn handle_update_era_timer_hud(
 ) {
     let endless = infinite_mode.active;
 
-    for mut text in timer_text.iter_mut() {
+    for (mut text, mut text_color) in timer_text.iter_mut() {
         if endless {
-            text.sections[0].value = "ENDLESS".to_string();
-            text.sections[0].style.color = RED;
+            text.0 = "ENDLESS".to_string();
+            text_color.0 = RED;
         } else {
-            text.sections[0].style.color = WHITE.with_a(0.);
+            text_color.0 = WHITE.with_alpha(0.);
         }
     }
 
-    for mut text in elapsed_text.iter_mut() {
+    for (mut text, mut text_color) in elapsed_text.iter_mut() {
         if endless {
-            text.sections[0].value = infinite_mode.get_elapsed_display_string();
-            text.sections[0].style.color = YELLOW;
+            text.0 = infinite_mode.get_elapsed_display_string();
+            text_color.0 = YELLOW;
         } else {
-            text.sections[0].style.color = WHITE.with_a(0.);
+            text_color.0 = WHITE.with_alpha(0.);
         }
     }
 
@@ -3775,7 +3690,7 @@ pub fn handle_update_era_timer_hud(
         transform.translation.y = row_y;
         transform.translation.x = hud_era_timer_center_x(res.game_width, timer_size.x);
         sprite.custom_size = Some(timer_size);
-        sprite.color = Color::rgba(0.4, 0.1, 0.1, 0.8);
+        sprite.color = Color::srgba(0.4, 0.1, 0.1, 0.8);
         *visibility = if endless {
             Visibility::Visible
         } else {
@@ -3815,7 +3730,7 @@ pub fn skill_slot_cooldown_progress(
     // Roll now lives in the slot charge system (slot_index < 4). Only fall back to the
     // legacy dash cooldown timer if the slot hasn't been set up with charges yet.
     if Some(slot_index) == roll_slot && !(slot_index < 4 && slots.0[slot_index].max_charges > 0) {
-        if dash_cooldown.finished() {
+        if dash_cooldown.is_finished() {
             return None;
         }
         let duration = dash_cooldown.duration().as_secs_f32();
@@ -3840,10 +3755,10 @@ pub fn skill_slot_cooldown_progress(
     }
 
     let overlay = overlay?;
-    if overlay.timer.finished() {
+    if overlay.timer.is_finished() {
         return None;
     }
-    Some(overlay.timer.percent())
+    Some(overlay.timer.fraction())
 }
 
 /// Marker component for decorative XP shards that rain during skill choice UI
@@ -3869,7 +3784,7 @@ pub fn spawn_skill_cooldown_overlay_with_elapsed(
     elapsed: f32,
     index: usize,
 ) -> Entity {
-    use bevy::utils::Duration;
+    use std::time::Duration;
 
     // Ready / not on cooldown — spawn a finished timer with zero height so the overlay stays
     // invisible even when gameplay is paused (e.g. tutorial popups skip tick systems).
@@ -3877,24 +3792,23 @@ pub fn spawn_skill_cooldown_overlay_with_elapsed(
         let mut timer = Timer::from_seconds(0.001, TimerMode::Once);
         timer.tick(Duration::from_secs_f32(0.001));
         return commands
-            .spawn(SpriteBundle {
-                sprite: Sprite {
-                    color: Color::rgba(1., 1., 1., 0.45),
+            .spawn((
+                Sprite {
+                    color: Color::srgba(1., 1., 1., 0.45),
                     custom_size: Some(Vec2::new(16., 0.)),
-                    anchor: Anchor::BottomCenter,
                     ..default()
                 },
-                transform: Transform {
+                Transform {
                     translation: Vec3::new(0., -8., 3.),
                     scale: Vec3::new(1., 1., 1.),
                     ..Default::default()
                 },
-                ..default()
-            })
+            ))
+            .insert(Anchor::BOTTOM_CENTER)
             .insert(SkillCooldownOverlay { timer, index })
             .insert(RenderLayers::from_layers(&[3]))
             .insert(Name::new("overlay"))
-            .set_parent(parent)
+            .insert(ChildOf(parent))
             .id();
     }
 
@@ -3907,27 +3821,26 @@ pub fn spawn_skill_cooldown_overlay_with_elapsed(
     }
 
     // Calculate initial overlay size based on timer progress
-    let initial_size = 16.0 * (1.0 - timer.percent());
+    let initial_size = 16.0 * (1.0 - timer.fraction());
 
     commands
-        .spawn(SpriteBundle {
-            sprite: Sprite {
-                color: Color::rgba(1., 1., 1., 0.45),
+        .spawn((
+            Sprite {
+                color: Color::srgba(1., 1., 1., 0.45),
                 custom_size: Some(Vec2::new(16., initial_size)),
-                anchor: Anchor::BottomCenter,
                 ..default()
             },
-            transform: Transform {
+            Transform {
                 translation: Vec3::new(0., -8., 3.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
-            ..default()
-        })
+        ))
+        .insert(Anchor::BOTTOM_CENTER)
         .insert(SkillCooldownOverlay { timer, index })
         .insert(RenderLayers::from_layers(&[3]))
         .insert(Name::new("overlay"))
-        .set_parent(parent)
+        .insert(ChildOf(parent))
         .id()
 }
 
@@ -3939,11 +3852,11 @@ pub fn tick_skill_cooldown_overlays(
     time: Res<Time>,
 ) {
     let roll_slot = player_skills
-        .get_single()
+        .single()
         .ok()
         .and_then(|skills| skills.has_active_skill(ActiveSkill::Roll));
 
-    let Ok(slots) = class_slots.get_single() else {
+    let Ok(slots) = class_slots.single() else {
         return;
     };
 
@@ -3969,21 +3882,21 @@ pub fn tick_skill_cooldown_overlays(
 }
 
 pub fn handle_active_skill_event(
-    mut active_skill_used: EventReader<ActiveSkillUsedEvent>,
+    mut active_skill_used: MessageReader<ActiveSkillUsedEvent>,
     mut overlays: Query<&mut SkillCooldownOverlay>,
     class_slots: Query<&ClassSkillSlots, With<Player>>,
     player_skills: Query<&PlayerSkills, With<Player>>,
 ) {
     let roll_slot = player_skills
-        .get_single()
+        .single()
         .ok()
         .and_then(|skills| skills.has_active_skill(ActiveSkill::Roll));
 
-    let Ok(slots) = class_slots.get_single() else {
+    let Ok(slots) = class_slots.single() else {
         return;
     };
 
-    for e in active_skill_used.iter() {
+    for e in active_skill_used.read() {
         if Some(e.slot) == roll_slot {
             continue;
         }
@@ -4008,7 +3921,7 @@ pub fn handle_active_skill_event(
 
 /// Updates the "Xs" cooldown text on active skill HUD tooltips.
 pub fn update_skill_tooltip_cooldown(
-    mut cooldown_texts: Query<(&Parent, &mut Text), With<SkillTooltipCooldownText>>,
+    mut cooldown_texts: Query<(&ChildOf, &mut Text2d), With<SkillTooltipCooldownText>>,
     tooltip_containers: Query<&ActiveSkillHudTooltipSkill>,
     game: Res<crate::Game>,
     player_skills: Query<&PlayerSkills, With<Player>>,
@@ -4016,16 +3929,16 @@ pub fn update_skill_tooltip_cooldown(
     overlays: Query<&SkillCooldownOverlay>,
 ) {
     let roll_slot = player_skills
-        .get_single()
+        .single()
         .ok()
         .and_then(|s| s.has_active_skill(ActiveSkill::Roll));
 
-    let Ok(slots) = class_slots.get_single() else {
+    let Ok(slots) = class_slots.single() else {
         return;
     };
 
     for (parent, mut text) in cooldown_texts.iter_mut() {
-        let Ok(tooltip_skill) = tooltip_containers.get(parent.get()) else {
+        let Ok(tooltip_skill) = tooltip_containers.get(parent.parent()) else {
             continue;
         };
         let slot_index = tooltip_skill.0;
@@ -4069,7 +3982,7 @@ pub fn update_skill_tooltip_cooldown(
                 .unwrap_or((0.0, 0.0))
         };
 
-        text.sections[0].value = if remaining > 0.05 {
+        text.0 = if remaining > 0.05 {
             format!("{:.1}s", remaining)
         } else if max_cooldown > 0.0 {
             format!("{:.1}s", max_cooldown)
@@ -4081,7 +3994,7 @@ pub fn update_skill_tooltip_cooldown(
 
 /// Updates the cooldown corner text on pet skill HUD tooltips.
 pub fn update_pet_skill_tooltip_cooldown(
-    mut cooldown_texts: Query<&mut Text, With<PetSkillTooltipCooldownText>>,
+    mut cooldown_texts: Query<&mut Text2d, With<PetSkillTooltipCooldownText>>,
     tooltips: Query<Entity, With<PetSkillHudTooltip>>,
     pet_q: Query<&Pet>,
     slime: Query<&crate::pets::pet_abilities::SlimeShieldTimer, With<Pet>>,
@@ -4111,14 +4024,14 @@ pub fn update_pet_skill_tooltip_cooldown(
     };
 
     for mut text in cooldown_texts.iter_mut() {
-        text.sections[0].value = label.clone();
+        text.0 = label.clone();
     }
 }
 
 pub fn update_active_skill_keybind_text(
     bindings: HudBindingDisplay,
     respawned_skill_labels: Query<(), Changed<PlayerSkills>>,
-    mut texts: Query<(&ActiveSkillKeybindText, &mut Text)>,
+    mut texts: Query<(&ActiveSkillKeybindText, &mut Text2d)>,
     mut last_gamepad_connected: Local<Option<bool>>,
 ) {
     let labels_respawned = !respawned_skill_labels.is_empty();
@@ -4126,7 +4039,7 @@ pub fn update_active_skill_keybind_text(
         && !binding_labels_dirty(
             bindings.keybinds.is_changed(),
             bindings.gamepad_mappings.is_changed(),
-            &bindings.gamepads,
+            gamepad_connected(&bindings.gamepads),
             &mut last_gamepad_connected,
         )
     {
@@ -4134,11 +4047,11 @@ pub fn update_active_skill_keybind_text(
     }
 
     for (keybind_text, mut text) in texts.iter_mut() {
-        text.sections[0].value = format_binding_label(
+        text.0 = format_binding_label(
             BindingLabel::ActiveSkill(keybind_text.slot),
             &bindings.keybinds,
             &bindings.gamepad_mappings,
-            &bindings.gamepads,
+            gamepad_connected(&bindings.gamepads),
         );
     }
 }
@@ -4146,25 +4059,25 @@ pub fn update_active_skill_keybind_text(
 pub fn update_hotbar_keybind_text(
     keybinds: Res<crate::keybinds::InputMappings>,
     gamepad_mappings: Res<GamepadMappings>,
-    gamepads: Res<Gamepads>,
-    mut texts: Query<(&HotbarKeybindText, &mut Text)>,
+    gamepads: ConnectedGamepads,
+    mut texts: Query<(&HotbarKeybindText, &mut Text2d)>,
     mut last_gamepad_connected: Local<Option<bool>>,
 ) {
     if !binding_labels_dirty(
         keybinds.is_changed(),
         gamepad_mappings.is_changed(),
-        &gamepads,
+        gamepad_connected(&gamepads),
         &mut last_gamepad_connected,
     ) {
         return;
     }
 
     for (keybind_text, mut text) in texts.iter_mut() {
-        text.sections[0].value = format_binding_label(
+        text.0 = format_binding_label(
             BindingLabel::Hotbar(keybind_text.slot),
             &keybinds,
             &gamepad_mappings,
-            &gamepads,
+            gamepad_connected(&gamepads),
         );
     }
 }
@@ -4172,14 +4085,14 @@ pub fn update_hotbar_keybind_text(
 pub fn update_inventory_keybind_text(
     keybinds: Res<crate::keybinds::InputMappings>,
     gamepad_mappings: Res<GamepadMappings>,
-    gamepads: Res<Gamepads>,
-    mut texts: Query<&mut Text, With<InventoryKeybindText>>,
+    gamepads: ConnectedGamepads,
+    mut texts: Query<&mut Text2d, With<InventoryKeybindText>>,
     mut last_gamepad_connected: Local<Option<bool>>,
 ) {
     if !binding_labels_dirty(
         keybinds.is_changed(),
         gamepad_mappings.is_changed(),
-        &gamepads,
+        gamepad_connected(&gamepads),
         &mut last_gamepad_connected,
     ) {
         return;
@@ -4189,24 +4102,24 @@ pub fn update_inventory_keybind_text(
         BindingLabel::Inventory,
         &keybinds,
         &gamepad_mappings,
-        &gamepads,
+        gamepad_connected(&gamepads),
     );
     for mut text in texts.iter_mut() {
-        text.sections[0].value = label.clone();
+        text.0 = label.clone();
     }
 }
 
 pub fn update_minimap_keybind_text(
     keybinds: Res<crate::keybinds::InputMappings>,
     gamepad_mappings: Res<GamepadMappings>,
-    gamepads: Res<Gamepads>,
-    mut texts: Query<&mut Text, With<MinimapKeybindText>>,
+    gamepads: ConnectedGamepads,
+    mut texts: Query<&mut Text2d, With<MinimapKeybindText>>,
     mut last_gamepad_connected: Local<Option<bool>>,
 ) {
     if !binding_labels_dirty(
         keybinds.is_changed(),
         gamepad_mappings.is_changed(),
-        &gamepads,
+        gamepad_connected(&gamepads),
         &mut last_gamepad_connected,
     ) {
         return;
@@ -4216,19 +4129,19 @@ pub fn update_minimap_keybind_text(
         BindingLabel::Minimap,
         &keybinds,
         &gamepad_mappings,
-        &gamepads,
+        gamepad_connected(&gamepads),
     );
     for mut text in texts.iter_mut() {
-        text.sections[0].value = label.clone();
+        text.0 = label.clone();
     }
 }
 
 pub fn update_options_keybind_text(
-    gamepads: Res<Gamepads>,
-    mut texts: Query<&mut Text, With<OptionsKeybindText>>,
+    gamepads: ConnectedGamepads,
+    mut texts: Query<&mut Text2d, With<OptionsKeybindText>>,
     mut last_gamepad_connected: Local<Option<bool>>,
 ) {
-    let connected = crate::gamepad_bindings::gamepad_connected(&gamepads);
+    let connected = gamepad_connected(&gamepads);
     let device_changed = match *last_gamepad_connected {
         None => true,
         Some(prev) => prev != connected,
@@ -4238,9 +4151,9 @@ pub fn update_options_keybind_text(
         return;
     }
 
-    let label = format_pause_options_label(&gamepads);
+    let label = format_pause_options_label(gamepad_connected(&gamepads));
     for mut text in texts.iter_mut() {
-        text.sections[0].value = label.clone();
+        text.0 = label.clone();
     }
 }
 
@@ -4275,7 +4188,7 @@ pub fn sync_consumable_buff_hud(
     existing: Query<Entity, With<ConsumableBuffHudMarker>>,
     res: Res<ScreenResolution>,
 ) {
-    let Ok(buffs) = player.get_single() else {
+    let Ok(buffs) = player.single() else {
         return;
     };
     let keys = consumable_buff_hud_layout_keys(buffs);
@@ -4285,7 +4198,7 @@ pub fn sync_consumable_buff_hud(
     *last_keys = Some(keys);
 
     for e in existing.iter() {
-        commands.entity(e).despawn_recursive();
+        commands.entity(e).despawn();
     }
 
     let visible: Vec<(usize, &crate::attributes::ConsumableBuffEntry)> = buffs
@@ -4306,15 +4219,14 @@ pub fn sync_consumable_buff_hud(
 
         let icon_root = commands
             .spawn((
-                SpriteBundle {
-                    texture: graphics.get_ui_element_texture(UIElement::InventorySlotHotbar),
-                    sprite: Sprite {
+                (
+                    Sprite {
+                        image: graphics.get_ui_element_texture(UIElement::InventorySlotHotbar),
                         custom_size: Some(Vec2::splat(CONSUMABLE_BUFF_HUD_ICON_PX)),
                         ..default()
                     },
-                    transform: Transform::from_translation(Vec3::new(x, y, 2.)),
-                    ..default()
-                },
+                    Transform::from_translation(Vec3::new(x, y, 2.)),
+                ),
                 RenderLayers::from_layers(&[3]),
                 Name::new("consumable_buff_hud"),
                 Interactable::default(),
@@ -4349,28 +4261,23 @@ fn spawn_consumable_buff_duration_overlay(
 ) -> Entity {
     commands
         .spawn((
-            SpriteBundle {
-                sprite: Sprite {
-                    color: Color::rgba(1., 1., 1., 0.45),
+            (
+                Sprite {
+                    color: Color::srgba(1., 1., 1., 0.45),
                     custom_size: Some(Vec2::new(
                         CONSUMABLE_BUFF_HUD_ICON_PX,
                         CONSUMABLE_BUFF_HUD_ICON_PX,
                     )),
-                    anchor: Anchor::BottomCenter,
                     ..default()
                 },
-                transform: Transform::from_translation(Vec3::new(
-                    0.,
-                    -CONSUMABLE_BUFF_HUD_ICON_PX / 2.,
-                    4.,
-                )),
-                ..default()
-            },
+                Transform::from_translation(Vec3::new(0., -CONSUMABLE_BUFF_HUD_ICON_PX / 2., 4.)),
+            ),
+            Anchor::BOTTOM_CENTER,
             RenderLayers::from_layers(&[3]),
             ConsumableBuffHudDurationOverlay { hud_slot },
             Name::new("consumable_buff_duration"),
         ))
-        .set_parent(parent)
+        .insert(ChildOf(parent))
         .id()
 }
 
@@ -4389,12 +4296,12 @@ pub fn tick_consumable_buff_hud_overlays(
     buffs: Query<&ActiveConsumableBuffs, With<Player>>,
     mut overlays: Query<(&ConsumableBuffHudDurationOverlay, &mut Sprite)>,
 ) {
-    let Ok(b) = buffs.get_single() else {
+    let Ok(b) = buffs.single() else {
         return;
     };
     for (ov, mut sprite) in overlays.iter_mut() {
         if let Some(entry) = nth_visible_consumable_buff(b, ov.hud_slot) {
-            let p = entry.display_timer.percent();
+            let p = entry.display_timer.fraction();
             sprite.custom_size = Some(Vec2::new(
                 CONSUMABLE_BUFF_HUD_ICON_PX,
                 CONSUMABLE_BUFF_HUD_ICON_PX * (1.0 - p),
@@ -4452,7 +4359,7 @@ pub fn handle_consumable_buff_hud_tooltip(
     *last_hovered = hovered_stack.clone();
 
     for tooltip_e in existing_tooltips.iter() {
-        commands.entity(tooltip_e).despawn_recursive();
+        commands.entity(tooltip_e).despawn();
     }
 
     if let Some((stack, icon_pos)) = currently_hovered {
@@ -4491,19 +4398,19 @@ fn pet_ability_cooldown(
     use Pet;
     match pet {
         Pet::Slime => slime
-            .get_single()
+            .single()
             .ok()
             .map(|t| (t.0.elapsed().as_secs_f32(), t.0.duration().as_secs_f32())),
         Pet::Fairy => fairy
-            .get_single()
+            .single()
             .ok()
             .map(|t| (t.0.elapsed().as_secs_f32(), t.0.duration().as_secs_f32())),
         Pet::Porkipine => porkipine
-            .get_single()
+            .single()
             .ok()
             .map(|t| (t.0.elapsed().as_secs_f32(), t.0.duration().as_secs_f32())),
         Pet::GoldenPig => coin
-            .get_single()
+            .single()
             .ok()
             .map(|t| (t.0.elapsed().as_secs_f32(), t.0.duration().as_secs_f32())),
         Pet::Goliath => None,
@@ -4524,7 +4431,7 @@ pub fn update_pet_skill_hud_slot(
 ) {
     let Some(pet) = pet_q.iter().next() else {
         for (e, _) in existing.iter() {
-            commands.entity(e).despawn_recursive();
+            commands.entity(e).despawn();
         }
         return;
     };
@@ -4534,7 +4441,7 @@ pub fn update_pet_skill_hud_slot(
     }
 
     for (e, _) in existing.iter() {
-        commands.entity(e).despawn_recursive();
+        commands.entity(e).despawn();
     }
 
     // Position matches the formula in `handle_update_player_skills`, with 4 reserved
@@ -4545,9 +4452,10 @@ pub fn update_pet_skill_hud_slot(
     let y = -res.game_height / 2. + HUD_ACTION_ROW_Y_FROM_BOTTOM;
 
     let slot_bg = commands
-        .spawn(SpatialBundle::from_transform(Transform::from_translation(
-            Vec3::new(x, y, Z_DEPTH_HUD_ACTIVE_SKILLS),
-        )))
+        .spawn((
+            Transform::from_translation(Vec3::new(x, y, Z_DEPTH_HUD_ACTIVE_SKILLS)),
+            Visibility::default(),
+        ))
         .insert(RenderLayers::from_layers(&[3]))
         .insert(PetSkillSlotBg)
         .insert(PetSkillSlotFor(pet.clone()))
@@ -4571,37 +4479,35 @@ pub fn update_pet_skill_hud_slot(
         .insert(PetSkillLabelBackground);
 
     commands
-        .spawn(SpriteBundle {
-            texture: graphics.get_pet_active_skill_icon(pet.clone()),
-            sprite: Sprite {
+        .spawn((
+            Sprite {
+                image: graphics.get_pet_active_skill_icon(pet.clone()),
                 custom_size: Some(Vec2::new(16., 16.)),
                 ..default()
             },
-            transform: Transform::from_translation(Vec3::new(0., 0., 1.)),
-            ..default()
-        })
+            Transform::from_translation(Vec3::new(0., 0., 1.)),
+        ))
         .insert(RenderLayers::from_layers(&[3]))
         .insert(PetSkillIcon)
         .insert(super::interactions::Interactable::default())
         .insert(Name::new("PET SKILL ICON"))
-        .set_parent(slot_bg);
+        .insert(ChildOf(slot_bg));
 
     // Cooldown overlay (matches the class-skill overlay visual style).
     commands
-        .spawn(SpriteBundle {
-            sprite: Sprite {
-                color: Color::rgba(1., 1., 1., 0.45),
+        .spawn((
+            Sprite {
+                color: Color::srgba(1., 1., 1., 0.45),
                 custom_size: Some(Vec2::new(16., 0.)),
-                anchor: Anchor::BottomCenter,
                 ..default()
             },
-            transform: Transform::from_translation(Vec3::new(0., -8., 3.)),
-            ..default()
-        })
+            Transform::from_translation(Vec3::new(0., -8., 3.)),
+        ))
+        .insert(Anchor::BOTTOM_CENTER)
         .insert(PetSkillCooldownOverlay)
         .insert(RenderLayers::from_layers(&[3]))
         .insert(Name::new("pet skill cooldown overlay"))
-        .set_parent(slot_bg);
+        .insert(ChildOf(slot_bg));
 }
 
 /// Drives the pet skill slot's cooldown overlay from the pet's auto-cast timer.
@@ -4645,7 +4551,7 @@ pub fn handle_pet_skill_hud_tooltip(
     cursor_pos: Res<CursorPos>,
     hit_detection_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     mut pet_icons: Query<
-        (Entity, &GlobalTransform, &mut Interactable, &Parent),
+        (Entity, &GlobalTransform, &mut Interactable, &ChildOf),
         With<PetSkillIcon>,
     >,
     slot_for: Query<&PetSkillSlotFor>,
@@ -4675,7 +4581,7 @@ pub fn handle_pet_skill_hud_tooltip(
             ) {
                 return None;
             }
-            let pet = slot_for.get(parent.get()).ok()?;
+            let pet = slot_for.get(parent.parent()).ok()?;
             Some((pet.0.clone(), xform.translation()))
         });
 
@@ -4686,7 +4592,7 @@ pub fn handle_pet_skill_hud_tooltip(
     }
 
     for tt in existing_tooltips.iter() {
-        commands.entity(tt).despawn_recursive();
+        commands.entity(tt).despawn();
     }
 
     if let Some((pet, pos)) = currently_hovered {
@@ -4694,7 +4600,7 @@ pub fn handle_pet_skill_hud_tooltip(
         let (container, _) = spawn_skill_tooltip_shell(
             &mut commands,
             &graphics,
-            hud_skill_tooltip_world_position(pos, res.scale, ui_state.0 == UIState::Pause),
+            hud_skill_tooltip_world_position(pos, res.scale, *ui_state.get() == UIState::Pause),
             "PET SKILL TOOLTIP",
         );
         commands.entity(container).insert(PetSkillHudTooltip);
@@ -4737,7 +4643,7 @@ pub fn sync_heirloom_hud_depth(
     game_state: Res<State<GameState>>,
     mut icons: Query<&mut Transform, With<SkillHudIcon>>,
 ) {
-    let target_z = if game_state.0 == GameState::GameOver {
+    let target_z = if *game_state == GameState::GameOver {
         Z_DEPTH_HUD_HEIRLOOM_ICONS_FOREGROUND
     } else {
         Z_DEPTH_HUD_HEIRLOOM_ICONS

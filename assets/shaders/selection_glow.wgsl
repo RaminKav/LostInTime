@@ -10,25 +10,26 @@
 #import bevy_sprite::mesh2d_bindings
 
 #import bevy_sprite::mesh2d_functions
+#import bevy_sprite::mesh2d_vertex_output::VertexOutput
 
 // Base purple sampled from the Selected slot art (linear 0..1).
-@group(1) @binding(0)
+@group(#{MATERIAL_BIND_GROUP}) @binding(0)
 var<uniform> glow_color: vec4<f32>;
 // Brighter purple mixed in on shimmer highlights.
-@group(1) @binding(1)
+@group(#{MATERIAL_BIND_GROUP}) @binding(1)
 var<uniform> hot_color: vec4<f32>;
 // params: x = time (seconds), y = shimmer speed, z = border thickness in texels (matches the
 // slot art's own pixel resolution), w = base intensity (0..1)
-@group(1) @binding(2)
+@group(#{MATERIAL_BIND_GROUP}) @binding(2)
 var<uniform> params: vec4<f32>;
 // shape_params: x/y = the slot's own art size in texels (1 texel == 1 game pixel here), z = how
 // much larger this padded quad is than the slot (`GLOW_SCALE`), w = shimmer frame duration in
 // seconds (low frame rate so it flickers like sprite art instead of smoothly interpolating).
-@group(1) @binding(3)
+@group(#{MATERIAL_BIND_GROUP}) @binding(3)
 var<uniform> shape_params: vec4<f32>;
-@group(1) @binding(4)
+@group(#{MATERIAL_BIND_GROUP}) @binding(4)
 var source_color_texture: texture_2d<f32>;
-@group(1) @binding(5)
+@group(#{MATERIAL_BIND_GROUP}) @binding(5)
 var source_texture_sampler: sampler;
 
 fn hash(p: vec2<f32>) -> f32 {
@@ -87,9 +88,8 @@ fn ring_alpha(uv: vec2<f32>, texel: vec2<f32>, k: f32) -> f32 {
 }
 
 @fragment
-fn fragment(
-    #import bevy_sprite::mesh2d_vertex_output
-) -> @location(0) vec4<f32> {
+fn fragment(mesh: VertexOutput) -> @location(0) vec4<f32> {
+    let uv = mesh.uv;
     let slot_size = max(shape_params.xy, vec2<f32>(1.0, 1.0));
     let glow_scale = max(shape_params.z, 1.0);
     let frame_duration = max(shape_params.w, 0.001);

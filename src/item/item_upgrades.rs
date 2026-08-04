@@ -1,5 +1,6 @@
 use rand::Rng;
 
+use crate::aim::ManualAimOverride;
 use crate::animations::player_sprite::PlayerAnimation;
 use crate::animations::AttackEvent;
 use crate::assets::Graphics;
@@ -11,7 +12,6 @@ use crate::blessings::OwnedBlessings;
 use crate::custom_commands::CommandsExt;
 use crate::enemy::Mob;
 use crate::inputs::{attack_aim_direction, AttackAutoTargetState, AutoAttackState};
-use crate::aim::ManualAimOverride;
 use crate::item::ammo::Ammo;
 use crate::item::WorldObject;
 use crate::player::combat_heirlooms::hit_is_weapon_damage;
@@ -35,15 +35,15 @@ use super::{
     MainHand,
 };
 
-#[derive(Component, Reflect, FromReflect, Default, Clone)]
+#[derive(Component, Reflect, Default, Clone)]
 #[reflect(Component)]
 pub struct ClawUpgradeMultiThrow(pub Timer, pub u8);
 
-#[derive(Component, Reflect, FromReflect, Default, Clone)]
+#[derive(Component, Reflect, Default, Clone)]
 #[reflect(Component)]
 pub struct BowUpgradeSpread(pub u8);
 
-#[derive(Component, Reflect, FromReflect, Default, Clone)]
+#[derive(Component, Reflect, Default, Clone)]
 #[reflect(Component)]
 pub struct ArrowSpeedUpgrade(pub f32);
 
@@ -63,8 +63,8 @@ pub struct IceExplosionThrottle {
 /// direct result of an attack, so it cannot spam.
 pub fn handle_delayed_ranged_attack(
     wep_query: Query<(&RangedAttack, Option<&Ammo>), With<MainHand>>,
-    mut ranged_attack_event: EventWriter<RangedAttackEvent>,
-    mut attack_events: EventReader<AttackEvent>,
+    mut ranged_attack_event: MessageWriter<RangedAttackEvent>,
+    mut attack_events: MessageReader<AttackEvent>,
     game: GameParam,
     cursor_pos: Res<CursorPos>,
     auto_target: Res<AttackAutoTargetState>,
@@ -74,9 +74,9 @@ pub fn handle_delayed_ranged_attack(
     mut multi_throw_query: Query<&mut ClawUpgradeMultiThrow, With<Player>>,
     mut remaining: Local<u8>,
 ) {
-    let attacked = attack_events.iter().count() > 0;
+    let attacked = attack_events.read().count() > 0;
 
-    let Ok((ranged_attack, ammo_option)) = wep_query.get_single() else {
+    let Ok((ranged_attack, ammo_option)) = wep_query.single() else {
         *remaining = 0;
         return;
     };
@@ -85,7 +85,7 @@ pub fn handle_delayed_ranged_attack(
             return;
         }
     }
-    let Ok(mut multi_throw) = multi_throw_query.get_single_mut() else {
+    let Ok(mut multi_throw) = multi_throw_query.single_mut() else {
         return;
     };
     if ranged_attack.0 == Projectile::Arrow || ranged_attack.0 == Projectile::Electricity {
@@ -111,7 +111,7 @@ pub fn handle_delayed_ranged_attack(
         multi_throw.0.tick(time.delta());
         if multi_throw.0.just_finished() {
             *remaining -= 1;
-            ranged_attack_event.send(RangedAttackEvent {
+            ranged_attack_event.write(RangedAttackEvent {
                 projectile: ranged_attack.0.clone(),
                 direction: attack_aim_direction(
                     game.player().position.truncate(),
@@ -135,9 +135,9 @@ pub fn handle_delayed_ranged_attack(
 }
 pub fn handle_spread_arrows_attack(
     wep_query: Query<&RangedAttack, With<MainHand>>,
-    mut ranged_attack_event: EventWriter<RangedAttackEvent>,
+    mut ranged_attack_event: MessageWriter<RangedAttackEvent>,
     game: GameParam,
-    mouse_button_input: Res<Input<MouseButton>>,
+    mouse_button_input: Res<ButtonInput<MouseButton>>,
     auto_attack: Res<AutoAttackState>,
     auto_target: Res<AttackAutoTargetState>,
     manual_aim: Res<ManualAimOverride>,
@@ -149,13 +149,13 @@ pub fn handle_spread_arrows_attack(
     >,
     mut count: Local<u8>,
 ) {
-    let Ok(ranged_attack) = wep_query.get_single() else {
+    let Ok(ranged_attack) = wep_query.single() else {
         return;
     };
     if ranged_attack.0 != Projectile::Arrow {
         return;
     }
-    let Ok((spread_attack, anim, cooldown_option)) = att_cooldown_query.get_single() else {
+    let Ok((spread_attack, anim, cooldown_option)) = att_cooldown_query.single() else {
         return;
     };
     if cooldown_option.is_none() && !anim.is_shooting_bow() {
@@ -186,7 +186,7 @@ pub fn handle_spread_arrows_attack(
 
         let new_dir = rotate(raw_dir, spread_factor * if flip { -1. } else { 1. });
 
-        ranged_attack_event.send(RangedAttackEvent {
+        ranged_attack_event.write(RangedAttackEvent {
             projectile: ranged_attack.0.clone(),
             direction: new_dir,
             from_enemy: false,
@@ -202,7 +202,7 @@ pub fn handle_spread_arrows_attack(
 }
 
 pub fn handle_on_hit_upgrades(
-    mut hits: EventReader<HitEvent>,
+    mut hits: MessageReader<HitEvent>,
     mut upgrades: Query<
         (
             Entity,
@@ -223,10 +223,10 @@ pub fn handle_on_hit_upgrades(
     player_att_blessings: Query<(&ItemAttributes, &OwnedBlessings, &CurrentHealth), With<Player>>,
     asset_server: Res<AssetServer>,
     mut events: ParamSet<(
-        EventWriter<RangedAttackEvent>,
-        EventWriter<StatusEffectEvent>,
-        EventWriter<LifestealEvent>,
-        EventWriter<ModifyHealthEvent>,
+        MessageWriter<RangedAttackEvent>,
+        MessageWriter<StatusEffectEvent>,
+        MessageWriter<LifestealEvent>,
+        MessageWriter<ModifyHealthEvent>,
     )>,
     mut throttle: Local<IceExplosionThrottle>, // Track explosions spawned this frame
     mut trigger_counts: ResMut<crate::player::skills::HeirloomTriggerCounts>,
@@ -235,15 +235,19 @@ pub fn handle_on_hit_upgrades(
     throttle.count = 0;
     throttle.sound_played = false;
 
-    let (player_e, skills, projectile_size, att_cooldown, mut current_mana) = upgrades.single_mut();
-    if *elec_count > 0 && att_cooldown.is_none() {
-        *elec_count = 0;
-    }
-    let Ok((player_attributes, player_blessings, current_hp)) = player_att_blessings.get_single()
+    let Ok((player_e, skills, projectile_size, att_cooldown, mut current_mana)) =
+        upgrades.single_mut()
     else {
         return;
     };
-    for hit in hits.iter() {
+    if *elec_count > 0 && att_cooldown.is_none() {
+        *elec_count = 0;
+    }
+    let Ok((player_attributes, player_blessings, current_hp)) = player_att_blessings.single()
+    else {
+        return;
+    };
+    for hit in hits.read() {
         // Skip DoT tick damage (e.g. poison) so it does not re-trigger on-hit effects.
         if matches!(hit.from_heirloom_effect, Some(Heirloom::PoisonStacks)) {
             continue;
@@ -258,7 +262,7 @@ pub fn handle_on_hit_upgrades(
         };
         let kevin_chance = player_blessings.get_kevin_self_damage_chance();
         if current_hp.0 > 1 && kevin_chance > 0.0 && rng.gen_bool(kevin_chance as f64) {
-            events.p3().send(ModifyHealthEvent(-1));
+            events.p3().write(ModifyHealthEvent(-1));
         }
         if skills.has(Heirloom::IncreaseProjectileCount)
             && hit.hit_with_projectile == Some(Projectile::Electricity)
@@ -282,7 +286,7 @@ pub fn handle_on_hit_upgrades(
                 &asset_server,
                 1. + player_attributes.size.value as f32 / 100.,
             );
-            events.p0().send(RangedAttackEvent {
+            events.p0().write(RangedAttackEvent {
                 projectile: Projectile::Electricity,
                 direction: (nearest_mob_t.1.translation().truncate()
                     - hit_entity_txfm.translation().truncate())
@@ -347,7 +351,7 @@ pub fn handle_on_hit_upgrades(
                     .saturating_add(stacks_to_apply as u128 + bonus_stack as u128);
                 burning.duration_timer.reset();
                 let stacks = burning.stacks as i32;
-                events.p1().send(StatusEffectEvent {
+                events.p1().write(StatusEffectEvent {
                     entity: hit_e,
                     effect: StatusEffect::Poison,
                     num_stacks: stacks,
@@ -360,7 +364,7 @@ pub fn handle_on_hit_upgrades(
                     duration_timer: Timer::from_seconds(3.0 * duration_bonus, TimerMode::Once),
                     stacks: initial_stacks,
                 });
-                events.p1().send(StatusEffectEvent {
+                events.p1().write(StatusEffectEvent {
                     entity: hit_e,
                     effect: StatusEffect::Poison,
                     num_stacks: initial_stacks as i32,
@@ -380,7 +384,7 @@ pub fn handle_on_hit_upgrades(
                     frail_stacks.num_stacks += 1;
                     frail_stacks.timer.reset();
                     let stacks = frail_stacks.num_stacks as i32;
-                    events.p1().send(StatusEffectEvent {
+                    events.p1().write(StatusEffectEvent {
                         entity: hit_e,
                         effect: StatusEffect::Frail,
                         num_stacks: stacks,
@@ -391,7 +395,7 @@ pub fn handle_on_hit_upgrades(
                     num_stacks: 1,
                     timer: Timer::from_seconds(1.2, TimerMode::Repeating),
                 });
-                events.p1().send(StatusEffectEvent {
+                events.p1().write(StatusEffectEvent {
                     entity: hit_e,
                     effect: StatusEffect::Frail,
                     num_stacks: 1,
@@ -404,7 +408,7 @@ pub fn handle_on_hit_upgrades(
             try_add_slow_stacks(hit_e, status.as_mut(), &mut events.p1());
         }
 
-        events.p2().send(LifestealEvent {
+        events.p2().write(LifestealEvent {
             thorns_lifesteal_stacks: 0,
             is_direct_player_damage: true,
         });

@@ -28,13 +28,27 @@ use crate::{
 
 use super::{item_upgrades::ArrowSpeedUpgrade, WorldObject};
 
-#[derive(Component, Reflect, FromReflect, Default, Clone, Debug)]
+#[derive(Component, Reflect, Default, Clone, Debug)]
 #[reflect(Component)]
 pub struct RangedAttack(pub Projectile);
 
 pub struct RangedAttackPlugin;
 
-#[derive(Deserialize, FromReflect, Default, Reflect, Clone, Copy, Hash, Serialize, Component, IntoStaticStr, Display, Debug, PartialEq, Eq)]
+#[derive(
+    Deserialize,
+    Default,
+    Reflect,
+    Clone,
+    Copy,
+    Hash,
+    Serialize,
+    Component,
+    IntoStaticStr,
+    Display,
+    Debug,
+    PartialEq,
+    Eq,
+)]
 #[reflect(Component)]
 pub enum Projectile {
     #[default]
@@ -236,7 +250,7 @@ pub enum AnimVisualCategory {
     Heirloom,
 }
 
-#[derive(Deserialize, FromReflect, Default, Reflect, Clone, Serialize, Component, Debug)]
+#[derive(Deserialize, Default, Reflect, Clone, Serialize, Component, Debug)]
 #[reflect(Component, Default)]
 #[serde(default)]
 pub struct ProjectileState {
@@ -251,7 +265,7 @@ pub struct ProjectileState {
     pub world_object_pierce_count: u8,
 }
 
-#[derive(Deserialize, FromReflect, Default, Reflect, Clone, Serialize, Component)]
+#[derive(Deserialize, Default, Reflect, Clone, Serialize, Component)]
 #[reflect(Component, Default)]
 #[serde(default)]
 pub struct ArcProjectileData {
@@ -261,7 +275,7 @@ pub struct ArcProjectileData {
     pub col_points: Vec<f32>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Message)]
 pub struct RangedAttackEvent {
     pub projectile: Projectile,
     pub direction: Vec2,
@@ -284,13 +298,14 @@ pub struct EnemyProjectile {
 
 impl Plugin for RangedAttackPlugin {
     fn build(&self, app: &mut App) {
-        app.add_event::<RangedAttackEvent>().add_systems(
+        app.add_message::<RangedAttackEvent>().add_systems(
+            Update,
             (
                 handle_ranged_attack_event,
                 handle_translate_projectiles.run_if(is_not_paused),
                 handle_spawn_projectiles_after_delay.run_if(is_not_paused),
             )
-                .in_set(OnUpdate(GameState::Main)),
+                .run_if(in_state(GameState::Main)),
         );
     }
 }
@@ -379,7 +394,7 @@ pub struct HomingEnergyBall {
 }
 
 fn handle_ranged_attack_event(
-    mut events: EventReader<RangedAttackEvent>,
+    mut events: MessageReader<RangedAttackEvent>,
     player_query: Query<
         (
             Entity,
@@ -397,11 +412,11 @@ fn handle_ranged_attack_event(
     game: Res<Game>,
     player_class: Res<PlayerClass>,
     mut commands: Commands,
-    mut modify_mana_event: EventWriter<ModifyManaEvent>,
+    mut modify_mana_event: MessageWriter<ModifyManaEvent>,
     mut trigger_counts: ResMut<HeirloomTriggerCounts>,
 ) {
-    for proj_event in events.iter() {
-        let (
+    for proj_event in events.read() {
+        let Ok((
             _player_e,
             current_mana,
             max_mana,
@@ -410,7 +425,10 @@ fn handle_ranged_attack_event(
             proj_size,
             player_cooldown,
             teleported_option,
-        ) = player_query.single();
+        )) = player_query.single()
+        else {
+            continue;
+        };
         // if proj is from the player, check if the player is on cooldown
         // Skip this check for skill projectiles (they have their own cooldown system)
         if !proj_event.from_enemy
@@ -425,8 +443,8 @@ fn handle_ranged_attack_event(
         // Ammo gate for non-staff player shots
         // Skip ammo consumption if Rapidfire is active (duration hasn't finished)
         // let is_rapidfire_active = rapidfire_state
-        //     .get_single()
-        //     .map(|r| !r.duration.finished())
+        //     .single()
+        //     .map(|r| !r.duration.is_finished())
         //     .unwrap_or(false);
         // if !proj_event.from_enemy
         //     && proj_event.from_entity.is_none()
@@ -459,7 +477,7 @@ fn handle_ranged_attack_event(
                 } else {
                     1.
                 }) as i32;
-            modify_mana_event.send(ModifyManaEvent::new(-actual_cost));
+            modify_mana_event.write(ModifyManaEvent::new(-actual_cost));
             if let Some(heirloom) = proj_event.mana_cost_heirloom.clone() {
                 trigger_counts.record_mana(heirloom, actual_cost);
             } else if proj_event.projectile == Projectile::PlasmaBall {
@@ -546,7 +564,7 @@ fn handle_ranged_attack_event(
         }
 
         if teleported_option.is_some() {
-            modify_mana_event.send(ModifyManaEvent::gain(
+            modify_mana_event.write(ModifyManaEvent::gain(
                 mana_regen.0 + skills.get_count(Heirloom::MPRegen) * 5,
                 ManaGainSource::ManaRegen,
             ));
@@ -573,16 +591,13 @@ fn handle_translate_projectiles(
     speed_modifiers: Query<&ArrowSpeedUpgrade>,
     time: Res<Time>,
 ) {
-    let arrow_speed_upgrade = speed_modifiers
-        .get_single()
-        .unwrap_or(&ArrowSpeedUpgrade(1.))
-        .0;
+    let arrow_speed_upgrade = speed_modifiers.single().unwrap_or(&ArrowSpeedUpgrade(1.)).0;
     for (mut transform, state) in &mut player_projectiles {
-        let delta = state.direction * (state.speed * arrow_speed_upgrade) * time.delta_seconds();
+        let delta = state.direction * (state.speed * arrow_speed_upgrade) * time.delta_secs();
         transform.translation += delta.extend(0.0);
     }
     for (mut transform, state) in &mut enemy_projectiles {
-        let delta = state.direction * state.speed * time.delta_seconds();
+        let delta = state.direction * state.speed * time.delta_secs();
         transform.translation += delta.extend(0.0);
     }
 }
@@ -604,8 +619,10 @@ fn handle_spawn_projectiles_after_delay(
     asset_server: Res<AssetServer>,
     player_projectile_size: Query<&ProjectileSize, With<Player>>,
 ) {
-    let player_att = player_projectile_size.single();
-    let max_mana = max_mana_q.get_single().map(|m| m.0).unwrap_or(100);
+    let Ok(player_att) = player_projectile_size.single() else {
+        return;
+    };
+    let max_mana = max_mana_q.single().map(|m| m.0).unwrap_or(100);
     for (e, mut proj) in projectiles.iter_mut() {
         proj.timer.tick(time.delta());
         if proj.timer.just_finished() {
@@ -653,9 +670,11 @@ fn handle_spawn_projectiles_after_delay(
                     commands.entity(p).insert(proj.proj.animation_category());
                 }
                 if proj.proj.is_anchored_to_player_pos() && !proj.is_followup_proj {
-                    let entity = proj.from_entity.unwrap_or(player.single());
+                    let Some(entity) = proj.from_entity.or_else(|| player.single().ok()) else {
+                        continue;
+                    };
                     // Check if parent entity still exists before adding child
-                    if let Some(mut entity_commands) = commands.get_entity(entity) {
+                    if let Ok(mut entity_commands) = commands.get_entity(entity) {
                         entity_commands.add_child(p);
                     }
                 }
@@ -706,7 +725,10 @@ fn handle_spawn_projectiles_after_delay(
                     }
                 }
 
-                let player_att = game.player_stats.single().0 .0;
+                let Ok((attack, ..)) = game.player_stats.single() else {
+                    continue;
+                };
+                let player_att = attack.0;
                 let computed_dmg = proj.dmg_override.unwrap_or(player_att);
                 debug!(
                     "Spawned projectile {:?} with dmg {}",
@@ -731,7 +753,7 @@ fn handle_spawn_projectiles_after_delay(
                         TimerMode::Once,
                     )));
             }
-            commands.entity(e).despawn_recursive();
+            commands.entity(e).despawn();
         }
     }
 }

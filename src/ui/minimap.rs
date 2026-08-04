@@ -1,3 +1,4 @@
+use bevy::text::Justify;
 use crate::assets::Graphics;
 use crate::client::GameOverEvent;
 use crate::colors::{DARK_BROWN, DESERT_TILE, DESERT_WATER, SNOW_TILE, SNOW_WATER, WHITE};
@@ -9,12 +10,14 @@ use crate::world::world_helpers::{
 };
 use crate::world::{TileMapPosition, CHUNK_SIZE, ISLAND_SIZE, TILE_SIZE};
 use crate::{CustomFlush, GameParam, GameState, InputMappings, Player, ScreenResolution, DEBUG};
+use bevy::asset::RenderAssetUsages;
+use bevy::camera::visibility::RenderLayers;
+use bevy::math::primitives::Rectangle;
+use bevy::platform::collections::{HashMap, HashSet};
 use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
-use bevy::render::view::RenderLayers;
 use bevy::sprite::Anchor;
-use bevy::sprite::MaterialMesh2dBundle;
-use bevy::utils::{HashMap, HashSet};
+use bevy::sprite_render::MeshMaterial2d;
 use bevy_ecs_tilemap::prelude::*;
 
 use super::{game_fonts as gf, layout_sync::UiLayoutKey, ui_helpers, UIElement};
@@ -26,92 +29,114 @@ impl Plugin for MinimapPlugin {
         app.insert_resource(MinimapTileCache::default())
             .insert_resource(IslandMapOpen(false))
             .insert_resource(FogOfWarData::default())
-            .add_event::<UpdateMiniMapEvent>()
-            .add_system(
+            .add_message::<UpdateMiniMapEvent>()
+            .add_systems(
+                Update,
                 toggle_island_map
                     .run_if(in_state(GameState::Main))
                     .run_if(|dungeon: Query<&Dungeon>| dungeon.is_empty()),
             )
-            .add_system(
+            .add_systems(
+                Update,
                 clear_cache_for_new_dimensions
                     .run_if(in_state(GameState::Main).or_else(in_state(GameState::Initializing))),
             )
-            .add_system(
+            .add_systems(
+                Update,
                 close_map_on_dungeon_entry
                     .run_if(in_state(GameState::Main).or_else(in_state(GameState::Initializing))),
             )
-            .add_system(
+            .add_systems(
+                Update,
                 update_minimap_cache
                     .run_if(in_state(GameState::Main).or_else(in_state(GameState::Initializing)))
                     .run_if(|dungeon: Query<&Dungeon>| dungeon.is_empty()),
             )
-            .add_system(
+            .add_systems(
+                Update,
                 cache_explored_chunks
                     .after(CustomFlush)
                     .run_if(in_state(GameState::Main).or_else(in_state(GameState::Initializing)))
                     .run_if(|dungeon: Query<&Dungeon>| dungeon.is_empty()),
             )
-            .add_system(
+            .add_systems(
+                Update,
                 update_fog_of_war
                     .run_if(in_state(GameState::Main).or_else(in_state(GameState::Initializing)))
                     .run_if(|dungeon: Query<&Dungeon>| dungeon.is_empty()),
             )
-            .add_system(
+            .add_systems(
+                Update,
                 setup_island_map
                     .after(CustomFlush)
                     .run_if(in_state(GameState::Main).or_else(in_state(GameState::Initializing)))
                     .run_if(|dungeon: Query<&Dungeon>| dungeon.is_empty()),
             )
-            .add_system(
+            .add_systems(
+                Update,
                 sync_island_map_overlay
                     .after(setup_island_map)
                     .run_if(in_state(GameState::Main).or_else(in_state(GameState::Initializing)))
                     .run_if(|dungeon: Query<&Dungeon>| dungeon.is_empty()),
             )
-            .add_system(
+            .add_systems(
+                Update,
                 sync_island_map_legend
                     .after(sync_island_map_overlay)
                     .run_if(in_state(GameState::Main).or_else(in_state(GameState::Initializing)))
                     .run_if(|dungeon: Query<&Dungeon>| dungeon.is_empty()),
             )
-            .add_system(
+            .add_systems(
+                Update,
                 update_player_marker_on_map
                     .run_if(in_state(GameState::Main))
                     .run_if(|dungeon: Query<&Dungeon>| dungeon.is_empty()),
             )
-            .add_system(
+            .add_systems(
+                Update,
                 update_object_icons_on_map
                     .after(setup_island_map)
                     .run_if(in_state(GameState::Main))
                     .run_if(|dungeon: Query<&Dungeon>| dungeon.is_empty()),
             )
-            .add_system(
+            .add_systems(
+                Update,
                 update_fog_overlay_on_map
                     .after(setup_island_map)
                     .run_if(in_state(GameState::Main))
                     .run_if(|dungeon: Query<&Dungeon>| dungeon.is_empty()),
             )
-            .add_system(close_map_on_game_over.run_if(in_state(GameState::Main)))
-            .add_system(
+            .add_systems(
+                Update,
+                close_map_on_game_over.run_if(in_state(GameState::Main)),
+            )
+            .add_systems(
+                Update,
                 setup_hud_minimap
                     .run_if(in_state(GameState::Main))
                     .run_if(|dungeon: Query<&Dungeon>| dungeon.is_empty()),
             )
-            .add_system(
+            .add_systems(
+                Update,
                 update_hud_minimap_texture
                     .after(setup_hud_minimap)
                     .run_if(in_state(GameState::Main))
                     .run_if(|dungeon: Query<&Dungeon>| dungeon.is_empty()),
             )
-            .add_system(
+            .add_systems(
+                Update,
                 update_hud_minimap_icons
                     .after(update_hud_minimap_texture)
                     .run_if(in_state(GameState::Main))
                     .run_if(|dungeon: Query<&Dungeon>| dungeon.is_empty()),
             )
-            .add_system(despawn_hud_minimap_in_dungeon.run_if(in_state(GameState::Main)))
-            .add_system(
-                invalidate_island_map_on_ui_layout_change
+            .add_systems(
+                Update,
+                despawn_hud_minimap_in_dungeon.run_if(in_state(GameState::Main)),
+            )
+            .add_systems(
+                Update,
+                (invalidate_island_map_on_ui_layout_change)
                     .after(crate::update_pixel_perfect_viewport),
             );
     }
@@ -250,7 +275,7 @@ pub struct HudMinimapIcon {
 #[derive(Resource)]
 pub struct IslandMapOpen(pub bool);
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Message)]
 pub struct UpdateMiniMapEvent {
     pub pos: Option<TileMapPosition>,
     pub new_tile: Option<WorldObject>,
@@ -359,8 +384,8 @@ fn is_grass_obj(obj: &WorldObject) -> bool {
 }
 
 fn toggle_island_map(
-    key_input: Res<Input<KeyCode>>,
-    mouse_input: Res<Input<MouseButton>>,
+    key_input: Res<ButtonInput<KeyCode>>,
+    mouse_input: Res<ButtonInput<MouseButton>>,
     mut map_open: ResMut<IslandMapOpen>,
     keybinds: Res<InputMappings>,
     curr_ui_state: Res<State<super::UIState>>,
@@ -371,7 +396,7 @@ fn toggle_island_map(
     >,
 ) {
     let gamepad_pressed = crate::gamepad_input::gamepad_action_just_pressed(
-        gamepad_action_q.get_single().ok(),
+        gamepad_action_q.single().ok(),
         crate::gamepad_input::GamepadAction::ToggleMap,
     );
     if keybinds.check_map_input(&key_input, &mouse_input) || gamepad_pressed {
@@ -379,17 +404,17 @@ fn toggle_island_map(
         map_open.0 = !map_open.0;
         // Opening the map should dismiss other menus the same way inventory/options do —
         // otherwise the island map stacks on top of whatever UI was already open.
-        if opening && curr_ui_state.0 != super::UIState::Closed {
+        if opening && *curr_ui_state.get() != super::UIState::Closed {
             next_ui_state.set(super::UIState::Closed);
         }
     }
 }
 
 fn update_minimap_cache(
-    mut minimap_update: EventReader<UpdateMiniMapEvent>,
+    mut minimap_update: MessageReader<UpdateMiniMapEvent>,
     mut cache: ResMut<MinimapTileCache>,
 ) {
-    for event in minimap_update.iter() {
+    for event in minimap_update.read() {
         let Some(pos) = event.pos else {
             //TODO: find another way to trigger change detection
             let _ = &mut cache.cache;
@@ -435,22 +460,22 @@ fn clear_cache_for_new_dimensions(
         map_open.0 = false;
 
         for map in map_query.iter() {
-            commands.entity(map).despawn_recursive();
+            commands.entity(map).despawn();
         }
         for fog in fog_query.iter() {
-            commands.entity(fog).despawn_recursive();
+            commands.entity(fog).despawn();
         }
         for marker in marker_query.iter() {
-            commands.entity(marker).despawn_recursive();
+            commands.entity(marker).despawn();
         }
         for overlay in overlay_query.iter() {
-            commands.entity(overlay).despawn_recursive();
+            commands.entity(overlay).despawn();
         }
         for legend in legend_query.iter() {
-            commands.entity(legend).despawn_recursive();
+            commands.entity(legend).despawn();
         }
         for hud in hud_query.iter() {
-            commands.entity(hud).despawn_recursive();
+            commands.entity(hud).despawn();
         }
 
         if is_dungeon_transition {
@@ -502,7 +527,7 @@ fn setup_island_map(
     old_map: Query<Entity, With<IslandMap>>,
     dungeon_check: Query<&Dungeon, With<ActiveDimension>>,
     map_open: Res<IslandMapOpen>,
-    mut minimap_events: EventReader<UpdateMiniMapEvent>,
+    mut minimap_events: MessageReader<UpdateMiniMapEvent>,
 ) {
     let should_show_map = map_open.0 && dungeon_check.is_empty();
 
@@ -516,7 +541,7 @@ fn setup_island_map(
     }
 
     let map_exists = old_map.iter().next().is_some();
-    let has_object_updates = minimap_events.iter().count() > 0;
+    let has_object_updates = minimap_events.read().count() > 0;
 
     // Only rebuild if:
     // 1. Map doesn't exist yet, OR
@@ -532,7 +557,7 @@ fn setup_island_map(
     }
 
     for old_map in old_map.iter() {
-        commands.entity(old_map).despawn_recursive();
+        commands.entity(old_map).despawn();
     }
 
     let num_chunks = ((ISLAND_SIZE / CHUNK_SIZE as f32) + 1.) as i32;
@@ -600,9 +625,9 @@ fn setup_island_map(
                         if let Some(obj) = minimap_cache.cache.get(&check_pos) {
                             if matches!(obj, WorldObject::BossShrine) {
                                 let c = obj.get_obj_color();
-                                data.push((c.r() * 255.) as u8);
-                                data.push((c.g() * 255.) as u8);
-                                data.push((c.b() * 255.) as u8);
+                                data.push((c.to_srgba().red * 255.) as u8);
+                                data.push((c.to_srgba().green * 255.) as u8);
+                                data.push((c.to_srgba().blue * 255.) as u8);
                                 data.push(255);
                                 drew_large_object = true;
                                 break;
@@ -669,9 +694,9 @@ fn setup_island_map(
                                     | WorldObject::TimeGate
                             ) {
                                 let c = obj.get_obj_color();
-                                data.push((c.r() * 255.) as u8);
-                                data.push((c.g() * 255.) as u8);
-                                data.push((c.b() * 255.) as u8);
+                                data.push((c.to_srgba().red * 255.) as u8);
+                                data.push((c.to_srgba().green * 255.) as u8);
+                                data.push((c.to_srgba().blue * 255.) as u8);
                                 data.push(255);
                                 drew_medium_object = true;
                                 break;
@@ -689,9 +714,9 @@ fn setup_island_map(
                 if let Some(cached_tile) = minimap_cache.cache.get(&map_pos) {
                     if !is_grass_obj(cached_tile) {
                         let c = cached_tile.get_obj_color();
-                        data.push((c.r() * 255.) as u8);
-                        data.push((c.g() * 255.) as u8);
-                        data.push((c.b() * 255.) as u8);
+                        data.push((c.to_srgba().red * 255.) as u8);
+                        data.push((c.to_srgba().green * 255.) as u8);
+                        data.push((c.to_srgba().blue * 255.) as u8);
                         data.push(255);
                         continue;
                     }
@@ -701,9 +726,9 @@ fn setup_island_map(
                     explored_tile[quadrant],
                     &game.era.current_era,
                 );
-                data.push((c.r() * 255.) as u8);
-                data.push((c.g() * 255.) as u8);
-                data.push((c.b() * 255.) as u8);
+                data.push((c.to_srgba().red * 255.) as u8);
+                data.push((c.to_srgba().green * 255.) as u8);
+                data.push((c.to_srgba().blue * 255.) as u8);
                 data.push(255);
             } else {
                 data.push(40);
@@ -719,21 +744,21 @@ fn setup_island_map(
         TextureDimension::D2,
         data,
         TextureFormat::Rgba8UnormSrgb,
+        RenderAssetUsages::default(),
     );
     let image_handle = assets.add(image);
 
     let map_display_size = island_map_display_size(&game.resolution);
 
     let map_border = commands
-        .spawn(SpriteBundle {
-            texture: graphics.get_ui_element_texture(UIElement::Minimap),
-            sprite: Sprite {
+        .spawn((
+            Sprite {
+                image: graphics.get_ui_element_texture(UIElement::Minimap),
                 custom_size: Some(Vec2::new(map_display_size + 4., map_display_size + 4.)),
-                ..Default::default()
+                ..default()
             },
-            transform: Transform::from_translation(Vec3::new(ISLAND_MAP_X_OFFSET, 0., 900.)),
-            ..Default::default()
-        })
+            Transform::from_translation(Vec3::new(ISLAND_MAP_X_OFFSET, 0., 900.)),
+        ))
         .insert(RenderLayers::from_layers(&[3]))
         .insert(IslandMap)
         .insert(Name::new("ISLAND_MAP_BORDER"))
@@ -743,15 +768,14 @@ fn setup_island_map(
     // quads were not respecting the intended display size on some UI layout buckets).
     let map = commands
         .spawn((
-            SpriteBundle {
-                texture: image_handle,
-                sprite: Sprite {
+            (
+                Sprite {
+                    image: image_handle,
                     custom_size: Some(Vec2::splat(map_display_size)),
                     ..default()
                 },
-                transform: Transform::from_translation(Vec3::new(0., 0., 2.)),
-                ..default()
-            },
+                Transform::from_translation(Vec3::new(0., 0., 2.)),
+            ),
             IslandMapImage,
             RenderLayers::from_layers(&[3]),
             Name::new("ISLAND_MAP_IMAGE"),
@@ -779,7 +803,7 @@ fn sync_island_map_overlay(
         }
     } else {
         for entity in existing.iter() {
-            commands.entity(entity).despawn_recursive();
+            commands.entity(entity).despawn();
         }
     }
 }
@@ -799,10 +823,10 @@ fn spawn_island_map_legend(
 
     let root = commands
         .spawn((
-            SpatialBundle {
-                transform: Transform::from_translation(Vec3::new(legend_center_x, 0., 901.)),
-                ..default()
-            },
+            (
+                Transform::from_translation(Vec3::new(legend_center_x, 0., 901.)),
+                Visibility::default(),
+            ),
             IslandMapLegend,
             RenderLayers::from_layers(&[3]),
             Name::new("ISLAND_MAP_LEGEND"),
@@ -812,51 +836,41 @@ fn spawn_island_map_legend(
     for (i, row) in MINIMAP_LEGEND_ROWS.iter().enumerate() {
         let row_y = total_height * 0.5 - (i as f32 + 0.5) * MINIMAP_LEGEND_ROW_HEIGHT;
         let row_entity = commands
-            .spawn(SpatialBundle {
-                transform: Transform::from_translation(Vec3::new(0., row_y, 0.)),
-                ..default()
-            })
+            .spawn((
+                Transform::from_translation(Vec3::new(0., row_y, 0.)),
+                Visibility::default(),
+            ))
             .id();
         commands.entity(root).add_child(row_entity);
 
         commands
             .spawn((
-                SpriteBundle {
-                    texture: graphics.get_ui_element_texture(row.icon.clone()),
-                    sprite: Sprite {
+                (
+                    Sprite {
+                        image: graphics.get_ui_element_texture(row.icon.clone()),
                         custom_size: Some(Vec2::splat(MINIMAP_LEGEND_ICON_DISPLAY_SIZE)),
                         ..default()
                     },
-                    transform: Transform::from_translation(Vec3::new(
-                        -MINIMAP_LEGEND_TEXT_OFFSET_X,
-                        0.,
-                        0.,
-                    )),
-                    ..default()
-                },
+                    Transform::from_translation(Vec3::new(-MINIMAP_LEGEND_TEXT_OFFSET_X, 0., 0.)),
+                ),
                 RenderLayers::from_layers(&[3]),
             ))
-            .set_parent(row_entity);
+            .insert(ChildOf(row_entity));
 
         commands
             .spawn((
-                Text2dBundle {
-                    text: Text::from_section(
-                        row.label,
-                        gf::BODY.text_style(&asset_server, WHITE),
-                    )
-                    .with_alignment(TextAlignment::Left),
-                    text_anchor: Anchor::CenterLeft,
-                    transform: Transform {
+                gf::BODY
+                    .text(&asset_server, row.label, WHITE)
+                    .justify(Justify::Left)
+                    .anchor(Anchor::CENTER_LEFT)
+                    .with_transform(Transform {
                         translation: Vec3::new(-2., 0., 1.),
                         scale: gf::BODY.transform_scale(),
                         ..default()
-                    },
-                    ..default()
-                },
+                    }),
                 RenderLayers::from_layers(&[3]),
             ))
-            .set_parent(row_entity);
+            .insert(ChildOf(row_entity));
     }
 }
 
@@ -874,7 +888,7 @@ fn sync_island_map_legend(
 
     if !should_show {
         for entity in existing.iter() {
-            commands.entity(entity).despawn_recursive();
+            commands.entity(entity).despawn();
         }
         return;
     }
@@ -884,7 +898,7 @@ fn sync_island_map_legend(
     }
 
     for entity in existing.iter() {
-        commands.entity(entity).despawn_recursive();
+        commands.entity(entity).despawn();
     }
 
     spawn_island_map_legend(
@@ -908,12 +922,12 @@ fn update_player_marker_on_map(
 ) {
     if !map_open.0 {
         for marker in marker_query.iter() {
-            commands.entity(marker).despawn_recursive();
+            commands.entity(marker).despawn();
         }
         return;
     }
 
-    let Ok(player_transform) = player_query.get_single() else {
+    let Ok(player_transform) = player_query.single() else {
         return;
     };
 
@@ -970,8 +984,8 @@ fn update_player_marker_on_map(
         (total_pixels as f32 / 2.0 - image_y as f32 - tile_fraction_y * pixels_per_tile as f32)
             * scale_factor;
 
-    let player_texture = graphics.get_ui_element_texture(UIElement::PlayerMinimapIcon);
     let marker_sprite = Sprite {
+        image: graphics.get_ui_element_texture(UIElement::PlayerMinimapIcon),
         custom_size: Some(Vec2::splat(MINIMAP_ICON_DISPLAY_SIZE)),
         ..default()
     };
@@ -986,12 +1000,10 @@ fn update_player_marker_on_map(
     } else if let Some(map_border) = map_border_query.iter().next() {
         let marker = commands
             .spawn((
-                SpriteBundle {
-                    texture: player_texture,
-                    sprite: marker_sprite,
-                    transform: Transform::from_translation(Vec3::new(screen_x, screen_y, 5.0)),
-                    ..default()
-                },
+                (
+                    marker_sprite,
+                    Transform::from_translation(Vec3::new(screen_x, screen_y, 5.0)),
+                ),
                 RenderLayers::from_layers(&[3]),
                 IslandMapPlayerMarker,
                 Name::new("ISLAND_MAP_PLAYER_MARKER"),
@@ -1011,19 +1023,19 @@ fn update_object_icons_on_map(
     graphics: Res<Graphics>,
     icon_query: Query<(Entity, &IslandMapObjectIcon)>,
     map_border_query: Query<Entity, With<IslandMap>>,
-    mut minimap_events: EventReader<UpdateMiniMapEvent>,
+    mut minimap_events: MessageReader<UpdateMiniMapEvent>,
     game: GameParam,
 ) {
     if !map_open.0 {
         for (icon_entity, _) in icon_query.iter() {
-            if let Some(entity_commands) = commands.get_entity(icon_entity) {
-                entity_commands.despawn_recursive();
+            if let Ok(mut entity_commands) = commands.get_entity(icon_entity) {
+                entity_commands.despawn();
             }
         }
         return;
     }
 
-    let has_object_updates = minimap_events.iter().count() > 0;
+    let has_object_updates = minimap_events.read().count() > 0;
     if has_object_updates {
         return;
     }
@@ -1060,8 +1072,8 @@ fn update_object_icons_on_map(
         };
 
         if should_remove {
-            if let Some(entity_commands) = commands.get_entity(icon_entity) {
-                entity_commands.despawn_recursive();
+            if let Ok(mut entity_commands) = commands.get_entity(icon_entity) {
+                entity_commands.despawn();
             }
         }
     }
@@ -1125,15 +1137,14 @@ fn update_object_icons_on_map(
         // Spawn icon
         let icon_entity = commands
             .spawn((
-                SpriteBundle {
-                    texture: graphics.get_ui_element_texture(ui_element),
-                    sprite: Sprite {
+                (
+                    Sprite {
+                        image: graphics.get_ui_element_texture(ui_element),
                         custom_size: Some(Vec2::splat(MINIMAP_ICON_DISPLAY_SIZE)),
                         ..default()
                     },
-                    transform: Transform::from_translation(Vec3::new(screen_x, screen_y, 2.5)), // Between map (2) and player (5)
-                    ..Default::default()
-                },
+                    Transform::from_translation(Vec3::new(screen_x, screen_y, 2.5)),
+                ),
                 RenderLayers::from_layers(&[3]),
                 IslandMapObjectIcon {
                     tile_pos: *pos,
@@ -1143,11 +1154,11 @@ fn update_object_icons_on_map(
             ))
             .id();
 
-        if let Some(mut entity_commands) = commands.get_entity(map_border) {
+        if let Ok(mut entity_commands) = commands.get_entity(map_border) {
             entity_commands.add_child(icon_entity);
         } else {
-            if let Some(entity_commands) = commands.get_entity(icon_entity) {
-                entity_commands.despawn_recursive();
+            if let Ok(mut entity_commands) = commands.get_entity(icon_entity) {
+                entity_commands.despawn();
             }
         }
     }
@@ -1165,7 +1176,7 @@ fn update_fog_of_war(
     if *DEBUG {
         return;
     }
-    let Ok(player_transform) = player_query.get_single() else {
+    let Ok(player_transform) = player_query.single() else {
         return;
     };
 
@@ -1265,7 +1276,7 @@ fn update_fog_overlay_on_map(
     }
 
     for fog in fog_query.iter() {
-        commands.entity(fog).despawn_recursive();
+        commands.entity(fog).despawn();
     }
 
     let num_chunks = ((ISLAND_SIZE / CHUNK_SIZE as f32) + 1.) as i32;
@@ -1321,6 +1332,7 @@ fn update_fog_overlay_on_map(
         TextureDimension::D2,
         data,
         TextureFormat::Rgba8UnormSrgb,
+        RenderAssetUsages::default(),
     );
     let handle = assets.add(image);
     let mat = color_mat.add(ColorMaterial::from(handle));
@@ -1329,20 +1341,12 @@ fn update_fog_overlay_on_map(
 
     if map_border_query.iter().next().is_some() {
         commands.spawn((
-            MaterialMesh2dBundle {
-                mesh: meshes
-                    .add(
-                        shape::Quad {
-                            size: Vec2::new(map_display_size, map_display_size),
-                            ..Default::default()
-                        }
-                        .into(),
-                    )
-                    .into(),
-                transform: Transform::from_translation(Vec3::new(ISLAND_MAP_X_OFFSET, 0., 903.)),
-                material: mat,
-                ..default()
-            },
+            Mesh2d(meshes.add(Mesh::from(Rectangle::new(
+                map_display_size,
+                map_display_size,
+            )))),
+            MeshMaterial2d(mat),
+            Transform::from_translation(Vec3::new(ISLAND_MAP_X_OFFSET, 0., 903.)),
             RenderLayers::from_layers(&[3]),
             IslandMapFogOverlay,
             Name::new("ISLAND_MAP_FOG_OVERLAY"),
@@ -1419,7 +1423,7 @@ fn invalidate_island_map_on_ui_layout_change(
         .chain(overlay.iter())
         .chain(legend.iter())
     {
-        commands.entity(entity).despawn_recursive();
+        commands.entity(entity).despawn();
     }
 }
 
@@ -1449,6 +1453,7 @@ fn setup_hud_minimap(
         TextureDimension::D2,
         data,
         TextureFormat::Rgba8UnormSrgb,
+        RenderAssetUsages::default(),
     );
     let image_handle = assets.add(image);
 
@@ -1460,10 +1465,10 @@ fn setup_hud_minimap(
 
     let container = commands
         .spawn((
-            SpatialBundle {
-                transform: Transform::from_translation(Vec3::new(pos_x, pos_y, 6.0)),
-                ..default()
-            },
+            (
+                Transform::from_translation(Vec3::new(pos_x, pos_y, 6.0)),
+                Visibility::default(),
+            ),
             HudMinimap {
                 image_handle: image_handle.clone(),
             },
@@ -1476,15 +1481,14 @@ fn setup_hud_minimap(
     // material asset changes, not when the Image texture is updated each frame.
     let map_sprite = commands
         .spawn((
-            SpriteBundle {
-                texture: image_handle.clone(),
-                sprite: Sprite {
+            (
+                Sprite {
+                    image: image_handle.clone(),
                     custom_size: Some(Vec2::splat(display_size)),
                     ..default()
                 },
-                transform: Transform::from_translation(Vec3::new(0., 0., 0.)),
-                ..default()
-            },
+                Transform::from_translation(Vec3::new(0., 0., 0.)),
+            ),
             HudMinimapSprite,
             RenderLayers::from_layers(&[3]),
             Name::new("HUD_MINIMAP_IMAGE"),
@@ -1494,15 +1498,14 @@ fn setup_hud_minimap(
 
     let marker = commands
         .spawn((
-            SpriteBundle {
-                texture: graphics.get_ui_element_texture(UIElement::PlayerMinimapIcon),
-                sprite: Sprite {
+            (
+                Sprite {
+                    image: graphics.get_ui_element_texture(UIElement::PlayerMinimapIcon),
                     custom_size: Some(Vec2::splat(HUD_MINIMAP_ICON_SIZE)),
                     ..default()
                 },
-                transform: Transform::from_translation(Vec3::new(0., 0., 2.0)),
-                ..default()
-            },
+                Transform::from_translation(Vec3::new(0., 0., 2.0)),
+            ),
             HudMinimapPlayerMarker,
             RenderLayers::from_layers(&[3]),
             Name::new("HUD_MINIMAP_PLAYER_MARKER"),
@@ -1519,13 +1522,13 @@ fn update_hud_minimap_texture(
     cache: Res<MinimapTileCache>,
     game: GameParam,
 ) {
-    let Ok(hud) = hud_query.get_single() else {
+    let Ok(hud) = hud_query.single() else {
         return;
     };
-    let Ok(player_t) = player_query.get_single() else {
+    let Ok(player_t) = player_query.single() else {
         return;
     };
-    let Some(image) = assets.get_mut(&hud.image_handle) else {
+    let Some(mut image) = assets.get_mut(&hud.image_handle) else {
         return;
     };
 
@@ -1536,7 +1539,7 @@ fn update_hud_minimap_texture(
     let border_thickness: f32 = 2.;
     let era = game.era.current_era.clone();
 
-    let data = &mut image.data;
+    let data = image.data.as_mut().expect("minimap image pixel data");
     let mut idx = 0usize;
     for py in 0..total_pixels {
         for px in 0..total_pixels {
@@ -1561,9 +1564,9 @@ fn update_hud_minimap_texture(
                 continue;
             }
             if dist > radius_pixels - border_thickness {
-                data[idx] = (DARK_BROWN.r() * 255.0) as u8;
-                data[idx + 1] = (DARK_BROWN.g() * 255.0) as u8;
-                data[idx + 2] = (DARK_BROWN.b() * 255.0) as u8;
+                data[idx] = (DARK_BROWN.to_srgba().red * 255.0) as u8;
+                data[idx + 1] = (DARK_BROWN.to_srgba().green * 255.0) as u8;
+                data[idx + 2] = (DARK_BROWN.to_srgba().blue * 255.0) as u8;
                 data[idx + 3] = 255;
                 idx += 4;
                 continue;
@@ -1588,17 +1591,17 @@ fn update_hud_minimap_texture(
                 } else if let Some(terrain) = cache.explored_terrain.get(&map_pos) {
                     minimap_base_terrain_color_for_era(terrain[quadrant], &era)
                 } else {
-                    Color::rgb(0.16, 0.16, 0.16)
+                    Color::srgb(0.16, 0.16, 0.16)
                 }
             } else if let Some(terrain) = cache.explored_terrain.get(&map_pos) {
                 minimap_base_terrain_color_for_era(terrain[quadrant], &era)
             } else {
-                Color::rgb(0.16, 0.16, 0.16)
+                Color::srgb(0.16, 0.16, 0.16)
             };
 
-            data[idx] = (color.r() * 255.0) as u8;
-            data[idx + 1] = (color.g() * 255.0) as u8;
-            data[idx + 2] = (color.b() * 255.0) as u8;
+            data[idx] = (color.to_srgba().red * 255.0) as u8;
+            data[idx + 1] = (color.to_srgba().green * 255.0) as u8;
+            data[idx + 2] = (color.to_srgba().blue * 255.0) as u8;
             data[idx + 3] = 255;
             idx += 4;
         }
@@ -1615,10 +1618,10 @@ fn update_hud_minimap_icons(
     mut icon_query: Query<(Entity, &HudMinimapIcon, &mut Transform)>,
     player_query: Query<&GlobalTransform, With<Player>>,
 ) {
-    let Ok(player_t) = player_query.get_single() else {
+    let Ok(player_t) = player_query.single() else {
         return;
     };
-    let Ok(container) = container_query.get_single() else {
+    let Ok(container) = container_query.single() else {
         return;
     };
 
@@ -1654,7 +1657,7 @@ fn update_hud_minimap_icons(
         if keep {
             existing_keys.insert(icon.tile_pos);
         } else {
-            commands.entity(entity).despawn_recursive();
+            commands.entity(entity).despawn();
         }
     }
 
@@ -1680,15 +1683,14 @@ fn update_hud_minimap_icons(
             };
             let icon_entity = commands
                 .spawn((
-                    SpriteBundle {
-                        texture: graphics.get_ui_element_texture(ui_element),
-                        sprite: Sprite {
+                    (
+                        Sprite {
+                            image: graphics.get_ui_element_texture(ui_element),
                             custom_size: Some(Vec2::splat(HUD_MINIMAP_ICON_SIZE)),
                             ..default()
                         },
-                        transform: Transform::from_translation(Vec3::new(local_x, local_y, 1.0)),
-                        ..default()
-                    },
+                        Transform::from_translation(Vec3::new(local_x, local_y, 1.0)),
+                    ),
                     HudMinimapIcon {
                         tile_pos: *pos,
                         object_type: *obj,
@@ -1712,13 +1714,13 @@ fn despawn_hud_minimap_in_dungeon(
         return;
     }
     for entity in hud_query.iter() {
-        commands.entity(entity).despawn_recursive();
+        commands.entity(entity).despawn();
     }
 }
 
 /// System to close the map when the player dies
 fn close_map_on_game_over(
-    mut game_over_events: EventReader<GameOverEvent>,
+    mut game_over_events: MessageReader<GameOverEvent>,
     mut map_open: ResMut<IslandMapOpen>,
 ) {
     if !game_over_events.is_empty() {

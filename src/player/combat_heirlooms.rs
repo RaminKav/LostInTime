@@ -1,8 +1,14 @@
+use crate::aseprite_assets::{
+    BombSprite, CherryBombExplosionSprite, CherryBombSprite, EnergyBallEffect,
+};
+use crate::aseprite_helpers::aseprite_bundle;
+use bevy_aseprite_ultra::prelude::Aseprite;
 use std::{collections::HashSet, f32::consts::TAU};
 
 use bevy::prelude::*;
-use bevy_aseprite::{anim::AsepriteAnimation, aseprite, AsepriteBundle};
-use bevy_rapier2d::prelude::{Collider, RapierContext, RigidBody, Sensor};
+use bevy_rapier2d::prelude::{
+    Collider, RapierContext, ReadRapierContext, RigidBody, Sensor, WriteRapierContext,
+};
 use rand::{seq::SliceRandom, Rng};
 
 use crate::{
@@ -15,7 +21,9 @@ use crate::{
     audio::{AudioSoundEffect, SoundSpawner},
     combat::{
         combat_helpers::{spawn_deferred_aseprite_collider, DespawnTimer},
-        status_effects::{Burning, MobStatusEffects, StatusEffect, StatusEffectEvent},
+        status_effects::{
+            Burning, DeathDefianceTint, MobStatusEffects, StatusEffect, StatusEffectEvent,
+        },
         EnemyDeathEvent, HitEvent, ObjBreakEvent,
     },
     custom_commands::CommandsExt,
@@ -135,6 +143,7 @@ pub struct StoneToothRockLifetime {
 }
 
 /// Fired when healing triggers "all summons once" (e.g. HealSummons heirloom).
+#[derive(Message)]
 pub struct TriggerSummonsEvent(pub Entity);
 
 /// Marker on the player while the Reaper heirloom is equipped. Stored
@@ -273,12 +282,11 @@ fn calculate_summon_damage(
     (i32::max(1, damage as i32), was_crit, was_overcrit)
 }
 
-fn get_world_object_sprite(graphics: &Graphics, object: WorldObject) -> Option<TextureAtlasSprite> {
+fn get_world_object_sprite(graphics: &Graphics, object: WorldObject) -> Option<Sprite> {
     graphics
         .spritesheet_map
         .as_ref()
-        .and_then(|map| map.get(&object))
-        .cloned()
+        .and_then(|map| map.get(&object).cloned())
 }
 
 // ----- Summon helpers: shared spawn logic for timer-based and on-heal triggers -----
@@ -287,7 +295,6 @@ fn get_world_object_sprite(graphics: &Graphics, object: WorldObject) -> Option<T
 /// Returns the number actually spawned.
 pub fn spawn_ant_farm_ants(
     commands: &mut Commands,
-    texture_atlas: &Handle<TextureAtlas>,
     graphics: &Graphics,
     player_pos: Vec3,
     count: usize,
@@ -311,14 +318,8 @@ pub fn spawn_ant_farm_ants(
         let mut sprite = graphics.get_heirloom_icon(Heirloom::AntFarm);
         sprite.custom_size = Some(Vec2::splat(12.0 * size_multiplier));
         commands.spawn((
-            SpriteSheetBundle {
-                texture_atlas: texture_atlas.clone(),
-                sprite,
-                transform: Transform::from_translation(
-                    player_pos + Vec3::new(offset.x, offset.y, 0.2),
-                ),
-                ..default()
-            },
+            sprite.clone(),
+            Transform::from_translation(player_pos + Vec3::new(offset.x, offset.y, 0.2)),
             AntFarmAnt {
                 target: None,
                 damage_fraction: 2.0,
@@ -340,7 +341,6 @@ pub fn spawn_ant_farm_ants(
 /// Returns the number actually spawned.
 pub fn spawn_stone_tooth_rocks(
     commands: &mut Commands,
-    texture_atlas: &Handle<TextureAtlas>,
     graphics: &Graphics,
     player_e: Entity,
     player_pos: Vec3,
@@ -374,12 +374,8 @@ pub fn spawn_stone_tooth_rocks(
                 let transform =
                     Transform::from_translation(player_pos + Vec3::new(offset.x, offset.y, 0.25));
                 commands.spawn((
-                    SpriteSheetBundle {
-                        texture_atlas: texture_atlas.clone(),
-                        sprite: scaled_sprite.clone(),
-                        transform,
-                        ..default()
-                    },
+                    scaled_sprite.clone(),
+                    transform,
                     OrbitingStone {
                         owner: player_e,
                         base_angle,
@@ -405,7 +401,6 @@ pub fn spawn_stone_tooth_rocks(
 /// Spawns up to `count` Summon Ring projectiles (piercing, 2s outward then returns to player). Deducts mana per ring if `mana_value` is `Some`.
 pub fn spawn_summon_ring_rings(
     commands: &mut Commands,
-    texture_atlas: &Handle<TextureAtlas>,
     graphics: &Graphics,
     player_e: Entity,
     player_pos: Vec3,
@@ -434,14 +429,10 @@ pub fn spawn_summon_ring_rings(
         sprite.custom_size = Some(Vec2::splat(16.0 * size_multiplier));
         let rotation = Quat::from_rotation_z(angle);
         commands.spawn((
-            SpriteSheetBundle {
-                texture_atlas: texture_atlas.clone(),
-                sprite,
-                transform: Transform {
-                    translation: player_pos + Vec3::new(0., 0., 0.25),
-                    rotation,
-                    ..default()
-                },
+            sprite.clone(),
+            Transform {
+                translation: player_pos + Vec3::new(0., 0., 0.25),
+                rotation,
                 ..default()
             },
             SummonRingProjectile {
@@ -483,7 +474,7 @@ pub fn handle_ant_farm_state(
     mut trigger_counts: ResMut<HeirloomTriggerCounts>,
 ) {
     let Ok((player_e, player_txfm, skills, projectile_size, mut state_option, mut curr_mana)) =
-        player_query.get_single_mut()
+        player_query.single_mut()
     else {
         return;
     };
@@ -514,16 +505,15 @@ pub fn handle_ant_farm_state(
         return;
     };
 
-    let Some(texture_atlas) = graphics.texture_atlas.as_ref() else {
+    if graphics.texture_atlas_layout.is_none() || graphics.texture_atlas_image.is_none() {
         return;
-    };
+    }
 
     let count_usize = count_i32.max(0) as usize;
     let mut mana_opt = Some(&mut curr_mana.0);
     let mana_cost_per = Heirloom::AntFarm.get_mana_cost();
     let spawned = spawn_ant_farm_ants(
         &mut commands,
-        texture_atlas,
         &graphics,
         player_pos,
         count_usize,
@@ -555,7 +545,7 @@ pub fn handle_summon_ring_state(
     mut trigger_counts: ResMut<HeirloomTriggerCounts>,
 ) {
     let Ok((player_e, player_txfm, skills, projectile_size, mut state_option, mut curr_mana)) =
-        player_query.get_single_mut()
+        player_query.single_mut()
     else {
         return;
     };
@@ -586,16 +576,15 @@ pub fn handle_summon_ring_state(
         return;
     };
 
-    let Some(texture_atlas) = graphics.texture_atlas.as_ref() else {
+    if graphics.texture_atlas_layout.is_none() || graphics.texture_atlas_image.is_none() {
         return;
-    };
+    }
 
     let count_usize = count_i32.max(0) as usize;
     let mut mana_opt = Some(&mut curr_mana.0);
     let mana_cost_per = Heirloom::SummonRing.get_mana_cost();
     let spawned = spawn_summon_ring_rings(
         &mut commands,
-        texture_atlas,
         &graphics,
         player_e,
         player_pos,
@@ -615,7 +604,7 @@ const SUMMON_RING_RETURN_REACH_DISTANCE: f32 = 12.0;
 pub fn update_summon_ring(
     mut commands: Commands,
     time: Res<Time>,
-    rapier_context: Res<RapierContext>,
+    rapier_context: ReadRapierContext,
     mut rings: Query<(Entity, &mut Transform, &mut SummonRingProjectile)>,
     player_transforms: Query<&GlobalTransform, With<Player>>,
     mobs: Query<(Entity, &GlobalTransform, &CurrentHealth, &MaxHealth, &Mob), With<Mob>>,
@@ -625,11 +614,14 @@ pub fn update_summon_ring(
     >,
     player_entity: Query<Entity, With<Player>>,
     frail_query: Query<&MobStatusEffects>,
-    mut hit_events: EventWriter<HitEvent>,
+    mut hit_events: MessageWriter<HitEvent>,
     game: GameParam,
 ) {
+    let Ok(rapier_context) = rapier_context.single() else {
+        return;
+    };
     let mob_snapshots = gather_live_mobs(&mobs);
-    let delta = time.delta_seconds();
+    let delta = time.delta_secs();
     let move_step = SUMMON_RING_SPEED * delta;
 
     let mut to_despawn = Vec::new();
@@ -655,7 +647,7 @@ pub fn update_summon_ring(
             transform.rotation = Quat::from_rotation_z(direction.y.atan2(direction.x));
 
             // Pierce and damage mobs on the way back too.
-            for (e1, e2, _) in rapier_context.intersections_with(ring_entity) {
+            for (e1, e2, _) in rapier_context.intersection_pairs_with(ring_entity) {
                 let other = if e1 == ring_entity { e2 } else { e1 };
                 if other == ring_entity {
                     continue;
@@ -675,7 +667,7 @@ pub fn update_summon_ring(
                         .unwrap_or(0);
                     let (damage, was_crit, was_overcrit) =
                         calculate_summon_damage(&mut commands, &game, other, frail_stacks);
-                    hit_events.send(HitEvent {
+                    hit_events.write(HitEvent {
                         hit_entity: other,
                         damage,
                         dir,
@@ -696,7 +688,7 @@ pub fn update_summon_ring(
 
         ring.lifetime.tick(time.delta());
         ring.bounce_cooldown.tick(time.delta());
-        if ring.lifetime.finished() {
+        if ring.lifetime.is_finished() {
             ring.returning = true;
             continue;
         }
@@ -705,7 +697,7 @@ pub fn update_summon_ring(
         transform.translation = new_pos.extend(transform.translation.z);
         transform.rotation = Quat::from_rotation_z(ring.direction.y.atan2(ring.direction.x));
 
-        for (e1, e2, _) in rapier_context.intersections_with(ring_entity) {
+        for (e1, e2, _) in rapier_context.intersection_pairs_with(ring_entity) {
             let other = if e1 == ring_entity { e2 } else { e1 };
             if other == ring_entity {
                 continue;
@@ -727,7 +719,7 @@ pub fn update_summon_ring(
                     .unwrap_or(0);
                 let (damage, was_crit, was_overcrit) =
                     calculate_summon_damage(&mut commands, &game, other, frail_stacks);
-                hit_events.send(HitEvent {
+                hit_events.write(HitEvent {
                     hit_entity: other,
                     damage,
                     dir,
@@ -752,7 +744,7 @@ pub fn update_summon_ring(
                 if summon_ring_pass_through(*obj) {
                     continue;
                 }
-                if !ring.bounce_cooldown.finished() {
+                if !ring.bounce_cooldown.is_finished() {
                     continue;
                 }
                 let obj_pos = obj_txfm.translation().truncate();
@@ -800,7 +792,7 @@ pub fn update_summon_ring(
         }
     }
     for e in to_despawn {
-        commands.entity(e).despawn_recursive();
+        commands.entity(e).despawn();
     }
 }
 
@@ -810,7 +802,7 @@ pub fn update_ant_farm_ants(
     mut ants: Query<(Entity, &mut Transform, &mut AntFarmAnt)>,
     mobs: Query<(Entity, &GlobalTransform, &CurrentHealth, &MaxHealth, &Mob), With<Mob>>,
     frail_query: Query<&MobStatusEffects>,
-    mut hit_events: EventWriter<HitEvent>,
+    mut hit_events: MessageWriter<HitEvent>,
     game: GameParam,
 ) {
     let mob_snapshots = gather_live_mobs(&mobs);
@@ -818,8 +810,8 @@ pub fn update_ant_farm_ants(
     if mob_snapshots.is_empty() {
         for (entity, _, mut ant) in ants.iter_mut() {
             ant.lifetime.tick(time.delta());
-            if ant.lifetime.finished() {
-                commands.entity(entity).despawn_recursive();
+            if ant.lifetime.is_finished() {
+                commands.entity(entity).despawn();
                 continue;
             }
             ant.spawn_delay.tick(time.delta());
@@ -831,13 +823,13 @@ pub fn update_ant_farm_ants(
 
     for (entity, mut transform, mut ant) in ants.iter_mut() {
         ant.lifetime.tick(time.delta());
-        if ant.lifetime.finished() {
-            commands.entity(entity).despawn_recursive();
+        if ant.lifetime.is_finished() {
+            commands.entity(entity).despawn();
             continue;
         }
 
         ant.spawn_delay.tick(time.delta());
-        if !ant.spawn_delay.finished() {
+        if !ant.spawn_delay.is_finished() {
             continue;
         }
 
@@ -856,7 +848,7 @@ pub fn update_ant_farm_ants(
         let to_target = snapshot.position - ant_pos;
         let distance = to_target.length();
         let direction = to_target.normalize_or_zero();
-        let step = (ant.speed * time.delta_seconds()).min(distance);
+        let step = (ant.speed * time.delta_secs()).min(distance);
         transform.translation += (direction * step).extend(0.0);
 
         let contact_dist = ANT_CONTACT_DISTANCE * ant.size_multiplier;
@@ -867,7 +859,7 @@ pub fn update_ant_farm_ants(
                 .unwrap_or(0);
             let (damage, was_crit, was_overcrit) =
                 calculate_summon_damage(&mut commands, &game, snapshot.entity, frail_stacks);
-            hit_events.send(HitEvent {
+            hit_events.write(HitEvent {
                 hit_entity: snapshot.entity,
                 damage,
                 dir: direction,
@@ -881,7 +873,7 @@ pub fn update_ant_farm_ants(
                 from_heirloom_effect: Some(Heirloom::AntFarm),
                 from_active_skill: false,
             });
-            commands.entity(entity).despawn_recursive();
+            commands.entity(entity).despawn();
         }
     }
 }
@@ -908,12 +900,12 @@ pub fn update_stone_tooth(
     )>,
     mobs: Query<(Entity, &GlobalTransform, &CurrentHealth, &MaxHealth, &Mob), With<Mob>>,
     frail_query: Query<&MobStatusEffects>,
-    mut hit_events: EventWriter<HitEvent>,
+    mut hit_events: MessageWriter<HitEvent>,
     graphics: Res<Graphics>,
     mut game: GameParam,
 ) {
     let Ok((player_e, player_txfm, skills, projectile_size, mut state_option, mut curr_mana)) =
-        player_query.get_single_mut()
+        player_query.single_mut()
     else {
         return;
     };
@@ -928,7 +920,7 @@ pub fn update_stone_tooth(
 
     if stacks > 0 {
         if let Some(state) = state_option.as_mut() {
-            state.elapsed += time.delta_seconds();
+            state.elapsed += time.delta_secs();
             if state.elapsed >= STONE_TOOTH_SPAWN_INTERVAL {
                 state.elapsed %= STONE_TOOTH_SPAWN_INTERVAL;
                 should_spawn_stones = true;
@@ -947,15 +939,15 @@ pub fn update_stone_tooth(
     if stacks <= 0 {
         for (entity, stone, _, _) in stones.iter() {
             if stone.owner == player_e {
-                commands.entity(entity).despawn_recursive();
+                commands.entity(entity).despawn();
             }
         }
         return;
     }
 
-    let Some(texture_atlas) = graphics.texture_atlas.as_ref() else {
+    if graphics.texture_atlas_layout.is_none() || graphics.texture_atlas_image.is_none() {
         return;
-    };
+    }
 
     let mob_snapshots = gather_live_mobs(&mobs);
 
@@ -969,7 +961,7 @@ pub fn update_stone_tooth(
             continue;
         };
         lifetime.lifetime.tick(time.delta());
-        if lifetime.lifetime.finished() {
+        if lifetime.lifetime.is_finished() {
             to_despawn.push(entity);
             continue;
         }
@@ -1001,7 +993,7 @@ pub fn update_stone_tooth(
                     .unwrap_or(0);
                 let (damage, was_crit, was_overcrit) =
                     calculate_summon_damage(&mut commands, &game, snapshot.entity, frail_stacks);
-                hit_events.send(HitEvent {
+                hit_events.write(HitEvent {
                     hit_entity: snapshot.entity,
                     damage,
                     dir,
@@ -1020,7 +1012,7 @@ pub fn update_stone_tooth(
         }
     }
     for entity in to_despawn {
-        commands.entity(entity).despawn_recursive();
+        commands.entity(entity).despawn();
     }
 
     // On timer: spawn a batch of rocks (orbit 1.5s, then ~3s delay before next batch)
@@ -1032,7 +1024,7 @@ pub fn update_stone_tooth(
         .filter(|(_, stone, _, lifetime_option)| {
             stone.owner == player_e
                 && lifetime_option
-                    .map(|lifetime| !lifetime.lifetime.finished())
+                    .map(|lifetime| !lifetime.lifetime.is_finished())
                     .unwrap_or(false)
         })
         .count();
@@ -1040,7 +1032,6 @@ pub fn update_stone_tooth(
     let mana_cost_per = Heirloom::StoneTooth.get_mana_cost();
     let spawned = spawn_stone_tooth_rocks(
         &mut commands,
-        texture_atlas,
         &graphics,
         player_e,
         player_pos,
@@ -1059,7 +1050,7 @@ pub fn update_stone_tooth(
 
 pub fn handle_trigger_summons_on_heal(
     mut commands: Commands,
-    mut trigger_events: EventReader<TriggerSummonsEvent>,
+    mut trigger_events: MessageReader<TriggerSummonsEvent>,
     mut player_query: Query<
         (
             Entity,
@@ -1077,10 +1068,10 @@ pub fn handle_trigger_summons_on_heal(
     graphics: Res<Graphics>,
     mut trigger_counts: ResMut<HeirloomTriggerCounts>,
 ) {
-    let Some(texture_atlas) = graphics.texture_atlas.as_ref() else {
+    if graphics.texture_atlas_layout.is_none() || graphics.texture_atlas_image.is_none() {
         return;
-    };
-    for event in trigger_events.iter() {
+    }
+    for event in trigger_events.read() {
         let Ok((
             player_e,
             player_txfm,
@@ -1104,7 +1095,6 @@ pub fn handle_trigger_summons_on_heal(
             let mut mana_opt = Some(&mut curr_mana.0);
             spawn_ant_farm_ants(
                 &mut commands,
-                texture_atlas,
                 &graphics,
                 player_pos,
                 ant_stacks,
@@ -1124,14 +1114,13 @@ pub fn handle_trigger_summons_on_heal(
                 .filter(|(stone, lifetime_option)| {
                     stone.owner == player_e
                         && lifetime_option
-                            .map(|lifetime| !lifetime.lifetime.finished())
+                            .map(|lifetime| !lifetime.lifetime.is_finished())
                             .unwrap_or(false)
                 })
                 .count();
             let mut mana_opt = Some(&mut curr_mana.0);
             spawn_stone_tooth_rocks(
                 &mut commands,
-                texture_atlas,
                 &graphics,
                 player_e,
                 player_pos,
@@ -1152,7 +1141,6 @@ pub fn handle_trigger_summons_on_heal(
             let mut mana_opt = Some(&mut curr_mana.0);
             spawn_summon_ring_rings(
                 &mut commands,
-                texture_atlas,
                 &graphics,
                 player_e,
                 player_pos,
@@ -1170,21 +1158,21 @@ pub fn handle_trigger_summons_on_heal(
 
 pub fn handle_reaper_soul_spawns(
     mut commands: Commands,
-    mut death_events: EventReader<EnemyDeathEvent>,
+    mut death_events: MessageReader<EnemyDeathEvent>,
     mut player_query: Query<(&PlayerSkills, &mut CurrentMana), With<Player>>,
     graphics: Res<Graphics>,
     mobs: Query<(Entity, &GlobalTransform, &CurrentHealth, &MaxHealth, &Mob), With<Mob>>,
     mut trigger_counts: ResMut<HeirloomTriggerCounts>,
 ) {
-    let Ok((skills, mut curr_mana)) = player_query.get_single_mut() else {
+    let Ok((skills, mut curr_mana)) = player_query.single_mut() else {
         return;
     };
     let stacks = skills.get_count(Heirloom::Reaper);
     let spawn_count = stacks.max(0) as usize;
 
-    let Some(texture_atlas) = graphics.texture_atlas.as_ref() else {
+    if graphics.texture_atlas_layout.is_none() || graphics.texture_atlas_image.is_none() {
         return;
-    };
+    }
     let Some(sprite_template) = get_world_object_sprite(&graphics, WorldObject::ReaperSoul) else {
         return;
     };
@@ -1195,7 +1183,7 @@ pub fn handle_reaper_soul_spawns(
     }
 
     let mut rng = rand::thread_rng();
-    for event in death_events.iter() {
+    for event in death_events.read() {
         let mut best_target: Option<&MobSnapshot> = None;
         let mut best_dist_sq = REAPER_SOUL_MAX_SPAWN_RANGE * REAPER_SOUL_MAX_SPAWN_RANGE;
         for snapshot in mob_snapshots.iter() {
@@ -1223,14 +1211,10 @@ pub fn handle_reaper_soul_spawns(
             let mut sprite = sprite_template.clone();
             sprite.custom_size = Some(Vec2::splat(14.0));
             commands.spawn((
-                SpriteSheetBundle {
-                    texture_atlas: texture_atlas.clone(),
-                    sprite,
-                    transform: Transform::from_translation(
-                        (event.enemy_pos + offset).extend(0.3 + i as f32 * 0.01),
-                    ),
-                    ..default()
-                },
+                sprite.clone(),
+                Transform::from_translation(
+                    (event.enemy_pos + offset).extend(0.3 + i as f32 * 0.01),
+                ),
                 ReaperSoul {
                     target: Some(best_snapshot.entity),
                     damage_fraction: REAPER_DAMAGE_PERCENT,
@@ -1249,7 +1233,7 @@ pub fn handle_reaper_soul_spawns(
 pub fn handle_mana_orb_drops(
     mut commands: Commands,
     proto: ProtoParam,
-    mut death_events: EventReader<EnemyDeathEvent>,
+    mut death_events: MessageReader<EnemyDeathEvent>,
     mut trigger_counts: ResMut<HeirloomTriggerCounts>,
     player_skills: Query<&PlayerSkills, With<Player>>,
 ) {
@@ -1257,11 +1241,11 @@ pub fn handle_mana_orb_drops(
     const MANA_ORB_DROP_CHANCE: f64 = 0.1;
     let drop_mult = 1.0
         + player_skills
-            .get_single()
+            .single()
             .map(|s| s.get_count(Heirloom::ManaOrbDropMult) as f64)
             .unwrap_or(0.0);
     let roll_chance = (MANA_ORB_DROP_CHANCE * drop_mult).min(1.0);
-    for event in death_events.iter() {
+    for event in death_events.read() {
         if !rng.gen_bool(roll_chance) {
             continue;
         }
@@ -1281,7 +1265,7 @@ pub fn handle_mana_orb_drops(
 pub fn handle_boss_hit_mana_orb_drops(
     mut commands: Commands,
     proto: ProtoParam,
-    mut hit_events: EventReader<HitEvent>,
+    mut hit_events: MessageReader<HitEvent>,
     mobs: Query<(&Mob, &GlobalTransform, Option<&EliteMob>)>,
     mut trigger_counts: ResMut<HeirloomTriggerCounts>,
     player_skills: Query<&PlayerSkills, With<Player>>,
@@ -1290,12 +1274,12 @@ pub fn handle_boss_hit_mana_orb_drops(
     const MANA_ORB_DROP_CHANCE: f64 = 0.01;
     let drop_mult = 1.0
         + player_skills
-            .get_single()
+            .single()
             .map(|s| s.get_count(Heirloom::ManaOrbDropMult) as f64)
             .unwrap_or(0.0);
     let roll_chance = (MANA_ORB_DROP_CHANCE * drop_mult).min(1.0);
 
-    for hit in hit_events.iter() {
+    for hit in hit_events.read() {
         // Check if hit entity is a boss
         let Ok((mob, boss_transform, is_elite)) = mobs.get(hit.hit_entity) else {
             continue;
@@ -1315,13 +1299,7 @@ pub fn handle_boss_hit_mana_orb_drops(
         let distance = rng.gen_range(0.0..32.0);
         let offset = Vec2::new(angle.cos(), angle.sin()) * distance;
 
-        commands.spawn_item_from_proto(
-            WorldObject::ManaOrb,
-            &proto,
-            boss_pos + offset,
-            1,
-            None,
-        );
+        commands.spawn_item_from_proto(WorldObject::ManaOrb, &proto, boss_pos + offset, 1, None);
         trigger_counts.increment(Heirloom::ManaOrbs);
     }
 }
@@ -1332,7 +1310,7 @@ pub fn update_reaper_souls(
     mut souls: Query<(Entity, &mut Transform, &mut ReaperSoul)>,
     mobs: Query<(Entity, &GlobalTransform, &CurrentHealth, &MaxHealth, &Mob), With<Mob>>,
     frail_query: Query<&MobStatusEffects>,
-    mut hit_events: EventWriter<HitEvent>,
+    mut hit_events: MessageWriter<HitEvent>,
     game: GameParam,
 ) {
     let mob_snapshots = gather_live_mobs(&mobs);
@@ -1340,7 +1318,7 @@ pub fn update_reaper_souls(
     // If no mobs exist, despawn all souls immediately
     if mob_snapshots.is_empty() {
         for (entity, _, _) in souls.iter() {
-            commands.entity(entity).despawn_recursive();
+            commands.entity(entity).despawn();
         }
         return;
     }
@@ -1349,8 +1327,8 @@ pub fn update_reaper_souls(
 
     for (entity, mut transform, mut soul) in souls.iter_mut() {
         soul.lifetime.tick(time.delta());
-        if soul.lifetime.finished() {
-            commands.entity(entity).despawn_recursive();
+        if soul.lifetime.is_finished() {
+            commands.entity(entity).despawn();
             continue;
         }
 
@@ -1360,7 +1338,7 @@ pub fn update_reaper_souls(
 
         // If no target can be found, despawn the soul
         let Some(snapshot) = target_snapshot else {
-            commands.entity(entity).despawn_recursive();
+            commands.entity(entity).despawn();
             continue;
         };
 
@@ -1371,12 +1349,12 @@ pub fn update_reaper_souls(
         if direction.length_squared() == 0.0 {
             continue;
         }
-        soul.drift_phase += REAPER_SOUL_DRIFT_FREQ * time.delta_seconds();
+        soul.drift_phase += REAPER_SOUL_DRIFT_FREQ * time.delta_secs();
         let drift_amount = soul.drift_phase.sin() * REAPER_SOUL_DRIFT_STRENGTH;
         let perp = Vec2::new(-direction.y, direction.x);
         let mut steering = direction + perp * drift_amount;
         steering = steering.normalize_or_zero();
-        let step = soul.speed * time.delta_seconds();
+        let step = soul.speed * time.delta_secs();
         transform.translation += (steering * step).extend(0.0);
 
         if transform.translation.truncate().distance(snapshot.position) <= REAPER_CONTACT_DISTANCE {
@@ -1386,7 +1364,7 @@ pub fn update_reaper_souls(
                 .unwrap_or(0);
             let (damage, was_crit, was_overcrit) =
                 calculate_summon_damage(&mut commands, &game, snapshot.entity, frail_stacks);
-            hit_events.send(HitEvent {
+            hit_events.write(HitEvent {
                 hit_entity: snapshot.entity,
                 damage,
                 dir: direction,
@@ -1400,18 +1378,21 @@ pub fn update_reaper_souls(
                 from_heirloom_effect: Some(Heirloom::Reaper),
                 from_active_skill: false,
             });
-            commands.entity(entity).despawn_recursive();
+            commands.entity(entity).despawn();
         }
     }
 }
 
 pub fn break_crates_with_roll(
     game: GameParam,
-    rapier_context: Res<RapierContext>,
+    rapier_context: ReadRapierContext,
     crate_query: Query<(Entity, &GlobalTransform, &WorldObject)>,
-    mut obj_break_events: EventWriter<ObjBreakEvent>,
+    mut obj_break_events: MessageWriter<ObjBreakEvent>,
     mut broken_this_frame: Local<HashSet<Entity>>,
 ) {
+    let Ok(rapier_context) = rapier_context.single() else {
+        return;
+    };
     broken_this_frame.clear();
 
     let player_entity = game.game.player;
@@ -1422,7 +1403,7 @@ pub fn break_crates_with_roll(
     }
 
     let mut to_break: Vec<(Entity, WorldObject, TileMapPosition)> = Vec::new();
-    for (first, second, _) in rapier_context.intersections_with(player_entity) {
+    for (first, second, _) in rapier_context.intersection_pairs_with(player_entity) {
         let other = if first == player_entity {
             second
         } else {
@@ -1443,7 +1424,7 @@ pub fn break_crates_with_roll(
     }
 
     for (entity, obj, tile_pos) in to_break {
-        obj_break_events.send(ObjBreakEvent {
+        obj_break_events.write(ObjBreakEvent {
             entity,
             obj,
             pos: tile_pos,
@@ -1476,12 +1457,12 @@ pub struct SkillPowerHuntTracker {
 }
 
 pub fn handle_max_hp_hunt(
-    mut death_events: EventReader<EnemyDeathEvent>,
+    mut death_events: MessageReader<EnemyDeathEvent>,
     mut player_query: Query<(&mut MaxHPHuntTracker, &PlayerSkills), With<Player>>,
-    mut attribute_events: EventWriter<crate::attributes::AttributeChangeEvent>,
+    mut attribute_events: MessageWriter<crate::attributes::AttributeChangeEvent>,
     mut trigger_counts: ResMut<HeirloomTriggerCounts>,
 ) {
-    let Ok((mut tracker, skills)) = player_query.get_single_mut() else {
+    let Ok((mut tracker, skills)) = player_query.single_mut() else {
         return;
     };
 
@@ -1493,7 +1474,7 @@ pub fn handle_max_hp_hunt(
     let max_hp_cap = stacks * 250;
 
     let mut hp_was_gained = false;
-    for _death_event in death_events.iter() {
+    for _death_event in death_events.read() {
         if tracker.total_hp_gained >= max_hp_cap {
             continue;
         }
@@ -1511,7 +1492,7 @@ pub fn handle_max_hp_hunt(
     // Trigger attribute recalculation if HP was gained
     // This ensures the MaxHPHunt bonus is included in the max health calculation
     if hp_was_gained {
-        attribute_events.send_default();
+        attribute_events.write_default();
     }
 }
 
@@ -1520,12 +1501,12 @@ pub fn handle_max_hp_hunt(
 // ============================================================================
 
 pub fn handle_skill_power_hunt(
-    mut skill_events: EventReader<ActiveSkillUsedEvent>,
+    mut skill_events: MessageReader<ActiveSkillUsedEvent>,
     mut player_query: Query<(&PlayerSkills, Option<&mut SkillPowerHuntTracker>), With<Player>>,
-    mut attribute_events: EventWriter<crate::attributes::AttributeChangeEvent>,
+    mut attribute_events: MessageWriter<crate::attributes::AttributeChangeEvent>,
     mut trigger_counts: ResMut<HeirloomTriggerCounts>,
 ) {
-    let Ok((skills, state_option)) = player_query.get_single_mut() else {
+    let Ok((skills, state_option)) = player_query.single_mut() else {
         return;
     };
     let count = skills.get_count(Heirloom::SkillPowerHunt);
@@ -1540,13 +1521,13 @@ pub fn handle_skill_power_hunt(
     let sp_cap = count * 1000;
 
     let mut rng = rand::thread_rng();
-    for _ in skill_events.iter() {
+    for _ in skill_events.read() {
         if tracker.bonus_skill_power >= sp_cap {
             continue;
         }
         if rng.gen_ratio((count * 7).min(100) as u32, 100) {
             tracker.bonus_skill_power = (tracker.bonus_skill_power + 1).min(sp_cap);
-            attribute_events.send_default();
+            attribute_events.write_default();
             trigger_counts.increment(Heirloom::SkillPowerHunt);
         }
     }
@@ -1583,7 +1564,7 @@ pub fn tick_stand_still_state(
     time: Res<Time>,
     mut player_query: Query<(&mut StandStillState, &crate::inputs::MovementVector), With<Player>>,
 ) {
-    let Ok((mut state, movement)) = player_query.get_single_mut() else {
+    let Ok((mut state, movement)) = player_query.single_mut() else {
         return;
     };
 
@@ -1593,7 +1574,7 @@ pub fn tick_stand_still_state(
         state.time_still = 0.0;
         state.was_moving = true;
     } else {
-        state.time_still = (state.time_still + time.delta_seconds()).min(STAND_STILL_MAX_TIME);
+        state.time_still = (state.time_still + time.delta_secs()).min(STAND_STILL_MAX_TIME);
         state.was_moving = false;
     }
 }
@@ -1624,9 +1605,11 @@ impl StandStillState {
 // ============================================================================
 
 /// Fired when the Cooked Cross ([`Heirloom::DeathDefiance`]) heirloom saves the player from death.
+#[derive(Message)]
 pub struct DeathDefianceSurvivedEvent;
 
 /// Fired when an orb upgrade ranks a piece of equipment to Legendary rarity.
+#[derive(Message)]
 pub struct LegendaryEquipmentRankedEvent;
 
 /// Marker component for mobs frozen by Death Defiance. Inserted briefly on
@@ -1637,21 +1620,21 @@ pub struct LegendaryEquipmentRankedEvent;
 #[component(storage = "SparseSet")]
 pub struct DeathDefianceFrozen {
     pub timer: Timer,
-    pub original_color: Color,
 }
 
 pub fn handle_death_defiance_freeze(
     mut commands: Commands,
     time: Res<Time>,
-    mut frozen_mobs: Query<(Entity, &mut DeathDefianceFrozen, &mut TextureAtlasSprite)>,
+    mut frozen_mobs: Query<(Entity, &mut DeathDefianceFrozen)>,
 ) {
-    for (entity, mut frozen, mut sprite) in frozen_mobs.iter_mut() {
+    for (entity, mut frozen) in frozen_mobs.iter_mut() {
         frozen.timer.tick(time.delta());
 
         if frozen.timer.just_finished() {
-            // Restore original color and remove freeze
-            sprite.color = frozen.original_color;
-            commands.entity(entity).remove::<DeathDefianceFrozen>();
+            commands
+                .entity(entity)
+                .remove::<DeathDefianceFrozen>()
+                .remove::<DeathDefianceTint>();
         }
     }
 }
@@ -1696,11 +1679,11 @@ impl ThornsOnDamageTracker {
 }
 
 pub fn handle_crate_break_damage(
-    mut obj_break_events: EventReader<ObjBreakEvent>,
+    mut obj_break_events: MessageReader<ObjBreakEvent>,
     mut player_query: Query<(&mut CrateBreakDamageTracker, &PlayerSkills), With<Player>>,
     mut trigger_counts: ResMut<HeirloomTriggerCounts>,
 ) {
-    let Ok((mut tracker, skills)) = player_query.get_single_mut() else {
+    let Ok((mut tracker, skills)) = player_query.single_mut() else {
         return;
     };
 
@@ -1709,7 +1692,7 @@ pub fn handle_crate_break_damage(
         return;
     }
 
-    for event in obj_break_events.iter() {
+    for event in obj_break_events.read() {
         // Check if this was a crate
         if matches!(
             event.obj,
@@ -1761,15 +1744,15 @@ impl Default for DodgeCritState {
 }
 
 pub fn handle_dodge_crit_activation(
-    mut dodge_events: EventReader<crate::ui::damage_numbers::DodgeEvent>,
+    mut dodge_events: MessageReader<crate::ui::damage_numbers::DodgeEvent>,
     mut player_query: Query<
         (&mut DodgeCritState, &PlayerSkills, &mut BonusAttackSpeed),
         With<Player>,
     >,
-    mut attribute_event: EventWriter<crate::attributes::AttributeChangeEvent>,
+    mut attribute_event: MessageWriter<crate::attributes::AttributeChangeEvent>,
     mut trigger_counts: ResMut<HeirloomTriggerCounts>,
 ) {
-    let Ok((mut state, skills, mut bonus_attack_speed)) = player_query.get_single_mut() else {
+    let Ok((mut state, skills, mut bonus_attack_speed)) = player_query.single_mut() else {
         return;
     };
 
@@ -1777,7 +1760,7 @@ pub fn handle_dodge_crit_activation(
         return;
     }
 
-    for _ in dodge_events.iter() {
+    for _ in dodge_events.read() {
         // Refreshing an already-active buff only resets the timer; the attack-speed
         // multiplier is added once so repeated dodges don't stack past 2x.
         if !state.buff_active {
@@ -1786,7 +1769,7 @@ pub fn handle_dodge_crit_activation(
         state.buff_active = true;
         state.buff_timer.reset();
         state.next_hit_bonus = true;
-        attribute_event.send(crate::attributes::AttributeChangeEvent);
+        attribute_event.write(crate::attributes::AttributeChangeEvent);
         trigger_counts.increment(Heirloom::DodgeCrit);
     }
 }
@@ -1794,9 +1777,9 @@ pub fn handle_dodge_crit_activation(
 pub fn tick_dodge_crit_buff(
     time: Res<Time>,
     mut player_query: Query<(&mut DodgeCritState, &mut BonusAttackSpeed), With<Player>>,
-    mut attribute_event: EventWriter<crate::attributes::AttributeChangeEvent>,
+    mut attribute_event: MessageWriter<crate::attributes::AttributeChangeEvent>,
 ) {
-    let Ok((mut state, mut bonus_attack_speed)) = player_query.get_single_mut() else {
+    let Ok((mut state, mut bonus_attack_speed)) = player_query.single_mut() else {
         return;
     };
 
@@ -1806,7 +1789,7 @@ pub fn tick_dodge_crit_buff(
             state.buff_active = false;
             state.next_hit_bonus = false; // Also clear the unused next hit bonus
             bonus_attack_speed.remove_multiplier(DODGE_CRIT_ATTACK_SPEED_BONUS);
-            attribute_event.send(crate::attributes::AttributeChangeEvent);
+            attribute_event.write(crate::attributes::AttributeChangeEvent);
         }
     }
 }
@@ -1816,15 +1799,15 @@ pub fn tick_dodge_crit_buff(
 /// and heirloom hits are ignored so the bonus is reserved for the next weapon hit,
 /// matching where the 2x is applied in [`GameParam::calculate_player_damage`].
 pub fn handle_dodge_crit_next_hit_reset(
-    mut hit_events: EventReader<crate::combat::HitEvent>,
+    mut hit_events: MessageReader<crate::combat::HitEvent>,
     mut player_query: Query<&mut DodgeCritState, With<Player>>,
 ) {
-    for hit in hit_events.iter() {
+    for hit in hit_events.read() {
         if hit.hit_by_mob.is_some() || !hit_is_weapon_damage(hit) {
             continue;
         }
 
-        if let Ok(mut state) = player_query.get_single_mut() {
+        if let Ok(mut state) = player_query.single_mut() {
             if state.next_hit_bonus {
                 state.next_hit_bonus = false;
             }
@@ -2029,10 +2012,10 @@ impl ManaChargeDamageState {
 
 /// System to track mana regen and store it for the MPBarDMG heirloom
 pub fn handle_mana_charge_damage(
-    mut mana_events: EventReader<ModifyManaEvent>,
+    mut mana_events: MessageReader<ModifyManaEvent>,
     mut player_query: Query<(&PlayerSkills, Option<&mut ManaChargeDamageState>), With<Player>>,
 ) {
-    let Ok((skills, state_option)) = player_query.get_single_mut() else {
+    let Ok((skills, state_option)) = player_query.single_mut() else {
         return;
     };
 
@@ -2045,7 +2028,7 @@ pub fn handle_mana_charge_damage(
         return;
     };
 
-    for event in mana_events.iter() {
+    for event in mana_events.read() {
         // Only track positive mana changes (regen, not consumption)
         if event.0 > 0 {
             state.add_mana(event.0);
@@ -2056,10 +2039,10 @@ pub fn handle_mana_charge_damage(
 /// System to reset stored mana after an attack is made.
 /// Runs after HitEvents are processed.
 pub fn handle_mana_charge_damage_reset(
-    mut hit_events: EventReader<HitEvent>,
+    mut hit_events: MessageReader<HitEvent>,
     mut player_query: Query<(&PlayerSkills, Option<&mut ManaChargeDamageState>), With<Player>>,
 ) {
-    let Ok((skills, state_option)) = player_query.get_single_mut() else {
+    let Ok((skills, state_option)) = player_query.single_mut() else {
         return;
     };
 
@@ -2068,7 +2051,7 @@ pub fn handle_mana_charge_damage_reset(
     }
     // Only reset if there was a hit from the player (not from mobs, not from heirloom effects)
     let mut player_dealt_damage = false;
-    for event in hit_events.iter() {
+    for event in hit_events.read() {
         // Player weapon hits have hit_with_melee or hit_with_projectile set
         // Exclude heirloom effect damage (like echoes) to only consume on weapon attacks
         if event.from_heirloom_effect.is_none()
@@ -2097,13 +2080,13 @@ pub fn handle_mana_charge_damage_reset(
 
 /// System to spawn mana orb projectiles when mana is regenerated
 pub fn handle_mana_orb_attack(
-    mut mana_events: EventReader<ModifyManaEvent>,
+    mut mana_events: MessageReader<ModifyManaEvent>,
     mut player_query: Query<(&PlayerSkills, &GlobalTransform, &mut CurrentMana), With<Player>>,
     mobs: Query<(Entity, &GlobalTransform, &CurrentHealth), With<Mob>>,
-    mut ranged_attack_event: EventWriter<RangedAttackEvent>,
+    mut ranged_attack_event: MessageWriter<RangedAttackEvent>,
     mut trigger_counts: ResMut<HeirloomTriggerCounts>,
 ) {
-    let Ok((skills, player_transform, mut current_mana)) = player_query.get_single_mut() else {
+    let Ok((skills, player_transform, mut current_mana)) = player_query.single_mut() else {
         return;
     };
 
@@ -2126,7 +2109,7 @@ pub fn handle_mana_orb_attack(
     let mut rng = rand::thread_rng();
     let mut remaining_mana = current_mana.0;
 
-    for event in mana_events.iter() {
+    for event in mana_events.read() {
         // Only trigger on positive mana changes (regen, not consumption)
         if event.0 <= 0 {
             continue;
@@ -2161,7 +2144,7 @@ pub fn handle_mana_orb_attack(
             if let Some((_, target_transform, _)) = nearby_mobs.choose(&mut rng) {
                 let target_pos = target_transform.translation().truncate();
                 let direction = (target_pos - player_pos).normalize_or_zero();
-                ranged_attack_event.send(RangedAttackEvent {
+                ranged_attack_event.write(RangedAttackEvent {
                     projectile: crate::item::projectile::Projectile::ManaOrbProjectile,
                     direction,
                     mana_cost: None,
@@ -2213,15 +2196,15 @@ impl ManaRegenPoisonTracker {
 
 /// System to track mana regen and apply poison to all enemies when 100 is reached
 pub fn handle_mana_regen_poison(
-    mut mana_events: EventReader<ModifyManaEvent>,
+    mut mana_events: MessageReader<ModifyManaEvent>,
     mut player_query: Query<(&PlayerSkills, Option<&mut ManaRegenPoisonTracker>), With<Player>>,
     enemies: Query<Entity, (With<Mob>, Without<Player>)>,
     mut mob_status: Query<&mut MobStatusEffects, With<Mob>>,
     player_skills: Query<&PlayerSkills, With<Player>>,
-    mut status_event: EventWriter<StatusEffectEvent>,
+    mut status_event: MessageWriter<StatusEffectEvent>,
     mut trigger_counts: ResMut<HeirloomTriggerCounts>,
 ) {
-    let Ok((skills, state_option)) = player_query.get_single_mut() else {
+    let Ok((skills, state_option)) = player_query.single_mut() else {
         return;
     };
 
@@ -2232,7 +2215,7 @@ pub fn handle_mana_regen_poison(
     }
 
     let poison_duration_bonus = player_skills
-        .get_single()
+        .single()
         .map(|s| s.get_count(Heirloom::PoisonDuration) as f32 * 0.5 + 1.)
         .unwrap_or(1.0);
 
@@ -2242,7 +2225,7 @@ pub fn handle_mana_regen_poison(
         return;
     };
 
-    for event in mana_events.iter() {
+    for event in mana_events.read() {
         if event.0 > 0 {
             let poison_count = tracker.add_mana(event.0);
 
@@ -2256,7 +2239,7 @@ pub fn handle_mana_regen_poison(
                         burning.stacks = burning.stacks.saturating_add(heirloom_count as u128);
                         burning.duration_timer.reset();
                         let stacks = burning.stacks as i32;
-                        status_event.send(StatusEffectEvent {
+                        status_event.write(StatusEffectEvent {
                             entity: enemy_entity,
                             effect: StatusEffect::Poison,
                             num_stacks: stacks,
@@ -2270,7 +2253,7 @@ pub fn handle_mana_regen_poison(
                             ),
                             stacks: 1,
                         });
-                        status_event.send(StatusEffectEvent {
+                        status_event.write(StatusEffectEvent {
                             entity: enemy_entity,
                             effect: StatusEffect::Poison,
                             num_stacks: 1,
@@ -2289,12 +2272,12 @@ const SKILL_MANA_REGEN_PROC_PCT_PER_STACK: u32 = 15;
 
 /// System to trigger mana regen when a skill is used
 pub fn handle_skill_mana_regen(
-    mut skill_events: EventReader<ActiveSkillUsedEvent>,
+    mut skill_events: MessageReader<ActiveSkillUsedEvent>,
     mut player_query: Query<(&PlayerSkills, &ManaRegen), With<Player>>,
-    mut modify_mana_event: EventWriter<ModifyManaEvent>,
+    mut modify_mana_event: MessageWriter<ModifyManaEvent>,
     mut trigger_counts: ResMut<HeirloomTriggerCounts>,
 ) {
-    let Ok((skills, mana_regen)) = player_query.get_single_mut() else {
+    let Ok((skills, mana_regen)) = player_query.single_mut() else {
         return;
     };
 
@@ -2306,14 +2289,14 @@ pub fn handle_skill_mana_regen(
     let mut rng = rand::thread_rng();
     let chance_pct = stacks as u32 * SKILL_MANA_REGEN_PROC_PCT_PER_STACK;
 
-    for _event in skill_events.iter() {
+    for _event in skill_events.read() {
         let proc_count = roll_stacked_proc_count(chance_pct, &mut rng);
         if proc_count == 0 {
             continue;
         }
 
         for _ in 0..proc_count {
-            modify_mana_event.send(ModifyManaEvent::gain(
+            modify_mana_event.write(ModifyManaEvent::gain(
                 mana_regen.0,
                 ManaGainSource::Heirloom(Heirloom::SkillManaRegen),
             ));
@@ -2327,14 +2310,14 @@ pub fn handle_skill_mana_regen(
 
 /// System to spawn lightning strikes when mana is regenerated
 pub fn handle_mana_regen_lightning(
-    mut mana_events: EventReader<ModifyManaEvent>,
+    mut mana_events: MessageReader<ModifyManaEvent>,
     mut player_query: Query<(&PlayerSkills, &GlobalTransform, &Attack, &CurrentMana), With<Player>>,
     mobs: Query<(Entity, &GlobalTransform, &CurrentHealth), With<Mob>>,
-    mut ranged_attack_event: EventWriter<RangedAttackEvent>,
+    mut ranged_attack_event: MessageWriter<RangedAttackEvent>,
     mut commands: Commands,
     mut trigger_counts: ResMut<HeirloomTriggerCounts>,
 ) {
-    let Ok((skills, player_transform, attack, current_mana)) = player_query.get_single_mut() else {
+    let Ok((skills, player_transform, attack, current_mana)) = player_query.single_mut() else {
         return;
     };
 
@@ -2346,7 +2329,7 @@ pub fn handle_mana_regen_lightning(
     let player_pos = player_transform.translation().truncate();
     let mut rng = rand::thread_rng();
 
-    for event in mana_events.iter() {
+    for event in mana_events.read() {
         // Only trigger on positive mana changes (regen, not consumption)
         if event.0 <= 0 {
             continue;
@@ -2380,7 +2363,7 @@ pub fn handle_mana_regen_lightning(
             // Check if player has enough mana
             if current_mana.0 >= MANA_COST {
                 let lightning_damage = attack.0; // 100% damage
-                ranged_attack_event.send(RangedAttackEvent {
+                ranged_attack_event.write(RangedAttackEvent {
                     projectile: Projectile::Lightning,
                     direction: Vec2::ZERO,
                     mana_cost: Some(MANA_COST),
@@ -2402,8 +2385,6 @@ pub fn handle_mana_regen_lightning(
 // ============================================================================
 // EnergyBallBarrage (Voltaic Core) - homing energy balls every 150 damage dealt
 // ============================================================================
-
-aseprite!(pub EnergyBallEffect, "textures/effects/EnergyBall.ase");
 
 pub const ENERGY_BALL_DAMAGE_THRESHOLD: i32 = 150;
 /// Maximum homing fire balls Underworld's Hat may spawn per second (end-game damage
@@ -2437,7 +2418,7 @@ fn is_energy_ball_damage_hit(hit: &HitEvent) -> bool {
 }
 
 /// Spawns the muzzle flash at the player's position. Purely visual — no
-/// collider, no damage — so we spawn it as a bare `AsepriteBundle` +
+/// collider, no damage — so we spawn it as a bare `aseprite_bundle` +
 /// `DespawnTimer`, the same pattern as other one-shot visual effects.
 fn spawn_energy_ball_muzzle(
     commands: &mut Commands,
@@ -2450,13 +2431,14 @@ fn spawn_energy_ball_muzzle(
     let offset = direction.normalize_or_zero() * ENERGY_BALL_MUZZLE_OFFSET;
     let angle = direction.y.atan2(direction.x);
     commands.spawn((
-        AsepriteBundle {
-            aseprite: asset_server.load(EnergyBallEffect::PATH),
-            animation: AsepriteAnimation::from(EnergyBallEffect::tags::MUZZLE),
-            transform: Transform::from_translation(player_pos + offset.extend(0.))
+        aseprite_bundle(
+            asset_server.load(EnergyBallEffect::PATH),
+            EnergyBallEffect::tags::MUZZLE,
+            Transform::from_translation(player_pos + offset.extend(0.))
                 .with_rotation(Quat::from_rotation_z(angle)),
-            ..default()
-        },
+            Visibility::default(),
+            true,
+        ),
         AnimVisualCategory::Heirloom,
         DespawnTimer(Timer::from_seconds(
             ENERGY_BALL_MUZZLE_DURATION,
@@ -2473,7 +2455,7 @@ fn spawn_energy_ball_muzzle(
 /// and the aseprite swap that happens in `spawn_projectile_from_proto`.
 pub fn handle_energy_ball_barrage(
     time: Res<Time>,
-    mut hit_events: EventReader<HitEvent>,
+    mut hit_events: MessageReader<HitEvent>,
     in_i_frame: Query<&crate::combat::InvincibilityTimer>,
     mut player_query: Query<
         (
@@ -2485,19 +2467,19 @@ pub fn handle_energy_ball_barrage(
         With<Player>,
     >,
     mobs: Query<Entity, With<Mob>>,
-    mut ranged_attack_events: EventWriter<RangedAttackEvent>,
+    mut ranged_attack_events: MessageWriter<RangedAttackEvent>,
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     mut trigger_counts: ResMut<HeirloomTriggerCounts>,
 ) {
-    let Ok((skills, player_transform, attack, mut tracker)) = player_query.get_single_mut() else {
+    let Ok((skills, player_transform, attack, mut tracker)) = player_query.single_mut() else {
         return;
     };
     if skills.get_count(Heirloom::EnergyBallBarrage) <= 0 {
         return;
     }
 
-    tracker.rate_window_elapsed += time.delta_seconds();
+    tracker.rate_window_elapsed += time.delta_secs();
     if tracker.rate_window_elapsed >= 1.0 {
         tracker.rate_window_elapsed -= 1.0;
         tracker.spawns_this_sec = 0;
@@ -2508,7 +2490,7 @@ pub fn handle_energy_ball_barrage(
     let mut rng = rand::thread_rng();
     let mut fired = 0u32;
 
-    for hit in hit_events.iter() {
+    for hit in hit_events.read() {
         if hit.hit_by_mob.is_some() {
             continue;
         }
@@ -2555,7 +2537,7 @@ pub fn handle_energy_ball_barrage(
                 );
 
                 // Actual projectile through the standard pipeline.
-                ranged_attack_events.send(RangedAttackEvent {
+                ranged_attack_events.write(RangedAttackEvent {
                     projectile: Projectile::EnergyBall,
                     direction: initial_dir,
                     mana_cost: None,
@@ -2602,7 +2584,7 @@ pub fn update_homing_energy_balls(
     mobs: Query<(Entity, &GlobalTransform, &CurrentHealth), With<Mob>>,
 ) {
     for (mut transform, mut ball, mut proj_state) in balls.iter_mut() {
-        let dt = time.delta_seconds();
+        let dt = time.delta_secs();
 
         ball.lock_elapsed = (ball.lock_elapsed + dt).min(ball.lock_duration);
         let lock_t = (ball.lock_elapsed / ball.lock_duration.max(0.001)).clamp(0., 1.);
@@ -2681,10 +2663,6 @@ pub fn update_homing_energy_balls(
 // LobArc - shared arcing projectile flight used by Cherry Bomb heirloom and Bomb skill
 // ============================================================================
 
-aseprite!(pub CherryBombSprite, "textures/effects/CherryBomb.aseprite");
-aseprite!(pub CherryBombExplosionSprite, "textures/effects/CherryBombExplosion.ase");
-aseprite!(pub BombSprite, "textures/effects/Bomb.ase");
-
 const CHERRY_BOMB_PROC_PCT_PER_STACK: u32 = 25;
 const CHERRY_BOMB_MIN_TILES: f32 = 3.0;
 const CHERRY_BOMB_MAX_TILES: f32 = 10.0;
@@ -2744,12 +2722,13 @@ pub fn spawn_cherry_bomb_flight(
     };
 
     commands.spawn((
-        AsepriteBundle {
-            aseprite: cherry_bomb_ase.clone(),
-            animation: AsepriteAnimation::from(CherryBombSprite::tags::BOMB),
-            transform: Transform::from_translation(start_pos.extend(11.)),
-            ..default()
-        },
+        aseprite_bundle(
+            cherry_bomb_ase.clone(),
+            CherryBombSprite::tags::BOMB,
+            Transform::from_translation(start_pos.extend(11.)),
+            Visibility::default(),
+            false,
+        ),
         LobArc {
             start_pos,
             target_pos,
@@ -2775,12 +2754,13 @@ pub fn spawn_skill_bomb_lob(
     };
 
     commands.spawn((
-        AsepriteBundle {
-            aseprite: bomb_ase.clone(),
-            animation: AsepriteAnimation::from(BombSprite::tags::BOMB),
-            transform: Transform::from_translation(start_pos.extend(11.)),
-            ..default()
-        },
+        aseprite_bundle(
+            bomb_ase.clone(),
+            BombSprite::tags::BOMB,
+            Transform::from_translation(start_pos.extend(11.)),
+            Visibility::default(),
+            false,
+        ),
         LobArc {
             start_pos,
             target_pos,
@@ -2819,7 +2799,7 @@ fn spawn_cherry_bomb_explosion(
             CHERRY_BOMB_EXPLOSION_RADIUS,
         ),
         explosion_ase.clone(),
-        AsepriteAnimation::from(CherryBombExplosionSprite::tags::EXPLOSION),
+        CherryBombExplosionSprite::tags::EXPLOSION,
         false,
         Projectile::CherryBombExplosion,
         vec![],
@@ -2828,13 +2808,13 @@ fn spawn_cherry_bomb_explosion(
 }
 
 pub fn handle_cherry_bomb_on_attack(
-    mut attacks: EventReader<AttackEvent>,
+    mut attacks: MessageReader<AttackEvent>,
     mut player: Query<(&PlayerSkills, &Attack, &GlobalTransform, &mut CurrentMana), With<Player>>,
     graphics: Res<Graphics>,
     mut commands: Commands,
     mut trigger_counts: ResMut<HeirloomTriggerCounts>,
 ) {
-    let Ok((skills, attack, player_transform, mut current_mana)) = player.get_single_mut() else {
+    let Ok((skills, attack, player_transform, mut current_mana)) = player.single_mut() else {
         return;
     };
 
@@ -2856,7 +2836,7 @@ pub fn handle_cherry_bomb_on_attack(
     let player_pos = player_transform.translation().truncate();
     let explosion_damage = (attack.0 as f32 * attack_damage_multiplier(100.)).round() as i32;
 
-    for _ in attacks.iter() {
+    for _ in attacks.read() {
         let mut rng = rand::thread_rng();
         let chance_pct = stacks as u32 * CHERRY_BOMB_PROC_PCT_PER_STACK;
         let proc_count = roll_stacked_proc_count(chance_pct, &mut rng);
@@ -2895,13 +2875,13 @@ pub fn update_lob_arcs(
     graphics: Res<Graphics>,
     player_size: Query<&ProjectileSize, With<Player>>,
     mut bombs: Query<(Entity, &mut LobArc, &mut Transform)>,
-    mut ranged_attack_events: EventWriter<RangedAttackEvent>,
+    mut ranged_attack_events: MessageWriter<RangedAttackEvent>,
     enemies: Query<(Entity, &GlobalTransform), With<Mob>>,
     mut mob_status: Query<&mut MobStatusEffects, With<Mob>>,
-    mut status_event: EventWriter<StatusEffectEvent>,
+    mut status_event: MessageWriter<StatusEffectEvent>,
 ) {
     let size_multiplier = player_size
-        .get_single()
+        .single()
         .map(|s| s.get_multiplier())
         .unwrap_or(1.0);
 
@@ -2926,7 +2906,7 @@ pub fn update_lob_arcs(
                     commands.spawn(SoundSpawner::new(AudioSoundEffect::IceExplosion, 0.25));
                 }
                 LobArcLanding::SkillBomb { explosion_damage } => {
-                    ranged_attack_events.send(RangedAttackEvent {
+                    ranged_attack_events.write(RangedAttackEvent {
                         projectile: Projectile::BombExplosion,
                         direction: Vec2::ZERO,
                         mana_cost: None,
@@ -2946,7 +2926,7 @@ pub fn update_lob_arcs(
                     );
                 }
             }
-            commands.entity(entity).despawn_recursive();
+            commands.entity(entity).despawn();
         }
     }
 }
@@ -2957,7 +2937,7 @@ pub fn apply_bomb_frail_at_position(
     target_pos: Vec2,
     enemies: &Query<(Entity, &GlobalTransform), With<Mob>>,
     mob_status: &mut Query<&mut MobStatusEffects, With<Mob>>,
-    status_event: &mut EventWriter<StatusEffectEvent>,
+    status_event: &mut MessageWriter<StatusEffectEvent>,
 ) {
     for (enemy_entity, enemy_transform) in enemies.iter() {
         let enemy_pos = enemy_transform.translation().truncate();
@@ -2970,7 +2950,7 @@ pub fn apply_bomb_frail_at_position(
                 timer: Timer::from_seconds(1.2, TimerMode::Repeating),
             });
         }
-        status_event.send(StatusEffectEvent {
+        status_event.write(StatusEffectEvent {
             entity: enemy_entity,
             effect: StatusEffect::Frail,
             num_stacks: 3,

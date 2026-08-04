@@ -3,7 +3,8 @@
 //! spawns a screen-locked beacon (reusing [`ScreenLockedTargetWorldPos`]) that points to the
 //! marked world location during normal play. Clicking near an existing marker removes it.
 
-use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
+use bevy::text::Justify;
+use bevy::{camera::visibility::RenderLayers, prelude::*, sprite::Anchor};
 
 use crate::{
     assets::Graphics,
@@ -29,6 +30,7 @@ use super::{
 use crate::item::WorldObject;
 use crate::Player;
 
+
 /// Radius (UI space) around an existing marker within which a click removes it instead of adding.
 const MARKER_REMOVE_RADIUS: f32 = 5.0;
 /// Marker "x" draw size on the island map.
@@ -39,19 +41,33 @@ pub struct MapMarkerPlugin;
 impl Plugin for MapMarkerPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<MapMarkers>()
-            .add_system(
+            .add_systems(
+                Update,
                 clear_markers_on_new_dimension
                     .run_if(in_state(GameState::Main).or_else(in_state(GameState::Initializing))),
             )
-            .add_system(
+            .add_systems(
+                Update,
                 handle_map_marker_clicks
                     .run_if(in_state(GameState::Main))
                     .run_if(|dungeon: Query<&Dungeon>| dungeon.is_empty()),
             )
-            .add_system(sync_map_marker_icons.run_if(in_state(GameState::Main)))
-            .add_system(sync_map_marker_beacons.run_if(in_state(GameState::Main)))
-            .add_system(sync_hud_minimap_markers.run_if(in_state(GameState::Main)))
-            .add_system(sync_map_marker_info_box.run_if(in_state(GameState::Main)));
+            .add_systems(
+                Update,
+                sync_map_marker_icons.run_if(in_state(GameState::Main)),
+            )
+            .add_systems(
+                Update,
+                sync_map_marker_beacons.run_if(in_state(GameState::Main)),
+            )
+            .add_systems(
+                Update,
+                sync_hud_minimap_markers.run_if(in_state(GameState::Main)),
+            )
+            .add_systems(
+                Update,
+                sync_map_marker_info_box.run_if(in_state(GameState::Main)),
+            );
     }
 }
 
@@ -170,7 +186,7 @@ fn next_free_color(markers: &[MapMarker]) -> Option<MarkerColor> {
 
 fn handle_map_marker_clicks(
     cursor_pos: Res<CursorPos>,
-    mouse_input: Res<Input<MouseButton>>,
+    mouse_input: Res<ButtonInput<MouseButton>>,
     map_open: Res<IslandMapOpen>,
     res: Res<ScreenResolution>,
     upgrades: Res<UnlockUpgrades>,
@@ -225,7 +241,7 @@ fn sync_map_marker_icons(
     if !map_open.0 {
         if existing_count > 0 {
             for e in existing.iter() {
-                commands.entity(e).despawn_recursive();
+                commands.entity(e).despawn();
             }
         }
         return;
@@ -237,10 +253,10 @@ fn sync_map_marker_icons(
     }
 
     for e in existing.iter() {
-        commands.entity(e).despawn_recursive();
+        commands.entity(e).despawn();
     }
 
-    let Ok(border) = map_border.get_single() else {
+    let Ok(border) = map_border.single() else {
         return;
     };
 
@@ -249,20 +265,15 @@ fn sync_map_marker_icons(
         let pos = transform.world_to_map_local(marker.world_pos);
         let icon = commands
             .spawn((
-                Text2dBundle {
-                    text: Text::from_section(
-                        "x",
-                        MAP_MARKER_FONT.text_style(&asset_server, marker.color.color()),
-                    )
-                    .with_alignment(TextAlignment::Center),
-                    text_anchor: Anchor::Center,
-                    transform: Transform {
+                MAP_MARKER_FONT
+                    .text(&asset_server, "x", marker.color.color())
+                    .justify(Justify::Center)
+                    .anchor(Anchor::CENTER)
+                    .with_transform(Transform {
                         translation: Vec3::new(pos.x, pos.y, 6.0),
                         scale: MAP_MARKER_FONT.transform_scale(),
                         ..default()
-                    },
-                    ..default()
-                },
+                    }),
                 RenderLayers::from_layers(&[3]),
                 MapMarkerOnMap,
                 Name::new("MAP_MARKER_ON_MAP"),
@@ -285,7 +296,7 @@ fn sync_map_marker_beacons(
     }
 
     for e in existing.iter() {
-        commands.entity(e).despawn_recursive();
+        commands.entity(e).despawn();
     }
 
     for marker in markers.markers.iter() {
@@ -310,13 +321,13 @@ fn sync_hud_minimap_markers(
     player_query: Query<&GlobalTransform, With<Player>>,
     mut marker_query: Query<(Entity, &HudMinimapMarker, &mut Transform, &mut Visibility)>,
 ) {
-    let Ok(player_t) = player_query.get_single() else {
+    let Ok(player_t) = player_query.single() else {
         return;
     };
-    let Ok(container) = container_query.get_single() else {
+    let Ok(container) = container_query.single() else {
         // No HUD minimap (e.g. in a dungeon): drop any stale marker icons.
         for (e, _, _, _) in marker_query.iter() {
-            commands.entity(e).despawn_recursive();
+            commands.entity(e).despawn();
         }
         return;
     };
@@ -340,32 +351,29 @@ fn sync_hud_minimap_markers(
 
     if needs_rebuild {
         for (e, _, _, _) in marker_query.iter() {
-            commands.entity(e).despawn_recursive();
+            commands.entity(e).despawn();
         }
         for (i, marker) in markers.markers.iter().enumerate() {
             let pos = local_pos(marker);
             let visible = pos.length() <= max_dist;
             let icon = commands
                 .spawn((
-                    Text2dBundle {
-                        text: Text::from_section(
-                            "x",
-                            MAP_MARKER_FONT.text_style(&asset_server, marker.color.color()),
-                        )
-                        .with_alignment(TextAlignment::Center),
-                        text_anchor: Anchor::Center,
-                        transform: Transform {
-                            translation: Vec3::new(pos.x, pos.y, 3.0),
-                            scale: MAP_MARKER_FONT.transform_scale(),
-                            ..default()
-                        },
-                        visibility: if visible {
+                    (
+                        MAP_MARKER_FONT
+                            .text(&asset_server, "x", marker.color.color())
+                            .justify(Justify::Center)
+                            .anchor(Anchor::CENTER)
+                            .with_transform(Transform {
+                                translation: Vec3::new(pos.x, pos.y, 3.0),
+                                scale: MAP_MARKER_FONT.transform_scale(),
+                                ..default()
+                            }),
+                        if visible {
                             Visibility::Inherited
                         } else {
                             Visibility::Hidden
                         },
-                        ..default()
-                    },
+                    ),
                     RenderLayers::from_layers(&[3]),
                     HudMinimapMarker(i),
                     Name::new("HUD_MINIMAP_MARKER"),
@@ -402,7 +410,7 @@ fn sync_map_marker_info_box(
 ) {
     if !map_open.0 {
         for e in existing.iter() {
-            commands.entity(e).despawn_recursive();
+            commands.entity(e).despawn();
         }
         return;
     }
@@ -412,7 +420,7 @@ fn sync_map_marker_info_box(
     }
 
     for e in existing.iter() {
-        commands.entity(e).despawn_recursive();
+        commands.entity(e).despawn();
     }
 
     // Sit on the left, above the legend icon stack.
@@ -423,15 +431,14 @@ fn sync_map_marker_info_box(
 
     let box_e = commands
         .spawn((
-            SpriteBundle {
-                texture: graphics.get_ui_element_texture(UIElement::TooltipInfoBox),
-                sprite: Sprite {
+            (
+                Sprite {
+                    image: graphics.get_ui_element_texture(UIElement::TooltipInfoBox),
                     custom_size: Some(TOOLTIP_INFO_BOX_SIZE),
                     ..default()
                 },
-                transform: Transform::from_translation(Vec3::new(pos.x, pos.y, 905.)),
-                ..default()
-            },
+                Transform::from_translation(Vec3::new(pos.x, pos.y, 905.)),
+            ),
             RenderLayers::from_layers(&[3]),
             MapMarkerInfoBox,
             Name::new("MAP_MARKER_INFO_BOX"),
@@ -441,23 +448,18 @@ fn sync_map_marker_info_box(
     for (line, y) in [("Click to mark", 5.), ("a location on the map", -6.)] {
         commands
             .spawn((
-                Text2dBundle {
-                    text: Text::from_section(
-                        line.to_string(),
-                        gf::TOOLTIP_INFO_BOX.text_style(&asset_server, WHITE),
-                    )
-                    .with_alignment(TextAlignment::Center),
-                    text_anchor: Anchor::Center,
-                    transform: Transform {
+                gf::TOOLTIP_INFO_BOX
+                    .text(&asset_server, line.to_string(), WHITE)
+                    .justify(Justify::Center)
+                    .anchor(Anchor::CENTER)
+                    .with_transform(Transform {
                         translation: Vec3::new(0., y, 2.),
                         scale: gf::TOOLTIP_INFO_BOX.transform_scale(),
                         ..default()
-                    },
-                    ..default()
-                },
+                    }),
                 RenderLayers::from_layers(&[3]),
             ))
-            .set_parent(box_e);
+            .insert(ChildOf(box_e));
     }
 }
 

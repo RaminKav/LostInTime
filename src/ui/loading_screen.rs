@@ -3,9 +3,12 @@ use bevy::sprite::Anchor;
 
 use crate::{
     blessings::PendingRunStartBlessing,
-    colors::DARK_WOOD_BROWN, enemy::spawner::GlobalSpawners, player::Player,
+    colors::DARK_WOOD_BROWN,
+    enemy::spawner::GlobalSpawners,
+    player::Player,
     ui::{game_fonts as gf, ui_helpers},
-    world::chunk::DoneCreateChunkEvent, GameState, RenderLayers, ScreenResolution,
+    world::chunk::DoneCreateChunkEvent,
+    GameState, RenderLayers, ScreenResolution,
 };
 
 #[derive(Component)]
@@ -22,36 +25,32 @@ pub fn spawn_loading_overlay(
     message: &str,
 ) {
     commands
-        .spawn(SpriteBundle {
-            sprite: Sprite {
-                color: Color::rgba(0., 0., 0., 1.0),
+        .spawn((
+            Sprite {
+                color: Color::srgba(0., 0., 0., 1.0),
                 custom_size: Some(ui_helpers::full_screen_overlay_size(res)),
                 ..default()
             },
-            transform: Transform {
+            Transform {
                 translation: Vec3::new(0., 0., LOADING_SCREEN_BG_Z),
                 ..default()
             },
-            ..default()
-        })
+        ))
         .insert(LoadingScreen)
         .insert(RenderLayers::from_layers(&[3]))
         .insert(Name::new("LOADING SCREEN BG"));
 
     commands
-        .spawn(Text2dBundle {
-            text: Text::from_section(
-                message,
-                gf::MENU_TITLE_LARGE.text_style(&asset_server, DARK_WOOD_BROWN),
-            ),
-            text_anchor: Anchor::Center,
-            transform: Transform {
-                translation: Vec3::new(0., 0., LOADING_SCREEN_TEXT_Z),
-                scale: gf::MENU_TITLE_LARGE.transform_scale(),
-                ..default()
-            },
-            ..default()
-        })
+        .spawn(
+            gf::MENU_TITLE_LARGE
+                .text(&asset_server, message, DARK_WOOD_BROWN)
+                .anchor(Anchor::CENTER)
+                .with_transform(Transform {
+                    translation: Vec3::new(0., 0., LOADING_SCREEN_TEXT_Z),
+                    scale: gf::MENU_TITLE_LARGE.transform_scale(),
+                    ..default()
+                }),
+        )
         .insert(LoadingScreen)
         .insert(RenderLayers::from_layers(&[3]))
         .insert(Name::new("LOADING TEXT"));
@@ -77,7 +76,7 @@ fn despawn_loading_screens(
     loading_screens: &Query<Entity, With<LoadingScreen>>,
 ) {
     for entity in loading_screens.iter() {
-        commands.entity(entity).despawn_recursive();
+        commands.entity(entity).despawn();
     }
 }
 
@@ -96,7 +95,7 @@ pub struct InitializationTimer {
 pub fn check_initialization_complete(
     mut next_state: ResMut<NextState<GameState>>,
     player_query: Query<Entity, With<Player>>,
-    mut done_chunk_event: EventReader<DoneCreateChunkEvent>,
+    mut done_chunk_event: MessageReader<DoneCreateChunkEvent>,
     mut commands: Commands,
     loading_screens: Query<Entity, With<LoadingScreen>>,
     chunk_query: Query<&crate::world::chunk::Chunk>,
@@ -119,7 +118,7 @@ pub fn check_initialization_complete(
     let timer = init_timer.as_mut().unwrap();
 
     // Check if DoneCreateChunkEvent has been received (signals chunk generation has started)
-    if done_chunk_event.iter().next().is_some() {
+    if done_chunk_event.read().next().is_some() {
         if !timer.done_chunk_event_received {
             info!("DoneCreateChunkEvent received, starting timer");
         }
@@ -131,8 +130,8 @@ pub fn check_initialization_complete(
         timer.timer.tick(time.delta());
     }
 
-    // Check if player exists
-    let player_exists = player_query.get_single().is_ok();
+    // Any player is enough — `single()` is false for 0 *and* 2+ (stale player + new spawn).
+    let player_exists = !player_query.is_empty();
 
     // Count how many chunks have been created (at least a few should exist)
     let chunks_created = chunk_query.iter().count();
@@ -140,7 +139,7 @@ pub fn check_initialization_complete(
     // Start stuck fallback when we have player + done event + main timer finished but still 0 chunks
     let waiting_for_chunks_stuck = player_exists
         && timer.done_chunk_event_received
-        && timer.timer.finished()
+        && timer.timer.is_finished()
         && chunks_created == 0;
     if waiting_for_chunks_stuck {
         if timer.stuck_fallback_timer.is_none() {
@@ -167,7 +166,7 @@ pub fn check_initialization_complete(
             chunks_created
         );
     }
-    if timer.done_chunk_event_received && !timer.timer.finished() {
+    if timer.done_chunk_event_received && !timer.timer.is_finished() {
         let pct =
             (timer.timer.elapsed_secs() / timer.timer.duration().as_secs_f32() * 100.0) as u32;
         if timer.last_logged_timer_pct != Some(pct) {
@@ -187,7 +186,7 @@ pub fn check_initialization_complete(
         && timer
             .stuck_fallback_timer
             .as_ref()
-            .map(|t| t.finished())
+            .map(|t| t.is_finished())
             .unwrap_or(false);
     if force_transition_stuck {
         warn!(
@@ -207,7 +206,7 @@ pub fn check_initialization_complete(
     // and at least some chunks have been created
     if player_exists
         && timer.done_chunk_event_received
-        && timer.timer.finished()
+        && timer.timer.is_finished()
         && chunks_created > 0
     {
         info!(

@@ -26,8 +26,8 @@ pub fn handle_pet_spawner_interaction(
     pets: Query<(), With<Pet>>,
     game: GameParam,
     mut item_action_param: ItemActionParam,
-    key_input: Res<Input<KeyCode>>,
-    mouse_input: Res<Input<MouseButton>>,
+    key_input: Res<ButtonInput<KeyCode>>,
+    mouse_input: Res<ButtonInput<MouseButton>>,
     keybinds: Res<InputMappings>,
     asset_server: Res<AssetServer>,
     seen_tips: Res<SeenTips>,
@@ -36,7 +36,7 @@ pub fn handle_pet_spawner_interaction(
         return;
     }
 
-    let player_t = match player_query.get_single() {
+    let player_t = match player_query.single() {
         Ok(t) => t,
         Err(_) => return,
     };
@@ -73,7 +73,7 @@ pub fn handle_pet_spawner_interaction(
                     // Achievement was newly unlocked, send event
                     item_action_param
                         .achievement_events
-                        .send(AchievementUnlockedEvent {
+                        .write(AchievementUnlockedEvent {
                             achievement: achievement.clone(),
                             reward_currency: achievement.reward_currency(),
                         });
@@ -91,9 +91,7 @@ pub fn handle_pet_spawner_interaction(
                             PetState::default(),
                             YSort(0.001),
                             Collider::capsule(Vec2::new(0., -6.), Vec2::new(0., -6.), 5.0),
-                            TransformBundle::from_transform(Transform::from_translation(
-                                spawner_t.translation(),
-                            )),
+                            Transform::from_translation(spawner_t.translation()),
                             Name::new(format!("{:?} Pet", pet_type)),
                         ));
                     }
@@ -110,7 +108,7 @@ pub fn handle_pet_spawner_interaction(
                     );
 
                     if !seen_tips.has_seen(&Tip::Pets) {
-                        item_action_param.tip_event.send(TipEvent {
+                        item_action_param.tip_event.write(TipEvent {
                             tip: Tip::Pets,
                             pos: Vec3::new(-184., -116., 50.),
                         });
@@ -119,7 +117,7 @@ pub fn handle_pet_spawner_interaction(
             }
 
             // Despawn the spawner object after interaction
-            commands.entity(spawner_e).despawn_recursive();
+            commands.entity(spawner_e).despawn();
         }
     }
 }

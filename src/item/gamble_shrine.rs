@@ -23,6 +23,7 @@ pub struct GambleShrine {
     pub tile_pos: TileMapPosition,
 }
 
+#[derive(Message)]
 pub struct GambleShrineEvent {
     pub entity: Entity,
     pub success: bool,
@@ -33,7 +34,7 @@ pub fn handle_gamble_shrine_rewards(
     proto: ProtoParam,
     mut commands: Commands,
     mut game: GameParam,
-    mut minimap_event: EventWriter<UpdateMiniMapEvent>,
+    mut minimap_event: MessageWriter<UpdateMiniMapEvent>,
     item_drop_query: Query<(Entity, &ItemStack), (With<ItemDrop>, Without<BeingPulledToPlayer>)>,
     inv: Query<&Inventory, With<Player>>,
     pets: Query<(), With<Pet>>,
@@ -56,7 +57,7 @@ pub fn handle_gamble_shrine_rewards(
                 .remove::<ObjectAction>();
             game.add_object_to_chunk_cache(shrine.tile_pos, WorldObject::GambleShrineDone);
 
-            minimap_event.send(UpdateMiniMapEvent {
+            minimap_event.write(UpdateMiniMapEvent {
                 pos: Some(shrine.tile_pos),
                 new_tile: Some(WorldObject::GambleShrineDone),
             });

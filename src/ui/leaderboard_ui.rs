@@ -1,6 +1,7 @@
+use bevy::text::Justify;
 use crate::ui::game_fonts as gf;
+use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
-use bevy::render::view::RenderLayers;
 
 use crate::{
     client::leaderboard::LeaderboardCache,
@@ -61,15 +62,14 @@ fn spawn_leaderboard_panel(
 
     // Background panel
     commands.spawn((
-        SpriteBundle {
-            sprite: Sprite {
-                color: Color::rgba(0.15, 0.12, 0.10, 0.95),
+        (
+            Sprite {
+                color: Color::srgba(0.15, 0.12, 0.10, 0.95),
                 custom_size: Some(Vec2::new(LEADERBOARD_PANEL_WIDTH, LEADERBOARD_PANEL_HEIGHT)),
                 ..Default::default()
             },
-            transform: Transform::from_translation(Vec3::new(panel_x, panel_y, 9.)),
-            ..Default::default()
-        },
+            Transform::from_translation(Vec3::new(panel_x, panel_y, 9.)),
+        ),
         RenderLayers::from_layers(&[3]),
         LeaderboardUI,
         UIState::Closed,
@@ -78,24 +78,19 @@ fn spawn_leaderboard_panel(
 
     // Title
     commands.spawn((
-        Text2dBundle {
-            text: Text::from_section(
-                "Leaderboard",
-                gf::BODY.text_style(&asset_server, YELLOW_2),
-            )
-            .with_alignment(TextAlignment::Center),
-            text_anchor: bevy::sprite::Anchor::Center,
-            transform: Transform {
+        gf::BODY
+            .text(&asset_server, "Leaderboard", YELLOW_2)
+            .justify(Justify::Center)
+            .anchor(bevy::sprite::Anchor::CENTER)
+            .with_transform(Transform {
                 translation: Vec3::new(
-                panel_x + 0.5,
-                panel_y + LEADERBOARD_PANEL_HEIGHT / 2. - 8.5,
-                12.,
-            ),
+                    panel_x + 0.5,
+                    panel_y + LEADERBOARD_PANEL_HEIGHT / 2. - 8.5,
+                    12.,
+                ),
                 scale: gf::BODY.transform_scale(),
                 ..Default::default()
-            },
-            ..Default::default()
-        },
+            }),
         RenderLayers::from_layers(&[3]),
         LeaderboardUI,
         UIState::Closed,
@@ -139,71 +134,56 @@ fn spawn_leaderboard_entries(
         info!("Spawning LOADING text");
 
         commands.spawn((
-            Text2dBundle {
-                text: Text::from_section(
-                    "Loading...",
-                    gf::BODY.text_style(&asset_server, YELLOW_2),
-                )
-                .with_alignment(TextAlignment::Left),
-                text_anchor: bevy::sprite::Anchor::CenterLeft,
-                transform: Transform {
-                translation: Vec3::new(text_x, start_y, 11.),
-                scale: gf::BODY.transform_scale(),
-                ..Default::default()
-            },
-                ..Default::default()
-            },
+            gf::BODY
+                .text(&asset_server, "Loading...", YELLOW_2)
+                .justify(Justify::Left)
+                .anchor(bevy::sprite::Anchor::CENTER_LEFT)
+                .with_transform(Transform {
+                    translation: Vec3::new(text_x, start_y, 11.),
+                    scale: gf::BODY.transform_scale(),
+                    ..Default::default()
+                }),
             RenderLayers::from_layers(&[3]),
             LeaderboardUI,
             LeaderboardEntryText,
             UIState::Closed,
-            Name::new("Loading Text"),
+            Name::new("Loading Text2d"),
         ));
     } else if let Some(_error) = &cache.last_error {
         info!("Spawning ERROR text");
         commands.spawn((
-            Text2dBundle {
-                text: Text::from_section(
-                    "Server offline",
-                    gf::BODY.text_style(&asset_server, RED),
-                )
-                .with_alignment(TextAlignment::Left),
-                text_anchor: bevy::sprite::Anchor::CenterLeft,
-                transform: Transform {
-                translation: Vec3::new(text_x, start_y, 11.),
-                scale: gf::BODY.transform_scale(),
-                ..Default::default()
-            },
-                ..Default::default()
-            },
+            gf::BODY
+                .text(&asset_server, "Server offline", RED)
+                .justify(Justify::Left)
+                .anchor(bevy::sprite::Anchor::CENTER_LEFT)
+                .with_transform(Transform {
+                    translation: Vec3::new(text_x, start_y, 11.),
+                    scale: gf::BODY.transform_scale(),
+                    ..Default::default()
+                }),
             RenderLayers::from_layers(&[3]),
             LeaderboardUI,
             LeaderboardEntryText,
             UIState::Closed,
-            Name::new("Error Text"),
+            Name::new("Error Text2d"),
         ));
     } else if cache.entries.is_empty() {
         info!("Spawning NO SCORES text");
         commands.spawn((
-            Text2dBundle {
-                text: Text::from_section(
-                    "No scores!",
-                    gf::BODY.text_style(&asset_server, DARK_WOOD_BROWN),
-                )
-                .with_alignment(TextAlignment::Left),
-                text_anchor: bevy::sprite::Anchor::CenterLeft,
-                transform: Transform {
-                translation: Vec3::new(text_x, start_y, 11.),
-                scale: gf::BODY.transform_scale(),
-                ..Default::default()
-            },
-                ..Default::default()
-            },
+            gf::BODY
+                .text(&asset_server, "No scores!", DARK_WOOD_BROWN)
+                .justify(Justify::Left)
+                .anchor(bevy::sprite::Anchor::CENTER_LEFT)
+                .with_transform(Transform {
+                    translation: Vec3::new(text_x, start_y, 11.),
+                    scale: gf::BODY.transform_scale(),
+                    ..Default::default()
+                }),
             RenderLayers::from_layers(&[3]),
             LeaderboardUI,
             LeaderboardEntryText,
             UIState::Closed,
-            Name::new("Empty Text"),
+            Name::new("Empty Text2d"),
         ));
     } else {
         // Display entries (only top )
@@ -216,20 +196,19 @@ fn spawn_leaderboard_entries(
 
             // Rank
             commands.spawn((
-                Text2dBundle {
-                    text: Text::from_section(
+                gf::BODY
+                    .text(
+                        &asset_server,
                         format!("{}.", entry.rank.unwrap_or(0)),
-                        gf::BODY.text_style(&asset_server, YELLOW),
+                        YELLOW,
                     )
-                    .with_alignment(TextAlignment::Left),
-                    text_anchor: bevy::sprite::Anchor::CenterRight,
-                    transform: Transform {
-                translation: Vec3::new(text_x + 9., y, 15.),
-                scale: gf::BODY.transform_scale(),
-                ..Default::default()
-            },
-                    ..Default::default()
-                },
+                    .justify(Justify::Left)
+                    .anchor(bevy::sprite::Anchor::CENTER_RIGHT)
+                    .with_transform(Transform {
+                        translation: Vec3::new(text_x + 9., y, 15.),
+                        scale: gf::BODY.transform_scale(),
+                        ..Default::default()
+                    }),
                 RenderLayers::from_layers(&[3]),
                 LeaderboardUI,
                 LeaderboardEntryText,
@@ -241,20 +220,15 @@ fn spawn_leaderboard_entries(
 
             // Player name
             commands.spawn((
-                Text2dBundle {
-                    text: Text::from_section(
-                        &name,
-                        gf::BODY.text_style(&asset_server, WHITE),
-                    )
-                    .with_alignment(TextAlignment::Left),
-                    text_anchor: bevy::sprite::Anchor::CenterLeft,
-                    transform: Transform {
-                translation: Vec3::new(text_x + 12., y, 15.),
-                scale: gf::BODY.transform_scale(),
-                ..Default::default()
-            },
-                    ..Default::default()
-                },
+                gf::BODY
+                    .text(&asset_server, &name, WHITE)
+                    .justify(Justify::Left)
+                    .anchor(bevy::sprite::Anchor::CENTER_LEFT)
+                    .with_transform(Transform {
+                        translation: Vec3::new(text_x + 12., y, 15.),
+                        scale: gf::BODY.transform_scale(),
+                        ..Default::default()
+                    }),
                 RenderLayers::from_layers(&[3]),
                 LeaderboardUI,
                 LeaderboardEntryText,
@@ -263,20 +237,15 @@ fn spawn_leaderboard_entries(
 
             // Score
             commands.spawn((
-                Text2dBundle {
-                    text: Text::from_section(
-                        format_score(entry.score),
-                        gf::BODY.text_style(&asset_server, YELLOW_2),
-                    )
-                    .with_alignment(TextAlignment::Left),
-                    text_anchor: bevy::sprite::Anchor::CenterLeft,
-                    transform: Transform {
-                translation: Vec3::new(text_x + 94., y, 15.),
-                scale: gf::BODY.transform_scale(),
-                ..Default::default()
-            },
-                    ..Default::default()
-                },
+                gf::BODY
+                    .text(&asset_server, format_score(entry.score), YELLOW_2)
+                    .justify(Justify::Left)
+                    .anchor(bevy::sprite::Anchor::CENTER_LEFT)
+                    .with_transform(Transform {
+                        translation: Vec3::new(text_x + 94., y, 15.),
+                        scale: gf::BODY.transform_scale(),
+                        ..Default::default()
+                    }),
                 RenderLayers::from_layers(&[3]),
                 LeaderboardUI,
                 LeaderboardEntryText,
@@ -284,20 +253,15 @@ fn spawn_leaderboard_entries(
             ));
 
             commands.spawn((
-                Text2dBundle {
-                    text: Text::from_section(
-                        &entry.class,
-                        gf::BODY.text_style(&asset_server, LIGHT_BLUE),
-                    )
-                    .with_alignment(TextAlignment::Left),
-                    text_anchor: bevy::sprite::Anchor::CenterLeft,
-                    transform: Transform {
-                translation: Vec3::new(text_x + 122., y, 15.),
-                scale: gf::BODY.transform_scale(),
-                ..Default::default()
-            },
-                    ..Default::default()
-                },
+                gf::BODY
+                    .text(&asset_server, &entry.class, LIGHT_BLUE)
+                    .justify(Justify::Left)
+                    .anchor(bevy::sprite::Anchor::CENTER_LEFT)
+                    .with_transform(Transform {
+                        translation: Vec3::new(text_x + 122., y, 15.),
+                        scale: gf::BODY.transform_scale(),
+                        ..Default::default()
+                    }),
                 RenderLayers::from_layers(&[3]),
                 LeaderboardUI,
                 LeaderboardEntryText,
@@ -318,7 +282,7 @@ pub fn update_leaderboard_display(
         (
             With<LeaderboardUI>,
             Without<LeaderboardEntryText>,
-            Without<Text>,
+            Without<Text2d>,
         ),
     >,
 ) {
@@ -328,11 +292,11 @@ pub fn update_leaderboard_display(
 
     // Despawn old entry texts
     for entity in entry_query.iter() {
-        commands.entity(entity).despawn_recursive();
+        commands.entity(entity).despawn();
     }
 
     // Get panel position
-    if let Ok(panel_transform) = panel_query.get_single() {
+    if let Ok(panel_transform) = panel_query.single() {
         let panel_x = panel_transform.translation.x;
         let panel_y = panel_transform.translation.y;
 
@@ -354,7 +318,7 @@ pub fn ensure_leaderboard_entries(
     mut commands: Commands,
     cache: Res<LeaderboardCache>,
     asset_server: Res<AssetServer>,
-    panel_query: Query<&Transform, (With<LeaderboardUI>, Without<Text>)>,
+    panel_query: Query<&Transform, (With<LeaderboardUI>, Without<Text2d>)>,
     entry_query: Query<(), With<LeaderboardEntryText>>,
 ) {
     // Only run if we have the panel but no entries
@@ -367,7 +331,7 @@ pub fn ensure_leaderboard_entries(
     }
 
     // We have a panel but no entries - spawn them
-    if let Ok(panel_transform) = panel_query.get_single() {
+    if let Ok(panel_transform) = panel_query.single() {
         info!(
             "Ensuring leaderboard entries exist (is_loading: {}, entries: {})",
             cache.is_loading,
@@ -399,7 +363,7 @@ pub fn cleanup_leaderboard_ui(mut commands: Commands, query: Query<Entity, With<
         );
     }
     for entity in query.iter() {
-        commands.entity(entity).despawn_recursive();
+        commands.entity(entity).despawn();
     }
 }
 
@@ -413,7 +377,7 @@ pub fn sync_main_menu_leaderboard_ui(
     resolution: Res<ScreenResolution>,
     cache: Res<LeaderboardCache>,
 ) {
-    if ui_state.0 != UIState::Closed {
+    if *ui_state != UIState::Closed {
         return;
     }
 
@@ -423,7 +387,7 @@ pub fn sync_main_menu_leaderboard_ui(
         }
     } else {
         for entity in existing.iter() {
-            commands.entity(entity).despawn_recursive();
+            commands.entity(entity).despawn();
         }
     }
 }

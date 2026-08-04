@@ -8,19 +8,19 @@ use super::WorldObject;
 pub struct LootTablePlugin;
 impl Plugin for LootTablePlugin {
     fn build(&self, _app: &mut App) {
-        // app.add_event::<CraftingSlotUpdateEvent>().add_system_set(
+        // app.add_message::<CraftingSlotUpdateEvent>().add_system_set(
         //     SystemSet::on_update(GameState::Main)
         //         .with_run_criteria(FixedTimestep::step(TIME_STEP as f64))
         // );
     }
 }
 
-#[derive(Default, Reflect, FromReflect, Clone, Debug, Component, Deserialize)]
+#[derive(Default, Reflect, Clone, Debug, Component, Deserialize)]
 pub struct LootTable {
     pub drops: Vec<Loot>,
 }
 
-#[derive(Default, Reflect, FromReflect, Clone, Debug, Deserialize)]
+#[derive(Default, Reflect, Clone, Debug, Deserialize)]
 pub struct Loot {
     pub item: WorldObject,
     pub min: usize,

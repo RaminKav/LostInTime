@@ -1,23 +1,18 @@
-// idle
-// walk
-// run (run stop)
-// roll
-// parry (parry success)
-// attack (2 forms)
-// sprint
-// bowbasic
-
-//when direction changes, we need to assign a new animation handle
-//
+use crate::aseprite_assets::{
+    FairyPetSprite, PlayerBlueAseprite, PlayerDeadAseprite, PlayerGreenAseprite,
+    PlayerGreyAseprite, PlayerHunterAseprite, PlayerRedAseprite, PlayerRogueAseprite,
+    PlayerThiefAseprite, PlayerWizardAseprite, SlimePetSprite,
+};
 use bevy::prelude::*;
-use bevy_aseprite::{anim::AsepriteAnimation, aseprite, Aseprite};
+use bevy_aseprite_ultra::prelude::{
+    Animation, AnimationEvents, AnimationRepeat, AnimationState, AseAnimation, Aseprite,
+};
 
 use crate::{
     attributes::AttributeChangeEvent,
     inputs::FacingDirection,
     item::WorldObject,
     player::skills::{ActiveSkillChoiceState, HeirloomRarity, PlayerClass},
-    FairyPetSprite, SlimePetSprite,
 };
 
 /// Timer to track how long an attack animation has been playing. Added
@@ -28,14 +23,11 @@ use crate::{
 #[component(storage = "SparseSet")]
 pub struct AttackAnimationTimer(pub Timer);
 
-aseprite!(pub PlayerRedAseprite, "textures/player/player_red.aseprite");
-aseprite!(pub PlayerBlueAseprite, "textures/player/player_blue.aseprite");
-aseprite!(pub PlayerGreyAseprite, "textures/player/player_grey.aseprite");
-aseprite!(pub PlayerGreenAseprite, "textures/player/player_green.aseprite");
-aseprite!(pub PlayerRogueAseprite, "textures/player/player_rogue.aseprite");
-aseprite!(pub PlayerThiefAseprite, "textures/player/player_thief.aseprite");
-aseprite!(pub PlayerWizardAseprite, "textures/player/player_wizard.aseprite");
-aseprite!(pub PlayerHunterAseprite, "textures/player/player_hunter.aseprite");
+/// Force-restart the current attack/bow clip when a new swing starts while
+/// [`PlayerAnimation`] is already `Attack`/`Bow` (no `Changed` trigger).
+#[derive(Component)]
+#[component(storage = "SparseSet")]
+pub struct RestartPlayerAttackAnim;
 
 #[derive(Resource)]
 pub struct PlayerSpriteHandles {
@@ -51,7 +43,6 @@ pub struct PlayerSpriteHandles {
     pub slime_pet: Handle<Aseprite>,
     pub fairy_pet: Handle<Aseprite>,
 }
-aseprite!(pub PlayerDeadAseprite, "textures/player/player_dead.aseprite");
 
 #[derive(Component, Eq, PartialEq, Debug)]
 pub enum PlayerAnimation {
@@ -71,22 +62,73 @@ pub enum PlayerAnimation {
 }
 impl PlayerAnimation {
     pub fn get_str(&self, dir: FacingDirection) -> String {
-        let dir_str = dir.get_anim_dir_str();
+        // Tag names must match the `.aseprite` file exactly (parsed from the binary).
+        // A missing tag makes bevy_aseprite_ultra skip that entity's animation update.
         match self {
-            PlayerAnimation::Idle => format!("Idle{}", dir_str),
-            PlayerAnimation::Walk => format!("Walk{}", dir_str),
-            PlayerAnimation::Run => format!("Run{}", dir_str),
-            PlayerAnimation::Roll => format!("Roll{}", dir_str),
-            PlayerAnimation::Parry => format!("Parry{}", dir_str),
-            PlayerAnimation::ParryHit => format!("ParryHit{}", dir_str),
-            PlayerAnimation::Spear => format!("Spear{}", dir_str),
-            PlayerAnimation::Attack => format!("Attack2{}", dir_str),
-            PlayerAnimation::Bow => format!("Bow{}", dir_str),
-            PlayerAnimation::Lunge => format!("Lunge{}", dir_str),
-            PlayerAnimation::RunAttack2 => format!("RunAttack2{}", dir_str),
-            PlayerAnimation::Teleport => format!("Teleport{}", dir_str),
-            PlayerAnimation::SpinAttack => "SpinAttackFront".to_string(),
+            PlayerAnimation::Idle => match dir {
+                FacingDirection::Up => "IdleBack",
+                FacingDirection::Down => "IdleFront",
+                FacingDirection::Left | FacingDirection::Right => "IdleSide",
+            },
+            PlayerAnimation::Walk => match dir {
+                FacingDirection::Up => "WalkBack",
+                FacingDirection::Down => "WalkFront",
+                FacingDirection::Left | FacingDirection::Right => "WalkSide",
+            },
+            PlayerAnimation::Run => match dir {
+                FacingDirection::Up => "RunBack",
+                FacingDirection::Down => "RunFront",
+                FacingDirection::Left | FacingDirection::Right => "RunSide",
+            },
+            PlayerAnimation::Roll => match dir {
+                FacingDirection::Up => "RollBack",
+                FacingDirection::Down => "RollFront",
+                FacingDirection::Left | FacingDirection::Right => "RollSide",
+            },
+            PlayerAnimation::Parry => match dir {
+                FacingDirection::Up => "ParryBack",
+                FacingDirection::Down => "ParryFront",
+                FacingDirection::Left | FacingDirection::Right => "ParrySide",
+            },
+            PlayerAnimation::ParryHit => match dir {
+                FacingDirection::Up => "ParryHitBack",
+                FacingDirection::Down => "ParryHitFront",
+                FacingDirection::Left | FacingDirection::Right => "ParryHitSide",
+            },
+            PlayerAnimation::Spear => match dir {
+                FacingDirection::Up => "SpearBack",
+                FacingDirection::Down => "SpearFront",
+                FacingDirection::Left | FacingDirection::Right => "SpearSide",
+            },
+            PlayerAnimation::Attack => match dir {
+                FacingDirection::Up => "Attack2Back",
+                FacingDirection::Down => "Attack2Front",
+                FacingDirection::Left | FacingDirection::Right => "Attack2Side",
+            },
+            PlayerAnimation::Bow => match dir {
+                FacingDirection::Up => "BowBack",
+                FacingDirection::Down => "BowFront",
+                FacingDirection::Left | FacingDirection::Right => "BowSide",
+            },
+            PlayerAnimation::Lunge => match dir {
+                FacingDirection::Up => "LungeBack",
+                FacingDirection::Down => "LungeFront",
+                FacingDirection::Left | FacingDirection::Right => "LungeSide",
+            },
+            PlayerAnimation::RunAttack2 => match dir {
+                FacingDirection::Up => "RunAttack2Back",
+                FacingDirection::Down => "RunAttack2Front",
+                FacingDirection::Left | FacingDirection::Right => "RunAttack2Side",
+            },
+            PlayerAnimation::Teleport => match dir {
+                FacingDirection::Up => "TeleportBack",
+                FacingDirection::Down => "TeleportFront",
+                FacingDirection::Left | FacingDirection::Right => "TeleportSide",
+            },
+            // Most class sheets only define the front clip; rogue/thief have more.
+            PlayerAnimation::SpinAttack => "SpinAttackFront",
         }
+        .to_string()
     }
     pub fn is_dir_locked(&self) -> bool {
         match self {
@@ -174,10 +216,13 @@ impl PlayerAnimation {
 #[derive(Component)]
 pub struct PlayerAnimationState {
     pub prev_dir: FacingDirection,
-    /// Previous aseprite frame index, used to detect when a one-time tag loops.
+    /// Previous **tag-relative** frame, used to detect when a one-time tag wraps.
     prev_aseprite_frame: usize,
-    /// Set once the animation advances past its first frame.
+    /// Set once the animation advances past its first relative frame.
     seen_aseprite_progress: bool,
+    /// After a tag switch, ignore the next wrap sample — `AnimationState` still
+    /// holds the previous tag's frame until ultra applies the new tag.
+    suppress_wrap_detect: bool,
 }
 impl PlayerAnimationState {
     pub fn new() -> Self {
@@ -185,12 +230,22 @@ impl PlayerAnimationState {
             prev_dir: FacingDirection::Down,
             prev_aseprite_frame: 0,
             seen_aseprite_progress: false,
+            suppress_wrap_detect: false,
         }
     }
 
     fn reset_aseprite_frame_tracker(&mut self) {
         self.prev_aseprite_frame = 0;
         self.seen_aseprite_progress = false;
+        self.suppress_wrap_detect = true;
+    }
+}
+
+fn play_player_tag(ase: &mut AseAnimation, tag: &str, once: bool) {
+    if once {
+        ase.animation.play(tag, AnimationRepeat::Count(1));
+    } else {
+        ase.animation.play_loop(tag);
     }
 }
 
@@ -199,22 +254,18 @@ pub fn handle_anim_change_when_player_dir_changes(
         (
             &FacingDirection,
             &PlayerAnimation,
-            &mut AsepriteAnimation,
+            &mut AseAnimation,
             &mut PlayerAnimationState,
-            &mut TextureAtlasSprite,
+            &mut Sprite,
         ),
         Or<(Changed<FacingDirection>, Changed<PlayerAnimation>)>,
     >,
 ) {
-    for (new_dir, curr_anim, mut prev_anim_state, mut prev_dir, mut sprite) in
-        new_dir_query.iter_mut()
-    {
-        if curr_anim.is_dir_locked() && !prev_anim_state.just_finished() {
+    for (new_dir, curr_anim, mut ase, mut anim_state, mut sprite) in new_dir_query.iter_mut() {
+        if curr_anim.is_dir_locked() {
             // Left/right share the same Aseprite tag (`…Side`); only `flip_x` differs.
-            // Locked animations skip full tag swaps mid-playback, but during rapid
-            // attack chains (e.g. auto attack) we must still refresh horizontal flip.
             let side_to_side = matches!(
-                (&prev_dir.prev_dir, new_dir),
+                (&anim_state.prev_dir, new_dir),
                 (
                     FacingDirection::Left | FacingDirection::Right,
                     FacingDirection::Left | FacingDirection::Right,
@@ -222,35 +273,15 @@ pub fn handle_anim_change_when_player_dir_changes(
             );
             if side_to_side {
                 sprite.flip_x = new_dir == &FacingDirection::Left;
-                prev_dir.prev_dir = new_dir.clone();
+                anim_state.prev_dir = new_dir.clone();
             }
             continue;
         }
 
-        match new_dir {
-            FacingDirection::Up => {
-                *prev_anim_state = AsepriteAnimation::from(curr_anim.get_str(new_dir.clone()));
-
-                sprite.flip_x = false;
-            }
-            FacingDirection::Down => {
-                *prev_anim_state = AsepriteAnimation::from(curr_anim.get_str(new_dir.clone()));
-                sprite.flip_x = false;
-            }
-            FacingDirection::Left | FacingDirection::Right => {
-                *prev_anim_state = AsepriteAnimation::from(curr_anim.get_str(new_dir.clone()));
-                if new_dir == &FacingDirection::Left {
-                    sprite.flip_x = true;
-                } else {
-                    sprite.flip_x = false;
-                }
-            }
-        }
-
-        prev_dir.prev_dir = new_dir.clone();
-        if curr_anim.is_one_time_anim() {
-            prev_dir.reset_aseprite_frame_tracker();
-        }
+        let tag = curr_anim.get_str(new_dir.clone());
+        play_player_tag(&mut ase, tag.as_str(), false);
+        sprite.flip_x = matches!(new_dir, FacingDirection::Left);
+        anim_state.prev_dir = new_dir.clone();
     }
 }
 
@@ -258,17 +289,44 @@ pub fn handle_player_animation_change(
     mut query: Query<
         (
             &PlayerAnimation,
-            &mut AsepriteAnimation,
+            &mut AseAnimation,
             &mut PlayerAnimationState,
             &FacingDirection,
         ),
         Changed<PlayerAnimation>,
     >,
 ) {
-    for (curr_anim, mut aseprite_anim, mut anim_state, dir) in query.iter_mut() {
-        *aseprite_anim = AsepriteAnimation::from(curr_anim.get_str(dir.clone()));
+    for (curr_anim, mut ase, mut anim_state, dir) in query.iter_mut() {
+        let tag = curr_anim.get_str(dir.clone());
+        play_player_tag(&mut ase, tag.as_str(), curr_anim.is_one_time_anim());
         anim_state.prev_dir = dir.clone();
         anim_state.reset_aseprite_frame_tracker();
+    }
+}
+
+/// Restart attack/bow clips when a new swing starts without a `PlayerAnimation` change
+/// (same state already `Attack`/`Bow`). Needed so long class sheets (wizard) can cut
+/// short and resync with weapon cadence like short warrior clips do naturally.
+pub fn handle_restart_player_attack_anim(
+    mut query: Query<
+        (
+            Entity,
+            &PlayerAnimation,
+            &mut AseAnimation,
+            &mut PlayerAnimationState,
+            &FacingDirection,
+        ),
+        With<RestartPlayerAttackAnim>,
+    >,
+    mut commands: Commands,
+) {
+    for (e, curr_anim, mut ase, mut anim_state, dir) in query.iter_mut() {
+        if curr_anim.is_an_attack() || curr_anim.is_shooting_bow() {
+            let tag = curr_anim.get_str(dir.clone());
+            play_player_tag(&mut ase, tag.as_str(), true);
+            anim_state.reset_aseprite_frame_tracker();
+        }
+        commands.entity(e).remove::<RestartPlayerAttackAnim>();
     }
 }
 
@@ -276,61 +334,73 @@ pub fn cleanup_one_time_animations(
     mut query: Query<(
         Entity,
         &PlayerAnimation,
-        &mut AsepriteAnimation,
         &mut PlayerAnimationState,
+        &AnimationState,
         Option<&crate::attributes::AttackCooldown>,
         Option<&mut AttackAnimationTimer>,
     )>,
+    mut finished_events: MessageReader<AnimationEvents>,
     mut commands: Commands,
     time: Res<Time>,
 ) {
-    for (
-        e,
-        curr_anim,
-        mut aseprite_anim,
-        mut anim_state,
-        attack_cooldown_option,
-        attack_timer_option,
-    ) in query.iter_mut()
+    let mut finished = std::collections::HashSet::new();
+    for event in finished_events.read() {
+        if let AnimationEvents::Finished(entity) = event {
+            finished.insert(*entity);
+        }
+    }
+
+    for (e, curr_anim, mut anim_state, ultra_state, attack_cooldown_option, attack_timer_option) in
+        query.iter_mut()
     {
-        if curr_anim.is_one_time_anim() {
-            let current_frame = aseprite_anim.current_frame();
-            // bevy_aseprite always loops Forward tags back to the first frame.
-            // `just_finished()` is only true for one frame when entering the last
-            // frame, and is cleared at the start of the next `update_animations`
-            // tick. If the last frame duration is shorter than one game tick
-            // (e.g. 10ms at 60fps ≈ 16.7ms delta), the next tick can consume
-            // the last frame and loop back to frame 0 before cleanup runs — leaving
-            // Teleport stuck replaying its opening frames.
-            let looped = anim_state.seen_aseprite_progress
-                && current_frame < anim_state.prev_aseprite_frame;
-            if current_frame > 0 {
+        if !curr_anim.is_one_time_anim() {
+            continue;
+        }
+
+        // Use tag-relative frames. Global sheet indices made Walk→Attack look like a
+        // wrap on classes whose Attack tags sit earlier in the sheet than Walk
+        // (wizard): one attack frame, then false "finished" → Idle → Walk while moving.
+        let current_frame = usize::from(ultra_state.relative_frame());
+        let mut looped = false;
+        if anim_state.suppress_wrap_detect {
+            anim_state.prev_aseprite_frame = current_frame;
+            anim_state.seen_aseprite_progress = false;
+            anim_state.suppress_wrap_detect = false;
+        } else {
+            looped =
+                anim_state.seen_aseprite_progress && current_frame < anim_state.prev_aseprite_frame;
+            if current_frame > anim_state.prev_aseprite_frame {
                 anim_state.seen_aseprite_progress = true;
             }
             anim_state.prev_aseprite_frame = current_frame;
+        }
 
-            let mut animation_finished = aseprite_anim.just_finished() || looped;
+        let is_attack_clip = curr_anim.is_an_attack() || curr_anim.is_shooting_bow();
+        // Attacks already end via Finished + AttackAnimationTimer cadence cut. Never
+        // trust wrap detection for them — it's what caused the move+auto-attack glitch.
+        let mut animation_finished = finished.contains(&e) || (!is_attack_clip && looped);
 
-            // Allow attack animations to be interrupted early if attack cooldown is very low
-            // This prevents animation duration from being the bottleneck for attack speed
-            if curr_anim.is_an_attack() || curr_anim.is_shooting_bow() {
-                if let Some(cooldown) = attack_cooldown_option {
-                    if let Some(mut attack_timer) = attack_timer_option {
-                        attack_timer.0.tick(time.delta());
-                        // If attack cooldown is less than 0.25s (typical animation duration),
-                        // allow the animation to finish after the cooldown duration has elapsed
-                        if cooldown.0 < 0.25 && attack_timer.0.elapsed_secs() >= cooldown.0 * 0.8 {
-                            animation_finished = true;
-                        }
+        // Weapon cadence wins over clip length. Warrior Attack2 ≈ 245ms so it
+        // naturally ends near typical cooldowns; wizard Attack2 ≈ 500–600ms would
+        // otherwise finish late, flash Idle, then start the next swing out of sync.
+        // Cut the swing once we've played most of the cooldown window (any AS).
+        if is_attack_clip {
+            if let Some(cooldown) = attack_cooldown_option {
+                if let Some(mut attack_timer) = attack_timer_option {
+                    attack_timer.0.tick(time.delta());
+                    // Ignore stale Finished from a previous swing that was just restarted.
+                    if attack_timer.0.elapsed_secs() < 0.02 {
+                        animation_finished = false;
+                    } else if attack_timer.0.elapsed_secs() >= cooldown.0 * 0.8 {
+                        animation_finished = true;
                     }
                 }
             }
+        }
 
-            if animation_finished {
-                aseprite_anim.pause();
-                commands.entity(e).insert(PlayerAnimation::Idle);
-                commands.entity(e).remove::<AttackAnimationTimer>();
-            }
+        if animation_finished {
+            commands.entity(e).insert(PlayerAnimation::Idle);
+            commands.entity(e).remove::<AttackAnimationTimer>();
         }
     }
 }
@@ -353,10 +423,14 @@ pub fn preload_player_sprites(mut commands: Commands, asset_server: Res<AssetSer
 pub fn change_player_class_visuals(
     mut player: Query<
         (Entity, &mut crate::player::skills::PlayerSkills),
-        (Without<PlayerClass>, With<crate::Player>),
+        // Gate on `AseAnimation`, not `PlayerClass`. In Bevy 0.19 `Resource` impls
+        // `Component` but resources are unique — inserting `PlayerClass` onto the player
+        // is stripped while the resource exists, so `Without<PlayerClass>` matched every
+        // frame and re-inserted `AnimationState::default()`, freezing the sprite on frame 0.
+        (Without<AseAnimation>, With<crate::Player>),
     >,
     mut commands: Commands,
-    mut att_event: EventWriter<AttributeChangeEvent>,
+    mut att_event: MessageWriter<AttributeChangeEvent>,
     player_class: Res<PlayerClass>,
     sprite_handles: Res<PlayerSpriteHandles>,
     graphics: Res<crate::assets::Graphics>,
@@ -379,15 +453,19 @@ pub fn change_player_class_visuals(
 
         active_skills[0].add_skill_components(e, &mut commands);
 
-        //att update event
+        // Do not `.insert(player_class.clone())` — `PlayerClass` is a Resource.
         commands
             .entity(e)
-            .remove::<TextureAtlasSprite>()
             .insert(class.clone())
-            .insert(player_class.clone())
-            .insert(handle)
-            .insert(AsepriteAnimation::from(anim));
+            .insert((
+                AseAnimation {
+                    aseprite: handle,
+                    animation: Animation::tag(anim).with_repeat(AnimationRepeat::Loop),
+                },
+                AnimationState::default(),
+                Sprite::default(),
+            ));
 
-        att_event.send(AttributeChangeEvent);
+        att_event.write(AttributeChangeEvent);
     }
 }

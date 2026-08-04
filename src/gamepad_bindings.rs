@@ -1,6 +1,6 @@
-use bevy::input::gamepad::GamepadButtonType;
+use bevy::input::gamepad::GamepadButton;
 use bevy::prelude::*;
-use leafwing_input_manager::prelude::{DualAxis, InputMap};
+use leafwing_input_manager::prelude::{GamepadStick, InputMap};
 use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io::BufReader;
@@ -25,9 +25,9 @@ pub fn format_binding_label(
     label: BindingLabel,
     keybinds: &InputMappings,
     gamepad_mappings: &GamepadMappings,
-    gamepads: &Gamepads,
+    gamepad_connected: bool,
 ) -> String {
-    if gamepad_connected(gamepads) {
+    if gamepad_connected {
         let button = match label {
             BindingLabel::ActiveSkill(slot) => gamepad_mappings.get_active_skill_button(slot),
             BindingLabel::Hotbar(slot) => gamepad_mappings.get_hotbar_button(slot),
@@ -54,10 +54,9 @@ pub fn format_binding_label(
 pub fn binding_labels_dirty(
     keybinds_changed: bool,
     gamepad_mappings_changed: bool,
-    gamepads: &Gamepads,
+    connected: bool,
     last_gamepad_connected: &mut Option<bool>,
 ) -> bool {
-    let connected = gamepad_connected(gamepads);
     let device_changed = match *last_gamepad_connected {
         None => true,
         Some(prev) => prev != connected,
@@ -67,15 +66,15 @@ pub fn binding_labels_dirty(
 }
 
 /// Pause/options hint on the HUD corner icon (Start on controller, Esc on keyboard).
-pub fn format_pause_options_label(gamepads: &Gamepads) -> String {
-    if gamepad_connected(gamepads) {
+pub fn format_pause_options_label(gamepad_connected: bool) -> String {
+    if gamepad_connected {
         "Start".to_string()
     } else {
         "Esc".to_string()
     }
 }
 
-/// Persisted gamepad button identity (mirrors Bevy `GamepadButtonType` face/trigger/d-pad values).
+/// Persisted gamepad button identity (mirrors Bevy `GamepadButton` face/trigger/d-pad values).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
 pub enum GamepadBindingButton {
     South,
@@ -95,42 +94,42 @@ pub enum GamepadBindingButton {
 }
 
 impl GamepadBindingButton {
-    pub fn to_button_type(self) -> GamepadButtonType {
+    pub fn to_button_type(self) -> GamepadButton {
         match self {
-            Self::South => GamepadButtonType::South,
-            Self::East => GamepadButtonType::East,
-            Self::North => GamepadButtonType::North,
-            Self::West => GamepadButtonType::West,
-            Self::LeftTrigger => GamepadButtonType::LeftTrigger,
-            Self::RightTrigger => GamepadButtonType::RightTrigger,
-            Self::LeftTrigger2 => GamepadButtonType::LeftTrigger2,
-            Self::RightTrigger2 => GamepadButtonType::RightTrigger2,
-            Self::DPadUp => GamepadButtonType::DPadUp,
-            Self::DPadDown => GamepadButtonType::DPadDown,
-            Self::DPadLeft => GamepadButtonType::DPadLeft,
-            Self::DPadRight => GamepadButtonType::DPadRight,
-            Self::Start => GamepadButtonType::Start,
-            Self::Select => GamepadButtonType::Select,
+            Self::South => GamepadButton::South,
+            Self::East => GamepadButton::East,
+            Self::North => GamepadButton::North,
+            Self::West => GamepadButton::West,
+            Self::LeftTrigger => GamepadButton::LeftTrigger,
+            Self::RightTrigger => GamepadButton::RightTrigger,
+            Self::LeftTrigger2 => GamepadButton::LeftTrigger2,
+            Self::RightTrigger2 => GamepadButton::RightTrigger2,
+            Self::DPadUp => GamepadButton::DPadUp,
+            Self::DPadDown => GamepadButton::DPadDown,
+            Self::DPadLeft => GamepadButton::DPadLeft,
+            Self::DPadRight => GamepadButton::DPadRight,
+            Self::Start => GamepadButton::Start,
+            Self::Select => GamepadButton::Select,
         }
     }
 
     /// Returns `None` for stick axes or other non-button inputs.
-    pub fn from_button_type(button: GamepadButtonType) -> Option<Self> {
+    pub fn from_button_type(button: GamepadButton) -> Option<Self> {
         Some(match button {
-            GamepadButtonType::South => Self::South,
-            GamepadButtonType::East => Self::East,
-            GamepadButtonType::North => Self::North,
-            GamepadButtonType::West => Self::West,
-            GamepadButtonType::LeftTrigger => Self::LeftTrigger,
-            GamepadButtonType::RightTrigger => Self::RightTrigger,
-            GamepadButtonType::LeftTrigger2 => Self::LeftTrigger2,
-            GamepadButtonType::RightTrigger2 => Self::RightTrigger2,
-            GamepadButtonType::DPadUp => Self::DPadUp,
-            GamepadButtonType::DPadDown => Self::DPadDown,
-            GamepadButtonType::DPadLeft => Self::DPadLeft,
-            GamepadButtonType::DPadRight => Self::DPadRight,
-            GamepadButtonType::Start => Self::Start,
-            GamepadButtonType::Select => Self::Select,
+            GamepadButton::South => Self::South,
+            GamepadButton::East => Self::East,
+            GamepadButton::North => Self::North,
+            GamepadButton::West => Self::West,
+            GamepadButton::LeftTrigger => Self::LeftTrigger,
+            GamepadButton::RightTrigger => Self::RightTrigger,
+            GamepadButton::LeftTrigger2 => Self::LeftTrigger2,
+            GamepadButton::RightTrigger2 => Self::RightTrigger2,
+            GamepadButton::DPadUp => Self::DPadUp,
+            GamepadButton::DPadDown => Self::DPadDown,
+            GamepadButton::DPadLeft => Self::DPadLeft,
+            GamepadButton::DPadRight => Self::DPadRight,
+            GamepadButton::Start => Self::Start,
+            GamepadButton::Select => Self::Select,
             _ => return None,
         })
     }
@@ -272,31 +271,31 @@ impl GamepadMappings {
     /// default layout where basic attack shares skill slot 1's trigger.
     pub fn to_input_map(&self) -> InputMap<GamepadAction> {
         let mut map = InputMap::default();
-        map.insert(DualAxis::left_stick(), GamepadAction::Move);
-        map.insert(DualAxis::right_stick(), GamepadAction::Aim);
+        map.insert_dual_axis(GamepadAction::Move, GamepadStick::LEFT);
+        map.insert_dual_axis(GamepadAction::Aim, GamepadStick::RIGHT);
 
         let skill0 = self.active_skill_slot_0.to_button_type();
         let skill1 = self.active_skill_slot_1.to_button_type();
         let skill2 = self.active_skill_slot_2.to_button_type();
 
-        map.insert(skill1, GamepadAction::Attack);
-        map.insert(skill0, GamepadAction::Skill0);
-        map.insert(skill1, GamepadAction::Skill1);
-        map.insert(skill2, GamepadAction::Skill2);
+        map.insert(GamepadAction::Attack, skill1);
+        map.insert(GamepadAction::Skill0, skill0);
+        map.insert(GamepadAction::Skill1, skill1);
+        map.insert(GamepadAction::Skill2, skill2);
         map.insert(
-            self.inventory.to_button_type(),
             GamepadAction::ToggleInventory,
+            self.inventory.to_button_type(),
         );
-        map.insert(self.minimap.to_button_type(), GamepadAction::ToggleMap);
-        map.insert(self.interact.to_button_type(), GamepadAction::Interact);
+        map.insert(GamepadAction::ToggleMap, self.minimap.to_button_type());
+        map.insert(GamepadAction::Interact, self.interact.to_button_type());
         map.insert(
-            self.attack_auto_target.to_button_type(),
             GamepadAction::AutoTarget,
+            self.attack_auto_target.to_button_type(),
         );
-        map.insert(self.hotbar_slot_0.to_button_type(), GamepadAction::Hotbar0);
-        map.insert(self.hotbar_slot_1.to_button_type(), GamepadAction::Hotbar1);
-        map.insert(self.hotbar_slot_2.to_button_type(), GamepadAction::Hotbar2);
-        map.insert(self.hotbar_slot_3.to_button_type(), GamepadAction::Hotbar3);
+        map.insert(GamepadAction::Hotbar0, self.hotbar_slot_0.to_button_type());
+        map.insert(GamepadAction::Hotbar1, self.hotbar_slot_1.to_button_type());
+        map.insert(GamepadAction::Hotbar2, self.hotbar_slot_2.to_button_type());
+        map.insert(GamepadAction::Hotbar3, self.hotbar_slot_3.to_button_type());
         map
     }
 
@@ -348,7 +347,10 @@ pub fn get_gamepad_display_name(button: GamepadBindingButton) -> String {
     }
 }
 
+/// Connected gamepads, which Bevy models as entities carrying a [`Gamepad`] component.
+pub type ConnectedGamepads<'w, 's> = Query<'w, 's, (), With<Gamepad>>;
+
 /// True when at least one gamepad is connected — controller bindings take priority in options UI.
-pub fn gamepad_connected(gamepads: &Gamepads) -> bool {
-    gamepads.iter().next().is_some()
+pub fn gamepad_connected(gamepads: &ConnectedGamepads<'_, '_>) -> bool {
+    !gamepads.is_empty()
 }

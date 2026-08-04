@@ -1,5 +1,4 @@
-use bevy::{prelude::*, utils::HashMap};
-use bevy_save::{CloneReflect, Snapshot};
+use bevy::{platform::collections::HashMap, prelude::*};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -15,7 +14,6 @@ use crate::{
     world::{dungeon::Dungeon, world_helpers::world_pos_to_tile_pos},
     CustomFlush, GameParam, GameState,
 };
-use bevy::ecs::schedule::NextState;
 
 use super::{
     chunk::Chunk, dungeon::CachedPlayerPos, dungeon_room::DungeonRoomEntity,
@@ -39,6 +37,7 @@ pub struct GenerationSeed {
 #[derive(Component, Debug)]
 #[component(storage = "SparseSet")]
 pub struct SpawnDimension;
+#[derive(Message)]
 pub struct DimensionSpawnEvent {
     pub swap_to_dim_now: bool,
     pub new_era: Option<Era>,
@@ -46,22 +45,6 @@ pub struct DimensionSpawnEvent {
 #[derive(Component, Reflect, Default, Debug, Clone)]
 #[reflect(Component)]
 pub struct ActiveDimension;
-
-#[derive(Component, Default)]
-pub struct ChunkCache {
-    pub snapshots: HashMap<IVec2, Snapshot>,
-}
-impl Clone for ChunkCache {
-    fn clone(&self) -> Self {
-        let mut cloned_map = HashMap::default();
-        for v in &self.snapshots {
-            cloned_map.insert(*v.0, v.1.clone_value());
-        }
-        Self {
-            snapshots: cloned_map,
-        }
-    }
-}
 
 #[derive(Component, Default, Clone, Eq, PartialEq, Hash, Debug, Serialize, Deserialize)]
 pub enum Era {
@@ -162,24 +145,30 @@ pub struct DimensionPlugin;
 
 impl Plugin for DimensionPlugin {
     fn build(&self, app: &mut App) {
-        app.add_event::<DimensionSpawnEvent>()
-            .add_system(Self::clear_entities_for_dim_swap.before(CustomFlush))
-            .add_system(
+        app.add_message::<DimensionSpawnEvent>()
+            .add_systems(
+                Update,
+                Self::clear_entities_for_dim_swap.before(CustomFlush),
+            )
+            .add_systems(
+                Update,
                 Self::new_dim_with_params
-                    .in_base_set(CoreSet::PreUpdate)
                     // `GameParam` requires `WorldObjectCache`; gate on it so this system never
                     // runs during run teardown (exit-to-menu sends `CleanUpRunStateEvent`, which
                     // removes the cache in the same `PreUpdate` frame while still in `Main`).
-                    .run_if(resource_exists::<WorldObjectCache>())
+                    .run_if(resource_exists::<WorldObjectCache>)
                     .run_if(
                         in_state(GameState::Main)
                             .or_else(in_state(GameState::Initializing))
                             .or_else(in_state(GameState::BlessingChoice)),
                     ),
             )
-            .add_system(rebuild_attributes_on_new_dimension.in_schedule(OnEnter(GameState::Main)))
-            .add_system(log_drop_filter_on_dim_swap)
-            .add_system(apply_system_buffers.in_set(CustomFlush));
+            .add_systems(
+                OnEnter(GameState::Main),
+                rebuild_attributes_on_new_dimension,
+            )
+            .add_systems(Update, log_drop_filter_on_dim_swap)
+            .add_systems(Update, ApplyDeferred.in_set(CustomFlush));
     }
 }
 
@@ -187,11 +176,11 @@ impl Plugin for DimensionPlugin {
 /// swap is requested. If size/contents persist across the era2 -> era3 transition, the
 /// resource is NOT being reset. Remove once the leak is resolved.
 fn log_drop_filter_on_dim_swap(
-    mut spawn_event: EventReader<DimensionSpawnEvent>,
+    mut spawn_event: MessageReader<DimensionSpawnEvent>,
     break_drop_filter: Res<crate::inventory::BreakDropFilter>,
 ) {
-    for new_dim in spawn_event.iter() {
-        warn!(
+    for new_dim in spawn_event.read() {
+        debug!(
             "[DROP-FILTER] era swap -> {:?} | filter_size={} contents={:?}",
             new_dim.new_era,
             break_drop_filter.0.len(),
@@ -203,8 +192,8 @@ impl DimensionPlugin {
     ///spawns the initial world dimension entity
     pub fn new_dim_with_params(
         mut commands: Commands,
-        mut spawn_event: EventReader<DimensionSpawnEvent>,
-        mut move_player_event: EventWriter<MovePlayerEvent>,
+        mut spawn_event: MessageReader<DimensionSpawnEvent>,
+        mut move_player_event: MessageWriter<MovePlayerEvent>,
         player_cache_pos: Query<(Entity, &CachedPlayerPos), With<Player>>,
         mut game: GameParam,
         defs: Res<crate::defs::GameDefs>,
@@ -221,7 +210,7 @@ impl DimensionPlugin {
         // Process only the first dimension spawn per frame to avoid double-firing when the portal
         // is triggered by both click and interact key (F), or by rapid double input.
         let mut processed_one = false;
-        for new_dim in spawn_event.iter() {
+        for new_dim in spawn_event.read() {
             if processed_one {
                 warn!(
                     "Ignoring duplicate DimensionSpawnEvent for {:?} (portal was likely triggered twice)",
@@ -250,7 +239,9 @@ impl DimensionPlugin {
                     next_state.set(GameState::Initializing);
                 }
                 if new_era.is_dungeon() {
-                    let player = game.player_query.single().0;
+                    let Ok((player, ..)) = game.player_query.single() else {
+                        return;
+                    };
                     let player_pos = game.player().position;
                     commands
                         .entity(player)
@@ -379,8 +370,8 @@ impl DimensionPlugin {
             }
 
             if !sent_dungeon_spawn {
-                if let Ok((e, cached_pos)) = player_cache_pos.get_single() {
-                    move_player_event.send(MovePlayerEvent {
+                if let Ok((e, cached_pos)) = player_cache_pos.single() {
+                    move_player_event.write(MovePlayerEvent {
                         pos: cached_pos.0,
                         clear_recall_history: true,
                     });
@@ -413,12 +404,12 @@ impl DimensionPlugin {
         for d in new_dim.iter() {
             //despawn all entities with positions, except the player
             // clean up old dimension,
-            if let Ok(old_dim) = old_dim.get_single() {
+            if let Ok(old_dim) = old_dim.single() {
                 info!("DESPAWNING EVERYTHING!!! {:?}", entity_query.iter().len());
                 for e in entity_query.iter() {
-                    commands.entity(e).despawn_recursive();
+                    commands.entity(e).despawn();
                 }
-                commands.entity(old_dim).despawn_recursive();
+                commands.entity(old_dim).despawn();
             }
             //give the new dimension active tag, and use its chunk manager as the game resource
             commands
@@ -428,8 +419,10 @@ impl DimensionPlugin {
         }
     }
 }
-pub fn rebuild_attributes_on_new_dimension(mut attribute_event: EventWriter<AttributeChangeEvent>) {
-    attribute_event.send_default();
+pub fn rebuild_attributes_on_new_dimension(
+    mut attribute_event: MessageWriter<AttributeChangeEvent>,
+) {
+    attribute_event.write_default();
 }
 pub fn dim_spawned(dim_spawn: Query<Entity, With<ActiveDimension>>) -> bool {
     dim_spawn.iter().count() > 0

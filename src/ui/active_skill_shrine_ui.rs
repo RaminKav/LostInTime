@@ -1,4 +1,5 @@
-use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
+use bevy::text::Justify;
+use bevy::{camera::visibility::RenderLayers, prelude::*, sprite::Anchor};
 
 use crate::{
     assets::Graphics,
@@ -10,9 +11,9 @@ use crate::{
     blessings::OwnedBlessings,
     colors::{WHITE, YELLOW_2},
     item::active_skill_shrine::{
-        assign_shrine_skill_to_slot, reroll_active_skill_shrine_offer_skills,
-        shrine_assign_action, shrine_assignable_slots, skill_choices_from_offer_skills, ActiveSkillShrineOverwrite, ActiveSkillShrineSelection,
-        ShrineAssignAction,
+        assign_shrine_skill_to_slot, reroll_active_skill_shrine_offer_skills, shrine_assign_action,
+        shrine_assignable_slots, skill_choices_from_offer_skills, ActiveSkillShrineOverwrite,
+        ActiveSkillShrineSelection, ShrineAssignAction,
     },
     juice::bounce::BounceOnHit,
     player::{
@@ -25,8 +26,8 @@ use crate::{
         Player,
     },
     ui::{
-        game_fonts as gf,
         essence_ui::{MERCHANT_REROLL_ICON_PATH, MERCHANT_REROLL_ICON_SIZE},
+        game_fonts as gf,
         ui_helpers::spawn_full_screen_ui_overlay_tuned,
         SKILL_TOOLTIP_SIZE,
     },
@@ -34,19 +35,21 @@ use crate::{
 };
 
 use super::{
-    interactions::Interaction, main_menu::spawn_back_button, options_ui::CheatSettings,
+    interactions::Interaction,
+    main_menu::spawn_back_button,
+    options_ui::CheatSettings,
     player_hud::{
         spawn_skill_tooltip_content, spawn_skill_tooltip_shell, SKILL_TOOLTIP_BG_LOCAL,
         SKILL_TOOLTIP_ICON_SIZE,
     },
-    Interactable, Focusable, UIElement, UIState, KEYBIND_BADGE_COLOR, TOOLTIP_INFO_BOX_SIZE,
+    Focusable, Interactable, UIElement, UIState, KEYBIND_BADGE_COLOR, TOOLTIP_INFO_BOX_SIZE,
 };
 
 /// Bundles the params needed to fire the skills tutorial popup when the active skill shrine UI
 /// closes, keeping the interaction-handler system param counts under Bevy's tuple limit.
 #[derive(bevy::ecs::system::SystemParam)]
 pub struct ActiveSkillShrineTutorialTrigger<'w, 's> {
-    popup_events: EventWriter<'w, crate::ui::tutorial_ui::TutorialPopupEvent>,
+    popup_events: MessageWriter<'w, crate::ui::tutorial_ui::TutorialPopupEvent>,
     seen_chunks: Option<Res<'w, crate::ui::tutorial_ui::SeenTutorialChunks>>,
     tutorial_ui: Query<'w, 's, (), With<crate::ui::tutorial_ui::TutorialUI>>,
 }
@@ -70,6 +73,23 @@ pub struct ShrineAssignUnlockParams<'w> {
     unlocked_skills: Res<'w, UnlockedSkills>,
     unlock_upgrades: Res<'w, UnlockUpgrades>,
     cheat_settings: Res<'w, CheatSettings>,
+}
+
+/// Focus + mouseless gate for shrine UI hover/confirm (avoids stuck bounce when mouse-only).
+#[derive(bevy::ecs::system::SystemParam)]
+pub struct ShrineUiFocus<'w> {
+    focus: crate::ui::focus::FocusInput<'w>,
+    mouseless: Res<'w, crate::inputs::MouselessModeState>,
+}
+
+impl ShrineUiFocus<'_> {
+    fn is_focused(&self, entity: Entity, cursor_pos: &crate::cursor::CursorPos) -> bool {
+        (self.mouseless.0 || cursor_pos.suppress_ui_hover) && self.focus.is_focused(entity)
+    }
+
+    fn confirm_just_pressed(&self) -> bool {
+        self.focus.confirm_just_pressed()
+    }
 }
 
 const SHRINE_TOOLTIP_GAP: f32 = 24.;
@@ -138,17 +158,8 @@ fn shrine_skill_tooltip_stats(
         &ProjectileSize,
     ),
 ) -> ShrineSkillTooltipStats {
-    let (
-        skill_power,
-        blessings,
-        max_mana,
-        max_health,
-        bonus_as,
-        attack_speed,
-        crit,
-        spd,
-        size,
-    ) = skill_power;
+    let (skill_power, blessings, max_mana, max_health, bonus_as, attack_speed, crit, spd, size) =
+        skill_power;
     let bonus_as_mult = effective_player_attack_speed_multiplier(
         attack_speed.map(|a| a.0).unwrap_or(0),
         bonus_as.map(|b| b.get_multiplier()).unwrap_or(1.0),
@@ -201,19 +212,18 @@ fn spawn_shrine_gain_skill_icon(
     const GAIN_SKILL_ICON_SIZE: Vec2 = Vec2::new(32., 32.);
 
     commands
-        .spawn(SpriteBundle {
-            texture: graphics.get_active_skill_icon(active_skill),
-            sprite: Sprite {
+        .spawn((
+            Sprite {
+                image: graphics.get_active_skill_icon(active_skill),
                 custom_size: Some(GAIN_SKILL_ICON_SIZE),
                 ..default()
             },
-            transform: Transform::from_translation(Vec3::new(0., center_y, 21.)),
-            ..default()
-        })
+            Transform::from_translation(Vec3::new(0., center_y, 21.)),
+        ))
         .insert(UIState::ActiveSkills)
         .insert(RenderLayers::from_layers(&[3]))
         .insert(Name::new("NEW_ACTIVE_SKILL_ICON"))
-        .set_parent(parent);
+        .insert(ChildOf(parent));
 }
 
 fn spawn_shrine_interactive_skill_tooltip(
@@ -229,12 +239,8 @@ fn spawn_shrine_interactive_skill_tooltip(
     focus_index: u32,
 ) {
     let container_pos = shrine_skill_tooltip_container_pos(Vec3::new(0., visual_center_y, 21.));
-    let (container, bg) = spawn_skill_tooltip_shell(
-        commands,
-        graphics,
-        container_pos,
-        "SHRINE SKILL TOOLTIP",
-    );
+    let (container, bg) =
+        spawn_skill_tooltip_shell(commands, graphics, container_pos, "SHRINE SKILL TOOLTIP");
     let active_skill = shrine_ui.skill_choice.active_skill.clone();
 
     commands
@@ -242,7 +248,7 @@ fn spawn_shrine_interactive_skill_tooltip(
         .insert(BounceOnHit::shrine_hover())
         .insert(UIState::ActiveSkillShrine)
         .insert(Name::new(container_name))
-        .set_parent(parent);
+        .insert(ChildOf(parent));
 
     commands
         .entity(bg)
@@ -295,7 +301,7 @@ fn spawn_shrine_interactive_slot_tooltip(
         .insert(BounceOnHit::shrine_hover())
         .insert(UIState::ActiveSkills)
         .insert(Name::new(container_name))
-        .set_parent(parent);
+        .insert(ChildOf(parent));
 
     commands
         .entity(bg)
@@ -341,7 +347,7 @@ fn spawn_empty_shrine_slot_tooltip(
         .insert(BounceOnHit::shrine_hover())
         .insert(UIState::ActiveSkills)
         .insert(Name::new("EMPTY_SKILL_SLOT_CONTAINER"))
-        .set_parent(parent);
+        .insert(ChildOf(parent));
 
     commands
         .entity(bg)
@@ -359,21 +365,18 @@ fn spawn_empty_shrine_slot_tooltip(
         .insert(Name::new("EMPTY_SKILL_SLOT_HIT"));
 
     commands
-        .spawn(Text2dBundle {
-            text: Text::from_section(
-                "Empty Slot",
-                gf::MENU_TITLE.text_style(&asset_server, WHITE),
-            ),
-            text_anchor: Anchor::CenterLeft,
-            transform: Transform {
-                translation: Vec3::new(-24., 14., 2.),
-                scale: gf::MENU_TITLE.transform_scale(),
-                ..default()
-            },
-            ..default()
-        })
+        .spawn(
+            gf::MENU_TITLE
+                .text(&asset_server, "Empty Slot", WHITE)
+                .anchor(Anchor::CENTER_LEFT)
+                .with_transform(Transform {
+                    translation: Vec3::new(-24., 14., 2.),
+                    scale: gf::MENU_TITLE.transform_scale(),
+                    ..default()
+                }),
+        )
         .insert(RenderLayers::from_layers(&[3]))
-        .set_parent(container);
+        .insert(ChildOf(container));
 }
 
 fn spawn_active_skill_shrine_skill_choices(
@@ -434,49 +437,46 @@ fn spawn_active_skill_shrine_reroll_button(
     let color = if enabled {
         Color::WHITE
     } else {
-        Color::rgb(0.45, 0.45, 0.45)
+        Color::srgb(0.45, 0.45, 0.45)
     };
 
-    let mut btn = commands.spawn(SpriteBundle {
-        sprite: Sprite {
+    let mut btn = commands.spawn((
+        Sprite {
             color: KEYBIND_BADGE_COLOR,
             custom_size: Some(SHRINE_REROLL_BADGE_SIZE),
             ..default()
         },
-        transform: Transform::from_translation(Vec3::new(0., SHRINE_REROLL_BUTTON_Y, 3.)),
-        ..default()
-    });
+        Transform::from_translation(Vec3::new(0., SHRINE_REROLL_BUTTON_Y, 3.)),
+    ));
     btn.insert(RenderLayers::from_layers(&[3]))
         .insert(UIState::ActiveSkillShrine)
         .insert(ActiveSkillShrineRerollButton)
         .insert(Name::new("Active Skill Shrine Reroll"));
 
     if enabled {
-        btn.insert(Interactable::default())
-            .insert(Focusable {
-                group: UIState::ActiveSkillShrine,
-                index: 10,
-            });
+        btn.insert(Interactable::default()).insert(Focusable {
+            group: UIState::ActiveSkillShrine,
+            index: 10,
+        });
     }
 
     let btn_e = btn.id();
 
     commands
-        .spawn(SpriteBundle {
-            texture: asset_server.load(MERCHANT_REROLL_ICON_PATH),
-            sprite: Sprite {
+        .spawn((
+            Sprite {
+                image: asset_server.load(MERCHANT_REROLL_ICON_PATH),
                 custom_size: Some(MERCHANT_REROLL_ICON_SIZE),
                 color,
                 ..default()
             },
-            transform: Transform::from_translation(Vec3::new(0., 0., 1.)),
-            ..default()
-        })
+            Transform::from_translation(Vec3::new(0., 0., 1.)),
+        ))
         .insert(RenderLayers::from_layers(&[3]))
         .insert(ActiveSkillShrineRerollIcon)
-        .set_parent(btn_e);
+        .insert(ChildOf(btn_e));
 
-    commands.entity(btn_e).set_parent(parent);
+    commands.entity(btn_e).insert(ChildOf(parent));
 }
 
 fn spawn_active_skill_shrine_reroll_info_box(
@@ -491,61 +491,50 @@ fn spawn_active_skill_shrine_reroll_info_box(
         SHRINE_REROLL_BUTTON_Y,
     );
     let box_e = commands
-        .spawn(SpriteBundle {
-            texture: graphics.get_ui_element_texture(UIElement::TooltipInfoBox),
-            sprite: Sprite {
+        .spawn((
+            Sprite {
+                image: graphics.get_ui_element_texture(UIElement::TooltipInfoBox),
                 custom_size: Some(TOOLTIP_INFO_BOX_SIZE),
                 ..default()
             },
-            transform: Transform::from_translation(Vec3::new(pos.x, pos.y, 2.)),
-            ..default()
-        })
+            Transform::from_translation(Vec3::new(pos.x, pos.y, 2.)),
+        ))
         .insert(RenderLayers::from_layers(&[3]))
         .insert(UIState::ActiveSkillShrine)
         .insert(Name::new("Active Skill Shrine Reroll Info Box"))
-        .set_parent(parent)
+        .insert(ChildOf(parent))
         .id();
 
     commands
         .spawn((
-            Text2dBundle {
-                text: Text::from_section(
-                    "Rerolls left:".to_string(),
-                    gf::BODY.text_style(&asset_server, WHITE),
-                )
-                .with_alignment(TextAlignment::Center),
-                text_anchor: Anchor::Center,
-                transform: Transform {
+            gf::BODY
+                .text(&asset_server, "Rerolls left:".to_string(), WHITE)
+                .justify(Justify::Center)
+                .anchor(Anchor::CENTER)
+                .with_transform(Transform {
                     translation: Vec3::new(0., 5., 2.),
                     scale: gf::BODY.transform_scale(),
                     ..default()
-                },
-                ..default()
-            },
+                }),
             RenderLayers::from_layers(&[3]),
         ))
-        .set_parent(box_e);
+        .insert(ChildOf(box_e));
 
     commands
         .spawn((
-            Text2dBundle {
-                text: Text::from_section(
-                    rerolls_remaining.to_string(),
-                    gf::BODY.text_style(&asset_server, WHITE),
-                )
-                .with_alignment(TextAlignment::Center),
-                text_anchor: Anchor::Center,
-                transform: Transform {
+            gf::BODY
+                .text(&asset_server, rerolls_remaining.to_string(), WHITE)
+                .justify(Justify::Center)
+                .anchor(Anchor::CENTER)
+                .with_transform(Transform {
                     translation: Vec3::new(0., -6., 2.),
                     scale: gf::BODY.transform_scale(),
                     ..default()
-                },
-                ..default()
-            },
+                }),
             RenderLayers::from_layers(&[3]),
             ActiveSkillShrineRerollsText,
         ))
-        .set_parent(box_e);
+        .insert(ChildOf(box_e));
 }
 
 pub fn setup_active_skill_shrine_ui(
@@ -570,48 +559,37 @@ pub fn setup_active_skill_shrine_ui(
         With<Player>,
     >,
 ) {
-    let shrine_overlay = spawn_full_screen_ui_overlay_tuned(
-        &mut commands,
-        &res,
-        0.0,
-        0.95,
-        SHRINE_UI_OVERLAY_Z,
-    );
+    let shrine_overlay =
+        spawn_full_screen_ui_overlay_tuned(&mut commands, &res, 0.0, 0.95, SHRINE_UI_OVERLAY_Z);
     commands
         .entity(shrine_overlay)
         .insert(UIState::ActiveSkillShrine);
     let _title_text = commands
         .spawn((
-            Text2dBundle {
-                text: Text::from_section(
-                    "Choose a New Skill".to_string(),
-                    gf::MENU_TITLE_LARGE.text_style(&asset_server, WHITE),
-                ),
-                transform: Transform {
+            gf::MENU_TITLE_LARGE
+                .text(&asset_server, "Choose a New Skill".to_string(), WHITE)
+                .with_transform(Transform {
                     translation: Vec3::new(0., res.game_height / 2. - 40., 21.),
                     scale: gf::MENU_TITLE_LARGE.transform_scale(),
                     ..Default::default()
-                },
-                ..default()
-            },
+                }),
             RenderLayers::from_layers(&[3]),
             UIState::BlessingChoice,
         ))
         .id();
     let _title_text2 = commands
         .spawn((
-            Text2dBundle {
-                text: Text::from_section(
+            gf::MENU_TITLE
+                .text(
+                    &asset_server,
                     "(Assign to an active skill slot)".to_string(),
-                    gf::MENU_TITLE.text_style(&asset_server, WHITE),
-                ),
-                transform: Transform {
+                    WHITE,
+                )
+                .with_transform(Transform {
                     translation: Vec3::new(0., res.game_height / 2. - 62., 21.),
                     scale: gf::MENU_TITLE.transform_scale(),
                     ..Default::default()
-                },
-                ..default()
-            },
+                }),
             RenderLayers::from_layers(&[3]),
             UIState::BlessingChoice,
         ))
@@ -619,27 +597,27 @@ pub fn setup_active_skill_shrine_ui(
 
     let shrine_root = commands
         .spawn((
-            SpatialBundle::from_transform(Transform::IDENTITY),
+            (Transform::IDENTITY, Visibility::default()),
             RenderLayers::from_layers(&[3]),
             UIState::ActiveSkillShrine,
             ActiveSkillShrineRoot,
             Name::new("Active Skill Shrine UI"),
         ))
-        .set_parent(shrine_overlay)
+        .insert(ChildOf(shrine_overlay))
         .id();
 
     let choices_root = commands
         .spawn((
-            SpatialBundle::from_transform(Transform::IDENTITY),
+            (Transform::IDENTITY, Visibility::default()),
             RenderLayers::from_layers(&[3]),
             UIState::ActiveSkillShrine,
             ActiveSkillShrineChoicesRoot,
             Name::new("Active Skill Shrine Choices"),
         ))
-        .set_parent(shrine_root)
+        .insert(ChildOf(shrine_root))
         .id();
 
-    let Ok(skill_power) = skill_power.get_single() else {
+    let Ok(skill_power) = skill_power.single() else {
         return;
     };
     spawn_active_skill_shrine_skill_choices(
@@ -679,7 +657,6 @@ pub fn setup_active_skill_shrine_ui(
     commands
         .entity(back_button)
         .insert(UIState::ActiveSkillShrine);
-
 }
 
 pub fn tick_active_skill_shrine_ui_interaction_lock_timers(
@@ -687,7 +664,7 @@ pub fn tick_active_skill_shrine_ui_interaction_lock_timers(
     mut query: Query<&mut ActiveSkillShrineUI>,
 ) {
     for mut skill_ui in query.iter_mut() {
-        if skill_ui.interaction_lock_timer.finished() {
+        if skill_ui.interaction_lock_timer.is_finished() {
             continue;
         }
         skill_ui.interaction_lock_timer.tick(time.delta());
@@ -699,7 +676,7 @@ pub fn tick_active_skill_slot_choice_ui_interaction_lock_timers(
     mut query: Query<&mut ActiveSkillSlotChoiceUI>,
 ) {
     for mut slot_ui in query.iter_mut() {
-        if slot_ui.interaction_lock_timer.finished() {
+        if slot_ui.interaction_lock_timer.is_finished() {
             continue;
         }
         slot_ui.interaction_lock_timer.tick(time.delta());
@@ -708,19 +685,20 @@ pub fn tick_active_skill_slot_choice_ui_interaction_lock_timers(
 
 pub fn handle_active_skill_shrine_ui_interaction(
     cursor_pos: Res<crate::cursor::CursorPos>,
-    mouse_input: Res<Input<MouseButton>>,
+    mouse_input: Res<ButtonInput<MouseButton>>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     mut skill_choices: Query<(Entity, &mut Interactable, &ActiveSkillShrineUI)>,
-    parents: Query<&Parent>,
+    parents: Query<&ChildOf>,
     mut containers: Query<(&mut Transform, &mut BounceOnHit)>,
     shrine_selection: ResMut<ActiveSkillShrineSelection>,
     mut next_ui_state: ResMut<NextState<UIState>>,
     mut commands: Commands,
-    mut player_skills: Query<(Entity, &mut PlayerSkills, &PlayerClass), With<Player>>,
+    mut player_skills: Query<(Entity, &mut PlayerSkills), With<Player>>,
+    player_class: Res<PlayerClass>,
     unlock_params: ShrineAssignUnlockParams,
-    mut att_event: EventWriter<crate::attributes::AttributeChangeEvent>,
+    mut att_event: MessageWriter<crate::attributes::AttributeChangeEvent>,
     mut shrine_query: Query<&mut crate::item::active_skill_shrine::ActiveSkillShrineState>,
-    focus_input: crate::ui::focus::FocusInput,
+    shrine_focus: ShrineUiFocus,
     mut tutorial_trigger: ActiveSkillShrineTutorialTrigger,
 ) {
     let hit_test = super::ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None);
@@ -728,9 +706,9 @@ pub fn handle_active_skill_shrine_ui_interaction(
 
     for (e, mut interactable, skill_ui) in skill_choices.iter_mut() {
         let is_hit = matches!(hit_test, Some(hit_ent) if hit_ent.0 == e);
-        let is_focused = focus_input.is_focused(e);
-        let confirm_pressed = (is_hit && left_mouse_pressed)
-            || (is_focused && focus_input.confirm_just_pressed());
+        let is_focused = shrine_focus.is_focused(e, &cursor_pos);
+        let confirm_pressed =
+            (is_hit && left_mouse_pressed) || (is_focused && shrine_focus.confirm_just_pressed());
 
         if is_hit || is_focused {
             match interactable.current() {
@@ -741,7 +719,8 @@ pub fn handle_active_skill_shrine_ui_interaction(
                         0.2,
                     ));
                     if let Ok(parent) = parents.get(e) {
-                        if let Ok((mut transform, mut bounce)) = containers.get_mut(parent.get()) {
+                        if let Ok((mut transform, mut bounce)) = containers.get_mut(parent.parent())
+                        {
                             super::ui_helpers::apply_ui_hover_scale(
                                 &mut transform,
                                 Some(&mut bounce),
@@ -752,11 +731,9 @@ pub fn handle_active_skill_shrine_ui_interaction(
                     }
                 }
                 Interaction::Hovering => {
-                    if confirm_pressed && skill_ui.interaction_lock_timer.finished() {
+                    if confirm_pressed && skill_ui.interaction_lock_timer.is_finished() {
                         let picked_skill = skill_ui.skill_choice.clone();
-                        let Ok((player_e, mut skills, player_class)) =
-                            player_skills.get_single_mut()
-                        else {
+                        let Ok((player_e, mut skills)) = player_skills.single_mut() else {
                             return;
                         };
 
@@ -783,7 +760,7 @@ pub fn handle_active_skill_shrine_ui_interaction(
                                 }
                                 commands.remove_resource::<ActiveSkillShrineSelection>();
                                 next_ui_state.set(UIState::Closed);
-                                att_event.send(crate::attributes::AttributeChangeEvent);
+                                att_event.write(crate::attributes::AttributeChangeEvent);
                                 tutorial_trigger.try_trigger();
                             }
                             ShrineAssignAction::ShowSlotPicker => {
@@ -807,7 +784,7 @@ pub fn handle_active_skill_shrine_ui_interaction(
             };
             interactable.change(Interaction::None);
             if let Ok(parent) = parents.get(e) {
-                if let Ok((mut transform, mut bounce)) = containers.get_mut(parent.get()) {
+                if let Ok((mut transform, mut bounce)) = containers.get_mut(parent.parent()) {
                     super::ui_helpers::apply_ui_hover_scale(
                         &mut transform,
                         Some(&mut bounce),
@@ -821,7 +798,7 @@ pub fn handle_active_skill_shrine_ui_interaction(
 
 pub fn handle_active_skill_shrine_reroll_button(
     cursor_pos: Res<crate::cursor::CursorPos>,
-    mouse_input: Res<Input<MouseButton>>,
+    mouse_input: Res<ButtonInput<MouseButton>>,
     mut sprites: ParamSet<(
         Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
         Query<&mut Sprite, With<ActiveSkillShrineRerollIcon>>,
@@ -832,7 +809,10 @@ pub fn handle_active_skill_shrine_reroll_button(
         &ActiveSkillShrineRerollButton,
         &Children,
     )>,
-    mut reroll_text: Query<&mut Text, With<ActiveSkillShrineRerollsText>>,
+    mut reroll_text: Query<
+        (&mut Text2d, &mut TextColor),
+        With<ActiveSkillShrineRerollsText>,
+    >,
     mut commands: Commands,
     mut run_unlocks: ResMut<RunUnlockState>,
     mut shrine_selection: ResMut<ActiveSkillShrineSelection>,
@@ -856,7 +836,7 @@ pub fn handle_active_skill_shrine_reroll_button(
     shrine_state: Query<&crate::item::active_skill_shrine::ActiveSkillShrineState>,
     graphics: Res<Graphics>,
     asset_server: Res<AssetServer>,
-    focus_input: crate::ui::focus::FocusInput,
+    shrine_focus: ShrineUiFocus,
 ) {
     let hit_entity = {
         let ui_sprites = sprites.p0();
@@ -870,19 +850,19 @@ pub fn handle_active_skill_shrine_reroll_button(
         let icon_color = if enabled {
             Color::WHITE
         } else {
-            Color::rgb(0.45, 0.45, 0.45)
+            Color::srgb(0.45, 0.45, 0.45)
         };
         let is_hit = hit_entity == Some(e);
-        let is_focused = focus_input.is_focused(e);
-        let confirm_pressed = (is_hit && left_mouse_pressed)
-            || (is_focused && focus_input.confirm_just_pressed());
+        let is_focused = shrine_focus.is_focused(e, &cursor_pos);
+        let confirm_pressed =
+            (is_hit && left_mouse_pressed) || (is_focused && shrine_focus.confirm_just_pressed());
 
         if is_hit || is_focused {
             match interactable.current() {
                 Interaction::None if enabled => {
                     interactable.change(Interaction::Hovering);
                     for child in btn_children.iter() {
-                        if let Ok(mut sprite) = sprites.p1().get_mut(*child) {
+                        if let Ok(mut sprite) = sprites.p1().get_mut(child) {
                             sprite.color = YELLOW_2;
                         }
                     }
@@ -900,7 +880,7 @@ pub fn handle_active_skill_shrine_reroll_button(
                             .collect();
                         let offer_skills = reroll_active_skill_shrine_offer_skills(
                             &previous_offer,
-                            player_skills.get_single().ok(),
+                            player_skills.single().ok(),
                         );
                         if offer_skills.is_empty() {
                             return;
@@ -915,9 +895,9 @@ pub fn handle_active_skill_shrine_reroll_button(
                                 .insert(shrine.tile_pos, offer_skills);
                         }
 
-                        if let Ok(choices_e) = choices_root.get_single() {
-                            commands.entity(choices_e).despawn_descendants();
-                            if let Ok(stats) = skill_power.get_single() {
+                        if let Ok(choices_e) = choices_root.single() {
+                            commands.entity(choices_e).despawn_related::<Children>();
+                            if let Ok(stats) = skill_power.single() {
                                 spawn_active_skill_shrine_skill_choices(
                                     &mut commands,
                                     &graphics,
@@ -932,7 +912,7 @@ pub fn handle_active_skill_shrine_reroll_button(
                         interactable.change(Interaction::None);
                         commands.spawn(SoundSpawner::new(AudioSoundEffect::UISkillReRoll, 0.4));
                         for child in btn_children.iter() {
-                            if let Ok(mut sprite) = sprites.p1().get_mut(*child) {
+                            if let Ok(mut sprite) = sprites.p1().get_mut(child) {
                                 sprite.color = icon_color;
                             }
                         }
@@ -943,18 +923,16 @@ pub fn handle_active_skill_shrine_reroll_button(
         } else if matches!(interactable.current(), Interaction::Hovering) {
             interactable.change(Interaction::None);
             for child in btn_children.iter() {
-                if let Ok(mut sprite) = sprites.p1().get_mut(*child) {
+                if let Ok(mut sprite) = sprites.p1().get_mut(child) {
                     sprite.color = icon_color;
                 }
             }
         }
     }
 
-    for mut text in reroll_text.iter_mut() {
-        if let Some(section) = text.sections.first_mut() {
-            section.value = run_unlocks.rerolls_remaining.to_string();
-            section.style.color = if any_hovered { YELLOW_2 } else { WHITE };
-        }
+    for (mut text, mut text_color) in reroll_text.iter_mut() {
+        text.0 = run_unlocks.rerolls_remaining.to_string();
+        text_color.0 = if any_hovered { YELLOW_2 } else { WHITE };
     }
 }
 
@@ -964,7 +942,13 @@ pub fn update_active_skill_shrine_reroll_button_state(
         (Entity, &mut Sprite, &Children),
         (With<ActiveSkillShrineRerollButton>, With<Interactable>),
     >,
-    mut reroll_icons: Query<&mut Sprite, (With<ActiveSkillShrineRerollIcon>, Without<ActiveSkillShrineRerollButton>)>,
+    mut reroll_icons: Query<
+        &mut Sprite,
+        (
+            With<ActiveSkillShrineRerollIcon>,
+            Without<ActiveSkillShrineRerollButton>,
+        ),
+    >,
     mut commands: Commands,
 ) {
     if !run_unlocks.is_changed() {
@@ -975,12 +959,12 @@ pub fn update_active_skill_shrine_reroll_button_state(
     let badge_color = if enabled {
         KEYBIND_BADGE_COLOR
     } else {
-        Color::rgba(62. / 255., 58. / 255., 58. / 255., 0.45)
+        Color::srgba(62. / 255., 58. / 255., 58. / 255., 0.45)
     };
     let icon_color = if enabled {
         Color::WHITE
     } else {
-        Color::rgb(0.45, 0.45, 0.45)
+        Color::srgb(0.45, 0.45, 0.45)
     };
 
     for (e, mut sprite, children) in reroll_buttons.iter_mut() {
@@ -989,7 +973,7 @@ pub fn update_active_skill_shrine_reroll_button_state(
             commands.entity(e).remove::<Interactable>();
         }
         for child in children.iter() {
-            if let Ok(mut icon) = reroll_icons.get_mut(*child) {
+            if let Ok(mut icon) = reroll_icons.get_mut(child) {
                 icon.color = icon_color;
             }
         }
@@ -998,16 +982,14 @@ pub fn update_active_skill_shrine_reroll_button_state(
 
 pub fn update_active_skill_shrine_reroll_count_text(
     run_unlocks: Res<RunUnlockState>,
-    mut reroll_text: Query<&mut Text, With<ActiveSkillShrineRerollsText>>,
+    mut reroll_text: Query<&mut Text2d, With<ActiveSkillShrineRerollsText>>,
 ) {
     if !run_unlocks.is_changed() {
         return;
     }
 
     for mut text in reroll_text.iter_mut() {
-        if let Some(section) = text.sections.first_mut() {
-            section.value = run_unlocks.rerolls_remaining.to_string();
-        }
+        text.0 = run_unlocks.rerolls_remaining.to_string();
     }
 }
 
@@ -1038,7 +1020,6 @@ pub fn setup_active_skill_shrine_overwrite_ui(
     skills: Query<
         (
             &PlayerSkills,
-            &PlayerClass,
             &SkillPower,
             &OwnedBlessings,
             &MaxMana,
@@ -1051,6 +1032,7 @@ pub fn setup_active_skill_shrine_overwrite_ui(
         ),
         With<Player>,
     >,
+    player_class: Res<PlayerClass>,
     unlocked_skills: Res<UnlockedSkills>,
     unlock_upgrades: Res<UnlockUpgrades>,
     cheat_settings: Res<CheatSettings>,
@@ -1059,9 +1041,8 @@ pub fn setup_active_skill_shrine_overwrite_ui(
     commands
         .entity(overwrite_overlay)
         .insert(UIState::ActiveSkills);
-    let (
+    let Ok((
         skills,
-        player_class,
         skill_power,
         blessings,
         max_mana,
@@ -1071,7 +1052,10 @@ pub fn setup_active_skill_shrine_overwrite_ui(
         crit,
         spd,
         size,
-    ) = skills.single();
+    )) = skills.single()
+    else {
+        return;
+    };
     let assignable_slots = shrine_assignable_slots(
         &player_class.class,
         &unlocked_skills,
@@ -1089,18 +1073,13 @@ pub fn setup_active_skill_shrine_overwrite_ui(
 
     let _title_text = commands
         .spawn((
-            Text2dBundle {
-                text: Text::from_section(
-                    title.to_string(),
-                    gf::MENU_TITLE_LARGE.text_style(&asset_server, WHITE),
-                ),
-                transform: Transform {
+            gf::MENU_TITLE_LARGE
+                .text(&asset_server, title.to_string(), WHITE)
+                .with_transform(Transform {
                     translation: Vec3::new(0., res.game_height / 2. - 30., 21.),
                     scale: gf::MENU_TITLE_LARGE.transform_scale(),
                     ..Default::default()
-                },
-                ..default()
-            },
+                }),
             RenderLayers::from_layers(&[3]),
             UIState::BlessingChoice,
         ))
@@ -1108,12 +1087,12 @@ pub fn setup_active_skill_shrine_overwrite_ui(
 
     let overwrite_root = commands
         .spawn((
-            SpatialBundle::from_transform(Transform::IDENTITY),
+            (Transform::IDENTITY, Visibility::default()),
             RenderLayers::from_layers(&[3]),
             UIState::ActiveSkills,
             Name::new("Active Skill Shrine Overwrite UI"),
         ))
-        .set_parent(overwrite_overlay)
+        .insert(ChildOf(overwrite_overlay))
         .id();
 
     let stats = shrine_skill_tooltip_stats((
@@ -1136,10 +1115,7 @@ pub fn setup_active_skill_shrine_overwrite_ui(
     };
 
     if !has_empty_target {
-        let icon_y = half_spacing
-            + SKILL_TOOLTIP_SIZE.y * 0.5
-            + SHRINE_TOOLTIP_GAP
-            + 16.;
+        let icon_y = half_spacing + SKILL_TOOLTIP_SIZE.y * 0.5 + SHRINE_TOOLTIP_GAP + 16.;
         spawn_shrine_gain_skill_icon(
             &mut commands,
             &graphics,
@@ -1215,10 +1191,10 @@ pub fn setup_active_skill_shrine_overwrite_ui(
 
 pub fn handle_active_skill_shrine_overwrite_interaction(
     cursor_pos: Res<crate::cursor::CursorPos>,
-    mouse_input: Res<Input<MouseButton>>,
+    mouse_input: Res<ButtonInput<MouseButton>>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     mut skill_choices: Query<(Entity, &mut Interactable, &ActiveSkillSlotChoiceUI)>,
-    parents: Query<&Parent>,
+    parents: Query<&ChildOf>,
     mut containers: Query<(&mut Transform, &mut BounceOnHit)>,
     mut player_skills: Query<(
         Entity,
@@ -1227,10 +1203,10 @@ pub fn handle_active_skill_shrine_overwrite_interaction(
     )>,
     mut next_ui_state: ResMut<NextState<UIState>>,
     mut commands: Commands,
-    mut att_event: EventWriter<crate::attributes::AttributeChangeEvent>,
+    mut att_event: MessageWriter<crate::attributes::AttributeChangeEvent>,
     mut shrine_query: Query<&mut crate::item::active_skill_shrine::ActiveSkillShrineState>,
     shrine_overwrite_res: Option<Res<ActiveSkillShrineOverwrite>>,
-    focus_input: crate::ui::focus::FocusInput,
+    shrine_focus: ShrineUiFocus,
     mut tutorial_trigger: ActiveSkillShrineTutorialTrigger,
 ) {
     // Only handle if this is a shrine overwrite, not heirloom limbo
@@ -1245,9 +1221,9 @@ pub fn handle_active_skill_shrine_overwrite_interaction(
 
     for (e, mut interactable, skill_ui) in skill_choices.iter_mut() {
         let is_hit = matches!(hit_test, Some(hit_ent) if hit_ent.0 == e);
-        let is_focused = focus_input.is_focused(e);
-        let confirm_pressed = (is_hit && left_mouse_pressed)
-            || (is_focused && focus_input.confirm_just_pressed());
+        let is_focused = shrine_focus.is_focused(e, &cursor_pos);
+        let confirm_pressed =
+            (is_hit && left_mouse_pressed) || (is_focused && shrine_focus.confirm_just_pressed());
 
         if is_hit || is_focused {
             match interactable.current() {
@@ -1258,7 +1234,8 @@ pub fn handle_active_skill_shrine_overwrite_interaction(
                         0.2,
                     ));
                     if let Ok(parent) = parents.get(e) {
-                        if let Ok((mut transform, mut bounce)) = containers.get_mut(parent.get()) {
+                        if let Ok((mut transform, mut bounce)) = containers.get_mut(parent.parent())
+                        {
                             super::ui_helpers::apply_ui_hover_scale(
                                 &mut transform,
                                 Some(&mut bounce),
@@ -1269,8 +1246,10 @@ pub fn handle_active_skill_shrine_overwrite_interaction(
                     }
                 }
                 Interaction::Hovering => {
-                    if confirm_pressed && skill_ui.interaction_lock_timer.finished() {
-                        let (player_e, mut skills, _t) = player_skills.single_mut();
+                    if confirm_pressed && skill_ui.interaction_lock_timer.is_finished() {
+                        let Ok((player_e, mut skills, _t)) = player_skills.single_mut() else {
+                            return;
+                        };
                         let new_skill = overwrite.skill_choice.clone();
 
                         assign_shrine_skill_to_slot(&mut skills, skill_ui.index, new_skill.clone());
@@ -1288,7 +1267,7 @@ pub fn handle_active_skill_shrine_overwrite_interaction(
                         commands.remove_resource::<ActiveSkillShrineOverwrite>();
                         commands.remove_resource::<ActiveSkillShrineSelection>();
                         next_ui_state.set(UIState::Closed);
-                        att_event.send(crate::attributes::AttributeChangeEvent);
+                        att_event.write(crate::attributes::AttributeChangeEvent);
                         tutorial_trigger.try_trigger();
                     }
                 }
@@ -1300,7 +1279,7 @@ pub fn handle_active_skill_shrine_overwrite_interaction(
             };
             interactable.change(Interaction::None);
             if let Ok(parent) = parents.get(e) {
-                if let Ok((mut transform, mut bounce)) = containers.get_mut(parent.get()) {
+                if let Ok((mut transform, mut bounce)) = containers.get_mut(parent.parent()) {
                     super::ui_helpers::apply_ui_hover_scale(
                         &mut transform,
                         Some(&mut bounce),

@@ -1,5 +1,7 @@
+use bevy::text::Justify;
+use crate::aseprite_helpers::aseprite_bundle;
 use crate::ui::game_fonts as gf;
-use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
+use bevy::{camera::visibility::RenderLayers, prelude::*, sprite::Anchor};
 
 use crate::{
     assets::Graphics,
@@ -15,7 +17,7 @@ use crate::{
     proto::proto_param::ProtoParam,
     ui::{
         focus::FocusInput,
-        interactions::{Interactable, Interaction},
+        interactions::{set_sprite_image, Interactable, Interaction},
         inventory_ui::UIState,
         main_menu::spawn_exit_icon_button,
         ui_helpers, Focusable, UIElement,
@@ -101,21 +103,20 @@ pub fn setup_beastiary_browser_ui(
     mut selected: ResMut<SelectedBeastiaryMob>,
     mut pagination: ResMut<BeastiaryPagination>,
     proto: ProtoParam,
-    mut texture_atlases: ResMut<Assets<TextureAtlas>>,
+    mut texture_atlases: ResMut<Assets<TextureAtlasLayout>>,
 ) {
     selected.0 = None;
     pagination.page = 0;
 
     commands.spawn((
-        SpriteBundle {
-            sprite: Sprite {
-                color: Color::rgba(0., 0., 0., 0.82),
+        (
+            Sprite {
+                color: Color::srgba(0., 0., 0., 0.82),
                 custom_size: Some(crate::ui::ui_helpers::full_screen_overlay_size(&resolution)),
                 ..Default::default()
             },
-            transform: Transform::from_translation(Vec3::new(0., 0., OVERLAY_Z)),
-            ..Default::default()
-        },
+            Transform::from_translation(Vec3::new(0., 0., OVERLAY_Z)),
+        ),
         RenderLayers::from_layers(&[3]),
         BeastiaryBrowserUI,
         UIState::BeastiaryBrowser,
@@ -123,15 +124,14 @@ pub fn setup_beastiary_browser_ui(
     ));
 
     commands.spawn((
-        SpriteBundle {
-            texture: graphics.get_ui_element_texture(UIElement::Bestiary),
-            sprite: Sprite {
+        (
+            Sprite {
+                image: graphics.get_ui_element_texture(UIElement::Bestiary),
                 custom_size: Some(Vec2::new(PANEL_W, PANEL_H)),
-                ..Default::default()
+                ..default()
             },
-            transform: Transform::from_translation(Vec3::new(0., 0., PANEL_Z)),
-            ..Default::default()
-        },
+            Transform::from_translation(Vec3::new(0., 0., PANEL_Z)),
+        ),
         RenderLayers::from_layers(&[3]),
         BeastiaryBrowserUI,
         UIState::BeastiaryBrowser,
@@ -146,15 +146,14 @@ pub fn setup_beastiary_browser_ui(
     let next_x = nav_center_x + NAV_BTN_W * 0.5 + NAV_BTN_GAP * 0.5;
 
     commands.spawn((
-        SpriteBundle {
-            texture: graphics.get_ui_element_texture(UIElement::BestiaryPrevButton),
-            sprite: Sprite {
+        (
+            Sprite {
+                image: graphics.get_ui_element_texture(UIElement::BestiaryPrevButton),
                 custom_size: Some(Vec2::new(NAV_BTN_W, NAV_BTN_H)),
-                ..Default::default()
+                ..default()
             },
-            transform: Transform::from_translation(Vec3::new(prev_x, NAV_BTNS_Y, CONTENT_Z)),
-            ..Default::default()
-        },
+            Transform::from_translation(Vec3::new(prev_x, NAV_BTNS_Y, CONTENT_Z)),
+        ),
         RenderLayers::from_layers(&[3]),
         UIElement::BestiaryPrevButton,
         Interactable::default(),
@@ -169,15 +168,14 @@ pub fn setup_beastiary_browser_ui(
     ));
 
     commands.spawn((
-        SpriteBundle {
-            texture: graphics.get_ui_element_texture(UIElement::BestiaryNextButton),
-            sprite: Sprite {
+        (
+            Sprite {
+                image: graphics.get_ui_element_texture(UIElement::BestiaryNextButton),
                 custom_size: Some(Vec2::new(NAV_BTN_W, NAV_BTN_H)),
-                ..Default::default()
+                ..default()
             },
-            transform: Transform::from_translation(Vec3::new(next_x, NAV_BTNS_Y, CONTENT_Z)),
-            ..Default::default()
-        },
+            Transform::from_translation(Vec3::new(next_x, NAV_BTNS_Y, CONTENT_Z)),
+        ),
         RenderLayers::from_layers(&[3]),
         UIElement::BestiaryNextButton,
         Interactable::default(),
@@ -277,15 +275,14 @@ fn spawn_grid_cell(
     if cards_collected == 0 {
         let cell = commands
             .spawn((
-                SpriteBundle {
-                    texture: card_bg,
-                    sprite: Sprite {
+                (
+                    Sprite {
+                        image: card_bg,
                         custom_size: Some(Vec2::new(CARD_W, CARD_H)),
-                        ..Default::default()
+                        ..default()
                     },
-                    transform: Transform::from_translation(Vec3::new(x, y, CONTENT_Z)),
-                    ..Default::default()
-                },
+                    Transform::from_translation(Vec3::new(x, y, CONTENT_Z)),
+                ),
                 RenderLayers::from_layers(&[3]),
                 Interactable::default(),
                 BounceOnHit::with_strength_fraction(CARD_BOUNCE_STRENGTH),
@@ -300,41 +297,37 @@ fn spawn_grid_cell(
             ))
             .id();
         commands
-            .spawn(Text2dBundle {
-                text: Text::from_section(
-                    "?",
-                    gf::DISPLAY_LARGE.text_style(&asset_server, Color::rgba(0.85, 0.85, 0.85, 1.)),
-                ),
-                text_anchor: Anchor::Center,
-                transform: Transform {
-                translation: Vec3::new(0., 0., 1.),
-                scale: gf::DISPLAY_LARGE.transform_scale(),
-                ..Default::default()
-            },
-                ..Default::default()
-            })
+            .spawn(
+                gf::DISPLAY_LARGE
+                    .text(&asset_server, "?", Color::srgba(0.85, 0.85, 0.85, 1.))
+                    .anchor(Anchor::CENTER)
+                    .with_transform(Transform {
+                        translation: Vec3::new(0., 0., 1.),
+                        scale: gf::DISPLAY_LARGE.transform_scale(),
+                        ..Default::default()
+                    }),
+            )
             .insert(RenderLayers::from_layers(&[3]))
             .insert(UIState::BeastiaryBrowser)
-            .set_parent(cell);
+            .insert(ChildOf(cell));
     } else {
         // Owned: card slot background + mob card sprite + bottom-right "x{N}" overlay.
         let mut atlas_sprite = graphics
             .spritesheet_map
             .as_ref()
             .and_then(|map| map.get(&card_obj).cloned())
-            .unwrap_or_else(TextureAtlasSprite::default);
+            .unwrap_or_default();
         atlas_sprite.custom_size = Some(Vec2::new(CARD_SPRITE_W, CARD_SPRITE_H));
         let cell = commands
             .spawn((
-                SpriteBundle {
-                    texture: card_bg,
-                    sprite: Sprite {
+                (
+                    Sprite {
+                        image: card_bg,
                         custom_size: Some(Vec2::new(CARD_W, CARD_H)),
-                        ..Default::default()
+                        ..default()
                     },
-                    transform: Transform::from_translation(Vec3::new(x, y, CONTENT_Z)),
-                    ..Default::default()
-                },
+                    Transform::from_translation(Vec3::new(x, y, CONTENT_Z)),
+                ),
                 RenderLayers::from_layers(&[3]),
                 Interactable::default(),
                 BounceOnHit::with_strength_fraction(CARD_BOUNCE_STRENGTH),
@@ -350,41 +343,26 @@ fn spawn_grid_cell(
             .id();
         commands
             .spawn((
-                SpriteSheetBundle {
-                    sprite: atlas_sprite,
-                    texture_atlas: graphics
-                        .texture_atlas
-                        .as_ref()
-                        .expect("texture atlas loaded")
-                        .clone(),
-                    transform: Transform::from_translation(Vec3::new(0., 0., 1.)),
-                    ..Default::default()
-                },
+                atlas_sprite.clone(),
+                Transform::from_translation(Vec3::new(0., 0., 1.)),
                 RenderLayers::from_layers(&[3]),
                 UIState::BeastiaryBrowser,
             ))
-            .set_parent(cell);
+            .insert(ChildOf(cell));
         commands
-            .spawn(Text2dBundle {
-                text: Text::from_section(
-                    format!("x{cards_collected}"),
-                    gf::DISPLAY.text_style(&asset_server, WHITE),
-                ),
-                text_anchor: Anchor::Center,
-                transform: Transform {
-                translation: Vec3::new(
-                    CARD_W * 0.5 - 4.,
-                    -CARD_H * 0.5,
-                    2.,
-                ),
-                scale: gf::DISPLAY.transform_scale(),
-                ..Default::default()
-            },
-                ..Default::default()
-            })
+            .spawn(
+                gf::DISPLAY
+                    .text(&asset_server, format!("x{cards_collected}"), WHITE)
+                    .anchor(Anchor::CENTER)
+                    .with_transform(Transform {
+                        translation: Vec3::new(CARD_W * 0.5 - 4., -CARD_H * 0.5, 2.),
+                        scale: gf::DISPLAY.transform_scale(),
+                        ..Default::default()
+                    }),
+            )
             .insert(RenderLayers::from_layers(&[3]))
             .insert(UIState::BeastiaryBrowser)
-            .set_parent(cell);
+            .insert(ChildOf(cell));
     }
 }
 
@@ -417,7 +395,7 @@ fn spawn_detail_panel(
     graphics: &Graphics,
     beastiary: &Beastiary,
     proto: &ProtoParam,
-    texture_atlases: &mut Assets<TextureAtlas>,
+    texture_atlases: &mut Assets<TextureAtlasLayout>,
     center_x: f32,
     top_y: f32,
     panel_width: f32,
@@ -425,24 +403,15 @@ fn spawn_detail_panel(
 ) {
     let Some(mob) = selected else {
         commands.spawn((
-            Text2dBundle {
-                text: Text::from_section(
-                    "Select a card to view details.",
-                    gf::BODY.text_style(&asset_server, WHITE),
-                )
-                .with_alignment(TextAlignment::Center),
-                text_anchor: Anchor::Center,
-                transform: Transform {
-                translation: Vec3::new(
-                    center_x,
-                    top_y - panel_width * 0.4,
-                    CONTENT_Z,
-                ),
-                scale: gf::BODY.transform_scale(),
-                ..Default::default()
-            },
-                ..Default::default()
-            },
+            gf::BODY
+                .text(&asset_server, "Select a card to view details.", WHITE)
+                .justify(Justify::Center)
+                .anchor(Anchor::CENTER)
+                .with_transform(Transform {
+                    translation: Vec3::new(center_x, top_y - panel_width * 0.4, CONTENT_Z),
+                    scale: gf::BODY.transform_scale(),
+                    ..Default::default()
+                }),
             RenderLayers::from_layers(&[3]),
             BeastiaryBrowserUI,
             UIState::BeastiaryBrowser,
@@ -456,24 +425,15 @@ fn spawn_detail_panel(
     let copies = entry.cards_collected;
     if copies == 0 {
         commands.spawn((
-            Text2dBundle {
-                text: Text::from_section(
-                    "Collect a card to learn more.",
-                    gf::BODY.text_style(&asset_server, WHITE),
-                )
-                .with_alignment(TextAlignment::Center),
-                text_anchor: Anchor::Center,
-                transform: Transform {
-                translation: Vec3::new(
-                    center_x,
-                    top_y - panel_width * 0.4,
-                    CONTENT_Z,
-                ),
-                scale: gf::BODY.transform_scale(),
-                ..Default::default()
-            },
-                ..Default::default()
-            },
+            gf::BODY
+                .text(&asset_server, "Collect a card to learn more.", WHITE)
+                .justify(Justify::Center)
+                .anchor(Anchor::CENTER)
+                .with_transform(Transform {
+                    translation: Vec3::new(center_x, top_y - panel_width * 0.4, CONTENT_Z),
+                    scale: gf::BODY.transform_scale(),
+                    ..Default::default()
+                }),
             RenderLayers::from_layers(&[3]),
             BeastiaryBrowserUI,
             UIState::BeastiaryBrowser,
@@ -497,20 +457,15 @@ fn spawn_detail_panel(
 
     let mut y = preview_y - 72. - detail_text_offset_below_preview(mob);
     commands.spawn((
-        Text2dBundle {
-            text: Text::from_section(
-                mob_display_name(mob),
-                gf::DISPLAY.text_style(&asset_server, DARK_WOOD_BROWN),
-            )
-            .with_alignment(TextAlignment::Center),
-            text_anchor: Anchor::Center,
-            transform: Transform {
+        gf::DISPLAY
+            .text(&asset_server, mob_display_name(mob), DARK_WOOD_BROWN)
+            .justify(Justify::Center)
+            .anchor(Anchor::CENTER)
+            .with_transform(Transform {
                 translation: Vec3::new(center_x, 140., CONTENT_Z),
                 scale: gf::DISPLAY.transform_scale(),
                 ..Default::default()
-            },
-            ..Default::default()
-        },
+            }),
         RenderLayers::from_layers(&[3]),
         BeastiaryBrowserUI,
         UIState::BeastiaryBrowser,
@@ -522,20 +477,15 @@ fn spawn_detail_panel(
         y -= 18.;
         if let Some((hp, atk)) = mob_base_hp_and_attack(proto, mob) {
             commands.spawn((
-                Text2dBundle {
-                    text: Text::from_section(
-                        format!("HP {hp}     ATK {atk}"),
-                        gf::BODY.text_style(&asset_server, RED),
-                    )
-                    .with_alignment(TextAlignment::Center),
-                    text_anchor: Anchor::Center,
-                    transform: Transform {
-                translation: Vec3::new(center_x, y, CONTENT_Z),
-                scale: gf::BODY.transform_scale(),
-                ..Default::default()
-            },
-                    ..Default::default()
-                },
+                gf::BODY
+                    .text(&asset_server, format!("HP {hp}     ATK {atk}"), RED)
+                    .justify(Justify::Center)
+                    .anchor(Anchor::CENTER)
+                    .with_transform(Transform {
+                        translation: Vec3::new(center_x, y, CONTENT_Z),
+                        scale: gf::BODY.transform_scale(),
+                        ..Default::default()
+                    }),
                 RenderLayers::from_layers(&[3]),
                 BeastiaryBrowserUI,
                 UIState::BeastiaryBrowser,
@@ -563,20 +513,15 @@ fn spawn_locked_line(
     text: &str,
 ) {
     commands.spawn((
-        Text2dBundle {
-            text: Text::from_section(
-                text,
-                gf::BODY.text_style(&asset_server, GREY),
-            )
-            .with_alignment(TextAlignment::Center),
-            text_anchor: Anchor::Center,
-            transform: Transform {
+        gf::BODY
+            .text(&asset_server, text, GREY)
+            .justify(Justify::Center)
+            .anchor(Anchor::CENTER)
+            .with_transform(Transform {
                 translation: Vec3::new(x, y, CONTENT_Z),
                 scale: gf::BODY.transform_scale(),
                 ..Default::default()
-            },
-            ..Default::default()
-        },
+            }),
         RenderLayers::from_layers(&[3]),
         BeastiaryBrowserUI,
         UIState::BeastiaryBrowser,
@@ -600,24 +545,15 @@ fn spawn_run_stats(
     ];
     for (i, line) in lines.iter().enumerate() {
         commands.spawn((
-            Text2dBundle {
-                text: Text::from_section(
-                    line.clone(),
-                    gf::BODY.text_style(&asset_server, DARK_WOOD_BROWN),
-                )
-                .with_alignment(TextAlignment::Center),
-                text_anchor: Anchor::Center,
-                transform: Transform {
-                translation: Vec3::new(
-                    x,
-                    start_y - i as f32 * 10.,
-                    CONTENT_Z,
-                ),
-                scale: gf::BODY.transform_scale(),
-                ..Default::default()
-            },
-                ..Default::default()
-            },
+            gf::BODY
+                .text(&asset_server, line.clone(), DARK_WOOD_BROWN)
+                .justify(Justify::Center)
+                .anchor(Anchor::CENTER)
+                .with_transform(Transform {
+                    translation: Vec3::new(x, start_y - i as f32 * 10., CONTENT_Z),
+                    scale: gf::BODY.transform_scale(),
+                    ..Default::default()
+                }),
             RenderLayers::from_layers(&[3]),
             BeastiaryBrowserUI,
             UIState::BeastiaryBrowser,
@@ -675,11 +611,11 @@ fn preview_sheet_data(mob: &Mob) -> Option<(Vec2, usize, usize, usize, usize)> {
 /// `bevy_aseprite` plugin animates these automatically in every `GameState`,
 /// so no local animator system is needed for them.
 fn preview_aseprite_data(mob: &Mob) -> Option<(&'static str, &'static str)> {
-    use crate::enemy::aseprite_enemy::{
+    use crate::aseprite_assets::RedMushling;
+    use crate::aseprite_assets::StoneGolem;
+    use crate::aseprite_assets::{
         BigCactusAse, BullAse, LizardAse, SmallCactusAse, VoidCrawlerAse, VoidWormAse,
     };
-    use crate::enemy::red_mushling::RedMushling;
-    use crate::enemy::stone_golem::StoneGolem;
     match mob {
         Mob::Bull => Some((BullAse::PATH, "WalkDown")),
         Mob::BigCactus => Some((BigCactusAse::PATH, "WalkDown")),
@@ -716,13 +652,13 @@ pub struct BeastiaryPreviewSheet {
 ///    `animate_character_spritesheet_animations` only runs in
 ///    `GameState::Main`, so we can't reuse it here.
 /// 2. **Aseprite mobs** (Bull, cacti, Lizard, VoidCrawler, StoneGolem, RedMushling):
-///    spawn `AsepriteBundle` with the matching walk tag. `bevy_aseprite`'s
+///    spawn `aseprite_bundle` with the matching walk tag. `bevy_aseprite_ultra`'s
 ///    plugin advances animations every frame in every `GameState`.
 fn spawn_mob_preview(
     commands: &mut Commands,
     asset_server: &AssetServer,
     graphics: &Graphics,
-    texture_atlases: &mut Assets<TextureAtlas>,
+    texture_atlases: &mut Assets<TextureAtlasLayout>,
     mob: &Mob,
     x: f32,
     y: f32,
@@ -733,18 +669,26 @@ fn spawn_mob_preview(
         if let Some(handles) = graphics.mob_spritesheets.as_ref().and_then(|m| m.get(mob)) {
             // index 2 = down (matches assets/mod.rs build order: side, up, down)
             if let Some(down) = handles.get(2).cloned() {
-                let atlas = TextureAtlas::from_grid(down, frame, cols, rows, None, None);
+                let atlas = TextureAtlasLayout::from_grid(
+                    UVec2::new(frame.x as u32, frame.y as u32),
+                    cols as u32,
+                    rows as u32,
+                    None,
+                    None,
+                );
                 let atlas_handle = texture_atlases.add(atlas);
                 let walk_start_index = walk_row * cols;
-                let mut sprite = TextureAtlasSprite::new(walk_start_index);
-                sprite.custom_size = Some(frame * preview_scale);
                 commands.spawn((
-                    SpriteSheetBundle {
-                        sprite,
-                        texture_atlas: atlas_handle,
-                        transform: Transform::from_translation(Vec3::new(x, y, CONTENT_Z)),
-                        ..Default::default()
+                    Sprite {
+                        image: down,
+                        texture_atlas: Some(TextureAtlas {
+                            layout: atlas_handle,
+                            index: walk_start_index,
+                        }),
+                        custom_size: Some(frame * preview_scale),
+                        ..default()
                     },
+                    Transform::from_translation(Vec3::new(x, y, CONTENT_Z)),
                     BeastiaryPreviewSheet {
                         timer: Timer::from_seconds(0.12, TimerMode::Repeating),
                         walk_start_index,
@@ -762,16 +706,15 @@ fn spawn_mob_preview(
     }
 
     if let Some((path, walk_tag)) = preview_aseprite_data(mob) {
-        let mut animation = bevy_aseprite::anim::AsepriteAnimation::from(walk_tag);
-        animation.play();
         commands.spawn((
-            bevy_aseprite::AsepriteBundle {
-                aseprite: asset_server.load(path),
-                animation,
-                transform: Transform::from_translation(Vec3::new(x, y, CONTENT_Z))
+            aseprite_bundle(
+                asset_server.load(path),
+                walk_tag,
+                Transform::from_translation(Vec3::new(x, y, CONTENT_Z))
                     .with_scale(Vec3::splat(preview_scale)),
-                ..Default::default()
-            },
+                Visibility::Inherited,
+                false,
+            ),
             RenderLayers::from_layers(&[3]),
             BeastiaryBrowserUI,
             UIState::BeastiaryBrowser,
@@ -783,15 +726,14 @@ fn spawn_mob_preview(
 
     // Final fallback — should not be reached for mobs in `BEASTIARY_MOBS`.
     commands.spawn((
-        SpriteBundle {
-            sprite: Sprite {
-                color: Color::rgba(0.3, 0.3, 0.35, 1.),
+        (
+            Sprite {
+                color: Color::srgba(0.3, 0.3, 0.35, 1.),
                 custom_size: Some(Vec2::new(48., 48.)),
                 ..Default::default()
             },
-            transform: Transform::from_translation(Vec3::new(x, y, CONTENT_Z)),
-            ..Default::default()
-        },
+            Transform::from_translation(Vec3::new(x, y, CONTENT_Z)),
+        ),
         RenderLayers::from_layers(&[3]),
         BeastiaryBrowserUI,
         UIState::BeastiaryBrowser,
@@ -804,15 +746,16 @@ fn spawn_mob_preview(
 /// at a fixed rate regardless of `GameState`.
 pub fn animate_beastiary_previews(
     time: Res<Time>,
-    mut q: Query<(&mut BeastiaryPreviewSheet, &mut TextureAtlasSprite)>,
+    mut q: Query<(&mut BeastiaryPreviewSheet, &mut Sprite)>,
 ) {
     for (mut sheet, mut sprite) in &mut q {
         sheet.timer.tick(time.delta());
         if sheet.timer.just_finished() {
             let start = sheet.walk_start_index;
             let len = sheet.walk_frames.max(1);
-            let next = start + ((sprite.index + 1).saturating_sub(start)) % len;
-            sprite.index = next;
+            if let Some(atlas) = &mut sprite.texture_atlas {
+                atlas.index = start + ((atlas.index + 1).saturating_sub(start)) % len;
+            }
         }
     }
 }
@@ -820,7 +763,7 @@ pub fn animate_beastiary_previews(
 pub fn handle_beastiary_card_click(
     mut commands: Commands,
     cursor_pos: Res<CursorPos>,
-    mouse_input: Res<Input<MouseButton>>,
+    mouse_input: Res<ButtonInput<MouseButton>>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     mut cells: Query<(
         Entity,
@@ -834,7 +777,7 @@ pub fn handle_beastiary_card_click(
     graphics: Res<Graphics>,
     beastiary: Res<Beastiary>,
     proto: ProtoParam,
-    mut texture_atlases: ResMut<Assets<TextureAtlas>>,
+    mut texture_atlases: ResMut<Assets<TextureAtlasLayout>>,
     focus_input: FocusInput,
 ) {
     let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None);
@@ -868,7 +811,7 @@ pub fn handle_beastiary_card_click(
     if let Some(mob) = clicked {
         selected.0 = Some(mob.clone());
         for entity in detail_entities.iter() {
-            commands.entity(entity).despawn_recursive();
+            commands.entity(entity).despawn();
         }
         commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.2));
         spawn_detail_panel(
@@ -902,7 +845,7 @@ pub fn refresh_beastiary_grid_on_pagination_change(
         return;
     }
     for entity in existing_cells.iter() {
-        commands.entity(entity).despawn_recursive();
+        commands.entity(entity).despawn();
     }
     spawn_beastiary_grid(
         &mut commands,
@@ -916,20 +859,28 @@ pub fn refresh_beastiary_grid_on_pagination_change(
 fn beastiary_prev_normal_sprite(commands: &mut Commands, graphics: &Graphics, entity: Entity) {
     commands
         .entity(entity)
-        .insert(UIElement::BestiaryPrevButton)
-        .insert(graphics.get_ui_element_texture(UIElement::BestiaryPrevButton));
+        .insert(UIElement::BestiaryPrevButton);
+    set_sprite_image(
+        commands,
+        entity,
+        graphics.get_ui_element_texture(UIElement::BestiaryPrevButton),
+    );
 }
 
 fn beastiary_next_normal_sprite(commands: &mut Commands, graphics: &Graphics, entity: Entity) {
     commands
         .entity(entity)
-        .insert(UIElement::BestiaryNextButton)
-        .insert(graphics.get_ui_element_texture(UIElement::BestiaryNextButton));
+        .insert(UIElement::BestiaryNextButton);
+    set_sprite_image(
+        commands,
+        entity,
+        graphics.get_ui_element_texture(UIElement::BestiaryNextButton),
+    );
 }
 
 pub fn handle_beastiary_pagination_clicks(
     cursor_pos: Res<CursorPos>,
-    mouse_input: Res<Input<MouseButton>>,
+    mouse_input: Res<ButtonInput<MouseButton>>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     mut prev_buttons: Query<
         (Entity, &mut Interactable),
@@ -964,9 +915,11 @@ pub fn handle_beastiary_pagination_clicks(
                     commands
                         .entity(entity)
                         .insert(UIElement::BestiaryPrevButtonHover)
-                        .insert(
-                            graphics.get_ui_element_texture(UIElement::BestiaryPrevButtonHover),
-                        );
+                        .insert(Sprite {
+                            image: graphics
+                                .get_ui_element_texture(UIElement::BestiaryPrevButtonHover),
+                            ..default()
+                        });
                     commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonHover, 0.05));
                 }
                 Interaction::Hovering => {
@@ -995,9 +948,11 @@ pub fn handle_beastiary_pagination_clicks(
                     commands
                         .entity(entity)
                         .insert(UIElement::BestiaryNextButtonHover)
-                        .insert(
-                            graphics.get_ui_element_texture(UIElement::BestiaryNextButtonHover),
-                        );
+                        .insert(Sprite {
+                            image: graphics
+                                .get_ui_element_texture(UIElement::BestiaryNextButtonHover),
+                            ..default()
+                        });
                     commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonHover, 0.05));
                 }
                 Interaction::Hovering => {
@@ -1024,7 +979,7 @@ pub fn cleanup_beastiary_browser_ui(
     mut pagination: ResMut<BeastiaryPagination>,
 ) {
     for entity in query.iter() {
-        commands.entity(entity).despawn_recursive();
+        commands.entity(entity).despawn();
     }
     selected.0 = None;
     pagination.page = 0;

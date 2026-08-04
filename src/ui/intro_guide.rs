@@ -1,13 +1,18 @@
-use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
+use bevy::text::Justify;
+use bevy::color::Alpha;
+use bevy::{camera::visibility::RenderLayers, prelude::*, sprite::Anchor};
 
 use crate::{
     client::GameData,
     colors::BLACK,
-    gamepad_bindings::{format_binding_label, BindingLabel, GamepadMappings},
+    gamepad_bindings::{
+        format_binding_label, gamepad_connected, BindingLabel, ConnectedGamepads, GamepadMappings,
+    },
     keybinds::InputMappings,
     ui::game_fonts as gf,
     GameState, ScreenResolution,
 };
+
 
 /// Render layer shared with the rest of the on-screen HUD (see `player_hud`).
 const INTRO_GUIDE_RENDER_LAYER: u8 = 3;
@@ -38,9 +43,9 @@ fn key_label(
     label: BindingLabel,
     keybinds: &InputMappings,
     gamepad_mappings: &GamepadMappings,
-    gamepads: &Gamepads,
+    gamepad_connected: bool,
 ) -> String {
-    format_binding_label(label, keybinds, gamepad_mappings, gamepads)
+    format_binding_label(label, keybinds, gamepad_mappings, gamepad_connected)
 }
 
 fn spawn_key_badge(
@@ -52,42 +57,42 @@ fn spawn_key_badge(
     parent: Entity,
 ) {
     let badge = commands
-        .spawn(SpriteBundle {
-            sprite: Sprite {
-                color: crate::ui::KEYBIND_BADGE_COLOR.with_a(0.),
+        .spawn((
+            Sprite {
+                color: crate::ui::KEYBIND_BADGE_COLOR.with_alpha(0.),
                 custom_size: Some(size),
                 ..default()
             },
             transform,
-            ..default()
-        })
-        .insert(RenderLayers::from_layers(&[INTRO_GUIDE_RENDER_LAYER]))
+        ))
+        .insert(RenderLayers::from_layers(&[
+            INTRO_GUIDE_RENDER_LAYER as usize
+        ]))
         .insert(IntroGuideVisual {
             target_alpha: BADGE_TARGET_ALPHA,
         })
-        .set_parent(parent)
+        .insert(ChildOf(parent))
         .id();
 
     commands
-        .spawn(Text2dBundle {
-            text: Text::from_section(
-                label,
-                gf::DISPLAY.text_style(&asset_server, crate::colors::WHITE.with_a(0.)),
-            )
-            .with_alignment(TextAlignment::Center),
-            text_anchor: Anchor::Center,
-            transform: Transform {
-                translation: Vec3::new(0., 0., 1.),
-                scale: gf::DISPLAY.transform_scale(),
-                ..default()
-            },
-            ..default()
-        })
-        .insert(RenderLayers::from_layers(&[INTRO_GUIDE_RENDER_LAYER]))
+        .spawn(
+            gf::DISPLAY
+                .text(&asset_server, label, crate::colors::WHITE.with_alpha(0.))
+                .justify(Justify::Center)
+                .anchor(Anchor::CENTER)
+                .with_transform(Transform {
+                    translation: Vec3::new(0., 0., 1.),
+                    scale: gf::DISPLAY.transform_scale(),
+                    ..default()
+                }),
+        )
+        .insert(RenderLayers::from_layers(&[
+            INTRO_GUIDE_RENDER_LAYER as usize
+        ]))
         .insert(IntroGuideVisual {
             target_alpha: TEXT_TARGET_ALPHA,
         })
-        .set_parent(badge);
+        .insert(ChildOf(badge));
 }
 
 fn spawn_caption(
@@ -98,46 +103,45 @@ fn spawn_caption(
     transform: Transform,
     parent: Entity,
 ) {
-    let render_layers = RenderLayers::from_layers(&[INTRO_GUIDE_RENDER_LAYER]);
-    let caption_style = gf::DISPLAY.text_style(&asset_server, crate::colors::WHITE.with_a(0.));
-    let shadow_style = gf::DISPLAY.text_style(&asset_server, BLACK.with_a(0.));
+    let render_layers = RenderLayers::from_layers(&[INTRO_GUIDE_RENDER_LAYER as usize]);
 
     let caption = commands
-        .spawn(Text2dBundle {
-            text: Text::from_section(text.clone(), caption_style)
-                .with_alignment(TextAlignment::Center),
-            text_anchor: anchor.clone(),
-            transform: Transform {
-                scale: gf::DISPLAY.transform_scale(),
-                ..transform
-            },
-            ..default()
-        })
+        .spawn(
+            gf::DISPLAY
+                .text(
+                    &asset_server,
+                    text.clone(),
+                    crate::colors::WHITE.with_alpha(0.),
+                )
+                .justify(Justify::Center)
+                .anchor(anchor.clone())
+                .with_transform(Transform {
+                    scale: gf::DISPLAY.transform_scale(),
+                    ..transform
+                }),
+        )
         .insert(render_layers.clone())
         .insert(IntroGuideVisual {
             target_alpha: TEXT_TARGET_ALPHA,
         })
-        .set_parent(parent)
+        .insert(ChildOf(parent))
         .id();
 
-    // Shadow copy — same pattern as `spawn_floating_text_with_shadow` in damage_numbers.rs.
+    // Shadow copy — identity local scale; inherits parent role scale.
     commands
-        .spawn(Text2dBundle {
-            text: Text::from_section(text, shadow_style)
-                .with_alignment(TextAlignment::Center),
-            text_anchor: anchor.clone(),
-            transform: Transform {
-                translation: Vec3::new(1., -1., -1.),
-                scale: gf::DISPLAY.transform_scale(),
-                ..default()
-            },
-            ..default()
-        })
+        .spawn(
+            gf::DISPLAY
+                .text(&asset_server, text, BLACK.with_alpha(0.))
+                .justify(Justify::Center)
+                .anchor(anchor.clone())
+                .at(Vec3::new(1., -1., -1.))
+                .with_scale(Vec3::ONE),
+        )
         .insert(render_layers)
         .insert(IntroGuideVisual {
             target_alpha: TEXT_TARGET_ALPHA,
         })
-        .set_parent(caption);
+        .insert(ChildOf(caption));
 }
 
 pub fn spawn_intro_guide(
@@ -145,7 +149,7 @@ pub fn spawn_intro_guide(
     asset_server: Res<AssetServer>,
     keybinds: Res<InputMappings>,
     gamepad_mappings: Res<GamepadMappings>,
-    gamepads: Res<Gamepads>,
+    gamepads: ConnectedGamepads,
     resolution: Res<ScreenResolution>,
     game_data: Option<Res<GameData>>,
 ) {
@@ -159,9 +163,10 @@ pub fn spawn_intro_guide(
     // chest full-screen overlays (z=9) so opening the inventory while the guide is still
     // fading covers it instead of the guide drawing on top. Child offsets stay < 1.
     let root = commands
-        .spawn(SpatialBundle::from_transform(Transform::from_translation(
-            Vec3::new(0., 0., 5.),
-        )))
+        .spawn((
+            Transform::from_translation(Vec3::new(0., 0., 5.)),
+            Visibility::default(),
+        ))
         .insert(IntroGuideRoot { elapsed: 0. })
         .insert(Name::new("Intro Guide"))
         .id();
@@ -173,10 +178,11 @@ pub fn spawn_intro_guide(
     // ----- Left section: WASD movement, ~25% in from the left edge. -----
     let left_x = -resolution.game_width * 0.25;
     let left_group = commands
-        .spawn(SpatialBundle::from_transform(Transform::from_translation(
-            Vec3::new(left_x, 0., 0.),
-        )))
-        .set_parent(root)
+        .spawn((
+            Transform::from_translation(Vec3::new(left_x, 0., 0.)),
+            Visibility::default(),
+        ))
+        .insert(ChildOf(root))
         .id();
 
     // "Move" caption sits above the keys.
@@ -184,7 +190,7 @@ pub fn spawn_intro_guide(
         &mut commands,
         &asset_server,
         "Move".to_string(),
-        Anchor::Center,
+        Anchor::CENTER,
         Transform::from_translation(Vec3::new(0., key.y * 1.5 + gap * 2. + 12., 1.)),
         left_group,
     );
@@ -216,10 +222,11 @@ pub fn spawn_intro_guide(
     // ----- Right section: action keybinds, ~25% in from the right edge. -----
     let right_x = resolution.game_width * 0.25;
     let right_group = commands
-        .spawn(SpatialBundle::from_transform(Transform::from_translation(
-            Vec3::new(right_x, 0., 0.),
-        )))
-        .set_parent(root)
+        .spawn((
+            Transform::from_translation(Vec3::new(right_x, 0., 0.)),
+            Visibility::default(),
+        ))
+        .insert(ChildOf(root))
         .id();
 
     let rows = [
@@ -228,7 +235,7 @@ pub fn spawn_intro_guide(
                 BindingLabel::AttackAutoTarget,
                 &keybinds,
                 &gamepad_mappings,
-                &gamepads,
+                gamepad_connected(&gamepads),
             ),
             "Auto Aim",
         ),
@@ -237,7 +244,7 @@ pub fn spawn_intro_guide(
                 BindingLabel::Inventory,
                 &keybinds,
                 &gamepad_mappings,
-                &gamepads,
+                gamepad_connected(&gamepads),
             ),
             "Inventory",
         ),
@@ -246,7 +253,7 @@ pub fn spawn_intro_guide(
                 BindingLabel::Minimap,
                 &keybinds,
                 &gamepad_mappings,
-                &gamepads,
+                gamepad_connected(&gamepads),
             ),
             "Map",
         ),
@@ -274,7 +281,7 @@ pub fn spawn_intro_guide(
             &mut commands,
             &asset_server,
             caption.to_string(),
-            Anchor::CenterLeft,
+            Anchor::CENTER_LEFT,
             Transform::from_translation(Vec3::new(label_x, y, 1.)),
             right_group,
         );
@@ -287,15 +294,15 @@ pub fn tick_intro_guide(
     time: Res<Time>,
     mut roots: Query<(Entity, &mut IntroGuideRoot)>,
     mut visuals: Query<
-        (&IntroGuideVisual, Option<&mut Sprite>, Option<&mut Text>),
-        Or<(With<Sprite>, With<Text>)>,
+        (&IntroGuideVisual, Option<&mut Sprite>, Option<&mut TextColor>),
+        Or<(With<Sprite>, With<Text2d>)>,
     >,
 ) {
-    let Ok((root_entity, mut root)) = roots.get_single_mut() else {
+    let Ok((root_entity, mut root)) = roots.single_mut() else {
         return;
     };
 
-    root.elapsed += time.delta_seconds();
+    root.elapsed += time.delta_secs();
     let t = root.elapsed;
 
     let fade = if t < FADE_IN_SECS {
@@ -305,19 +312,17 @@ pub fn tick_intro_guide(
     } else if t < FADE_IN_SECS + HOLD_SECS + FADE_OUT_SECS {
         1.0 - ((t - FADE_IN_SECS - HOLD_SECS) / FADE_OUT_SECS).clamp(0., 1.)
     } else {
-        commands.entity(root_entity).despawn_recursive();
+        commands.entity(root_entity).despawn();
         return;
     };
 
     for (visual, sprite, text) in visuals.iter_mut() {
         let alpha = visual.target_alpha * fade;
         if let Some(mut sprite) = sprite {
-            sprite.color.set_a(alpha);
+            sprite.color = sprite.color.with_alpha(alpha);
         }
-        if let Some(mut text) = text {
-            for section in text.sections.iter_mut() {
-                section.style.color.set_a(alpha);
-            }
+        if let Some(mut text_color) = text {
+            text_color.0 = text_color.0.with_alpha(alpha);
         }
     }
 }
@@ -326,11 +331,10 @@ pub struct IntroGuidePlugin;
 
 impl Plugin for IntroGuidePlugin {
     fn build(&self, app: &mut App) {
-        app.add_system(
-            spawn_intro_guide
-                .run_if(crate::run_once_per_run())
-                .in_schedule(OnEnter(GameState::Main)),
+        app.add_systems(
+            OnEnter(GameState::Main),
+            spawn_intro_guide.run_if(crate::run_once_per_run()),
         )
-        .add_system(tick_intro_guide.run_if(in_state(GameState::Main)));
+        .add_systems(Update, tick_intro_guide.run_if(in_state(GameState::Main)));
     }
 }

@@ -1,21 +1,27 @@
+use crate::aseprite_assets::{
+    BigCactusAse, BullAse, Crow, LizardAse, SmallCactusAse, VoidCrawlerAse, VoidWormAse,
+};
+use crate::aseprite_helpers::{
+    ase_animation, aseprite_bundle, collect_finished, is_paused, pause, play_loop, play_once, start,
+};
 use bevy::prelude::*;
-use bevy_aseprite::{anim::AsepriteAnimation, aseprite, AsepriteBundle};
+use bevy_aseprite_ultra::prelude::{AnimationEvents, AnimationState, AseAnimation, Aseprite};
 use bevy_rapier2d::prelude::{Collider, CollisionGroups, Group, KinematicCharacterController};
-use seldom_state::prelude::{StateMachine, Trigger};
+use seldom_state::prelude::{always, IntoTrigger, StateMachine};
 
 use crate::{
     ai::{
-        BullChargePhase, BullChargeState, CachedAttackDistance, CachedLineOfSight,
-        CircleAttackState, EnemyAttackCooldown, FollowState, HurtByPlayer, IdleState,
-        LeapAttackState, MultiLeapAttackState, MultiLeapPhase, NightTimeAggro,
-        ProjectileAttackState,
+        cached_attack_distance, cached_line_of_sight, hurt_by_player, night_time_aggro,
+        BullChargePhase, BullChargeState, CircleAttackState, EnemyAttackCooldown, FollowState,
+        IdleState, LeapAttackState, MultiLeapAttackState, MultiLeapPhase, ProjectileAttackState,
     },
     animations::{enemy_sprites::spawn_attack_warning_aseprite, HitAnimationTracker},
     attributes::Attack,
     combat::{combat_helpers::spawn_temp_collider, status_effects::MobStatusEffects},
     enemy::{
-        void_worm::VoidWormLaserState, BullChargeAttack, CircleAttack, CombatAlignment, FollowSpeed,
-        LaserAttack, LeapAttack, Mob, MobIsAttacking, MultiLeapAttack, ProjectileAttack,
+        void_worm::VoidWormLaserState, BullChargeAttack, CircleAttack, CombatAlignment,
+        FollowSpeed, LaserAttack, LeapAttack, Mob, MobIsAttacking, MultiLeapAttack,
+        ProjectileAttack,
     },
     inputs::FacingDirection,
     item::projectile::{EnemyProjectile, Projectile, RangedAttackEvent},
@@ -29,13 +35,6 @@ use crate::{
 };
 
 // Each "basic" aseprite enemy (walk + lunge) must be declared here so the macro runs at compile time.
-aseprite!(pub Crow, "textures/crow.ase");
-aseprite!(pub SmallCactusAse, "textures/cactus_small/cactus_small.ase");
-aseprite!(pub BigCactusAse, "textures/cactus_large/cactus_large.ase");
-aseprite!(pub BullAse, "textures/bull/bull.ase");
-aseprite!(pub LizardAse, "textures/lizard/lizard.ase");
-aseprite!(pub VoidCrawlerAse, "textures/VoidCrawler/voidcrawler.ase");
-aseprite!(pub VoidWormAse, "textures/VoidWorm/VoidWorm.ase");
 
 /// Fixed animation tag names for the shared aseprite basic enemy behavior.
 /// Aseprite files must use these exact tag names: WalkUp, WalkDown, WalkSide, AttackUp, AttackDown, AttackSide.
@@ -63,7 +62,7 @@ pub struct AsepriteBasicEnemy;
 pub struct CurrentAsepriteTag(pub String);
 
 /// Returns (aseprite path, initial walk tag) for mobs that use the shared aseprite basic behavior.
-/// Add a new match arm and an `aseprite!(pub Name, "path")` at the top of this file for each new enemy.
+/// Add a new match arm and an `` at the top of this file for each new enemy.
 fn get_aseprite_basic_config(mob: &Mob) -> Option<(&'static str, &'static str)> {
     match mob {
         Mob::Crow => Some((Crow::PATH, WALK_DOWN)),
@@ -82,7 +81,7 @@ pub fn is_aseprite_basic_mob(mob: &Mob) -> bool {
     get_aseprite_basic_config(mob).is_some()
 }
 
-/// Initializes aseprite basic enemies: when a Mob in our registry is spawned, insert AsepriteBundle and marker.
+/// Initializes aseprite basic enemies: when a Mob in our registry is spawned, insert native aseprite components and marker.
 pub fn aseprite_enemy_setup(
     mut commands: Commands,
     new_mobs: Query<(Entity, &Mob, &Transform), Added<Mob>>,
@@ -93,32 +92,24 @@ pub fn aseprite_enemy_setup(
             continue;
         };
 
-        let mut animation = AsepriteAnimation::from(initial_tag);
-        animation.play();
-
         commands
             .entity(entity)
-            .insert(AsepriteBundle {
-                aseprite: asset_server.load(path),
-                animation,
-                transform: *transform,
-                ..Default::default()
-            })
+            .insert(aseprite_bundle(
+                asset_server.load(path),
+                initial_tag,
+                *transform,
+                Visibility::Inherited,
+                false,
+            ))
             .insert(CurrentAsepriteTag(initial_tag.to_string()))
             .insert(AsepriteBasicEnemy);
     }
 }
 
-fn set_animation_tag(
-    anim: &mut AsepriteAnimation,
-    current_tag: &mut CurrentAsepriteTag,
-    new_tag: &str,
-) {
+fn set_animation_tag(anim: &mut AseAnimation, current_tag: &mut CurrentAsepriteTag, new_tag: &str) {
     if current_tag.0 != new_tag {
-        *anim = AsepriteAnimation::from(new_tag);
-        if anim.is_paused() {
-            anim.play();
-        }
+        // Preserve aseprite handle — never rebuild via `from()` (wipes Handle::default).
+        play_loop(anim, new_tag);
         current_tag.0 = new_tag.to_string();
     }
 }
@@ -183,7 +174,7 @@ pub fn handle_new_aseprite_enemy_state_machine(
         commands
             .entity(e)
             .insert(CollisionGroups::new(Group::GROUP_1, Group::GROUP_1));
-        if dungeon_check.get_single().is_ok() {
+        if dungeon_check.single().is_ok() {
             alignment = CombatAlignment::Hostile;
         }
 
@@ -192,8 +183,8 @@ pub fn handle_new_aseprite_enemy_state_machine(
         match alignment {
             CombatAlignment::Neutral => {
                 state_machine = state_machine
-                    .trans::<IdleState>(
-                        HurtByPlayer,
+                    .trans::<IdleState, _>(
+                        hurt_by_player,
                         FollowState {
                             target: game.game.player,
                             curr_delta: None,
@@ -201,10 +192,8 @@ pub fn handle_new_aseprite_enemy_state_machine(
                             speed: follow_speed.0,
                         },
                     )
-                    .trans::<FollowState>(
-                        Trigger::not(CachedLineOfSight {
-                            range_sq: 130. * 130.,
-                        }),
+                    .trans::<FollowState, _>(
+                        cached_line_of_sight(130. * 130.).not(),
                         IdleState {
                             walk_timer: Timer::from_seconds(2., TimerMode::Repeating),
                             direction: FacingDirection::new_rand_dir(rand::thread_rng()),
@@ -214,10 +203,9 @@ pub fn handle_new_aseprite_enemy_state_machine(
                     );
             }
             CombatAlignment::Hostile => {
-                state_machine = state_machine.trans::<IdleState>(
-                    CachedLineOfSight {
-                        range_sq: 130. * 130.,
-                    },
+                // Hostiles chase immediately — no aggro/LoS distance gate.
+                state_machine = state_machine.trans::<IdleState, _>(
+                    always,
                     FollowState {
                         target: game.game.player,
                         curr_delta: None,
@@ -230,49 +218,35 @@ pub fn handle_new_aseprite_enemy_state_machine(
         }
 
         if let Some(leap_attack) = leap_attack_option {
-            state_machine = state_machine
-                .trans::<FollowState>(
-                    CachedAttackDistance {
-                        range_sq: leap_attack.activation_distance * leap_attack.activation_distance,
-                    },
-                    LeapAttackState {
-                        target: game.game.player,
-                        attack_startup_timer: Timer::from_seconds(
-                            leap_attack.startup,
-                            TimerMode::Once,
-                        ),
-                        attack_duration_timer: Timer::from_seconds(
-                            leap_attack.duration,
-                            TimerMode::Once,
-                        ),
-                        attack_cooldown_timer: Timer::from_seconds(
-                            leap_attack.cooldown,
-                            TimerMode::Once,
-                        ),
-                        dir: None,
-                        speed: leap_attack.speed,
-                        attack_preview_entity: None,
-                    },
-                )
-                .trans::<LeapAttackState>(
-                    Trigger::not(CachedAttackDistance {
-                        range_sq: (leap_attack.activation_distance + 32.).powi(2),
-                    }),
-                    FollowState {
-                        target: game.game.player,
-                        curr_delta: None,
-                        curr_path: None,
-                        speed: follow_speed.0,
-                    },
-                );
+            // Complete the lunge once entered — see `handle_new_mob_state_machine`.
+            state_machine = state_machine.trans::<FollowState, _>(
+                cached_attack_distance(
+                    leap_attack.activation_distance * leap_attack.activation_distance,
+                ),
+                LeapAttackState {
+                    target: game.game.player,
+                    attack_startup_timer: Timer::from_seconds(leap_attack.startup, TimerMode::Once),
+                    attack_duration_timer: Timer::from_seconds(
+                        leap_attack.duration,
+                        TimerMode::Once,
+                    ),
+                    attack_cooldown_timer: Timer::from_seconds(
+                        leap_attack.cooldown,
+                        TimerMode::Once,
+                    ),
+                    dir: None,
+                    speed: leap_attack.speed,
+                    attack_preview_entity: None,
+                },
+            );
         }
 
         if let Some(proj_attack) = proj_attack_option {
             state_machine = state_machine
-                .trans::<FollowState>(
-                    CachedAttackDistance {
-                        range_sq: proj_attack.activation_distance * proj_attack.activation_distance,
-                    },
+                .trans::<FollowState, _>(
+                    cached_attack_distance(
+                        proj_attack.activation_distance * proj_attack.activation_distance,
+                    ),
                     ProjectileAttackState {
                         target: game.game.player,
                         attack_startup_timer: Timer::from_seconds(
@@ -291,10 +265,8 @@ pub fn handle_new_aseprite_enemy_state_machine(
                         projectile: proj_attack.projectile.clone(),
                     },
                 )
-                .trans::<ProjectileAttackState>(
-                    Trigger::not(CachedAttackDistance {
-                        range_sq: (proj_attack.activation_distance + 30.).powi(2),
-                    }),
+                .trans::<ProjectileAttackState, _>(
+                    cached_attack_distance((proj_attack.activation_distance + 30.).powi(2)).not(),
                     FollowState {
                         target: game.game.player,
                         curr_delta: None,
@@ -306,11 +278,10 @@ pub fn handle_new_aseprite_enemy_state_machine(
 
         if let Some(circle_attack) = circle_attack_option {
             state_machine = state_machine
-                .trans::<FollowState>(
-                    CachedAttackDistance {
-                        range_sq: circle_attack.activation_distance
-                            * circle_attack.activation_distance,
-                    },
+                .trans::<FollowState, _>(
+                    cached_attack_distance(
+                        circle_attack.activation_distance * circle_attack.activation_distance,
+                    ),
                     CircleAttackState {
                         target: game.game.player,
                         attack_startup_timer: Timer::from_seconds(
@@ -329,10 +300,8 @@ pub fn handle_new_aseprite_enemy_state_machine(
                         ),
                     },
                 )
-                .trans::<CircleAttackState>(
-                    Trigger::not(CachedAttackDistance {
-                        range_sq: (circle_attack.activation_distance + 32.).powi(2),
-                    }),
+                .trans::<CircleAttackState, _>(
+                    cached_attack_distance((circle_attack.activation_distance + 32.).powi(2)).not(),
                     FollowState {
                         target: game.game.player,
                         curr_delta: None,
@@ -344,10 +313,10 @@ pub fn handle_new_aseprite_enemy_state_machine(
 
         if let Some(multi_leap) = multi_leap_option {
             state_machine = state_machine
-                .trans::<FollowState>(
-                    CachedAttackDistance {
-                        range_sq: multi_leap.activation_distance * multi_leap.activation_distance,
-                    },
+                .trans::<FollowState, _>(
+                    cached_attack_distance(
+                        multi_leap.activation_distance * multi_leap.activation_distance,
+                    ),
                     MultiLeapAttackState {
                         target: game.game.player,
                         attack_startup_timer: Timer::from_seconds(
@@ -380,10 +349,8 @@ pub fn handle_new_aseprite_enemy_state_machine(
                         current_phase: MultiLeapPhase::Startup,
                     },
                 )
-                .trans::<MultiLeapAttackState>(
-                    Trigger::not(CachedAttackDistance {
-                        range_sq: (multi_leap.activation_distance + 32.).powi(2),
-                    }),
+                .trans::<MultiLeapAttackState, _>(
+                    cached_attack_distance((multi_leap.activation_distance + 32.).powi(2)).not(),
                     FollowState {
                         target: game.game.player,
                         curr_delta: None,
@@ -394,10 +361,10 @@ pub fn handle_new_aseprite_enemy_state_machine(
         }
 
         if let Some(bull_charge) = bull_charge_option {
-            state_machine = state_machine.trans::<FollowState>(
-                CachedAttackDistance {
-                    range_sq: bull_charge.activation_distance * bull_charge.activation_distance,
-                },
+            state_machine = state_machine.trans::<FollowState, _>(
+                cached_attack_distance(
+                    bull_charge.activation_distance * bull_charge.activation_distance,
+                ),
                 BullChargeState {
                     target: game.game.player,
                     charge_target_pos: None,
@@ -425,10 +392,8 @@ pub fn handle_new_aseprite_enemy_state_machine(
                 rand::thread_rng()
                     .gen_range(laser_attack.min_stop_distance..=laser_attack.max_stop_distance)
             };
-            state_machine = state_machine.trans::<FollowState>(
-                CachedAttackDistance {
-                    range_sq: stop_distance * stop_distance,
-                },
+            state_machine = state_machine.trans::<FollowState, _>(
+                cached_attack_distance(stop_distance * stop_distance),
                 VoidWormLaserState::new(
                     game.game.player,
                     laser_attack.laser_duration,
@@ -440,8 +405,8 @@ pub fn handle_new_aseprite_enemy_state_machine(
         }
 
         if alignment != CombatAlignment::Passive {
-            state_machine = state_machine.trans::<IdleState>(
-                NightTimeAggro,
+            state_machine = state_machine.trans::<IdleState, _>(
+                night_time_aggro,
                 FollowState {
                     target: game.game.player,
                     curr_delta: None,
@@ -463,7 +428,7 @@ pub fn aseprite_follow(
         (
             Entity,
             &mut FollowState,
-            &mut AsepriteAnimation,
+            &mut AseAnimation,
             &mut CurrentAsepriteTag,
             Option<&MobStatusEffects>,
             Option<&Parried>,
@@ -476,6 +441,7 @@ pub fn aseprite_follow(
     time: Res<Time>,
     night_tracker: Res<NightTracker>,
     grid: Res<crate::ai::steering::EnemySpatialGrid>,
+    game: Res<crate::Game>,
 ) {
     for (
         entity,
@@ -500,7 +466,13 @@ pub fn aseprite_follow(
             continue;
         }
 
-        let Ok(target_translation) = transforms.get(follow.target) else {
+        let target = if transforms.get(follow.target).is_ok() {
+            follow.target
+        } else {
+            game.player
+        };
+        follow.target = target;
+        let Ok(target_translation) = transforms.get(target) else {
             continue;
         };
         let enemy_translation = transforms.get(entity).unwrap().translation;
@@ -531,16 +503,16 @@ pub fn aseprite_follow(
             delta
                 * follow.speed
                 * PLAYER_MOVE_SPEED
-                * time.delta_seconds()
+                * time.delta_secs()
                 * status_option
                     .map(|s| s.movement_speed_multiplier())
                     .unwrap_or(1.0)
                 * if night_tracker.is_night() { 2. } else { 1. },
         );
 
-        commands
-            .entity(entity)
-            .insert(FacingDirection::from_translation(delta));
+        if let Ok(mut entity_commands) = commands.get_entity(entity) {
+            entity_commands.try_insert(FacingDirection::from_translation(delta));
+        }
 
         // Fixed tag names: WalkUp, WalkDown, WalkSide
         let to_target = target_translation.translation.truncate() - enemy_translation.truncate();
@@ -577,7 +549,7 @@ pub fn aseprite_idle(
         (
             Entity,
             &mut IdleState,
-            &mut AsepriteAnimation,
+            &mut AseAnimation,
             &mut CurrentAsepriteTag,
             Option<&crate::player::combat_heirlooms::DeathDefianceFrozen>,
             Option<&MobStatusEffects>,
@@ -603,7 +575,7 @@ pub fn aseprite_idle(
         idle.walk_timer.tick(time.delta());
         let mut idle_kcc = transforms.get_mut(entity).unwrap();
         if !idle.is_stopped {
-            let s = idle.speed * PLAYER_MOVE_SPEED * time.delta_seconds();
+            let s = idle.speed * PLAYER_MOVE_SPEED * time.delta_secs();
             match idle.direction {
                 FacingDirection::Left => idle_kcc.translation = Some(Vec2::new(-s, 0.)),
                 FacingDirection::Right => idle_kcc.translation = Some(Vec2::new(s, 0.)),
@@ -622,7 +594,9 @@ pub fn aseprite_idle(
             if rng.gen_ratio(1, 2) {
                 idle.is_stopped = true;
                 set_animation_tag(&mut anim, &mut current_tag, WALK_DOWN);
-                commands.entity(entity).insert(FacingDirection::Down);
+                if let Ok(mut entity_commands) = commands.get_entity(entity) {
+                    entity_commands.try_insert(FacingDirection::Down);
+                }
             } else {
                 idle.is_stopped = false;
                 let new_dir = idle.direction.get_next_rand_dir(rand::thread_rng()).clone();
@@ -634,7 +608,9 @@ pub fn aseprite_idle(
                     FacingDirection::Down => WALK_DOWN,
                 };
                 set_animation_tag(&mut anim, &mut current_tag, tag);
-                commands.entity(entity).insert(new_dir);
+                if let Ok(mut entity_commands) = commands.get_entity(entity) {
+                    entity_commands.try_insert(new_dir);
+                }
             }
         }
     }
@@ -652,7 +628,7 @@ pub fn aseprite_hit_react(
         (
             &HitAnimationTracker,
             &FacingDirection,
-            &mut AsepriteAnimation,
+            &mut AseAnimation,
             &mut CurrentAsepriteTag,
         ),
         With<AsepriteBasicEnemy>,
@@ -681,7 +657,7 @@ pub fn aseprite_leap_attack(
             &mut KinematicCharacterController,
             &mut LeapAttackState,
             &FollowSpeed,
-            &mut AsepriteAnimation,
+            &mut AseAnimation,
             &mut CurrentAsepriteTag,
             Option<&MobStatusEffects>,
             Option<&mut Parried>,
@@ -693,7 +669,9 @@ pub fn aseprite_leap_attack(
     time: Res<Time>,
     skills: Query<&PlayerSkills>,
     asset_server: Res<AssetServer>,
+    mut finished_events: MessageReader<AnimationEvents>,
 ) {
+    let finished = collect_finished(&mut finished_events);
     for (
         entity,
         mob,
@@ -715,14 +693,15 @@ pub fn aseprite_leap_attack(
         let target_translation = transforms.get(attack.target).unwrap().translation();
         let attack_translation = transforms.get_mut(entity).unwrap().translation();
 
-        if attack.attack_startup_timer.finished() && !attack.attack_duration_timer.finished() {
+        if attack.attack_startup_timer.is_finished() && !attack.attack_duration_timer.is_finished()
+        {
             let delta = target_translation - attack_translation;
             let delta_xy = delta.truncate();
             if attack.dir.is_none() {
                 attack.dir = Some(
                     delta_xy.normalize_or_zero()
                         * attack.speed
-                        * time.delta_seconds()
+                        * time.delta_secs()
                         * status_option
                             .map(|s| 1.0 - s.slow_stacks() as f32 * 0.15)
                             .unwrap_or(1.0),
@@ -731,7 +710,11 @@ pub fn aseprite_leap_attack(
             if let Some(ref mut parried) = parried_option {
                 if !parried.kb_applied {
                     parried.kb_applied = true;
-                    let mult = if skills.single().has(Heirloom::ParryKnockback) {
+                    let mult = if skills
+                        .single()
+                        .map(|skills| skills.has(Heirloom::ParryKnockback))
+                        .unwrap_or(false)
+                    {
                         1.
                     } else {
                         0.5
@@ -752,9 +735,9 @@ pub fn aseprite_leap_attack(
             commands.entity(entity).insert(MobIsAttacking(mob.clone()));
         }
 
-        if attack.attack_duration_timer.finished() {
+        if attack.attack_duration_timer.is_finished() {
             attack.dir = None;
-            if anim.just_finished() || parried_option.is_some() {
+            if finished.contains(&entity) || parried_option.is_some() {
                 if follow_speed.0 > 0. {
                     commands.entity(entity).insert(FollowState {
                         target: attack.target,
@@ -772,7 +755,7 @@ pub fn aseprite_leap_attack(
                     .insert(EnemyAttackCooldown(attack.attack_cooldown_timer.clone()));
             }
         } else {
-            if attack.attack_startup_timer.percent() == 0. {
+            if attack.attack_startup_timer.fraction() == 0. {
                 spawn_attack_warning_aseprite(
                     &mut commands,
                     &asset_server,
@@ -805,7 +788,7 @@ pub fn aseprite_projectile_attack(
             &Attack,
             &mut ProjectileAttackState,
             &FollowSpeed,
-            &mut AsepriteAnimation,
+            &mut AseAnimation,
             &mut CurrentAsepriteTag,
             Option<&AsepriteProjectileFired>,
             Option<&crate::player::combat_heirlooms::DeathDefianceFrozen>,
@@ -814,11 +797,13 @@ pub fn aseprite_projectile_attack(
         With<AsepriteBasicEnemy>,
     >,
     mut commands: Commands,
-    mut events: EventWriter<RangedAttackEvent>,
+    mut events: MessageWriter<RangedAttackEvent>,
     asset_server: Res<AssetServer>,
     time: Res<Time>,
+    mut finished_events: MessageReader<AnimationEvents>,
 ) {
     const FEATHER_SPREAD_RAD: f32 = 0.15;
+    let finished = collect_finished(&mut finished_events);
 
     for (
         entity,
@@ -844,8 +829,8 @@ pub fn aseprite_projectile_attack(
             (target_translation.truncate() - attack_translation.truncate()).normalize_or_zero();
 
         // Phase 1: startup timer (pre-animation wind-up, enemy stays in walk anim; show attack warning)
-        if !attack.attack_startup_timer.finished() {
-            if attack.attack_startup_timer.percent() == 0. {
+        if !attack.attack_startup_timer.is_finished() {
+            if attack.attack_startup_timer.fraction() == 0. {
                 spawn_attack_warning_aseprite(
                     &mut commands,
                     &asset_server,
@@ -874,7 +859,7 @@ pub fn aseprite_projectile_attack(
 
         // Phase 3: tick projectile delay, fire once the delay elapses
         attack.projectile_delay_timer.tick(time.delta());
-        if attack.projectile_delay_timer.finished() && fired_option.is_none() {
+        if attack.projectile_delay_timer.is_finished() && fired_option.is_none() {
             let dir = attack.dir.unwrap();
 
             let num_projectiles = if *mob == Mob::Crow { 2 } else { 1 };
@@ -890,7 +875,7 @@ pub fn aseprite_projectile_attack(
                 } else {
                     dir
                 };
-                events.send(RangedAttackEvent {
+                events.write(RangedAttackEvent {
                     projectile: attack.projectile.clone(),
                     direction: proj_dir,
                     from_entity: Some(entity),
@@ -907,7 +892,7 @@ pub fn aseprite_projectile_attack(
         }
 
         // Phase 4: wait for attack animation to finish, then transition back
-        if anim.just_finished() {
+        if finished.contains(&entity) {
             let walk_tag = attack_tag_to_walk_tag(&current_tag.0);
             commands
                 .entity(entity)
@@ -971,7 +956,7 @@ pub fn aseprite_circle_attack(
             &Attack,
             &mut CircleAttackState,
             &FollowSpeed,
-            &mut AsepriteAnimation,
+            &mut AseAnimation,
             &mut CurrentAsepriteTag,
             Option<&crate::player::combat_heirlooms::DeathDefianceFrozen>,
             Option<&MobStatusEffects>,
@@ -982,7 +967,9 @@ pub fn aseprite_circle_attack(
     mut commands: Commands,
     time: Res<Time>,
     asset_server: Res<AssetServer>,
+    mut finished_events: MessageReader<AnimationEvents>,
 ) {
+    let finished = collect_finished(&mut finished_events);
     for (
         entity,
         mob,
@@ -1005,8 +992,8 @@ pub fn aseprite_circle_attack(
         let delta = (target_pos.truncate() - my_pos.truncate()).normalize_or_zero();
 
         // Phase 1: startup (show warning)
-        if !attack.attack_startup_timer.finished() {
-            if attack.attack_startup_timer.percent() == 0. {
+        if !attack.attack_startup_timer.is_finished() {
+            if attack.attack_startup_timer.fraction() == 0. {
                 spawn_attack_warning_aseprite(
                     &mut commands,
                     &asset_server,
@@ -1031,7 +1018,7 @@ pub fn aseprite_circle_attack(
 
         // Phase 3: spawn circle hitbox after delay
         attack.hitbox_delay_timer.tick(time.delta());
-        if attack.hitbox_delay_timer.finished() && !attack.spawned_hitbox {
+        if attack.hitbox_delay_timer.is_finished() && !attack.spawned_hitbox {
             attack.spawned_hitbox = true;
 
             let config = circle_configs.get(entity).ok();
@@ -1056,7 +1043,7 @@ pub fn aseprite_circle_attack(
         }
 
         // Phase 4: wait for anim to finish
-        if anim.just_finished() {
+        if finished.contains(&entity) {
             let walk_tag = attack_tag_to_walk_tag(&current_tag.0);
             commands
                 .entity(entity)
@@ -1087,7 +1074,7 @@ pub fn aseprite_multi_leap_attack(
             &mut KinematicCharacterController,
             &mut MultiLeapAttackState,
             &FollowSpeed,
-            &mut AsepriteAnimation,
+            &mut AseAnimation,
             &mut CurrentAsepriteTag,
             Option<&MobStatusEffects>,
             Option<&crate::player::combat_heirlooms::DeathDefianceFrozen>,
@@ -1128,7 +1115,7 @@ pub fn aseprite_multi_leap_attack(
         match attack.current_phase {
             MultiLeapPhase::Startup => {
                 // Show warning icon, wait for startup timer — no movement, walk anim continues.
-                if attack.attack_startup_timer.percent() == 0. {
+                if attack.attack_startup_timer.fraction() == 0. {
                     // Switch to attack anim facing the player, wait for lunge_delay before moving.
                     let attack_tag = direction_to_attack_tag(delta_xy);
                     set_animation_tag(&mut anim, &mut current_tag, attack_tag);
@@ -1144,7 +1131,7 @@ pub fn aseprite_multi_leap_attack(
                     );
                 }
                 attack.attack_startup_timer.tick(time.delta());
-                if attack.attack_startup_timer.finished() {
+                if attack.attack_startup_timer.is_finished() {
                     attack.current_phase = MultiLeapPhase::LungeWindup;
                     attack.lunge_delay_timer.reset();
                 }
@@ -1159,7 +1146,7 @@ pub fn aseprite_multi_leap_attack(
                 commands.entity(entity).insert(MobIsAttacking(mob.clone()));
 
                 attack.lunge_delay_timer.tick(time.delta());
-                if attack.lunge_delay_timer.finished() {
+                if attack.lunge_delay_timer.is_finished() {
                     attack.current_phase = MultiLeapPhase::Lunging;
                     attack.attack_duration_timer.reset();
                     attack.dir = None;
@@ -1171,7 +1158,7 @@ pub fn aseprite_multi_leap_attack(
                     attack.dir = Some(
                         delta_xy
                             * attack.speed
-                            * time.delta_seconds()
+                            * time.delta_secs()
                             * status_option
                                 .map(|s| 1.0 - s.slow_stacks() as f32 * 0.15)
                                 .unwrap_or(1.0),
@@ -1187,7 +1174,7 @@ pub fn aseprite_multi_leap_attack(
                     apply_horizontal_sprite_flip_for_dir(&mut tf, attack.dir.unwrap_or(delta_xy));
                 }
 
-                if attack.attack_duration_timer.finished() {
+                if attack.attack_duration_timer.is_finished() {
                     attack.hits_remaining = attack.hits_remaining.saturating_sub(1);
                     if attack.hits_remaining > 0 {
                         attack.current_phase = MultiLeapPhase::Pausing;
@@ -1199,7 +1186,7 @@ pub fn aseprite_multi_leap_attack(
             MultiLeapPhase::Pausing => {
                 // Brief gap between hits, then start the next lunge windup.
                 attack.hit_pause_timer.tick(time.delta());
-                if attack.hit_pause_timer.finished() {
+                if attack.hit_pause_timer.is_finished() {
                     attack.current_phase = MultiLeapPhase::LungeWindup;
                     attack.lunge_delay_timer.reset();
                     attack.dir = None;
@@ -1209,9 +1196,9 @@ pub fn aseprite_multi_leap_attack(
 
         let hits_complete = attack.hits_remaining == 0
             && attack.current_phase == MultiLeapPhase::Lunging
-            && attack.attack_duration_timer.finished();
+            && attack.attack_duration_timer.is_finished();
 
-        if hits_complete || attack.attack_clip_timer.finished() {
+        if hits_complete || attack.attack_clip_timer.is_finished() {
             attack.dir = None;
             kcc.translation = None;
             let walk_tag = attack_tag_to_walk_tag(&current_tag.0);
@@ -1245,7 +1232,7 @@ pub fn aseprite_bull_charge(
             &mut KinematicCharacterController,
             &mut BullChargeState,
             &FollowSpeed,
-            &mut AsepriteAnimation,
+            &mut AseAnimation,
             &mut CurrentAsepriteTag,
             Option<&MobStatusEffects>,
             Option<&crate::player::combat_heirlooms::DeathDefianceFrozen>,
@@ -1280,7 +1267,7 @@ pub fn aseprite_bull_charge(
 
         match charge.phase {
             BullChargePhase::WindUp => {
-                if charge.attack_startup_timer.percent() == 0. {
+                if charge.attack_startup_timer.fraction() == 0. {
                     spawn_attack_warning_aseprite(
                         &mut commands,
                         &asset_server,
@@ -1305,7 +1292,7 @@ pub fn aseprite_bull_charge(
                     }
                 }
                 charge.attack_startup_timer.tick(time.delta());
-                if charge.attack_startup_timer.finished() {
+                if charge.attack_startup_timer.is_finished() {
                     let target_pos = global_transforms.get(charge.target).unwrap().translation();
                     let my_pos = global_transforms.get(entity).unwrap().translation();
                     let dir = (target_pos.truncate() - my_pos.truncate()).normalize_or_zero();
@@ -1343,7 +1330,7 @@ pub fn aseprite_bull_charge(
                     }
                 } else {
                     let speed = charge.charge_speed
-                        * time.delta_seconds()
+                        * time.delta_secs()
                         * status_option
                             .map(|s| 1.0 - s.slow_stacks() as f32 * 0.15)
                             .unwrap_or(1.0);
@@ -1361,8 +1348,8 @@ pub fn aseprite_bull_charge(
                 charge.deceleration_timer.tick(time.delta());
 
                 let dir = charge.charge_dir.unwrap_or(Vec2::ZERO);
-                let t = charge.deceleration_timer.percent();
-                let decel_speed = charge.charge_speed * (1.0 - t) * 0.3 * time.delta_seconds();
+                let t = charge.deceleration_timer.fraction();
+                let decel_speed = charge.charge_speed * (1.0 - t) * 0.3 * time.delta_secs();
                 if decel_speed > 0.1 {
                     kcc.translation = Some(dir * decel_speed);
                 }
@@ -1372,7 +1359,7 @@ pub fn aseprite_bull_charge(
                     }
                 }
 
-                if charge.deceleration_timer.finished() {
+                if charge.deceleration_timer.is_finished() {
                     // Re-initiate: go back to wind-up with a fresh target
                     charge.phase = BullChargePhase::WindUp;
                     charge.attack_startup_timer.reset();

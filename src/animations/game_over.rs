@@ -1,8 +1,11 @@
+use bevy::text::Justify;
+use crate::aseprite_helpers::pause;
 use crate::ui::game_fonts as gf;
+use bevy_aseprite_ultra::prelude::AseAnimation;
 use std::{fs::File, io::BufReader};
 
-use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
-use bevy_aseprite::{anim::AsepriteAnimation, Aseprite};
+use bevy::color::Alpha;
+use bevy::{camera::visibility::RenderLayers, prelude::*, sprite::Anchor};
 use rand::seq::IteratorRandom;
 
 use crate::{
@@ -58,7 +61,7 @@ pub struct GameOverFadeout(Timer);
 
 impl GameOverFadeout {
     pub fn progress(&self) -> f32 {
-        self.0.percent()
+        self.0.fraction()
     }
 }
 
@@ -91,15 +94,15 @@ fn format_run_time_mm_ss(elapsed_seconds: f64) -> String {
 
 pub fn handle_game_over_fadeout(
     mut commands: Commands,
-    game_over_events: EventReader<GameOverEvent>,
+    game_over_events: MessageReader<GameOverEvent>,
     mut next_state: ResMut<NextState<GameState>>,
     mut player: Query<
         (
             Entity,
             &FacingDirection,
             &mut Transform,
-            &mut TextureAtlasSprite,
-            &mut AsepriteAnimation,
+            &mut AseAnimation,
+            &mut Sprite,
             &PlayerLevel,
         ),
         With<Player>,
@@ -133,45 +136,43 @@ pub fn handle_game_over_fadeout(
     if !game_over_events.is_empty() {
         // Clean up boss health bars and guide HUD
         for entity in boss_health_bars.iter() {
-            commands.entity(entity).despawn_recursive();
+            commands.entity(entity).despawn();
         }
         for entity in guide_hud.iter() {
-            commands.entity(entity).despawn_recursive();
+            commands.entity(entity).despawn();
         }
-        let (player_e, dir, mut player_t, mut sprite, mut anim, player_level) = player.single_mut();
+        let Ok((player_e, dir, mut player_t, mut anim, mut sprite, player_level)) =
+            player.single_mut()
+        else {
+            return;
+        };
         next_ui_state.set(UIState::Closed);
         // BLACK OVERLAY
         commands
-            .spawn(SpriteBundle {
-                sprite: Sprite {
-                    color: Color::rgba(0., 0., 0., 0.),
+            .spawn((
+                Sprite {
+                    color: Color::srgba(0., 0., 0., 0.),
                     custom_size: Some(crate::ui::ui_helpers::full_screen_overlay_size(&resolution)),
                     ..default()
                 },
-                transform: Transform {
+                Transform {
                     translation: Vec3::new(0., 0., Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND - 1.),
                     scale: Vec3::new(1., 1., 1.),
                     ..Default::default()
                 },
-                ..default()
-            })
+            ))
             .insert(RenderLayers::from_layers(&[3]))
             .insert(Name::new("overlay"))
             .insert(GameOverFadeout(Timer::from_seconds(6.5, TimerMode::Once)));
         // GAME OVER TEXT
         commands.spawn((
-            Text2dBundle {
-                text: Text::from_section(
-                    "Game Over",
-                    gf::DISPLAY_LARGE.text_style(&asset_server, WHITE.with_a(0.)),
-                ),
-                transform: Transform {
+            gf::DISPLAY_LARGE
+                .text(&asset_server, "Game Over", WHITE.with_alpha(0.))
+                .with_transform(Transform {
                     translation: Vec3::new(0., 100., Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND),
                     scale: gf::DISPLAY_LARGE.transform_scale(),
                     ..Default::default()
-                },
-                ..default()
-            },
+                }),
             GameOverText,
             RenderLayers::from_layers(&[3]),
         ));
@@ -184,45 +185,38 @@ pub fn handle_game_over_fadeout(
         };
 
         commands.spawn((
-            Text2dBundle {
-                text: Text::from_section(
-                    rank_text,
-                    gf::DISPLAY.text_style(&asset_server, WHITE.with_a(0.)),
-                ),
-                transform: Transform {
+            gf::DISPLAY
+                .text(&asset_server, rank_text, WHITE.with_alpha(0.))
+                .with_transform(Transform {
                     translation: Vec3::new(0., 64., Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND), // Moved 30px higher
                     scale: gf::DISPLAY.transform_scale(),
                     ..Default::default()
-                },
-                ..default()
-            },
+                }),
             GameOverText,
             GameOverRankText, // Special marker for updating
             RenderLayers::from_layers(&[3]),
-            Name::new("Rank Text"),
+            Name::new("Rank Text2d"),
         ));
 
         // Left panel position (same as damage tracker)
         let panel_x = -resolution.game_width / 2. + 10.;
-        let stat_text_style = gf::BODY.text_style(&asset_server, WHITE.with_a(0.));
 
         // SCORE TEXT - same style and alignment as damage display
         commands.spawn((
-            Text2dBundle {
-                text: Text::from_section(
+            gf::DISPLAY
+                .text(
+                    &asset_server,
                     format!("Score: {}", run_score.score),
-                    gf::DISPLAY.text_style(&asset_server, WHITE.with_a(0.)),
-                ),
-                transform: Transform {
+                    WHITE.with_alpha(0.),
+                )
+                .with_transform(Transform {
                     translation: Vec3::new(0., 48., Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND), // Moved 30px higher
                     scale: gf::DISPLAY.transform_scale(),
                     ..Default::default()
-                },
-                ..default()
-            },
+                }),
             GameOverText,
             RenderLayers::from_layers(&[3]),
-            Name::new("Score Text"),
+            Name::new("Score Text2d"),
         ));
         // DAMAGE BREAKDOWN + mob stats — left side list with category headers
         let start_y = resolution.game_height / 2. - 60. + HUD_GAME_OVER_LEFT_PANEL_Y_OFFSET;
@@ -275,14 +269,15 @@ pub fn handle_game_over_fadeout(
         let era_manager = trackers.p1();
         let era_num = era_display_number(&era_manager.current_era);
         commands.spawn((
-            Text2dBundle {
-                text: Text::from_section(
+            gf::BODY
+                .text(
+                    &asset_server,
                     format!("Era Reached: {}", era_num),
-                    stat_text_style.clone(),
+                    WHITE.with_alpha(0.),
                 )
-                .with_alignment(TextAlignment::Left),
-                text_anchor: Anchor::CenterLeft,
-                transform: Transform {
+                .justify(Justify::Left)
+                .anchor(Anchor::CENTER_LEFT)
+                .with_transform(Transform {
                     translation: Vec3::new(
                         right_stats_x,
                         line_y,
@@ -290,25 +285,24 @@ pub fn handle_game_over_fadeout(
                     ),
                     scale: gf::BODY.transform_scale(),
                     ..Default::default()
-                },
-                ..default()
-            },
+                }),
             GameOverText,
             RenderLayers::from_layers(&[3]),
-            Name::new("Era Text"),
+            Name::new("Era Text2d"),
         ));
         line_y -= line_step;
 
         let chaos_tracker = trackers.p2();
         commands.spawn((
-            Text2dBundle {
-                text: Text::from_section(
+            gf::BODY
+                .text(
+                    &asset_server,
                     format!("Chaos Level: {:.1}", chaos_tracker.get_chaos()),
-                    stat_text_style.clone(),
+                    WHITE.with_alpha(0.),
                 )
-                .with_alignment(TextAlignment::Left),
-                text_anchor: Anchor::CenterLeft,
-                transform: Transform {
+                .justify(Justify::Left)
+                .anchor(Anchor::CENTER_LEFT)
+                .with_transform(Transform {
                     translation: Vec3::new(
                         right_stats_x,
                         line_y,
@@ -316,27 +310,26 @@ pub fn handle_game_over_fadeout(
                     ),
                     scale: gf::BODY.transform_scale(),
                     ..Default::default()
-                },
-                ..default()
-            },
+                }),
             GameOverText,
             RenderLayers::from_layers(&[3]),
-            Name::new("Chaos Text"),
+            Name::new("Chaos Text2d"),
         ));
         line_y -= line_step;
 
         commands.spawn((
-            Text2dBundle {
-                text: Text::from_section(
+            gf::BODY
+                .text(
+                    &asset_server,
                     format!(
                         "Run Time: {}",
                         format_run_time_mm_ss(run_timer.elapsed_seconds)
                     ),
-                    stat_text_style.clone(),
+                    WHITE.with_alpha(0.),
                 )
-                .with_alignment(TextAlignment::Left),
-                text_anchor: Anchor::CenterLeft,
-                transform: Transform {
+                .justify(Justify::Left)
+                .anchor(Anchor::CENTER_LEFT)
+                .with_transform(Transform {
                     translation: Vec3::new(
                         right_stats_x,
                         line_y,
@@ -344,12 +337,10 @@ pub fn handle_game_over_fadeout(
                     ),
                     scale: gf::BODY.transform_scale(),
                     ..Default::default()
-                },
-                ..default()
-            },
+                }),
             GameOverText,
             RenderLayers::from_layers(&[3]),
-            Name::new("Run Time Text"),
+            Name::new("Run Time Text2d"),
         ));
         line_y -= line_step;
 
@@ -357,14 +348,15 @@ pub fn handle_game_over_fadeout(
         if let Some(ref inf) = infinite_mode {
             if inf.active && inf.elapsed_seconds > 0.0 {
                 commands.spawn((
-                    Text2dBundle {
-                        text: Text::from_section(
+                    gf::BODY
+                        .text(
+                            &asset_server,
                             format!("Time in Endless: {}", inf.get_elapsed_display_string()),
-                            stat_text_style.clone(),
+                            WHITE.with_alpha(0.),
                         )
-                        .with_alignment(TextAlignment::Left),
-                        text_anchor: Anchor::CenterLeft,
-                        transform: Transform {
+                        .justify(Justify::Left)
+                        .anchor(Anchor::CENTER_LEFT)
+                        .with_transform(Transform {
                             translation: Vec3::new(
                                 right_stats_x,
                                 line_y,
@@ -372,26 +364,25 @@ pub fn handle_game_over_fadeout(
                             ),
                             scale: gf::BODY.transform_scale(),
                             ..Default::default()
-                        },
-                        ..default()
-                    },
+                        }),
                     GameOverText,
                     RenderLayers::from_layers(&[3]),
-                    Name::new("Endless Time Text"),
+                    Name::new("Endless Time Text2d"),
                 ));
                 line_y -= line_step;
             }
         }
 
         commands.spawn((
-            Text2dBundle {
-                text: Text::from_section(
+            gf::BODY
+                .text(
+                    &asset_server,
                     format!("Level: {}", player_level.level),
-                    stat_text_style.clone(),
+                    WHITE.with_alpha(0.),
                 )
-                .with_alignment(TextAlignment::Left),
-                text_anchor: Anchor::CenterLeft,
-                transform: Transform {
+                .justify(Justify::Left)
+                .anchor(Anchor::CENTER_LEFT)
+                .with_transform(Transform {
                     translation: Vec3::new(
                         right_stats_x,
                         line_y,
@@ -399,12 +390,10 @@ pub fn handle_game_over_fadeout(
                     ),
                     scale: gf::BODY.transform_scale(),
                     ..Default::default()
-                },
-                ..default()
-            },
+                }),
             GameOverText,
             RenderLayers::from_layers(&[3]),
-            Name::new("Game Over Level Text"),
+            Name::new("Game Over Level Text2d"),
         ));
 
         // FINAL STATS — centered, just above "Try Again"
@@ -412,19 +401,18 @@ pub fn handle_game_over_fadeout(
         let view_stats_y = TRY_AGAIN_BUTTON_Y + 9. + 8. + 7.;
         let final_stats_hit = commands
             .spawn((
-                SpriteBundle {
-                    sprite: Sprite {
-                        color: Color::rgba(0.35, 0.35, 0.35, 0.),
+                (
+                    Sprite {
+                        color: Color::srgba(0.35, 0.35, 0.35, 0.),
                         custom_size: Some(Vec2::new(80., 14.)),
                         ..default()
                     },
-                    transform: Transform::from_translation(Vec3::new(
+                    Transform::from_translation(Vec3::new(
                         0.,
                         view_stats_y,
                         Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND + 1.,
                     )),
-                    ..default()
-                },
+                ),
                 Interactable::default(),
                 GameOverFinalStatsHitbox,
                 crate::ui::focus::OverlayFocusable { index: 1 },
@@ -435,43 +423,37 @@ pub fn handle_game_over_fadeout(
             .id();
         commands
             .spawn((
-                Text2dBundle {
-                    text: Text::from_section(
-                        "View Final Stats",
-                        gf::BODY.text_style(&asset_server, YELLOW_2.with_a(0.)),
-                    )
-                    .with_alignment(TextAlignment::Center),
-                    text_anchor: Anchor::Center,
-                    transform: Transform {
+                gf::BODY
+                    .text(&asset_server, "View Final Stats", YELLOW_2.with_alpha(0.))
+                    .justify(Justify::Center)
+                    .anchor(Anchor::CENTER)
+                    .with_transform(Transform {
                         translation: Vec3::new(0., 0., 1.),
                         scale: gf::BODY.transform_scale(),
                         ..Default::default()
-                    },
-                    ..default()
-                },
+                    }),
                 GameOverText,
                 RenderLayers::from_layers(&[3]),
-                Name::new("Game Over Final Stats Text"),
+                Name::new("Game Over Final Stats Text2d"),
             ))
-            .set_parent(final_stats_hit);
+            .insert(ChildOf(final_stats_hit));
 
         // OK BUTTON - spawn like main menu buttons
         let button_entity = commands
             .spawn((
-                SpriteBundle {
-                    texture: graphics.get_ui_element_texture(UIElement::UnlocksButton),
-                    sprite: Sprite {
-                        color: Color::rgba(1.0, 1.0, 1.0, 0.0), // Start transparent
+                (
+                    Sprite {
+                        image: graphics.get_ui_element_texture(UIElement::UnlocksButton),
+                        color: Color::srgba(1.0, 1.0, 1.0, 0.0), // Start transparent
                         custom_size: Some(Vec2::new(84., 18.)),
-                        ..Default::default()
+                        ..default()
                     },
-                    transform: Transform::from_translation(Vec3::new(
+                    Transform::from_translation(Vec3::new(
                         0.,
                         -99.,
                         Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND + 2.,
                     )),
-                    ..Default::default()
-                },
+                ),
                 Interactable::default(),
                 UIElement::UnlocksButton,
                 MenuButton::GameOverOK,
@@ -485,24 +467,19 @@ pub fn handle_game_over_fadeout(
         // Button text as child
         commands
             .spawn((
-                Text2dBundle {
-                    text: Text::from_section(
-                        "Try Again",
-                        gf::DISPLAY.text_style(&asset_server, WHITE.with_a(0.)),
-                    ),
-                    transform: Transform {
+                gf::DISPLAY
+                    .text(&asset_server, "Try Again", WHITE.with_alpha(0.))
+                    .with_transform(Transform {
                         translation: Vec3::new(0., 0., 1.),
                         scale: gf::DISPLAY.transform_scale(),
                         ..Default::default()
-                    },
-                    ..default()
-                },
+                    }),
                 GameOverText,
                 RenderLayers::from_layers(&[3]),
-                Name::new("Game Over OK Text"),
+                Name::new("Game Over OK Text2d"),
             ))
-            .set_parent(button_entity);
-        next_state.0 = Some(GameState::GameOver);
+            .insert(ChildOf(button_entity));
+        next_state.set(GameState::GameOver);
         // move player to UI camera to be above the fade out overlay
         commands
             .entity(player_e)
@@ -512,8 +489,8 @@ pub fn handle_game_over_fadeout(
         player_t.translation = Vec3::new(0., 0., 100.);
 
         // Tint player sprite red instead of swapping to death sprite
-        anim.pause();
-        sprite.color = Color::rgba(1.0, 0.2, 0.2, 1.0); // Brighter red tint, fully opaque
+        pause(&mut anim);
+        sprite.color = Color::srgba(1.0, 0.2, 0.2, 1.0); // Brighter red tint, fully opaque
         if dir == &FacingDirection::Left {
             sprite.flip_x = true;
         }
@@ -529,12 +506,12 @@ pub struct GameOverPlayerTint;
 
 /// System to ensure player stays red during game over
 pub fn maintain_player_red_tint(
-    mut player: Query<&mut TextureAtlasSprite, (With<Player>, With<GameOverPlayerTint>)>,
+    mut player: Query<&mut Sprite, (With<Player>, With<GameOverPlayerTint>)>,
 ) {
-    if let Ok(mut sprite) = player.get_single_mut() {
+    if let Ok(mut sprite) = player.single_mut() {
         // Keep the sprite red
-        if sprite.color != Color::rgba(1.0, 0.2, 0.2, 1.0) {
-            sprite.color = Color::rgba(1.0, 0.2, 0.2, 1.0);
+        if sprite.color != Color::srgba(1.0, 0.2, 0.2, 1.0) {
+            sprite.color = Color::srgba(1.0, 0.2, 0.2, 1.0);
         }
     }
 }
@@ -563,7 +540,7 @@ pub fn tick_game_over_overlay(
     time: Res<Time>,
     mut query: Query<(Entity, &mut GameOverFadeout, &mut Sprite), Without<GameOverText>>,
     asset_server: Res<AssetServer>,
-    mut game_over_text: Query<&mut Text, With<GameOverText>>,
+    mut game_over_text: Query<&mut TextColor, With<GameOverText>>,
     mut game_over_sprites: Query<&mut Sprite, (With<GameOverText>, Without<GameOverFadeout>)>,
     mut heirloom_icons: Query<(&mut Transform, &mut HudGameOverHeirloomSlide), With<SkillHudIcon>>,
     mut heirloom_untagged: Query<
@@ -591,12 +568,12 @@ pub fn tick_game_over_overlay(
 
     for (mut transform, mut slide) in heirloom_icons.iter_mut() {
         slide.timer.tick(time.delta());
-        let t = slide.timer.percent().clamp(0., 1.);
+        let t = slide.timer.fraction().clamp(0., 1.);
         transform.translation.y = slide.start_y + HUD_HEIRLOOM_GAME_OVER_Y_OFFSET * t;
     }
 
     for (_e, mut timer, mut sprite) in query.iter_mut() {
-        if timer.0.percent() >= 0.25 && !*tip_check {
+        if timer.0.fraction() >= 0.25 && !*tip_check {
             *tip_check = true;
             // Try to load tips from save
             let tips = vec![
@@ -618,23 +595,24 @@ pub fn tick_game_over_overlay(
 
             let picked_tip = tips.iter().choose(&mut rand::thread_rng()).unwrap();
             commands
-                .spawn(Text2dBundle {
-                    text: Text::from_section(
-                        format!("Tip: {}", picked_tip).to_string(),
-                        gf::BODY.text_style(&asset_server, WHITE),
-                    ),
-                    transform: Transform {
-                        translation: Vec3::new(
-                            0.,
-                            -res.game_height / 2. + 56.5,
-                            Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND,
-                        ),
-                        scale: gf::BODY.transform_scale(),
-                        ..Default::default()
-                    },
-                    text_anchor: Anchor::Center,
-                    ..Default::default()
-                })
+                .spawn(
+                    gf::BODY
+                        .text(
+                            &asset_server,
+                            format!("Tip: {}", picked_tip).to_string(),
+                            WHITE,
+                        )
+                        .anchor(Anchor::CENTER)
+                        .with_transform(Transform {
+                            translation: Vec3::new(
+                                0.,
+                                -res.game_height / 2. + 56.5,
+                                Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND,
+                            ),
+                            scale: gf::BODY.transform_scale(),
+                            ..Default::default()
+                        }),
+                )
                 .insert(RenderLayers::from_layers(&[3]));
 
             // total currency counter
@@ -665,7 +643,7 @@ pub fn tick_game_over_overlay(
                 ),
                 WHITE,
                 format!("{:}", currency_before_run),
-                Anchor::CenterLeft,
+                Anchor::CENTER_LEFT,
                 FLOATING_TEXT,
                 3,
                 None,
@@ -684,7 +662,7 @@ pub fn tick_game_over_overlay(
             commands
                 .entity(stack)
                 .insert(TimeFragmentIcon)
-                .set_parent(text);
+                .insert(ChildOf(text));
 
             commands.spawn(GameEndTimeFragmentSpawner {
                 timer: Timer::from_seconds(0.05, TimerMode::Once),
@@ -694,14 +672,14 @@ pub fn tick_game_over_overlay(
         }
         timer.0.tick(time.delta());
 
-        let alpha = f32::min(1., timer.0.percent() * 5.);
+        let alpha = f32::min(1., timer.0.fraction() * 5.);
         sprite.color = overwrite_alpha(sprite.color, alpha);
         if alpha >= 0.45 {
-            let text_alpha = f32::min(1., timer.0.percent() * 2.);
+            let text_alpha = f32::min(1., timer.0.fraction() * 2.);
 
             // Update text alpha
-            game_over_text.iter_mut().for_each(|mut s| {
-                s.sections[0].style.color = overwrite_alpha(s.sections[0].style.color, text_alpha);
+            game_over_text.iter_mut().for_each(|mut text_color| {
+                text_color.0 = overwrite_alpha(text_color.0, text_alpha);
             });
 
             // Update button sprite alpha
@@ -774,7 +752,7 @@ pub fn handle_spawn_collected_time_fragments(
                     }
                 }
                 if all_time_fragments.iter().count() == 0 {
-                    commands.entity(e).despawn_recursive();
+                    commands.entity(e).despawn();
                 }
             }
         }
@@ -784,17 +762,17 @@ pub fn handle_spawn_collected_time_fragments(
 /// System to update the rank text on game over screen when rank becomes available
 pub fn update_game_over_rank_text(
     last_submitted: Res<LastSubmittedScore>,
-    mut rank_text_query: Query<&mut Text, With<GameOverRankText>>,
+    mut rank_text_query: Query<&mut Text2d, With<GameOverRankText>>,
 ) {
     // Only update if the rank changed
     if !last_submitted.is_changed() {
         return;
     }
 
-    if let Ok(mut text) = rank_text_query.get_single_mut() {
+    if let Ok(mut text) = rank_text_query.single_mut() {
         if let Some(rank) = last_submitted.rank {
             // Update the text to show the actual rank
-            text.sections[0].value = format_rank(rank);
+            text.0 = format_rank(rank);
         }
     }
 }
@@ -890,7 +868,7 @@ pub fn handle_game_over_final_stats_tooltip(
                 pickup_range,
                 attack_speed,
                 skills,
-            )) = player_stats.get_single()
+            )) = player_stats.single()
             else {
                 return;
             };
@@ -934,7 +912,7 @@ pub fn handle_game_over_final_stats_tooltip(
         }
     } else {
         for e in existing_tooltips.iter() {
-            commands.entity(e).despawn_recursive();
+            commands.entity(e).despawn();
         }
     }
 }

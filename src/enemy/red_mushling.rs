@@ -1,23 +1,22 @@
-use bevy::prelude::*;
-use bevy_rapier2d::geometry::{Collider, Sensor};
-use seldom_state::{
-    prelude::StateMachine,
-    trigger::{BoolTrigger, Trigger},
+use crate::aseprite_assets::RedMushling;
+use crate::aseprite_helpers::{
+    ase_animation, aseprite_bundle, collect_finished, is_paused, pause, play_loop, play_once, start,
 };
+use bevy::prelude::*;
+use bevy_aseprite_ultra::prelude::{AnimationEvents, AnimationState, AseAnimation, Aseprite};
+use bevy_rapier2d::geometry::{Collider, Sensor};
+use seldom_state::prelude::{IntoTrigger, StateMachine};
 
 use crate::{
-    ai::{FollowState, HurtByPlayer, IdleState, LineOfSight, NightTimeAggro},
+    ai::{hurt_by_player, line_of_sight, night_time_aggro, FollowState, IdleState},
     animations::enemy_sprites::spawn_attack_warning_aseprite,
-    ecs_helpers::SafeHierarchyExt,
     attributes::Attack,
+    ecs_helpers::SafeHierarchyExt,
     inputs::FacingDirection,
     Game,
 };
-use bevy_aseprite::{anim::AsepriteAnimation, aseprite, AsepriteBundle};
 
 use super::{Mob, MobIsAttacking};
-
-aseprite!(pub RedMushling, "textures/redmushling/red_mushling.ase");
 
 pub fn handle_new_red_mushling_state_machine(
     mut commands: Commands,
@@ -30,15 +29,19 @@ pub fn handle_new_red_mushling_state_machine(
             continue;
         }
         let mut e_cmds = commands.entity(e);
-        let mut animation = AsepriteAnimation::from(RedMushling::tags::SPURTING);
-        animation.pause();
+        let handle = asset_server.load(RedMushling::PATH);
+        let mut animation = ase_animation(handle, RedMushling::tags::SPURTING, false);
+        pause(&mut animation);
         e_cmds
-            .insert(AsepriteBundle {
-                aseprite: asset_server.load(RedMushling::PATH),
+            .insert((
                 animation,
-                transform: *transform,
-                ..Default::default()
-            })
+                Sprite::default(),
+                *transform,
+                GlobalTransform::default(),
+                Visibility::Inherited,
+                InheritedVisibility::default(),
+                ViewVisibility::default(),
+            ))
             .insert(WaitingToSproutState)
             .insert(MushlingWakeupState {
                 time_alive: Timer::from_seconds(15.0, TimerMode::Once),
@@ -48,40 +51,29 @@ pub fn handle_new_red_mushling_state_machine(
         let state_machine = StateMachine::default()
             .with_state::<GasAttackState>()
             .set_trans_logging(false)
-            .trans::<WaitingToSproutState>(HurtByPlayer, SproutingState)
-            .trans::<WaitingToSproutState>(
-                LineOfSight {
-                    target: game.player,
-                    range: 40.,
-                }
-                .or(MushkingSummoned),
+            .trans::<WaitingToSproutState, _>(hurt_by_player, SproutingState)
+            .trans::<WaitingToSproutState, _>(
+                line_of_sight(game.player, 40.).or(mushking_summoned),
                 SproutingState,
             )
-            .trans::<IdleState>(
-                LineOfSight {
-                    target: game.player,
-                    range: 30.,
-                },
+            .trans::<IdleState, _>(
+                line_of_sight(game.player, 30.),
                 GasAttackState {
                     hitbox: None,
                     speed_up_anim: false,
                     cooldown: Timer::from_seconds(0.6, TimerMode::Once),
                 },
             )
-            .trans::<FollowState>(
-                LineOfSight {
-                    target: game.player,
-                    range: 20.,
-                }
-                .and(MushkingSummoned.not()),
+            .trans::<FollowState, _>(
+                line_of_sight(game.player, 20.).and(mushking_summoned.not()),
                 GasAttackState {
                     hitbox: None,
                     speed_up_anim: false,
                     cooldown: Timer::from_seconds(0.6, TimerMode::Once),
                 },
             )
-            .trans::<IdleState>(
-                MushkingSummoned,
+            .trans::<IdleState, _>(
+                mushking_summoned,
                 FollowState {
                     target: game.player,
                     curr_delta: None,
@@ -89,8 +81,8 @@ pub fn handle_new_red_mushling_state_machine(
                     speed: 1.,
                 },
             )
-            .trans::<IdleState>(
-                NightTimeAggro,
+            .trans::<IdleState, _>(
+                night_time_aggro,
                 FollowState {
                     target: game.player,
                     curr_delta: None,
@@ -98,11 +90,8 @@ pub fn handle_new_red_mushling_state_machine(
                     speed: 0.4,
                 },
             )
-            .trans::<FollowState>(
-                MushkingSummoned.and(LineOfSight {
-                    target: game.player,
-                    range: 20.,
-                }),
+            .trans::<FollowState, _>(
+                IntoTrigger::and(mushking_summoned, line_of_sight(game.player, 20.)),
                 GasAttackState {
                     hitbox: None,
                     speed_up_anim: true,
@@ -139,18 +128,23 @@ pub struct MushlingWakeupState {
 
 pub fn sprout(
     mut sprouts: Query<
-        (Entity, &mut AsepriteAnimation, Option<&MushlingWakeupState>),
+        (
+            Entity,
+            &mut AseAnimation,
+            &AnimationState,
+            Option<&MushlingWakeupState>,
+        ),
         With<SproutingState>,
     >,
     mut commands: Commands,
     game: Res<Game>,
 ) {
-    for (entity, mut anim, wakeup_state_option) in sprouts.iter_mut() {
-        if anim.is_paused() {
-            anim.play();
+    for (entity, mut anim, state, wakeup_state_option) in sprouts.iter_mut() {
+        if is_paused(&anim) {
+            start(&mut anim);
         }
 
-        if anim.current_frame() >= 16 {
+        if usize::from(state.current_frame()) >= 16 {
             let has_wakeup_state = wakeup_state_option.is_some();
 
             if has_wakeup_state {
@@ -163,7 +157,7 @@ pub fn sprout(
                         curr_path: None,
                         speed: 0.4,
                     });
-                *anim = AsepriteAnimation::from(RedMushling::tags::IDLE_FRONT);
+                play_loop(&mut anim, RedMushling::tags::IDLE_FRONT);
             } else {
                 commands
                     .entity(entity)
@@ -173,43 +167,50 @@ pub fn sprout(
                         speed_up_anim: false,
                         cooldown: Timer::from_seconds(0.6, TimerMode::Once),
                     });
-                *anim = AsepriteAnimation::from(RedMushling::tags::ATTACK);
+                play_loop(&mut anim, RedMushling::tags::ATTACK);
             }
         }
     }
 }
 
 pub fn gas_attack(
-    mut sprouts: Query<(Entity, &mut AsepriteAnimation, &Attack, &mut GasAttackState)>,
+    mut sprouts: Query<(
+        Entity,
+        &mut AseAnimation,
+        &AnimationState,
+        &Attack,
+        &mut GasAttackState,
+    )>,
     mut commands: Commands,
     time: Res<Time>,
+    mut finished_events: MessageReader<AnimationEvents>,
 ) {
-    for (entity, mut anim, attack, mut gas_state) in sprouts.iter_mut() {
+    let finished = collect_finished(&mut finished_events);
+    for (entity, mut anim, state, attack, mut gas_state) in sprouts.iter_mut() {
         gas_state.cooldown.tick(time.delta());
-        if !gas_state.cooldown.finished() {
+        if !gas_state.cooldown.is_finished() {
             continue;
         }
 
-        if !gas_state.speed_up_anim && (anim.current_frame() < 18 || anim.current_frame() > 46) {
-            *anim = AsepriteAnimation::from(RedMushling::tags::ATTACK);
+        let frame = usize::from(state.current_frame());
+        if !gas_state.speed_up_anim && (frame < 18 || frame > 46) {
+            play_loop(&mut anim, RedMushling::tags::ATTACK);
         }
-        if gas_state.speed_up_anim && (anim.current_frame() < 66 || anim.current_frame() > 77) {
-            *anim = AsepriteAnimation::from(RedMushling::tags::NUKE);
+        if gas_state.speed_up_anim && (frame < 66 || frame > 77) {
+            play_loop(&mut anim, RedMushling::tags::NUKE);
         }
-        if anim.is_paused() {
-            anim.play();
+        if is_paused(&anim) {
+            start(&mut anim);
         }
-        if anim.current_frame() >= 33 && anim.current_frame() < 39
-            || (gas_state.speed_up_anim && anim.current_frame() >= 66)
-        {
+        if frame >= 33 && frame < 39 || (gas_state.speed_up_anim && frame >= 66) {
             if let Some(hitbox) = gas_state.hitbox {
-                if let Some(mut hit_e) = commands.get_entity(hitbox) {
+                if let Ok(mut hit_e) = commands.get_entity(hitbox) {
                     hit_e.insert(Collider::capsule(Vec2::ZERO, Vec2::ZERO, 24.));
                 }
             } else {
                 let hitbox = commands
                     .spawn((
-                        TransformBundle::default(),
+                        Transform::default(),
                         *attack,
                         Collider::capsule(Vec2::ZERO, Vec2::ZERO, 7.),
                         MobIsAttacking(Mob::RedMushling),
@@ -220,9 +221,9 @@ pub fn gas_attack(
                 gas_state.hitbox = Some(hitbox);
             }
         }
-        if anim.just_finished() {
+        if finished.contains(&entity) {
             if gas_state.speed_up_anim {
-                commands.entity(entity).despawn_recursive();
+                commands.entity(entity).despawn();
                 continue;
             }
             commands
@@ -234,31 +235,19 @@ pub fn gas_attack(
                     speed: 0.,
                     is_stopped: true,
                 });
-            *anim = AsepriteAnimation::from(RedMushling::tags::IDLE_FRONT);
-        } else if anim.current_frame() == 39 {
+            play_loop(&mut anim, RedMushling::tags::IDLE_FRONT);
+        } else if frame == 39 {
             if let Some(hitbox) = gas_state.hitbox {
-                if let Some(hitbox) = commands.get_entity(hitbox) {
-                    hitbox.despawn_recursive();
+                if let Ok(mut hitbox) = commands.get_entity(hitbox) {
+                    hitbox.despawn();
                 }
             }
         }
     }
 }
 
-#[derive(Clone, Copy, Reflect)]
-pub struct MushkingSummoned;
-
-impl BoolTrigger for MushkingSummoned {
-    type Param<'w, 's> = Query<'w, 's, &'static Mob>;
-
-    fn trigger(&self, _entity: Entity, query: Self::Param<'_, '_>) -> bool {
-        for mob in query.iter() {
-            if mob == &Mob::RedMushking {
-                return true;
-            }
-        }
-        false
-    }
+fn mushking_summoned(query: Query<&Mob>) -> bool {
+    query.iter().any(|mob| mob == &Mob::RedMushking)
 }
 
 /// Short-lived warning marker on the rush hitbox entity before it deals
@@ -273,7 +262,7 @@ pub fn handle_mushling_rush_warnings(
     asset_server: Res<AssetServer>,
     mushlings: Query<(Entity, &Mob, Option<&FollowState>, Option<&GasAttackState>)>,
     mushking_exists: Query<&Mob>,
-    existing_warnings: Query<(Entity, &Parent), With<MushlingRushWarning>>,
+    existing_warnings: Query<(Entity, &ChildOf), With<MushlingRushWarning>>,
 ) {
     // Check if mushking exists
     let mushking_active = mushking_exists.iter().any(|mob| mob == &Mob::RedMushking);
@@ -282,7 +271,7 @@ pub fn handle_mushling_rush_warnings(
     let mut warnings_by_mushling: std::collections::HashMap<Entity, Entity> =
         std::collections::HashMap::new();
     for (warning_entity, parent) in existing_warnings.iter() {
-        warnings_by_mushling.insert(parent.get(), warning_entity);
+        warnings_by_mushling.insert(parent.parent(), warning_entity);
     }
 
     // Track which mushlings should have warnings
@@ -318,7 +307,7 @@ pub fn handle_mushling_rush_warnings(
     // Despawn warnings for mushlings that no longer need them
     for (mushling_entity, warning_entity) in warnings_by_mushling.iter() {
         if !should_have_warning.contains(mushling_entity) {
-            commands.entity(*warning_entity).despawn_recursive();
+            commands.entity(*warning_entity).despawn();
         }
     }
 
@@ -362,7 +351,7 @@ pub fn handle_mushling_wakeup_timers(
             Entity,
             &Mob,
             &mut MushlingWakeupState,
-            &mut AsepriteAnimation,
+            &mut AseAnimation,
             Option<&WaitingToSproutState>,
         ),
         Without<FollowState>,
@@ -384,7 +373,7 @@ pub fn handle_mushling_wakeup_timers(
 
         wakeup_state.time_alive.tick(time.delta());
 
-        if wakeup_state.time_alive.finished() {
+        if wakeup_state.time_alive.is_finished() {
             wakeup_state.wakeup_check_timer.tick(time.delta());
 
             if wakeup_state.wakeup_check_timer.just_finished() {
@@ -394,8 +383,8 @@ pub fn handle_mushling_wakeup_timers(
                         .entity(entity)
                         .remove::<WaitingToSproutState>()
                         .insert(SproutingState);
-                    if anim.is_paused() {
-                        anim.play();
+                    if is_paused(&anim) {
+                        start(&mut anim);
                     }
                 }
             }

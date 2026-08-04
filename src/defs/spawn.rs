@@ -20,7 +20,7 @@ use crate::{
 use super::registry::GameDefs;
 use super::types::{ColliderDef, ColliderKind, EntityDef, SpriteSheetDef};
 
-/// Queued on spawn; resolved into a real [`SpriteSheetBundle`] before gameplay systems run.
+/// Queued on spawn; resolved into a sprite with an atlas layout before gameplay systems run.
 #[derive(Component, Clone)]
 pub struct PendingSpriteSheet(pub SpriteSheetDef);
 
@@ -232,7 +232,7 @@ pub fn insert_entity_def(entity: &mut EntityCommands, def: &EntityDef) {
         entity.insert(v);
     }
 
-    entity.insert(VisibilityBundle::default());
+    entity.insert(Visibility::default());
 }
 
 pub fn spawn_from_def(commands: &mut Commands, def: &EntityDef, pos: Vec2) -> Entity {
@@ -242,7 +242,7 @@ pub fn spawn_from_def(commands: &mut Commands, def: &EntityDef, pos: Vec2) -> En
     // TransformBundle (not bare Transform) — atlas/sprite rendering needs GlobalTransform.
     // Old proto SpriteSheetBundle templates supplied this; GameDefs spawn must too.
     commands.entity(id).insert((
-        TransformBundle::from_transform(Transform::from_translation(pos.extend(0.))),
+        Transform::from_translation(pos.extend(0.)),
         ActiveEvents::COLLISION_EVENTS,
     ));
     id
@@ -263,70 +263,56 @@ pub fn apply_era_generation_resource(defs: &GameDefs, era_name: &str) -> Option<
     defs.get_era(era_name).map(|e| e.world_generation.clone())
 }
 
-fn apply_pending_sprite_sheets(
+/// Resolves [`PendingSpriteSheet`] into a [`Sprite`].
+///
+/// Important: only insert/replace the `Sprite`. Re-inserting `Transform` here used to
+/// clobber elite scale (and any other in-place Transform edits) when this system's
+/// deferred `insert` flushed after those systems ran.
+pub fn apply_pending_sprite_sheets(
     mut commands: Commands,
-    pending: Query<(Entity, &PendingSpriteSheet, Option<&Transform>, Option<&Visibility>)>,
+    pending: Query<(Entity, &PendingSpriteSheet)>,
     asset_server: Res<AssetServer>,
-    mut texture_atlases: ResMut<Assets<TextureAtlas>>,
+    mut texture_atlas_layouts: ResMut<Assets<TextureAtlasLayout>>,
 ) {
-    for (entity, pending, transform, visibility) in pending.iter() {
+    for (entity, pending) in pending.iter() {
         let texture_handle = asset_server.load(&pending.0.asset);
-        let texture_atlas = TextureAtlas::from_grid(
-            texture_handle,
-            pending.0.size,
-            pending.0.cols,
-            pending.0.rows,
+        let texture_atlas_layout = TextureAtlasLayout::from_grid(
+            UVec2::new(pending.0.size.x as u32, pending.0.size.y as u32),
+            pending.0.cols as u32,
+            pending.0.rows as u32,
             None,
             None,
         );
-        let handle = texture_atlases.add(texture_atlas);
-        // Full SpriteSheetBundle is required for atlas rendering (GlobalTransform etc.),
-        // but ..default() would wipe the spawn offset already written onto Transform.
-        // Carry those components forward — same end state as old proto (sheet first,
-        // then transform overwrite), just deferred.
+        let layout = texture_atlas_layouts.add(texture_atlas_layout);
         commands
             .entity(entity)
-            .insert(SpriteSheetBundle {
-                texture_atlas: handle,
-                transform: transform.cloned().unwrap_or_default(),
-                visibility: visibility.cloned().unwrap_or_default(),
+            .insert(Sprite {
+                image: texture_handle,
+                texture_atlas: Some(TextureAtlas { layout, index: 0 }),
                 ..default()
             })
             .remove::<PendingSpriteSheet>();
     }
 }
 
-fn apply_pending_sprite_textures(
+pub fn apply_pending_sprite_textures(
     mut commands: Commands,
-    pending: Query<(
-        Entity,
-        &PendingSpriteTexture,
-        Option<&Transform>,
-        Option<&Visibility>,
-        Option<&WorldObject>,
-    )>,
+    pending: Query<(Entity, &PendingSpriteTexture, Option<&WorldObject>)>,
     asset_server: Res<AssetServer>,
 ) {
-    for (entity, pending, transform, visibility, world_object) in pending.iter() {
+    for (entity, pending, world_object) in pending.iter() {
         let custom_size = world_object
             .filter(|o| **o == WorldObject::BossShrine)
             .map(|_| Vec2::new(128., 128.));
         commands
             .entity(entity)
-            .insert(SpriteBundle {
-                texture: asset_server.load(&pending.0),
-                sprite: Sprite {
-                    custom_size,
-                    ..default()
-                },
-                transform: transform.cloned().unwrap_or_default(),
-                visibility: visibility.cloned().unwrap_or_default(),
+            .insert(Sprite {
+                image: asset_server.load(&pending.0),
+                custom_size,
                 ..default()
             })
             .remove::<PendingSpriteTexture>()
-            .remove::<PendingSpriteSheet>()
-            .remove::<TextureAtlasSprite>()
-            .remove::<Handle<TextureAtlas>>();
+            .remove::<PendingSpriteSheet>();
     }
 }
 
@@ -336,11 +322,8 @@ impl Plugin for DefsSpawnPlugin {
     fn build(&self, app: &mut App) {
         // Resolve custom sprite sheets the same frame they were queued (before most Update systems).
         app.add_systems(
-            (
-                apply_pending_sprite_sheets,
-                apply_pending_sprite_textures,
-            )
-                .in_base_set(CoreSet::PreUpdate),
+            Update,
+            (apply_pending_sprite_sheets, apply_pending_sprite_textures),
         );
     }
 }

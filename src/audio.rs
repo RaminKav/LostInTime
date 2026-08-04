@@ -3,9 +3,10 @@ use std::fs::File;
 use std::io::BufReader;
 
 use bevy::{
-    asset::{HandleId, LoadState},
+    asset::LoadState,
+    audio::{AudioPlayer, AudioSink, AudioSinkPlayback, AudioSource, PlaybackSettings, Volume},
+    platform::collections::HashMap,
     prelude::*,
-    utils::HashMap,
 };
 use rand::seq::IteratorRandom;
 use serde::{Deserialize, Serialize};
@@ -25,7 +26,10 @@ use crate::{
 };
 
 const MAX_HIT_SOUNDS_PER_FRAME: usize = 3;
-const SFX_CLEANUP_DELAY_SECS: f32 = 5.0;
+
+/// Marker for the entity currently playing background music.
+#[derive(Component)]
+struct BgmAudio;
 
 /// Controls the global volume for music and sound effects independently.
 /// Values range from 0 (muted) to 10 (full volume).
@@ -97,7 +101,7 @@ pub struct AudioPlugin;
 #[derive(Resource, Debug)]
 pub struct BGMPicker {
     pub current_track: String,
-    pub current_handle: Option<Handle<AudioSink>>,
+    pub current_entity: Option<Entity>,
 }
 
 /// Resource to track sound cooldowns to prevent spam
@@ -106,6 +110,7 @@ pub struct SoundCooldowns {
     pub cooldowns: HashMap<AudioSoundEffect, Timer>,
 }
 
+#[derive(Message)]
 pub struct UpdateBGMTrackEvent {
     pub asset_path: String,
 }
@@ -131,7 +136,7 @@ impl SoundCache {
         Some(
             self.handles
                 .entry(path.to_string())
-                .or_insert_with(|| asset_server.load(path))
+                .or_insert_with(|| asset_server.load(path.to_string()))
                 .clone(),
         )
     }
@@ -142,28 +147,15 @@ impl SoundCache {
         volume: f32,
         global_volume: f32,
         asset_server: &AssetServer,
-        audio: &Audio,
-        tracker: &mut SinkCleanupTracker,
+        commands: &mut Commands,
     ) {
         if let Some(handle) = self.get_or_load(path, asset_server) {
-            let sink_handle = audio.play_with_settings(
-                handle,
-                PlaybackSettings::ONCE.with_volume(volume * global_volume),
-            );
-            tracker.pending.push((
-                sink_handle.id(),
-                Timer::from_seconds(SFX_CLEANUP_DELAY_SECS, TimerMode::Once),
+            commands.spawn((
+                AudioPlayer::new(handle),
+                PlaybackSettings::DESPAWN.with_volume(Volume::Linear(volume * global_volume)),
             ));
         }
     }
-}
-
-/// Tracks AudioSink handles with timers so we can remove them from
-/// Assets<AudioSink> after playback is guaranteed to have finished.
-/// Bevy 0.10 does not auto-cleanup ONCE sinks and lacks `empty()`.
-#[derive(Resource, Default)]
-pub struct SinkCleanupTracker {
-    pending: Vec<(HandleId, Timer)>,
 }
 
 #[derive(Component, Display, Clone, Copy, PartialEq, Eq, Hash)]
@@ -239,27 +231,26 @@ impl Plugin for AudioPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(BGMPicker {
             current_track: "sounds/bgm_day.ogg".to_owned(),
-            current_handle: None,
+            current_entity: None,
         })
         .insert_resource(AudioVolume::load())
         .init_resource::<SoundCooldowns>()
         .init_resource::<SoundCache>()
-        .init_resource::<SinkCleanupTracker>()
-        .add_event::<UpdateBGMTrackEvent>()
-        .add_system(bgm_audio)
-        .add_system(update_bgm_volume)
-        .add_system(handle_sound_spawners)
-        .add_system(tick_sound_cooldowns)
-        .add_system(update_sound_cache)
-        .add_system(cleanup_finished_audio_sinks)
+        .add_message::<UpdateBGMTrackEvent>()
+        .add_systems(Update, bgm_audio)
+        .add_systems(Update, update_bgm_volume)
+        .add_systems(Update, handle_sound_spawners)
+        .add_systems(Update, tick_sound_cooldowns)
+        .add_systems(Update, update_sound_cache)
         .add_systems(
+            Update,
             (
                 sword_swing_sound.after(handle_attack_cooldowns),
                 use_item_audio,
                 break_item_audio,
                 hit_collision_audio,
             )
-                .in_set(OnUpdate(GameState::Main)),
+                .run_if(in_state(GameState::Main)),
         );
     }
 }
@@ -275,7 +266,10 @@ pub fn tick_sound_cooldowns(time: Res<Time>, mut cooldowns: ResMut<SoundCooldown
 fn update_sound_cache(mut cache: ResMut<SoundCache>, asset_server: Res<AssetServer>) {
     let mut newly_failed = Vec::new();
     for (path, handle) in &cache.handles {
-        if asset_server.get_load_state(handle.clone()) == LoadState::Failed {
+        if matches!(
+            asset_server.get_load_state(handle.id()),
+            Some(LoadState::Failed(_))
+        ) {
             newly_failed.push(path.clone());
         }
     }
@@ -283,25 +277,6 @@ fn update_sound_cache(mut cache: ResMut<SoundCache>, asset_server: Res<AssetServ
         warn!("Sound file failed to load, skipping future plays: {}", path);
         cache.handles.remove(&path);
         cache.failed.insert(path);
-    }
-}
-
-/// Ticks sink cleanup timers and removes expired AudioSink assets.
-/// Sound effects are short so SFX_CLEANUP_DELAY_SECS is enough headroom.
-fn cleanup_finished_audio_sinks(
-    time: Res<Time>,
-    mut tracker: ResMut<SinkCleanupTracker>,
-    mut audio_sinks: ResMut<Assets<AudioSink>>,
-) {
-    let mut i = 0;
-    while i < tracker.pending.len() {
-        tracker.pending[i].1.tick(time.delta());
-        if tracker.pending[i].1.finished() {
-            let (id, _) = tracker.pending.swap_remove(i);
-            audio_sinks.remove(id);
-        } else {
-            i += 1;
-        }
     }
 }
 
@@ -358,12 +333,10 @@ fn get_sound_cooldown_duration(sound: &AudioSoundEffect) -> Option<f32> {
 pub fn handle_sound_spawners(
     mut sounds: Query<(Entity, &mut SoundSpawner)>,
     asset_server: Res<AssetServer>,
-    audio: Res<Audio>,
     time: Res<Time>,
     mut commands: Commands,
     mut cooldowns: ResMut<SoundCooldowns>,
     mut cache: ResMut<SoundCache>,
-    mut tracker: ResMut<SinkCleanupTracker>,
     volume: Res<AudioVolume>,
 ) {
     if *crate::NO_AUDIO {
@@ -376,7 +349,7 @@ pub fn handle_sound_spawners(
         let mut play_sound = false;
         if let Some(delay) = sound.delay.as_mut() {
             delay.tick(time.delta());
-            if delay.finished() {
+            if delay.is_finished() {
                 play_sound = true;
             }
         } else {
@@ -388,7 +361,7 @@ pub fn handle_sound_spawners(
                 let can_play = cooldowns
                     .cooldowns
                     .get(&sound.sound)
-                    .map(|timer| timer.finished())
+                    .map(|timer| timer.is_finished())
                     .unwrap_or(true);
 
                 if !can_play {
@@ -407,25 +380,11 @@ pub fn handle_sound_spawners(
                 use rand::seq::SliceRandom;
                 let paths = ["sounds/swing.ogg", "sounds/swing2.ogg", "sounds/swing3.ogg"];
                 if let Some(path) = paths.choose(&mut rand::thread_rng()) {
-                    cache.play(
-                        path,
-                        sound.volume,
-                        sfx_vol,
-                        &asset_server,
-                        &audio,
-                        &mut tracker,
-                    );
+                    cache.play(path, sound.volume, sfx_vol, &asset_server, &mut commands);
                 }
             } else {
                 let path = format!("sounds/{}.ogg", sound.sound);
-                cache.play(
-                    &path,
-                    sound.volume,
-                    sfx_vol,
-                    &asset_server,
-                    &audio,
-                    &mut tracker,
-                );
+                cache.play(&path, sound.volume, sfx_vol, &asset_server, &mut commands);
             }
             commands.entity(e).despawn();
         }
@@ -433,16 +392,18 @@ pub fn handle_sound_spawners(
 }
 pub fn sword_swing_sound(
     mut commands: Commands,
-    mouse_button_input: Res<Input<MouseButton>>,
+    mouse_button_input: Res<ButtonInput<MouseButton>>,
     player_query: Query<(Option<&AttackTimer>, &PlayerAnimation), With<Player>>,
     curr_ui_state: Res<State<UIState>>,
 ) {
     if *crate::NO_AUDIO {
         return;
     }
-    let (attack_timer_option, player_anim) = player_query.single();
+    let Ok((attack_timer_option, player_anim)) = player_query.single() else {
+        return;
+    };
     if mouse_button_input.pressed(MouseButton::Left)
-        && curr_ui_state.0 == UIState::Closed
+        && *curr_ui_state.get() == UIState::Closed
         && player_anim == &PlayerAnimation::Attack
     {
         if attack_timer_option.is_some() {
@@ -454,46 +415,46 @@ pub fn sword_swing_sound(
     }
 }
 pub fn bgm_audio(
+    mut commands: Commands,
     asset_server: Res<AssetServer>,
-    audio: Res<Audio>,
     mut bgm_tracker: ResMut<BGMPicker>,
-    audio_handles: Res<Assets<AudioSink>>,
-    mut bgm_update_events: EventReader<UpdateBGMTrackEvent>,
+    mut bgm_update_events: MessageReader<UpdateBGMTrackEvent>,
     mut cache: ResMut<SoundCache>,
     volume: Res<AudioVolume>,
+    bgm_sinks: Query<&AudioSink, With<BgmAudio>>,
 ) {
     if *crate::NO_AUDIO {
         bgm_update_events.clear();
         return;
     }
-    // Sinks are only inserted in `play_queued_audio_system` (PostUpdate). If several events
-    // fire in one Update (e.g. night tick + peaceful transition, or duplicate day requests on
-    // era load), stopping the "previous" sink fails because it is not in `Assets` yet, and we
-    // queue multiple loops — so overlapping BGM. Coalesce to the last requested track per frame.
     let mut coalesced_path: Option<String> = None;
-    for event in bgm_update_events.iter() {
+    for event in bgm_update_events.read() {
         coalesced_path = Some(event.asset_path.clone());
     }
     let Some(path) = coalesced_path else {
         return;
     };
 
-    if path == bgm_tracker.current_track && bgm_tracker.current_handle.is_some() {
+    if path == bgm_tracker.current_track && bgm_tracker.current_entity.is_some() {
         return;
     }
 
-    if let Some(prev_handle) = bgm_tracker.current_handle.as_ref() {
-        if let Some(prev_audio) = audio_handles.get(prev_handle) {
-            prev_audio.stop();
+    if let Some(prev_entity) = bgm_tracker.current_entity.take() {
+        if let Ok(sink) = bgm_sinks.get(prev_entity) {
+            sink.stop();
         }
+        commands.entity(prev_entity).despawn();
     }
     bgm_tracker.current_track = path.clone();
     if let Some(bgm_handle) = cache.get_or_load(&path, &asset_server) {
-        let new_handle = audio_handles.get_handle(audio.play_with_settings(
-            bgm_handle,
-            PlaybackSettings::LOOP.with_volume(0.75 * volume.music_fraction()),
-        ));
-        bgm_tracker.current_handle = Some(new_handle);
+        let entity = commands
+            .spawn((
+                AudioPlayer::new(bgm_handle),
+                PlaybackSettings::LOOP.with_volume(Volume::Linear(0.75 * volume.music_fraction())),
+                BgmAudio,
+            ))
+            .id();
+        bgm_tracker.current_entity = Some(entity);
     }
 }
 
@@ -501,24 +462,23 @@ pub fn bgm_audio(
 pub fn update_bgm_volume(
     volume: Res<AudioVolume>,
     bgm_tracker: Res<BGMPicker>,
-    audio_sinks: Res<Assets<AudioSink>>,
+    mut bgm_sinks: Query<&mut AudioSink, With<BgmAudio>>,
 ) {
     if !volume.is_changed() {
         return;
     }
-    if let Some(handle) = bgm_tracker.current_handle.as_ref() {
-        if let Some(sink) = audio_sinks.get(handle) {
-            sink.set_volume(0.75 * volume.music_fraction());
+    if let Some(entity) = bgm_tracker.current_entity {
+        if let Ok(mut sink) = bgm_sinks.get_mut(entity) {
+            sink.set_volume(Volume::Linear(0.75 * volume.music_fraction()));
         }
     }
 }
 
 pub fn use_item_audio(
     asset_server: Res<AssetServer>,
-    audio: Res<Audio>,
-    mut use_item_event: EventReader<UseItemEvent>,
+    mut use_item_event: MessageReader<UseItemEvent>,
     mut cache: ResMut<SoundCache>,
-    mut tracker: ResMut<SinkCleanupTracker>,
+    mut commands: Commands,
     volume: Res<AudioVolume>,
 ) {
     if *crate::NO_AUDIO {
@@ -526,7 +486,7 @@ pub fn use_item_audio(
         return;
     }
     let sfx_vol = volume.sfx_fraction();
-    for item in use_item_event.iter() {
+    for item in use_item_event.read() {
         if [
             WorldObject::Apple,
             WorldObject::BrownMushroomBlock,
@@ -547,21 +507,20 @@ pub fn use_item_audio(
                 "sounds/crunch3.ogg",
             ];
             if let Some(path) = paths.iter().choose(&mut rand::thread_rng()) {
-                cache.play(path, 0.2, sfx_vol, &asset_server, &audio, &mut tracker);
+                cache.play(path, 0.2, sfx_vol, &asset_server, &mut commands);
             }
         } else {
             let path = format!("sounds/{}.ogg", item.0);
-            cache.play(&path, 0.2, sfx_vol, &asset_server, &audio, &mut tracker);
+            cache.play(&path, 0.2, sfx_vol, &asset_server, &mut commands);
         }
     }
 }
 
 pub fn break_item_audio(
     asset_server: Res<AssetServer>,
-    audio: Res<Audio>,
-    mut obj_break_events: EventReader<ObjBreakEvent>,
+    mut obj_break_events: MessageReader<ObjBreakEvent>,
     mut cache: ResMut<SoundCache>,
-    mut tracker: ResMut<SinkCleanupTracker>,
+    mut commands: Commands,
     volume: Res<AudioVolume>,
 ) {
     if *crate::NO_AUDIO {
@@ -569,7 +528,7 @@ pub fn break_item_audio(
         return;
     }
     let sfx_vol = volume.sfx_fraction();
-    for item in obj_break_events.iter() {
+    for item in obj_break_events.read() {
         if [
             WorldObject::Grass,
             WorldObject::Grass2,
@@ -592,23 +551,22 @@ pub fn break_item_audio(
                 "sounds/rustle7.ogg",
             ];
             if let Some(path) = paths.iter().choose(&mut rand::thread_rng()) {
-                cache.play(path, 0.15, sfx_vol, &asset_server, &audio, &mut tracker);
+                cache.play(path, 0.15, sfx_vol, &asset_server, &mut commands);
             }
         } else {
             let path = format!("sounds/{}.ogg", item.obj);
-            cache.play(&path, 0.15, sfx_vol, &asset_server, &audio, &mut tracker);
+            cache.play(&path, 0.15, sfx_vol, &asset_server, &mut commands);
         }
     }
 }
 
 pub fn hit_collision_audio(
     asset_server: Res<AssetServer>,
-    audio: Res<Audio>,
-    mut hit_events: EventReader<HitEvent>,
+    mut hit_events: MessageReader<HitEvent>,
     world_objects: Query<&WorldObject>,
     mobs: Query<&Mob>,
     mut cache: ResMut<SoundCache>,
-    mut tracker: ResMut<SinkCleanupTracker>,
+    mut commands: Commands,
     volume: Res<AudioVolume>,
 ) {
     if *crate::NO_AUDIO {
@@ -617,17 +575,17 @@ pub fn hit_collision_audio(
     }
     let sfx_vol = volume.sfx_fraction();
     let mut played = 0;
-    for hit in hit_events.iter() {
+    for hit in hit_events.read() {
         if played >= MAX_HIT_SOUNDS_PER_FRAME {
             break;
         }
         if let Ok(obj) = world_objects.get(hit.hit_entity) {
             let path = format!("sounds/{}.ogg", obj);
-            cache.play(&path, 0.15, sfx_vol, &asset_server, &audio, &mut tracker);
+            cache.play(&path, 0.15, sfx_vol, &asset_server, &mut commands);
             played += 1;
         } else if let Ok(mob) = mobs.get(hit.hit_entity) {
             let path = format!("sounds/{}.ogg", mob);
-            cache.play(&path, 0.15, sfx_vol, &asset_server, &audio, &mut tracker);
+            cache.play(&path, 0.15, sfx_vol, &asset_server, &mut commands);
             played += 1;
         }
     }

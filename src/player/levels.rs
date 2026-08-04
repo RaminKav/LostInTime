@@ -28,7 +28,7 @@ pub struct PlayerLevel {
     pub xp: u32,
     pub next_level_xp: u32,
 }
-#[derive(Component, Reflect, FromReflect, Default, Clone, Debug)]
+#[derive(Component, Reflect, Default, Clone, Debug)]
 #[reflect(Component)]
 pub struct ExperienceReward(pub u32);
 
@@ -92,7 +92,7 @@ pub fn handle_level_up(
 
             if player_level.level <= 50 {
                 let mut rng = rand::thread_rng();
-                let loot_bonus = player_atts.get_single().map(|a| a.0).unwrap_or(0);
+                let loot_bonus = player_atts.single().map(|a| a.0).unwrap_or(0);
                 skills_queue.add_new_skills_after_levelup(&mut rng, loot_bonus, player_level.level);
                 next_inv_state.set(UIState::Skills);
             }
@@ -114,9 +114,9 @@ pub fn hide_particles_when_inv_open(
     particles: Query<Entity, With<LevelUpParticles>>,
     ui_state: Res<State<UIState>>,
 ) {
-    if ui_state.0 != UIState::Closed {
+    if *ui_state != UIState::Closed {
         for p in particles.iter() {
-            commands.entity(p).despawn_recursive();
+            commands.entity(p).despawn();
         }
     }
 }

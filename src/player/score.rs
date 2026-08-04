@@ -2,9 +2,7 @@ use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    chaos::ChaosTracker,
-    combat::damage_tracker::MobStatTracker,
-    item::WorldObject,
+    chaos::ChaosTracker, combat::damage_tracker::MobStatTracker, item::WorldObject,
     night::InfiniteMode,
 };
 
@@ -75,7 +73,10 @@ pub struct StartingWeapon {
 }
 
 /// System to reset the run score when starting a new run
-pub fn reset_run_score(mut run_score: ResMut<RunScore>, cheat_settings: Res<crate::ui::CheatSettings>) {
+pub fn reset_run_score(
+    mut run_score: ResMut<RunScore>,
+    cheat_settings: Res<crate::ui::CheatSettings>,
+) {
     info!("Resetting run score from {} to 0", run_score.score);
     *run_score = RunScore::new(cheat_settings.dev_mode);
 }
@@ -87,18 +88,18 @@ pub fn reset_run_timer(mut run_timer: ResMut<RunTimer>) {
 
 /// Tick the run timer while the player is actively in `GameState::Main`.
 pub fn tick_run_timer(time: Res<Time>, mut run_timer: ResMut<RunTimer>) {
-    run_timer.elapsed_seconds += time.delta_seconds_f64();
+    run_timer.elapsed_seconds += time.delta_secs_f64();
 }
 
 /// System to track mob kills and update score
 pub fn track_mob_kills(
     mut run_score: ResMut<RunScore>,
     mut mob_stat_tracker: ResMut<MobStatTracker>,
-    mut death_events: bevy::ecs::event::EventReader<crate::combat::EnemyDeathEvent>,
+    mut death_events: bevy::ecs::message::MessageReader<crate::combat::EnemyDeathEvent>,
     chaos: Res<ChaosTracker>,
     infinite_mode: Res<InfiniteMode>,
 ) {
-    for death in death_events.iter() {
+    for death in death_events.read() {
         mob_stat_tracker.record_kill(death.mob.clone());
         // Include both global chaos and infinite mode chaos bonus for score
         let total_chaos = chaos.get_chaos() + infinite_mode.get_chaos_bonus();
@@ -109,9 +110,9 @@ pub fn track_mob_kills(
 /// System to track item destruction (boulders, stumps, etc.)
 pub fn track_item_destruction(
     mut run_score: ResMut<RunScore>,
-    mut break_events: bevy::ecs::event::EventReader<crate::ObjBreakEvent>,
+    mut break_events: bevy::ecs::message::MessageReader<crate::ObjBreakEvent>,
 ) {
-    for break_event in break_events.iter() {
+    for break_event in break_events.read() {
         // Only count certain items as score-worthy
         match break_event.obj {
             WorldObject::Boulder

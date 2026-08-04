@@ -3,30 +3,26 @@ pub mod skill_icons;
 use std::fs::File;
 use std::io::BufReader;
 
+use crate::aseprite_assets::{
+    AccessoryShrineAnim, ArmorShrineAnim, CombatShrineAnim, IceExplosion, PinkFlowerAseprite,
+    Portal, ShrineEye, ShrineRepairRingAnim, SmallExplosion, UIPortal, WeaponShrineAnim,
+};
+use bevy::asset::RenderAssetUsages;
+use bevy::platform::collections::HashMap;
 use bevy::prelude::*;
-use bevy::reflect::TypeUuid;
 use bevy::render::render_resource::{AsBindGroup, Extent3d, TextureDimension, TextureFormat};
-use bevy::sprite::{Material2d, Material2dPlugin};
-use bevy::utils::HashMap;
-use bevy_aseprite::Aseprite;
+use bevy::sprite_render::{Material2d, Material2dPlugin};
+use bevy_aseprite_ultra::prelude::Aseprite;
 use serde::Deserialize;
 use strum::IntoEnumIterator;
 
 use crate::attributes::ItemGlow;
-use crate::bounce::PinkFlowerAseprite;
 use crate::client::GameData;
 use crate::enemy::Mob;
-use crate::item::combat_shrine::CombatShrineAnim;
-use crate::item::dungeon_shrine::AccessoryShrineAnim;
-use crate::item::dungeon_shrine::ArmorShrineAnim;
-use crate::item::dungeon_shrine::WeaponShrineAnim;
-use crate::item::shrine_visuals::ShrineEye;
-use crate::item::shrine_repair::ShrineRepairRingAnim;
 use crate::item::{
     FurnaceRecipeList, RecipeList, RecipeListProto, Recipes, WorldObject, WorldObjectResource,
 };
 use crate::pets::state::Pet;
-use crate::player::mage_skills::{IceExplosion, SmallExplosion};
 use crate::player::skills::SkillClass;
 use crate::player::skills::{ActiveSkill, Heirloom};
 use crate::player::{
@@ -39,7 +35,6 @@ use crate::ui::tutorial_ui::{seen_tutorial_chunks_from_game_data, SeenTutorialCh
 use crate::ui::UIElement;
 
 use self::skill_icons::{load_skill_icons, SkillIcon};
-use crate::world::portal::{Portal, UIPortal};
 use crate::{datafiles, GameState, ImageAssets};
 
 pub struct GameAssetsPlugin;
@@ -53,8 +48,8 @@ pub struct WorldObjectData {
 }
 
 impl WorldObjectData {
-    pub fn to_atlas_rect(self) -> bevy::math::Rect {
-        bevy::math::Rect {
+    pub fn to_atlas_rect(self) -> URect {
+        let rect = bevy::math::Rect {
             //A tiny amount is clipped off the sides of the rectangle
             //to stop contents of other sprites from bleeding through
             min: Vec2::new(
@@ -65,6 +60,10 @@ impl WorldObjectData {
                 self.texture_pos.x * 16. + self.size.x - 0.15,
                 self.texture_pos.y * 16. + self.size.y - 0.15,
             ),
+        };
+        URect {
+            min: UVec2::new(rect.min.x.round() as u32, rect.min.y.round() as u32),
+            max: UVec2::new(rect.max.x.round() as u32, rect.max.y.round() as u32),
         }
     }
 }
@@ -99,14 +98,13 @@ pub struct PetData {
 }
 
 /// Container for all class and pet data loaded from RON
-#[derive(Deserialize, TypeUuid, Clone)]
-#[uuid = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"]
+#[derive(Asset, TypePath, Deserialize, Clone)]
 pub struct ClassPetData {
     pub classes: HashMap<SkillClass, ClassData>,
     pub pets: HashMap<Pet, PetData>,
 }
 
-#[derive(Component, Reflect, FromReflect, Default, Clone, Debug)]
+#[derive(Component, Reflect, Default, Clone, Debug)]
 #[reflect(Component)]
 pub enum SpriteSize {
     #[default]
@@ -120,13 +118,12 @@ impl SpriteSize {
     }
 }
 
-#[derive(Component, Reflect, FromReflect, Default, Clone, Debug)]
+#[derive(Component, Reflect, Default, Clone, Debug)]
 #[reflect(Component)]
 pub struct SpriteAnchor(pub Vec2);
 
 /// Loaded from sprites_desc.ron and contains the description of every sprite in the game
-#[derive(Deserialize, TypeUuid)]
-#[uuid = "413be529-bfeb-41b3-9db0-4b8b380a2c36"]
+#[derive(Asset, TypePath, Deserialize)]
 pub struct GraphicsDesc {
     items: HashMap<WorldObject, WorldObjectData>,
     icons: HashMap<WorldObject, SpriteData>,
@@ -135,10 +132,12 @@ pub struct GraphicsDesc {
 
 impl Plugin for GameAssetsPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugin(Material2dPlugin::<FoliageMaterial>::default())
+        app.add_plugins(Material2dPlugin::<FoliageMaterial>::default())
             .insert_resource(Graphics {
-                texture_atlas: None,
-                wall_texture_atlas: None,
+                texture_atlas_layout: None,
+                texture_atlas_image: None,
+                wall_texture_atlas_layout: None,
+                wall_texture_atlas_image: None,
                 spritesheet_map: None,
                 icons: None,
                 ui_image_handles: None,
@@ -171,11 +170,7 @@ impl Plugin for GameAssetsPlugin {
                 inv_stat_highlight_legendary_ase: None,
                 cursor_color_sprites: None,
             })
-            .add_system(
-                Self::update_graphics
-                    .run_if(in_state(GameState::Main).or_else(in_state(GameState::Initializing))),
-            )
-            .add_system(Self::load_graphics.in_schedule(OnExit(GameState::Loading)));
+            .add_systems(OnExit(GameState::Loading), Self::load_graphics);
     }
 }
 
@@ -188,8 +183,7 @@ impl Material2d for FoliageMaterial {
     // }
 }
 
-#[derive(AsBindGroup, TypeUuid, Debug, Clone)]
-#[uuid = "9600d1e3-1911-4286-9810-e9bd9ff685e1"]
+#[derive(Asset, TypePath, AsBindGroup, Debug, Clone)]
 pub struct FoliageMaterial {
     #[uniform(0)]
     speed: f32,
@@ -218,16 +212,18 @@ pub struct FoliageMaterial {
 #[derive(Resource)]
 
 pub struct Graphics {
-    pub texture_atlas: Option<Handle<TextureAtlas>>,
-    pub wall_texture_atlas: Option<Handle<TextureAtlas>>,
-    pub spritesheet_map: Option<HashMap<WorldObject, TextureAtlasSprite>>,
-    pub icons: Option<HashMap<WorldObject, TextureAtlasSprite>>,
+    pub texture_atlas_layout: Option<Handle<TextureAtlasLayout>>,
+    pub texture_atlas_image: Option<Handle<Image>>,
+    pub wall_texture_atlas_layout: Option<Handle<TextureAtlasLayout>>,
+    pub wall_texture_atlas_image: Option<Handle<Image>>,
+    pub spritesheet_map: Option<HashMap<WorldObject, Sprite>>,
+    pub icons: Option<HashMap<WorldObject, Sprite>>,
     pub ui_image_handles: Option<HashMap<UIElement, Handle<Image>>>,
     pub mob_spritesheets: Option<HashMap<Mob, Vec<Handle<Image>>>>,
     pub status_effect_icons: Option<HashMap<StatusEffect, Handle<Image>>>,
     pub skill_icons: Option<HashMap<SkillIcon, Handle<Image>>>,
     pub heirloom_skill_icons: Option<HashMap<Heirloom, Handle<Image>>>,
-    pub heirloom_sprites: Option<HashMap<Heirloom, TextureAtlasSprite>>,
+    pub heirloom_sprites: Option<HashMap<Heirloom, Sprite>>,
     pub item_glows: Option<HashMap<ItemGlow, Handle<Image>>>,
     pub combat_shrine_anim: Option<Handle<Aseprite>>,
     pub weapon_shrine_anim: Option<Handle<Aseprite>>,
@@ -256,9 +252,43 @@ pub struct Graphics {
     pub inv_stat_highlight_rare_ase: Option<Handle<Aseprite>>,
     pub inv_stat_highlight_legendary_ase: Option<Handle<Aseprite>>,
     /// Selectable custom-cursor color sprites, in selection order (sheet positions (4,1)..(11,1)).
-    pub cursor_color_sprites: Option<Vec<TextureAtlasSprite>>,
+    pub cursor_color_sprites: Option<Vec<Sprite>>,
 }
+fn atlas_frame_sprite(
+    image: Handle<Image>,
+    layout: Handle<TextureAtlasLayout>,
+    index: usize,
+    custom_size: Vec2,
+) -> Sprite {
+    let mut sprite = Sprite::from_atlas_image(
+        image,
+        TextureAtlas {
+            layout,
+            index,
+        },
+    );
+    sprite.custom_size = Some(custom_size);
+    sprite
+}
+
 impl Graphics {
+    /// Wall sheet frame by atlas index (legacy wall objects).
+    pub fn wall_sprite(&self, index: usize) -> Sprite {
+        Sprite::from_atlas_image(
+            self.wall_texture_atlas_image
+                .as_ref()
+                .expect("wall sprite sheet image is not loaded")
+                .clone(),
+            TextureAtlas {
+                layout: self.wall_texture_atlas_layout
+                    .as_ref()
+                    .expect("wall sprite sheet layout is not loaded")
+                    .clone(),
+                index,
+            },
+        )
+    }
+
     pub fn get_ui_element_texture(&self, element: UIElement) -> Handle<Image> {
         self.ui_image_handles
             .as_ref()
@@ -275,7 +305,7 @@ impl Graphics {
             .unwrap()
             .clone()
     }
-    pub fn get_heirloom_icon(&self, heirloom: Heirloom) -> TextureAtlasSprite {
+    pub fn get_heirloom_icon(&self, heirloom: Heirloom) -> Sprite {
         self.heirloom_sprites
             .as_ref()
             .unwrap()
@@ -308,7 +338,7 @@ impl Graphics {
         self.get_skill_icon(SkillIcon::PetPassive(pet))
     }
     /// Cursor color sprite for the given selection index, wrapping if out of range.
-    pub fn get_cursor_color_sprite(&self, index: u8) -> Option<TextureAtlasSprite> {
+    pub fn get_cursor_color_sprite(&self, index: u8) -> Option<Sprite> {
         self.cursor_color_sprites.as_ref().and_then(|sprites| {
             if sprites.is_empty() {
                 None
@@ -355,32 +385,43 @@ fn _convert_to_image(
     assert!(original_image.texture_descriptor.format == TextureFormat::Rgba8UnormSrgb);
 
     let mut data = Vec::default();
-    //Every pixel is 4 entries in image.data
-    let mut starting_index =
-        (sprite_desc.texture_pos.x + original_image.size().x * sprite_desc.texture_pos.y) as usize;
-    for _y in 0..sprite_desc.size.y as usize {
-        for x in 0..sprite_desc.size.x as usize {
-            let index = starting_index + x;
-            //Copy 1 pixel at index
-            data.push(original_image.data[index * 4]);
-            data.push(original_image.data[index * 4 + 1]);
-            data.push(original_image.data[index * 4 + 2]);
-            data.push(original_image.data[index * 4 + 3]);
-        }
-        starting_index += original_image.size().y as usize;
-    }
-
     let size = Extent3d {
         width: sprite_desc.size.x as u32,
         height: sprite_desc.size.y as u32,
         depth_or_array_layers: 1,
     };
+    //Every pixel is 4 entries in image.data
+    let width = original_image.size().x as f32;
+    let mut starting_index =
+        (sprite_desc.texture_pos.x + width * sprite_desc.texture_pos.y) as usize;
+    let Some(image_data) = original_image.data.as_ref() else {
+        return assets.add(Image::new(
+            size,
+            TextureDimension::D2,
+            data,
+            TextureFormat::Rgba8UnormSrgb,
+            RenderAssetUsages::default(),
+        ));
+    };
+    for _y in 0..sprite_desc.size.y as usize {
+        for x in 0..sprite_desc.size.x as usize {
+            let index = starting_index + x;
+            //Copy 1 pixel at index
+            data.push(image_data[index * 4]);
+            data.push(image_data[index * 4 + 1]);
+            data.push(image_data[index * 4 + 2]);
+            data.push(image_data[index * 4 + 3]);
+        }
+        starting_index += original_image.size().y as usize;
+    }
+
     let image = Image::new(
         size,
         TextureDimension::D2,
         data,
         //FIXME
         TextureFormat::Rgba8UnormSrgb,
+        RenderAssetUsages::default(),
     );
     assets.add(image)
 }
@@ -392,7 +433,7 @@ impl GameAssetsPlugin {
         mut graphics: ResMut<Graphics>,
         mut recipes: ResMut<Recipes>,
         sprite_sheet: Res<ImageAssets>,
-        mut texture_assets: ResMut<Assets<TextureAtlas>>,
+        mut texture_assets: ResMut<Assets<TextureAtlasLayout>>,
         mut world_obj_data: ResMut<WorldObjectResource>,
         asset_server: Res<AssetServer>,
         graphics_desc: Res<Assets<GraphicsDesc>>,
@@ -496,9 +537,7 @@ impl GameAssetsPlugin {
             commands.insert_resource(TimeCrystals::default());
             commands.insert_resource(crate::player::beastiary::Beastiary::default());
             commands.insert_resource(crate::player::beastiary::RunBeastiary::default());
-            commands.insert_resource(
-                crate::player::beastiary::LastPlayerAttackerMob::default(),
-            );
+            commands.insert_resource(crate::player::beastiary::LastPlayerAttackerMob::default());
         }
         commands.insert_resource(CoinCurrency::default());
         let sprite_desc_handle: Handle<GraphicsDesc> = sprite_sheet.sprite_desc.clone();
@@ -514,18 +553,13 @@ impl GameAssetsPlugin {
         } else {
             commands.insert_resource(ClassUnlockData::default());
         }
-        let mut atlas = TextureAtlas::new_empty(image_handle.clone(), Vec2::new(256., 736.));
-        let wall_atlas = TextureAtlas::from_grid(
-            wall_image_handle.clone(),
-            Vec2::new(16., 32.),
-            32,
-            4,
-            None,
-            None,
-        );
+        let mut atlas = TextureAtlasLayout::new_empty(UVec2::new(256, 736));
+        let wall_atlas = TextureAtlasLayout::from_grid(UVec2::new(16, 32), 32, 4, None, None);
 
-        let mut spritesheet_map = HashMap::default();
-        let mut icon_map = HashMap::default();
+        let mut spritesheet_entries: Vec<(WorldObject, usize, Vec2)> = Vec::new();
+        let mut icon_entries: Vec<(WorldObject, usize, Vec2)> = Vec::new();
+        let mut heirloom_entries: Vec<(Heirloom, usize, Vec2)> = Vec::new();
+        let mut cursor_entries: Vec<(usize, Vec2)> = Vec::new();
         let mut ui_image_handles = HashMap::default();
         let mut status_effect_handles = HashMap::default();
         let skill_handles = HashMap::default();
@@ -551,35 +585,30 @@ impl GameAssetsPlugin {
         let mut upgradeable_items = Vec::new();
 
         for (item, rect) in sprite_desc.items.iter() {
-            {
-                let mut sprite = TextureAtlasSprite::new(atlas.add_texture(rect.to_atlas_rect()));
-
-                //Set the size to be proportional to the source rectangle
-                sprite.custom_size = Some(Vec2::new(rect.size.x, rect.size.y));
-                spritesheet_map.insert(*item, sprite);
-            }
+            let index = atlas.add_texture(rect.to_atlas_rect());
+            spritesheet_entries.push((*item, index, rect.size));
             world_obj_data.properties.insert(*item, *rect);
         }
 
         // load icons
         for (item, rect) in sprite_desc.icons.iter() {
-            let mut sprite =
-                TextureAtlasSprite::new(atlas.add_texture(bevy::math::Rect::from_corners(
-                    rect.texture_pos * 16.,
-                    rect.texture_pos * 16. + rect.size,
-                )));
-
-            //Set the size to be proportional to the source rectangle
-            sprite.custom_size = Some(Vec2::new(rect.size.x, rect.size.y));
-            icon_map.insert(*item, sprite);
+            let index = atlas.add_texture(URect::from_corners(
+                UVec2::new(
+                    (rect.texture_pos.x * 16.) as u32,
+                    (rect.texture_pos.y * 16.) as u32,
+                ),
+                UVec2::new(
+                    (rect.texture_pos.x * 16. + rect.size.x) as u32,
+                    (rect.texture_pos.y * 16. + rect.size.y) as u32,
+                ),
+            ));
+            icon_entries.push((*item, index, rect.size));
         }
 
         // load heirloom sprites
-        let mut heirloom_sprites = HashMap::default();
         for (heirloom, rect) in sprite_desc.heirlooms.iter() {
-            let mut sprite = TextureAtlasSprite::new(atlas.add_texture(rect.to_atlas_rect()));
-            sprite.custom_size = Some(Vec2::new(rect.size.x, rect.size.y));
-            heirloom_sprites.insert(heirloom.clone(), sprite);
+            let index = atlas.add_texture(rect.to_atlas_rect());
+            heirloom_entries.push((heirloom.clone(), index, rect.size));
         }
 
         // load recipes
@@ -621,25 +650,78 @@ impl GameAssetsPlugin {
 
         // Selectable cursor color sprites laid out horizontally on row 1 of the sheet,
         // starting at column 4 (positions (4,1)..(11,1)).
-        let cursor_color_sprites = (0..crate::cursor::NUM_CURSOR_COLORS)
-            .map(|i| {
-                let rect = WorldObjectData {
-                    texture_pos: Vec2::new(4. + i as f32, 1.),
-                    size: Vec2::new(16., 16.),
-                    anchor: None,
-                };
-                let mut sprite = TextureAtlasSprite::new(atlas.add_texture(rect.to_atlas_rect()));
-                sprite.custom_size = Some(Vec2::new(rect.size.x, rect.size.y));
-                sprite
-            })
-            .collect::<Vec<_>>();
+        for i in 0..crate::cursor::NUM_CURSOR_COLORS {
+            let rect = WorldObjectData {
+                texture_pos: Vec2::new(4. + i as f32, 1.),
+                size: Vec2::new(16., 16.),
+                anchor: None,
+            };
+            let index = atlas.add_texture(rect.to_atlas_rect());
+            cursor_entries.push((index, rect.size));
+        }
 
         let atlas_handle = texture_assets.add(atlas);
         let wall_atlas_handle = texture_assets.add(wall_atlas);
 
+        let spritesheet_map = spritesheet_entries
+            .into_iter()
+            .map(|(item, index, size)| {
+                (
+                    item,
+                    atlas_frame_sprite(
+                        image_handle.clone(),
+                        atlas_handle.clone(),
+                        index,
+                        size,
+                    ),
+                )
+            })
+            .collect::<HashMap<_, _>>();
+        let icon_map = icon_entries
+            .into_iter()
+            .map(|(item, index, size)| {
+                (
+                    item,
+                    atlas_frame_sprite(
+                        image_handle.clone(),
+                        atlas_handle.clone(),
+                        index,
+                        size,
+                    ),
+                )
+            })
+            .collect::<HashMap<_, _>>();
+        let heirloom_sprites = heirloom_entries
+            .into_iter()
+            .map(|(heirloom, index, size)| {
+                (
+                    heirloom,
+                    atlas_frame_sprite(
+                        image_handle.clone(),
+                        atlas_handle.clone(),
+                        index,
+                        size,
+                    ),
+                )
+            })
+            .collect::<HashMap<_, _>>();
+        let cursor_color_sprites = cursor_entries
+            .into_iter()
+            .map(|(index, size)| {
+                atlas_frame_sprite(
+                    image_handle.clone(),
+                    atlas_handle.clone(),
+                    index,
+                    size,
+                )
+            })
+            .collect::<Vec<_>>();
+
         *graphics = Graphics {
-            texture_atlas: Some(atlas_handle),
-            wall_texture_atlas: Some(wall_atlas_handle),
+            texture_atlas_layout: Some(atlas_handle),
+            texture_atlas_image: Some(image_handle),
+            wall_texture_atlas_layout: Some(wall_atlas_handle),
+            wall_texture_atlas_image: Some(wall_image_handle),
             spritesheet_map: Some(spritesheet_map),
             ui_image_handles: Some(ui_image_handles),
             icons: Some(icon_map),
@@ -657,9 +739,7 @@ impl GameAssetsPlugin {
             accessory_shrine_anim: Some(asset_server.load(AccessoryShrineAnim::PATH)),
             ice_explosion_ase: Some(asset_server.load(IceExplosion::PATH)),
             small_explosion_ase: Some(asset_server.load(SmallExplosion::PATH)),
-            cherry_bomb_ase: Some(
-                asset_server.load("textures/effects/CherryBomb.aseprite"),
-            ),
+            cherry_bomb_ase: Some(asset_server.load("textures/effects/CherryBomb.aseprite")),
             cherry_bomb_explosion_ase: Some(
                 asset_server.load("textures/effects/CherryBombExplosion.ase"),
             ),
@@ -684,60 +764,6 @@ impl GameAssetsPlugin {
             class_pet_data: Some(class_pet_data.clone()),
             cursor_color_sprites: Some(cursor_color_sprites),
         };
-    }
-    /// Keeps the graphics up to date for things that are spawned from proto, or change Obj type
-    pub fn update_graphics(// mut to_update_query: Query<
-        //     (
-        //         Entity,
-        //         &mut TextureAtlasSprite,
-        //         &Handle<TextureAtlas>,
-        //         &WorldObject,
-        //         Option<&ItemStack>,
-        //     ),
-        //     (
-        //         Changed<WorldObject>,
-        //         Without<Wall>,
-        //         Without<Equipment>,
-        //         Without<crate::combat::MarkedForDeath>,
-        //         Without<crate::item::projectile::Projectile>,
-        //     ),
-        // >,
-        // mut commands: Commands,
-        // graphics: Res<Graphics>,
-        // texture_atlases: Res<Assets<TextureAtlas>>,
-    ) {
-        return;
-        //     let item_map = &&graphics.spritesheet_map;
-        //     if let Some(item_map) = item_map {
-        //         for (e, mut sprite, spritesheet, world_object, maybe_stack) in
-        //             to_update_query.iter_mut()
-        //         {
-        //             if let Some(texture_atlas) = texture_atlases.get(spritesheet) {
-        //                 if texture_atlas.textures.len() < 100 {
-        //                     continue;
-        //                 }
-        //             }
-        //             let has_icon = graphics.icons.as_ref().unwrap().get(world_object);
-        //             let new_sprite = if let Some(icon) = has_icon {
-        //                 icon
-        //             } else {
-        //                 item_map
-        //                     .get(world_object)
-        //                     .unwrap_or_else(|| panic!("No graphic for object {world_object:?}"))
-        //             };
-
-        //             // Check if entity still exists before inserting components
-        //             let Some(mut entity_commands) = commands.get_entity(e) else {
-        //                 continue; // Entity was despawned, skip it
-        //             };
-
-        //             entity_commands.insert(graphics.texture_atlas.as_ref().unwrap().clone());
-        //             sprite.clone_from(new_sprite);
-        //             if let Some(stack) = maybe_stack {
-        //                 add_item_glows(&mut commands, &graphics, e, stack.rarity.clone());
-        //             }
-        //         }
-        //     }
     }
 }
 

@@ -20,63 +20,70 @@ pub struct BlessingsPlugin;
 
 impl Plugin for BlessingsPlugin {
     fn build(&self, app: &mut App) {
-        app.add_event::<AncestorBlessingSelectEvent>()
+        app.add_message::<AncestorBlessingSelectEvent>()
             .init_resource::<BlessingItemRewards>()
-            .add_system(
+            .add_systems(
+                Update,
                 handle_ancestor_blessing_selected
                     .after(handle_blessing_choice_card_interactions)
                     .run_if(
                         in_state(GameState::BlessingChoice)
-                            .and_then(resource_exists::<BlessingTransitionState>()),
+                            .and_then(resource_exists::<BlessingTransitionState>),
                     ),
             )
-            .add_system(enter_blessing_ui.in_schedule(OnEnter(GameState::BlessingChoice)))
-            .add_system(
+            .add_systems(OnEnter(GameState::BlessingChoice), enter_blessing_ui)
+            .add_systems(
+                Update,
                 transition_to_main_after_blessing
-                    .run_if(resource_exists::<BlessingTransitionState>()),
+                    .run_if(resource_exists::<BlessingTransitionState>),
             )
-            .add_system(
+            .add_systems(
+                Update,
                 transition_blessing_ui_after_choice
-                    .run_if(resource_exists::<BlessingTransitionState>()),
+                    .run_if(resource_exists::<BlessingTransitionState>),
             )
-            .add_system(setup_blessing_choice_ui.in_schedule(OnEnter(UIState::BlessingChoice)))
-            .add_system(
+            .add_systems(OnEnter(UIState::BlessingChoice), setup_blessing_choice_ui)
+            .add_systems(
+                Update,
                 handle_blessing_choice_card_interactions.run_if(
                     in_state(UIState::BlessingChoice)
-                        .and_then(not(resource_exists::<BlessingTransitionState>())),
+                        .and_then(not(resource_exists::<BlessingTransitionState>)),
                 ),
             )
-            .add_system(
+            .add_systems(
+                Update,
                 handle_blessing_choice_icon_tooltips
                     .after(handle_blessing_choice_card_interactions)
                     .run_if(
                         in_state(GameState::BlessingChoice)
                             .and_then(in_state(UIState::BlessingChoice))
-                            .and_then(not(resource_exists::<BlessingTransitionState>())),
+                            .and_then(not(resource_exists::<BlessingTransitionState>)),
                     ),
             )
-            .add_system(
+            .add_systems(
+                Update,
                 process_heirloom_tooltip_requests
                     .after(handle_blessing_choice_icon_tooltips)
                     .run_if(
                         in_state(GameState::BlessingChoice)
                             .and_then(in_state(UIState::BlessingChoice))
-                            .and_then(not(resource_exists::<BlessingTransitionState>())),
+                            .and_then(not(resource_exists::<BlessingTransitionState>)),
                     ),
             )
             // Reuse the real inventory item-tooltip renderer for blessing item cards. It is
             // event-driven; the blessing hover system emits `ToolTipUpdateEvent` with a
             // `world_anchor`, and this dispatcher (normally Main-only) must also run here.
-            .add_system(
+            .add_systems(
+                Update,
                 handle_spawn_inv_item_tooltip
                     .after(handle_blessing_choice_icon_tooltips)
                     .run_if(
                         in_state(GameState::BlessingChoice)
                             .and_then(in_state(UIState::BlessingChoice))
-                            .and_then(not(resource_exists::<BlessingTransitionState>())),
+                            .and_then(not(resource_exists::<BlessingTransitionState>)),
                     ),
             )
-            .add_system(spawn_blessing_item_drops.in_schedule(OnEnter(GameState::Main)));
+            .add_systems(OnEnter(GameState::Main), spawn_blessing_item_drops);
     }
 }
 
@@ -106,7 +113,20 @@ pub struct StartingWeaponOverride {
 #[derive(Component, Clone, Debug)]
 pub struct BlessingMaxHpPenalty(pub i32);
 
-#[derive(Debug, FromReflect, Reflect, PartialEq, Eq, Clone, Copy, Hash, Component, IntoStaticStr, Ord, PartialOrd, EnumIter)]
+#[derive(
+    Debug,
+    Reflect,
+    PartialEq,
+    Eq,
+    Clone,
+    Copy,
+    Hash,
+    Component,
+    IntoStaticStr,
+    Ord,
+    PartialOrd,
+    EnumIter,
+)]
 pub enum Blessing {
     SkillAttackSpeed,
     OrbsAndTomes,

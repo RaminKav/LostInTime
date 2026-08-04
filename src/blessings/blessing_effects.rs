@@ -171,7 +171,7 @@ impl BlessingItemRewards {
 }
 
 pub fn handle_ancestor_blessing_selected(
-    mut blessing_event: EventReader<AncestorBlessingSelectEvent>,
+    mut blessing_event: MessageReader<AncestorBlessingSelectEvent>,
     mut blessing_item_rewards: ResMut<BlessingItemRewards>,
     heirloom_queue: Res<HeirloomChoiceQueue>,
     mut player: Query<(
@@ -184,15 +184,15 @@ pub fn handle_ancestor_blessing_selected(
     asset_server: Res<AssetServer>,
     mut blessing_transition_state: ResMut<BlessingTransitionState>,
     mut run_unlock_state: ResMut<RunUnlockState>,
-    mut currency_event: EventWriter<ModifyCurencyEvent>,
-    mut attribute_event: EventWriter<AttributeChangeEvent>,
+    mut currency_event: MessageWriter<ModifyCurencyEvent>,
+    mut attribute_event: MessageWriter<AttributeChangeEvent>,
     player_class: Option<Res<PlayerClass>>,
     class_ranks: Option<Res<ClassRankSystem>>,
 ) {
-    for event in blessing_event.iter() {
+    for event in blessing_event.read() {
         let mut rng = rand::thread_rng();
         let (player_entity, mut player_skills, player_transform, player_level) =
-            player.get_single_mut().unwrap();
+            player.single_mut().unwrap();
         let player_level = player_level.level;
 
         apply_ancestor_blessing(
@@ -213,7 +213,7 @@ pub fn handle_ancestor_blessing_selected(
             class_ranks.as_deref(),
         );
 
-        attribute_event.send(AttributeChangeEvent);
+        attribute_event.write(AttributeChangeEvent);
     }
 }
 
@@ -228,7 +228,7 @@ fn apply_ancestor_blessing(
     blessing_item_rewards: &mut BlessingItemRewards,
     blessing_transition_state: &mut BlessingTransitionState,
     run_unlock_state: &mut RunUnlockState,
-    currency_event: &mut EventWriter<ModifyCurencyEvent>,
+    currency_event: &mut MessageWriter<ModifyCurencyEvent>,
     commands: &mut Commands,
     asset_server: &AssetServer,
     player_class: Option<&PlayerClass>,
@@ -334,7 +334,12 @@ fn apply_ancestor_blessing(
                     blessing_transition_state,
                 );
             }
-            apply_chaos_tradeoff(choice.blessing, player_entity, selected_class.clone(), commands);
+            apply_chaos_tradeoff(
+                choice.blessing,
+                player_entity,
+                selected_class.clone(),
+                commands,
+            );
         }
         AncestorBlessing::TwoOfSpecificCommon => {
             if let Some(heirloom) = choice.resolved_heirloom.clone() {
@@ -439,7 +444,12 @@ fn apply_ancestor_blessing(
         }
         AncestorBlessing::PlasmaWeapon => {
             blessing_item_rewards.queue_item(WorldObject::PlasmaStaff);
-            apply_chaos_tradeoff(choice.blessing, player_entity, selected_class.clone(), commands);
+            apply_chaos_tradeoff(
+                choice.blessing,
+                player_entity,
+                selected_class.clone(),
+                commands,
+            );
         }
         AncestorBlessing::LaserBeam => {
             let laser_beam_skill =
@@ -449,7 +459,12 @@ fn apply_ancestor_blessing(
                 first_open_combat_skill_slot(player_skills),
             );
             ActiveSkill::LaserBeam.add_skill_components(player_entity, commands);
-            apply_chaos_tradeoff(choice.blessing, player_entity, selected_class.clone(), commands);
+            apply_chaos_tradeoff(
+                choice.blessing,
+                player_entity,
+                selected_class.clone(),
+                commands,
+            );
         }
         AncestorBlessing::TwoRandomRareHeirlooms => {
             grant_random_heirlooms(
@@ -464,7 +479,12 @@ fn apply_ancestor_blessing(
                 blessing_item_rewards,
                 blessing_transition_state,
             );
-            apply_chaos_tradeoff(choice.blessing, player_entity, selected_class.clone(), commands);
+            apply_chaos_tradeoff(
+                choice.blessing,
+                player_entity,
+                selected_class.clone(),
+                commands,
+            );
         }
         AncestorBlessing::FiveOfRandomCommon => {
             if let Some(heirloom) = choice.resolved_heirloom.clone() {
@@ -478,13 +498,23 @@ fn apply_ancestor_blessing(
                     blessing_transition_state,
                 );
             }
-            apply_chaos_tradeoff(choice.blessing, player_entity, selected_class.clone(), commands);
+            apply_chaos_tradeoff(
+                choice.blessing,
+                player_entity,
+                selected_class.clone(),
+                commands,
+            );
         }
         AncestorBlessing::RandomRareEquipment => {
             if let Some(equipment) = choice.resolved_item {
                 blessing_item_rewards.queue_item_with_rarity(equipment, ItemRarity::Rare);
             }
-            apply_chaos_tradeoff(choice.blessing, player_entity, selected_class.clone(), commands);
+            apply_chaos_tradeoff(
+                choice.blessing,
+                player_entity,
+                selected_class.clone(),
+                commands,
+            );
         }
         AncestorBlessing::ThreeOfRandomUncommon => {
             if let Some(heirloom) = choice.resolved_heirloom.clone() {
@@ -498,7 +528,12 @@ fn apply_ancestor_blessing(
                     blessing_transition_state,
                 );
             }
-            apply_chaos_tradeoff(choice.blessing, player_entity, selected_class.clone(), commands);
+            apply_chaos_tradeoff(
+                choice.blessing,
+                player_entity,
+                selected_class.clone(),
+                commands,
+            );
         }
     }
 }

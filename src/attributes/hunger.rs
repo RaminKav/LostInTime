@@ -100,7 +100,7 @@ pub fn tick_hunger(
             d
         });
 
-        if tracker.timer.finished() {
+        if tracker.timer.is_finished() {
             // if hunger.current == 0 {
             //     health.0 -= 1;
             // } else {
@@ -113,8 +113,8 @@ pub fn tick_hunger(
 
 pub fn handle_actions_drain_hunger(
     mut hunger_query: Query<(&mut Hunger, &mut HungerTracker, &mut CurrentHealth), With<Hunger>>,
-    mut action_events: EventReader<ActionSuccessEvent>,
-    mut attack_event: EventReader<AttackEvent>,
+    mut action_events: MessageReader<ActionSuccessEvent>,
+    mut attack_event: MessageReader<AttackEvent>,
 ) {
     if !HUNGER_DRAIN_ENABLED {
         action_events.clear();
@@ -126,7 +126,7 @@ pub fn handle_actions_drain_hunger(
         return;
     }
 
-    // Advance our readers so the same events don't re-trigger every frame (see EventReader::is_empty docs).
+    // Advance our readers so the same events don't re-trigger every frame (see MessageReader::is_empty docs).
     action_events.clear();
     attack_event.clear();
 

@@ -12,29 +12,29 @@
 #import bevy_sprite::mesh2d_bindings
 
 #import bevy_sprite::mesh2d_functions
+#import bevy_sprite::mesh2d_vertex_output::VertexOutput
 
 // Dark tint drawn everywhere outside the cutout rect (linear rgb + alpha).
-@group(1) @binding(0)
+@group(#{MATERIAL_BIND_GROUP}) @binding(0)
 var<uniform> overlay_color: vec4<f32>;
 // Pulsing glow color traced around the cutout rect's border.
-@group(1) @binding(1)
+@group(#{MATERIAL_BIND_GROUP}) @binding(1)
 var<uniform> glow_color: vec4<f32>;
 // rect: cutout rectangle in quad-local units, centered on the quad's own origin (min_x, min_y, max_x, max_y).
-@group(1) @binding(2)
+@group(#{MATERIAL_BIND_GROUP}) @binding(2)
 var<uniform> rect: vec4<f32>;
 // params: x/y = this quad's own size (so uv can be mapped back to quad-local position), z = time
 // (seconds), w = border thickness in quad-local units (pixels).
-@group(1) @binding(3)
+@group(#{MATERIAL_BIND_GROUP}) @binding(3)
 var<uniform> params: vec4<f32>;
 // params2: x = pulse speed, y = ping period (seconds), z = max ping ring travel distance
 // (quad-local units), w = unused.
-@group(1) @binding(4)
+@group(#{MATERIAL_BIND_GROUP}) @binding(4)
 var<uniform> params2: vec4<f32>;
 
 @fragment
-fn fragment(
-    #import bevy_sprite::mesh2d_vertex_output
-) -> @location(0) vec4<f32> {
+fn fragment(mesh: VertexOutput) -> @location(0) vec4<f32> {
+    let uv = mesh.uv;
     let quad_size = max(params.xy, vec2<f32>(1.0, 1.0));
     let time = params.z;
     let border = max(params.w, 0.5);

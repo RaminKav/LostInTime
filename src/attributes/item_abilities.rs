@@ -16,7 +16,7 @@ use crate::{
 
 use super::Attack;
 
-#[derive(Debug, PartialEq, Reflect, FromReflect, Clone, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Reflect, Clone, Serialize, Deserialize)]
 #[reflect(Default)]
 pub enum ItemAbility {
     Arc(i32),
@@ -35,17 +35,19 @@ impl Default for ItemAbility {
 // when AttackEvent is fired, we match on enum and handle teh ability.
 
 pub fn handle_item_abilitiy_on_attack(
-    mut attacks: EventReader<AttackEvent>,
-    mut ranged_attack_event: EventWriter<RangedAttackEvent>,
+    mut attacks: MessageReader<AttackEvent>,
+    mut ranged_attack_event: MessageWriter<RangedAttackEvent>,
     mut player: Query<(&PlayerSkills, &Attack, &mut CurrentMana), With<Player>>,
     mut game: GameParam,
     mut commands: Commands,
 ) {
-    let (skills, dmg, mut current_mana) = player.single_mut();
+    let Ok((skills, dmg, mut current_mana)) = player.single_mut() else {
+        return;
+    };
     let Some(_) = game.player().main_hand_slot else {
         return;
     };
-    for attack in attacks.iter() {
+    for attack in attacks.read() {
         let mut rng = rand::thread_rng();
         if skills.has(Heirloom::WaveAttack)
             && rng.gen_bool((skills.get_count(Heirloom::WaveAttack) as f64 * 0.33).clamp(0., 1.))
@@ -56,7 +58,7 @@ pub fn handle_item_abilitiy_on_attack(
                 game.heirloom_trigger_counts
                     .record_mana(Heirloom::WaveAttack, mana_cost);
                 game.heirloom_trigger_counts.increment(Heirloom::WaveAttack);
-                ranged_attack_event.send(RangedAttackEvent {
+                ranged_attack_event.write(RangedAttackEvent {
                     projectile: Projectile::Arc,
                     direction: attack.direction,
                     from_entity: None,

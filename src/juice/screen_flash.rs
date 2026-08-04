@@ -1,4 +1,4 @@
-use bevy::{prelude::*, render::view::RenderLayers};
+use bevy::{camera::visibility::RenderLayers, prelude::*};
 
 use crate::{ScreenResolution, DEBUG};
 
@@ -18,28 +18,29 @@ pub fn screen_flash_effect(
     time: Res<Time>,
     resolution: Res<ScreenResolution>,
 ) {
-    if let Ok((e, mut flash)) = existing_flash.get_single_mut() {
-        if flash_state.timer.finished() {
-            commands.entity(e).despawn_recursive();
+    if let Ok((e, mut flash)) = existing_flash.single_mut() {
+        if flash_state.timer.is_finished() {
+            commands.entity(e).despawn();
             commands.remove_resource::<FlashEffect>();
             return;
         }
-        flash.color.set_a(flash_state.timer.percent_left());
+        flash.color = flash
+            .color
+            .with_alpha(flash_state.timer.fraction_remaining());
     } else {
         commands
-            .spawn(SpriteBundle {
-                sprite: Sprite {
+            .spawn((
+                Sprite {
                     color: flash_state.color,
                     custom_size: Some(crate::ui::ui_helpers::full_screen_overlay_size(&resolution)),
                     ..default()
                 },
-                transform: Transform {
+                Transform {
                     translation: Vec3::new(0., 0., 10.),
                     scale: Vec3::new(1., 1., 1.),
                     ..Default::default()
                 },
-                ..default()
-            })
+            ))
             .insert(ScreenFlash)
             .insert(RenderLayers::from_layers(&[3]))
             .insert(Name::new("flash overlay"));
@@ -47,11 +48,11 @@ pub fn screen_flash_effect(
     flash_state.timer.tick(time.delta());
 }
 
-pub fn test_flash(keys: Res<Input<KeyCode>>, mut commands: Commands) {
-    if keys.just_pressed(KeyCode::G) && *DEBUG {
+pub fn test_flash(keys: Res<ButtonInput<KeyCode>>, mut commands: Commands) {
+    if keys.just_pressed(KeyCode::KeyG) && *DEBUG {
         commands.insert_resource(FlashEffect {
             timer: Timer::from_seconds(0.5, TimerMode::Once),
-            color: Color::rgba(1., 1., 1., 1.),
+            color: Color::srgba(1., 1., 1., 1.),
         });
     }
 }

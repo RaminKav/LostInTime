@@ -15,7 +15,7 @@ use std::fmt::Formatter;
 
 use bevy_ecs_tilemap::{prelude::*, tiles::TilePos};
 
-use bevy::{prelude::*, utils::HashMap};
+use bevy::{platform::collections::HashMap, prelude::*};
 use portal::handle_player_near_portal;
 use serde::{Deserialize, Serialize};
 use world_helpers::tile_pos_to_world_pos;
@@ -24,14 +24,9 @@ use crate::item::WorldObject;
 use crate::GameState;
 
 use self::{
-    chunk::ChunkPlugin,
-    dimension::DimensionPlugin,
-    dungeon::DungeonPlugin,
-    dungeon_room::DungeonRoomPlugin,
-    generation::GenerationPlugin,
-    tile::TilePlugin,
-    world_helpers::get_neighbour_tile,
-    y_sort::YSortPlugin,
+    chunk::ChunkPlugin, dimension::DimensionPlugin, dungeon::DungeonPlugin,
+    dungeon_room::DungeonRoomPlugin, generation::GenerationPlugin, tile::TilePlugin,
+    world_helpers::get_neighbour_tile, y_sort::YSortPlugin,
 };
 
 pub const TILE_SIZE: TilemapTileSize = TilemapTileSize { x: 16., y: 16. };
@@ -45,7 +40,9 @@ pub struct ChunkObjectData(pub Vec<(f32, f32, WorldObject)>);
 
 /// A component that represents a position in the tilemap. The `quadrant` is a number from 0 to 3
 /// where 0 is top left, 1 is top right, 2 is bottom left, 3 is bottom right
-#[derive(Eq, Hash, PartialEq, Debug, Component, Copy, Clone, Default, Reflect, FromReflect, Serialize, Deserialize)]
+#[derive(
+    Eq, Hash, PartialEq, Debug, Component, Copy, Clone, Default, Reflect, Serialize, Deserialize,
+)]
 #[reflect(Component)]
 pub struct TileMapPosition {
     pub chunk_pos: IVec2,
@@ -91,14 +88,14 @@ impl Display for TileMapPosition {
     }
 }
 
-#[derive(Eq, Hash, Component, PartialEq, Debug, Clone, Default, Reflect, FromReflect, Deserialize)]
+#[derive(Eq, Hash, Component, PartialEq, Debug, Clone, Default, Reflect, Deserialize)]
 #[reflect(Component)]
 pub struct WallTextureData {
     pub obj_bit_index: u8,
     pub texture_offset: u8,
 }
 
-#[derive(Resource, Reflect, FromReflect, Default, Debug, Clone, Serialize, Deserialize)]
+#[derive(Resource, Reflect, Default, Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct WorldGeneration {
     pub water_frequency: f64,
@@ -112,7 +109,7 @@ pub struct WorldGeneration {
     pub obj_allowed_tiles_map: HashMap<WorldObject, Vec<WorldObject>>,
 }
 
-#[derive(Component, Reflect, FromReflect, Default, Debug, Clone, Serialize, Deserialize)]
+#[derive(Component, Reflect, Default, Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct ForestGenerationParams {
     pub tree_spacing_radius: f32,
@@ -124,7 +121,7 @@ pub struct ForestGenerationParams {
 
 /// Inclusive [min, max] count range used to roll how many of a given shrine
 /// will exist in the world for a single era.
-#[derive(Component, Reflect, FromReflect, Default, Debug, Clone, Serialize, Deserialize)]
+#[derive(Component, Reflect, Default, Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct ShrineCount {
     pub min: u32,
@@ -133,15 +130,21 @@ pub struct ShrineCount {
 pub struct WorldPlugin;
 impl Plugin for WorldPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugin(GenerationPlugin)
-            .add_plugin(ChunkPlugin)
-            .add_plugin(DimensionPlugin)
-            .add_plugin(DungeonPlugin)
-            .add_plugin(DungeonRoomPlugin)
-            .add_plugin(TilePlugin)
-            .add_plugin(YSortPlugin)
+        app.add_plugins(GenerationPlugin)
+            .add_plugins(ChunkPlugin)
+            .add_plugins(DimensionPlugin)
+            .add_plugins(DungeonPlugin)
+            .add_plugins(DungeonRoomPlugin)
+            .add_plugins(TilePlugin)
+            .add_plugins(YSortPlugin)
             .init_resource::<portal::BossKillTracker>()
-            .add_system(portal::track_boss_kills.in_set(OnUpdate(GameState::Main)))
-            .add_system(handle_player_near_portal.in_set(OnUpdate(GameState::Main)));
+            .add_systems(
+                Update,
+                portal::track_boss_kills.run_if(in_state(GameState::Main)),
+            )
+            .add_systems(
+                Update,
+                handle_player_near_portal.run_if(in_state(GameState::Main)),
+            );
     }
 }

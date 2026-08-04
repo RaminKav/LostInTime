@@ -1,4 +1,4 @@
-use bevy::{prelude::*, render::view::RenderLayers};
+use bevy::{camera::visibility::RenderLayers, prelude::*};
 
 use strum::IntoEnumIterator;
 
@@ -26,7 +26,7 @@ pub fn despawn_dev_skill_picker_grid_layers(
     layers: &Query<Entity, With<DevSkillPickerGridLayer>>,
 ) {
     for e in layers.iter() {
-        commands.entity(e).despawn_recursive();
+        commands.entity(e).despawn();
     }
 }
 
@@ -57,15 +57,14 @@ pub fn spawn_skill_grid_overlay(
 
     let backdrop = commands
         .spawn((
-            SpriteBundle {
-                sprite: Sprite {
-                    color: Color::rgba(35. / 255., 70. / 255., 70. / 255., 1.),
+            (
+                Sprite {
+                    color: Color::srgba(35. / 255., 70. / 255., 70. / 255., 1.),
                     custom_size: Some(Vec2::new(backdrop_w, backdrop_h)),
                     ..Default::default()
                 },
-                transform: Transform::from_translation(Vec3::new(center.x, center.y, 98.5)),
-                ..Default::default()
-            },
+                Transform::from_translation(Vec3::new(center.x, center.y, 98.5)),
+            ),
             RenderLayers::from_layers(&[3]),
             DevSkillPickerGridLayer,
             UIState::Inventory,
@@ -87,15 +86,14 @@ pub fn spawn_skill_grid_overlay(
 
         let icon = commands
             .spawn((
-                SpriteBundle {
-                    texture: graphics.get_active_skill_icon(active_skill),
-                    sprite: Sprite {
+                (
+                    Sprite {
+                        image: graphics.get_active_skill_icon(active_skill),
                         custom_size: Some(Vec2::new(GRID_ICON, GRID_ICON)),
-                        ..Default::default()
+                        ..default()
                     },
-                    transform: Transform::from_translation(Vec3::new(x, y, 99.5)),
-                    ..Default::default()
-                },
+                    Transform::from_translation(Vec3::new(x, y, 99.5)),
+                ),
                 RenderLayers::from_layers(&[3]),
                 Interactable::default(),
                 DevSkillPickerIcon { active_skill },

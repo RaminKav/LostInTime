@@ -1,3 +1,4 @@
+use bevy::text::Justify;
 use crate::{
     assets::Graphics,
     attributes::AttributeChangeEvent,
@@ -17,14 +18,14 @@ use crate::{
         heirloom_tooltip::{
             heirloom_hud_hover_tooltip_position, HeirloomTooltipRequest, HeirloomTooltipShow,
         },
-        interactions::{Interactable, Interaction},
+        interactions::{set_sprite_image, Interactable, Interaction},
         main_menu::{spawn_back_button, MAIN_MENU_WIDE_BUTTON_SIZE},
         Focusable, SkipFocusSelectedIndicator, UIElement, UIState,
     },
     ScreenResolution, GAME_HEIGHT,
 };
+use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
-use bevy::render::view::RenderLayers;
 
 #[derive(Resource, Default)]
 pub struct MicrowaveShrineUsages(pub u32);
@@ -61,7 +62,7 @@ pub fn setup_microwave_shrine_ui(
     player_skills: Query<&PlayerSkills>,
     coins: Res<CoinCurrency>,
 ) {
-    let Ok(skills) = player_skills.get_single() else {
+    let Ok(skills) = player_skills.single() else {
         return;
     };
 
@@ -75,10 +76,10 @@ pub fn setup_microwave_shrine_ui(
     }
 
     let container = commands
-        .spawn(SpatialBundle {
-            transform: Transform::from_translation(Vec3::new(0., 0., 50.)),
-            ..Default::default()
-        })
+        .spawn((
+            Transform::from_translation(Vec3::new(0., 0., 50.)),
+            Visibility::default(),
+        ))
         .insert(MicrowaveShrineUI)
         .insert(UIState::MicrowaveShrine)
         .insert(RenderLayers::from_layers(&[3]))
@@ -93,70 +94,56 @@ pub fn setup_microwave_shrine_ui(
 
     // BG
     let bg = commands
-        .spawn(SpriteBundle {
-            sprite: Sprite {
-                color: Color::rgba(0.1, 0.1, 0.1, 0.95),
+        .spawn((
+            Sprite {
+                color: Color::srgba(0.1, 0.1, 0.1, 0.95),
                 custom_size: Some(crate::ui::ui_helpers::full_screen_overlay_size(&res)),
                 ..default()
             },
-            ..default()
-        })
+            Transform::default(),
+        ))
         .insert(RenderLayers::from_layers(&[3]))
-        .set_parent(container)
+        .insert(ChildOf(container))
         .id();
 
     // Title text (slkscrbold: 8.4 everywhere, see player_hud, class_selection, tips)
     commands
-        .spawn(Text2dBundle {
-            text: Text::from_section(
-                "Heirloom Swap Shrine",
-                gf::MENU_TITLE.text_style(&asset_server, WHITE),
-            )
-            .with_alignment(TextAlignment::Center),
-            transform: Transform {
-                translation: Vec3::new(0., GAME_HEIGHT / 2. - 60., 2.),
-                scale: gf::MENU_TITLE.transform_scale(),
-                ..Default::default()
-            },
-            ..Default::default()
-        })
+        .spawn(
+            gf::MENU_TITLE
+                .text(&asset_server, "Heirloom Swap Shrine", WHITE)
+                .justify(Justify::Center)
+                .with_transform(Transform {
+                    translation: Vec3::new(0., GAME_HEIGHT / 2. - 60., 2.),
+                    scale: gf::MENU_TITLE.transform_scale(),
+                    ..Default::default()
+                }),
+        )
         .insert(RenderLayers::from_layers(&[3]))
-        .set_parent(container);
+        .insert(ChildOf(container));
 
     commands
-        .spawn(Text2dBundle {
-            text: Text::from_section(
-                "Select heirloom rarity, then select an heirloom to gain. \nCosts coins and consumes a random heirloom of the same rarity",
-                gf::BODY.text_style(&asset_server, WHITE),
-            )
-            .with_alignment(TextAlignment::Center),
-            transform: Transform {
+        .spawn(gf::BODY.text(&asset_server, "Select heirloom rarity, then select an heirloom to gain. \nCosts coins and consumes a random heirloom of the same rarity", WHITE).justify(Justify::Center).with_transform(Transform {
                 translation: Vec3::new(0., GAME_HEIGHT / 2. - 100., 2.),
                 scale: gf::BODY.transform_scale(),
                 ..Default::default()
-            },
-            ..Default::default()
-        })
+            }))
         .insert(RenderLayers::from_layers(&[3]))
-        .set_parent(container);
+        .insert(ChildOf(container));
 
     // Gold count (slkscr: 8.4)
     commands
-        .spawn(Text2dBundle {
-            text: Text::from_section(
-                format!("Gold: {}", coins.coins),
-                gf::BODY.text_style(&asset_server, YELLOW),
-            )
-            .with_alignment(TextAlignment::Center),
-            transform: Transform {
-                translation: Vec3::new(0., GAME_HEIGHT / 2. - 80., 2.),
-                scale: gf::BODY.transform_scale(),
-                ..Default::default()
-            },
-            ..Default::default()
-        })
+        .spawn(
+            gf::BODY
+                .text(&asset_server, format!("Gold: {}", coins.coins), YELLOW)
+                .justify(Justify::Center)
+                .with_transform(Transform {
+                    translation: Vec3::new(0., GAME_HEIGHT / 2. - 80., 2.),
+                    scale: gf::BODY.transform_scale(),
+                    ..Default::default()
+                }),
+        )
         .insert(RenderLayers::from_layers(&[3]))
-        .set_parent(container);
+        .insert(ChildOf(container));
 
     let rarities = [
         (HeirloomRarity::Common, 10),
@@ -179,15 +166,14 @@ pub fn setup_microwave_shrine_ui(
         let btn_size = MAIN_MENU_WIDE_BUTTON_SIZE;
 
         let btn = commands
-            .spawn(SpriteBundle {
-                texture: graphics.get_ui_element_texture(UIElement::MainMenuStartButton),
-                sprite: Sprite {
+            .spawn((
+                Sprite {
+                    image: graphics.get_ui_element_texture(UIElement::MainMenuStartButton),
                     custom_size: Some(btn_size),
                     ..default()
                 },
-                transform: Transform::from_translation(Vec3::new(0., 30. - (i as f32 * 40.), 1.)),
-                ..default()
-            })
+                Transform::from_translation(Vec3::new(0., 30. - (i as f32 * 40.), 1.)),
+            ))
             .insert(RenderLayers::from_layers(&[3]))
             .insert(UIElement::MainMenuStartButton)
             .insert(Interactable::default())
@@ -202,7 +188,7 @@ pub fn setup_microwave_shrine_ui(
                 can_afford,
                 has_enough_heirlooms,
             })
-            .set_parent(container)
+            .insert(ChildOf(container))
             .id();
 
         let rarity_str = match rarity {
@@ -213,21 +199,18 @@ pub fn setup_microwave_shrine_ui(
         };
 
         commands
-            .spawn(Text2dBundle {
-                text: Text::from_section(
-                    format!("{} ({}g)", rarity_str, cost),
-                    gf::TITLE.text_style(&asset_server, WHITE),
-                )
-                .with_alignment(TextAlignment::Center),
-                transform: Transform {
-                    translation: Vec3::new(0., -1., 1.),
-                    scale: gf::TITLE.transform_scale(),
-                    ..Default::default()
-                },
-                ..Default::default()
-            })
+            .spawn(
+                gf::TITLE
+                    .text(&asset_server, format!("{} ({}g)", rarity_str, cost), WHITE)
+                    .justify(Justify::Center)
+                    .with_transform(Transform {
+                        translation: Vec3::new(0., -1., 1.),
+                        scale: gf::TITLE.transform_scale(),
+                        ..Default::default()
+                    }),
+            )
             .insert(RenderLayers::from_layers(&[3]))
-            .set_parent(btn);
+            .insert(ChildOf(btn));
     }
 
     // Exit / Back button — child of container with high z so it draws above the overlay
@@ -243,7 +226,7 @@ pub fn setup_microwave_shrine_ui(
     );
     commands
         .entity(back_button)
-        .set_parent(container)
+        .insert(ChildOf(container))
         .insert(UIState::MicrowaveShrine)
         .insert(Focusable {
             group: UIState::MicrowaveShrine,
@@ -263,7 +246,7 @@ fn point_in_sprite(cursor: &Vec3, size: Vec2, xform: &GlobalTransform) -> bool {
 pub fn handle_microwave_shrine_rarity_click(
     mut commands: Commands,
     cursor_pos: Res<CursorPos>,
-    mouse_input: Res<Input<MouseButton>>,
+    mouse_input: Res<ButtonInput<MouseButton>>,
     mut buttons: Query<(
         Entity,
         &Sprite,
@@ -272,7 +255,7 @@ pub fn handle_microwave_shrine_rarity_click(
         &mut Interactable,
     )>,
     ui_root: Query<Entity, With<MicrowaveShrineUI>>,
-    rarity_buttons_to_remove: Query<(Entity, &Parent), With<MicrowaveRarityButton>>,
+    rarity_buttons_to_remove: Query<(Entity, &ChildOf), With<MicrowaveRarityButton>>,
     player_skills: Query<&PlayerSkills>,
     asset_server: Res<AssetServer>,
     graphics: Res<Graphics>,
@@ -299,9 +282,11 @@ pub fn handle_microwave_shrine_rarity_click(
                         commands
                             .entity(e)
                             .insert(UIElement::MainMenuStartButtonHover)
-                            .insert(
-                                graphics.get_ui_element_texture(UIElement::MainMenuStartButtonHover),
-                            );
+                            .insert(Sprite {
+                                image: graphics
+                                    .get_ui_element_texture(UIElement::MainMenuStartButtonHover),
+                                ..default()
+                            });
                     }
                 }
                 Interaction::Hovering => {
@@ -311,22 +296,24 @@ pub fn handle_microwave_shrine_rarity_click(
                         commands
                             .entity(e)
                             .insert(UIElement::MainMenuStartButton)
-                            .insert(
-                                graphics.get_ui_element_texture(UIElement::MainMenuStartButton),
-                            );
+                            .insert(Sprite {
+                                image: graphics
+                                    .get_ui_element_texture(UIElement::MainMenuStartButton),
+                                ..default()
+                            });
                     } else if confirm_pressed {
-                        if let Ok(root) = ui_root.get_single() {
+                        if let Ok(root) = ui_root.single() {
                             // Remove only the three rarity buttons; keep overlay (bg, title, gold)
                             let to_despawn: Vec<Entity> = rarity_buttons_to_remove
                                 .iter()
-                                .filter(|(_, p)| p.get() == root)
+                                .filter(|(_, p)| p.parent() == root)
                                 .map(|(e, _)| e)
                                 .collect();
                             for entity in to_despawn {
-                                commands.entity(entity).despawn_recursive();
+                                commands.entity(entity).despawn();
                             }
 
-                            let Ok(skills) = player_skills.get_single() else {
+                            let Ok(skills) = player_skills.single() else {
                                 return;
                             };
 
@@ -344,20 +331,15 @@ pub fn handle_microwave_shrine_rarity_click(
                                     Vec2::new(-75. + (col as f32 * 30.), 30. - (row as f32 * 40.));
 
                                 let h_btn = commands
-                                    .spawn(SpriteSheetBundle {
-                                        sprite: graphics.get_heirloom_icon(heirloom.clone()),
-                                        texture_atlas: graphics
-                                            .texture_atlas
-                                            .as_ref()
-                                            .unwrap()
-                                            .clone(),
-                                        transform: Transform::from_translation(offset.extend(1.)),
-                                        ..default()
-                                    })
-                                    .insert(Sprite {
-                                        custom_size: Some(Vec2::splat(HEIRLOOM_BUTTON_HIT_SIZE)),
-                                        ..default()
-                                    })
+                                    .spawn((
+                                        {
+                                            let mut sprite = graphics.get_heirloom_icon(heirloom.clone());
+                                            sprite.custom_size =
+                                                Some(Vec2::splat(HEIRLOOM_BUTTON_HIT_SIZE));
+                                            sprite
+                                        },
+                                        Transform::from_translation(offset.extend(1.)),
+                                    ))
                                     .insert(RenderLayers::from_layers(&[3]))
                                     .insert(Interactable::default())
                                     .insert(Focusable {
@@ -367,25 +349,22 @@ pub fn handle_microwave_shrine_rarity_click(
                                     .insert(MicrowaveHeirloomButton {
                                         heirloom: heirloom.clone(),
                                     })
-                                    .set_parent(root)
+                                    .insert(ChildOf(root))
                                     .id();
 
                                 commands
-                                    .spawn(Text2dBundle {
-                                        text: Text::from_section(
-                                            format!("x{}", count),
-                                            gf::HUD_MICRO.text_style(&asset_server, WHITE),
-                                        )
-                                        .with_alignment(TextAlignment::Center),
-                                        transform: Transform {
-                                            translation: Vec3::new(0., -12., 1.),
-                                            scale: gf::HUD_MICRO.transform_scale(),
-                                            ..Default::default()
-                                        },
-                                        ..Default::default()
-                                    })
+                                    .spawn(
+                                        gf::HUD_MICRO
+                                            .text(&asset_server, format!("x{}", count), WHITE)
+                                            .justify(Justify::Center)
+                                            .with_transform(Transform {
+                                                translation: Vec3::new(0., -12., 1.),
+                                                scale: gf::HUD_MICRO.transform_scale(),
+                                                ..Default::default()
+                                            }),
+                                    )
                                     .insert(RenderLayers::from_layers(&[3]))
-                                    .set_parent(h_btn);
+                                    .insert(ChildOf(h_btn));
                             }
                         }
                     }
@@ -394,17 +373,19 @@ pub fn handle_microwave_shrine_rarity_click(
             }
         } else if matches!(interactable.current(), Interaction::Hovering) {
             interactable.change(Interaction::None);
-            commands
-                .entity(e)
-                .insert(UIElement::MainMenuStartButton)
-                .insert(graphics.get_ui_element_texture(UIElement::MainMenuStartButton));
+            commands.entity(e).insert(UIElement::MainMenuStartButton);
+            set_sprite_image(
+                &mut commands,
+                e,
+                graphics.get_ui_element_texture(UIElement::MainMenuStartButton),
+            );
         }
     }
 }
 
 /// Show the shared heirloom hover card for whichever swap icon is under the cursor.
 pub fn handle_microwave_shrine_heirloom_tooltip(
-    mut tooltip_requests: EventWriter<HeirloomTooltipRequest>,
+    mut tooltip_requests: MessageWriter<HeirloomTooltipRequest>,
     buttons: Query<
         (&MicrowaveHeirloomButton, &GlobalTransform, &Interactable),
         With<MicrowaveHeirloomButton>,
@@ -424,9 +405,11 @@ pub fn handle_microwave_shrine_heirloom_tooltip(
     }
 
     match &currently_hovered {
-        None => tooltip_requests.send(HeirloomTooltipRequest::Clear),
+        None => {
+            let _ = tooltip_requests.write(HeirloomTooltipRequest::Clear);
+        }
         Some((heirloom, icon_pos)) => {
-            let Ok(skills) = player_skills.get_single() else {
+            let Ok(skills) = player_skills.single() else {
                 *last_hovered = hovered_heirloom;
                 return;
             };
@@ -446,7 +429,7 @@ pub fn handle_microwave_shrine_heirloom_tooltip(
             );
             tooltip_pos.y -= 10.;
 
-            tooltip_requests.send(HeirloomTooltipRequest::Show(HeirloomTooltipShow {
+            tooltip_requests.write(HeirloomTooltipRequest::Show(HeirloomTooltipShow {
                 heirloom: heirloom.clone(),
                 rarity,
                 position: tooltip_pos,
@@ -466,7 +449,7 @@ const HEIRLOOM_BUTTON_HIT_SIZE: f32 = 28.0;
 pub fn handle_microwave_shrine_heirloom_click(
     mut commands: Commands,
     cursor_pos: Res<CursorPos>,
-    mouse_input: Res<Input<MouseButton>>,
+    mouse_input: Res<ButtonInput<MouseButton>>,
     mut next_ui_state: ResMut<NextState<UIState>>,
     mut buttons: Query<(
         Entity,
@@ -480,8 +463,8 @@ pub fn handle_microwave_shrine_heirloom_click(
     mut shrines: Query<&mut MicrowaveShrineState>,
     asset_server: Res<AssetServer>,
     graphics: Res<Graphics>,
-    mut modify_currency: EventWriter<ModifyCurencyEvent>,
-    mut attribute_event: EventWriter<AttributeChangeEvent>,
+    mut modify_currency: MessageWriter<ModifyCurencyEvent>,
+    mut attribute_event: MessageWriter<AttributeChangeEvent>,
     player_query: Query<(Entity, &Transform), With<crate::player::Player>>,
     ui_focus: Res<crate::ui::focus::UiFocus>,
 ) {
@@ -504,10 +487,10 @@ pub fn handle_microwave_shrine_heirloom_click(
                 }
                 Interaction::Hovering => {
                     if confirm_pressed {
-                        let Ok(mut skills) = player_skills.get_single_mut() else {
+                        let Ok(mut skills) = player_skills.single_mut() else {
                             return;
                         };
-                        let Ok((root, shrine_ref)) = ui_root.get_single() else {
+                        let Ok((root, shrine_ref)) = ui_root.single() else {
                             return;
                         };
 
@@ -529,7 +512,7 @@ pub fn handle_microwave_shrine_heirloom_click(
                         };
                         let cost = base_cost * 2u32.pow(usages.0);
 
-                        modify_currency.send(ModifyCurencyEvent {
+                        modify_currency.write(ModifyCurencyEvent {
                             delta: -(cost as i32),
                             obj: WorldObject::Coin,
                         });
@@ -561,13 +544,13 @@ pub fn handle_microwave_shrine_heirloom_click(
                             }
 
                             // Add/update heirloom components, trigger attribute recalc, and show floating text (like essence_ui, item_chest)
-                            if let Ok((player_entity, pt)) = player_query.get_single() {
+                            if let Ok((player_entity, pt)) = player_query.single() {
                                 btn.heirloom.add_heirloom_components(
                                     player_entity,
                                     &mut commands,
                                     skills.clone(),
                                 );
-                                attribute_event.send(AttributeChangeEvent);
+                                attribute_event.write(AttributeChangeEvent);
                                 // Format: "-1 " {icon} {name}. Use layer 0 so icon/name show (main text is layer 0; layer 3 is UI-only).
                                 let color = rarity.get_color();
                                 let floating_text = spawn_floating_text_with_shadow(
@@ -584,45 +567,19 @@ pub fn handle_microwave_shrine_heirloom_click(
                                     .insert(RenderLayers::from_layers(&[0]));
                                 // Icon after "-1 " (child of shadow entity)
                                 let icon_entity = commands
-                                    .spawn(SpriteSheetBundle {
-                                        sprite: graphics.get_heirloom_icon(consumed.clone()),
-                                        texture_atlas: graphics
-                                            .texture_atlas
-                                            .as_ref()
-                                            .unwrap()
-                                            .clone(),
-                                        transform: Transform::from_translation(Vec3::new(
-                                            4., 0., 4.,
-                                        )),
-                                        ..default()
-                                    })
+                                    .spawn((
+                                        graphics.get_heirloom_icon(consumed.clone()),
+                                        Transform::from_translation(Vec3::new(4., 0., 4.)),
+                                    ))
                                     .insert(RenderLayers::from_layers(&[0]))
                                     .id();
                                 commands.entity(floating_text).add_child(icon_entity);
-                                // Name after icon (same font/size as floating text)
-                                // let name_entity = commands
-                                //     .spawn(Text2dBundle {
-                                //         text: Text::from_section(
-                                //             consumed.get_title(),
-                                //             gf::BODY.text_style(&asset_server, color),
-                                //         ),
-                                //         text_anchor: bevy::sprite::Anchor::CenterLeft,
-                                //         transform: Transform {
-                                //             translation: Vec3::new(5., 0., 4.),
-                                //             scale: gf::BODY.transform_scale(),
-                                //             ..default()
-                                //         },
-                                //         ..default()
-                                //     })
-                                //     .insert(RenderLayers::from_layers(&[0]))
-                                //     .id();
-                                // commands.entity(floating_text).add_child(name_entity);
                             }
                         }
 
                         commands.remove_resource::<MicrowaveShrineActive>();
                         next_ui_state.set(UIState::Closed);
-                        commands.entity(root).despawn_recursive();
+                        commands.entity(root).despawn();
                         return;
                     }
                 }

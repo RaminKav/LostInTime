@@ -1,6 +1,5 @@
+use bevy::platform::collections::HashMap;
 use bevy::prelude::*;
-use bevy::reflect::TypeUuid;
-use bevy::utils::HashMap;
 use serde::Deserialize;
 
 use crate::cursor::CursorPos;
@@ -20,8 +19,10 @@ pub struct GroundPatchData {
 pub type GrassPatchData = GroundPatchData;
 
 impl GroundPatchData {
-    pub fn to_atlas_rect(self) -> bevy::math::Rect {
-        bevy::math::Rect {
+    pub fn to_atlas_rect(self) -> URect {
+        let rect = bevy::math::Rect {
+            //A tiny amount is clipped off the sides of the rectangle
+            //to stop contents of other sprites from bleeding through
             min: Vec2::new(
                 self.texture_pos.x * 16. + 0.15,
                 self.texture_pos.y * 16. + 0.15,
@@ -30,12 +31,16 @@ impl GroundPatchData {
                 self.texture_pos.x * 16. + self.size.x - 0.15,
                 self.texture_pos.y * 16. + self.size.y - 0.15,
             ),
+        };
+        URect {
+            min: UVec2::new(rect.min.x.round() as u32, rect.min.y.round() as u32),
+            max: UVec2::new(rect.max.x.round() as u32, rect.max.y.round() as u32),
         }
     }
 }
 
 /// Logical identifiers for decorative ground patch sprites (grass and desert).
-#[derive(Deserialize, Debug, Hash, PartialEq, Eq, Clone, Copy, Reflect, FromReflect, Component, Default)]
+#[derive(Deserialize, Debug, Hash, PartialEq, Eq, Clone, Copy, Reflect, Component, Default)]
 #[reflect(Component)]
 pub enum GroundPatch {
     #[default]
@@ -49,21 +54,29 @@ pub enum GroundPatch {
 
 /// RON asset describing each grass patch sprite location on the
 /// `grass_patches.png` sheet.
-#[derive(Deserialize, TypeUuid)]
-#[uuid = "b8a3a5d2-7f7d-4a23-9e9f-1d7d6f3b2a91"]
+#[derive(Asset, TypePath, Deserialize)]
 pub struct GrassPatchesDesc {
     pub patches: HashMap<GroundPatch, GroundPatchData>,
 }
 
-/// Loaded atlas + per-patch sprite info populated after assets finish loading.
+/// Loaded per-patch sprites populated after assets finish loading.
 #[derive(Resource, Default)]
 pub struct GroundPatchesGraphics {
-    pub grass_atlas: Option<Handle<TextureAtlas>>,
-    pub grass_sprites: Option<HashMap<GroundPatch, TextureAtlasSprite>>,
-    pub desert_atlas: Option<Handle<TextureAtlas>>,
-    pub desert_sprites: Option<HashMap<GroundPatch, TextureAtlasSprite>>,
-    pub desert_small_atlas: Option<Handle<TextureAtlas>>,
-    pub desert_small_sprites: Option<HashMap<GroundPatch, TextureAtlasSprite>>,
+    pub grass_sprites: Option<HashMap<GroundPatch, Sprite>>,
+    pub desert_sprites: Option<HashMap<GroundPatch, Sprite>>,
+    pub desert_small_sprites: Option<HashMap<GroundPatch, Sprite>>,
+}
+
+impl GroundPatchesGraphics {
+    fn patch_sprite(&self, patch: GroundPatch) -> Option<Sprite> {
+        match patch {
+            GroundPatch::DesertPatch1 => self.desert_sprites.as_ref()?.get(&patch).cloned(),
+            GroundPatch::DesertPatchSmall => {
+                self.desert_small_sprites.as_ref()?.get(&patch).cloned()
+            }
+            _ => self.grass_sprites.as_ref()?.get(&patch).cloned(),
+        }
+    }
 }
 
 /// Marker for spawned decorative ground patches.
@@ -172,29 +185,55 @@ impl Plugin for GrassPatchesPlugin {
     fn build(&self, app: &mut App) {
         app.register_type::<GroundPatch>()
             .init_resource::<GroundPatchesGraphics>()
-            .add_system(load_ground_patches.in_schedule(OnExit(GameState::Loading)))
-            .add_system(debug_spawn_ground_patches.in_set(OnUpdate(GameState::Main)));
+            .add_systems(OnExit(GameState::Loading), load_ground_patches)
+            .add_systems(
+                Update,
+                debug_spawn_ground_patches.run_if(in_state(GameState::Main)),
+            );
     }
+}
+
+fn make_patch_sprite(
+    image: Handle<Image>,
+    layout: Handle<TextureAtlasLayout>,
+    index: usize,
+    size: Vec2,
+) -> Sprite {
+    let mut sprite = Sprite::from_atlas_image(
+        image,
+        TextureAtlas {
+            layout,
+            index,
+        },
+    );
+    sprite.custom_size = Some(size);
+    sprite
 }
 
 fn load_ground_patches(
     image_assets: Res<ImageAssets>,
     grass_descs: Res<Assets<GrassPatchesDesc>>,
-    mut texture_atlases: ResMut<Assets<TextureAtlas>>,
+    mut texture_atlases: ResMut<Assets<TextureAtlasLayout>>,
     mut ground_graphics: ResMut<GroundPatchesGraphics>,
 ) {
     if let Some(desc) = grass_descs.get(&image_assets.grass_patches_desc) {
-        let mut atlas = TextureAtlas::new_empty(
-            image_assets.grass_patches_sheet.clone(),
-            Vec2::new(176., 320.),
-        );
-        let mut sprites = HashMap::default();
+        let mut atlas = TextureAtlasLayout::new_empty(UVec2::new(176, 320));
+        let mut entries = Vec::new();
         for (patch, data) in desc.patches.iter() {
-            let mut sprite = TextureAtlasSprite::new(atlas.add_texture(data.to_atlas_rect()));
-            sprite.custom_size = Some(data.size);
-            sprites.insert(*patch, sprite);
+            let index = atlas.add_texture(data.to_atlas_rect());
+            entries.push((*patch, index, data.size));
         }
-        ground_graphics.grass_atlas = Some(texture_atlases.add(atlas));
+        let layout = texture_atlases.add(atlas);
+        let image = image_assets.grass_patches_sheet.clone();
+        let sprites = entries
+            .into_iter()
+            .map(|(patch, index, size)| {
+                (
+                    patch,
+                    make_patch_sprite(image.clone(), layout.clone(), index, size),
+                )
+            })
+            .collect();
         ground_graphics.grass_sprites = Some(sprites);
     } else {
         warn!("GrassPatchesDesc asset not loaded yet");
@@ -204,32 +243,32 @@ fn load_ground_patches(
         texture_pos: Vec2::ZERO,
         size: Vec2::new(64., 64.),
     };
-    let mut desert_atlas = TextureAtlas::new_empty(
+    let mut desert_atlas = TextureAtlasLayout::new_empty(UVec2::new(64, 64));
+    let desert_index = desert_atlas.add_texture(desert_patch_data.to_atlas_rect());
+    let desert_layout = texture_atlases.add(desert_atlas);
+    let desert_sprite = make_patch_sprite(
         image_assets.desert_patch_sheet.clone(),
-        Vec2::new(64., 64.),
+        desert_layout,
+        desert_index,
+        desert_patch_data.size,
     );
-    let mut desert_sprite =
-        TextureAtlasSprite::new(desert_atlas.add_texture(desert_patch_data.to_atlas_rect()));
-    desert_sprite.custom_size = Some(desert_patch_data.size);
-    ground_graphics.desert_atlas = Some(texture_atlases.add(desert_atlas));
-    ground_graphics.desert_sprites = Some(HashMap::from([(
-        GroundPatch::DesertPatch1,
-        desert_sprite,
-    )]));
+    ground_graphics.desert_sprites =
+        Some(HashMap::from([(GroundPatch::DesertPatch1, desert_sprite)]));
 
     let desert_small_patch_data = GroundPatchData {
         texture_pos: Vec2::ZERO,
         size: Vec2::new(32., 32.),
     };
-    let mut desert_small_atlas = TextureAtlas::new_empty(
+    let mut desert_small_atlas = TextureAtlasLayout::new_empty(UVec2::new(32, 32));
+    let desert_small_index =
+        desert_small_atlas.add_texture(desert_small_patch_data.to_atlas_rect());
+    let desert_small_layout = texture_atlases.add(desert_small_atlas);
+    let desert_small_sprite = make_patch_sprite(
         image_assets.desert_patch_small_sheet.clone(),
-        Vec2::new(32., 32.),
+        desert_small_layout,
+        desert_small_index,
+        desert_small_patch_data.size,
     );
-    let mut desert_small_sprite = TextureAtlasSprite::new(
-        desert_small_atlas.add_texture(desert_small_patch_data.to_atlas_rect()),
-    );
-    desert_small_sprite.custom_size = Some(desert_small_patch_data.size);
-    ground_graphics.desert_small_atlas = Some(texture_atlases.add(desert_small_atlas));
     ground_graphics.desert_small_sprites = Some(HashMap::from([(
         GroundPatch::DesertPatchSmall,
         desert_small_sprite,
@@ -253,32 +292,7 @@ pub fn spawn_ground_patch(
     parent_local_offset: Vec2,
     extra_child_local_z: f32,
 ) -> Option<Entity> {
-    let (atlas, sprite) = match patch {
-        GroundPatch::DesertPatch1 => (
-            ground_graphics.desert_atlas.as_ref()?.clone(),
-            ground_graphics
-                .desert_sprites
-                .as_ref()?
-                .get(&patch)?
-                .clone(),
-        ),
-        GroundPatch::DesertPatchSmall => (
-            ground_graphics.desert_small_atlas.as_ref()?.clone(),
-            ground_graphics
-                .desert_small_sprites
-                .as_ref()?
-                .get(&patch)?
-                .clone(),
-        ),
-        _ => (
-            ground_graphics.grass_atlas.as_ref()?.clone(),
-            ground_graphics
-                .grass_sprites
-                .as_ref()?
-                .get(&patch)?
-                .clone(),
-        ),
-    };
+    let sprite = ground_graphics.patch_sprite(patch)?;
 
     let transform = if parent.is_some() {
         Transform::from_translation(Vec3::new(
@@ -290,12 +304,7 @@ pub fn spawn_ground_patch(
         Transform::from_translation(Vec3::new(world_pos.x, world_pos.y, 0.))
     };
 
-    let mut ec = commands.spawn(SpriteSheetBundle {
-        sprite,
-        texture_atlas: atlas,
-        transform,
-        ..Default::default()
-    });
+    let mut ec = commands.spawn((sprite, transform));
     ec.insert(patch)
         .insert(GroundPatchSprite)
         .insert(Name::new("Ground Patch"));
@@ -311,22 +320,22 @@ pub fn spawn_ground_patch(
 
 fn debug_spawn_ground_patches(
     mut commands: Commands,
-    keys: Res<Input<KeyCode>>,
+    keys: Res<ButtonInput<KeyCode>>,
     cursor: Res<CursorPos>,
     ground_graphics: Res<GroundPatchesGraphics>,
 ) {
     if !*DEBUG {
         return;
     }
-    let patch = if keys.just_pressed(KeyCode::Key6) {
+    let patch = if keys.just_pressed(KeyCode::Digit6) {
         GroundPatch::GrassPatch1
-    } else if keys.just_pressed(KeyCode::Key7) {
+    } else if keys.just_pressed(KeyCode::Digit7) {
         GroundPatch::GrassPatch2
-    } else if keys.just_pressed(KeyCode::Key8) {
+    } else if keys.just_pressed(KeyCode::Digit8) {
         GroundPatch::GrassPatch3
-    } else if keys.just_pressed(KeyCode::Key9) {
+    } else if keys.just_pressed(KeyCode::Digit9) {
         GroundPatch::GrassPatch4
-    } else if keys.just_pressed(KeyCode::Key0) {
+    } else if keys.just_pressed(KeyCode::Digit0) {
         GroundPatch::DesertPatch1
     } else if keys.just_pressed(KeyCode::Minus) {
         GroundPatch::DesertPatchSmall

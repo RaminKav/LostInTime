@@ -1,20 +1,27 @@
-use crate::{cursor::CursorPos, juice::bounce::BounceOnHit, keybinds::InputBinding, world, Game, ScreenResolution};
+use bevy::text::Justify;
+use crate::{
+    cursor::CursorPos, juice::bounce::BounceOnHit, keybinds::InputBinding, world, Game,
+    ScreenResolution,
+};
 use bevy::{
+    camera::visibility::RenderLayers,
+    math::primitives::Rectangle,
+    mesh::Mesh2d,
     prelude::*,
-    reflect::TypeUuid,
     render::{
-        mesh::MeshVertexBufferLayout,
+        mesh::MeshVertexBufferLayoutRef,
         render_resource::{
             AsBindGroup, BlendComponent, BlendFactor, BlendOperation, BlendState,
-            RenderPipelineDescriptor, ShaderRef, SpecializedMeshPipelineError,
+            RenderPipelineDescriptor, SpecializedMeshPipelineError,
         },
-        view::RenderLayers,
     },
-    sprite::{Material2d, Material2dKey, Mesh2dHandle},
+    shader::ShaderRef,
+    sprite_render::{AlphaMode2d, Material2d, Material2dKey, MeshMaterial2d},
 };
 use bevy_ecs_tilemap::tiles::TilePos;
 
-use super::{Interactable, UIState, game_fonts as gf};
+use super::{game_fonts as gf, Interactable, UIState};
+
 
 /// How much more transparent the centre of a radial overlay is vs. its edge.
 /// Kept small for a very subtle vignette-like effect.
@@ -29,7 +36,12 @@ pub const RADIAL_OVERLAY_DEFAULT_FALLOFF: f32 = 0.2;
 /// Linear RGB components for the radial overlay material (alpha channel ignored).
 #[inline]
 pub fn radial_overlay_color_uniform(color: Color) -> Vec4 {
-    Vec4::new(color.r(), color.g(), color.b(), 1.0)
+    Vec4::new(
+        color.to_srgba().red,
+        color.to_srgba().green,
+        color.to_srgba().blue,
+        1.0,
+    )
 }
 
 const RADIAL_OVERLAY_BLEND: BlendState = BlendState {
@@ -47,8 +59,7 @@ const RADIAL_OVERLAY_BLEND: BlendState = BlendState {
 
 /// Full-screen radial overlay: tint color + centre/edge alpha ramp.
 /// `params`: x = centre alpha, y = edge alpha, z = falloff exponent.
-#[derive(AsBindGroup, TypeUuid, Debug, Clone)]
-#[uuid = "b5d1f0c2-7a3e-4c1d-9f2a-1e6c8b4d7a90"]
+#[derive(Asset, TypePath, AsBindGroup, Debug, Clone)]
 pub struct RadialOverlayMaterial {
     #[uniform(0)]
     pub params: Vec4,
@@ -61,9 +72,13 @@ impl Material2d for RadialOverlayMaterial {
         "shaders/radial_overlay.wgsl".into()
     }
 
+    fn alpha_mode(&self) -> AlphaMode2d {
+        AlphaMode2d::Blend
+    }
+
     fn specialize(
         descriptor: &mut RenderPipelineDescriptor,
-        _layout: &MeshVertexBufferLayout,
+        _layout: &MeshVertexBufferLayoutRef,
         _key: Material2dKey<Self>,
     ) -> Result<(), SpecializedMeshPipelineError> {
         if let Some(fragment) = &mut descriptor.fragment {
@@ -134,13 +149,16 @@ pub fn pointcast_2d<'a>(
     cursor_pos: &Res<CursorPos>,
     ui_sprites: &'a Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     excluded_entity: Option<Entity>,
-    computed_visibility: Option<&Query<&ComputedVisibility>>,
+    computed_visibility: Option<&Query<&ViewVisibility>>,
 ) -> Option<(Entity, &'a Sprite, &'a GlobalTransform)> {
     if !cursor_pos.ui_hover_hit_allowed() {
         return None;
     }
 
-    let mut ret: Option<(Entity, &Sprite, &GlobalTransform)> = None;
+    // Prefer the top-most hit. Query order is not z-order — without this, large
+    // behind-the-controls focus rows (e.g. options steppers) steal clicks from
+    // the `<` / `>` buttons drawn on top of them.
+    let mut ret: Option<(Entity, &'a Sprite, &'a GlobalTransform, f32)> = None;
 
     for (ent, sprite, xform) in ui_sprites.iter() {
         if let Some(excluded) = excluded_entity {
@@ -151,7 +169,7 @@ pub fn pointcast_2d<'a>(
 
         if computed_visibility
             .and_then(|query| query.get(ent).ok())
-            .is_some_and(|visibility| !visibility.is_visible())
+            .is_some_and(|visibility| !visibility.get())
         {
             continue;
         }
@@ -168,11 +186,14 @@ pub fn pointcast_2d<'a>(
         if (initial_x..=terminal_x).contains(&cursor_pos.ui_coords.x)
             && (initial_y..=terminal_y).contains(&cursor_pos.ui_coords.y)
         {
-            ret = Some((ent, sprite, xform));
+            let z = xform.translation().z;
+            if ret.map(|(_, _, _, z0)| z > z0).unwrap_or(true) {
+                ret = Some((ent, sprite, xform, z));
+            }
         }
     }
 
-    ret
+    ret.map(|(e, s, t, _)| (e, s, t))
 }
 
 pub fn _get_player_chunk_tile_coords(game: &mut Game) -> (IVec2, TilePos) {
@@ -232,38 +253,34 @@ pub fn spawn_keybind_badge(
     parent: Option<Entity>,
     render_layer: u8,
 ) -> (Entity, Entity) {
-    let mut key_bg = commands.spawn(SpriteBundle {
-        sprite: Sprite {
+    let mut key_bg = commands.spawn((
+        Sprite {
             color: crate::ui::KEYBIND_BADGE_COLOR,
             custom_size: Some(crate::ui::KEYBIND_BADGE_SIZE),
             ..default()
         },
         transform,
-        ..default()
-    });
-    key_bg.insert(RenderLayers::from_layers(&[render_layer]));
+    ));
+    key_bg.insert(RenderLayers::from_layers(&[render_layer as usize]));
     if let Some(parent) = parent {
-        key_bg.set_parent(parent);
+        key_bg.insert(ChildOf(parent));
     }
     let key_bg = key_bg.id();
 
     let key_text = commands
-        .spawn(Text2dBundle {
-            text: Text::from_section(
-                label.into(),
-                gf::BODY.text_style(&asset_server, crate::colors::WHITE),
-            )
-            .with_alignment(TextAlignment::Center),
-            text_anchor: bevy::sprite::Anchor::Center,
-            transform: Transform {
-                translation: Vec3::new(0., 0., 1.),
-                scale: gf::BODY.transform_scale(),
-                ..Default::default()
-            },
-            ..Default::default()
-        })
-        .insert(RenderLayers::from_layers(&[render_layer]))
-        .set_parent(key_bg)
+        .spawn(
+            gf::BODY
+                .text(&asset_server, label.into(), crate::colors::WHITE)
+                .justify(Justify::Center)
+                .anchor(bevy::sprite::Anchor::CENTER)
+                .with_transform(Transform {
+                    translation: Vec3::new(0., 0., 1.),
+                    scale: gf::BODY.transform_scale(),
+                    ..Default::default()
+                }),
+        )
+        .insert(RenderLayers::from_layers(&[render_layer as usize]))
+        .insert(ChildOf(key_bg))
         .id();
 
     (key_bg, key_text)
@@ -278,38 +295,34 @@ pub fn spawn_hud_label_badge(
     parent: Option<Entity>,
     render_layer: u8,
 ) -> (Entity, Entity) {
-    let mut key_bg = commands.spawn(SpriteBundle {
-        sprite: Sprite {
+    let mut key_bg = commands.spawn((
+        Sprite {
             color: crate::ui::KEYBIND_BADGE_COLOR,
             custom_size: Some(crate::ui::KEYBIND_BADGE_SIZE),
             ..default()
         },
         transform,
-        ..default()
-    });
-    key_bg.insert(RenderLayers::from_layers(&[render_layer]));
+    ));
+    key_bg.insert(RenderLayers::from_layers(&[render_layer as usize]));
     if let Some(parent) = parent {
-        key_bg.set_parent(parent);
+        key_bg.insert(ChildOf(parent));
     }
     let key_bg = key_bg.id();
 
     let key_text = commands
-        .spawn(Text2dBundle {
-            text: Text::from_section(
-                label.to_string(),
-                gf::BODY.text_style(&asset_server, crate::colors::WHITE),
-            )
-            .with_alignment(TextAlignment::Center),
-            text_anchor: bevy::sprite::Anchor::Center,
-            transform: Transform {
-                translation: Vec3::new(0., 0., 1.),
-                scale: gf::BODY.transform_scale(),
-                ..Default::default()
-            },
-            ..Default::default()
-        })
-        .insert(RenderLayers::from_layers(&[render_layer]))
-        .set_parent(key_bg)
+        .spawn(
+            gf::BODY
+                .text(&asset_server, label.to_string(), crate::colors::WHITE)
+                .justify(Justify::Center)
+                .anchor(bevy::sprite::Anchor::CENTER)
+                .with_transform(Transform {
+                    translation: Vec3::new(0., 0., 1.),
+                    scale: gf::BODY.transform_scale(),
+                    ..Default::default()
+                }),
+        )
+        .insert(RenderLayers::from_layers(&[render_layer as usize]))
+        .insert(ChildOf(key_bg))
         .id();
 
     (key_bg, key_text)
@@ -338,13 +351,7 @@ pub fn spawn_full_screen_ui_overlay(
     alpha: f32,
     depth: f32,
 ) -> Entity {
-    spawn_full_screen_ui_overlay_colored(
-        commands,
-        res,
-        alpha,
-        depth,
-        RADIAL_OVERLAY_DEFAULT_COLOR,
-    )
+    spawn_full_screen_ui_overlay_colored(commands, res, alpha, depth, RADIAL_OVERLAY_DEFAULT_COLOR)
 }
 
 /// Full-screen radial overlay with explicit centre/edge alphas (default black tint).
@@ -388,7 +395,13 @@ pub fn spawn_full_screen_ui_overlay_tuned_colored(
 }
 
 pub fn spawn_ui_overlay(commands: &mut Commands, size: Vec2, alpha: f32, depth: f32) -> Entity {
-    spawn_full_screen_ui_overlay_colored_inner(commands, size, alpha, depth, RADIAL_OVERLAY_DEFAULT_COLOR)
+    spawn_full_screen_ui_overlay_colored_inner(
+        commands,
+        size,
+        alpha,
+        depth,
+        RADIAL_OVERLAY_DEFAULT_COLOR,
+    )
 }
 
 fn spawn_full_screen_ui_overlay_colored(
@@ -438,7 +451,7 @@ pub struct RadialOverlayMaterialCache(
 );
 
 /// Marker placed on a freshly-spawned overlay entity; [`attach_radial_overlay_visuals`]
-/// fills in the mesh + material the next time it runs, then removes this component.
+/// (after `CustomFlush`) fills in the mesh + material the same frame, then removes this.
 #[derive(Component, Clone, Copy)]
 pub struct PendingRadialOverlay {
     size: Vec2,
@@ -460,7 +473,7 @@ pub fn spawn_ui_overlay_tuned_colored(
 ) -> Entity {
     commands
         .spawn((
-            SpatialBundle::from_transform(Transform::from_xyz(0., 0., depth)),
+            (Transform::from_xyz(0., 0., depth), Visibility::default()),
             RenderLayers::from_layers(&[3]),
             UIState::Inventory,
             PendingRadialOverlay {
@@ -490,10 +503,7 @@ pub fn attach_radial_overlay_visuals(
             .0
             .entry(mesh_key)
             .or_insert_with(|| {
-                meshes.add(Mesh::from(shape::Quad {
-                    size: overlay.size,
-                    ..default()
-                }))
+                meshes.add(Mesh::from(Rectangle::new(overlay.size.x, overlay.size.y)))
             })
             .clone();
 
@@ -524,7 +534,7 @@ pub fn attach_radial_overlay_visuals(
 
         commands
             .entity(entity)
-            .insert((Mesh2dHandle::from(mesh), material))
+            .insert((Mesh2d(mesh), MeshMaterial2d(material)))
             .remove::<PendingRadialOverlay>();
     }
 }

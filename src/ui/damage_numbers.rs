@@ -1,4 +1,4 @@
-use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
+use bevy::{camera::visibility::RenderLayers, prelude::*, sprite::Anchor};
 use rand::Rng;
 
 use crate::{
@@ -17,9 +17,10 @@ use crate::{
 };
 
 use super::{
-    game_fonts::{FontStyle, DamageTextSize},
+    game_fonts::{DamageTextSize, FontStyle},
     spawn_item_stack_icon, UIElement, UI_SLOT_SIZE,
 };
+
 
 /// Font used for damage, healing/regen, and item-pickup floating labels.
 #[inline]
@@ -99,6 +100,7 @@ pub struct QueueFloatingText {
 #[derive(Component)]
 pub struct PreviousHealth(pub i32);
 
+#[derive(Message)]
 pub struct DodgeEvent {
     pub entity: Entity,
 }
@@ -151,7 +153,7 @@ pub fn add_previous_health(
 ) {
     for (entity, max_health) in query.iter() {
         // Check if entity still exists before inserting components
-        if let Some(mut entity_commands) = commands.get_entity(entity) {
+        if let Ok(mut entity_commands) = commands.get_entity(entity) {
             entity_commands.insert(PreviousHealth(max_health.0));
         }
     }
@@ -273,12 +275,12 @@ pub fn handle_add_damage_numbers_after_hit(
 }
 pub fn handle_add_dodge_text(
     mut commands: Commands,
-    mut dodge_events: EventReader<DodgeEvent>,
+    mut dodge_events: MessageReader<DodgeEvent>,
     txfms: Query<&GlobalTransform>,
     asset_server: Res<AssetServer>,
     cheat_settings: Option<Res<CheatSettings>>,
 ) {
-    for event in dodge_events.iter() {
+    for event in dodge_events.read() {
         let mut rng = rand::thread_rng();
         let drop_spread = 16.;
         let pos_offset = Vec3::new(
@@ -304,12 +306,13 @@ pub fn tick_damage_numbers(
     mut texts: ParamSet<(
         Query<(
             Entity,
-            &mut Text,
+            &mut Text2d,
+            &mut TextColor,
             &mut DamageNumber,
             &mut Transform,
             &Children,
         )>,
-        Query<(Entity, &mut Text), With<FloatingTextShadow>>,
+        Query<(Entity, &mut TextColor), With<FloatingTextShadow>>,
     )>,
 ) {
     const MOVE_ACCELERATION: f32 = 50.0;
@@ -317,19 +320,19 @@ pub fn tick_damage_numbers(
 
     let mut shadow_fades: Vec<(Entity, f32)> = Vec::new();
 
-    for (entity, mut text, mut damage_number, mut t, children) in texts.p0().iter_mut() {
+    for (entity, _text, mut color, mut damage_number, mut t, children) in texts.p0().iter_mut() {
         damage_number.timer.tick(time.delta());
 
         // Calculate upward float offset (part of the damage number animation)
         let float_start = damage_number.anim.float_start;
         let float_accel = damage_number.anim.scaled_float_accel();
         let fade_start = damage_number.anim.fade_start;
-        let percent = damage_number.timer.percent();
+        let percent = damage_number.timer.fraction();
 
         // Upward float drift — applied directly to the transform.
         if percent > float_start {
             damage_number.velocity += float_accel;
-            t.translation.y += damage_number.velocity * time.delta_seconds();
+            t.translation.y += damage_number.velocity * time.delta_secs();
         } else {
             damage_number.velocity += float_accel;
         }
@@ -341,12 +344,12 @@ pub fn tick_damage_numbers(
 
         if distance_to_target > 0.1 {
             let direction = if distance_to_target > 0.0 { 1.0 } else { -1.0 };
-            damage_number.move_velocity += MOVE_ACCELERATION * time.delta_seconds() * direction;
+            damage_number.move_velocity += MOVE_ACCELERATION * time.delta_secs() * direction;
             damage_number.move_velocity = damage_number
                 .move_velocity
                 .clamp(-MAX_MOVE_VELOCITY, MAX_MOVE_VELOCITY);
 
-            let move_delta = damage_number.move_velocity * time.delta_seconds();
+            let move_delta = damage_number.move_velocity * time.delta_secs();
             let new_y = current_y + move_delta;
 
             if (new_y - target_y).abs() < distance_to_target.abs() {
@@ -364,23 +367,19 @@ pub fn tick_damage_numbers(
         if percent > fade_start {
             let fade_t = (percent - fade_start) / (1.0 - fade_start);
             let alpha = 1.0 - fade_t;
-            for section in text.sections.iter_mut() {
-                section.style.color.set_a(alpha);
-            }
+            color.0 = color.0.with_alpha(alpha);
             for child in children.iter() {
-                shadow_fades.push((*child, alpha));
+                shadow_fades.push((child, alpha));
             }
         }
-        if damage_number.timer.finished() {
-            commands.entity(entity).despawn_recursive();
+        if damage_number.timer.is_finished() {
+            commands.entity(entity).despawn();
         }
     }
 
     for (shadow_entity, alpha) in shadow_fades {
-        if let Ok((_, mut shadow)) = texts.p1().get_mut(shadow_entity) {
-            for section in shadow.sections.iter_mut() {
-                section.style.color.set_a(alpha);
-            }
+        if let Ok((_, mut shadow_color)) = texts.p1().get_mut(shadow_entity) {
+            shadow_color.0 = shadow_color.0.with_alpha(alpha);
         }
     }
 }
@@ -405,20 +404,19 @@ pub fn spawn_screen_locked_icon_to_world_pos(
         .entity(item_icon)
         .insert(Name::new("SCREEN ICON ITEM"));
 
-    let mut binding = commands.spawn(SpriteBundle {
-        texture: graphics.get_ui_element_texture(UIElement::InventorySlot),
-        transform: Transform::default(), // Position will be set in handle_clamp_screen_locked_icons_worldpos
-        sprite: Sprite {
+    let mut binding = commands.spawn((
+        Sprite {
+            image: graphics.get_ui_element_texture(UIElement::InventorySlot),
             custom_size: Some(UI_SLOT_SIZE),
-            ..Default::default()
+            ..default()
         },
-        ..Default::default()
-    });
+        Transform::default(),
+    ));
     let slot_entity = binding
         .insert(RenderLayers::from_layers(&[3]))
         .insert(ScreenLockedTargetWorldPos(world_pos))
         .insert(Name::new("SCREEN ICON (WORLD POS)"))
-        .push_children(&[item_icon]);
+        .add_children(&[item_icon]);
     slot_entity.id()
 }
 
@@ -437,7 +435,7 @@ pub fn handle_clamp_screen_locked_icons_worldpos(
     let offset = Vec2::splat(12.);
     let hide_radius = SCREEN_LOCKED_ICON_HIDE_RADIUS_TILES * TILE_SIZE.x;
 
-    let camera_txfm = match game_camera.get_single() {
+    let camera_txfm = match game_camera.single() {
         Ok(t) => t,
         Err(_) => return,
     };
@@ -622,8 +620,8 @@ fn spawn_floating_text_with_shadow_inner(
     render_layers: Option<RenderLayers>,
     anim: FloatingTextAnim,
 ) -> (Entity, Entity) {
-    let mut shadow_e = Entity::from_raw(0);
-    let mut parent_e = Entity::from_raw(0);
+    let mut shadow_e = Entity::PLACEHOLDER;
+    let mut parent_e = Entity::PLACEHOLDER;
     for i in 0..2 {
         let is_shadow = i == 0;
         let entity = spawn_text(
@@ -636,16 +634,12 @@ fn spawn_floating_text_with_shadow_inner(
             },
             if is_shadow { BLACK } else { color },
             text.clone(),
-            Anchor::CenterRight,
+            Anchor::CENTER_RIGHT,
             font_style,
             0,
-            if is_shadow {
-                Some(Vec3::ONE)
-            } else {
-                None
-            },
+            if is_shadow { Some(Vec3::ONE) } else { None },
         );
-        if let Some(layers) = render_layers {
+        if let Some(layers) = render_layers.clone() {
             commands.entity(entity).insert(layers);
         }
         if is_shadow {
@@ -687,7 +681,7 @@ pub fn handle_queued_floating_texts(
     // Tick timers and collect entities ready to process
     for (entity, mut queued) in query.iter_mut() {
         queued.delay_timer.tick(time.delta());
-        if queued.delay_timer.finished() {
+        if queued.delay_timer.is_finished() {
             to_process.push((entity, queued.clone()));
         }
     }
@@ -732,7 +726,7 @@ pub fn handle_queued_floating_texts(
             Vec2::new(0., 0.),
             0,
         );
-        commands.entity(icon).set_parent(text_entity);
+        commands.entity(icon).insert(ChildOf(text_entity));
 
         // Despawn the marker entity
         commands.entity(*marker_entity).despawn();
@@ -752,16 +746,15 @@ pub fn spawn_text(
 ) -> Entity {
     let scale = scale_override.unwrap_or_else(|| font_style.transform_scale());
     commands
-        .spawn(Text2dBundle {
-            text: Text::from_section(text, font_style.text_style(&asset_server, color)),
-            transform: Transform {
-                translation: pos,
-                scale,
-                ..Default::default()
-            },
-            text_anchor: anchor,
-            ..Default::default()
-        })
-        .insert(RenderLayers::from_layers(&[render_layer]))
+        .spawn(
+            font_style
+                .text(&asset_server, text, color)
+                .anchor(anchor)
+                .at(pos)
+                // `with_scale` (not `with_transform`) so identity scale is kept for
+                // shadow children that inherit the parent's role scale.
+                .with_scale(scale),
+        )
+        .insert(RenderLayers::from_layers(&[render_layer as usize]))
         .id()
 }

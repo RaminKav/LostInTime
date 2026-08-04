@@ -1,7 +1,8 @@
 //! Shared heirloom **hover** tooltip: one event channel and one processor so any UI can
 //! show/dismiss the same card layout without duplicating spawn logic.
 
-use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
+use bevy::text::Justify;
+use bevy::{camera::visibility::RenderLayers, prelude::*, sprite::Anchor};
 
 use crate::{
     assets::Graphics,
@@ -12,6 +13,7 @@ use crate::{
 };
 
 use super::{
+    desc_spans::spawn_desc_line,
     game_fonts as gf,
     tooltip_info_boxes::{
         build_tooltip_info_boxes, spawn_tooltip_info_boxes_with_resolution, HeirloomDescLineKind,
@@ -67,7 +69,7 @@ pub struct HeirloomTooltipShow {
 }
 
 /// Request to clear or show the single global heirloom hover tooltip.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Message)]
 pub enum HeirloomTooltipRequest {
     Clear,
     Show(HeirloomTooltipShow),
@@ -99,21 +101,20 @@ pub fn spawn_heirloom_tooltip_card(
 ) -> Entity {
     let (ui_element, size) = heirloom.get_ui_element(rarity);
     let card_e = commands
-        .spawn(SpriteBundle {
-            texture: graphics.get_ui_element_texture(ui_element.clone()),
-            sprite: Sprite {
+        .spawn((
+            Sprite {
+                image: graphics.get_ui_element_texture(ui_element.clone()),
                 custom_size: Some(size),
-                ..Default::default()
+                ..default()
             },
-            transform: Transform {
+            Transform {
                 // Force a high z so the card (and its children) render above all other
                 // layer-3 UI like shop icons/hitboxes, regardless of the caller's z.
                 translation: position + Vec3::new(0., 0., HEIRLOOM_TOOLTIP_CARD_Z),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
-            ..Default::default()
-        })
+        ))
         .insert(ui_element)
         .insert(Name::new("HEIRLOOM TOOLTIP CARD"))
         .insert(RenderLayers::from_layers(&[3]))
@@ -121,62 +122,54 @@ pub fn spawn_heirloom_tooltip_card(
         .id();
 
     let skill_icon = commands
-        .spawn(SpriteSheetBundle {
-            sprite: graphics.get_heirloom_icon(heirloom.clone()),
-            texture_atlas: graphics.texture_atlas.as_ref().unwrap().clone(),
-            transform: Transform {
+        .spawn((
+            graphics.get_heirloom_icon(heirloom.clone()),
+            Transform {
                 translation: Vec2::new(2., 52.).extend(4.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
-            ..Default::default()
-        })
+        ))
         .insert(RenderLayers::from_layers(&[3]))
         .insert(HeirloomIconOutline::new(
             rarity,
             HeirloomIconOutlineStyle::TooltipCard,
         ))
         .insert(Name::new("HEIRLOOM ICON"))
-        .set_parent(card_e)
+        .insert(ChildOf(card_e))
         .id();
 
     if let Some(glow) = rarity.get_item_glow() {
         commands
-            .spawn(SpriteBundle {
-                texture: graphics.get_item_glow(glow),
-                sprite: Sprite {
+            .spawn((
+                Sprite {
+                    image: graphics.get_item_glow(glow),
                     custom_size: Some(Vec2::new(32., 32.)),
-                    ..Default::default()
+                    ..default()
                 },
-                transform: Transform {
+                Transform {
                     translation: Vec2::new(0., 0.).extend(-1.),
                     scale: Vec3::new(1., 1., 1.),
                     ..Default::default()
                 },
-                ..Default::default()
-            })
+            ))
             .insert(RenderLayers::from_layers(&[3]))
-            .set_parent(skill_icon);
+            .insert(ChildOf(skill_icon));
     }
 
     let mut text_title = commands.spawn((
-        Text2dBundle {
-            text: Text::from_section(
-                heirloom.get_title(),
-                gf::HEIRLOOM_CARD_TITLE.text_style(&asset_server, WHITE),
-            ),
-            text_anchor: Anchor::Center,
-            transform: Transform {
+        gf::HEIRLOOM_CARD_TITLE
+            .text(&asset_server, heirloom.get_title(), WHITE)
+            .anchor(Anchor::CENTER)
+            .with_transform(Transform {
                 translation: Vec3::new(2., 20., 1.),
                 scale: gf::HEIRLOOM_CARD_TITLE.transform_scale(),
                 ..Default::default()
-            },
-            ..default()
-        },
+            }),
         Name::new("Heirloom Title"),
         RenderLayers::from_layers(&[3]),
     ));
-    text_title.set_parent(card_e);
+    text_title.insert(ChildOf(card_e));
 
     let desc_lines = heirloom.desc_lines();
     let mut line_index = 0usize;
@@ -212,24 +205,18 @@ pub fn spawn_heirloom_tooltip_card(
         let y = gf::heirloom_desc_first_line_y()
             - line_index as f32 * gf::HEIRLOOM_CARD_DESC_LINE_STEP
             + desc_y_offset;
-        let mut text_desc = commands.spawn((
-            Text2dBundle {
-                text: Text::from_section(
-                    line.text.as_str(),
-                    gf::HEIRLOOM_CARD_BODY.text_style(&asset_server, color),
-                ),
-                text_anchor: Anchor::Center,
-                transform: Transform {
-                    translation: Vec3::new(2., y, 1.),
-                    scale: gf::HEIRLOOM_CARD_BODY.transform_scale(),
-                    ..Default::default()
-                },
-                ..default()
-            },
-            Name::new("Heirloom Desc"),
-            RenderLayers::from_layers(&[3]),
-        ));
-        text_desc.set_parent(card_e);
+        spawn_desc_line(
+            commands,
+            asset_server,
+            gf::HEIRLOOM_CARD_BODY,
+            &line.as_desc_line(),
+            color,
+            Vec3::new(2., y, 1.),
+            Anchor::CENTER,
+            Justify::Center,
+            3,
+            card_e,
+        );
         line_index += 1;
     }
 
@@ -239,23 +226,18 @@ pub fn spawn_heirloom_tooltip_card(
             - 1.0
             + desc_y_offset;
         let mut text_scaling = commands.spawn((
-            Text2dBundle {
-                text: Text::from_section(
-                    scaling_text,
-                    gf::HEIRLOOM_CARD_META.text_style(&asset_server, LIGHT_GREY),
-                ),
-                text_anchor: Anchor::Center,
-                transform: Transform {
+            gf::HEIRLOOM_CARD_META
+                .text(&asset_server, scaling_text, LIGHT_GREY)
+                .anchor(Anchor::CENTER)
+                .with_transform(Transform {
                     translation: Vec3::new(0.5, scaling_y, 1.),
                     scale: gf::HEIRLOOM_CARD_META.transform_scale(),
                     ..Default::default()
-                },
-                ..default()
-            },
+                }),
             Name::new("Heirloom Scaling Text"),
             RenderLayers::from_layers(&[3]),
         ));
-        text_scaling.set_parent(card_e);
+        text_scaling.insert(ChildOf(card_e));
     }
 
     if show_info_boxes {
@@ -273,7 +255,7 @@ pub fn spawn_heirloom_tooltip_card(
             },
             &info_boxes,
         ) {
-            commands.entity(info_root).set_parent(card_e);
+            commands.entity(info_root).insert(ChildOf(card_e));
         }
     }
 
@@ -283,19 +265,19 @@ pub fn spawn_heirloom_tooltip_card(
 /// Consumes [`HeirloomTooltipRequest`]. Hover systems compute world position (see [`ui_world_translation`]).
 pub fn process_heirloom_tooltip_requests(
     mut commands: Commands,
-    mut events: EventReader<HeirloomTooltipRequest>,
+    mut events: MessageReader<HeirloomTooltipRequest>,
     graphics: Res<Graphics>,
     asset_server: Res<AssetServer>,
     resolution: Res<ScreenResolution>,
     existing: Query<Entity, With<HeirloomDynamicTooltip>>,
 ) {
-    let batch: Vec<HeirloomTooltipRequest> = events.iter().cloned().collect();
+    let batch: Vec<HeirloomTooltipRequest> = events.read().cloned().collect();
     if batch.is_empty() {
         return;
     }
 
     for e in existing.iter() {
-        commands.entity(e).despawn_recursive();
+        commands.entity(e).despawn();
     }
 
     let Some(HeirloomTooltipRequest::Show(spec)) = batch.last() else {

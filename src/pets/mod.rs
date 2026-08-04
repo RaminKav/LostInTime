@@ -14,8 +14,9 @@ pub struct PetsPlugin;
 
 impl Plugin for PetsPlugin {
     fn build(&self, app: &mut App) {
-        app.add_event::<UpdatePetWeaponEvent>()
+        app.add_message::<UpdatePetWeaponEvent>()
             .add_systems(
+                Update,
                 (
                     find_new_target.run_if(is_not_paused),
                     handle_inv_change_pet_wep_update,
@@ -34,12 +35,11 @@ impl Plugin for PetsPlugin {
                     golden_pig_coin_ability.run_if(is_not_paused),
                     handle_pet_spawner_interaction,
                 )
-                    .in_set(OnUpdate(GameState::Main)),
+                    .run_if(in_state(GameState::Main)),
             )
-            .add_system(
-                configure_pet_on_spawn
-                    .run_if(in_state(GameState::Main))
-                    .in_base_set(CoreSet::PostUpdate),
+            .add_systems(
+                Update,
+                configure_pet_on_spawn.run_if(in_state(GameState::Main)),
             );
     }
 }

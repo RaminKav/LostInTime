@@ -1,5 +1,5 @@
+use bevy::platform::collections::HashMap;
 use bevy::prelude::*;
-use bevy::utils::HashMap;
 use strum::IntoEnumIterator;
 use strum_macros::Display;
 

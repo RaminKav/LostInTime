@@ -1,16 +1,20 @@
-//! Void Worm: an endless-mode void-family enemy.
-//!
-//! Movement reuses the shared aseprite walk/follow behavior (see
-//! [`crate::enemy::aseprite_enemy`]). The laser is a separate aseprite whose
-//! **animations** draw the beam — we never rotate the laser entity, only flip
-//! and position it.
-//!
-//! Art defaults (scale 1,1, no rotation):
-//! - `Vertical` tag: beam points **down**, base on the left edge of the sprite.
-//! - `Angled` tag: beam points **down-left**, base on the right edge ~⅓ down.
+// Void Worm: an endless-mode void-family enemy.
+//
+// Movement reuses the shared aseprite walk/follow behavior (see
+// [`crate::enemy::aseprite_enemy`]). The laser is a separate aseprite whose
+// animations draw the beam — we never rotate the laser entity, only flip and
+// position it.
+//
+// Art defaults (scale 1,1, no rotation):
+// - `Vertical` tag: beam points down, base on the left edge of the sprite.
+// - `Angled` tag: beam points down-left, base on the right edge ~⅓ down.
+use crate::aseprite_assets::VoidLaserAse;
+use crate::aseprite_helpers::{
+    ase_animation, aseprite_bundle, collect_finished, is_paused, pause, play_loop, play_once, start,
+};
+use bevy_aseprite_ultra::prelude::{AnimationState, AseAnimation, Aseprite};
 
 use bevy::prelude::*;
-use bevy_aseprite::{anim::AsepriteAnimation, aseprite, AsepriteBundle};
 use bevy_rapier2d::prelude::Collider;
 
 use crate::{
@@ -26,8 +30,6 @@ use crate::{
     item::projectile::{EnemyProjectile, Projectile},
     player::{combat_heirlooms::DeathDefianceFrozen, Player},
 };
-
-aseprite!(pub VoidLaserAse, "textures/VoidWorm/VoidLaser.ase");
 
 const WALK_DOWN: &str = "WalkDown";
 const ATTACK_UP: &str = "AttackUp";
@@ -278,11 +280,11 @@ pub struct VoidWormLaserVisual {
     pub owner: Entity,
 }
 
-fn set_worm_tag(anim: &mut AsepriteAnimation, current: &mut CurrentAsepriteTag, tag: &str) {
+fn set_worm_tag(anim: &mut AseAnimation, current: &mut CurrentAsepriteTag, tag: &str) {
     if current.0 != tag {
-        *anim = AsepriteAnimation::from(tag);
-        if anim.is_paused() {
-            anim.play();
+        play_loop(anim, tag);
+        if is_paused(anim) {
+            start(anim);
         }
         current.0 = tag.to_string();
     }
@@ -300,7 +302,7 @@ pub fn void_worm_laser_attack(
         &FollowSpeed,
         &mut VoidWormLaserState,
         &mut Transform,
-        &mut AsepriteAnimation,
+        &mut AseAnimation,
         &mut CurrentAsepriteTag,
         Option<&FacingDirection>,
         Option<&MobStatusEffects>,
@@ -308,7 +310,7 @@ pub fn void_worm_laser_attack(
     )>,
 ) {
     let player_pos = player_query
-        .get_single()
+        .single()
         .ok()
         .map(|t| t.translation().truncate());
 
@@ -360,38 +362,31 @@ pub fn void_worm_laser_attack(
             let laser_translation =
                 (beam_base_visual - spawn_cfg.center_to_eye).extend(worm_pos.z + 1.);
 
-            let mut laser_anim = AsepriteAnimation::from(spawn_cfg.tag);
-            // Start at frame 0 and ensure it's playing (matches the robust
-            // one-time-aseprite spawn pattern used elsewhere).
-            laser_anim.current_frame = 0;
-            laser_anim.play();
-
             // Use the retained handle from Graphics so the asset + atlas stay
             // resident; loading on demand lets it unload between spawns and the
             // beam randomly fails to render or freezes.
             let laser_handle = graphics
                 .void_laser_ase
                 .clone()
-                .unwrap_or_else(|| Handle::<bevy_aseprite::Aseprite>::default());
-
+                .unwrap_or_else(|| Handle::<Aseprite>::default());
             let laser_duration = state.laser_timer.duration().as_secs_f32();
+
             let laser_entity = commands
-                .spawn(AsepriteBundle {
-                    aseprite: laser_handle,
-                    animation: laser_anim,
-                    transform: Transform {
-                        translation: laser_translation,
-                        rotation: Quat::from_rotation_z(spawn_cfg.rotation),
-                        scale: Vec3::ONE,
-                    },
-                    ..Default::default()
-                })
-                .insert(VisibilityBundle::default())
-                .insert(VoidWormLaserVisual { owner: entity })
-                .insert(DespawnTimer(Timer::from_seconds(
-                    laser_duration + 0.5,
-                    TimerMode::Once,
-                )))
+                .spawn((
+                    aseprite_bundle(
+                        laser_handle,
+                        spawn_cfg.tag,
+                        Transform {
+                            translation: laser_translation,
+                            rotation: Quat::from_rotation_z(spawn_cfg.rotation),
+                            scale: Vec3::ONE,
+                        },
+                        Visibility::Inherited,
+                        true,
+                    ),
+                    VoidWormLaserVisual { owner: entity },
+                    DespawnTimer(Timer::from_seconds(laser_duration + 0.5, TimerMode::Once)),
+                ))
                 .id();
             state.laser_entity = Some(laser_entity);
 
@@ -416,10 +411,10 @@ pub fn void_worm_laser_attack(
         }
 
         state.laser_timer.tick(time.delta());
-        if state.laser_timer.finished() {
+        if state.laser_timer.is_finished() {
             if let Some(laser_entity) = state.laser_entity.take() {
-                if let Some(e) = commands.get_entity(laser_entity) {
-                    e.despawn_recursive();
+                if let Ok(mut e) = commands.get_entity(laser_entity) {
+                    e.despawn();
                 }
             }
             set_worm_tag(&mut anim, &mut current_tag, WALK_DOWN);
@@ -448,8 +443,8 @@ pub fn cleanup_orphan_void_lasers(
 ) {
     for (laser_entity, visual) in lasers.iter() {
         if worms.get(visual.owner).is_err() {
-            if let Some(e) = commands.get_entity(laser_entity) {
-                e.despawn_recursive();
+            if let Ok(mut e) = commands.get_entity(laser_entity) {
+                e.despawn();
             }
         }
     }

@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
+use bevy::{camera::visibility::RenderLayers, prelude::*, sprite::Anchor};
 
 use crate::{
     assets::Graphics,
@@ -9,9 +9,7 @@ use crate::{
         time_crystals::TimeCrystals,
     },
     ui::{
-        game_fonts as gf,
-        interactions::Interactable,
-        inventory_ui::UIState,
+        game_fonts as gf, interactions::Interactable, inventory_ui::UIState,
         time_crystal_progress_ui::CrystalUnlockIcon,
     },
 };
@@ -88,7 +86,7 @@ pub fn despawn_heirloom_browser_grid_layers(
     layers: &Query<Entity, With<HeirloomBrowserGridLayer>>,
 ) {
     for e in layers.iter() {
-        commands.entity(e).despawn_recursive();
+        commands.entity(e).despawn();
     }
 }
 
@@ -97,11 +95,15 @@ pub fn despawn_dev_heirloom_picker_grid_layers(
     layers: &Query<Entity, With<DevHeirloomPickerGridLayer>>,
 ) {
     for e in layers.iter() {
-        commands.entity(e).despawn_recursive();
+        commands.entity(e).despawn();
     }
 }
 
-fn insert_grid_layer_markers(commands: &mut Commands, entity: Entity, context: HeirloomGridContext) {
+fn insert_grid_layer_markers(
+    commands: &mut Commands,
+    entity: Entity,
+    context: HeirloomGridContext,
+) {
     match context {
         HeirloomGridContext::TimeCrystalsBrowser => {
             commands.entity(entity).insert((
@@ -138,15 +140,14 @@ pub fn spawn_heirloom_grid_overlay(
 
     let backdrop = commands
         .spawn((
-            SpriteBundle {
-                sprite: Sprite {
-                    color: Color::rgba(35. / 255., 70. / 255., 70. / 255., 1.),
+            (
+                Sprite {
+                    color: Color::srgba(35. / 255., 70. / 255., 70. / 255., 1.),
                     custom_size: Some(Vec2::new(backdrop_w, backdrop_h)),
                     ..Default::default()
                 },
-                transform: Transform::from_translation(Vec3::new(center.x, center.y, GRID_Z_BACKDROP)),
-                ..Default::default()
-            },
+                Transform::from_translation(Vec3::new(center.x, center.y, GRID_Z_BACKDROP)),
+            ),
             RenderLayers::from_layers(&[3]),
             Name::new("Heirloom grid backdrop"),
         ))
@@ -170,16 +171,13 @@ pub fn spawn_heirloom_grid_overlay(
         if show_icon {
             let icon = commands
                 .spawn((
-                    SpriteSheetBundle {
-                        sprite: graphics.get_heirloom_icon(heirloom.clone()),
-                        texture_atlas: graphics.texture_atlas.as_ref().unwrap().clone(),
-                        transform: Transform::from_translation(Vec3::new(x, y, GRID_Z_CELL)),
-                        ..Default::default()
+                    {
+                        let mut sprite =
+                            graphics.get_heirloom_icon(heirloom.clone());
+                        sprite.custom_size = Some(Vec2::new(GRID_ICON, GRID_ICON));
+                        sprite
                     },
-                    Sprite {
-                        custom_size: Some(Vec2::new(GRID_ICON, GRID_ICON)),
-                        ..Default::default()
-                    },
+                    Transform::from_translation(Vec3::new(x, y, GRID_Z_CELL)),
                     RenderLayers::from_layers(&[3]),
                     Interactable::default(),
                     CrystalUnlockIcon {
@@ -196,15 +194,14 @@ pub fn spawn_heirloom_grid_overlay(
         } else {
             let cell = commands
                 .spawn((
-                    SpriteBundle {
-                        sprite: Sprite {
-                            color: Color::rgba(0.08, 0.08, 0.1, 0.55),
+                    (
+                        Sprite {
+                            color: Color::srgba(0.08, 0.08, 0.1, 0.55),
                             custom_size: Some(Vec2::new(GRID_CELL - 2., GRID_CELL - 2.)),
                             ..Default::default()
                         },
-                        transform: Transform::from_translation(Vec3::new(x, y, GRID_Z_CELL)),
-                        ..Default::default()
-                    },
+                        Transform::from_translation(Vec3::new(x, y, GRID_Z_CELL)),
+                    ),
                     RenderLayers::from_layers(&[3]),
                     Interactable::default(),
                     Name::new("Heirloom grid locked cell"),
@@ -216,19 +213,14 @@ pub fn spawn_heirloom_grid_overlay(
             }
             commands.entity(cell).with_children(|parent| {
                 parent.spawn((
-                    Text2dBundle {
-                        text: Text::from_section(
-                            "?",
-                            gf::DISPLAY.text_style(&asset_server, crate::colors::WHITE),
-                        ),
-                        text_anchor: Anchor::Center,
-                        transform: Transform {
+                    gf::DISPLAY
+                        .text(&asset_server, "?", crate::colors::WHITE)
+                        .anchor(Anchor::CENTER)
+                        .with_transform(Transform {
                             translation: Vec3::new(0., 0., 1.),
                             scale: gf::DISPLAY.transform_scale(),
                             ..Default::default()
-                        },
-                        ..Default::default()
-                    },
+                        }),
                     RenderLayers::from_layers(&[3]),
                 ));
             });
@@ -237,7 +229,10 @@ pub fn spawn_heirloom_grid_overlay(
 }
 
 /// Resolves a pool entry from the full unlock pool (canonical child/clash metadata).
-pub fn heirloom_choice_from_full_pool(heirloom: Heirloom, rarity: HeirloomRarity) -> HeirloomChoiceState {
+pub fn heirloom_choice_from_full_pool(
+    heirloom: Heirloom,
+    rarity: HeirloomRarity,
+) -> HeirloomChoiceState {
     HeirloomChoiceQueue::with_all_unlocks()
         .pool
         .into_iter()

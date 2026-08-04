@@ -1,4 +1,4 @@
-use bevy::{prelude::Resource, utils::HashMap};
+use bevy::{platform::collections::HashMap, prelude::Resource};
 
 use crate::{
     assets::{SpriteAnchor, SpriteSize},

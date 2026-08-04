@@ -1,3 +1,6 @@
+use crate::aseprite_assets::AttackWarning;
+use crate::aseprite_helpers::aseprite_bundle;
+use bevy_aseprite_ultra::prelude::{AseAnimation, Aseprite};
 // 0 - Idle animation
 // 1 - Walk animation
 // 2 - Attack animation
@@ -6,9 +9,9 @@
 // L, U, R, D -> 0, 1, 2, 3
 
 use bevy::prelude::*;
-use bevy_aseprite::{anim::AsepriteAnimation, aseprite, AsepriteBundle};
 
 use crate::{
+    animations::DoneAnimation,
     assets::Graphics,
     combat_helpers::DespawnTimer,
     ecs_helpers::SafeHierarchyExt,
@@ -19,9 +22,7 @@ use crate::{
 
 use super::AnimationTimer;
 
-aseprite!(pub AttackWarning, "textures/effects/AttackWarning.aseprite");
-
-#[derive(Component, Reflect, FromReflect, Eq, PartialEq, Debug, Default, Clone)]
+#[derive(Component, Reflect, Eq, PartialEq, Debug, Default, Clone)]
 #[reflect(Default)]
 pub enum EnemyAnimationState {
     Idle,
@@ -32,26 +33,43 @@ pub enum EnemyAnimationState {
     Death,
     Dash,
 }
-#[derive(Component, Reflect, FromReflect, Eq, PartialEq, Debug, Default)]
+#[derive(Component, Reflect, Eq, PartialEq, Debug, Default)]
 #[reflect(Default)]
 pub struct LeftFacingSideProfile;
 
-#[derive(Component, Clone, Reflect, FromReflect, Debug)]
+#[derive(Component, Clone, Reflect, Debug)]
 pub struct CharacterAnimationSpriteSheetData {
     pub animation_frames: Vec<u8>,
     pub anim_offset: usize,
 }
 impl CharacterAnimationSpriteSheetData {
-    pub fn get_starting_frame_for_animation(&self, animation: &EnemyAnimationState) -> usize {
-        let max_frames = *self.animation_frames.iter().max().unwrap() as f32;
+    pub fn row_for_animation(animation: &EnemyAnimationState) -> usize {
         match animation {
             EnemyAnimationState::Idle => 0,
-            EnemyAnimationState::Walk => (max_frames * 1.) as usize,
-            EnemyAnimationState::Hit | EnemyAnimationState::Dash => (max_frames * 2.) as usize,
-            EnemyAnimationState::Death => (max_frames * 3.) as usize,
-            EnemyAnimationState::Attack => (max_frames * 4.) as usize,
+            EnemyAnimationState::Walk => 1,
+            EnemyAnimationState::Hit | EnemyAnimationState::Dash => 2,
+            EnemyAnimationState::Death => 3,
+            EnemyAnimationState::Attack => 4,
         }
     }
+
+    pub fn get_starting_frame_for_animation(&self, animation: &EnemyAnimationState) -> usize {
+        let max_frames = *self.animation_frames.iter().max().unwrap() as f32;
+        (max_frames * Self::row_for_animation(animation) as f32) as usize
+    }
+
+    /// Keeps the sheet row in sync with [`EnemyAnimationState`].
+    /// Returns `true` when the row changed (caller should snap the atlas index).
+    pub fn sync_offset_to_state(&mut self, animation: &EnemyAnimationState) -> bool {
+        let expected = Self::row_for_animation(animation);
+        if self.anim_offset != expected {
+            self.anim_offset = expected;
+            true
+        } else {
+            false
+        }
+    }
+
     pub fn is_done_current_animation(&self, index: usize) -> bool {
         let max_frames = *self.animation_frames.iter().max().unwrap() as f32;
         let current_frame = index as f32;
@@ -66,103 +84,63 @@ pub fn change_anim_offset_when_character_action_state_changes(
         (
             &mut CharacterAnimationSpriteSheetData,
             &EnemyAnimationState,
-            &mut TextureAtlasSprite,
+            &mut Sprite,
         ),
         Changed<EnemyAnimationState>,
     >,
 ) {
     for (mut sprite_sheet_data, state, mut sprite) in query.iter_mut() {
-        let max_frames = *sprite_sheet_data.animation_frames.iter().max().unwrap() as f32;
-        match state {
-            EnemyAnimationState::Idle => {
-                sprite_sheet_data.anim_offset = 0;
-            }
-            EnemyAnimationState::Walk => {
-                sprite_sheet_data.anim_offset = 1;
-                sprite.index = (max_frames * 1.) as usize;
-            }
-            EnemyAnimationState::Hit | EnemyAnimationState::Dash => {
-                sprite_sheet_data.anim_offset = 2;
-                sprite.index = (max_frames * 2.) as usize;
-            }
-            EnemyAnimationState::Death => {
-                sprite_sheet_data.anim_offset = 3;
-                sprite.index = (max_frames * 3.) as usize;
-            }
-            EnemyAnimationState::Attack => {
-                sprite_sheet_data.anim_offset = 4;
-                sprite.index = (max_frames * 4.) as usize;
-            }
+        // Always update the row even if the atlas isn't ready yet. Pending sprite-sheet
+        // resolution used to make this system no-op on the Changed frame, leaving
+        // `anim_offset` stuck on the idle row while state was already Walk.
+        sprite_sheet_data.sync_offset_to_state(state);
+        if let Some(atlas) = sprite.texture_atlas.as_mut() {
+            atlas.index = sprite_sheet_data.get_starting_frame_for_animation(state);
         }
     }
 }
 /// Only runs for legacy sprite-sheet mobs. Aseprite-based mobs are excluded so their atlas is
 /// not overwritten with mob_spritesheets data they don't have:
 /// - [`AsepriteBasicEnemy`] for shared walk+lunge aseprite mobs
-/// - [`AsepriteAnimation`] for any other aseprite-driven mob (e.g. bosses) that may still carry
-///   [`FacingDirection`] for AI; those use their own sheet from [`AsepriteBundle`].
+/// - [`AseAnimation`] for any other aseprite-driven mob (e.g. bosses) that may still carry
+///   [`FacingDirection`] for AI; those use their own sheet from `aseprite_bundle`.
 pub fn change_character_anim_direction(
     mut mob_query: Query<
         (
             &FacingDirection,
-            &mut TextureAtlasSprite,
-            &mut Handle<TextureAtlas>,
+            &mut Sprite,
             &Mob,
             Option<&LeftFacingSideProfile>,
         ),
         (
             Changed<FacingDirection>,
             Without<AsepriteBasicEnemy>,
-            Without<AsepriteAnimation>,
+            Without<AseAnimation>,
         ),
     >,
-    mut texture_atlases: ResMut<Assets<TextureAtlas>>,
-    _asset_server: Res<AssetServer>,
     graphics: Res<Graphics>,
 ) {
-    for (facing_direction, mut sprite, texture_atlas_handle, mob, left_side_profile_option) in
-        mob_query.iter_mut()
-    {
-        let texture_atlas = texture_atlases.get_mut(&texture_atlas_handle).unwrap();
-
+    let Some(sheets) = graphics.mob_spritesheets.as_ref() else {
+        return;
+    };
+    for (facing_direction, mut sprite, mob, left_side_profile_option) in mob_query.iter_mut() {
+        let Some(handles) = sheets.get(mob) else {
+            continue;
+        };
         match facing_direction {
             FacingDirection::Left => {
-                texture_atlas.texture = graphics
-                    .mob_spritesheets
-                    .as_ref()
-                    .unwrap()
-                    .get(mob)
-                    .unwrap()[0]
-                    .clone();
+                sprite.image = handles[0].clone();
                 sprite.flip_x = left_side_profile_option.is_none();
             }
             FacingDirection::Up => {
-                texture_atlas.texture = graphics
-                    .mob_spritesheets
-                    .as_ref()
-                    .unwrap()
-                    .get(mob)
-                    .unwrap()[1]
-                    .clone();
+                sprite.image = handles[1].clone();
             }
             FacingDirection::Right => {
-                texture_atlas.texture = graphics
-                    .mob_spritesheets
-                    .as_ref()
-                    .unwrap()
-                    .get(mob)
-                    .unwrap()[0]
-                    .clone();
+                sprite.image = handles[0].clone();
                 sprite.flip_x = left_side_profile_option.is_some();
             }
             FacingDirection::Down => {
-                texture_atlas.texture = graphics
-                    .mob_spritesheets
-                    .as_ref()
-                    .unwrap()
-                    .get(mob)
-                    .unwrap()[2]
-                    .clone();
+                sprite.image = handles[2].clone();
             }
         }
     }
@@ -170,26 +148,39 @@ pub fn change_character_anim_direction(
 
 pub fn animate_character_spritesheet_animations(
     time: Res<Time>,
-    mut query: Query<(
-        Entity,
-        &mut AnimationTimer,
-        &CharacterAnimationSpriteSheetData,
-        &mut TextureAtlasSprite,
-        Option<&Parried>,
-    )>,
+    mut query: Query<
+        (
+            &mut AnimationTimer,
+            &mut CharacterAnimationSpriteSheetData,
+            &mut Sprite,
+            Option<&EnemyAnimationState>,
+        ),
+        Without<Parried>,
+    >,
 ) {
-    for (_e, mut timer, sprite_sheet_data, mut sprite, parried_option) in &mut query {
-        if parried_option.is_some() {
+    for (mut timer, mut sprite_sheet_data, mut sprite, anim_state) in query.iter_mut() {
+        let Some(atlas) = sprite.texture_atlas.as_mut() else {
             continue;
+        };
+        // Heal the spawn race where Walk was set before the atlas existed, or pending
+        // sprite apply reset the index to 0 while `anim_offset` still pointed at idle.
+        if let Some(state) = anim_state {
+            if sprite_sheet_data.sync_offset_to_state(state) {
+                atlas.index = sprite_sheet_data.get_starting_frame_for_animation(state);
+            }
         }
+
         timer.tick(time.delta());
         if timer.just_finished() {
             let max_frames = *sprite_sheet_data.animation_frames.iter().max().unwrap() as f32;
             let frames =
                 (sprite_sheet_data.animation_frames[sprite_sheet_data.anim_offset]) as usize;
-            sprite.index =
-                ((sprite.index + 1 - max_frames as usize * sprite_sheet_data.anim_offset) % frames)
-                    + max_frames as usize * sprite_sheet_data.anim_offset;
+            if frames == 0 {
+                continue;
+            }
+            let row_base = max_frames as usize * sprite_sheet_data.anim_offset;
+            let local = atlas.index.saturating_sub(row_base);
+            atlas.index = (local + 1) % frames + row_base;
             timer.reset();
         }
     }
@@ -202,15 +193,19 @@ pub fn spawn_attack_warning_aseprite(
     parent: Entity,
     duration: f32,
 ) -> Entity {
-    let anim = AsepriteAnimation::from(AttackWarning::tags::WARNING);
-    commands
-        .spawn(AsepriteBundle {
-            aseprite: asset_server.load(AttackWarning::PATH),
-            animation: anim,
-            transform: Transform::from_translation(pos),
-            ..Default::default()
-        })
-        .insert(DespawnTimer(Timer::from_seconds(duration, TimerMode::Once)))
+    let entity = commands
+        .spawn((
+            aseprite_bundle(
+                asset_server.load(AttackWarning::PATH),
+                AttackWarning::tags::WARNING,
+                Transform::from_translation(pos),
+                Visibility::default(),
+                true,
+            ),
+            DespawnTimer(Timer::from_seconds(duration, TimerMode::Once)),
+            DoneAnimation,
+        ))
         .safe_set_parent(parent)
-        .id()
+        .id();
+    entity
 }

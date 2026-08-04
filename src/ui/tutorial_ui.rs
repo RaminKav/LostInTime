@@ -1,7 +1,9 @@
+use bevy::text::Justify;
+use crate::aseprite_assets::TutorialAnims;
+use crate::aseprite_helpers::aseprite_bundle;
+use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
-use bevy::render::view::RenderLayers;
 use bevy::sprite::Anchor;
-use bevy_aseprite::{anim::AsepriteAnimation, aseprite, AsepriteBundle};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fs::File;
@@ -35,6 +37,7 @@ use crate::ui::{
     PROGRESS_BACKGROUND_SIZE, UI_SLOT_SIZE,
 };
 use crate::{inventory::Inventory, GameState, ScreenResolution};
+
 
 /// Z layers (sit above gameplay HUD but below pause overlays).
 const Z_TUTORIAL_OVERLAY: f32 = 70.0;
@@ -300,8 +303,6 @@ fn compact_tutorial_layout(
     }
 }
 
-aseprite!(pub TutorialAnims, "ui/TutorialAnims.ase");
-
 #[derive(Resource)]
 pub struct TutorialReady;
 
@@ -444,7 +445,7 @@ pub enum TutorialPopupMode {
     FullReplay,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Message)]
 pub struct TutorialPopupEvent {
     pub entries: Vec<TutorialContent>,
     pub mode: TutorialPopupMode,
@@ -510,7 +511,7 @@ pub fn persist_seen_tutorial_chunks(chunks: &SeenTutorialChunks) {
 
 /// Queue a contextual popup for any entries the player has not seen yet.
 pub fn try_send_contextual_popup(
-    writer: &mut EventWriter<TutorialPopupEvent>,
+    writer: &mut MessageWriter<TutorialPopupEvent>,
     seen: &SeenTutorialChunks,
     existing: &Query<(), With<TutorialUI>>,
     entries: &[TutorialContent],
@@ -526,7 +527,7 @@ pub fn try_send_contextual_popup(
     if pending.is_empty() {
         return;
     }
-    writer.send(TutorialPopupEvent {
+    writer.write(TutorialPopupEvent {
         entries: pending,
         mode: TutorialPopupMode::Contextual,
     });
@@ -563,8 +564,9 @@ pub struct TutorialPlugin;
 impl Plugin for TutorialPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<TutorialState>()
-            .add_event::<TutorialPopupEvent>()
+            .add_message::<TutorialPopupEvent>()
             .add_systems(
+                Update,
                 (
                     handle_tutorial_popup_events,
                     try_spawn_tutorial_overlay
@@ -580,7 +582,7 @@ impl Plugin for TutorialPlugin {
                     tick_pending_find_boss_shrine_hint,
                     tick_pending_tutorial_ready,
                 )
-                    .in_set(OnUpdate(GameState::Main)),
+                    .run_if(in_state(GameState::Main)),
             );
     }
 }
@@ -621,8 +623,8 @@ fn panel_center_x(
     }
 }
 
-fn show_find_boss_shrine_hint(events: &mut EventWriter<GlobalTextMessageEvent>) {
-    events.send(GlobalTextMessageEvent::new("Find the Boss Shrine", WHITE));
+fn show_find_boss_shrine_hint(events: &mut MessageWriter<GlobalTextMessageEvent>) {
+    events.write(GlobalTextMessageEvent::new("Find the Boss Shrine", WHITE));
 }
 
 fn schedule_pending_find_boss_shrine_hint(
@@ -640,14 +642,14 @@ fn schedule_pending_find_boss_shrine_hint(
 fn tick_pending_find_boss_shrine_hint(
     time: Res<Time>,
     mut pending: Option<ResMut<PendingFindBossShrineHint>>,
-    mut global_text_events: EventWriter<GlobalTextMessageEvent>,
+    mut global_text_events: MessageWriter<GlobalTextMessageEvent>,
     mut commands: Commands,
 ) {
     let Some(PendingFindBossShrineHint::Delay(timer)) = pending.as_deref_mut() else {
         return;
     };
     timer.tick(time.delta());
-    if timer.finished() {
+    if timer.is_finished() {
         show_find_boss_shrine_hint(&mut global_text_events);
         commands.remove_resource::<PendingFindBossShrineHint>();
     }
@@ -662,7 +664,7 @@ fn tick_pending_tutorial_ready(
         return;
     };
     pending.0.tick(time.delta());
-    if pending.0.finished() {
+    if pending.0.is_finished() {
         commands.insert_resource(TutorialReady);
         commands.remove_resource::<PendingTutorialReady>();
     }
@@ -671,7 +673,7 @@ fn tick_pending_tutorial_ready(
 #[allow(clippy::too_many_arguments)]
 fn handle_tutorial_popup_events(
     mut commands: Commands,
-    mut events: EventReader<TutorialPopupEvent>,
+    mut events: MessageReader<TutorialPopupEvent>,
     asset_server: Res<AssetServer>,
     resolution: Res<ScreenResolution>,
     mut state: ResMut<TutorialState>,
@@ -685,7 +687,7 @@ fn handle_tutorial_popup_events(
         return;
     }
     let mut pending_event: Option<TutorialPopupEvent> = None;
-    for event in events.iter() {
+    for event in events.read() {
         pending_event = Some(event.clone());
     }
     events.clear();
@@ -701,7 +703,7 @@ fn handle_tutorial_popup_events(
         if let [content] = event.entries[..] {
             let compact_layout = if content == TutorialContent::Heirlooms {
                 let heirloom_count = skills
-                    .get_single()
+                    .single()
                     .map(|s| s.heirlooms.len())
                     .unwrap_or(HEIRLOOM_TUTORIAL_PICK_COUNT);
                 let rect = heirloom_row_highlight_rect(&resolution, heirloom_count);
@@ -771,7 +773,7 @@ pub(crate) fn try_spawn_tutorial_overlay(
     ready: Option<Res<TutorialReady>>,
     replay: Option<Res<TutorialReplayRequested>>,
     game_data: Option<Res<GameData>>,
-    mut popup_events: EventWriter<TutorialPopupEvent>,
+    mut popup_events: MessageWriter<TutorialPopupEvent>,
     existing: Query<(), With<TutorialUI>>,
     pending_hint: Option<Res<PendingFindBossShrineHint>>,
     seen_chunks: Option<Res<SeenTutorialChunks>>,
@@ -819,7 +821,7 @@ pub(crate) fn try_spawn_tutorial_overlay(
 
     if replay_requested {
         commands.remove_resource::<TutorialReplayRequested>();
-        popup_events.send(TutorialPopupEvent {
+        popup_events.write(TutorialPopupEvent {
             entries: TutorialContent::ALL.to_vec(),
             mode: TutorialPopupMode::FullReplay,
         });
@@ -828,7 +830,7 @@ pub(crate) fn try_spawn_tutorial_overlay(
 
 fn check_heirloom_tutorial(
     skills: Query<&PlayerSkills>,
-    mut popup_events: EventWriter<TutorialPopupEvent>,
+    mut popup_events: MessageWriter<TutorialPopupEvent>,
     seen_chunks: Option<Res<SeenTutorialChunks>>,
     existing: Query<(), With<TutorialUI>>,
 ) {
@@ -838,7 +840,7 @@ fn check_heirloom_tutorial(
     if seen_chunks.has_seen(&TutorialContent::Heirlooms) {
         return;
     }
-    let Ok(skills) = skills.get_single() else {
+    let Ok(skills) = skills.single() else {
         return;
     };
     if skills.heirlooms.len() < HEIRLOOM_TUTORIAL_PICK_COUNT {
@@ -854,7 +856,7 @@ fn check_heirloom_tutorial(
 
 fn check_biome_timer_tutorial(
     run_timer: Res<RunTimer>,
-    mut popup_events: EventWriter<TutorialPopupEvent>,
+    mut popup_events: MessageWriter<TutorialPopupEvent>,
     seen_chunks: Option<Res<SeenTutorialChunks>>,
     existing: Query<(), With<TutorialUI>>,
 ) {
@@ -877,7 +879,7 @@ fn check_biome_timer_tutorial(
 
 fn check_map_navigation_tutorial(
     run_timer: Res<RunTimer>,
-    mut popup_events: EventWriter<TutorialPopupEvent>,
+    mut popup_events: MessageWriter<TutorialPopupEvent>,
     seen_chunks: Option<Res<SeenTutorialChunks>>,
     existing: Query<(), With<TutorialUI>>,
 ) {
@@ -903,7 +905,7 @@ pub const CHAOS_TUTORIAL_THRESHOLD: f32 = 4.0;
 
 fn check_chaos_tutorial(
     chaos_tracker: Option<Res<ChaosTracker>>,
-    mut popup_events: EventWriter<TutorialPopupEvent>,
+    mut popup_events: MessageWriter<TutorialPopupEvent>,
     seen_chunks: Option<Res<SeenTutorialChunks>>,
     existing: Query<(), With<TutorialUI>>,
 ) {
@@ -927,11 +929,11 @@ fn check_chaos_tutorial(
 /// Shows the hotbar tutorial the first time all four keyed hotbar slots (keys 1–4) are occupied.
 fn check_hotbar_food_tutorial(
     inventory: Query<&Inventory, (With<Player>, Changed<Inventory>)>,
-    mut popup_events: EventWriter<TutorialPopupEvent>,
+    mut popup_events: MessageWriter<TutorialPopupEvent>,
     seen_chunks: Option<Res<SeenTutorialChunks>>,
     existing: Query<(), With<TutorialUI>>,
 ) {
-    let (Some(seen_chunks), Ok(inv)) = (seen_chunks, inventory.get_single()) else {
+    let (Some(seen_chunks), Ok(inv)) = (seen_chunks, inventory.single()) else {
         return;
     };
     if seen_chunks.has_seen(&TutorialContent::HotbarFood) {
@@ -961,11 +963,11 @@ pub const MANA_TUTORIAL_THRESHOLD: i32 = 5;
 /// [`MANA_TUTORIAL_THRESHOLD`].
 fn check_mana_tutorial(
     player_mana: Query<&CurrentMana, (With<Player>, Changed<CurrentMana>)>,
-    mut popup_events: EventWriter<TutorialPopupEvent>,
+    mut popup_events: MessageWriter<TutorialPopupEvent>,
     seen_chunks: Option<Res<SeenTutorialChunks>>,
     existing: Query<(), With<TutorialUI>>,
 ) {
-    let (Some(seen_chunks), Ok(mana)) = (seen_chunks, player_mana.get_single()) else {
+    let (Some(seen_chunks), Ok(mana)) = (seen_chunks, player_mana.single()) else {
         return;
     };
     if seen_chunks.has_seen(&TutorialContent::Mana) {
@@ -984,7 +986,7 @@ fn check_mana_tutorial(
 
 /// Call when the active skill shrine UI closes (a skill pick has been finalized).
 pub fn try_active_skill_shrine_tutorial(
-    popup_events: &mut EventWriter<TutorialPopupEvent>,
+    popup_events: &mut MessageWriter<TutorialPopupEvent>,
     seen_chunks: &SeenTutorialChunks,
     existing: &Query<(), With<TutorialUI>>,
 ) {
@@ -998,7 +1000,7 @@ pub fn try_active_skill_shrine_tutorial(
 
 /// Call when the equipment loot chest UI opens (not heirloom chests).
 pub fn try_equipment_chest_tutorial(
-    popup_events: &mut EventWriter<TutorialPopupEvent>,
+    popup_events: &mut MessageWriter<TutorialPopupEvent>,
     seen_chunks: &SeenTutorialChunks,
     existing: &Query<(), With<TutorialUI>>,
 ) {
@@ -1014,7 +1016,7 @@ fn process_pending_inventory_tutorials(
     mut commands: Commands,
     pending: Option<Res<PendingInventoryTutorialCheck>>,
     inv: Query<&Inventory>,
-    mut popup_events: EventWriter<TutorialPopupEvent>,
+    mut popup_events: MessageWriter<TutorialPopupEvent>,
     seen_chunks: Option<Res<SeenTutorialChunks>>,
     existing: Query<(), With<TutorialUI>>,
     proto: ProtoParam,
@@ -1023,7 +1025,7 @@ fn process_pending_inventory_tutorials(
         return;
     }
     commands.remove_resource::<PendingInventoryTutorialCheck>();
-    let (Some(seen_chunks), Ok(inventory)) = (seen_chunks, inv.get_single()) else {
+    let (Some(seen_chunks), Ok(inventory)) = (seen_chunks, inv.single()) else {
         return;
     };
     try_inventory_open_tutorials(
@@ -1037,7 +1039,7 @@ fn process_pending_inventory_tutorials(
 
 /// Call when the player opens the inventory (from closed) to surface upgrade / stats tutorials.
 pub fn try_inventory_open_tutorials(
-    popup_events: &mut EventWriter<TutorialPopupEvent>,
+    popup_events: &mut MessageWriter<TutorialPopupEvent>,
     seen_chunks: &SeenTutorialChunks,
     existing: &Query<(), With<TutorialUI>>,
     inventory: &Inventory,
@@ -1084,7 +1086,7 @@ pub fn try_inventory_open_tutorials(
 
 /// Call when the player clicks Craft on the inventory side panel.
 pub fn try_craft_button_tutorial(
-    popup_events: &mut EventWriter<TutorialPopupEvent>,
+    popup_events: &mut MessageWriter<TutorialPopupEvent>,
     seen_chunks: &SeenTutorialChunks,
     existing: &Query<(), With<TutorialUI>>,
 ) {
@@ -1126,15 +1128,14 @@ fn spawn_tutorial_root(
             || panel_width > PANEL_WIDTH_SINGLE + f32::EPSILON;
         if use_dim {
             commands.spawn((
-                SpriteBundle {
-                    sprite: Sprite {
-                        color: Color::rgba(0., 0., 0., 0.85),
+                (
+                    Sprite {
+                        color: Color::srgba(0., 0., 0., 0.85),
                         custom_size: Some(Vec2::new(2000., 2000.)),
                         ..default()
                     },
-                    transform: Transform::from_translation(Vec3::new(0., 0., Z_TUTORIAL_OVERLAY)),
-                    ..default()
-                },
+                    Transform::from_translation(Vec3::new(0., 0., Z_TUTORIAL_OVERLAY)),
+                ),
                 RenderLayers::from_layers(&[3]),
                 TutorialUI,
                 Name::new("Tutorial Overlay Dim"),
@@ -1148,35 +1149,29 @@ fn spawn_tutorial_root(
         0.95
     };
     commands.spawn((
-        SpriteBundle {
-            sprite: Sprite {
-                color: Color::rgba(0.15, 0.12, 0.10, panel_alpha),
+        (
+            Sprite {
+                color: Color::srgba(0.15, 0.12, 0.10, panel_alpha),
                 custom_size: Some(Vec2::new(panel_width, panel_height)),
                 ..default()
             },
-            transform: Transform::from_translation(Vec3::new(panel_offset_x, 0., Z_TUTORIAL_PANEL)),
-            ..default()
-        },
+            Transform::from_translation(Vec3::new(panel_offset_x, 0., Z_TUTORIAL_PANEL)),
+        ),
         RenderLayers::from_layers(&[3]),
         TutorialUI,
         Name::new("Tutorial Panel"),
     ));
 
     commands.spawn((
-        Text2dBundle {
-            text: Text::from_section(
-                "Tutorial",
-                gf::DISPLAY_LARGE.text_style(&asset_server, YELLOW_2),
-            )
-            .with_alignment(TextAlignment::Center),
-            text_anchor: Anchor::Center,
-            transform: Transform {
+        gf::DISPLAY_LARGE
+            .text(&asset_server, "Tutorial", YELLOW_2)
+            .justify(Justify::Center)
+            .anchor(Anchor::CENTER)
+            .with_transform(Transform {
                 translation: Vec3::new(panel_offset_x, panel_height * 0.5 - 24.0, Z_TUTORIAL_TEXT),
                 scale: gf::DISPLAY_LARGE.transform_scale(),
                 ..Default::default()
-            },
-            ..default()
-        },
+            }),
         RenderLayers::from_layers(&[3]),
         TutorialUI,
         Name::new("Tutorial Title"),
@@ -1236,29 +1231,25 @@ fn spawn_compact_tutorial(
     }
 
     commands.spawn((
-        SpriteBundle {
-            sprite: Sprite {
-                color: Color::rgba(0.15, 0.12, 0.10, 0.98),
+        (
+            Sprite {
+                color: Color::srgba(0.15, 0.12, 0.10, 0.98),
                 custom_size: Some(Vec2::new(PANEL_WIDTH_COMPACT, PANEL_HEIGHT_COMPACT)),
                 ..default()
             },
-            transform: Transform::from_translation(panel_center.extend(Z_TUTORIAL_PANEL)),
-            ..default()
-        },
+            Transform::from_translation(panel_center.extend(Z_TUTORIAL_PANEL)),
+        ),
         RenderLayers::from_layers(&[3]),
         TutorialUI,
         Name::new("Tutorial Compact Panel"),
     ));
 
     commands.spawn((
-        Text2dBundle {
-            text: Text::from_section(
-                content.title(),
-                gf::DISPLAY.text_style(&asset_server, YELLOW_2),
-            )
-            .with_alignment(TextAlignment::Center),
-            text_anchor: Anchor::Center,
-            transform: Transform {
+        gf::DISPLAY
+            .text(&asset_server, content.title(), YELLOW_2)
+            .justify(Justify::Center)
+            .anchor(Anchor::CENTER)
+            .with_transform(Transform {
                 translation: Vec3::new(
                     panel_center.x,
                     panel_center.y + PANEL_HEIGHT_COMPACT * 0.5 - 14.0,
@@ -1266,26 +1257,22 @@ fn spawn_compact_tutorial(
                 ),
                 scale: gf::DISPLAY.transform_scale(),
                 ..Default::default()
-            },
-            ..default()
-        },
+            }),
         RenderLayers::from_layers(&[3]),
         TutorialUI,
         Name::new("Tutorial Compact Title"),
     ));
 
     commands.spawn((
-        Text2dBundle {
-            text: Text::from_section(content.body(), gf::BODY.text_style(&asset_server, WHITE))
-                .with_alignment(TextAlignment::Center),
-            text_anchor: Anchor::Center,
-            transform: Transform {
+        gf::BODY
+            .text(&asset_server, content.body(), WHITE)
+            .justify(Justify::Center)
+            .anchor(Anchor::CENTER)
+            .with_transform(Transform {
                 translation: Vec3::new(panel_center.x, panel_center.y + 2.0, Z_TUTORIAL_TEXT),
                 scale: gf::BODY.transform_scale(),
                 ..Default::default()
-            },
-            ..default()
-        },
+            }),
         RenderLayers::from_layers(&[3]),
         TutorialUI,
         Name::new("Tutorial Compact Body"),
@@ -1319,15 +1306,14 @@ fn spawn_button(
     let button_size = Vec2::new(54., 16.);
     let button_e = commands
         .spawn((
-            SpriteBundle {
-                sprite: Sprite {
+            (
+                Sprite {
                     color: BLACK,
                     custom_size: Some(button_size),
                     ..default()
                 },
-                transform: Transform::from_translation(pos),
-                ..default()
-            },
+                Transform::from_translation(pos),
+            ),
             Interactable::default(),
             RenderLayers::from_layers(&[3]),
             TutorialUI,
@@ -1339,21 +1325,19 @@ fn spawn_button(
 
     commands
         .spawn((
-            Text2dBundle {
-                text: Text::from_section(label, gf::DISPLAY.text_style(&asset_server, WHITE))
-                    .with_alignment(TextAlignment::Center),
-                text_anchor: Anchor::Center,
-                transform: Transform {
+            gf::DISPLAY
+                .text(&asset_server, label, WHITE)
+                .justify(Justify::Center)
+                .anchor(Anchor::CENTER)
+                .with_transform(Transform {
                     translation: Vec3::new(0., -1., 1.),
                     scale: gf::DISPLAY.transform_scale(),
                     ..Default::default()
-                },
-                ..default()
-            },
+                }),
             RenderLayers::from_layers(&[3]),
             TutorialUI,
         ))
-        .set_parent(button_e);
+        .insert(ChildOf(button_e));
 }
 
 fn column_index_for_entry(entry_i: usize, entry_count: usize) -> usize {
@@ -1431,20 +1415,15 @@ fn spawn_entry_text(
     let body_y = CONTENT_BAND_CENTER_Y + 14.0;
 
     commands.spawn((
-        Text2dBundle {
-            text: Text::from_section(
-                content.title(),
-                gf::DISPLAY.text_style(&asset_server, YELLOW_2),
-            )
-            .with_alignment(TextAlignment::Center),
-            text_anchor: Anchor::Center,
-            transform: Transform {
+        gf::DISPLAY
+            .text(&asset_server, content.title(), YELLOW_2)
+            .justify(Justify::Center)
+            .anchor(Anchor::CENTER)
+            .with_transform(Transform {
                 translation: Vec3::new(column_center_x, title_y, Z_TUTORIAL_TEXT),
                 scale: gf::DISPLAY.transform_scale(),
                 ..Default::default()
-            },
-            ..default()
-        },
+            }),
         RenderLayers::from_layers(&[3]),
         TutorialUI,
         TutorialPageEntity,
@@ -1453,17 +1432,15 @@ fn spawn_entry_text(
     ));
 
     commands.spawn((
-        Text2dBundle {
-            text: Text::from_section(content.body(), gf::BODY.text_style(&asset_server, WHITE))
-                .with_alignment(TextAlignment::Center),
-            text_anchor: Anchor::Center,
-            transform: Transform {
+        gf::BODY
+            .text(&asset_server, content.body(), WHITE)
+            .justify(Justify::Center)
+            .anchor(Anchor::CENTER)
+            .with_transform(Transform {
                 translation: Vec3::new(column_center_x, body_y, Z_TUTORIAL_TEXT),
                 scale: gf::BODY.transform_scale(),
                 ..Default::default()
-            },
-            ..default()
-        },
+            }),
         RenderLayers::from_layers(&[3]),
         TutorialUI,
         TutorialPageEntity,
@@ -1499,21 +1476,19 @@ fn spawn_entry_visual(
     content: TutorialContent,
     column_center_x: f32,
 ) {
-    let mut animation = AsepriteAnimation::from(tutorial_content_aseprite_tag(content));
-    animation.play();
-
     commands.spawn((
-        AsepriteBundle {
-            aseprite: asset_server.load(TutorialAnims::PATH),
-            animation,
-            transform: Transform::from_translation(Vec3::new(
+        aseprite_bundle(
+            asset_server.load(TutorialAnims::PATH),
+            tutorial_content_aseprite_tag(content),
+            Transform::from_translation(Vec3::new(
                 column_center_x,
                 TUTORIAL_ANIM_CENTER_Y,
                 Z_TUTORIAL_CONTENT,
             ))
             .with_scale(Vec3::splat(TUTORIAL_ASEPRITE_SIZE / 64.0)),
-            ..Default::default()
-        },
+            Visibility::Inherited,
+            false,
+        ),
         RenderLayers::from_layers(&[3]),
         TutorialUI,
         TutorialPageEntity,
@@ -1552,7 +1527,7 @@ fn tutorial_button_hit_under_cursor(
 fn handle_tutorial_buttons(
     mut commands: Commands,
     cursor_pos: Res<CursorPos>,
-    mouse_input: Res<Input<MouseButton>>,
+    mouse_input: Res<ButtonInput<MouseButton>>,
     ui_focus: Res<crate::ui::focus::UiFocus>,
     asset_server: Res<AssetServer>,
     mut button_queries: ParamSet<(
@@ -1637,8 +1612,8 @@ fn handle_tutorial_buttons(
             }
 
             for e in all_tutorial.iter() {
-                if let Some(ec) = commands.get_entity(e) {
-                    ec.despawn_recursive();
+                if let Ok(mut ec) = commands.get_entity(e) {
+                    ec.despawn();
                 }
             }
             schedule_pending_find_boss_shrine_hint(&mut commands, pending_hint);
@@ -1653,8 +1628,8 @@ fn refresh_page(
     state: &TutorialState,
 ) {
     for e in page_entities.iter() {
-        if let Some(ec) = commands.get_entity(e) {
-            ec.despawn_recursive();
+        if let Ok(mut ec) = commands.get_entity(e) {
+            ec.despawn();
         }
     }
     spawn_current_page(

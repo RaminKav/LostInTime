@@ -14,14 +14,17 @@ use super::{CurrentHealth, CurrentMana, Healing, MaxMana};
 
 use bevy::prelude::*;
 
+#[derive(Message)]
 pub struct ModifyHealthEvent(pub i32);
 
 pub fn handle_modify_health_event(
-    mut event: EventReader<ModifyHealthEvent>,
+    mut event: MessageReader<ModifyHealthEvent>,
     mut query: Query<(&mut CurrentHealth, &Healing), With<Player>>,
 ) {
-    for event in event.iter() {
-        let (mut health, bonus_healing_rate) = query.single_mut();
+    for event in event.read() {
+        let Ok((mut health, bonus_healing_rate)) = query.single_mut() else {
+            return;
+        };
 
         // Apply healing bonus only to positive health changes
         let final_delta = if event.0 > 0 {
@@ -36,6 +39,7 @@ pub fn handle_modify_health_event(
 /// Modifies the player's current mana. The optional [`ManaGainSource`] attributes positive
 /// changes to the mana orb HUD tooltip gain breakdown. `None` (or negative amounts) are not
 /// tracked as a gain source.
+#[derive(Message)]
 pub struct ModifyManaEvent(pub i32, pub Option<ManaGainSource>);
 
 impl ModifyManaEvent {
@@ -51,18 +55,20 @@ impl ModifyManaEvent {
 }
 
 pub fn handle_modify_mana_event(
-    mut event: EventReader<ModifyManaEvent>,
+    mut event: MessageReader<ModifyManaEvent>,
     mut query: Query<(&mut CurrentMana, &MaxMana, &GlobalTransform), With<Player>>,
     mut trigger_counts: ResMut<HeirloomTriggerCounts>,
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     cheat_settings: Option<Res<CheatSettings>>,
 ) {
-    for event in event.iter() {
+    for event in event.read() {
         if event.0 == 0 {
             continue;
         }
-        let (mut mana, max_mana, player_t) = query.single_mut();
+        let Ok((mut mana, max_mana, player_t)) = query.single_mut() else {
+            return;
+        };
 
         if event.0 > 0 {
             if let Some(source) = event.1.clone() {

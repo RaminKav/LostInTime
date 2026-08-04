@@ -24,7 +24,7 @@ pub fn handle_heirloom_shrine_completion(
     shrines: Query<(Entity, &HeirloomShrineState)>,
     mut commands: Commands,
     mut game: GameParam,
-    mut minimap_event: EventWriter<UpdateMiniMapEvent>,
+    mut minimap_event: MessageWriter<UpdateMiniMapEvent>,
 ) {
     for (e, shrine) in shrines.iter() {
         if shrine.is_used {
@@ -37,7 +37,7 @@ pub fn handle_heirloom_shrine_completion(
 
             game.add_object_to_chunk_cache(shrine.tile_pos, WorldObject::HeirloomShrineDone);
 
-            minimap_event.send(UpdateMiniMapEvent {
+            minimap_event.write(UpdateMiniMapEvent {
                 pos: Some(shrine.tile_pos),
                 new_tile: Some(WorldObject::HeirloomShrineDone),
             });
@@ -62,7 +62,7 @@ pub fn handle_heirloom_shrine_ui_setup(
     if shrine_just_activated {
         let mut rng = rand::thread_rng();
         let (loot_bonus, player_level) = player_atts
-            .get_single()
+            .single()
             .map(|a| (a.0 .0, a.1.level))
             .unwrap_or((0, 1));
         skills_queue.add_new_skills_after_levelup(&mut rng, loot_bonus, player_level);

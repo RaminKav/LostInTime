@@ -1,3 +1,4 @@
+#import bevy_sprite::mesh2d_vertex_output::VertexOutput
 // Outline / shadow for atlas sprites and standalone UI images. Samples
 // neighboring texels; when the current pixel is transparent but a neighbor is
 // opaque, draws `outline_color`. Neighbor samples are clamped to the sprite's
@@ -14,15 +15,15 @@
 //
 // All texture samples happen before branching (required by Naga uniformity rules).
 
-@group(1) @binding(0)
+@group(#{MATERIAL_BIND_GROUP}) @binding(0)
 var<uniform> uv_bounds: vec4<f32>; // (min_u, min_v, max_u, max_v)
-@group(1) @binding(1)
+@group(#{MATERIAL_BIND_GROUP}) @binding(1)
 var source_color_texture: texture_2d<f32>;
-@group(1) @binding(2)
+@group(#{MATERIAL_BIND_GROUP}) @binding(2)
 var source_texture_sampler: sampler;
-@group(1) @binding(3)
+@group(#{MATERIAL_BIND_GROUP}) @binding(3)
 var<uniform> outline_color: vec4<f32>;
-@group(1) @binding(4)
+@group(#{MATERIAL_BIND_GROUP}) @binding(4)
 var<uniform> ring_params: vec4<f32>;
 
 fn sample_alpha_in_bounds(p: vec2<f32>) -> f32 {
@@ -42,9 +43,8 @@ fn ring_alpha(uv: vec2<f32>, texel: vec2<f32>, k: f32) -> f32 {
 }
 
 @fragment
-fn fragment(
-    #import bevy_sprite::mesh2d_vertex_output
-) -> @location(0) vec4<f32> {
+fn fragment(mesh: VertexOutput) -> @location(0) vec4<f32> {
+    let uv = mesh.uv;
     let dims = vec2<f32>(textureDimensions(source_color_texture));
     let texel = vec2<f32>(1.0 / dims.x, 1.0 / dims.y);
 

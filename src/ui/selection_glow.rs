@@ -9,12 +9,14 @@
 //! which texture is currently on top. The shader samples the Selected art's own alpha channel
 //! to hug its actual silhouette (rounded corners, top notch, etc.) rather than a bounding-box
 //! shape, so it never "borders" the sprite's fully transparent corners.
+use bevy::camera::visibility::RenderLayers;
+use bevy::math::primitives::Rectangle;
+use bevy::mesh::Mesh2d;
+use bevy::platform::collections::HashMap;
 use bevy::prelude::*;
-use bevy::reflect::TypeUuid;
-use bevy::render::render_resource::{AsBindGroup, ShaderRef};
-use bevy::render::view::RenderLayers;
-use bevy::sprite::{Material2d, Material2dPlugin, Mesh2dHandle};
-use bevy::utils::HashMap;
+use bevy::render::render_resource::AsBindGroup;
+use bevy::shader::ShaderRef;
+use bevy::sprite_render::{AlphaMode2d, Material2d, Material2dPlugin};
 
 use crate::assets::Graphics;
 use crate::ui::class_selection::{PetSelectSlot, PlayerSelectSlot};
@@ -22,9 +24,9 @@ use crate::ui::UIElement;
 
 /// Base purple sampled from `PlayerSelectSlotSelected.png` / `PetSelectSlotSelected.png`'s
 /// border pixel (#5D2375-ish) so the glow reads as "the same purple as the selected frame".
-pub const SELECTION_GLOW_COLOR: Color = Color::rgb(93. / 255., 35. / 255., 117. / 255.);
+pub const SELECTION_GLOW_COLOR: Color = Color::srgb(93. / 255., 35. / 255., 117. / 255.);
 /// Brighter purple mixed in on shimmer highlights.
-pub const SELECTION_GLOW_HOT_COLOR: Color = Color::rgb(189. / 255., 88. / 255., 214. / 255.);
+pub const SELECTION_GLOW_HOT_COLOR: Color = Color::srgb(189. / 255., 88. / 255., 214. / 255.);
 
 const GLOW_Z: f32 = -0.5;
 /// How much larger than the slot's own size the glow quad is — only the part that pokes out
@@ -41,8 +43,7 @@ const GLOW_INTENSITY: f32 = 0.8;
 /// instead of smoothly interpolating.
 const GLOW_FRAME_DURATION: f32 = 0.09;
 
-#[derive(AsBindGroup, TypeUuid, Debug, Clone)]
-#[uuid = "9a2b6e13-4c3f-4a90-8e8b-3f6d1a2c9b77"]
+#[derive(Asset, TypePath, AsBindGroup, Debug, Clone)]
 pub struct SelectionGlowMaterial {
     #[uniform(0)]
     pub glow_color: Vec4,
@@ -64,6 +65,10 @@ pub struct SelectionGlowMaterial {
 impl Material2d for SelectionGlowMaterial {
     fn fragment_shader() -> ShaderRef {
         "shaders/selection_glow.wgsl".into()
+    }
+
+    fn alpha_mode(&self) -> AlphaMode2d {
+        AlphaMode2d::Blend
     }
 }
 
@@ -89,10 +94,15 @@ pub struct SelectionGlowPlugin;
 impl Plugin for SelectionGlowPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<SelectionGlowState>()
-            .add_plugin(Material2dPlugin::<SelectionGlowMaterial>::default())
-            .add_system(spawn_selection_glows)
-            .add_system(update_selection_glow_visibility)
-            .add_system(animate_selection_glow_material);
+            .add_plugins(Material2dPlugin::<SelectionGlowMaterial>::default())
+            .add_systems(
+                Update,
+                (
+                    spawn_selection_glows,
+                    update_selection_glow_visibility,
+                    animate_selection_glow_material,
+                ),
+            );
     }
 }
 
@@ -164,35 +174,31 @@ fn spawn_glow_child(
         .entry(art_texture.clone())
         .or_insert_with(|| {
             materials.add(SelectionGlowMaterial {
-                glow_color: SELECTION_GLOW_COLOR.into(),
-                hot_color: SELECTION_GLOW_HOT_COLOR.into(),
-                params: Vec4::new(
-                    0.,
-                    GLOW_SHIMMER_SPEED,
-                    GLOW_BORDER_LAYERS,
-                    GLOW_INTENSITY,
-                ),
+                glow_color: SELECTION_GLOW_COLOR.to_linear().to_vec4(),
+                hot_color: SELECTION_GLOW_HOT_COLOR.to_linear().to_vec4(),
+                params: Vec4::new(0., GLOW_SHIMMER_SPEED, GLOW_BORDER_LAYERS, GLOW_INTENSITY),
                 shape_params: Vec4::new(base_size.x, base_size.y, GLOW_SCALE, GLOW_FRAME_DURATION),
                 source_texture: Some(art_texture.clone()),
             })
         })
         .clone();
-    let mesh: Mesh2dHandle = meshes.add(Mesh::from(shape::Quad::new(glow_size))).into();
+    let mesh: Mesh2d = meshes
+        .add(Mesh::from(Rectangle::new(glow_size.x, glow_size.y)))
+        .into();
     let layers = layers.cloned().unwrap_or_else(|| RenderLayers::layer(3));
 
     let child = commands
         .spawn((
             mesh,
-            material.clone(),
-            SpatialBundle {
-                transform: Transform::from_xyz(0., 0., GLOW_Z),
-                visibility: if is_selected {
+            MeshMaterial2d(material.clone()),
+            (
+                Transform::from_xyz(0., 0., GLOW_Z),
+                if is_selected {
                     Visibility::Visible
                 } else {
                     Visibility::Hidden
                 },
-                ..Default::default()
-            },
+            ),
             layers,
             SelectionGlow,
             Name::new("Selection Glow"),
@@ -225,7 +231,7 @@ fn set_children_glow_visibility(
     } else {
         Visibility::Hidden
     };
-    for &child in children.iter() {
+    for child in children.iter() {
         if let Ok(mut visibility) = glow_visibility.get_mut(child) {
             *visibility = target;
         }
@@ -237,9 +243,9 @@ fn animate_selection_glow_material(
     state: Res<SelectionGlowState>,
     mut materials: ResMut<Assets<SelectionGlowMaterial>>,
 ) {
-    let elapsed = time.elapsed_seconds();
+    let elapsed = time.elapsed_secs();
     for handle in state.materials.values() {
-        if let Some(material) = materials.get_mut(handle) {
+        if let Some(mut material) = materials.get_mut(handle) {
             material.params.x = elapsed;
         }
     }

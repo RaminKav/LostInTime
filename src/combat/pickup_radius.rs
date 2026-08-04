@@ -19,16 +19,11 @@ pub fn update_pickup_radius(
     mut pickup_radius_query: Query<&mut PickupRadius, With<Player>>,
     pickup_range_attr: Query<&PickupRange, With<Player>>,
 ) {
-    let Ok(mut pickup_radius) = pickup_radius_query.get_single_mut() else {
+    let Ok(mut pickup_radius) = pickup_radius_query.single_mut() else {
         return;
     };
-    let pickup_range_bonus = 1.0
-        + (pickup_range_attr
-            .get_single()
-            .cloned()
-            .unwrap_or_default()
-            .0 as f32
-            / 100.0);
+    let pickup_range_bonus =
+        1.0 + (pickup_range_attr.single().cloned().unwrap_or_default().0 as f32 / 100.0);
 
     pickup_radius.0 = BASE_PICKUP_RADIUS * pickup_range_bonus;
 }
@@ -74,10 +69,10 @@ pub fn mark_items_in_pickup_range(
     proto: ProtoParam,
     break_drop_filter: Res<BreakDropFilter>,
 ) {
-    let Ok((player_transform, pickup_radius)) = player_query.get_single() else {
+    let Ok((player_transform, pickup_radius)) = player_query.single() else {
         return;
     };
-    let Ok(inv) = inv.get_single() else {
+    let Ok(inv) = inv.single() else {
         return;
     };
     let player_has_pet = pets.iter().next().is_some();
@@ -89,7 +84,7 @@ pub fn mark_items_in_pickup_range(
         if break_drop_filter.blocks_ground_pickup(item_stack.obj_type) {
             let item_pos = item_transform.translation.truncate();
             if player_pos.distance(item_pos) <= pickup_range {
-                commands.entity(item_entity).despawn_recursive();
+                commands.entity(item_entity).despawn();
             }
             continue;
         }
@@ -120,10 +115,10 @@ pub fn handle_item_pickup_radius(
     proto: ProtoParam,
     break_drop_filter: Res<BreakDropFilter>,
 ) {
-    let Ok(player_transform) = player_query.get_single() else {
+    let Ok(player_transform) = player_query.single() else {
         return;
     };
-    let Ok(inv) = inv.get_single() else {
+    let Ok(inv) = inv.single() else {
         return;
     };
     let player_has_pet = pets.iter().next().is_some();
@@ -132,7 +127,7 @@ pub fn handle_item_pickup_radius(
 
     for (item_entity, mut item_transform, mut pull_state, item_stack) in item_query.iter_mut() {
         if break_drop_filter.blocks_ground_pickup(item_stack.obj_type) {
-            commands.entity(item_entity).despawn_recursive();
+            commands.entity(item_entity).despawn();
             continue;
         }
         if !player_can_accept_ground_item_pickup(item_stack, inv, player_has_pet, &proto) {
@@ -147,14 +142,14 @@ pub fn handle_item_pickup_radius(
             continue;
         }
 
-        pull_state.time_pulled += time.delta_seconds();
+        pull_state.time_pulled += time.delta_secs();
 
         let pull_speed =
             (MIN_PULL_SPEED + pull_state.time_pulled * PULL_ACCELERATION).min(MAX_PULL_SPEED);
 
         let direction = (player_pos - item_pos).normalize_or_zero();
 
-        let movement = direction * pull_speed * time.delta_seconds();
+        let movement = direction * pull_speed * time.delta_secs();
         item_transform.translation += movement.extend(0.0);
     }
 }
@@ -181,7 +176,7 @@ pub fn pull_all_eligible_ground_items_to_player(
     pets: &Query<(), With<Pet>>,
     proto: &ProtoParam,
 ) {
-    let Ok(inv) = inv.get_single() else {
+    let Ok(inv) = inv.single() else {
         return;
     };
     let player_has_pet = pets.iter().next().is_some();
@@ -215,10 +210,10 @@ pub fn handle_magnet_pull(
     proto: ProtoParam,
     break_drop_filter: Res<BreakDropFilter>,
 ) {
-    let Ok((mut magnet_timer, player_skills)) = magnet_timer_query.get_single_mut() else {
+    let Ok((mut magnet_timer, player_skills)) = magnet_timer_query.single_mut() else {
         return;
     };
-    let Ok(inv) = inv.get_single() else {
+    let Ok(inv) = inv.single() else {
         return;
     };
     let player_has_pet = pets.iter().next().is_some();
@@ -231,7 +226,7 @@ pub fn handle_magnet_pull(
 
     magnet_timer.cooldown_timer.tick(time.delta());
 
-    if magnet_timer.cooldown_timer.finished() {
+    if magnet_timer.cooldown_timer.is_finished() {
         magnet_timer.cooldown_timer.reset();
         magnet_timer.duration_timer.reset();
 

@@ -1,4 +1,4 @@
-use bevy::{prelude::*, reflect::TypeUuid};
+use bevy::prelude::*;
 use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -97,8 +97,7 @@ impl UnlockedSkills {
     }
 }
 
-#[derive(Deserialize, TypeUuid, Clone, Debug)]
-#[uuid = "2fd56698-6f3b-45aa-8a7f-6f9f8700b5a1"]
+#[derive(Asset, TypePath, Deserialize, Clone, Debug)]
 pub struct ClassUnlockConfig {
     pub classes: HashMap<SkillClass, ClassUnlockEntry>,
 }

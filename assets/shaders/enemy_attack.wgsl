@@ -1,17 +1,17 @@
+#import bevy_sprite::mesh2d_vertex_output::VertexOutput
 // #import bevy_sprite::mesh2d_view_bindings
 // #import bevy_pbr::utils
-@group(1) @binding(0)
+@group(#{MATERIAL_BIND_GROUP}) @binding(0)
 var<uniform> is_attacking: f32;
-@group(1) @binding(1)
+@group(#{MATERIAL_BIND_GROUP}) @binding(1)
 var source_color_texture: texture_2d<f32>;
-@group(1) @binding(2)
+@group(#{MATERIAL_BIND_GROUP}) @binding(2)
 var source_texture_sampler: sampler;
 
 
 @fragment
-fn fragment(
-    #import bevy_sprite::mesh2d_vertex_output
-) -> @location(0) vec4<f32> {
+fn fragment(mesh: VertexOutput) -> @location(0) vec4<f32> {
+    let uv = mesh.uv;
 
     var color = textureSample(
         source_color_texture,

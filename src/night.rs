@@ -1,14 +1,15 @@
 use bevy::{
+    math::primitives::Rectangle,
     prelude::*,
-    reflect::TypeUuid,
     render::{
-        mesh::MeshVertexBufferLayout,
+        mesh::MeshVertexBufferLayoutRef,
         render_resource::{
             AsBindGroup, BlendComponent, BlendFactor, BlendOperation, BlendState,
-            RenderPipelineDescriptor, ShaderRef, SpecializedMeshPipelineError,
+            RenderPipelineDescriptor, SpecializedMeshPipelineError,
         },
     },
-    sprite::{Material2d, Material2dKey, Material2dPlugin, MaterialMesh2dBundle, Mesh2dHandle},
+    shader::ShaderRef,
+    sprite_render::{AlphaMode2d, Material2d, Material2dKey, Material2dPlugin, MeshMaterial2d},
 };
 use serde::{Deserialize, Serialize};
 
@@ -49,7 +50,7 @@ impl Night {
     /// Progress through the current in-game hour (0–1). Used for smooth overlay visuals only.
     #[inline]
     pub fn hour_progress(&self) -> f32 {
-        self.0.percent().clamp(0.0, 1.0)
+        self.0.fraction().clamp(0.0, 1.0)
     }
 }
 
@@ -86,21 +87,21 @@ const NIGHT_FADE_OUT_START: f32 = NIGHT_PERIOD_END_HOUR;
 const NIGHT_FADE_OUT_DURATION: f32 = 4.0;
 
 /// Muted sunset warmth.
-pub const DUSK_AMBER: Color = Color::rgb(0.38, 0.20, 0.12);
+pub const DUSK_AMBER: Color = Color::srgb(0.38, 0.20, 0.12);
 /// Muted twilight purple.
-pub const TWILIGHT_PURPLE: Color = Color::rgb(0.26, 0.13, 0.24);
+pub const TWILIGHT_PURPLE: Color = Color::srgb(0.26, 0.13, 0.24);
 /// Warm moonlit plum (less cool-blue than a straight indigo).
-pub const NIGHT_PLUM: Color = Color::rgb(0.18, 0.09, 0.22);
+pub const NIGHT_PLUM: Color = Color::srgb(0.18, 0.09, 0.22);
 /// Neutral warm shadow — fade-out target as the overlay disappears.
-const DAY_NEUTRAL: Color = Color::rgb(0.16, 0.13, 0.11);
+const DAY_NEUTRAL: Color = Color::srgb(0.16, 0.13, 0.11);
 
 #[inline]
 fn lerp_color(a: Color, b: Color, t: f32) -> Color {
     let t = t.clamp(0.0, 1.0);
-    Color::rgb(
-        a.r() + (b.r() - a.r()) * t,
-        a.g() + (b.g() - a.g()) * t,
-        a.b() + (b.b() - a.b()) * t,
+    Color::srgb(
+        a.to_srgba().red + (b.to_srgba().red - a.to_srgba().red) * t,
+        a.to_srgba().green + (b.to_srgba().green - a.to_srgba().green) * t,
+        a.to_srgba().blue + (b.to_srgba().blue - a.to_srgba().blue) * t,
     )
 }
 
@@ -125,10 +126,11 @@ fn night_overlay_world_size(res: &ScreenResolution) -> Vec2 {
 }
 
 /// Linear RGB + saturation boost packed for the night overlay shader.
+/// Uses `to_linear` (0.10's `as_linear_rgba_f32`); sRGB values here wash the tint out.
 #[inline]
 fn night_overlay_color_uniform(color: Color) -> Vec4 {
-    let [r, g, b, _] = color.as_linear_rgba_f32();
-    Vec4::new(r, g, b, TINT_SATURATION)
+    let c = color.to_linear();
+    Vec4::new(c.red, c.green, c.blue, TINT_SATURATION)
 }
 
 const NIGHT_OVERLAY_BLEND: BlendState = BlendState {
@@ -147,8 +149,7 @@ const NIGHT_OVERLAY_BLEND: BlendState = BlendState {
 /// Full-screen night overlay: time-of-day tint with a clear bubble around the player.
 /// `params`: x = intensity, y = bubble radius (uv), z = bubble softness, w = edge boost.
 /// `player_uv`: xy = player position in quad-uv space, z = aspect ratio (w/h).
-#[derive(AsBindGroup, TypeUuid, Debug, Clone)]
-#[uuid = "0c0f6b2a-6d3e-4a7b-9c5e-2f8a1d4b6e30"]
+#[derive(Asset, TypePath, AsBindGroup, Debug, Clone)]
 pub struct NightOverlayMaterial {
     #[uniform(0)]
     pub params: Vec4,
@@ -163,9 +164,13 @@ impl Material2d for NightOverlayMaterial {
         "shaders/night_overlay.wgsl".into()
     }
 
+    fn alpha_mode(&self) -> AlphaMode2d {
+        AlphaMode2d::Blend
+    }
+
     fn specialize(
         descriptor: &mut RenderPipelineDescriptor,
-        _layout: &MeshVertexBufferLayout,
+        _layout: &MeshVertexBufferLayoutRef,
         _key: Material2dKey<Self>,
     ) -> Result<(), SpecializedMeshPipelineError> {
         if let Some(fragment) = &mut descriptor.fragment {
@@ -370,7 +375,7 @@ impl EraTimer {
 pub struct InfiniteModeMob;
 
 /// Event sent when infinite mode starts
-#[derive(Default)]
+#[derive(Default, Message)]
 pub struct InfiniteModeStartedEvent;
 
 #[derive(Reflect, Resource, Clone, Debug, Serialize, Deserialize)]
@@ -488,28 +493,28 @@ impl NightTracker {
 
 pub struct NightPlugin;
 
-#[derive(Default)]
+#[derive(Default, Message)]
 pub struct NewDayEvent;
 
 impl Plugin for NightPlugin {
     fn build(&self, app: &mut App) {
         app.register_type::<NightTracker>()
-            .add_plugin(Material2dPlugin::<NightOverlayMaterial>::default())
-            .add_event::<NewDayEvent>()
-            .add_event::<InfiniteModeStartedEvent>()
-            .add_event::<EraTimerExpiredEvent>()
+            .add_plugins(Material2dPlugin::<NightOverlayMaterial>::default())
+            .add_message::<NewDayEvent>()
+            .add_message::<InfiniteModeStartedEvent>()
+            .add_message::<EraTimerExpiredEvent>()
             .init_resource::<InfiniteMode>()
             .init_resource::<EraTimer>()
             .init_resource::<DungeonNightStash>()
-            // .add_plugin(ResourceInspectorPlugin::<NightTracker>::default().run_if(dim_spawned))
-            .add_system(
-                spawn_night
-                    .run_if(run_once_per_run())
-                    .in_schedule(OnEnter(GameState::Main)),
+            // .add_plugins(ResourceInspectorPlugin::<NightTracker>::default().run_if(dim_spawned))
+            .add_systems(
+                OnEnter(GameState::Main),
+                spawn_night.run_if(run_once_per_run()),
             )
             // Reset era timer and infinite mode when starting a new run
-            .add_system(reset_era_timer_on_new_run.in_schedule(OnEnter(GameState::MainMenu)))
+            .add_systems(OnEnter(GameState::MainMenu), reset_era_timer_on_new_run)
             .add_systems(
+                Update,
                 (
                     manage_dungeon_night_freeze,
                     sync_night_overlay_on_tracker_change,
@@ -521,21 +526,21 @@ impl Plugin for NightPlugin {
                     handle_era_timer_expired,
                     transition_to_daytime_on_peaceful_mode,
                 )
-                    .in_set(OnUpdate(GameState::Main)),
+                    .run_if(in_state(GameState::Main)),
             )
             // PostUpdate: must run after `move_camera_with_player`; ordering from `OnUpdate`
             // creates an Update ↔ PostUpdate cycle.
-            .add_system(
+            .add_systems(
+                Update,
                 update_night_overlay
                     .after(crate::inputs::move_camera_with_player)
-                    .run_if(in_state(GameState::Main))
-                    .in_base_set(CoreSet::PostUpdate),
+                    .run_if(in_state(GameState::Main)),
             );
     }
 }
 
 /// Event sent when era timer expires
-#[derive(Default)]
+#[derive(Default, Message)]
 pub struct EraTimerExpiredEvent;
 
 pub fn spawn_night(
@@ -572,20 +577,14 @@ pub fn spawn_night(
     });
 
     // Unit quad scaled to the camera view each frame, so UVs stay 0..1 regardless of zoom.
-    let mesh = Mesh2dHandle::from(meshes.add(Mesh::from(shape::Quad {
-        size: Vec2::ONE,
-        ..default()
-    })));
+    let mesh = Mesh2d(meshes.add(Mesh::from(Rectangle::new(1.0, 1.0))));
 
     commands.spawn((
-        MaterialMesh2dBundle {
-            mesh,
-            material,
-            transform: Transform {
-                translation: Vec3::new(0.0, 0.0, NIGHT_OVERLAY_WORLD_Z),
-                scale: Vec3::new(overlay_size.x, overlay_size.y, 1.0),
-                ..default()
-            },
+        mesh,
+        MeshMaterial2d(material),
+        Transform {
+            translation: Vec3::new(0.0, 0.0, NIGHT_OVERLAY_WORLD_Z),
+            scale: Vec3::new(overlay_size.x, overlay_size.y, 1.0),
             ..default()
         },
         NightOverlay,
@@ -602,7 +601,11 @@ fn update_night_overlay(
     res: Res<ScreenResolution>,
     mut materials: ResMut<Assets<NightOverlayMaterial>>,
     mut night_query: Query<
-        (&Handle<NightOverlayMaterial>, &mut Transform, &Night),
+        (
+            &MeshMaterial2d<NightOverlayMaterial>,
+            &mut Transform,
+            &Night,
+        ),
         (With<NightOverlay>, With<Night>),
     >,
     camera_query: Query<&GlobalTransform, (With<TextureCamera>, Without<NightOverlay>)>,
@@ -625,7 +628,7 @@ fn update_night_overlay(
     };
     let aspect = res.world_view_width / res.world_view_height.max(1.0);
 
-    let player_uv = match (camera_query.get_single(), player_query.get_single()) {
+    let player_uv = match (camera_query.single(), player_query.single()) {
         (Ok(cam), Ok(player)) => {
             let cam = cam.translation();
             let player = player.translation();
@@ -638,12 +641,12 @@ fn update_night_overlay(
 
     let overlay_size = night_overlay_world_size(&res);
     let camera_pos = camera_query
-        .get_single()
+        .single()
         .map(|cam| cam.translation())
         .unwrap_or(Vec3::ZERO);
 
     for (handle, mut transform, _) in night_query.iter_mut() {
-        if let Some(material) = materials.get_mut(handle) {
+        if let Some(mut material) = materials.get_mut(&handle.0) {
             material.params.x = intensity;
             material.tint = night_overlay_color_uniform(tint);
             material.player_uv = Vec4::new(player_uv.x, player_uv.y, aspect, 0.0);
@@ -661,7 +664,7 @@ fn update_night_overlay(
 fn sync_night_overlay_on_tracker_change(
     night_tracker: Res<NightTracker>,
     infinite_mode: Res<InfiniteMode>,
-    mut bgm_track_event: EventWriter<UpdateBGMTrackEvent>,
+    mut bgm_track_event: MessageWriter<UpdateBGMTrackEvent>,
     bgm_tracker: Res<BGMPicker>,
 ) {
     if !night_tracker.is_changed() {
@@ -672,11 +675,11 @@ fn sync_night_overlay_on_tracker_change(
         return;
     }
     if night_tracker.is_night() && bgm_tracker.current_track != *"sounds/bgm_night.ogg" {
-        bgm_track_event.send(UpdateBGMTrackEvent {
+        bgm_track_event.write(UpdateBGMTrackEvent {
             asset_path: "sounds/bgm_night.ogg".to_owned(),
         });
     } else if !night_tracker.is_night() && bgm_tracker.current_track != *"sounds/bgm_day.ogg" {
-        bgm_track_event.send(UpdateBGMTrackEvent {
+        bgm_track_event.write(UpdateBGMTrackEvent {
             asset_path: "sounds/bgm_day.ogg".to_owned(),
         });
     }
@@ -689,7 +692,7 @@ pub fn manage_dungeon_night_freeze(
     mut stash: ResMut<DungeonNightStash>,
     dungeon_check: Query<&Dungeon, With<ActiveDimension>>,
 ) {
-    let in_dungeon = dungeon_check.get_single().is_ok();
+    let in_dungeon = dungeon_check.single().is_ok();
     if in_dungeon {
         if stash.saved_time.is_none() {
             stash.saved_time = Some(night_tracker.time);
@@ -704,19 +707,19 @@ pub fn tick_night_color(
     time: Res<Time>,
     mut query: Query<&mut Night>,
     mut night_tracker: ResMut<NightTracker>,
-    mut bgm_track_event: EventWriter<UpdateBGMTrackEvent>,
+    mut bgm_track_event: MessageWriter<UpdateBGMTrackEvent>,
     bgm_tracker: Res<BGMPicker>,
-    mut new_day_event: EventWriter<NewDayEvent>,
-    mut global_text_events: EventWriter<GlobalTextMessageEvent>,
+    mut new_day_event: MessageWriter<NewDayEvent>,
+    mut global_text_events: MessageWriter<GlobalTextMessageEvent>,
     infinite_mode: Res<InfiniteMode>,
     mut chaos_tracker: ResMut<ChaosTracker>,
     dungeon_check: Query<&Dungeon, With<ActiveDimension>>,
-    mut tutorial_popup_events: EventWriter<TutorialPopupEvent>,
+    mut tutorial_popup_events: MessageWriter<TutorialPopupEvent>,
     seen_tutorial_chunks: Option<Res<SeenTutorialChunks>>,
     existing_tutorial: Query<(), With<TutorialUI>>,
 ) {
     // Day/night cycle is frozen while in a dungeon (see manage_dungeon_night_freeze).
-    if dungeon_check.get_single().is_ok() {
+    if dungeon_check.single().is_ok() {
         return;
     }
 
@@ -724,7 +727,7 @@ pub fn tick_night_color(
     if infinite_mode.active {
         // Always play night music in infinite mode
         if bgm_tracker.current_track != *"sounds/bgm_night.ogg" {
-            bgm_track_event.send(UpdateBGMTrackEvent {
+            bgm_track_event.write(UpdateBGMTrackEvent {
                 asset_path: "sounds/bgm_night.ogg".to_owned(),
             });
         }
@@ -734,7 +737,7 @@ pub fn tick_night_color(
     let mut music_changed = false;
     for mut night_state in query.iter_mut() {
         night_state.0.tick(time.delta());
-        if night_state.0.finished() {
+        if night_state.0.is_finished() {
             let prev_time = night_tracker.time;
             night_tracker.time += 1.;
             if night_tracker.time >= 24. {
@@ -746,8 +749,8 @@ pub fn tick_night_color(
             if was_night && !night_tracker.is_night() {
                 night_tracker.days += 1;
                 chaos_tracker.add_chaos(1.);
-                new_day_event.send_default();
-                global_text_events.send(GlobalTextMessageEvent::day_announcement(
+                new_day_event.write_default();
+                global_text_events.write(GlobalTextMessageEvent::day_announcement(
                     night_tracker.display_day(),
                     WHITE,
                 ));
@@ -759,7 +762,7 @@ pub fn tick_night_color(
     if music_changed || night_tracker.is_added() || night_tracker.is_changed() {
         // change music
         if night_tracker.is_night() && bgm_tracker.current_track != *"sounds/bgm_night.ogg" {
-            bgm_track_event.send(UpdateBGMTrackEvent {
+            bgm_track_event.write(UpdateBGMTrackEvent {
                 asset_path: "sounds/bgm_night.ogg".to_owned(),
             });
 
@@ -775,7 +778,7 @@ pub fn tick_night_color(
                 );
             }
         } else if !night_tracker.is_night() && bgm_tracker.current_track != *"sounds/bgm_day.ogg" {
-            bgm_track_event.send(UpdateBGMTrackEvent {
+            bgm_track_event.write(UpdateBGMTrackEvent {
                 asset_path: "sounds/bgm_day.ogg".to_owned(),
             });
         }
@@ -784,12 +787,12 @@ pub fn tick_night_color(
 
 /// Handle infinite mode started event - set up infinite mode state
 pub fn handle_infinite_mode_started(
-    mut events: EventReader<InfiniteModeStartedEvent>,
+    mut events: MessageReader<InfiniteModeStartedEvent>,
     mut infinite_mode: ResMut<InfiniteMode>,
     world_obj_cache: Res<crate::world::generation::WorldObjectCache>,
     chunk_query: Query<&crate::world::chunk::Chunk>,
 ) {
-    for _ in events.iter() {
+    for _ in events.read() {
         if !infinite_mode.active {
             *infinite_mode = InfiniteMode::new();
             let tier = infinite_mode.get_tier();
@@ -821,7 +824,7 @@ pub fn tick_infinite_mode_chaos(time: Res<Time>, mut infinite_mode: ResMut<Infin
     if !infinite_mode.active {
         return;
     }
-    infinite_mode.elapsed_seconds += time.delta_seconds();
+    infinite_mode.elapsed_seconds += time.delta_secs();
 }
 
 /// Tick the difficulty timer in infinite mode - increases difficulty every 1.5 minutes (up to level 10)
@@ -857,8 +860,8 @@ pub fn tick_era_timer(
     mut era_timer: ResMut<EraTimer>,
     era_manager: Res<EraManager>,
     infinite_mode: Res<InfiniteMode>,
-    mut expired_event: EventWriter<EraTimerExpiredEvent>,
-    // mut tip_event: EventWriter<TipEvent>,
+    mut expired_event: MessageWriter<EraTimerExpiredEvent>,
+    // mut tip_event: MessageWriter<TipEvent>,
     // seen_tips: Res<SeenTips>,
 ) {
     // Don't tick if infinite mode is already active
@@ -874,11 +877,11 @@ pub fn tick_era_timer(
     let was_above_3min = era_timer.remaining_seconds > 180.0;
 
     // Tick the timer
-    era_timer.remaining_seconds -= time.delta_seconds();
+    era_timer.remaining_seconds -= time.delta_secs();
 
     if was_above_3min && era_timer.remaining_seconds <= 180.0 {
         // if !seen_tips.has_seen(&Tip::EndlessMode) {
-        //     tip_event.send(TipEvent {
+        //     tip_event.write(TipEvent {
         //         tip: Tip::EndlessMode,
         //         pos: Vec3::new(-184., -116., 65.),
         //     });
@@ -888,21 +891,21 @@ pub fn tick_era_timer(
     // Check if expired
     if era_timer.is_expired() {
         era_timer.remaining_seconds = 0.0; // Clamp to 0
-        expired_event.send_default();
+        expired_event.write_default();
     }
 }
 
 /// Handle era timer expiration - trigger infinite mode
 pub fn handle_era_timer_expired(
-    mut events: EventReader<EraTimerExpiredEvent>,
-    mut infinite_mode_event: EventWriter<InfiniteModeStartedEvent>,
+    mut events: MessageReader<EraTimerExpiredEvent>,
+    mut infinite_mode_event: MessageWriter<InfiniteModeStartedEvent>,
     infinite_mode: Res<InfiniteMode>,
     mut mob_spawning_paused: ResMut<crate::enemy::spawner::MobSpawningPaused>,
 ) {
-    for _ in events.iter() {
+    for _ in events.read() {
         if !infinite_mode.active {
             info!("ERA TIMER EXPIRED! Entering infinite mode!");
-            infinite_mode_event.send_default();
+            infinite_mode_event.write_default();
         }
         // Resume mob spawning when timer expires
         if mob_spawning_paused.paused {
@@ -965,7 +968,7 @@ fn reset_era_timer_on_new_run(
 fn transition_to_daytime_on_peaceful_mode(
     mob_spawning_paused: Res<MobSpawningPaused>,
     mut night_tracker: ResMut<NightTracker>,
-    mut bgm_track_event: EventWriter<UpdateBGMTrackEvent>,
+    mut bgm_track_event: MessageWriter<UpdateBGMTrackEvent>,
     infinite_mode: Res<InfiniteMode>,
 ) {
     if infinite_mode.active {
@@ -979,7 +982,7 @@ fn transition_to_daytime_on_peaceful_mode(
             night_tracker.time
         );
 
-        bgm_track_event.send(UpdateBGMTrackEvent {
+        bgm_track_event.write(UpdateBGMTrackEvent {
             asset_path: "sounds/bgm_day.ogg".to_owned(),
         });
     }

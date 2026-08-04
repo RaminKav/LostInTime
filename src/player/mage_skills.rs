@@ -1,5 +1,6 @@
+use crate::aseprite_assets::{Electricity, IceExplosion, IceFloor, SmallExplosion};
 use bevy::prelude::*;
-use bevy_aseprite::{anim::AsepriteAnimation, aseprite, Aseprite};
+use bevy_aseprite_ultra::prelude::Aseprite;
 use bevy_rapier2d::{geometry::Collider, prelude::KinematicCharacterController};
 
 use crate::{
@@ -31,10 +32,6 @@ use super::{
     ActiveSkillUsedEvent, Heirloom, MovePlayerEvent, Player, PlayerSkills,
 };
 
-aseprite!(pub IceExplosion, "textures/effects/IceExplosion2.aseprite");
-aseprite!(pub SmallExplosion, "textures/effects/SmallExplosion.aseprite");
-aseprite!(pub Electricity, "textures/effects/Electricity.aseprite");
-aseprite!(pub IceFloor, "textures/effects/IceFloor.aseprite");
 /// Brief marker set on the player right after teleporting; removed once the
 /// post-teleport shock timer expires. Stored `SparseSet` so the player entity
 /// stays in a single archetype across teleports.
@@ -116,8 +113,8 @@ pub(crate) fn resolve_teleport_destination_tile(
 }
 
 pub fn handle_teleport(
-    mut active_skill_events: EventReader<ActiveSkillUsedEvent>,
-    mut move_player: EventWriter<MovePlayerEvent>,
+    mut active_skill_events: MessageReader<ActiveSkillUsedEvent>,
+    mut move_player: MessageWriter<MovePlayerEvent>,
     mut player: Query<
         (
             Entity,
@@ -127,7 +124,6 @@ pub fn handle_teleport(
             &FacingDirection,
             &Attack,
             &SkillPower,
-            &AsepriteAnimation,
             &mut KinematicCharacterController,
             &mut TeleportState,
             &OwnedBlessings,
@@ -140,6 +136,8 @@ pub fn handle_teleport(
     mut commands: Commands,
     time: Res<Time>,
 ) {
+    // Player visuals use native ultra `AseAnimation`.
+    // Requiring the compat component made this query never match → cooldown-only no-op.
     let Ok((
         e,
         player_pos,
@@ -148,11 +146,10 @@ pub fn handle_teleport(
         facing,
         dmg,
         skill_power,
-        aseprite,
         mut kcc,
         mut teleport_state,
         blessings,
-    )) = player.get_single_mut()
+    )) = player.single_mut()
     else {
         return;
     };
@@ -161,10 +158,10 @@ pub fn handle_teleport(
     // The cooldown check is already done in dispatch_active_skill_events, so we just need to check animation timer
     let mut should_activate = false;
     if let Some(teleport_slot) = skills.has_active_skill(ActiveSkill::Teleport) {
-        for ev in active_skill_events.iter() {
+        for ev in active_skill_events.read() {
             if ev.slot == teleport_slot {
                 // Only check if animation timer is ready (to prevent spamming)
-                if teleport_state.timer.percent() == 0. || teleport_state.timer.percent() >= 1. {
+                if teleport_state.timer.fraction() == 0. || teleport_state.timer.fraction() >= 1. {
                     should_activate = true;
                     break;
                 }
@@ -183,8 +180,7 @@ pub fn handle_teleport(
     let player_pos = player_pos.translation();
     if teleport_state.timer.just_finished() {
         teleport_state.timer.reset();
-        let direction =
-            skill_aim_direction(move_direction.0, aim.facing_dir, facing.get_dir_vec());
+        let direction = skill_aim_direction(move_direction.0, aim.facing_dir, facing.get_dir_vec());
         if direction == Vec2::ZERO {
             return;
         }
@@ -238,21 +234,19 @@ pub fn handle_teleport(
 
         // Keep Shadow Step trail: clearing would wipe the pre-teleport samples
         // and make immediate Recall only retrace the landing tile.
-        move_player.send(MovePlayerEvent {
+        move_player.write(MovePlayerEvent {
             pos: dest_tile,
             clear_recall_history: false,
         });
     }
 
-    if teleport_state.timer.percent() != 0. {
+    if teleport_state.timer.fraction() != 0. {
         teleport_state.timer.tick(time.delta());
     }
 
-    if teleport_state.timer.percent() != 0. && teleport_state.timer.percent() < 1. {
+    if teleport_state.timer.fraction() != 0. && teleport_state.timer.fraction() < 1. {
         move_direction.0 = Vec2::ZERO;
         kcc.translation = Some(Vec2::new(move_direction.0.x, move_direction.0.y));
-    } else if aseprite.just_finished() {
-        teleport_state.timer.reset();
     }
 }
 
@@ -263,7 +257,7 @@ pub fn tick_just_teleported(
 ) {
     for (e, mut timer) in teleported.iter_mut() {
         timer.just_teleported_timer.tick(time.delta());
-        if timer.just_teleported_timer.finished() {
+        if timer.just_teleported_timer.is_finished() {
             commands.entity(e).remove::<JustTeleported>();
         }
     }
@@ -275,7 +269,7 @@ fn spawn_aseprite_explosion_hitbox(
     dmg: i32,
     size_multiplier: f32,
     handle: Handle<Aseprite>,
-    animation: AsepriteAnimation,
+    tag: &str,
     duration: f32,
     base_radius: f32,
     projectile: Projectile,
@@ -291,7 +285,7 @@ fn spawn_aseprite_explosion_hitbox(
         dmg,
         Collider::capsule(Vec2::ZERO, Vec2::ZERO, base_radius),
         handle,
-        animation,
+        tag,
         false,
         projectile,
         extra_components,
@@ -312,8 +306,9 @@ pub fn spawn_ice_explosion_hitbox(
         dmg,
         size_multiplier,
         graphics.ice_explosion_ase.as_ref().unwrap().clone(),
-        AsepriteAnimation::default(),
-        10.5,
+        IceExplosion::tags::ICE_EXPLOSION,
+        // Fallback lifetime; `DoneAnimation` despawns when the one-shot clip finishes.
+        1.5,
         26.0,
         Projectile::IceExplosionAOE,
         vec![DeferredComponent::IceExplosionDmg],
@@ -334,7 +329,7 @@ pub fn spawn_small_explosion_hitbox(
         dmg,
         size_multiplier,
         graphics.small_explosion_ase.as_ref().unwrap().clone(),
-        AsepriteAnimation::from(SmallExplosion::tags::EXPLOSION),
+        SmallExplosion::tags::EXPLOSION,
         1.0,
         13.0,
         Projectile::SmallExplosionAOE,

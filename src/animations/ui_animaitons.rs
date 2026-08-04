@@ -1,7 +1,7 @@
 // allows animating Entities by adding special components to them.
 // Move entities from point A to B (with or without acceleration)
 
-use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
+use bevy::{camera::visibility::RenderLayers, prelude::*, sprite::Anchor};
 
 use crate::{
     assets::Graphics,
@@ -11,10 +11,7 @@ use crate::{
     item::WorldObject,
     player::ModifyCurencyEvent,
     proto::proto_param::ProtoParam,
-    ui::{
-        damage_numbers::spawn_text,
-        game_fonts::FLOATING_TEXT,
-    },
+    ui::{damage_numbers::spawn_text, game_fonts::FLOATING_TEXT},
 };
 
 #[derive(Component)]
@@ -35,24 +32,24 @@ pub fn handle_move_animations(
         Entity,
         &mut Transform,
         &mut MoveUIAnimation,
-        &mut TextureAtlasSprite,
+        &mut Sprite,
         Option<&Children>,
     )>,
     mut commands: Commands,
-    mut child_text_query: Query<&mut Text>,
-    mut currency_event: EventWriter<ModifyCurencyEvent>,
+    mut child_text_query: Query<&mut TextColor>,
+    mut currency_event: MessageWriter<ModifyCurencyEvent>,
 ) {
     for (e, mut transform, mut move_anim, mut sprite, child_option) in query.iter_mut() {
-        if !move_anim.startup_delay.tick(time.delta()).finished() {
+        if !move_anim.startup_delay.tick(time.delta()).is_finished() {
             continue;
         }
 
         let direction = move_anim.end - move_anim.start;
         let curr_distance = (transform.translation - move_anim.start).length();
         let distance = direction.length();
-        let velocity = move_anim.velocity * time.delta_seconds();
+        let velocity = move_anim.velocity * time.delta_secs();
         let acceleration = move_anim.acceleration.unwrap_or(0.0);
-        let new_velocity = velocity + acceleration * time.delta_seconds();
+        let new_velocity = velocity + acceleration * time.delta_secs();
 
         let delta = direction.normalize() * new_velocity;
 
@@ -66,29 +63,29 @@ pub fn handle_move_animations(
             if move_anim.item_stack.obj_type == WorldObject::TimeFragment
                 || move_anim.item_stack.obj_type == WorldObject::Coin
             {
-                currency_event.send(ModifyCurencyEvent {
+                currency_event.write(ModifyCurencyEvent {
                     delta: move_anim.item_stack.count as i32,
                     obj: move_anim.item_stack.obj_type,
                 });
             }
             if move_anim.despawn_when_done {
-                commands.entity(e).despawn_recursive();
+                commands.entity(e).despawn();
             }
         }
 
         if let Some(fade) = move_anim.fade_factor {
-            let new_fade = sprite.color.a() - fade * time.delta_seconds();
-            sprite.color.set_a(new_fade);
-            if sprite.color.a() <= 0.4 && move_anim.despawn_when_done {
-                commands.entity(e).despawn_recursive();
+            let new_fade = sprite.color.to_srgba().alpha - fade * time.delta_secs();
+            sprite.color = sprite.color.with_alpha(new_fade);
+            if sprite.color.to_srgba().alpha <= 0.4 && move_anim.despawn_when_done {
+                commands.entity(e).despawn();
             }
 
             if let Some(child) = child_option {
                 for child_e in child.iter() {
-                    if let Ok(mut text) = child_text_query.get_mut(*child_e) {
+                    if let Ok(mut text_color) = child_text_query.get_mut(child_e) {
                         let new_fade =
-                            text.sections[0].style.color.a() - fade * time.delta_seconds();
-                        text.sections[0].style.color.set_a(new_fade);
+                            text_color.0.to_srgba().alpha - fade * time.delta_secs();
+                        text_color.0 = text_color.0.with_alpha(new_fade);
                     }
                 }
             }
@@ -153,23 +150,20 @@ pub fn handle_ui_time_fragments(
         }
 
         // Check if entity still exists before inserting components
-        let Some(mut entity_commands) = commands.get_entity(e) else {
+        let Ok(mut entity_commands) = commands.get_entity(e) else {
             continue; // Entity was despawned, skip it
         };
         let icon_e = entity_commands
-            .insert(SpriteSheetBundle {
-                sprite: graphics
-                    .spritesheet_map
-                    .as_ref()
-                    .unwrap()
-                    .get(&icon.icon)
-                    .unwrap()
-                    .clone(),
-                texture_atlas: graphics.texture_atlas.as_ref().unwrap().clone(),
-
-                transform: Transform::from_translation(icon.start),
-                ..Default::default()
-            })
+            .insert((
+                (graphics
+                        .spritesheet_map
+                        .as_ref()
+                        .unwrap()
+                        .get(&icon.icon)
+                        .unwrap()
+                        .clone()),
+                Transform::from_translation(icon.start),
+            ))
             .insert(MoveUIAnimation {
                 start: icon.start,
                 end: icon.end + Vec3::new(0.0, (i as f32 - non_text_movers_this_frame) * 10.0, 0.),
@@ -210,12 +204,12 @@ pub fn handle_ui_time_fragments(
                         "".to_string()
                     }
                 ),
-                Anchor::CenterLeft,
+                Anchor::CENTER_LEFT,
                 FLOATING_TEXT,
                 3,
                 None,
             );
-            commands.entity(text).set_parent(icon_e);
+            commands.entity(text).insert(ChildOf(icon_e));
         }
     }
 }

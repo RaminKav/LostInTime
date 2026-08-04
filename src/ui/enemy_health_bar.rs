@@ -20,7 +20,7 @@ pub fn handle_enemy_health_bar_change(
 ) {
     for (children, max_health, current_health) in query.iter_mut() {
         for child in children.iter() {
-            let Ok(mut bar_txfm) = query2.get_mut(*child) else {
+            let Ok(mut bar_txfm) = query2.get_mut(child) else {
                 continue;
             };
             bar_txfm.scale.x = current_health.0 as f32 / max_health.0 as f32 * BAR_SIZE;
@@ -36,19 +36,18 @@ pub fn add_ui_icon_for_elite_mobs(
 ) {
     for elite in elites.iter() {
         commands
-            .spawn(SpriteBundle {
-                texture: graphics.get_ui_element_texture(UIElement::EliteStar),
-                transform: Transform {
+            .spawn((
+                Sprite {
+                    image: graphics.get_ui_element_texture(UIElement::EliteStar),
+                    custom_size: Some(Vec2::new(5., 5.)),
+                    ..default()
+                },
+                Transform {
                     translation: Vec3::new(0., 10., 1.),
                     scale: Vec3::new(1., 1., 1.),
                     ..Default::default()
                 },
-                sprite: Sprite {
-                    custom_size: Some(Vec2::new(5., 5.)),
-                    ..Default::default()
-                },
-                ..Default::default()
-            })
+            ))
             .safe_set_parent(elite);
     }
 }

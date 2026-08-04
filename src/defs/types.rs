@@ -25,7 +25,7 @@ use crate::{
     player::levels::ExperienceReward,
     sapling::GrowsInto,
     ui::scrapper_ui::ScrapsInto,
-    world::{WallTextureData, WorldGeneration, y_sort::YSort},
+    world::{y_sort::YSort, WallTextureData, WorldGeneration},
 };
 
 #[derive(Clone, Debug, Default)]
@@ -35,8 +35,17 @@ pub struct ColliderDef {
 
 #[derive(Clone, Debug)]
 pub enum ColliderKind {
-    Cuboid { x: f32, y: f32 },
-    Capsule { x1: f32, y1: f32, x2: f32, y2: f32, r: f32 },
+    Cuboid {
+        x: f32,
+        y: f32,
+    },
+    Capsule {
+        x1: f32,
+        y1: f32,
+        x2: f32,
+        y2: f32,
+        r: f32,
+    },
 }
 
 impl Default for ColliderKind {
@@ -78,6 +87,7 @@ pub struct EntityDef {
     pub sprite_sheet: Option<SpriteSheetDef>,
     /// Standalone PNG path from old `SpriteBundle` (trees, large cactuses, etc.).
     pub sprite_texture: Option<String>,
+
     pub animation_timer: Option<AnimationTimerDef>,
     pub max_health: Option<MaxHealth>,
     pub attack: Option<Attack>,

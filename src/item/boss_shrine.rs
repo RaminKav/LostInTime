@@ -47,11 +47,11 @@ impl BossSummonTracker {
     }
     pub fn get_boss_tint(&self) -> Color {
         match self.summon_count - 1 {
-            0 => Color::rgba(1., 1., 1., 1.0),
-            1 => Color::rgba(0.2, 0.6, 1., 1.0),  // blue
-            2 => Color::rgba(0.8, 0.4, 1.0, 1.0), // purple
-            3 => Color::rgba(1.0, 0.4, 0.0, 1.0), // orange
-            _ => Color::rgba(1.0, 0.0, 0.0, 1.0),
+            0 => Color::srgba(1., 1., 1., 1.0),
+            1 => Color::srgba(0.2, 0.6, 1., 1.0),  // blue
+            2 => Color::srgba(0.8, 0.4, 1.0, 1.0), // purple
+            3 => Color::srgba(1.0, 0.4, 0.0, 1.0), // orange
+            _ => Color::srgba(1.0, 0.0, 0.0, 1.0),
         }
     }
 }
@@ -66,31 +66,33 @@ pub struct DelayedSpawn {
 
 pub fn handle_pay_shrine_cost(
     mut commands: Commands,
-    key_input: Res<Input<KeyCode>>,
-    mouse_input: Res<Input<MouseButton>>,
+    key_input: Res<ButtonInput<KeyCode>>,
+    mouse_input: Res<ButtonInput<MouseButton>>,
     keybinds: Res<InputMappings>,
     player_query: Query<&GlobalTransform, With<Player>>,
     game: GameParam,
     mut game_camera: Query<Entity, With<TextureCamera>>,
-    mut currency_event: EventWriter<ModifyCurencyEvent>,
-    mut global_text_events: EventWriter<GlobalTextMessageEvent>,
+    mut currency_event: MessageWriter<ModifyCurencyEvent>,
+    mut global_text_events: MessageWriter<GlobalTextMessageEvent>,
     dungeon_check: Query<&Dungeon>,
     delayed_spawn: Option<Res<DelayedSpawn>>,
     mut summon_tracker: ResMut<BossSummonTracker>,
     gamepad_action_q: Query<&ActionState<GamepadAction>, With<Player>>,
 ) {
-    if dungeon_check.get_single().is_ok() {
+    if dungeon_check.single().is_ok() {
         return;
     }
     if delayed_spawn.is_some() {
         return;
     }
     let gamepad_pressed = gamepad_action_q
-        .get_single()
-        .map(|a| a.just_pressed(GamepadAction::Interact))
+        .single()
+        .map(|a| a.just_pressed(&GamepadAction::Interact))
         .unwrap_or(false);
     if keybinds.check_interact_input(&key_input, &mouse_input) || gamepad_pressed {
-        let player_t = player_query.single();
+        let Ok(player_t) = player_query.single() else {
+            return;
+        };
         let Some(shrine) = game
             .world_obj_cache
             .unique_objs
@@ -104,12 +106,12 @@ pub fn handle_pay_shrine_cost(
         if shrine_pos.distance(player_t.translation().truncate()) < SHRINE_INTERACT_GUIDE_DISTANCE
             && game.get_coins() as i32 >= cost
         {
-            currency_event.send(ModifyCurencyEvent {
+            currency_event.write(ModifyCurencyEvent {
                 delta: -cost,
                 obj: WorldObject::Coin,
             });
             global_text_events
-                .send(GlobalTextMessageEvent::new("WARNING!", LIGHT_RED).with_panel_width(164.0));
+                .write(GlobalTextMessageEvent::new("WARNING!", LIGHT_RED).with_panel_width(164.0));
             let summon_index = summon_tracker.summon_count;
             summon_tracker.summon_count += 1;
             commands.insert_resource(DelayedSpawn {
@@ -215,21 +217,19 @@ pub fn handle_delayed_spawns(
     proto: ProtoParam,
 ) {
     delayed_spawns.timer.tick(time.delta());
-    if delayed_spawns.timer.finished() {
+    if delayed_spawns.timer.is_finished() {
         let summon_index = delayed_spawns.summon_index;
         commands.remove_resource::<DelayedSpawn>();
-        if let Some(entity) = commands.spawn_from_proto(
-            delayed_spawns.mob.clone(),
-            &proto.defs,
-            delayed_spawns.pos,
-        ) {
+        if let Some(entity) =
+            commands.spawn_from_proto(delayed_spawns.mob.clone(), &proto.defs, delayed_spawns.pos)
+        {
             commands
                 .entity(entity)
                 .insert(BossSummonIndex(summon_index));
         }
         commands.insert_resource(FlashEffect {
             timer: Timer::from_seconds(0.5, TimerMode::Once),
-            color: Color::rgba(1., 1., 1., 1.),
+            color: Color::srgba(1., 1., 1., 1.),
         });
     }
 }
@@ -240,7 +240,7 @@ pub const BOSS_SHRINE_TEXTURE_PATH: &str = "textures/BossShrine.png";
 /// Boss shrine uses a standalone PNG (not the shared atlas). Reset visibility/sprite after spawn.
 ///
 /// We re-insert the texture handle, sprite, and a full visibility bundle here as a failsafe:
-/// Spawn applies the `SpriteBundle`/`VisibilityBundle` on a deferred schedule, and
+/// Spawn applies the `SpriteBundle`/`Visibility` on a deferred schedule, and
 /// the order relative to our manual inserts in `spawn_object_from_proto` is not guaranteed. Forcing
 /// all render components here guarantees a consistent, visible result.
 pub fn ensure_boss_shrine_sprite_on_spawn(
@@ -252,17 +252,14 @@ pub fn ensure_boss_shrine_sprite_on_spawn(
         if obj != &WorldObject::BossShrine {
             continue;
         }
-        let texture: Handle<Image> = asset_server.load(BOSS_SHRINE_TEXTURE_PATH);
+        let image: Handle<Image> = asset_server.load(BOSS_SHRINE_TEXTURE_PATH);
         commands.entity(entity).insert((
-            texture,
             Sprite {
+                image,
                 custom_size: Some(Vec2::new(128., 128.)),
                 ..default()
             },
-            VisibilityBundle {
-                visibility: Visibility::Inherited,
-                ..default()
-            },
+            Visibility::Inherited,
         ));
     }
 }

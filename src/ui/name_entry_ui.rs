@@ -1,14 +1,17 @@
+use bevy::text::Justify;
+use bevy::camera::visibility::RenderLayers;
+use bevy::input::keyboard::KeyboardInput;
 use bevy::prelude::*;
-use bevy::render::view::RenderLayers;
 use bevy::sprite::Anchor;
+use bevy::window::Ime;
 
 use crate::{
     assets::Graphics,
     audio::{AudioSoundEffect, SoundSpawner},
     client::GameData,
     colors::*,
-    datafiles,
     cursor::CursorPos,
+    datafiles,
     ui::{
         game_fonts as gf,
         interactions::{Interactable, Interaction, UIElement},
@@ -31,6 +34,9 @@ pub struct NameEntryOKButton;
 
 #[derive(Component)]
 pub struct CursorBlink;
+
+#[derive(Component)]
+pub struct NameEntryValue;
 
 #[derive(Resource, Default)]
 pub struct CurrentNameInput {
@@ -64,7 +70,7 @@ pub fn setup_name_entry_ui(
     // commands.spawn((
     //     SpriteBundle {
     //         sprite: Sprite {
-    //             color: Color::rgba(0., 0., 0., 0.9),
+    //             color: Color::srgba(0., 0., 0., 0.9),
     //             custom_size: Some(Vec2::new(
     //                 resolution.game_width + 10.,
     //                 resolution.game_height + 20.,
@@ -79,27 +85,20 @@ pub fn setup_name_entry_ui(
     //     UIState::EnterName,
     //     Name::new("Name Entry Overlay"),
     // ));
-    let overlay = ui_helpers::spawn_full_screen_ui_overlay(
-        &mut commands,
-        &resolution,
-        0.99,
-        100.,
-    );
+    let overlay = ui_helpers::spawn_full_screen_ui_overlay(&mut commands, &resolution, 0.99, 100.);
     commands
         .entity(overlay)
         .insert(NameEntryUI)
         .insert(UIState::EnterName);
     // Panel background
     commands.spawn((
-        SpriteBundle {
-            sprite: Sprite {
-                color: Color::rgba(0.15, 0.12, 0.10, 0.98),
-                custom_size: Some(Vec2::new(panel_width, panel_height)),
-                ..Default::default()
-            },
-            transform: Transform::from_translation(Vec3::new(0., 0., 101.)),
-            ..Default::default()
-        },
+        (
+            Sprite::from_color(
+                Color::srgba(0.15, 0.12, 0.10, 0.98),
+                Vec2::new(panel_width, panel_height),
+            ),
+            Transform::from_translation(Vec3::new(0., 0., 101.)),
+        ),
         RenderLayers::from_layers(&[3]),
         NameEntryUI,
         UIState::EnterName,
@@ -108,20 +107,15 @@ pub fn setup_name_entry_ui(
 
     // Title text
     commands.spawn((
-        Text2dBundle {
-            text: Text::from_section(
-                "Enter Your Name",
-                gf::MENU_TITLE.text_style(&asset_server, WHITE),
-            )
-            .with_alignment(TextAlignment::Center),
-            text_anchor: Anchor::Center,
-            transform: Transform {
+        gf::MENU_TITLE
+            .text(&asset_server, "Enter Your Name", WHITE)
+            .justify(Justify::Center)
+            .anchor(Anchor::CENTER)
+            .with_transform(Transform {
                 translation: Vec3::new(0., 35., 102.),
                 scale: gf::MENU_TITLE.transform_scale(),
                 ..default()
-            },
-            ..Default::default()
-        },
+            }),
         RenderLayers::from_layers(&[3]),
         NameEntryUI,
         UIState::EnterName,
@@ -130,15 +124,10 @@ pub fn setup_name_entry_ui(
 
     // Input field background
     commands.spawn((
-        SpriteBundle {
-            sprite: Sprite {
-                color: DARK_WOOD_BROWN,
-                custom_size: Some(Vec2::new(140., 18.)),
-                ..Default::default()
-            },
-            transform: Transform::from_translation(Vec3::new(0., 5., 102.)),
-            ..Default::default()
-        },
+        (
+            Sprite::from_color(DARK_WOOD_BROWN, Vec2::new(140., 18.)),
+            Transform::from_translation(Vec3::new(0., 5., 102.)),
+        ),
         RenderLayers::from_layers(&[3]),
         NameEntryUI,
         UIState::EnterName,
@@ -147,68 +136,62 @@ pub fn setup_name_entry_ui(
 
     // Input field inner
     commands.spawn((
-        SpriteBundle {
-            sprite: Sprite {
-                color: Color::rgb(0.95, 0.93, 0.88),
-                custom_size: Some(Vec2::new(136., 14.)),
-                ..Default::default()
-            },
-            transform: Transform::from_translation(Vec3::new(0., 5., 103.)),
-            ..Default::default()
-        },
+        (
+            Sprite::from_color(Color::srgb(0.95, 0.93, 0.88), Vec2::new(136., 14.)),
+            Transform::from_translation(Vec3::new(0., 5., 103.)),
+        ),
         RenderLayers::from_layers(&[3]),
         NameEntryUI,
         UIState::EnterName,
         Name::new("Input Field Inner"),
     ));
 
-    // Input text with cursor (using two sections so cursor follows text)
-    let input_style = gf::BODY.text_style(&asset_server, DARK_WOOD_BROWN);
-    commands.spawn((
-        Text2dBundle {
-            text: Text {
-                sections: vec![
-                    TextSection {
-                        value: "".to_string(),
-                        style: input_style.clone(),
-                    },
-                    TextSection {
-                        value: "|".to_string(),
-                        style: input_style,
-                    },
-                ],
-                alignment: TextAlignment::Left,
-                ..Default::default()
-            },
-            text_anchor: Anchor::CenterLeft,
-            transform: Transform {
+    // Input text with cursor as independently mutable native spans.
+    let input = commands
+        .spawn((
+            gf::BODY
+                .text(&asset_server, "", DARK_WOOD_BROWN)
+                .justify(Justify::Left)
+                .anchor(Anchor::CENTER_LEFT)
+                .with_transform(Transform {
                 translation: Vec3::new(-65., 5.5, 104.),
                 scale: gf::BODY.transform_scale(),
                 ..default()
-            },
-            ..Default::default()
-        },
-        RenderLayers::from_layers(&[3]),
-        NameEntryUI,
-        NameEntryInput,
+                }),
+            RenderLayers::from_layers(&[3]),
+            NameEntryUI,
+            NameEntryInput,
+            UIState::EnterName,
+            Name::new("Input Text"),
+        ))
+        .id();
+    commands.spawn((
+        TextSpan::new(""),
+        gf::BODY.text_font(&asset_server),
+        TextColor(DARK_WOOD_BROWN),
+        NameEntryValue,
+        ChildOf(input),
+    ));
+    commands.spawn((
+        TextSpan::new("|"),
+        gf::BODY.text_font(&asset_server),
+        TextColor(DARK_WOOD_BROWN),
         CursorBlink,
-        UIState::EnterName,
-        Name::new("Input Text"),
+        ChildOf(input),
     ));
 
     // OK Button
     let button_entity = commands
-        .spawn(SpriteBundle {
-            texture: graphics
-                .get_ui_element_texture(UIElement::MenuButton)
-                .clone(),
-            sprite: Sprite {
+        .spawn((
+            Sprite {
+                image: graphics
+                    .get_ui_element_texture(UIElement::MenuButton)
+                    .clone(),
                 custom_size: Some(Vec2::new(50., 18.)),
                 ..Default::default()
             },
-            transform: Transform::from_translation(Vec3::new(0., -30., 102.)),
-            ..Default::default()
-        })
+            Transform::from_translation(Vec3::new(0., -30., 102.)),
+        ))
         .insert(RenderLayers::from_layers(&[3]))
         .insert(UIElement::MenuButton)
         .insert(Interactable::default())
@@ -220,56 +203,66 @@ pub fn setup_name_entry_ui(
 
     // OK Button text
     commands
-        .spawn(Text2dBundle {
-            text: Text::from_section(
-                "OK",
-                gf::BODY.text_style(&asset_server, DARK_WOOD_BROWN),
-            )
-            .with_alignment(TextAlignment::Center),
-            text_anchor: Anchor::Center,
-            transform: Transform {
-                translation: Vec3::new(0., 0.5, 1.),
-                scale: gf::BODY.transform_scale(),
-                ..default()
-            },
-            ..Default::default()
-        })
+        .spawn(
+            gf::BODY
+                .text(&asset_server, "OK", DARK_WOOD_BROWN)
+                .justify(Justify::Center)
+                .anchor(Anchor::CENTER)
+                .with_transform(Transform {
+                    translation: Vec3::new(0., 0.5, 1.),
+                    scale: gf::BODY.transform_scale(),
+                    ..default()
+                }),
+        )
         .insert(RenderLayers::from_layers(&[3]))
         .insert(UIState::EnterName)
         .insert(Name::new("OK Button Text"))
-        .set_parent(button_entity);
+        .insert(ChildOf(button_entity));
 }
 
-/// Handle text input for name entry
-pub fn handle_name_entry_input(
-    mut char_events: EventReader<ReceivedCharacter>,
-    key_input: Res<Input<KeyCode>>,
-    mut current_input: ResMut<CurrentNameInput>,
-) {
-    // Handle backspace
-    if key_input.just_pressed(KeyCode::Back) {
-        current_input.text.pop();
-    }
-
-    // Handle character input
-    for event in char_events.iter() {
-        let c = event.char;
-
+fn push_name_chars(current_input: &mut CurrentNameInput, value: &str) {
+    for c in value.chars() {
         // Ignore control characters and limit length to 15 characters
-        if c.is_alphanumeric() || c == ' ' || c == '_' || c == '-' {
-            if current_input.text.len() < 15 {
-                current_input.text.push(c);
-            }
+        if (c.is_alphanumeric() || c == ' ' || c == '_' || c == '-')
+            && current_input.text.len() < 15
+        {
+            current_input.text.push(c);
         }
     }
 }
 
-/// Update the displayed text in the input field
-/// We rebuild the entire Text to ensure Bevy's change detection picks it up
+/// Handle text input for name entry
+pub fn handle_name_entry_input(
+    mut ime_events: MessageReader<Ime>,
+    mut keyboard_events: MessageReader<KeyboardInput>,
+    key_input: Res<ButtonInput<KeyCode>>,
+    mut current_input: ResMut<CurrentNameInput>,
+) {
+    // Handle backspace
+    if key_input.just_pressed(KeyCode::Backspace) {
+        current_input.text.pop();
+    }
+
+    // IME commit (when enabled) and KeyboardInput::text (normal Latin typing on 0.19).
+    for event in ime_events.read() {
+        if let Ime::Commit { value, .. } = event {
+            push_name_chars(&mut current_input, value);
+        }
+    }
+    for event in keyboard_events.read() {
+        if event.state != bevy::input::ButtonState::Pressed {
+            continue;
+        }
+        if let Some(text) = event.text.as_deref() {
+            push_name_chars(&mut current_input, text);
+        }
+    }
+}
+
+/// Update the displayed text span in the input field.
 pub fn update_name_entry_text(
     current_input: Res<CurrentNameInput>,
-    mut text_query: Query<&mut Text, With<NameEntryInput>>,
-    asset_server: Res<AssetServer>,
+    mut text_query: Query<&mut TextSpan, With<NameEntryValue>>,
 ) {
     // Defensive: Check if query is empty to avoid race condition
     if text_query.is_empty() {
@@ -278,30 +271,8 @@ pub fn update_name_entry_text(
 
     for mut text in text_query.iter_mut() {
         let new_value = current_input.text.clone();
-        // Only update if different to avoid unnecessary work
-        if text.sections[0].value != new_value {
-            // Rebuild the entire Text to force change detection
-            let cursor_value = text
-                .sections
-                .get(1)
-                .map(|s| s.value.clone())
-                .unwrap_or_else(|| "|".to_string());
-
-            let style = gf::BODY.text_style(&asset_server, DARK_WOOD_BROWN);
-            *text = Text {
-                sections: vec![
-                    TextSection {
-                        value: new_value,
-                        style: style.clone(),
-                    },
-                    TextSection {
-                        value: cursor_value,
-                        style,
-                    },
-                ],
-                alignment: TextAlignment::Left,
-                ..Default::default()
-            };
+        if text.0 != new_value {
+            text.0 = new_value;
         }
     }
 }
@@ -309,7 +280,7 @@ pub fn update_name_entry_text(
 /// Handle OK button click
 pub fn handle_name_entry_ok_button(
     cursor_pos: Res<CursorPos>,
-    mouse_input: Res<Input<MouseButton>>,
+    mouse_input: Res<ButtonInput<MouseButton>>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     mut buttons: Query<(Entity, &mut Interactable), With<NameEntryOKButton>>,
     current_input: Res<CurrentNameInput>,
@@ -382,23 +353,38 @@ fn save_player_name(name: &str, game_data_resource: &mut GameData) {
 pub fn check_show_name_entry_popup(
     mut next_ui_state: ResMut<NextState<UIState>>,
     current_ui_state: Res<State<UIState>>,
+    game_data: Option<Res<GameData>>,
 ) {
     // Only check when in Closed state
-    if current_ui_state.0 != UIState::Closed {
+    if *current_ui_state.get() != UIState::Closed {
         return;
     }
 
-    let game_data_file_path = datafiles::game_data();
-
-    // Check if player name exists
-    let needs_name = if let Ok(file) = File::open(&game_data_file_path) {
-        let reader = BufReader::new(file);
-        match GameData::try_from_json_reader(reader) {
-            Ok(data) => data.player_name.is_none() || data.player_name.as_ref().unwrap().is_empty(),
-            Err(_) => true, // File doesn't exist or is corrupted, need name
+    // Prefer the already-loaded resource (from `load_game_data_for_ui`). Falling back to a file
+    // re-read used to treat any deserialize error as "needs name", which trapped the main menu
+    // in EnterName after the Bevy 0.19 KeyCode rename broke legacy keybind JSON.
+    let needs_name = match game_data.as_ref() {
+        Some(data) => data
+            .player_name
+            .as_ref()
+            .map(|name| name.trim().is_empty())
+            .unwrap_or(true),
+        None => {
+            let game_data_file_path = datafiles::game_data();
+            if let Ok(file) = File::open(&game_data_file_path) {
+                let reader = BufReader::new(file);
+                match GameData::try_from_json_reader(reader) {
+                    Ok(data) => data
+                        .player_name
+                        .as_ref()
+                        .map(|name| name.trim().is_empty())
+                        .unwrap_or(true),
+                    Err(_) => true,
+                }
+            } else {
+                true
+            }
         }
-    } else {
-        true // File doesn't exist, need name
     };
 
     if needs_name {
@@ -406,13 +392,11 @@ pub fn check_show_name_entry_popup(
     }
 }
 
-/// Update cursor blink animation
-/// We rebuild the entire Text to ensure Bevy's change detection picks it up
+/// Update the cursor span's blink animation.
 pub fn update_cursor_blink(
     time: Res<Time>,
     mut blink_timer: ResMut<CursorBlinkTimer>,
-    mut text_query: Query<&mut Text, With<CursorBlink>>,
-    asset_server: Res<AssetServer>,
+    mut text_query: Query<&mut TextSpan, With<CursorBlink>>,
 ) {
     // Defensive: Check if query is empty to avoid race condition
     if text_query.is_empty() {
@@ -423,32 +407,7 @@ pub fn update_cursor_blink(
 
     if blink_timer.timer.just_finished() {
         for mut text in text_query.iter_mut() {
-            if text.sections.len() > 1 {
-                let user_text = text.sections[0].value.clone();
-                let current_cursor = &text.sections[1].value;
-                let new_cursor = if current_cursor == "|" {
-                    "".to_string()
-                } else {
-                    "|".to_string()
-                };
-
-                // Rebuild the entire Text to force change detection
-                let style = gf::BODY.text_style(&asset_server, DARK_WOOD_BROWN);
-                *text = Text {
-                    sections: vec![
-                        TextSection {
-                            value: user_text,
-                            style: style.clone(),
-                        },
-                        TextSection {
-                            value: new_cursor,
-                            style,
-                        },
-                    ],
-                    alignment: TextAlignment::Left,
-                    ..Default::default()
-                };
-            }
+            text.0 = if text.0 == "|" { "" } else { "|" }.to_string();
         }
     }
 }
@@ -461,7 +420,7 @@ pub fn cleanup_name_entry_ui(
     mut blink_timer: ResMut<CursorBlinkTimer>,
 ) {
     for entity in query.iter() {
-        commands.entity(entity).despawn_recursive();
+        commands.entity(entity).despawn();
     }
     current_input.text.clear();
     // Reset blink timer for next time

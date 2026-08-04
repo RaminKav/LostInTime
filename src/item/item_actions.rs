@@ -1,5 +1,3 @@
-use std::marker::PhantomData;
-
 use crate::{
     attributes::{
         hunger::Hunger,
@@ -16,9 +14,9 @@ use crate::{
     proto::proto_param::ProtoParam,
     ui::{
         minimap::UpdateMiniMapEvent,
-        scrapper_ui::ScrapperContainer,
         tips::{SeenTips, TipEvent},
-        ChestContainer, FurnaceContainer, InventorySlotState, InventorySlotType, UIState,
+        ChestContainer, ChestInventory, FurnaceContainer, FurnaceInventory, InventorySlotState,
+        InventorySlotType, ScrapperContainer, ScrapperInventory, UIState,
     },
     world::{
         dimension::DimensionSpawnEvent,
@@ -30,6 +28,7 @@ use crate::{
     BounceEvent, GameParam, GameState, TextureCamera,
 };
 use bevy::{ecs::system::SystemParam, prelude::*};
+use bevy_aseprite_ultra::prelude::AseAnimation;
 use bevy_ecs_tilemap::tiles::TilePos;
 use serde::Deserialize;
 
@@ -41,7 +40,7 @@ fn push_player_consumable_buff(
     duration_secs: f32,
     effect: ConsumableBuffEffect,
 ) {
-    let Ok(mut buffs) = item_action_param.consumable_buffs.get_single_mut() else {
+    let Ok(mut buffs) = item_action_param.consumable_buffs.single_mut() else {
         return;
     };
     let needs_attr = matches!(
@@ -56,11 +55,11 @@ fn push_player_consumable_buff(
         effect,
     });
     if needs_attr {
-        item_action_param.attribute_change_event.send_default();
+        item_action_param.attribute_change_event.write_default();
     }
 }
 
-#[derive(Component, Reflect, FromReflect, Clone, Default, PartialEq, Debug, Deserialize)]
+#[derive(Component, Reflect, Clone, Default, PartialEq, Debug, Deserialize)]
 #[reflect(Component)]
 pub enum ItemAction {
     #[default]
@@ -166,7 +165,7 @@ fn format_stat_name(attr: &str) -> &'static str {
     }
 }
 
-#[derive(Component, Reflect, FromReflect, Default, Clone, Debug, Deserialize)]
+#[derive(Component, Reflect, Default, Clone, Debug, Deserialize)]
 #[reflect(Component)]
 pub struct ItemActions {
     pub actions: Vec<ItemAction>,
@@ -212,38 +211,39 @@ impl ItemActions {
         }
     }
 }
-#[derive(Component, Reflect, FromReflect, Default, Clone, Debug)]
+#[derive(Component, Reflect, Default, Clone, Debug)]
 #[reflect(Component)]
 pub struct ManaCost(pub i32);
-#[derive(Component, Reflect, FromReflect, Default, Clone, Debug)]
+#[derive(Component, Reflect, Default, Clone, Debug)]
 #[reflect(Component)]
 pub struct ConsumableItem;
 
+#[derive(Message)]
 pub struct ActionSuccessEvent {
     pub obj: WorldObject,
     pub item_slot: usize,
 }
 #[derive(SystemParam)]
 pub struct ItemActionParam<'w, 's> {
-    pub move_player_event: EventWriter<'w, MovePlayerEvent>,
-    pub bounce_event: EventWriter<'w, BounceEvent>,
-    pub use_item_event: EventWriter<'w, UseItemEvent>,
-    pub currency_event: EventWriter<'w, ModifyCurencyEvent>,
-    pub modify_health_event: EventWriter<'w, ModifyHealthEvent>,
-    pub increase_chaos_event: EventWriter<'w, IncreaseChaosEvent>,
-    pub dim_event: EventWriter<'w, DimensionSpawnEvent>,
-    pub analytics_event: EventWriter<'w, AnalyticsUpdateEvent>,
+    pub move_player_event: MessageWriter<'w, MovePlayerEvent>,
+    pub bounce_event: MessageWriter<'w, BounceEvent>,
+    pub use_item_event: MessageWriter<'w, UseItemEvent>,
+    pub currency_event: MessageWriter<'w, ModifyCurencyEvent>,
+    pub modify_health_event: MessageWriter<'w, ModifyHealthEvent>,
+    pub increase_chaos_event: MessageWriter<'w, IncreaseChaosEvent>,
+    pub dim_event: MessageWriter<'w, DimensionSpawnEvent>,
+    pub analytics_event: MessageWriter<'w, AnalyticsUpdateEvent>,
     pub next_inv_state: ResMut<'w, NextState<UIState>>,
     pub next_game_state: ResMut<'w, NextState<GameState>>,
-    pub modify_mana_event: EventWriter<'w, ModifyManaEvent>,
-    pub place_item_event: EventWriter<'w, PlaceItemEvent>,
-    pub action_success_event: EventWriter<'w, ActionSuccessEvent>,
-    pub minimap_event: EventWriter<'w, UpdateMiniMapEvent>,
+    pub modify_mana_event: MessageWriter<'w, ModifyManaEvent>,
+    pub place_item_event: MessageWriter<'w, PlaceItemEvent>,
+    pub action_success_event: MessageWriter<'w, ActionSuccessEvent>,
+    pub minimap_event: MessageWriter<'w, UpdateMiniMapEvent>,
     pub cursor_pos: Res<'w, CursorPos>,
     pub hunger_query: Query<'w, 's, &'static mut Hunger>,
-    pub chest_query: Query<'w, 's, &'static ChestContainer>,
-    pub scrapper_query: Query<'w, 's, &'static ScrapperContainer>,
-    pub furnace_query: Query<'w, 's, &'static FurnaceContainer>,
+    pub chest_query: Query<'w, 's, &'static ChestInventory>,
+    pub scrapper_query: Query<'w, 's, &'static ScrapperInventory>,
+    pub furnace_query: Query<'w, 's, &'static FurnaceInventory>,
     pub crafting_tracker: ResMut<'w, CraftingTracker>,
     pub recipes: Res<'w, Recipes>,
     pub night_tracker: Res<'w, NightTracker>,
@@ -254,13 +254,14 @@ pub struct ItemActionParam<'w, 's> {
     pub boss_kill_tracker: Option<Res<'w, BossKillTracker>>,
     pub achievements: Option<ResMut<'w, crate::player::achievements::Achievements>>,
     pub player_class: Option<ResMut<'w, crate::player::skills::PlayerClass>>,
-    pub achievement_events: EventWriter<'w, crate::player::achievements::AchievementUnlockedEvent>,
+    pub achievement_events:
+        MessageWriter<'w, crate::player::achievements::AchievementUnlockedEvent>,
     pub player_skills:
         Query<'w, 's, &'static crate::player::skills::PlayerSkills, With<crate::player::Player>>,
     pub infinite_mode: Res<'w, crate::night::InfiniteMode>,
-    pub tip_event: EventWriter<'w, TipEvent>,
+    pub tip_event: MessageWriter<'w, TipEvent>,
     pub seen_tips: Option<Res<'w, SeenTips>>,
-    pub attribute_change_event: EventWriter<'w, AttributeChangeEvent>,
+    pub attribute_change_event: MessageWriter<'w, AttributeChangeEvent>,
     pub consumable_buffs:
         Query<'w, 's, &'static mut ActiveConsumableBuffs, With<crate::player::Player>>,
     pub food_bonuses: Query<
@@ -269,11 +270,9 @@ pub struct ItemActionParam<'w, 's> {
         &'static mut crate::attributes::FoodAttributeBonuses,
         With<crate::player::Player>,
     >,
-    pub dungeon_wave_event: EventWriter<'w, StartNextDungeonWaveEvent>,
+    pub dungeon_wave_event: MessageWriter<'w, StartNextDungeonWaveEvent>,
     pub dungeon_reward_drop: ResMut<'w, DungeonRewardDrop>,
-
-    #[system_param(ignore)]
-    marker: PhantomData<&'s ()>,
+    pub aseprite_anims: Query<'w, 's, &'static mut AseAnimation>,
 }
 
 impl ItemActions {
@@ -292,14 +291,14 @@ impl ItemActions {
                 ItemAction::ModifyHealth(delta) => {
                     item_action_param
                         .modify_health_event
-                        .send(ModifyHealthEvent(*delta));
-                    item_action_param.use_item_event.send(UseItemEvent(obj));
+                        .write(ModifyHealthEvent(*delta));
+                    item_action_param.use_item_event.write(UseItemEvent(obj));
                 }
                 ItemAction::ModifyMana(delta) => {
                     item_action_param
                         .modify_mana_event
-                        .send(ModifyManaEvent::gain(*delta, ManaGainSource::Potion));
-                    item_action_param.use_item_event.send(UseItemEvent(obj));
+                        .write(ModifyManaEvent::gain(*delta, ManaGainSource::Potion));
+                    item_action_param.use_item_event.write(UseItemEvent(obj));
                 }
                 ItemAction::ApplyAttackSpeedBuff(duration, multiplier) => {
                     push_player_consumable_buff(
@@ -308,7 +307,7 @@ impl ItemActions {
                         *duration,
                         ConsumableBuffEffect::AttackSpeedAdd(*multiplier),
                     );
-                    item_action_param.use_item_event.send(UseItemEvent(obj));
+                    item_action_param.use_item_event.write(UseItemEvent(obj));
                 }
                 ItemAction::ApplyMovementSpeedBuff(duration, multiplier) => {
                     push_player_consumable_buff(
@@ -317,7 +316,7 @@ impl ItemActions {
                         *duration,
                         ConsumableBuffEffect::MovementSpeedMult(*multiplier),
                     );
-                    item_action_param.use_item_event.send(UseItemEvent(obj));
+                    item_action_param.use_item_event.write(UseItemEvent(obj));
                 }
                 ItemAction::ApplyTemporaryThorns(amount, duration) => {
                     push_player_consumable_buff(
@@ -326,7 +325,7 @@ impl ItemActions {
                         *duration,
                         ConsumableBuffEffect::FlatThorns(*amount),
                     );
-                    item_action_param.use_item_event.send(UseItemEvent(obj));
+                    item_action_param.use_item_event.write(UseItemEvent(obj));
                 }
                 ItemAction::ApplyTemporarySpeed(amount, duration) => {
                     push_player_consumable_buff(
@@ -335,18 +334,18 @@ impl ItemActions {
                         *duration,
                         ConsumableBuffEffect::FlatSpeed(*amount),
                     );
-                    item_action_param.use_item_event.send(UseItemEvent(obj));
+                    item_action_param.use_item_event.write(UseItemEvent(obj));
                 }
                 ItemAction::TriggerBounce => {
-                    item_action_param.bounce_event.send(BounceEvent);
-                    item_action_param.use_item_event.send(UseItemEvent(obj));
+                    item_action_param.bounce_event.write(BounceEvent);
+                    item_action_param.use_item_event.write(UseItemEvent(obj));
                 }
                 ItemAction::GainStat(attr_name, delta) => {
-                    if let Ok(mut food) = item_action_param.food_bonuses.get_single_mut() {
+                    if let Ok(mut food) = item_action_param.food_bonuses.single_mut() {
                         food.add(attr_name, *delta);
-                        item_action_param.attribute_change_event.send_default();
+                        item_action_param.attribute_change_event.write_default();
                     }
-                    item_action_param.use_item_event.send(UseItemEvent(obj));
+                    item_action_param.use_item_event.write(UseItemEvent(obj));
                 }
                 ItemAction::ApplyPeriodicHeal(heal, interval, total_duration) => {
                     push_player_consumable_buff(
@@ -361,14 +360,14 @@ impl ItemActions {
                             ),
                         },
                     );
-                    item_action_param.use_item_event.send(UseItemEvent(obj));
+                    item_action_param.use_item_event.write(UseItemEvent(obj));
                 }
                 ItemAction::TeleportHome => {
-                    item_action_param.move_player_event.send(MovePlayerEvent {
+                    item_action_param.move_player_event.write(MovePlayerEvent {
                         pos: TileMapPosition::new(IVec2::new(0, 0), TilePos::new(0, 0)),
                         clear_recall_history: true,
                     });
-                    item_action_param.use_item_event.send(UseItemEvent(obj));
+                    item_action_param.use_item_event.write(UseItemEvent(obj));
                 }
                 ItemAction::PlacesInto(obj) => {
                     let pos = item_action_param.cursor_pos.world_coords.truncate();
@@ -385,7 +384,7 @@ impl ItemActions {
                     ) {
                         return;
                     }
-                    item_action_param.place_item_event.send(PlaceItemEvent {
+                    item_action_param.place_item_event.write(PlaceItemEvent {
                         obj: *obj,
                         pos,
                         placed_by_player: true,
@@ -393,7 +392,7 @@ impl ItemActions {
                     });
                     item_action_param
                         .analytics_event
-                        .send(AnalyticsUpdateEvent {
+                        .write(AnalyticsUpdateEvent {
                             update_type: AnalyticsTrigger::ObjectPlaced(*obj),
                         });
                 }
@@ -401,7 +400,7 @@ impl ItemActions {
                     for mut hunger in item_action_param.hunger_query.iter_mut() {
                         hunger.modify_hunger(*delta);
                     }
-                    item_action_param.use_item_event.send(UseItemEvent(obj));
+                    item_action_param.use_item_event.write(UseItemEvent(obj));
                 }
                 ItemAction::Essence => {
                     item_action_param.next_inv_state.set(UIState::Essence);
@@ -415,16 +414,18 @@ impl ItemActions {
                     // );
                 }
                 ItemAction::GrantSkillPoint(amount) => {
-                    let mut sp = item_action_param.skill_points_query.single_mut();
+                    let Ok(mut sp) = item_action_param.skill_points_query.single_mut() else {
+                        return;
+                    };
                     sp.count += *amount;
 
-                    item_action_param.use_item_event.send(UseItemEvent(obj));
+                    item_action_param.use_item_event.write(UseItemEvent(obj));
                 }
                 ItemAction::BeaconPortal => {
                     if let Some(e) = item_action_param.beacon_guidance.portal.take() {
                         // Safely despawn - check if entity exists first
-                        if let Some(entity_commands) = commands.get_entity(e) {
-                            entity_commands.despawn_recursive();
+                        if let Ok(mut entity_commands) = commands.get_entity(e) {
+                            entity_commands.despawn();
                         }
                     } else {
                         let icon_e =
@@ -441,8 +442,8 @@ impl ItemActions {
                 ItemAction::BeaconDungeonEntrance => {
                     if let Some(e) = item_action_param.beacon_guidance.dungeon.take() {
                         // Safely despawn - check if entity exists first
-                        if let Some(entity_commands) = commands.get_entity(e) {
-                            entity_commands.despawn_recursive();
+                        if let Ok(mut entity_commands) = commands.get_entity(e) {
+                            entity_commands.despawn();
                         }
                     } else {
                         let pos = game
@@ -470,8 +471,8 @@ impl ItemActions {
                 ItemAction::BeaconBossShrine => {
                     if let Some(e) = item_action_param.beacon_guidance.boss.take() {
                         // Safely despawn - check if entity exists first
-                        if let Some(entity_commands) = commands.get_entity(e) {
-                            entity_commands.despawn_recursive();
+                        if let Ok(mut entity_commands) = commands.get_entity(e) {
+                            entity_commands.despawn();
                         }
                     } else {
                         let pos = game
@@ -502,25 +503,28 @@ impl ItemActions {
 
         item_action_param
             .action_success_event
-            .send(ActionSuccessEvent { obj, item_slot });
+            .write(ActionSuccessEvent { obj, item_slot });
     }
 }
 
 pub fn handle_item_action_success(
-    mut success_events: EventReader<ActionSuccessEvent>,
+    mut success_events: MessageReader<ActionSuccessEvent>,
     mut inv: Query<&mut Inventory>,
     proto_param: ProtoParam,
-    mut analytics_event: EventWriter<AnalyticsUpdateEvent>,
+    mut analytics_event: MessageWriter<AnalyticsUpdateEvent>,
     mut inv_slots: Query<&mut InventorySlotState>,
 ) {
-    for e in success_events.iter() {
+    for e in success_events.read() {
         if proto_param
             .get_component::<ConsumableItem, _>(e.obj)
             .is_some()
         {
-            let mut item_action_item = inv.single().items.items[e.item_slot].clone().unwrap();
+            let Ok(mut inv_mut) = inv.single_mut() else {
+                continue;
+            };
+            let mut item_action_item = inv_mut.items.items[e.item_slot].clone().unwrap();
             let consumed_from_slot = item_action_item.slot;
-            inv.single_mut().items.items[consumed_from_slot] = item_action_item.modify_count(-1);
+            inv_mut.items.items[consumed_from_slot] = item_action_item.modify_count(-1);
             for mut state in inv_slots.iter_mut() {
                 if state.slot_index == consumed_from_slot
                     && (state.r#type == InventorySlotType::Normal || state.r#type.is_hotbar())
@@ -528,7 +532,7 @@ pub fn handle_item_action_success(
                     state.dirty = true;
                 }
             }
-            analytics_event.send(AnalyticsUpdateEvent {
+            analytics_event.write(AnalyticsUpdateEvent {
                 update_type: AnalyticsTrigger::ItemConsumed(e.obj),
             });
 
@@ -570,7 +574,9 @@ pub fn handle_item_action_success(
                     &ItemAction::ModifyHealth(_) => was_healing = true,
                     _ => {}
                 });
-                let mut inv = inv.single_mut();
+                let Ok(mut inv) = inv.single_mut() else {
+                    return;
+                };
                 if was_food && !is_quick_use_slot {
                     // find another food item in inv and place it in this slot
                     for food in FOOD.iter() {

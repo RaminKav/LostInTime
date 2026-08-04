@@ -1,18 +1,19 @@
 use std::collections::HashMap;
 use std::time::Duration;
 
+use crate::aseprite_assets::{
+    PlayerGreyAseprite, PlayerHunterAseprite, PlayerRedAseprite, PlayerRogueAseprite,
+    PlayerThiefAseprite, PlayerWizardAseprite,
+};
 use bevy::prelude::*;
-use bevy_aseprite::Aseprite;
+use bevy_aseprite_ultra::prelude::Aseprite;
 use rand::{seq::SliceRandom, Rng};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use strum_macros::{Display, EnumIter};
 
 use crate::{
-    animations::player_sprite::{
-        PlayerGreyAseprite, PlayerHunterAseprite, PlayerRedAseprite, PlayerRogueAseprite,
-        PlayerSpriteHandles, PlayerThiefAseprite, PlayerWizardAseprite,
-    },
+    animations::player_sprite::PlayerSpriteHandles,
     attributes::{AttributeQuality, AttributeValue, ItemAttributes, ItemGlow},
     chaos::ChaosTracker,
     colors::{
@@ -36,7 +37,20 @@ use crate::{
 
 use super::{mage_skills::TeleportState, rogue_skills::ComboCounter};
 
-#[derive(Component, Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize, Hash, EnumIter, Default, Display)]
+#[derive(
+    Component,
+    Debug,
+    Copy,
+    Clone,
+    Eq,
+    PartialEq,
+    Serialize,
+    Deserialize,
+    Hash,
+    EnumIter,
+    Default,
+    Display,
+)]
 pub enum SkillClass {
     #[default]
     None,
@@ -48,7 +62,7 @@ pub enum SkillClass {
     Hunter,  // Bow, Gun - +3% crit dmg per level
 }
 
-#[derive(Component, Debug, Clone, Serialize, Deserialize, Resource, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Resource, Default)]
 pub struct PlayerClass {
     pub class: SkillClass,
     pub pets: Vec<Pet>,
@@ -143,7 +157,9 @@ impl SkillClass {
     }
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, Serialize, EnumIter, Display, Deserialize, Default)]
+#[derive(
+    Copy, Clone, Eq, PartialEq, Hash, Debug, Serialize, EnumIter, Display, Deserialize, Default,
+)]
 pub enum ActiveSkill {
     #[default]
     Roll,
@@ -1337,13 +1353,15 @@ impl Heirloom {
             // Self::CritDamage => &[D::CritDamage],
             // Self::Health | Self::HPRegen | Self::MaxHPHunt => &[D::Health],
             Self::Mana
-            | Self::MPRegen
             | Self::ManaOrbs
             | Self::MPBarCrit
             | Self::DamageDealtMp
-            | Self::MPRegenCooldown
             | Self::ManaOrbDropMult => &[D::Mana],
-            Self::FrozenMPRegen => &[D::Mana, D::FreezeChance],
+            Self::MPRegen | Self::MPRegenCooldown | Self::ManaOrbAttack | Self::MPBarDMG => {
+                &[D::ManaRegen]
+            }
+            Self::FrozenMPRegen => &[D::ManaRegen, D::FreezeChance],
+            Self::TeleportManaRegen => &[D::ManaRegen],
             Self::Thorns | Self::ThornsSpikes | Self::ThornsOnDamage | Self::ThornArmor => {
                 &[D::Thorns]
             }
@@ -1373,7 +1391,8 @@ impl Heirloom {
             | Self::StandStill
             | Self::MaxHPDamage => &[D::Attack],
             Self::ChaosBoost => &[D::Chaos],
-            Self::CoinLightning | Self::KillLightning | Self::ManaRegenLightning => &[D::Lightning],
+            Self::CoinLightning | Self::KillLightning => &[D::Lightning],
+            Self::ManaRegenLightning => &[D::Lightning, D::ManaRegen],
 
             Self::IceStaffAoE => &[D::IceExplosion, D::Weapons],
             Self::FrozenAoE => &[D::IceExplosion, D::FreezeChance],
@@ -1391,7 +1410,7 @@ impl Heirloom {
             Self::LoadedDice => &[D::Luck],
             Self::CherryBomb | Self::WaveAttack => &[D::Weapons],
             Self::SkillCDReduction | Self::SkillChargeIncrease => &[D::Skills],
-            Self::SkillManaRegen => &[D::Skills, D::Mana],
+            Self::SkillManaRegen => &[D::Skills, D::ManaRegen],
             Self::SkillEcho => &[D::Skills, D::Echo],
             _ => &[],
         }
@@ -1411,10 +1430,7 @@ impl Heirloom {
     }
 
     /// Mana/stat header lines first, blank gap, then effect body.
-    fn typed_from_strings(lines: Vec<String>) -> Vec<HeirloomDescLine> {
-        let classified: Vec<HeirloomDescLine> =
-            lines.into_iter().map(Self::classify_desc_line).collect();
-
+    fn typed_from_rich(classified: Vec<HeirloomDescLine>) -> Vec<HeirloomDescLine> {
         let mut mana = Vec::new();
         let mut stats = Vec::new();
         let mut effects = Vec::new();
@@ -1438,6 +1454,11 @@ impl Heirloom {
         result
     }
 
+    /// Mana/stat header lines first, blank gap, then effect body.
+    fn typed_from_strings(lines: Vec<String>) -> Vec<HeirloomDescLine> {
+        Self::typed_from_rich(lines.into_iter().map(Self::classify_desc_line).collect())
+    }
+
     pub fn desc_lines(&self) -> Vec<HeirloomDescLine> {
         // max 13 char per line, space included
         let lines = match self {
@@ -1455,7 +1476,15 @@ impl Heirloom {
             Heirloom::Mana => vec!["+25 Max Mana".to_string()],
             Heirloom::Shield => vec!["+10 Shield".to_string()],
             Heirloom::Speed => vec!["+10 Speed".to_string()],
-            Heirloom::Thorns => vec!["+25 Thorns ".to_string()],
+            Heirloom::Thorns => {
+                use crate::ui::desc_spans::DescSpan;
+                use crate::ui::TooltipDefinition;
+                return Self::typed_from_rich(vec![HeirloomDescLine::stat_spans([
+                    DescSpan::plain("+25 "),
+                    DescSpan::keyword(TooltipDefinition::Thorns, "Thorns"),
+                    DescSpan::plain(" "),
+                ])]);
+            }
             Heirloom::Lifesteal => {
                 vec!["+3% Lifesteal".to_string()]
             }
@@ -1482,38 +1511,75 @@ impl Heirloom {
                 "lob a cherry bomb.".to_string(),
                 format!("Costs {} mana", Heirloom::CherryBomb.get_mana_cost()),
             ],
-            Heirloom::FrailStacks => vec![
-                "Damage you deal has".to_string(),
-                "a +25% chance to".to_string(),
-                "apply a Frail".to_string(),
-                "stack.".to_string(),
-            ],
+            Heirloom::FrailStacks => {
+                use crate::ui::desc_spans::DescSpan;
+                use crate::ui::TooltipDefinition;
+                return Self::typed_from_rich(vec![
+                    HeirloomDescLine::effect("Damage you deal has"),
+                    HeirloomDescLine::effect("a +25% chance to"),
+                    HeirloomDescLine::effect_spans([
+                        DescSpan::plain("apply a "),
+                        DescSpan::keyword(TooltipDefinition::Frail, "Frail"),
+                        DescSpan::plain(" stack."),
+                    ]),
+                ]);
+            }
             Heirloom::SlowStacks => vec![
                 "Damage you deal has".to_string(),
                 "a +15% chance to".to_string(),
                 "apply a Freeze".to_string(),
                 "stack.".to_string(),
             ],
-            Heirloom::AntFarm => vec![
-                "Summon ants that".to_string(),
-                "rush towards".to_string(),
-                "enemies, dealing".to_string(),
-                "damage.".to_string(),
-                format!("Costs {} mana", Heirloom::AntFarm.get_mana_cost()),
-            ],
-            Heirloom::StoneTooth => vec![
-                "Summon rocks that".to_string(),
-                "orbit you and deal".to_string(),
-                "damage to enemies".to_string(),
-                "they hit.".to_string(),
-                format!("Costs {} mana", Heirloom::StoneTooth.get_mana_cost()),
-            ],
-            Heirloom::SummonRing => vec![
-                "Summon rings that".to_string(),
-                "pierce enemies and".to_string(),
-                "bounce off objects.".to_string(),
-                format!("Costs {} mana", Heirloom::SummonRing.get_mana_cost()),
-            ],
+            Heirloom::AntFarm => {
+                use crate::ui::desc_spans::DescSpan;
+                use crate::ui::TooltipDefinition;
+                return Self::typed_from_rich(vec![
+                    HeirloomDescLine::effect_spans([
+                        DescSpan::keyword(TooltipDefinition::Summon, "Summon"),
+                        DescSpan::plain(" ants that"),
+                    ]),
+                    HeirloomDescLine::effect("rush towards"),
+                    HeirloomDescLine::effect("enemies, dealing"),
+                    HeirloomDescLine::effect("damage."),
+                    HeirloomDescLine::mana(format!(
+                        "Costs {} mana",
+                        Heirloom::AntFarm.get_mana_cost()
+                    )),
+                ]);
+            }
+            Heirloom::StoneTooth => {
+                use crate::ui::desc_spans::DescSpan;
+                use crate::ui::TooltipDefinition;
+                return Self::typed_from_rich(vec![
+                    HeirloomDescLine::effect_spans([
+                        DescSpan::keyword(TooltipDefinition::Summon, "Summon"),
+                        DescSpan::plain(" rocks that"),
+                    ]),
+                    HeirloomDescLine::effect("orbit you and deal"),
+                    HeirloomDescLine::effect("damage to enemies"),
+                    HeirloomDescLine::effect("they hit."),
+                    HeirloomDescLine::mana(format!(
+                        "Costs {} mana",
+                        Heirloom::StoneTooth.get_mana_cost()
+                    )),
+                ]);
+            }
+            Heirloom::SummonRing => {
+                use crate::ui::desc_spans::DescSpan;
+                use crate::ui::TooltipDefinition;
+                return Self::typed_from_rich(vec![
+                    HeirloomDescLine::effect_spans([
+                        DescSpan::keyword(TooltipDefinition::Summon, "Summon"),
+                        DescSpan::plain(" rings that"),
+                    ]),
+                    HeirloomDescLine::effect("pierce enemies and"),
+                    HeirloomDescLine::effect("bounce off objects."),
+                    HeirloomDescLine::mana(format!(
+                        "Costs {} mana",
+                        Heirloom::SummonRing.get_mana_cost()
+                    )),
+                ]);
+            }
             Heirloom::Reaper => vec![
                 "Soul fragments".to_string(),
                 "chase enemies".to_string(),
@@ -1522,18 +1588,34 @@ impl Heirloom {
                 format!("Costs {} mana", Heirloom::Reaper.get_mana_cost()),
             ],
             Heirloom::SkillEcho => {
-                vec![
-                    "Using a skill".to_string(),
-                    "triggers an echo.".to_string(),
-                    format!("Costs {} mana", Heirloom::SkillEcho.get_mana_cost()),
-                ]
+                use crate::ui::desc_spans::DescSpan;
+                use crate::ui::TooltipDefinition;
+                return Self::typed_from_rich(vec![
+                    HeirloomDescLine::effect("Using a skill"),
+                    HeirloomDescLine::effect_spans([
+                        DescSpan::plain("triggers an "),
+                        DescSpan::keyword(TooltipDefinition::Echo, "echo"),
+                        DescSpan::plain("."),
+                    ]),
+                    HeirloomDescLine::mana(format!(
+                        "Costs {} mana",
+                        Heirloom::SkillEcho.get_mana_cost()
+                    )),
+                ]);
             }
-            Heirloom::PoisonStacks => vec![
-                "Damage you deal has".to_string(),
-                "a +25% chance to".to_string(),
-                "apply a Poison".to_string(),
-                "stack.".to_string(),
-            ],
+            Heirloom::PoisonStacks => {
+                use crate::ui::desc_spans::DescSpan;
+                use crate::ui::TooltipDefinition;
+                return Self::typed_from_rich(vec![
+                    HeirloomDescLine::effect("Damage you deal has"),
+                    HeirloomDescLine::effect("a +25% chance to"),
+                    HeirloomDescLine::effect_spans([
+                        DescSpan::plain("apply a "),
+                        DescSpan::keyword(TooltipDefinition::Poison, "Poison"),
+                    ]),
+                    HeirloomDescLine::effect("stack."),
+                ]);
+            }
             Heirloom::LethalBlow => vec![
                 "0.5% chance to".to_string(),
                 "execute enemies.".to_string(),
@@ -1567,12 +1649,19 @@ impl Heirloom {
                 "reduced.".to_string(),
             ],
             Heirloom::TeleportCount => vec!["Gain +1 Teleport".to_string(), "count.".to_string()],
-            Heirloom::TeleportManaRegen => vec![
-                "Attacking right".to_string(),
-                "after a Teleport".to_string(),
-                "triggers mana".to_string(),
-                "regeneration.".to_string(),
-            ],
+            Heirloom::TeleportManaRegen => {
+                use crate::ui::desc_spans::DescSpan;
+                use crate::ui::TooltipDefinition;
+                return Self::typed_from_rich(vec![
+                    HeirloomDescLine::effect("Attacking right"),
+                    HeirloomDescLine::effect("after a Teleport"),
+                    HeirloomDescLine::effect_spans([
+                        DescSpan::plain("triggers "),
+                        DescSpan::keyword(TooltipDefinition::ManaRegen, "Mana Regen"),
+                        DescSpan::plain("."),
+                    ]),
+                ]);
+            }
             Heirloom::SprintFaster => {
                 vec!["Your Sprint ability".to_string(), "is faster.".to_string()]
             }
@@ -1605,13 +1694,23 @@ impl Heirloom {
                 // ),
             ],
 
-            Heirloom::IceStaffAoE => vec![
-                "Your weapons have".to_string(),
-                "a 7% chance to ".to_string(),
-                "trigger an ice".to_string(),
-                "explosion.".to_string(),
-                format!("Costs {} mana", Heirloom::IceStaffAoE.get_mana_cost()),
-            ],
+            Heirloom::IceStaffAoE => {
+                use crate::ui::desc_spans::DescSpan;
+                use crate::ui::TooltipDefinition;
+                return Self::typed_from_rich(vec![
+                    HeirloomDescLine::effect("Your weapons have"),
+                    HeirloomDescLine::effect("a 7% chance to"),
+                    HeirloomDescLine::effect_spans([
+                        DescSpan::plain("trigger an "),
+                        DescSpan::keyword(TooltipDefinition::IceExplosion, "Ice Explosion"),
+                        DescSpan::plain("."),
+                    ]),
+                    HeirloomDescLine::mana(format!(
+                        "Costs {} mana",
+                        Heirloom::IceStaffAoE.get_mana_cost()
+                    )),
+                ]);
+            }
             Heirloom::BowArrowSpeed => {
                 vec!["Your Projectiles".to_string(), "move faster.".to_string()]
             }
@@ -1632,13 +1731,21 @@ impl Heirloom {
                 "parry knocks ".to_string(),
                 "back enemies.".to_string(),
             ],
-            Heirloom::ParryEcho => vec![
-                "A successful".to_string(),
-                "parry triggers".to_string(),
-                "an echo that".to_string(),
-                "damages enemies".to_string(),
-                "around you.".to_string(),
-            ],
+            Heirloom::ParryEcho => {
+                use crate::ui::desc_spans::DescSpan;
+                use crate::ui::TooltipDefinition;
+                return Self::typed_from_rich(vec![
+                    HeirloomDescLine::effect("A successful"),
+                    HeirloomDescLine::effect("parry triggers"),
+                    HeirloomDescLine::effect_spans([
+                        DescSpan::plain("an "),
+                        DescSpan::keyword(TooltipDefinition::Echo, "echo"),
+                        DescSpan::plain(" that"),
+                    ]),
+                    HeirloomDescLine::effect("damages enemies"),
+                    HeirloomDescLine::effect("around you."),
+                ]);
+            }
             Heirloom::DaggerCombo => vec![
                 "Weapon Attacks chained".to_string(),
                 "together build ".to_string(),
@@ -1647,22 +1754,47 @@ impl Heirloom {
                 "damage.".to_string(),
             ],
             Heirloom::HPRegen => vec!["+5 Health Regen".to_string()],
-            Heirloom::MPRegen => vec!["+5 Mana Regen".to_string()],
+            Heirloom::MPRegen => {
+                use crate::ui::desc_spans::DescSpan;
+                use crate::ui::TooltipDefinition;
+                return Self::typed_from_rich(vec![HeirloomDescLine::stat_spans([
+                    DescSpan::plain("+5 "),
+                    DescSpan::keyword(TooltipDefinition::ManaRegen, "Mana Regen"),
+                ])]);
+            }
             Heirloom::HPRegenCooldown => {
                 vec![
                     "Your Health regen".to_string(),
                     "cooldown is reduced.".to_string(),
                 ]
             }
-            Heirloom::MPRegenCooldown => vec![
-                "Your Mana regen".to_string(),
-                "cooldown is reduced".to_string(),
-            ],
-            Heirloom::OnHitEcho => vec![
-                "After taking damage,".to_string(),
-                "trigger an echo.".to_string(),
-                format!("Costs {} mana", Heirloom::OnHitEcho.get_mana_cost()),
-            ],
+            Heirloom::MPRegenCooldown => {
+                use crate::ui::desc_spans::DescSpan;
+                use crate::ui::TooltipDefinition;
+                return Self::typed_from_rich(vec![
+                    HeirloomDescLine::effect_spans([
+                        DescSpan::plain("Your "),
+                        DescSpan::keyword(TooltipDefinition::ManaRegen, "Mana Regen"),
+                    ]),
+                    HeirloomDescLine::effect("cooldown is reduced"),
+                ]);
+            }
+            Heirloom::OnHitEcho => {
+                use crate::ui::desc_spans::DescSpan;
+                use crate::ui::TooltipDefinition;
+                return Self::typed_from_rich(vec![
+                    HeirloomDescLine::effect("After taking damage,"),
+                    HeirloomDescLine::effect_spans([
+                        DescSpan::plain("trigger an "),
+                        DescSpan::keyword(TooltipDefinition::Echo, "echo"),
+                        DescSpan::plain("."),
+                    ]),
+                    HeirloomDescLine::mana(format!(
+                        "Costs {} mana",
+                        Heirloom::OnHitEcho.get_mana_cost()
+                    )),
+                ]);
+            }
 
             Heirloom::Knockback => vec![
                 "Damage you deal will".to_string(),
@@ -1685,14 +1817,24 @@ impl Heirloom {
                 "more damage.".to_string(),
             ],
 
-            Heirloom::FrozenAoE => vec![
-                "Killing a frozen".to_string(),
-                "enemy has a 25%".to_string(),
-                "chance to trigger an".to_string(),
-                "ice explosion.".to_string(),
-                "+15% freeze chance".to_string(),
-                format!("Costs {} mana", Heirloom::FrozenAoE.get_mana_cost()),
-            ],
+            Heirloom::FrozenAoE => {
+                use crate::ui::desc_spans::DescSpan;
+                use crate::ui::TooltipDefinition;
+                return Self::typed_from_rich(vec![
+                    HeirloomDescLine::effect("Killing a frozen"),
+                    HeirloomDescLine::effect("enemy has a 25%"),
+                    HeirloomDescLine::effect("chance to trigger an"),
+                    HeirloomDescLine::effect_spans([
+                        DescSpan::keyword(TooltipDefinition::IceExplosion, "Ice Explosion"),
+                        DescSpan::plain("."),
+                    ]),
+                    HeirloomDescLine::stat("+15% freeze chance"),
+                    HeirloomDescLine::mana(format!(
+                        "Costs {} mana",
+                        Heirloom::FrozenAoE.get_mana_cost()
+                    )),
+                ]);
+            }
             Heirloom::IceStaffFloor => vec![
                 "Killing an enemy has".to_string(),
                 "a 10% chance to leave".to_string(),
@@ -1707,25 +1849,39 @@ impl Heirloom {
                 "chance.".to_string(),
                 "+15% freeze chance".to_string(),
             ],
-            Heirloom::MPBarDMG => vec![
-                "Mana regeneration".to_string(),
-                "is stored, adding".to_string(),
-                "bonus damage on".to_string(),
-                "your next attack.".to_string(),
-            ],
+            Heirloom::MPBarDMG => {
+                use crate::ui::desc_spans::DescSpan;
+                use crate::ui::TooltipDefinition;
+                return Self::typed_from_rich(vec![
+                    HeirloomDescLine::effect_spans([DescSpan::keyword(
+                        TooltipDefinition::ManaRegen,
+                        "Mana Regen",
+                    )]),
+                    HeirloomDescLine::effect("is stored, adding"),
+                    HeirloomDescLine::effect("bonus damage on"),
+                    HeirloomDescLine::effect("your next attack."),
+                ]);
+            }
             Heirloom::MPBarCrit => vec![
                 "Your staff's attacks".to_string(),
                 "gain +10% critical".to_string(),
                 "hit chance if your".to_string(),
                 "mana bar is full.".to_string(),
             ],
-            Heirloom::FrozenMPRegen => vec![
-                "Killing a frozen".to_string(),
-                "enemy has a 20%".to_string(),
-                "chance to trigger".to_string(),
-                "mana regen.".to_string(),
-                "+15% freeze chance".to_string(),
-            ],
+            Heirloom::FrozenMPRegen => {
+                use crate::ui::desc_spans::DescSpan;
+                use crate::ui::TooltipDefinition;
+                return Self::typed_from_rich(vec![
+                    HeirloomDescLine::effect("Killing a frozen"),
+                    HeirloomDescLine::effect("enemy has a 20%"),
+                    HeirloomDescLine::effect("chance to trigger"),
+                    HeirloomDescLine::effect_spans([
+                        DescSpan::keyword(TooltipDefinition::ManaRegen, "Mana Regen"),
+                        DescSpan::plain("."),
+                    ]),
+                    HeirloomDescLine::stat("+15% freeze chance"),
+                ]);
+            }
             Heirloom::DodgeCrit => vec![
                 "Dodging grants 2x".to_string(),
                 "attack speed and a".to_string(),
@@ -1733,17 +1889,41 @@ impl Heirloom {
                 "weapon hit does 2x".to_string(),
                 "damage.".to_string(),
             ],
-            Heirloom::PoisonDuration => vec![
-                "Your poison effect".to_string(),
-                "lasts longer.".to_string(),
-                "+25% poison chance.".to_string(),
-            ],
-            Heirloom::PoisonStrength => vec![
-                "Your poison effect".to_string(),
-                "does +100% more".to_string(),
-                "damage.".to_string(),
-                "+25% poison chance.".to_string(),
-            ],
+            Heirloom::PoisonDuration => {
+                use crate::ui::desc_spans::DescSpan;
+                use crate::ui::TooltipDefinition;
+                return Self::typed_from_rich(vec![
+                    HeirloomDescLine::effect_spans([
+                        DescSpan::plain("Your "),
+                        DescSpan::keyword(TooltipDefinition::Poison, "Poison"),
+                        DescSpan::plain(" effect"),
+                    ]),
+                    HeirloomDescLine::effect("lasts longer."),
+                    HeirloomDescLine::stat_spans([
+                        DescSpan::plain("+25% "),
+                        DescSpan::keyword(TooltipDefinition::Poison, "Poison"),
+                        DescSpan::plain(" chance."),
+                    ]),
+                ]);
+            }
+            Heirloom::PoisonStrength => {
+                use crate::ui::desc_spans::DescSpan;
+                use crate::ui::TooltipDefinition;
+                return Self::typed_from_rich(vec![
+                    HeirloomDescLine::effect_spans([
+                        DescSpan::plain("Your "),
+                        DescSpan::keyword(TooltipDefinition::Poison, "Poison"),
+                        DescSpan::plain(" effect"),
+                    ]),
+                    HeirloomDescLine::effect("does +100% more"),
+                    HeirloomDescLine::effect("damage."),
+                    HeirloomDescLine::stat_spans([
+                        DescSpan::plain("+25% "),
+                        DescSpan::keyword(TooltipDefinition::Poison, "Poison"),
+                        DescSpan::plain(" chance."),
+                    ]),
+                ]);
+            }
             Heirloom::ViralVenum => vec![
                 "Killing a poisoned".to_string(),
                 "enemy spreads it's".to_string(),
@@ -1752,20 +1932,41 @@ impl Heirloom {
                 "+25% poison chance.".to_string(),
                 format!("Costs {} mana", Heirloom::ViralVenum.get_mana_cost()),
             ],
-            Heirloom::HealEcho => vec![
-                "Healing has a 10%".to_string(),
-                "chance to trigger an".to_string(),
-                "echo.".to_string(),
-                "+5 Health regen.".to_string(),
-                format!("Costs {} mana", Heirloom::HealEcho.get_mana_cost()),
-            ],
-            Heirloom::HealSummons => vec![
-                "Healing has a 10%".to_string(),
-                "chance to trigger".to_string(),
-                "all summon heirlooms".to_string(),
-                "once.".to_string(),
-                format!("Costs {} mana", Heirloom::HealSummons.get_mana_cost()),
-            ],
+            Heirloom::HealEcho => {
+                use crate::ui::desc_spans::DescSpan;
+                use crate::ui::TooltipDefinition;
+                return Self::typed_from_rich(vec![
+                    HeirloomDescLine::effect("Healing has a 10%"),
+                    HeirloomDescLine::effect("chance to trigger an"),
+                    HeirloomDescLine::effect_spans([
+                        DescSpan::keyword(TooltipDefinition::Echo, "echo"),
+                        DescSpan::plain("."),
+                    ]),
+                    HeirloomDescLine::stat("+5 Health regen."),
+                    HeirloomDescLine::mana(format!(
+                        "Costs {} mana",
+                        Heirloom::HealEcho.get_mana_cost()
+                    )),
+                ]);
+            }
+            Heirloom::HealSummons => {
+                use crate::ui::desc_spans::DescSpan;
+                use crate::ui::TooltipDefinition;
+                return Self::typed_from_rich(vec![
+                    HeirloomDescLine::effect("Healing has a 10%"),
+                    HeirloomDescLine::effect("chance to trigger"),
+                    HeirloomDescLine::effect_spans([
+                        DescSpan::plain("all "),
+                        DescSpan::keyword(TooltipDefinition::Summon, "Summon"),
+                        DescSpan::plain(" heirlooms"),
+                    ]),
+                    HeirloomDescLine::effect("once."),
+                    HeirloomDescLine::mana(format!(
+                        "Costs {} mana",
+                        Heirloom::HealSummons.get_mana_cost()
+                    )),
+                ]);
+            }
             Heirloom::FullStomach => vec![
                 "You get hungry".to_string(),
                 "at a slower rate.".to_string(),
@@ -1818,12 +2019,19 @@ impl Heirloom {
                 "increases damage".to_string(),
                 "rapidly.".to_string(),
             ],
-            Heirloom::ThornArmor => vec![
-                "Gain +10 Thorns".to_string(),
-                "for every 10".to_string(),
-                "Defence you have.".to_string(),
-                "+10 Defence.".to_string(),
-            ],
+            Heirloom::ThornArmor => {
+                use crate::ui::desc_spans::DescSpan;
+                use crate::ui::TooltipDefinition;
+                return Self::typed_from_rich(vec![
+                    HeirloomDescLine::effect_spans([
+                        DescSpan::plain("Gain +10 "),
+                        DescSpan::keyword(TooltipDefinition::Thorns, "Thorns"),
+                    ]),
+                    HeirloomDescLine::effect("for every 10"),
+                    HeirloomDescLine::effect("Defence you have."),
+                    HeirloomDescLine::stat("+10 Defence."),
+                ]);
+            }
             Heirloom::LifestealCoins => vec![
                 "Lifesteal triggers".to_string(),
                 "have a 10% chance to".to_string(),
@@ -1877,14 +2085,24 @@ impl Heirloom {
                 "+10 spd, +10 dodge".to_string(),
             ],
             Heirloom::ManaOrbs => vec!["Mana Orbs restore".to_string(), "5 more Mana.".to_string()],
-            Heirloom::ManaOrbAttack => vec![
-                "Mana regen shoots a".to_string(),
-                "mana orb at an enemy.".to_string(),
-                "It does damage equal".to_string(),
-                "to the amount".to_string(),
-                "regenerated.".to_string(),
-                format!("Costs {} mana", Heirloom::ManaOrbAttack.get_mana_cost()),
-            ],
+            Heirloom::ManaOrbAttack => {
+                use crate::ui::desc_spans::DescSpan;
+                use crate::ui::TooltipDefinition;
+                return Self::typed_from_rich(vec![
+                    HeirloomDescLine::effect_spans([
+                        DescSpan::keyword(TooltipDefinition::ManaRegen, "Mana Regen"),
+                        DescSpan::plain(" shoots a"),
+                    ]),
+                    HeirloomDescLine::effect("mana orb at an enemy."),
+                    HeirloomDescLine::effect("It does damage equal"),
+                    HeirloomDescLine::effect("to the amount"),
+                    HeirloomDescLine::effect("regenerated."),
+                    HeirloomDescLine::mana(format!(
+                        "Costs {} mana",
+                        Heirloom::ManaOrbAttack.get_mana_cost()
+                    )),
+                ]);
+            }
             Heirloom::ItemPickupRadius => vec![
                 "+25% pickup range".to_string(),
                 "Increases item".to_string(),
@@ -1904,57 +2122,134 @@ impl Heirloom {
             ],
 
             // Thorns build heirlooms
-            Heirloom::ThornsSpikes => vec![
-                "Taking damage shoots".to_string(),
-                "out 2 spikes. Damage".to_string(),
-                "scales with thorns.".to_string(),
-                "+15 Thorns.".to_string(),
-            ],
-            Heirloom::ThornsOnDamage => vec![
-                "Gain +1 Thorns each".to_string(),
-                "time you take damage.".to_string(),
-            ],
-            Heirloom::ThornsLifesteal => vec![
-                "Your thorns damage".to_string(),
-                "has +25% lifesteal.".to_string(),
-                "+15 Thorns.".to_string(),
-            ],
+            Heirloom::ThornsSpikes => {
+                use crate::ui::desc_spans::DescSpan;
+                use crate::ui::TooltipDefinition;
+                return Self::typed_from_rich(vec![
+                    HeirloomDescLine::effect("Taking damage shoots"),
+                    HeirloomDescLine::effect("out 2 spikes. Damage"),
+                    HeirloomDescLine::effect_spans([
+                        DescSpan::plain("scales with "),
+                        DescSpan::keyword(TooltipDefinition::Thorns, "Thorns"),
+                        DescSpan::plain("."),
+                    ]),
+                    HeirloomDescLine::stat_spans([
+                        DescSpan::plain("+15 "),
+                        DescSpan::keyword(TooltipDefinition::Thorns, "Thorns"),
+                        DescSpan::plain("."),
+                    ]),
+                ]);
+            }
+            Heirloom::ThornsOnDamage => {
+                use crate::ui::desc_spans::DescSpan;
+                use crate::ui::TooltipDefinition;
+                return Self::typed_from_rich(vec![
+                    HeirloomDescLine::effect_spans([
+                        DescSpan::plain("Gain +1 "),
+                        DescSpan::keyword(TooltipDefinition::Thorns, "Thorns"),
+                        DescSpan::plain(" each"),
+                    ]),
+                    HeirloomDescLine::effect("time you take damage."),
+                ]);
+            }
+            Heirloom::ThornsLifesteal => {
+                use crate::ui::desc_spans::DescSpan;
+                use crate::ui::TooltipDefinition;
+                return Self::typed_from_rich(vec![
+                    HeirloomDescLine::effect_spans([
+                        DescSpan::plain("Your "),
+                        DescSpan::keyword(TooltipDefinition::Thorns, "Thorns"),
+                        DescSpan::plain(" damage"),
+                    ]),
+                    HeirloomDescLine::effect("has +25% lifesteal."),
+                    HeirloomDescLine::stat_spans([
+                        DescSpan::plain("+15 "),
+                        DescSpan::keyword(TooltipDefinition::Thorns, "Thorns"),
+                        DescSpan::plain("."),
+                    ]),
+                ]);
+            }
 
             // Lightning strikes archetype
-            Heirloom::CoinLightning => vec![
-                "Picking up coins".to_string(),
-                "spawns a lightning".to_string(),
-                "strike".to_string(),
-                format!("Costs {} mana", Heirloom::CoinLightning.get_mana_cost()),
-            ],
-            Heirloom::KillLightning => vec![
-                "Killing an enemy".to_string(),
-                "has a 7% chance".to_string(),
-                "to spawn a lightning".to_string(),
-                "strike.".to_string(),
-                format!("Costs {} mana", Heirloom::KillLightning.get_mana_cost()),
-            ],
-            Heirloom::ManaRegenLightning => vec![
-                "Mana regen has a".to_string(),
-                "20% chance to Spawn".to_string(),
-                "a lightning strike".to_string(),
-                format!(
-                    "Costs {} mana.",
-                    Heirloom::ManaRegenLightning.get_mana_cost()
-                ),
-            ],
-            Heirloom::ManaRegenPoison => vec![
-                "Every time you".to_string(),
-                "regenerate 75 mana,".to_string(),
-                "apply a poison".to_string(),
-                "stack to all".to_string(),
-                "enemies.".to_string(),
-            ],
-            Heirloom::SkillManaRegen => vec![
-                "Using a skill has".to_string(),
-                "a 15% chance to".to_string(),
-                "trigger mana regen.".to_string(),
-            ],
+            Heirloom::CoinLightning => {
+                use crate::ui::desc_spans::DescSpan;
+                use crate::ui::TooltipDefinition;
+                return Self::typed_from_rich(vec![
+                    HeirloomDescLine::effect("Picking up coins"),
+                    HeirloomDescLine::effect("spawns a"),
+                    HeirloomDescLine::effect_spans([DescSpan::keyword(
+                        TooltipDefinition::Lightning,
+                        "Lightning Strike",
+                    )]),
+                    HeirloomDescLine::mana(format!(
+                        "Costs {} mana",
+                        Heirloom::CoinLightning.get_mana_cost()
+                    )),
+                ]);
+            }
+            Heirloom::KillLightning => {
+                use crate::ui::desc_spans::DescSpan;
+                use crate::ui::TooltipDefinition;
+                return Self::typed_from_rich(vec![
+                    HeirloomDescLine::effect("Killing an enemy"),
+                    HeirloomDescLine::effect("has a 7% chance"),
+                    HeirloomDescLine::effect("to spawn a"),
+                    HeirloomDescLine::effect_spans([
+                        DescSpan::keyword(TooltipDefinition::Lightning, "Lightning Strike"),
+                        DescSpan::plain("."),
+                    ]),
+                    HeirloomDescLine::mana(format!(
+                        "Costs {} mana",
+                        Heirloom::KillLightning.get_mana_cost()
+                    )),
+                ]);
+            }
+            Heirloom::ManaRegenLightning => {
+                use crate::ui::desc_spans::DescSpan;
+                use crate::ui::TooltipDefinition;
+                return Self::typed_from_rich(vec![
+                    HeirloomDescLine::effect_spans([
+                        DescSpan::keyword(TooltipDefinition::ManaRegen, "Mana Regen"),
+                        DescSpan::plain(" has a"),
+                    ]),
+                    HeirloomDescLine::effect("20% chance to Spawn"),
+                    HeirloomDescLine::effect_spans([
+                        DescSpan::plain("a "),
+                        DescSpan::keyword(TooltipDefinition::Lightning, "Lightning Strike"),
+                    ]),
+                    HeirloomDescLine::mana(format!(
+                        "Costs {} mana.",
+                        Heirloom::ManaRegenLightning.get_mana_cost()
+                    )),
+                ]);
+            }
+            Heirloom::ManaRegenPoison => {
+                use crate::ui::desc_spans::DescSpan;
+                use crate::ui::TooltipDefinition;
+                return Self::typed_from_rich(vec![
+                    HeirloomDescLine::effect("Every time you"),
+                    HeirloomDescLine::effect("regenerate 75 mana,"),
+                    HeirloomDescLine::effect_spans([
+                        DescSpan::plain("apply a "),
+                        DescSpan::keyword(TooltipDefinition::Poison, "Poison"),
+                    ]),
+                    HeirloomDescLine::effect("stack to all"),
+                    HeirloomDescLine::effect("enemies."),
+                ]);
+            }
+            Heirloom::SkillManaRegen => {
+                use crate::ui::desc_spans::DescSpan;
+                use crate::ui::TooltipDefinition;
+                return Self::typed_from_rich(vec![
+                    HeirloomDescLine::effect("Using a skill has"),
+                    HeirloomDescLine::effect("a 15% chance to"),
+                    HeirloomDescLine::effect_spans([
+                        DescSpan::plain("trigger "),
+                        DescSpan::keyword(TooltipDefinition::ManaRegen, "Mana Regen"),
+                        DescSpan::plain("."),
+                    ]),
+                ]);
+            }
             Heirloom::DamageDealtMp => vec![
                 "Damage from Weapons".to_string(),
                 "or skills has a 4%".to_string(),
@@ -2178,6 +2473,7 @@ impl Heirloom {
     }
 }
 
+#[derive(Message)]
 pub struct ActiveSkillUsedEvent {
     pub slot: usize,
     pub cooldown: f32,
@@ -2239,7 +2535,9 @@ pub fn grant_skill_charge_after_cooldown_complete(
     }
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Default, Debug, Serialize, Deserialize)]
+#[derive(
+    Copy, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Default, Debug, Serialize, Deserialize,
+)]
 pub enum HeirloomRarity {
     #[default]
     Common,

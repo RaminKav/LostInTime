@@ -1,14 +1,12 @@
+use bevy_aseprite_ultra::prelude::Aseprite;
 use std::time::Duration;
 
+use crate::aseprite_assets::IceFloor;
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 
-use bevy_aseprite::anim::AsepriteAnimation;
-use bevy_aseprite::Aseprite;
 use bevy_rapier2d::prelude::Collider;
-use combat_helpers::{
-    handle_deferred_aseprite_spawns, spawn_one_time_aseprite_collider, tick_despawn_timer,
-};
+use combat_helpers::{spawn_deferred_aseprite_collider, tick_despawn_timer};
 use rand::{seq::SliceRandom, Rng};
 pub mod status_effects;
 use status_effects::*;
@@ -58,12 +56,15 @@ use crate::{
     player::{
         combat_heirlooms::{HallucinationStatType, HallucinationStats, ThornsOnDamageTracker},
         levels::PlayerLevel,
-        mage_skills::{spawn_ice_explosion_hitbox, IceExplosionDmg, IceFloor},
+        mage_skills::{spawn_ice_explosion_hitbox, IceExplosionDmg},
         skills::{Heirloom, HeirloomTriggerCounts, ManaGainSource, PlayerSkills},
     },
     proto::proto_param::ProtoParam,
     ui::{
-        damage_numbers::{spawn_floating_text_with_shadow, spawn_missing_tool_craft_hint},
+        damage_numbers::{
+            handle_add_damage_numbers_after_hit, spawn_floating_text_with_shadow,
+            spawn_missing_tool_craft_hint,
+        },
         game_fonts::FLOATING_TEXT,
         CheatSettings,
     },
@@ -73,7 +74,7 @@ use crate::{
 
 use self::collisions::CollisionPlugion;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Message)]
 pub struct HitEvent {
     pub hit_entity: Entity,
     pub damage: i32,
@@ -106,16 +107,14 @@ pub struct MarkedForDeath;
 #[derive(Component, Debug, Clone)]
 #[component(storage = "SparseSet")]
 pub struct KilledByHeirloomEffect;
-#[derive(Debug, Clone)]
-
+#[derive(Debug, Clone, Message)]
 pub struct EnemyDeathEvent {
     pub entity: Entity,
     pub enemy_pos: Vec2,
     pub killed_by_crit: bool,
     pub mob: Mob,
 }
-#[derive(Debug, Clone)]
-
+#[derive(Debug, Clone, Message)]
 pub struct ObjBreakEvent {
     pub entity: Entity,
     pub obj: WorldObject,
@@ -123,27 +122,27 @@ pub struct ObjBreakEvent {
     pub give_drops_and_xp: bool,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Message)]
 pub struct MissingToolHintEvent {
     pub world_pos: Vec3,
     pub required: EquipmentType,
 }
 
-/// Bundles `EventWriter`s for [`handle_hits`] so the system stays within Bevy's `SystemParam` tuple limit.
+/// Bundles `MessageWriter`s for [`handle_hits`] so the system stays within Bevy's `SystemParam` tuple limit.
 #[derive(SystemParam)]
 pub struct HitOutcomeEvents<'w> {
-    pub enemy_death: EventWriter<'w, EnemyDeathEvent>,
-    pub combat_shrine_mob_death: EventWriter<'w, CombatShrineMobDeathEvent>,
-    pub dungeon_shrine_mob_death: EventWriter<'w, DungeonShrineMobDeathEvent>,
-    pub obj_break: EventWriter<'w, ObjBreakEvent>,
-    pub analytics: EventWriter<'w, AnalyticsUpdateEvent>,
-    pub attribute_change: EventWriter<'w, AttributeChangeEvent>,
-    pub missing_tool_hint: EventWriter<'w, MissingToolHintEvent>,
+    pub enemy_death: MessageWriter<'w, EnemyDeathEvent>,
+    pub combat_shrine_mob_death: MessageWriter<'w, CombatShrineMobDeathEvent>,
+    pub dungeon_shrine_mob_death: MessageWriter<'w, DungeonShrineMobDeathEvent>,
+    pub obj_break: MessageWriter<'w, ObjBreakEvent>,
+    pub analytics: MessageWriter<'w, AnalyticsUpdateEvent>,
+    pub attribute_change: MessageWriter<'w, AttributeChangeEvent>,
+    pub missing_tool_hint: MessageWriter<'w, MissingToolHintEvent>,
 }
 
 /// Event to trigger lifesteal calculation and healing
 /// `thorns_lifesteal_stacks` should be the number of ThornsLifesteal heirloom stacks (0 if not thorns damage)
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Message)]
 pub struct LifestealEvent {
     pub thorns_lifesteal_stacks: i32,
     /// True only for direct player→mob hits from [`crate::item::item_upgrades::handle_on_hit_upgrades`]
@@ -151,9 +150,10 @@ pub struct LifestealEvent {
     pub is_direct_player_damage: bool,
 }
 
-/// Flags set on an entity by `calculate_player_damage` so that
+/// Flags set on an entity by `handle_hits` so that
 /// `handle_add_damage_numbers_after_hit` can render yellow/orange crit
-/// numbers on the next `Changed<CurrentHealth>` tick.
+/// numbers on the same frame's `Changed<CurrentHealth>` (after the auto
+/// ApplyDeferred that follows `handle_hits`).
 ///
 /// Always-present on mobs (see `ensure_mob_components`). Inserting
 /// `WasHitWithCrit(true)` on a mob is a value update and causes no archetype
@@ -199,39 +199,41 @@ impl Plugin for CombatPlugin {
         // frame and silently drops events that Update-side readers hadn't observed yet. This
         // caused mob-kill scoring (and other on-kill effects that weren't strictly ordered
         // `.after(handle_hits)`) to be lost during late-game slowdown.
-        app.add_event::<HitEvent>()
-            .add_event::<EnemyDeathEvent>()
-            .add_event::<StatusEffectEvent>()
-            .add_event::<LifestealEvent>()
-            .add_event::<ObjBreakEvent>()
-            .add_event::<MissingToolHintEvent>()
+        app.add_message::<HitEvent>()
+            .add_message::<EnemyDeathEvent>()
+            .add_message::<StatusEffectEvent>()
+            .add_message::<LifestealEvent>()
+            .add_message::<ObjBreakEvent>()
+            .add_message::<MissingToolHintEvent>()
             .init_resource::<damage_tracker::DamageTracker>()
             .init_resource::<damage_tracker::MobStatTracker>()
             .init_resource::<damage_tracker::PetAbilityStats>()
-            .add_plugin(CollisionPlugion)
+            .add_plugins(CollisionPlugion)
             .add_systems(
+                Update,
                 (
                     pickup_radius::update_pickup_radius.run_if(is_not_paused),
                     pickup_radius::mark_items_in_pickup_range.run_if(is_not_paused),
                     pickup_radius::handle_item_pickup_radius.run_if(is_not_paused),
                     pickup_radius::handle_magnet_pull.run_if(is_not_paused),
                 )
-                    .in_set(OnUpdate(GameState::Main))
+                    .run_if(in_state(GameState::Main))
                     .chain()
                     .before(collisions::check_item_drop_collisions),
             )
-            // Process deferred Aseprite spawns in PreUpdate to ensure frame 0 initialization
-            .add_system(
-                handle_deferred_aseprite_spawns
-                    .in_base_set(CoreSet::PreUpdate)
-                    .run_if(in_state(GameState::Main)),
-            )
             .add_systems(
+                Update,
                 (
-                    handle_hits,
+                    // Bevy 0.19 auto-flushes Commands on `.after(handle_hits)` edges, so
+                    // MarkedForDeath is visible to cleanup the same frame. Damage numbers
+                    // must run after hits (and before cleanup) or kill hits spawn no text.
+                    handle_hits.before(CustomFlush),
                     handle_missing_tool_hint_events.after(handle_hits),
                     tick_despawn_timer,
-                    cleanup_marked_for_death_entities.after(handle_enemy_death),
+                    cleanup_marked_for_death_entities
+                        .after(handle_enemy_death)
+                        .after(handle_add_damage_numbers_after_hit)
+                        .before(CustomFlush),
                     handle_attack_cooldowns
                         .before(CustomFlush)
                         .run_if(is_not_paused),
@@ -246,19 +248,19 @@ impl Plugin for CombatPlugin {
                         .after(crate::attributes::modifiers::handle_modify_health_event),
                     damage_tracker::track_player_damage,
                 )
-                    .in_set(OnUpdate(GameState::Main)),
+                    .run_if(in_state(GameState::Main)),
             )
-            .add_system(apply_system_buffers.in_set(CustomFlush))
+            .add_systems(Update, ApplyDeferred.in_set(CustomFlush))
             // Run in PostUpdate (after Update's command flush so freshly spawned
             // projectiles/heirloom anims are queryable this frame) and before
             // visibility propagation so the correct `Visibility` is picked up the
             // same frame it spawns. Otherwise newly spawned hidden anims (e.g. the
             // sword projectile, boulder) flash visible for one frame before being
             // hidden.
-            .add_system(
+            .add_systems(
+                Update,
                 update_anim_visibility
-                    .in_base_set(CoreSet::PostUpdate)
-                    .before(bevy::render::view::VisibilitySystems::VisibilityPropagate)
+                    .before(bevy::camera::visibility::VisibilitySystems::VisibilityPropagate)
                     .run_if(in_state(GameState::Main)),
             );
     }
@@ -268,11 +270,9 @@ pub fn update_anim_visibility(
     settings: Res<CheatSettings>,
     mut all: Query<(&AnimVisualCategory, &mut Visibility)>,
     added_category: Query<Entity, Added<AnimVisualCategory>>,
-    // bevy_aseprite's `insert_sprite_sheet` inserts a fresh `SpriteSheetBundle`
-    // (which contains a default `VisibilityBundle`) onto the entity once the
-    // atlas finishes loading. That overwrites any `Visibility::Hidden` we set
-    // earlier, so we must re-apply when the sprite first appears.
-    added_sprite: Query<Entity, Added<bevy::sprite::TextureAtlasSprite>>,
+    // Re-apply when a Sprite first appears (aseprite load / atlas spawn can
+    // insert a default Visibility that would flash hidden anims for a frame).
+    added_sprite: Query<Entity, Added<Sprite>>,
 ) {
     let apply = |category: &AnimVisualCategory, vis: &mut Visibility| {
         let should_hide = match category {
@@ -305,31 +305,33 @@ pub fn handle_attack_cooldowns(
     mut commands: Commands,
     time: Res<Time>,
     tool_query: Query<Entity, With<MainHand>>,
-    mut attack_event: EventReader<AttackEvent>,
+    mut attack_event: MessageReader<AttackEvent>,
     mut player: Query<(Entity, &AttackCooldown, Option<&mut AttackTimer>), With<Player>>,
 ) {
-    let (player_e, cooldown, timer_option) = player.single_mut();
+    let Ok((player_e, cooldown, timer_option)) = player.single_mut() else {
+        return;
+    };
 
     if !attack_event.is_empty() && timer_option.is_none() {
-        if !attack_event.iter().next().unwrap().ignore_cooldown {
+        if !attack_event.read().next().unwrap().ignore_cooldown {
             let mut attack_cd_timer = AttackTimer(Timer::from_seconds(cooldown.0, TimerMode::Once));
             attack_cd_timer.0.tick(time.delta());
             commands.entity(player_e).insert(attack_cd_timer);
         }
-        if let Ok(tool) = tool_query.get_single() {
+        if let Ok(tool) = tool_query.single() {
             commands.entity(tool).remove::<HitMarker>();
         }
     }
     if let Some(mut t) = timer_option {
         t.0.tick(time.delta());
-        if t.0.finished() {
+        if t.0.is_finished() {
             commands.entity(player_e).remove::<AttackTimer>();
         }
     }
 }
 fn handle_enemy_death(
     proto_param: ProtoParam,
-    mut death_events: EventReader<EnemyDeathEvent>,
+    mut death_events: MessageReader<EnemyDeathEvent>,
     loot_tables: Query<&LootTable>,
     mob_data: Query<(&Mob, &MobLevel, Option<&EliteMob>)>,
     mut player_xp: Query<(&PlayerLevel, &PlayerSkills, &OwnedBlessings)>,
@@ -337,15 +339,17 @@ fn handle_enemy_death(
     infinite_mode: Res<InfiniteMode>,
     enemies: Query<(Entity, &GlobalTransform), (With<Mob>, Without<Player>)>,
     mut player_query: Query<(&GlobalTransform, &Attack, &mut CurrentMana), With<Player>>,
-    mut ranged_attack_event: EventWriter<RangedAttackEvent>,
+    mut ranged_attack_event: MessageWriter<RangedAttackEvent>,
     mut trigger_counts: ResMut<HeirloomTriggerCounts>,
     asset_server: Res<AssetServer>,
 ) {
-    for death_event in death_events.iter() {
+    for death_event in death_events.read() {
         let Ok((mob, mob_lvl, elite_option)) = mob_data.get(death_event.entity) else {
             continue;
         };
-        let (player_level, player_skills, blessings) = player_xp.single_mut();
+        let Ok((player_level, player_skills, blessings)) = player_xp.single_mut() else {
+            return;
+        };
         let is_infinite_mode = infinite_mode.active;
 
         let has_double_gold = blessings.has_double_gold_drops();
@@ -427,7 +431,9 @@ fn handle_enemy_death(
         }
 
         // On-kill heirloom effects (skip when kill was from another heirloom to prevent chaining)
-        let (_, attack, mut current_mana) = player_query.single_mut();
+        let Ok((_, attack, mut current_mana)) = player_query.single_mut() else {
+            return;
+        };
         // KillLightning: 7% chance per stack to spawn lightning on a random nearby enemy; over 100% = guaranteed 1 + (chance-100)% for a second strike on a different enemy
         let kill_lightning_stacks =
             player_skills.get_count(crate::player::skills::Heirloom::KillLightning);
@@ -481,7 +487,7 @@ fn handle_enemy_death(
                     chosen.push(idx);
                     let target_pos = nearby_enemies[idx].1;
                     trigger_counts.increment(Heirloom::KillLightning);
-                    ranged_attack_event.send(RangedAttackEvent {
+                    ranged_attack_event.write(RangedAttackEvent {
                         projectile: crate::item::projectile::Projectile::Lightning,
                         direction: Vec2::ZERO,
                         mana_cost: Some(5),
@@ -510,16 +516,18 @@ fn handle_enemy_death(
                     trigger_counts.record_mana(Heirloom::IceStaffFloor, mana_cost);
                     trigger_counts.increment(Heirloom::IceStaffFloor);
                     let pos = death_event.enemy_pos.extend(0.0);
-                    let ice = spawn_one_time_aseprite_collider(
+                    let ice = spawn_deferred_aseprite_collider(
                         &mut commands,
                         Transform::from_translation(pos),
                         6.5,
                         attack.0,
                         Collider::capsule(Vec2::ZERO, Vec2::ZERO, 14.),
-                        asset_server.load::<Aseprite, _>(IceFloor::PATH),
-                        AsepriteAnimation::from(IceFloor::tags::ICE_FLOOR),
+                        asset_server.load::<Aseprite>(IceFloor::PATH),
+                        IceFloor::tags::ICE_FLOOR,
                         true,
                         Projectile::IceFloor,
+                        vec![],
+                        None,
                     );
                     commands
                         .entity(ice)
@@ -564,7 +572,7 @@ pub fn handle_hits(
         Option<&CombatShrineMob>,
         Option<&DungeonShrineMob>,
     )>,
-    mut hit_events: EventReader<HitEvent>,
+    mut hit_events: MessageReader<HitEvent>,
     mut hit_outcome: HitOutcomeEvents,
     in_i_frame: Query<&InvincibilityTimer>,
     proto_param: ProtoParam,
@@ -575,7 +583,7 @@ pub fn handle_hits(
     mut run_beastiary: ResMut<crate::player::beastiary::RunBeastiary>,
     mut last_attacker: ResMut<crate::player::beastiary::LastPlayerAttackerMob>,
 ) {
-    for hit in hit_events.iter() {
+    for hit in hit_events.read() {
         // is in invincibility frames from a previous hit
         if in_i_frame.get(hit.hit_entity).is_ok() {
             continue;
@@ -642,7 +650,7 @@ pub fn handle_hits(
                     debug!("HP {:?} {:?}", e, hit_health.0);
                 }
                 if hit_health.0 <= 0 {
-                    hit_outcome.obj_break.send(ObjBreakEvent {
+                    hit_outcome.obj_break.write(ObjBreakEvent {
                         entity: e,
                         obj: *obj,
                         pos,
@@ -660,9 +668,7 @@ pub fn handle_hits(
                             hit_health.0 = 0;
 
                             // Hallucination effect: grant random stat buff
-                            if let Ok(mut hallucination_stats) =
-                                hallucination_query.get_single_mut()
-                            {
+                            if let Ok(mut hallucination_stats) = hallucination_query.single_mut() {
                                 let stat_type = HallucinationStatType::random();
                                 let amount = rng.gen_range(1..=4);
                                 hallucination_stats.add_stat(stat_type, amount);
@@ -685,7 +691,7 @@ pub fn handle_hits(
                                 );
 
                                 // Trigger attribute recalculation
-                                hit_outcome.attribute_change.send(AttributeChangeEvent);
+                                hit_outcome.attribute_change.write(AttributeChangeEvent);
                             }
                         }
                     }
@@ -703,8 +709,8 @@ pub fn handle_hits(
                         // shield breaks
                         commands.entity(e).remove::<SlimeTempShield>();
                         // Safely get the shield entity - might not exist if already despawned
-                        if let Ok(shield_entity) = slime_shields.get_single() {
-                            commands.entity(shield_entity).despawn_recursive();
+                        if let Ok(shield_entity) = slime_shields.single() {
+                            commands.entity(shield_entity).despawn();
                         }
                         shielded_hit = true;
                         if *DEBUG {
@@ -733,7 +739,7 @@ pub fn handle_hits(
 
                     // ManaGuard blessing: 80% of damage comes from mana instead of health
                     let mana_guard_percentage = player_blessing_mana_query
-                        .get_single()
+                        .single()
                         .map(|(b, _)| b.get_mana_guard_percentage())
                         .unwrap_or(0.0);
 
@@ -742,9 +748,7 @@ pub fn handle_hits(
                         let health_damage = damage_to_apply - mana_damage;
 
                         // Apply mana damage first
-                        if let Ok((_, mut current_mana)) =
-                            player_blessing_mana_query.get_single_mut()
-                        {
+                        if let Ok((_, mut current_mana)) = player_blessing_mana_query.single_mut() {
                             let actual_mana_damage = mana_damage.min(current_mana.0);
                             current_mana.0 -= actual_mana_damage;
                             // Any overflow goes to health
@@ -766,9 +770,7 @@ pub fn handle_hits(
                             }
                         }
 
-                        if let Ok((_, mut current_mana)) =
-                            player_blessing_mana_query.get_single_mut()
-                        {
+                        if let Ok((_, mut current_mana)) = player_blessing_mana_query.single_mut() {
                             let skills = game.get_player_skills();
                             trigger_on_hit_echo(
                                 e,
@@ -832,7 +834,14 @@ pub fn handle_hits(
                         Timer::from_seconds(i_frames.0, TimerMode::Once),
                     ));
                 }
-                if hit_health.0 <= 0 && game.player_query.single().0 != e {
+                if hit_health.0 <= 0
+                    && game
+                        .player_query
+                        .single()
+                        .map(|(player_e, _, _)| player_e)
+                        .ok()
+                        != Some(e)
+                {
                     commands.entity(e).insert(MarkedForDeath);
 
                     // Mark if killed by heirloom effect to prevent chaining
@@ -840,7 +849,7 @@ pub fn handle_hits(
                         commands.entity(e).insert(KilledByHeirloomEffect);
                     }
 
-                    hit_outcome.enemy_death.send(EnemyDeathEvent {
+                    hit_outcome.enemy_death.write(EnemyDeathEvent {
                         entity: e,
                         enemy_pos: t.translation().truncate(),
                         killed_by_crit: hit.was_crit,
@@ -850,7 +859,7 @@ pub fn handle_hits(
                     if let Some(parent_shrine) = shrine_option {
                         hit_outcome
                             .combat_shrine_mob_death
-                            .send(CombatShrineMobDeathEvent {
+                            .write(CombatShrineMobDeathEvent {
                                 shrine: parent_shrine.parent_shrine,
                                 tile_pos: parent_shrine.shrine_tile_pos,
                             });
@@ -859,13 +868,13 @@ pub fn handle_hits(
                     if let Some(parent_shrine) = dungeon_shrine_option {
                         hit_outcome
                             .dungeon_shrine_mob_death
-                            .send(DungeonShrineMobDeathEvent(parent_shrine.parent_shrine));
+                            .write(DungeonShrineMobDeathEvent(parent_shrine.parent_shrine));
                     }
                 }
 
                 if is_player {
                     let attacker_mob = hit.hit_by_mob.clone().unwrap_or(Mob::default());
-                    hit_outcome.analytics.send(AnalyticsUpdateEvent {
+                    hit_outcome.analytics.write(AnalyticsUpdateEvent {
                         update_type: AnalyticsTrigger::DamageTaken(
                             attacker_mob.clone(),
                             final_dmg as u32,
@@ -879,7 +888,7 @@ pub fn handle_hits(
                     commands.spawn(SoundSpawner::new(AudioSoundEffect::PlayerHit, 0.35));
                 } else if let Some(mob) = mob_option {
                     game.player_mut().next_hit_crit = false;
-                    hit_outcome.analytics.send(AnalyticsUpdateEvent {
+                    hit_outcome.analytics.write(AnalyticsUpdateEvent {
                         update_type: AnalyticsTrigger::DamageDealt(mob.clone(), final_dmg as u32),
                     });
                     if final_dmg > 0 {
@@ -891,7 +900,7 @@ pub fn handle_hits(
             // Only insert hit reaction when we applied the hit and the entity is still alive
             // (avoids queuing commands for entities that will be despawned by cleanup this frame)
             if hit_health.0 > 0 {
-                if let Some(mut hit_e) = commands.get_entity(hit.hit_entity) {
+                if let Ok(mut hit_e) = commands.get_entity(hit.hit_entity) {
                     hit_e.insert(BounceOnHit::new());
                 }
             }
@@ -900,7 +909,7 @@ pub fn handle_hits(
 }
 
 pub fn handle_missing_tool_hint_events(
-    mut events: EventReader<MissingToolHintEvent>,
+    mut events: MessageReader<MissingToolHintEvent>,
     mut cooldown: Local<Timer>,
     time: Res<Time>,
     mut commands: Commands,
@@ -914,11 +923,11 @@ pub fn handle_missing_tool_hint_events(
     }
     cooldown.tick(time.delta());
 
-    if !cooldown.finished() {
+    if !cooldown.is_finished() {
         return;
     }
 
-    if let Some(event) = events.iter().next() {
+    if let Some(event) = events.read().next() {
         spawn_missing_tool_craft_hint(
             &mut commands,
             &asset_server,
@@ -942,7 +951,7 @@ pub fn cleanup_marked_for_death_entities(
         ),
         With<MarkedForDeath>,
     >,
-    mut analytics: EventWriter<AnalyticsUpdateEvent>,
+    mut analytics: MessageWriter<AnalyticsUpdateEvent>,
     mut run_beastiary: ResMut<crate::player::beastiary::RunBeastiary>,
     mut player: Query<(
         &PlayerSkills,
@@ -952,7 +961,7 @@ pub fn cleanup_marked_for_death_entities(
         &ProjectileSize,
     )>,
     graphics: Res<Graphics>,
-    mut modify_mana_event: EventWriter<ModifyManaEvent>,
+    mut modify_mana_event: MessageWriter<ModifyManaEvent>,
     mut neaby_mobs: Query<
         (
             Entity,
@@ -961,7 +970,7 @@ pub fn cleanup_marked_for_death_entities(
         ),
         (With<Mob>, Without<MarkedForDeath>),
     >,
-    mut status_event: EventWriter<StatusEffectEvent>,
+    mut status_event: MessageWriter<StatusEffectEvent>,
     spike_attack_states: Query<&SpikeAttackState>,
     aoe_attack_states: Query<&AoEAttackState>,
     spike_warnings: Query<(Entity, &SpikeWarning)>,
@@ -979,7 +988,7 @@ pub fn cleanup_marked_for_death_entities(
             if mob == &Mob::StoneGolem {
                 for (warning_entity, warning) in spike_warnings.iter() {
                     if warning.golem_entity == e {
-                        commands.entity(warning_entity).despawn_recursive();
+                        commands.entity(warning_entity).despawn();
                     }
                 }
             }
@@ -987,8 +996,8 @@ pub fn cleanup_marked_for_death_entities(
             // RedMushking AoE attack previews
             if let Ok(aoe_state) = aoe_attack_states.get(e) {
                 for preview_e in &aoe_state.preview_entities {
-                    if let Some(entity_commands) = commands.get_entity(*preview_e) {
-                        entity_commands.despawn_recursive();
+                    if let Ok(mut entity_commands) = commands.get_entity(*preview_e) {
+                        entity_commands.despawn();
                     }
                 }
             }
@@ -1009,8 +1018,11 @@ pub fn cleanup_marked_for_death_entities(
                 .remove::<ClawAttackCollider>()
                 .remove::<MarkedForDeath>();
         } else {
-            let (skills, attack, mana_regen, mut current_mana, projectile_size) =
-                player.single_mut();
+            let Ok((skills, attack, mana_regen, mut current_mana, projectile_size)) =
+                player.single_mut()
+            else {
+                continue;
+            };
 
             // Only trigger heirloom on-kill effects if the kill wasn't from a heirloom effect
             // This prevents chaining (e.g., ice explosion killing enemies that trigger more ice explosions)
@@ -1068,7 +1080,7 @@ pub fn cleanup_marked_for_death_entities(
                     let rng = &mut rand::thread_rng();
                     let mirror_count = skills.get_count(Heirloom::FrozenMPRegen);
                     if mirror_count > 0 && rng.gen_bool((0.2 * mirror_count as f64).min(1.0)) {
-                        modify_mana_event.send(ModifyManaEvent::gain(
+                        modify_mana_event.write(ModifyManaEvent::gain(
                             mana_regen.0,
                             ManaGainSource::Heirloom(Heirloom::FrozenMPRegen),
                         ));
@@ -1094,9 +1106,9 @@ pub fn cleanup_marked_for_death_entities(
                 }
             }
 
-            commands.entity(e).despawn_recursive();
+            commands.entity(e).despawn();
         }
-        analytics.send(AnalyticsUpdateEvent {
+        analytics.write(AnalyticsUpdateEvent {
             update_type: AnalyticsTrigger::MobKilled(mob.clone()),
         });
         run_beastiary.record_kill(mob.clone());
@@ -1124,7 +1136,7 @@ pub fn cleanup_marked_for_death_entities(
                         });
                     }
                     let total_stacks = status.burning.as_ref().unwrap().stacks as i32;
-                    status_event.send(StatusEffectEvent {
+                    status_event.write(StatusEffectEvent {
                         entity: mob_e,
                         effect: StatusEffect::Poison,
                         num_stacks: total_stacks,
@@ -1138,20 +1150,20 @@ pub fn cleanup_marked_for_death_entities(
 /// Handles lifesteal calculation and healing based on LifestealEvent
 /// This centralizes all lifesteal logic to avoid duplication
 pub fn handle_lifesteal(
-    mut lifesteal_events: EventReader<LifestealEvent>,
+    mut lifesteal_events: MessageReader<LifestealEvent>,
     player_query: Query<(&PlayerSkills, &Lifesteal, &GlobalTransform), With<Player>>,
-    mut modify_health_events: EventWriter<ModifyHealthEvent>,
-    mut modify_mana_events: EventWriter<ModifyManaEvent>,
+    mut modify_health_events: MessageWriter<ModifyHealthEvent>,
+    mut modify_mana_events: MessageWriter<ModifyManaEvent>,
     mut commands: Commands,
     proto: ProtoParam,
     mut trigger_counts: ResMut<HeirloomTriggerCounts>,
 ) {
-    let Ok((skills, lifesteal, player_txfm)) = player_query.get_single() else {
+    let Ok((skills, lifesteal, player_txfm)) = player_query.single() else {
         return;
     };
     let player_pos = player_txfm.translation().truncate();
 
-    for event in lifesteal_events.iter() {
+    for event in lifesteal_events.read() {
         let mut rng = rand::thread_rng();
 
         if event.is_direct_player_damage {
@@ -1159,7 +1171,7 @@ pub fn handle_lifesteal(
             if stacks > 0 {
                 let chance = (0.04_f64 * stacks as f64).clamp(0.0, 1.0);
                 if rng.gen_bool(chance) {
-                    modify_mana_events.send(ModifyManaEvent::gain(
+                    modify_mana_events.write(ModifyManaEvent::gain(
                         3,
                         ManaGainSource::Heirloom(Heirloom::DamageDealtMp),
                     ));
@@ -1198,7 +1210,7 @@ pub fn handle_lifesteal(
                     crate::player::skills::HealthGainSource::Lifesteal,
                     heal_amount,
                 );
-                modify_health_events.send(ModifyHealthEvent(heal_amount));
+                modify_health_events.write(ModifyHealthEvent(heal_amount));
 
                 // LifestealCoins: Spawn a coin for each lifesteal proc
                 let count = skills.get_count(Heirloom::LifestealCoins) as f64;
@@ -1223,33 +1235,33 @@ pub fn handle_lifesteal(
 /// This runs after handle_hits to ensure we only increment when damage is actually applied
 /// Uses a Local HashSet to track which mobs have already triggered the increment this frame
 pub fn handle_thorns_on_damage_tracker(
-    mut hit_events: EventReader<HitEvent>,
+    mut hit_events: MessageReader<HitEvent>,
     mut thorns_tracker: Query<
         &mut crate::player::combat_heirlooms::ThornsOnDamageTracker,
         With<Player>,
     >,
     player_skills: Query<&PlayerSkills, With<Player>>,
     health: Query<(Entity, &CurrentHealth), With<Player>>,
-    mut attribute_events: EventWriter<AttributeChangeEvent>,
+    mut attribute_events: MessageWriter<AttributeChangeEvent>,
     in_i_frame: Query<&InvincibilityTimer>,
     mut trigger_counts: ResMut<HeirloomTriggerCounts>,
 ) {
-    let Ok((player_entity, _)) = health.get_single() else {
+    let Ok((player_entity, _)) = health.single() else {
         return;
     };
 
-    for hit in hit_events.iter() {
+    for hit in hit_events.read() {
         if in_i_frame.get(hit.hit_entity).is_ok() {
             continue;
         }
         if hit.hit_entity == player_entity {
             if hit.hit_by_mob.is_some() {
-                if let Ok(mut tracker) = thorns_tracker.get_single_mut() {
-                    if let Ok(skills) = player_skills.get_single() {
+                if let Ok(mut tracker) = thorns_tracker.single_mut() {
+                    if let Ok(skills) = player_skills.single() {
                         let stacks =
                             skills.get_count(crate::player::skills::Heirloom::ThornsOnDamage);
                         if tracker.gain_from_damage(stacks) {
-                            attribute_events.send(AttributeChangeEvent);
+                            attribute_events.write(AttributeChangeEvent);
                             trigger_counts.increment(Heirloom::ThornsOnDamage);
                         }
                     }
@@ -1311,7 +1323,7 @@ pub fn trigger_thorns_spikes(
     player_skills: &PlayerSkills,
     player_attack: i32,
     thorns: i32,
-    ranged_attack_event: &mut EventWriter<RangedAttackEvent>,
+    ranged_attack_event: &mut MessageWriter<RangedAttackEvent>,
     trigger_counts: &mut HeirloomTriggerCounts,
 ) {
     let thorns_spikes_stacks = player_skills.get_count(Heirloom::ThornsSpikes);
@@ -1330,7 +1342,7 @@ pub fn trigger_thorns_spikes(
         let angle = base_angle + angle_offset;
         let direction = Vec2::new(angle.cos(), angle.sin());
 
-        ranged_attack_event.send(RangedAttackEvent {
+        ranged_attack_event.write(RangedAttackEvent {
             projectile: Projectile::ThornsProjectile,
             direction,
             from_enemy: false,
@@ -1352,7 +1364,7 @@ pub fn trigger_thorns_spikes(
 /// [`collisions::check_mob_to_player_collisions`] (it bypasses
 /// `ModifyHealthEvent` and needs the attacker entity for thorns reflection).
 pub fn handle_thorns_on_self_damage(
-    mut events: EventReader<ModifyHealthEvent>,
+    mut events: MessageReader<ModifyHealthEvent>,
     mut player: Query<
         (
             Entity,
@@ -1365,19 +1377,19 @@ pub fn handle_thorns_on_self_damage(
         ),
         With<Player>,
     >,
-    mut ranged_attack_event: EventWriter<RangedAttackEvent>,
+    mut ranged_attack_event: MessageWriter<RangedAttackEvent>,
     mut trigger_counts: ResMut<HeirloomTriggerCounts>,
-    mut attribute_events: EventWriter<AttributeChangeEvent>,
+    mut attribute_events: MessageWriter<AttributeChangeEvent>,
     mut commands: Commands,
     asset_server: Res<AssetServer>,
 ) {
     let Ok((player_e, thorns, attack, skills, projectile_size, mut current_mana, mut tracker_opt)) =
-        player.get_single_mut()
+        player.single_mut()
     else {
         return;
     };
 
-    for event in events.iter() {
+    for event in events.read() {
         if event.0 >= 0 {
             continue;
         }
@@ -1407,7 +1419,7 @@ pub fn handle_thorns_on_self_damage(
         let on_damage_stacks = skills.get_count(Heirloom::ThornsOnDamage);
         if let Some(ref mut tracker) = tracker_opt {
             if tracker.gain_from_damage(on_damage_stacks) {
-                attribute_events.send(AttributeChangeEvent);
+                attribute_events.write(AttributeChangeEvent);
                 trigger_counts.increment(Heirloom::ThornsOnDamage);
             }
         }

@@ -1,4 +1,4 @@
-pub use bevy::prelude::*;
+use bevy::prelude::*;
 
 use crate::{
     assets::Graphics,
@@ -15,7 +15,16 @@ use super::{
 
 pub const CHEST_SIZE: usize = 6 * 2;
 
-#[derive(Component, Resource, Debug, Clone)]
+/// World-entity chest storage. Must NOT be a [`Resource`] — Bevy 0.19 treats
+/// resources as unique `IsResource` components and panics if that entity is
+/// despawned while uniqueness hooks still queue `remove_by_id`.
+#[derive(Component, Debug, Clone)]
+pub struct ChestInventory {
+    pub items: Container,
+}
+
+/// Open-chest UI resource (copied from / written back to [`ChestInventory`]).
+#[derive(Resource, Debug, Clone)]
 pub struct ChestContainer {
     pub items: Container,
     pub parent: Entity,
@@ -33,10 +42,10 @@ pub fn setup_chest_slots_ui(
     inv: Res<ChestContainer>,
     resolution: Res<ScreenResolution>,
 ) {
-    if inv_spawn_check.get_single().is_err() {
+    if inv_spawn_check.single().is_err() {
         return;
     }
-    if inv_state.0 != UIState::Chest {
+    if *inv_state != UIState::Chest {
         return;
     };
     for (slot_index, item) in inv.items.items.iter().enumerate() {
@@ -61,7 +70,7 @@ pub fn change_ui_state_to_chest_when_resource_added(mut inv_ui_state: ResMut<Nex
 
 pub fn add_inv_to_new_chest_objs(
     mut commands: Commands,
-    new_chests: Query<(Entity, &GlobalTransform, &WorldObject), Without<ChestContainer>>,
+    new_chests: Query<(Entity, &GlobalTransform, &WorldObject), Without<ChestInventory>>,
     container_reg: Res<ContainerRegistry>,
 ) {
     for (e, t, obj) in new_chests.iter() {
@@ -69,11 +78,10 @@ pub fn add_inv_to_new_chest_objs(
             let existing_cont_option = container_reg
                 .containers
                 .get(&world_pos_to_tile_pos(t.translation().truncate()));
-            commands.entity(e).insert(ChestContainer {
+            commands.entity(e).insert(ChestInventory {
                 items: existing_cont_option
                     .unwrap_or(&Container::with_size(CHEST_SIZE))
                     .clone(),
-                parent: e,
             });
         }
     }

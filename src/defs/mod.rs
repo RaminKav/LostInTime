@@ -16,6 +16,6 @@ impl Plugin for DefsPlugin {
         let mut defs = GameDefs::default();
         generated::register_all(&mut defs);
         app.insert_resource(defs)
-            .add_plugin(spawn::DefsSpawnPlugin);
+            .add_plugins(spawn::DefsSpawnPlugin);
     }
 }

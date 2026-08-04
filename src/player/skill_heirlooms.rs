@@ -1,8 +1,8 @@
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
-use bevy::utils::Duration;
 use bevy_rapier2d::prelude::Collider;
 use rand::{seq::SliceRandom, Rng};
+use std::time::Duration;
 
 use crate::{
     ai::FollowState,
@@ -17,8 +17,7 @@ use crate::{
     blessings::{Blessing, OwnedBlessings},
     combat::{
         status_effects::{
-            apply_status_blue_tint, Frail, MobStatusEffects, RapidfireSlowTint,
-            STATUS_EFFECT_BLUE_TINT,
+            Frail, FrozenTint, MobStatusEffects, RapidfireSlowTint,
         },
         EnemyDeathEvent, HitEvent,
     },
@@ -78,7 +77,7 @@ fn start_slot_cooldown_for_cast(
         // charge must NOT restart the timer — otherwise the partial progress toward
         // the next charge is wiped every cast. Leave the in-flight regen alone and
         // just let the already-consumed charge stand.
-        if should_start && !s.cooldown_timer.finished() {
+        if should_start && !s.cooldown_timer.is_finished() {
             return;
         }
         s.start_cooldown_seconds(cd_secs, should_start);
@@ -121,12 +120,12 @@ pub fn break_stealth(commands: &mut Commands, player_e: Entity, _stealth: &mut S
 }
 
 pub fn break_stealth_on_player_attack(
-    mut attack_events: EventReader<AttackEvent>,
+    mut attack_events: MessageReader<AttackEvent>,
     mut commands: Commands,
     mut q: Query<(Entity, &mut StealthState), (With<Stealthed>, With<Player>)>,
 ) {
     let mut any = false;
-    for _ in attack_events.iter() {
+    for _ in attack_events.read() {
         any = true;
     }
     if !any {
@@ -171,7 +170,7 @@ pub struct SkillStateQueries<'w, 's> {
 }
 
 pub fn handle_active_skill_event(
-    mut events: EventReader<ActiveSkillUsedEvent>,
+    mut events: MessageReader<ActiveSkillUsedEvent>,
     mut commands: Commands,
     mut players: Query<
         (
@@ -195,15 +194,15 @@ pub fn handle_active_skill_event(
     time: Res<Time>,
     cursor: Res<CursorPos>,
     asset_server: Res<AssetServer>,
-    mut ranged_attack_events: EventWriter<RangedAttackEvent>,
+    mut ranged_attack_events: MessageWriter<RangedAttackEvent>,
     proto_param: ProtoParam,
     defs: Res<crate::defs::GameDefs>,
     enemies: Query<(Entity, &GlobalTransform), With<Mob>>,
     mut trigger_counts: ResMut<HeirloomTriggerCounts>,
-    mut attribute_change: EventWriter<AttributeChangeEvent>,
+    mut attribute_change: MessageWriter<AttributeChangeEvent>,
     mut consumable_buffs_q: Query<&mut ActiveConsumableBuffs, With<Player>>,
 ) {
-    for ev in events.iter() {
+    for ev in events.read() {
         for (
             player_e,
             skills,
@@ -289,7 +288,7 @@ pub fn handle_active_skill_event(
                             item_stack: None,
                             effect: ConsumableBuffEffect::AttackSpeedAdd(0.3),
                         });
-                        attribute_change.send_default();
+                        attribute_change.write_default();
                     }
                 }
                 // ev.cooldown is already the effective cooldown (base * heirloom reduction * blessing mult)
@@ -332,7 +331,7 @@ pub fn handle_active_skill_event(
 
                         // Spawn cosmetic smoke effect on top of player
                         let _player_pos = player_txfm.translation().truncate();
-                        ranged_attack_events.send(RangedAttackEvent {
+                        ranged_attack_events.write(RangedAttackEvent {
                             projectile: Projectile::Smoke,
                             direction: Vec2::ZERO, // Smoke doesn't move
                             mana_cost: None,
@@ -355,10 +354,10 @@ pub fn handle_active_skill_event(
                         // speed layer is added on top of the active buff and the duration is
                         // refreshed. `attack_speed_bonus` stores the *cumulative* amount so it
                         // is fully removed when the buff finally ends.
-                        let was_active = rapid_state.map_or(false, |s| !s.duration.finished());
+                        let was_active = rapid_state.map_or(false, |s| !s.duration.is_finished());
                         let stored_bonus = if was_active {
                             bonus_attack_speed.add_multiplier(new_bonus);
-                            attribute_change.send_default();
+                            attribute_change.write_default();
                             rapid_state.unwrap().attack_speed_bonus + new_bonus
                         } else {
                             // No active buff. If a stale (expired) RapidfireState component is
@@ -366,7 +365,7 @@ pub fn handle_active_skill_event(
                             // system, so apply the speed manually; otherwise `Added` handles it.
                             if rapid_state.is_some() {
                                 bonus_attack_speed.add_multiplier(new_bonus);
-                                attribute_change.send_default();
+                                attribute_change.write_default();
                             }
                             new_bonus
                         };
@@ -384,7 +383,7 @@ pub fn handle_active_skill_event(
 
                         // Spawn cosmetic attack speed effect on top of player
                         let player_pos = player_txfm.translation().truncate();
-                        ranged_attack_events.send(RangedAttackEvent {
+                        ranged_attack_events.write(RangedAttackEvent {
                             projectile: Projectile::AttackSpeed,
                             direction: Vec2::ZERO, // Doesn't move
                             mana_cost: None,
@@ -420,7 +419,7 @@ pub fn handle_active_skill_event(
                             (base_dmg as f32 * power_mult * attack_damage_multiplier(FIRE_PILLAR))
                                 as i32;
                         let pos = cursor.world_coords.truncate();
-                        ranged_attack_events.send(RangedAttackEvent {
+                        ranged_attack_events.write(RangedAttackEvent {
                             projectile: Projectile::FireRing,
                             direction: Vec2::ZERO, // Fire ring doesn't move
                             mana_cost: None,
@@ -456,7 +455,7 @@ pub fn handle_active_skill_event(
                         let player_pos = player_txfm.translation().truncate();
                         let direction =
                             (cursor.world_coords.truncate() - player_pos).normalize_or_zero();
-                        ranged_attack_events.send(RangedAttackEvent {
+                        ranged_attack_events.write(RangedAttackEvent {
                             projectile: Projectile::LaserBeam,
                             direction,
                             mana_cost: None,
@@ -490,7 +489,7 @@ pub fn handle_active_skill_event(
                         health.0 = (health.0 + heal_amount).min(max_health.0);
 
                         // Spawn cosmetic heal hearts effect on top of player
-                        ranged_attack_events.send(RangedAttackEvent {
+                        ranged_attack_events.write(RangedAttackEvent {
                             projectile: Projectile::HealHearts,
                             direction: Vec2::ZERO, // Doesn't move
                             mana_cost: None,
@@ -528,7 +527,7 @@ pub fn handle_active_skill_event(
                         // The projectile system will handle rotation based on direction
                         let spawn_offset = -30.0; // pixels in front of player
                         let animation_pos = player_pos + direction_to_cursor * spawn_offset;
-                        ranged_attack_events.send(RangedAttackEvent {
+                        ranged_attack_events.write(RangedAttackEvent {
                             projectile: Projectile::Buckshot,
                             direction: direction_to_cursor,
                             mana_cost: None,
@@ -556,7 +555,7 @@ pub fn handle_active_skill_event(
                                     * attack_damage_multiplier(BUCKSHOT_PELLET))
                                     as i32
                             });
-                            ranged_attack_events.send(RangedAttackEvent {
+                            ranged_attack_events.write(RangedAttackEvent {
                                 projectile: Projectile::Bullet,
                                 direction: bullet_dir,
                                 mana_cost: None,
@@ -608,7 +607,7 @@ pub fn handle_active_skill_event(
                                 as i32;
                         let pos = cursor.world_coords.truncate() + Vec2::new(0., 32.); // slight offset so it appears below cursor
 
-                        ranged_attack_events.send(RangedAttackEvent {
+                        ranged_attack_events.write(RangedAttackEvent {
                             projectile: Projectile::IceWall,
                             direction: Vec2::ZERO,
                             mana_cost: None,
@@ -673,7 +672,7 @@ pub fn handle_active_skill_event(
                             let target = player_pos + Vec2::from_angle(angle) * dist;
                             // Offset up so the meteor's impact (bottom of sprite) lands on target.
                             let spawn_pos = target + Vec2::new(0., 80.);
-                            ranged_attack_events.send(RangedAttackEvent {
+                            ranged_attack_events.write(RangedAttackEvent {
                                 projectile: Projectile::Meteor,
                                 direction: Vec2::ZERO,
                                 mana_cost: None,
@@ -738,7 +737,7 @@ pub fn handle_active_skill_event(
                         let dmg =
                             (base_dmg as f32 * power_mult * attack_damage_multiplier(SHOUT)) as i32;
 
-                        ranged_attack_events.send(RangedAttackEvent {
+                        ranged_attack_events.write(RangedAttackEvent {
                             projectile: Projectile::Shout,
                             direction: Vec2::ZERO, // AoE doesn't need direction
                             mana_cost: None,
@@ -785,7 +784,7 @@ pub fn handle_active_skill_event(
                             * attack_damage_multiplier(PIERCING_STAR))
                             as i32;
 
-                        ranged_attack_events.send(RangedAttackEvent {
+                        ranged_attack_events.write(RangedAttackEvent {
                             projectile: Projectile::ThrowingStarLarge,
                             direction: direction_to_cursor,
                             mana_cost: None,
@@ -917,7 +916,7 @@ pub fn handle_active_skill_event(
                             (base_dmg as f32 * power_mult * attack_damage_multiplier(LIGHTNING))
                                 as i32;
                         for (_, enemy_pos, _) in enemy_distances {
-                            ranged_attack_events.send(RangedAttackEvent {
+                            ranged_attack_events.write(RangedAttackEvent {
                                 projectile: Projectile::Lightning,
                                 direction: Vec2::ZERO,
                                 mana_cost: None,
@@ -983,7 +982,7 @@ pub fn handle_active_skill_event(
                             // Pick a random enemy for each dagger
                             if let Some((_, enemy_pos)) = all_enemies.choose(&mut rng) {
                                 let direction = (*enemy_pos - player_pos).normalize_or_zero();
-                                ranged_attack_events.send(RangedAttackEvent {
+                                ranged_attack_events.write(RangedAttackEvent {
                                     projectile: Projectile::DaggerThrow,
                                     direction,
                                     mana_cost: None,
@@ -1026,7 +1025,7 @@ pub fn handle_active_skill_event(
                         let hit_interval = dagger_slash_hit_interval_seconds(speed.0);
 
                         // First slash fires immediately at the cast-time cursor direction.
-                        ranged_attack_events.send(RangedAttackEvent {
+                        ranged_attack_events.write(RangedAttackEvent {
                             projectile: Projectile::DaggerSlash,
                             direction,
                             mana_cost: None,
@@ -1081,7 +1080,7 @@ pub fn handle_active_skill_event(
                             let angle_offset = (i as f32 - 1.0) * spread_angle;
                             let angle = base_angle + angle_offset;
                             let direction = Vec2::new(angle.cos(), angle.sin());
-                            ranged_attack_events.send(RangedAttackEvent {
+                            ranged_attack_events.write(RangedAttackEvent {
                                 projectile: Projectile::ThrowingStar,
                                 direction,
                                 mana_cost: None,
@@ -1103,7 +1102,7 @@ pub fn handle_active_skill_event(
                         // throw stream rather than restarting it. The throw cadence is
                         // preserved so the stream doesn't hitch mid-flight.
                         let fury = match fury_state {
-                            Some(existing) if !existing.duration.finished() => {
+                            Some(existing) if !existing.duration.is_finished() => {
                                 let remaining = (existing.duration.duration().as_secs_f32()
                                     - existing.duration.elapsed_secs())
                                 .max(0.0);
@@ -1193,7 +1192,7 @@ pub fn handle_active_skill_event(
                             .entity(player_e)
                             .insert(PlayerAnimation::SpinAttack);
 
-                        ranged_attack_events.send(RangedAttackEvent {
+                        ranged_attack_events.write(RangedAttackEvent {
                             projectile: Projectile::SpinAttack,
                             direction: Vec2::ZERO,
                             mana_cost: None,
@@ -1242,7 +1241,7 @@ pub fn handle_active_skill_event(
                         for i in 0..arrow_volley_scaling::ARROWS_PER_WAVE {
                             let angle_offset = (i as f32 - 1.0) * spread_angle;
                             let direction = Vec2::from_angle(base_angle + angle_offset);
-                            ranged_attack_events.send(RangedAttackEvent {
+                            ranged_attack_events.write(RangedAttackEvent {
                                 projectile: Projectile::ArrowVolleyShot,
                                 direction,
                                 mana_cost: None,
@@ -1283,7 +1282,7 @@ pub fn handle_active_skill_event(
                             * attack_damage_multiplier(POSSESSED_BLADE))
                             as i32;
 
-                        ranged_attack_events.send(RangedAttackEvent {
+                        ranged_attack_events.write(RangedAttackEvent {
                             projectile: Projectile::PossessedBlade,
                             direction,
                             mana_cost: None,
@@ -1316,7 +1315,7 @@ pub fn handle_active_skill_event(
                     let echo_dmg = attack_opt.map(|a| (a.0 as f32 * 1.) as i32).unwrap_or(15);
                     let size_mult = skill_states
                         .player_projectile_size
-                        .get_single()
+                        .single()
                         .map(|s| s.get_multiplier())
                         .unwrap_or(1.0);
 
@@ -1360,22 +1359,22 @@ pub fn tick_stealth_and_buffs(
     mut stealth: Query<(Entity, &mut StealthState), With<Stealthed>>,
     mut rapid: Query<(Entity, &mut RapidfireState), With<Player>>,
     mut player_query: Query<&mut BonusAttackSpeed, With<Player>>,
-    mut attribute_event: EventWriter<crate::attributes::AttributeChangeEvent>,
+    mut attribute_event: MessageWriter<crate::attributes::AttributeChangeEvent>,
 ) {
     for (e, mut s) in stealth.iter_mut() {
         s.duration.tick(time.delta());
-        if s.duration.finished() {
+        if s.duration.is_finished() {
             commands.entity(e).remove::<Stealthed>();
             commands.entity(e).remove::<StealthState>();
         }
     }
     for (_e, mut r) in rapid.iter_mut() {
-        let was_finished = r.duration.finished();
+        let was_finished = r.duration.is_finished();
         r.duration.tick(time.delta());
-        if !was_finished && r.duration.finished() {
-            if let Ok(mut bonus_speed) = player_query.get_single_mut() {
+        if !was_finished && r.duration.is_finished() {
+            if let Ok(mut bonus_speed) = player_query.single_mut() {
                 bonus_speed.remove_multiplier(r.attack_speed_bonus);
-                attribute_event.send_default();
+                attribute_event.write_default();
             }
         }
     }
@@ -1390,37 +1389,29 @@ pub fn handle_rapidfire_slow_enemies(
             &mut MobStatusEffects,
             Option<&RapidfireSlowTint>,
             Option<&crate::player::combat_heirlooms::DeathDefianceFrozen>,
-            Option<&mut TextureAtlasSprite>,
+            Option<&FrozenTint>,
         ),
         With<Mob>,
     >,
     mut commands: Commands,
 ) {
-    let Some(state) = rapidfire_states.get_single().ok() else {
+    let Some(state) = rapidfire_states.single().ok() else {
         return;
     };
-    if state.duration.finished() || state.duration.percent() <= 0. {
+    if state.duration.is_finished() || state.duration.fraction() <= 0. {
         return;
     }
 
-    for (entity, mut status, tint, defiance_frozen, sprite) in enemies.iter_mut() {
+    for (entity, mut status, tint, defiance_frozen, frozen_tint) in enemies.iter_mut() {
         if !status.rapidfire_slow {
             status.rapidfire_slow = true;
         }
-        if defiance_frozen.is_some() || status.is_frozen() {
+        // Already covered by another freeze tint — skip inserting Rapidfire's.
+        if defiance_frozen.is_some() || status.is_frozen() || frozen_tint.is_some() {
             continue;
         }
-        if tint.is_some() {
-            if let Some(mut sprite) = sprite {
-                sprite.color = STATUS_EFFECT_BLUE_TINT;
-            }
-            continue;
-        }
-        if let Some(mut sprite) = sprite {
-            let original_color = apply_status_blue_tint(&mut sprite);
-            commands
-                .entity(entity)
-                .insert(RapidfireSlowTint { original_color });
+        if tint.is_none() {
+            commands.entity(entity).insert(RapidfireSlowTint);
         }
     }
 }
@@ -1433,29 +1424,25 @@ pub fn handle_rapidfire_slow_remove(
             Entity,
             &mut MobStatusEffects,
             Option<&RapidfireSlowTint>,
-            Option<&mut TextureAtlasSprite>,
         ),
         With<Mob>,
     >,
     mut commands: Commands,
 ) {
     let rapidfire_active = rapidfire_states
-        .get_single()
-        .map(|state| !state.duration.finished() && state.duration.percent() > 0.)
+        .single()
+        .map(|state| !state.duration.is_finished() && state.duration.fraction() > 0.)
         .unwrap_or(false);
     if rapidfire_active {
         return;
     }
 
-    for (entity, mut status, tint, sprite) in enemies.iter_mut() {
+    for (entity, mut status, tint) in enemies.iter_mut() {
         if !status.rapidfire_slow && tint.is_none() {
             continue;
         }
         status.rapidfire_slow = false;
-        if let Some(tint) = tint {
-            if let Some(mut sprite) = sprite {
-                sprite.color = tint.original_color;
-            }
+        if tint.is_some() {
             commands.entity(entity).remove::<RapidfireSlowTint>();
         }
     }
@@ -1552,8 +1539,8 @@ pub fn tick_class_skill_slots(
         With<Player>,
     >,
 ) {
-    let skills_single = player_skills.get_single().ok();
-    let blessings_single = blessings.get_single().ok();
+    let skills_single = player_skills.single().ok();
+    let blessings_single = blessings.single().ok();
     for (entity, mut slots, stealthed, rapidfire_state, fury_state) in q.iter_mut() {
         for i in 0..4 {
             let skill = slots.0[i].tracked_skill;
@@ -1605,7 +1592,7 @@ pub fn tick_fury_duration_and_throw(
     for mut f in fury.iter_mut() {
         f.duration.tick(time.delta());
         let (attack_speed_stat, bonus_mult) = player_as
-            .get_single()
+            .single()
             .map(|(as_stat, bonus)| {
                 (
                     as_stat.map(|a| a.0).unwrap_or(0),
@@ -1634,7 +1621,7 @@ pub fn handle_attach_possessed_blade_return(
     >,
     player: Query<Entity, With<Player>>,
 ) {
-    let Ok(player_e) = player.get_single() else {
+    let Ok(player_e) = player.single() else {
         return;
     };
     for (entity, proj, proj_state) in new_blades.iter() {
@@ -1681,8 +1668,8 @@ pub fn tick_possessed_blade_movement(
     )>,
     player_pos_q: Query<&GlobalTransform, With<Player>>,
 ) {
-    let dt = time.delta_seconds();
-    let Ok(player_txfm) = player_pos_q.get_single() else {
+    let dt = time.delta_secs();
+    let Ok(player_txfm) = player_pos_q.single() else {
         return;
     };
     let player_pos = player_txfm.translation().truncate();
@@ -1713,7 +1700,7 @@ pub fn tick_possessed_blade_movement(
                 let dist = to_player.length();
 
                 if dist < 10.0 {
-                    commands.entity(entity).despawn_recursive();
+                    commands.entity(entity).despawn();
                     continue;
                 }
 
@@ -1736,21 +1723,21 @@ pub fn tick_possessed_blade_movement(
 /// `LifestealEvent` system which requires the player to already have a
 /// lifesteal stat.
 pub fn handle_possessed_blade_kill_lifesteal(
-    mut hit_events: EventReader<HitEvent>,
-    mut death_events: EventReader<EnemyDeathEvent>,
+    mut hit_events: MessageReader<HitEvent>,
+    mut death_events: MessageReader<EnemyDeathEvent>,
     mut blades: Query<(Entity, &mut PossessedBladeReturn)>,
-    mut modify_health: EventWriter<crate::attributes::modifiers::ModifyHealthEvent>,
+    mut modify_health: MessageWriter<crate::attributes::modifiers::ModifyHealthEvent>,
 ) {
-    let dead_entities: Vec<Entity> = death_events.iter().map(|d| d.entity).collect();
+    let dead_entities: Vec<Entity> = death_events.read().map(|d| d.entity).collect();
 
     let blade_count = blades.iter().count();
 
     if dead_entities.is_empty() {
-        hit_events.iter().last();
+        hit_events.read().last();
         return;
     }
 
-    for hit in hit_events.iter() {
+    for hit in hit_events.read() {
         if hit.hit_with_projectile != Some(Projectile::PossessedBlade) {
             continue;
         }
@@ -1763,7 +1750,7 @@ pub fn handle_possessed_blade_kill_lifesteal(
         for (blade_e, mut blade) in blades.iter_mut() {
             if blade.kill_lifesteal_remaining > 0 {
                 blade.kill_lifesteal_remaining -= 1;
-                modify_health.send(crate::attributes::modifiers::ModifyHealthEvent(1));
+                modify_health.write(crate::attributes::modifiers::ModifyHealthEvent(1));
                 healed = true;
                 break;
             }
@@ -1791,7 +1778,7 @@ pub fn handle_attach_piercing_star_return(
     >,
     player: Query<Entity, With<Player>>,
 ) {
-    let Ok(player_e) = player.get_single() else {
+    let Ok(player_e) = player.single() else {
         return;
     };
     for (entity, proj, proj_state) in new_stars.iter() {
@@ -1837,8 +1824,8 @@ pub fn tick_piercing_star_movement(
     )>,
     player_pos_q: Query<&GlobalTransform, With<Player>>,
 ) {
-    let dt = time.delta_seconds();
-    let Ok(player_txfm) = player_pos_q.get_single() else {
+    let dt = time.delta_secs();
+    let Ok(player_txfm) = player_pos_q.single() else {
         return;
     };
     let player_pos = player_txfm.translation().truncate();
@@ -1865,7 +1852,7 @@ pub fn tick_piercing_star_movement(
                 let dist = to_player.length();
 
                 if dist < 10.0 {
-                    commands.entity(entity).despawn_recursive();
+                    commands.entity(entity).despawn();
                     continue;
                 }
 
@@ -1886,7 +1873,7 @@ pub fn tick_arrow_volley(
     mut volley_q: Query<(Entity, &mut ArrowVolleyState, &GlobalTransform), With<Player>>,
     player_skills: Query<(&SkillPower, &Attack, &OwnedBlessings), With<Player>>,
     cursor: Res<CursorPos>,
-    mut ranged_attack_events: EventWriter<RangedAttackEvent>,
+    mut ranged_attack_events: MessageWriter<RangedAttackEvent>,
 ) {
     for (player_e, mut state, player_txfm) in volley_q.iter_mut() {
         state.wave_timer.tick(time.delta());
@@ -1899,7 +1886,7 @@ pub fn tick_arrow_volley(
         }
         state.waves_remaining -= 1;
 
-        let Ok((skill_power, attack, blessings)) = player_skills.get_single() else {
+        let Ok((skill_power, attack, blessings)) = player_skills.single() else {
             continue;
         };
         let power_mult = crate::attributes::attribute_helpers::skill_power_multiplier(
@@ -1919,7 +1906,7 @@ pub fn tick_arrow_volley(
         for i in 0..arrow_volley_scaling::ARROWS_PER_WAVE {
             let angle_offset = (i as f32 - 1.0) * spread_angle;
             let direction = Vec2::from_angle(base_angle + angle_offset);
-            ranged_attack_events.send(RangedAttackEvent {
+            ranged_attack_events.write(RangedAttackEvent {
                 projectile: Projectile::ArrowVolleyShot,
                 direction,
                 mana_cost: None,
@@ -1953,21 +1940,21 @@ pub fn tick_pending_dagger_slashes(
     mut pending: Query<(Entity, &mut PendingDaggerSlash)>,
     player: Query<&GlobalTransform, With<Player>>,
     cursor: Res<CursorPos>,
-    mut ranged_attack_events: EventWriter<RangedAttackEvent>,
+    mut ranged_attack_events: MessageWriter<RangedAttackEvent>,
 ) {
     for (e, mut p) in pending.iter_mut() {
         p.delay.tick(time.delta());
         if !p.delay.just_finished() {
             continue;
         }
-        let Ok(player_txfm) = player.get_single() else {
+        let Ok(player_txfm) = player.single() else {
             commands.entity(e).despawn();
             continue;
         };
         let player_pos = player_txfm.translation().truncate();
         let cursor_pos = cursor.world_coords.truncate();
         let direction = (cursor_pos - player_pos).normalize_or_zero();
-        ranged_attack_events.send(RangedAttackEvent {
+        ranged_attack_events.write(RangedAttackEvent {
             projectile: Projectile::DaggerSlash,
             direction,
             mana_cost: None,
@@ -1998,17 +1985,17 @@ pub fn finalize_rapidfire_fury_charges(
         With<Player>,
     >,
 ) {
-    let skills_single = player_skills.get_single().ok();
-    let blessings_single = blessings.get_single().ok();
+    let skills_single = player_skills.single().ok();
+    let blessings_single = blessings.single().ok();
     for (e, mut slots, rapid, fury) in q.iter_mut() {
         if let Some(r) = rapid {
-            if r.duration.finished() {
+            if r.duration.is_finished() {
                 if let Some(si) = slots
                     .0
                     .iter()
                     .position(|s| s.tracked_skill == ActiveSkill::Rapidfire)
                 {
-                    if slots.0[si].cooldown_timer.finished() {
+                    if slots.0[si].cooldown_timer.is_finished() {
                         grant_skill_charge_after_cooldown_complete(
                             e,
                             ActiveSkill::Rapidfire,
@@ -2027,13 +2014,13 @@ pub fn finalize_rapidfire_fury_charges(
             }
         }
         if let Some(f) = fury {
-            if f.duration.finished() {
+            if f.duration.is_finished() {
                 if let Some(si) = slots
                     .0
                     .iter()
                     .position(|s| s.tracked_skill == ActiveSkill::Fury)
                 {
-                    if slots.0[si].cooldown_timer.finished() {
+                    if slots.0[si].cooldown_timer.is_finished() {
                         grant_skill_charge_after_cooldown_complete(
                             e,
                             ActiveSkill::Fury,
@@ -2059,8 +2046,8 @@ pub fn tick_druid_tree_dummy_timers(
 ) {
     for (e, mut dummy) in dummy_query.iter_mut() {
         dummy.timer.tick(time.delta());
-        if dummy.timer.finished() {
-            commands.entity(e).despawn_recursive();
+        if dummy.timer.is_finished() {
+            commands.entity(e).despawn();
         }
     }
 }
@@ -2116,7 +2103,7 @@ pub fn handle_druid_tree_taunt(
 
         let is_about_to_despawn = dummy_timers
             .get(dummy_entity)
-            .map(|d| d.timer.finished())
+            .map(|d| d.timer.is_finished())
             .unwrap_or(false);
 
         for (enemy_txfm, mut follow_state) in enemies.iter_mut() {
@@ -2150,12 +2137,10 @@ pub fn handle_druid_tree_taunt(
 }
 
 /// Darken the player's atlas sprite when stealthed, restore when not.
-pub fn update_stealth_color(
-    mut sprites: Query<(&mut TextureAtlasSprite, Option<&Stealthed>), With<Player>>,
-) {
+pub fn update_stealth_color(mut sprites: Query<(&mut Sprite, Option<&Stealthed>), With<Player>>) {
     for (mut sprite, stealth) in sprites.iter_mut() {
         if stealth.is_some() {
-            sprite.color = Color::rgba(0.2, 0.2, 0.2, 0.3);
+            sprite.color = Color::srgba(0.2, 0.2, 0.2, 0.3);
         } else {
             sprite.color = Color::WHITE;
         }
@@ -2257,12 +2242,12 @@ pub fn initialize_class_skill_slots(
 pub fn add_rapidfire_speed_to_bonus(
     added_rapidfire: Query<&RapidfireState, Added<RapidfireState>>,
     mut player_query: Query<&mut BonusAttackSpeed, With<Player>>,
-    mut attribute_event: EventWriter<crate::attributes::AttributeChangeEvent>,
+    mut attribute_event: MessageWriter<crate::attributes::AttributeChangeEvent>,
 ) {
     for buff in added_rapidfire.iter() {
-        if let Ok(mut bonus_speed) = player_query.get_single_mut() {
+        if let Ok(mut bonus_speed) = player_query.single_mut() {
             bonus_speed.add_multiplier(buff.attack_speed_bonus);
-            attribute_event.send_default();
+            attribute_event.write_default();
         }
     }
 }
@@ -2271,7 +2256,7 @@ pub fn add_rapidfire_speed_to_bonus(
 /// Reduces by 0.1s per stack of CritSkillCooldownReduction heirloom (Bob's Bell).
 /// Rate-limited to once per 0.1s via HeirloomTriggerCooldowns.
 pub fn reduce_skill_cooldown_on_crit(
-    mut hit_events: EventReader<HitEvent>,
+    mut hit_events: MessageReader<HitEvent>,
     mut commands: Commands,
     mut players: Query<
         (Entity, &PlayerSkills, Option<&mut HeirloomTriggerCooldowns>),
@@ -2281,7 +2266,7 @@ pub fn reduce_skill_cooldown_on_crit(
     mut class_slots: Query<&mut ClassSkillSlots, With<Player>>,
     mut trigger_counts: ResMut<crate::player::skills::HeirloomTriggerCounts>,
 ) {
-    for hit in hit_events.iter() {
+    for hit in hit_events.read() {
         if !hit.was_crit || hit.hit_by_mob.is_some() {
             continue;
         }
@@ -2295,7 +2280,7 @@ pub fn reduce_skill_cooldown_on_crit(
                 if cooldowns
                     .bobs_bell
                     .as_ref()
-                    .map_or(false, |t| !t.finished())
+                    .map_or(false, |t| !t.is_finished())
                 {
                     continue;
                 }
@@ -2308,7 +2293,7 @@ pub fn reduce_skill_cooldown_on_crit(
             if let Ok(mut slots) = class_slots.get_mut(player_e) {
                 let blessings_ref = blessings.get(player_e).ok();
                 for i in 0..4 {
-                    if !slots.0[i].cooldown_timer.finished() {
+                    if !slots.0[i].cooldown_timer.is_finished() {
                         slots.0[i]
                             .cooldown_timer
                             .tick(Duration::from_secs_f32(reduction));
@@ -2342,12 +2327,12 @@ pub fn reduce_skill_cooldown_on_crit(
 }
 
 pub fn handle_crit_heal(
-    mut hit_events: EventReader<crate::combat::HitEvent>,
+    mut hit_events: MessageReader<crate::combat::HitEvent>,
     player_query: Query<&PlayerSkills, With<crate::player::Player>>,
-    mut modify_health_event: EventWriter<crate::attributes::modifiers::ModifyHealthEvent>,
+    mut modify_health_event: MessageWriter<crate::attributes::modifiers::ModifyHealthEvent>,
     mut trigger_counts: ResMut<crate::player::skills::HeirloomTriggerCounts>,
 ) {
-    let Ok(skills) = player_query.get_single() else {
+    let Ok(skills) = player_query.single() else {
         return;
     };
 
@@ -2358,7 +2343,7 @@ pub fn handle_crit_heal(
 
     let mut rng = rand::thread_rng();
 
-    for hit in hit_events.iter() {
+    for hit in hit_events.read() {
         // Only process crits from player attacks (not from mobs hitting player)
         // Treat crit and overcrit the same
         if (!hit.was_crit && !hit.was_overcrit)
@@ -2389,7 +2374,7 @@ pub fn handle_crit_heal(
                 crate::player::skills::HealthGainSource::VampiricRing,
                 heal_amount,
             );
-            modify_health_event.send(crate::attributes::modifiers::ModifyHealthEvent(heal_amount));
+            modify_health_event.write(crate::attributes::modifiers::ModifyHealthEvent(heal_amount));
         }
     }
 }
@@ -2398,16 +2383,16 @@ pub fn handle_fury_skill(
     fury_states: Query<(&FuryState, &GlobalTransform), With<Player>>,
     enemies: Query<(Entity, &GlobalTransform), With<Mob>>,
     player_skills: Query<(&SkillPower, &Attack, &OwnedBlessings), With<Player>>,
-    mut ranged_attack_events: EventWriter<RangedAttackEvent>,
+    mut ranged_attack_events: MessageWriter<RangedAttackEvent>,
 ) {
     for (fury_state, player_transform) in fury_states.iter() {
-        if fury_state.duration.finished() {
+        if fury_state.duration.is_finished() {
             continue;
         }
 
         if fury_state.throw_timer.just_finished() {
             let player_pos = player_transform.translation().truncate();
-            let Ok((skill_power, attack, blessings)) = player_skills.get_single() else {
+            let Ok((skill_power, attack, blessings)) = player_skills.single() else {
                 continue;
             };
 
@@ -2435,7 +2420,7 @@ pub fn handle_fury_skill(
                 Vec2::new(angle.cos(), angle.sin())
             };
 
-            ranged_attack_events.send(RangedAttackEvent {
+            ranged_attack_events.write(RangedAttackEvent {
                 projectile: Projectile::FuryKunai,
                 direction,
                 mana_cost: None,
@@ -2463,11 +2448,11 @@ pub struct SkillExplosionBuff {
 
 /// Enable explosion-on-hit for a short window when a skill is cast.
 pub fn handle_skill_explosion_cast(
-    mut events: EventReader<ActiveSkillUsedEvent>,
+    mut events: MessageReader<ActiveSkillUsedEvent>,
     mut player: Query<(Entity, &PlayerSkills), With<Player>>,
     mut commands: Commands,
 ) {
-    let Ok((player_e, skills)) = player.get_single_mut() else {
+    let Ok((player_e, skills)) = player.single_mut() else {
         return;
     };
     let stacks = skills.get_count(Heirloom::SkillExplosion);
@@ -2477,7 +2462,7 @@ pub fn handle_skill_explosion_cast(
 
     let damage_fraction = Heirloom::skill_explosion_damage_fraction(stacks);
 
-    for _ in events.iter() {
+    for _ in events.read() {
         commands.entity(player_e).insert(SkillExplosionBuff {
             timer: Timer::from_seconds(SKILL_EXPLOSION_BUFF_SECS, TimerMode::Once),
             damage_fraction,
@@ -2492,7 +2477,7 @@ pub fn tick_skill_explosion_buff(
 ) {
     for (entity, mut buff) in query.iter_mut() {
         buff.timer.tick(time.delta());
-        if buff.timer.finished() {
+        if buff.timer.is_finished() {
             commands.entity(entity).remove::<SkillExplosionBuff>();
         }
     }
@@ -2500,9 +2485,14 @@ pub fn tick_skill_explosion_buff(
 
 /// Skill hits spawn a small explosion at the target while [`SkillExplosionBuff`] is active.
 pub fn handle_skill_explosion_hits(
-    mut hits: EventReader<HitEvent>,
+    mut hits: MessageReader<HitEvent>,
     mut player: Query<
-        (&PlayerSkills, &ProjectileSize, &mut CurrentMana, Option<&SkillExplosionBuff>),
+        (
+            &PlayerSkills,
+            &ProjectileSize,
+            &mut CurrentMana,
+            Option<&SkillExplosionBuff>,
+        ),
         With<Player>,
     >,
     mobs: Query<&GlobalTransform, With<Mob>>,
@@ -2513,7 +2503,7 @@ pub fn handle_skill_explosion_hits(
 ) {
     *throttle = 0;
 
-    let Ok((skills, projectile_size, mut current_mana, explosion_buff)) = player.get_single_mut()
+    let Ok((skills, projectile_size, mut current_mana, explosion_buff)) = player.single_mut()
     else {
         return;
     };
@@ -2526,7 +2516,7 @@ pub fn handle_skill_explosion_hits(
 
     let mana_cost = Heirloom::skill_explosion_mana_cost();
 
-    for hit in hits.iter() {
+    for hit in hits.read() {
         if hit.from_heirloom_effect.is_some() || hit.hit_by_mob.is_some() {
             continue;
         }
@@ -2570,11 +2560,11 @@ pub fn handle_skill_explosion_hits(
 /// Tracks the last projectile that hit each enemy (for dagger throw kill tracking)
 pub fn track_enemy_hit_projectiles(
     mut commands: Commands,
-    mut hit_events: EventReader<HitEvent>,
+    mut hit_events: MessageReader<HitEvent>,
     mut enemies: Query<&mut LastHitProjectile>,
     mobs: Query<Entity, With<Mob>>,
 ) {
-    for hit in hit_events.iter() {
+    for hit in hit_events.read() {
         // Only track hits on enemies
         if !mobs.contains(hit.hit_entity) {
             continue;
@@ -2594,15 +2584,15 @@ pub fn track_enemy_hit_projectiles(
 
 /// Tracks enemy deaths and increments dagger throw kill tracker (excluding dagger throw kills)
 pub fn track_dagger_throw_kills(
-    mut death_events: EventReader<EnemyDeathEvent>,
+    mut death_events: MessageReader<EnemyDeathEvent>,
     mut kill_trackers: Query<&mut DaggerThrowKillTracker, With<Player>>,
     last_hit_projectiles: Query<&LastHitProjectile>,
 ) {
-    let Ok(mut tracker) = kill_trackers.get_single_mut() else {
+    let Ok(mut tracker) = kill_trackers.single_mut() else {
         return;
     };
 
-    for death_event in death_events.iter() {
+    for death_event in death_events.read() {
         // Check if this enemy was killed by a dagger throw
         let was_killed_by_dagger_throw =
             if let Ok(last_hit) = last_hit_projectiles.get(death_event.entity) {

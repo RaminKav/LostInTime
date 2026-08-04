@@ -3,18 +3,18 @@
 
 // NOTE: Bindings must come before functions that use them!
 #import bevy_sprite::mesh2d_functions
+#import bevy_sprite::mesh2d_vertex_output::VertexOutput
 
 // params.x = center alpha, params.y = edge alpha, params.z = falloff exponent
-@group(1) @binding(0)
+@group(#{MATERIAL_BIND_GROUP}) @binding(0)
 var<uniform> params: vec4<f32>;
 // rgb in .xyz (linear 0..1); alpha comes from the radial ramp only
-@group(1) @binding(1)
+@group(#{MATERIAL_BIND_GROUP}) @binding(1)
 var<uniform> overlay_color: vec4<f32>;
 
 @fragment
-fn fragment(
-    #import bevy_sprite::mesh2d_vertex_output
-    ) -> @location(0) vec4<f32> {
+fn fragment(mesh: VertexOutput) -> @location(0) vec4<f32> {
+    let uv = mesh.uv;
     // Per-axis normalised position: 0 at centre, 1.0 at the screen mid-edges.
     let p = (uv - vec2<f32>(0.5, 0.5)) * 2.0;
     let dist = clamp(length(p), 0.0, 1.0);

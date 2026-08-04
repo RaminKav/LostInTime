@@ -1,13 +1,16 @@
+use crate::aseprite_helpers::{
+    ase_animation, aseprite_bundle, collect_finished, is_paused, pause, play_loop, play_once, start,
+};
+use bevy_aseprite_ultra::prelude::{AnimationState, AseAnimation, Aseprite};
 use std::cmp::max;
 
 use bevy::{
     asset::AssetServer,
+    camera::visibility::RenderLayers,
     math::Vec3,
-    prelude::{Commands, VisibilityBundle},
-    render::view::RenderLayers,
+    prelude::{Commands, Visibility},
     transform::components::Transform,
 };
-use bevy_aseprite::{anim::AsepriteAnimation, AsepriteBundle};
 use rand::{rngs::ThreadRng, Rng};
 
 use crate::{
@@ -371,24 +374,26 @@ pub fn spawn_rarity_animation(
 
         // glow/shake effects
         commands
-            .spawn(AsepriteBundle {
-                aseprite: asset_server.load(RarityGlows::PATH),
-                animation: AsepriteAnimation::from(RarityGlows::tags::RARER),
-                transform: Transform::from_translation(pos),
-                ..Default::default()
-            })
-            .insert(VisibilityBundle::default())
+            .spawn(aseprite_bundle(
+                asset_server.load(RarityGlows::PATH),
+                RarityGlows::tags::RARER,
+                Transform::from_translation(pos),
+                Visibility::Inherited,
+                true,
+            ))
+            .insert(Visibility::default())
             .insert(DoneAnimation)
             .insert(RenderLayers::from_layers(&[3]));
     } else if new_rarity == ItemRarity::Rare {
         commands
-            .spawn(AsepriteBundle {
-                aseprite: asset_server.load(RarityGlows::PATH),
-                animation: AsepriteAnimation::from(RarityGlows::tags::RARE),
-                transform: Transform::from_translation(pos),
-                ..Default::default()
-            })
-            .insert(VisibilityBundle::default())
+            .spawn(aseprite_bundle(
+                asset_server.load(RarityGlows::PATH),
+                RarityGlows::tags::RARE,
+                Transform::from_translation(pos),
+                Visibility::Inherited,
+                true,
+            ))
+            .insert(Visibility::default())
             .insert(DoneAnimation)
             .insert(RenderLayers::from_layers(&[3]));
         commands.spawn(SoundSpawner::new(AudioSoundEffect::RareDrop1, 0.15));

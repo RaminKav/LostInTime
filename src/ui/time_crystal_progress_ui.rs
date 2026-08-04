@@ -1,4 +1,5 @@
-use bevy::{ecs::query::Or, prelude::*, render::view::RenderLayers, sprite::Anchor};
+use bevy::text::Justify;
+use bevy::{camera::visibility::RenderLayers, ecs::query::Or, prelude::*, sprite::Anchor};
 
 use crate::{
     assets::Graphics,
@@ -102,10 +103,10 @@ pub fn check_show_time_crystal_progress_popup(
     if progress.is_none() {
         return;
     }
-    if current_ui_state.0 != UIState::Closed {
+    if *current_ui_state.get() != UIState::Closed {
         return;
     }
-    if next_ui_state.0.is_some() {
+    if !matches!(&*next_ui_state, NextState::Unchanged) {
         return;
     }
     next_ui_state.set(UIState::TimeCrystalProgress);
@@ -133,15 +134,14 @@ pub fn setup_time_crystal_progress_ui(
 
     // Background overlay (darken main menu)
     commands.spawn((
-        SpriteBundle {
-            sprite: Sprite {
-                color: Color::rgba(0., 0., 0., 0.7),
+        (
+            Sprite {
+                color: Color::srgba(0., 0., 0., 0.7),
                 custom_size: Some(crate::ui::ui_helpers::full_screen_overlay_size(&resolution)),
                 ..Default::default()
             },
-            transform: Transform::from_translation(Vec3::new(0., 0., PANEL_Z - 1.)),
-            ..Default::default()
-        },
+            Transform::from_translation(Vec3::new(0., 0., PANEL_Z - 1.)),
+        ),
         RenderLayers::from_layers(&[3]),
         TimeCrystalProgressUI,
         UIState::TimeCrystalProgress,
@@ -150,15 +150,14 @@ pub fn setup_time_crystal_progress_ui(
 
     // Panel background
     commands.spawn((
-        SpriteBundle {
-            sprite: Sprite {
-                color: Color::rgba(0.05, 0.05, 0.08, 0.95),
+        (
+            Sprite {
+                color: Color::srgba(0.05, 0.05, 0.08, 0.95),
                 custom_size: Some(Vec2::new(PANEL_WIDTH, panel_height)),
                 ..Default::default()
             },
-            transform: Transform::from_translation(Vec3::new(0., 0., PANEL_Z)),
-            ..Default::default()
-        },
+            Transform::from_translation(Vec3::new(0., 0., PANEL_Z)),
+        ),
         RenderLayers::from_layers(&[3]),
         TimeCrystalProgressUI,
         UIState::TimeCrystalProgress,
@@ -170,20 +169,15 @@ pub fn setup_time_crystal_progress_ui(
 
     // Title
     commands.spawn((
-        Text2dBundle {
-            text: Text::from_section(
-                "Time Crystal Progress",
-                gf::MENU_TITLE.text_style(&asset_server, WHITE),
-            )
-            .with_alignment(TextAlignment::Center),
-            text_anchor: Anchor::Center,
-            transform: Transform {
+        gf::MENU_TITLE
+            .text(&asset_server, "Time Crystal Progress", WHITE)
+            .justify(Justify::Center)
+            .anchor(Anchor::CENTER)
+            .with_transform(Transform {
                 translation: Vec3::new(0., cursor_y, PANEL_CONTENT_Z),
                 scale: gf::MENU_TITLE.transform_scale(),
                 ..default()
-            },
-            ..Default::default()
-        },
+            }),
         RenderLayers::from_layers(&[3]),
         TimeCrystalProgressUI,
         UIState::TimeCrystalProgress,
@@ -234,20 +228,15 @@ pub fn setup_time_crystal_progress_ui(
     };
 
     commands.spawn((
-        Text2dBundle {
-            text: Text::from_section(
-                focus_label,
-                gf::DISPLAY.text_style(&asset_server, YELLOW_2),
-            )
-            .with_alignment(TextAlignment::Center),
-            text_anchor: Anchor::Center,
-            transform: Transform {
+        gf::DISPLAY
+            .text(&asset_server, focus_label, YELLOW_2)
+            .justify(Justify::Center)
+            .anchor(Anchor::CENTER)
+            .with_transform(Transform {
                 translation: Vec3::new(0., cursor_y, PANEL_CONTENT_Z),
                 scale: gf::DISPLAY.transform_scale(),
                 ..default()
-            },
-            ..Default::default()
-        },
+            }),
         RenderLayers::from_layers(&[3]),
         TimeCrystalProgressUI,
         UIState::TimeCrystalProgress,
@@ -256,20 +245,15 @@ pub fn setup_time_crystal_progress_ui(
     cursor_y -= 14.;
 
     commands.spawn((
-        Text2dBundle {
-            text: Text::from_section(
-                shards_line,
-                gf::BODY.text_style(&asset_server, WHITE),
-            )
-            .with_alignment(TextAlignment::Center),
-            text_anchor: Anchor::Center,
-            transform: Transform {
+        gf::BODY
+            .text(&asset_server, shards_line, WHITE)
+            .justify(Justify::Center)
+            .anchor(Anchor::CENTER)
+            .with_transform(Transform {
                 translation: Vec3::new(0., cursor_y, PANEL_CONTENT_Z),
                 scale: gf::BODY.transform_scale(),
                 ..default()
-            },
-            ..Default::default()
-        },
+            }),
         RenderLayers::from_layers(&[3]),
         TimeCrystalProgressUI,
         UIState::TimeCrystalProgress,
@@ -280,20 +264,19 @@ pub fn setup_time_crystal_progress_ui(
     // Per-completed-crystal sections: header + heirloom icon row.
     for crystal_idx in newly_completed.iter().copied() {
         commands.spawn((
-            Text2dBundle {
-                text: Text::from_section(
+            gf::BODY
+                .text(
+                    &asset_server,
                     format!("Crystal #{} Completed!", crystal_idx + 1),
-                    gf::BODY.text_style(&asset_server, LIGHT_GREEN),
+                    LIGHT_GREEN,
                 )
-                .with_alignment(TextAlignment::Center),
-                text_anchor: Anchor::Center,
-                transform: Transform {
+                .justify(Justify::Center)
+                .anchor(Anchor::CENTER)
+                .with_transform(Transform {
                     translation: Vec3::new(0., cursor_y, PANEL_CONTENT_Z),
                     scale: gf::BODY.transform_scale(),
                     ..default()
-                },
-                ..Default::default()
-            },
+                }),
             RenderLayers::from_layers(&[3]),
             TimeCrystalProgressUI,
             UIState::TimeCrystalProgress,
@@ -313,18 +296,15 @@ pub fn setup_time_crystal_progress_ui(
         for (i, (heirloom, rarity)) in unlocks.into_iter().enumerate() {
             let icon_x = start_x + i as f32 * ICON_SPACING;
             commands.spawn((
-                SpriteSheetBundle {
-                    sprite: graphics.get_heirloom_icon(heirloom.clone()),
-                    texture_atlas: graphics.texture_atlas.as_ref().unwrap().clone(),
-                    transform: Transform {
-                        translation: Vec3::new(icon_x, cursor_y - ICON_SIZE * 0.5, PANEL_CONTENT_Z),
-                        scale: Vec3::new(1., 1., 1.),
-                        ..Default::default()
-                    },
-                    ..Default::default()
+                {
+                    let mut sprite =
+                        graphics.get_heirloom_icon(heirloom.clone());
+                    sprite.custom_size = Some(Vec2::new(ICON_SIZE, ICON_SIZE));
+                    sprite
                 },
-                Sprite {
-                    custom_size: Some(Vec2::new(ICON_SIZE, ICON_SIZE)),
+                Transform {
+                    translation: Vec3::new(icon_x, cursor_y - ICON_SIZE * 0.5, PANEL_CONTENT_Z),
+                    scale: Vec3::new(1., 1., 1.),
                     ..Default::default()
                 },
                 RenderLayers::from_layers(&[3]),
@@ -346,15 +326,14 @@ pub fn setup_time_crystal_progress_ui(
     let button_y = -half_h + 18.;
     let button_entity = commands
         .spawn((
-            SpriteBundle {
-                texture: graphics.get_ui_element_texture(UIElement::MenuButton),
-                sprite: Sprite {
+            (
+                Sprite {
+                    image: graphics.get_ui_element_texture(UIElement::MenuButton),
                     custom_size: Some(Vec2::new(50., 18.)),
-                    ..Default::default()
+                    ..default()
                 },
-                transform: Transform::from_translation(Vec3::new(0., button_y, PANEL_CONTENT_Z)),
-                ..Default::default()
-            },
+                Transform::from_translation(Vec3::new(0., button_y, PANEL_CONTENT_Z)),
+            ),
             RenderLayers::from_layers(&[3]),
             UIElement::MenuButton,
             Interactable::default(),
@@ -366,31 +345,28 @@ pub fn setup_time_crystal_progress_ui(
         .id();
 
     commands
-        .spawn(Text2dBundle {
-            text: Text::from_section(
-                "OK",
-                gf::BODY.text_style(&asset_server, crate::colors::DARK_WOOD_BROWN),
-            )
-            .with_alignment(TextAlignment::Center),
-            text_anchor: Anchor::Center,
-            transform: Transform {
-                translation: Vec3::new(0., 0.5, 1.),
-                scale: gf::BODY.transform_scale(),
-                ..default()
-            },
-            ..Default::default()
-        })
+        .spawn(
+            gf::BODY
+                .text(&asset_server, "OK", crate::colors::DARK_WOOD_BROWN)
+                .justify(Justify::Center)
+                .anchor(Anchor::CENTER)
+                .with_transform(Transform {
+                    translation: Vec3::new(0., 0.5, 1.),
+                    scale: gf::BODY.transform_scale(),
+                    ..default()
+                }),
+        )
         .insert(RenderLayers::from_layers(&[3]))
         .insert(UIState::TimeCrystalProgress)
-        .insert(Name::new("Time Crystal OK Text"))
-        .set_parent(button_entity);
+        .insert(Name::new("Time Crystal OK Text2d"))
+        .insert(ChildOf(button_entity));
 }
 
 /// Closes the popup when the OK button is clicked, and consumes the progress resource
 /// so it doesn't pop up again on subsequent main-menu visits.
 pub fn handle_time_crystal_progress_ok_button(
     cursor_pos: Res<CursorPos>,
-    mouse_input: Res<Input<MouseButton>>,
+    mouse_input: Res<ButtonInput<MouseButton>>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     mut buttons: Query<(Entity, &mut Interactable), With<TimeCrystalProgressOKButton>>,
     mut next_ui_state: ResMut<NextState<UIState>>,
@@ -428,7 +404,7 @@ pub fn handle_time_crystal_progress_ok_button(
 /// so we pointcast here and drive [`Interaction::Hovering`] ourselves, then send
 /// [`HeirloomTooltipRequest`] for the shared tooltip processor.
 pub fn handle_time_crystal_unlock_hover_tooltip(
-    mut tooltip_requests: EventWriter<HeirloomTooltipRequest>,
+    mut tooltip_requests: MessageWriter<HeirloomTooltipRequest>,
     ui_state: Res<State<UIState>>,
     dev_heirloom_grid_open: Option<Res<crate::ui::inventory_ui::DevHeirloomGridOpen>>,
     cursor_pos: Res<CursorPos>,
@@ -454,7 +430,7 @@ pub fn handle_time_crystal_unlock_hover_tooltip(
     >,
     mut last_hovered: Local<Option<Entity>>,
 ) {
-    let tooltip_ui_state = match ui_state.0 {
+    let tooltip_ui_state = match ui_state.get() {
         UIState::TimeCrystalProgress => UIState::TimeCrystalProgress,
         UIState::TimeCrystalsBrowser => UIState::TimeCrystalsBrowser,
         UIState::Inventory => {
@@ -463,7 +439,7 @@ pub fn handle_time_crystal_unlock_hover_tooltip(
                 // broadcast Clear every frame — that fights HUD heirloom hover tooltips.
                 if last_hovered.is_some() {
                     *last_hovered = None;
-                    tooltip_requests.send(HeirloomTooltipRequest::Clear);
+                    tooltip_requests.write(HeirloomTooltipRequest::Clear);
                 }
                 return;
             }
@@ -494,7 +470,9 @@ pub fn handle_time_crystal_unlock_hover_tooltip(
     }
 
     match hovered_entity {
-        None => tooltip_requests.send(HeirloomTooltipRequest::Clear),
+        None => {
+            let _ = tooltip_requests.write(HeirloomTooltipRequest::Clear);
+        }
         Some(entity) => {
             let Ok((_, _, transform, c_icon, l_cell)) = icons.get(entity) else {
                 *last_hovered = hovered_entity;
@@ -515,7 +493,7 @@ pub fn handle_time_crystal_unlock_hover_tooltip(
                 icon_pos.y + 100.
             };
             let tooltip_pos = Vec3::new(icon_pos.x, tooltip_y, TOOLTIP_Z);
-            tooltip_requests.send(HeirloomTooltipRequest::Show(HeirloomTooltipShow {
+            tooltip_requests.write(HeirloomTooltipRequest::Show(HeirloomTooltipShow {
                 heirloom,
                 rarity,
                 position: tooltip_pos,
@@ -535,9 +513,9 @@ pub fn cleanup_time_crystal_progress_ui(
     tooltips: Query<Entity, With<super::heirloom_tooltip::HeirloomDynamicTooltip>>,
 ) {
     for entity in query.iter() {
-        commands.entity(entity).despawn_recursive();
+        commands.entity(entity).despawn();
     }
     for entity in tooltips.iter() {
-        commands.entity(entity).despawn_recursive();
+        commands.entity(entity).despawn();
     }
 }

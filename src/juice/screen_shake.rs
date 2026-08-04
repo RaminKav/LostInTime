@@ -26,16 +26,15 @@ pub fn shake_effect(
 ) {
     for (e, mut t, mut shake) in shakers.iter_mut() {
         shake.timer.tick(time.delta());
-        if !shake.timer.finished() {
-            let sin = f32::sin(shake.speed * time.delta_seconds());
+        if !shake.timer.is_finished() {
+            let sin = f32::sin(shake.speed * time.delta_secs());
             // var direction = _Direction + Get2DNoise(_Seed) * _NoiseMagnitude;
             let perlin = Perlin::new(shake.seed);
 
             let dir = shake.dir
-                + perlin.get([time.delta_seconds_f64(), time.delta_seconds_f64()]) as f32
-                    * shake.noise;
+                + perlin.get([time.delta_secs_f64(), time.delta_secs_f64()]) as f32 * shake.noise;
             let dir = dir.normalize();
-            let extend = (dir * sin * shake.max_mag * shake.timer.percent_left()).extend(0.);
+            let extend = (dir * sin * shake.max_mag * shake.timer.fraction_remaining()).extend(0.);
             t.translation += extend;
         } else {
             commands.entity(e).remove::<ShakeEffect>();
@@ -45,10 +44,10 @@ pub fn shake_effect(
 
 pub fn test_shake(
     mut game_camera: Query<Entity, With<TextureCamera>>,
-    keys: Res<Input<KeyCode>>,
+    keys: Res<ButtonInput<KeyCode>>,
     mut commands: Commands,
 ) {
-    if keys.just_pressed(KeyCode::G) && *DEBUG {
+    if keys.just_pressed(KeyCode::KeyG) && *DEBUG {
         let mut rng = rand::thread_rng();
         let seed = rng.gen_range(0..100000);
         let speed = 10.;

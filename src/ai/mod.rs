@@ -26,30 +26,24 @@ impl Plugin for AIPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<EnemyAICacheMap>()
             .init_resource::<EnemySpatialGrid>()
-            .add_system(
+            // seldom_state 0.17 runs transitions in PostUpdate by default. Keep the
+            // LoS/attack-distance cache in that same schedule, immediately before
+            // Transition, so triggers never see a stale/empty map.
+            .add_plugins(StateMachinePlugin::default())
+            .add_systems(
+                PostUpdate,
                 update_enemy_ai_cache
-                    .in_base_set(CoreSet::PreUpdate)
-                    .run_if(in_state(GameState::Main)),
-            )
-            // Attack cooldowns are often inserted during Update (e.g. void worm laser
-            // ending). Refresh the cache once more before state transitions so
-            // CachedAttackDistance sees the new cooldown and doesn't immediately
-            // re-enter attack.
-            .add_system(
-                update_enemy_ai_cache
-                    .in_base_set(CoreSet::PostUpdate)
                     .before(StateSet::Transition)
                     .run_if(in_state(GameState::Main)),
             )
-            .add_plugin(StateMachinePlugin)
-            .add_system(
+            .add_systems(
+                Update,
                 build_enemy_spatial_grid
                     .run_if(is_not_paused)
-                    .before(follow)
-                    .before(aseprite_enemy::aseprite_follow)
-                    .in_set(OnUpdate(GameState::Main)),
+                    .run_if(in_state(GameState::Main)),
             )
             .add_systems(
+                Update,
                 (
                     follow.run_if(is_not_paused),
                     new_follow.run_if(is_not_paused),
@@ -66,9 +60,11 @@ impl Plugin for AIPlugin {
                     tick_enemy_attack_cooldowns.run_if(is_not_paused),
                     idle.run_if(is_not_paused),
                 )
-                    .in_set(OnUpdate(GameState::Main)),
+                    .after(build_enemy_spatial_grid)
+                    .run_if(in_state(GameState::Main)),
             )
             .add_systems(
+                Update,
                 (
                     aseprite_enemy::aseprite_follow.run_if(is_not_paused),
                     aseprite_enemy::aseprite_idle.run_if(is_not_paused),
@@ -79,7 +75,8 @@ impl Plugin for AIPlugin {
                     aseprite_enemy::aseprite_multi_leap_attack.run_if(is_not_paused),
                     aseprite_enemy::aseprite_bull_charge.run_if(is_not_paused),
                 )
-                    .in_set(OnUpdate(GameState::Main)),
+                    .after(build_enemy_spatial_grid)
+                    .run_if(in_state(GameState::Main)),
             );
     }
 }

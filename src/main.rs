@@ -12,6 +12,8 @@ use attributes::{
     Healing, HealthRegen, Lifesteal, LootRateBonus, MaxHealth, Speed, Thorns, XpRateBonus,
 };
 mod aim;
+pub mod aseprite_assets;
+pub mod aseprite_helpers;
 mod audio;
 mod bounce;
 mod container;
@@ -31,15 +33,15 @@ pub use keybinds::*;
 pub use pets::*;
 
 use audio::AudioPlugin;
-use bevy_aseprite::AsepritePlugin;
+use bevy_aseprite_ultra::prelude::AsepriteUltraPlugin;
 
 use bevy::{
-    core_pipeline::clear_color::ClearColorConfig,
+    camera::ClearColorConfig,
+    camera::{visibility::RenderLayers, ScalingMode},
     diagnostic::FrameTimeDiagnosticsPlugin,
     ecs::{schedule::ScheduleLabel, system::SystemParam},
     log::LogPlugin,
     prelude::*,
-    render::{camera::ScalingMode, view::RenderLayers},
     window::{PresentMode, PrimaryWindow, Window, WindowMode, WindowResolution},
 };
 use bevy_common_assets::ron::RonAssetPlugin;
@@ -51,6 +53,7 @@ use rand::Rng;
 use sapling::SaplingPlugin;
 
 mod juice;
+use bevy_inspector_egui::bevy_egui::EguiPlugin;
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_rapier2d::prelude::*;
 mod ai;
@@ -80,7 +83,9 @@ mod ui;
 mod world;
 use animations::AnimationsPlugin;
 use assets::{GameAssetsPlugin, Graphics, GraphicsDesc, SpriteSize};
-use bevy_asset_loader::prelude::{AssetCollection, LoadingState, LoadingStateAppExt};
+use bevy_asset_loader::prelude::{
+    AssetCollection, ConfigureLoadingState, LoadingState, LoadingStateAppExt,
+};
 use bevy_ecs_tilemap::TilemapPlugin;
 use blessings::BlessingsPlugin;
 use client::ClientPlugin;
@@ -109,7 +114,7 @@ use ui::{
     spawn_menu_text_buttons, InventorySlotState, UIPlugin,
 };
 use world::{
-    chunk::{Chunk, TileEntityCollection, TileSpriteData},
+    chunk::{Chunk, ReflectedPos, TileEntityCollection, TileSpriteData},
     generation::WorldObjectCache,
     world_helpers::world_pos_to_tile_pos,
     y_sort::YSort,
@@ -233,11 +238,12 @@ fn main() {
 
     // ok now run the game :)
     let mut app = App::new();
+    app.configure_sets(Update, CustomFlush);
 
     // macos bundles into a .app anyways, so we don't need to bundle assets.
     // doing it in the universal binary would double it since MacOS does M1 + Intel
     if cfg!(not(target_os = "macos")) {
-        app.add_plugin(EmbeddedAssetPlugin);
+        app.add_plugins(EmbeddedAssetPlugin::default());
     }
 
     let app = app
@@ -245,28 +251,24 @@ fn main() {
         .insert_resource(ClearColor(Color::BLACK))
         .insert_resource(crate::player::score::RunScore::new(false))
         .insert_resource(PlayerHealthPercent::default())
+        .init_resource::<Game>()
         .init_resource::<crate::player::skills::HeirloomTriggerCounts>()
         .init_resource::<crate::player::skills::ManaTrackerResetTimer>()
-        .add_state::<GameState>()
-        .edit_schedule(CoreSchedule::FixedUpdate, |s| {
-            s.configure_set(CoreGameSet::Main.run_if(in_state(GameState::Main)));
-        })
         .add_plugins(
             DefaultPlugins
                 .set(AssetPlugin {
-                    // Enable hot-reloading of assets:
-                    watch_for_changes: false,
+                    watch_for_changes_override: Some(false),
                     ..default()
                 })
                 .set(ImagePlugin::default_nearest())
                 .set(WindowPlugin {
                     primary_window: Some(Window {
-                        resolution: WindowResolution::new(WIDTH, HEIGHT),
+                        resolution: WindowResolution::new(WIDTH as u32, HEIGHT as u32),
                         title: "Willow: The Last Archivist".to_string(),
                         present_mode: PresentMode::Immediate,
                         resizable: true,
                         transparent: true,
-                        mode: WindowMode::BorderlessFullscreen,
+                        mode: WindowMode::BorderlessFullscreen(MonitorSelection::Primary),
                         ..Default::default()
                     }),
                     ..default()
@@ -274,92 +276,111 @@ fn main() {
                 .build()
                 .disable::<LogPlugin>(), // we handle logging ourselves
         )
-        .add_plugin(RonAssetPlugin::<GraphicsDesc>::new(&["desc.ron"]))
-        .add_plugin(RonAssetPlugin::<ClassPetData>::new(&["class.ron"]))
-        .add_plugin(RonAssetPlugin::<ClassUnlockConfig>::new(&[
+        // Bevy 0.19: StatesPlugin (via DefaultPlugins) must exist before init_state.
+        .init_state::<GameState>()
+        .configure_sets(
+            FixedUpdate,
+            CoreGameSet::Main.run_if(in_state(GameState::Main)),
+        )
+        .add_plugins(RonAssetPlugin::<GraphicsDesc>::new(&["desc.ron"]))
+        .add_plugins(RonAssetPlugin::<ClassPetData>::new(&["class.ron"]))
+        .add_plugins(RonAssetPlugin::<ClassUnlockConfig>::new(&[
             "class_unlocks.ron",
         ]))
-        .add_plugin(RonAssetPlugin::<RecipeListProto>::new(&["ron"]))
-        .add_plugin(RonAssetPlugin::<world::grass_patches::GrassPatchesDesc>::new(&["patches.ron"]))
-        .add_plugin(world::grass_patches::GrassPatchesPlugin)
-        .insert_resource(Msaa::Off)
-        .insert_resource(FixedTime::new_from_secs(TIME_STEP))
+        .add_plugins(RonAssetPlugin::<RecipeListProto>::new(&["ron"]))
+        .add_plugins(
+            RonAssetPlugin::<world::grass_patches::GrassPatchesDesc>::new(&["patches.ron"]),
+        )
+        .add_plugins(world::grass_patches::GrassPatchesPlugin)
+        .insert_resource(Time::<Fixed>::from_seconds(TIME_STEP as f64))
         .insert_resource(DisplayScaleSettings::load())
         .insert_resource(cursor::CursorColorSettings::load())
-        .add_plugin(panic_handler::PanicHandler::new().build())
-        .add_plugin(AsepritePlugin)
-        .add_plugin(FrameTimeDiagnosticsPlugin)
-        .add_plugin(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(100.0))
-        .add_plugin(WorldInspectorPlugin::new().run_if(should_show_inspector))
-        .add_plugin(TilemapPlugin)
-        .add_plugin(GameAssetsPlugin)
-        .add_plugin(AudioPlugin)
-        .add_plugin(ItemsPlugin)
-        .add_plugin(AnimationsPlugin)
-        .add_plugin(InputsPlugin)
-        .add_plugin(cursor::CustomCursorPlugin)
-        .add_plugin(gamepad_input::GamepadInputPlugin)
-        .add_plugin(aim::AimPlugin)
-        .add_plugin(UIPlugin)
-        .add_plugin(NightPlugin)
-        .add_plugin(ChaosPlugin)
-        .add_plugin(SaplingPlugin)
-        .add_plugin(AIPlugin)
-        .add_plugin(AttributesPlugin)
-        .add_plugin(CombatPlugin)
-        .add_plugin(EnemyPlugin)
-        .add_plugin(PlayerPlugin)
-        .add_plugin(WorldPlugin)
-        .add_plugin(ClientPlugin)
-        .add_plugin(client::leaderboard::LeaderboardPlugin)
-        .add_plugin(ProtoPlugin)
-        .add_plugin(defs::DefsPlugin)
-        .add_plugin(JuicePlugin)
-        .add_plugin(PetsPlugin)
-        .add_plugin(BlessingsPlugin)
-        // .add_plugin(DiagnosticExplorerAgentPlugin)
-        .add_startup_system(setup)
-        .add_system(update_pixel_perfect_viewport)
+        // Dialog runs off-thread with a timeout, then always aborts — showing a modal on the
+        // panicking winit/Metal thread left the process permanently frozen/unkillable.
+        .add_plugins(panic_handler::PanicHandler::new().build())
+        .add_plugins(AsepriteUltraPlugin)
+        .add_plugins(aseprite_helpers::AsepriteHelpersPlugin)
+        .add_plugins(FrameTimeDiagnosticsPlugin::default())
+        .add_plugins(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(100.0))
+        .add_plugins(EguiPlugin::default())
+        .add_plugins(WorldInspectorPlugin::new().run_if(should_show_inspector))
+        .add_plugins(TilemapPlugin)
+        .add_plugins(GameAssetsPlugin)
+        .add_plugins(AudioPlugin)
+        .add_plugins(ItemsPlugin)
+        .add_plugins(AnimationsPlugin)
+        .add_plugins(InputsPlugin)
+        .add_plugins(cursor::CustomCursorPlugin)
+        .add_plugins(gamepad_input::GamepadInputPlugin)
+        .add_plugins(aim::AimPlugin)
+        .add_plugins(UIPlugin)
+        .add_plugins(NightPlugin)
+        .add_plugins(ChaosPlugin)
+        .add_plugins(SaplingPlugin)
+        .add_plugins(AIPlugin)
+        .add_plugins(AttributesPlugin)
+        .add_plugins(CombatPlugin)
+        .add_plugins(EnemyPlugin)
+        .add_plugins(PlayerPlugin)
+        .add_plugins(WorldPlugin)
+        .add_plugins(ClientPlugin)
+        .add_plugins(client::leaderboard::LeaderboardPlugin)
+        .add_plugins(ProtoPlugin)
+        .add_plugins(defs::DefsPlugin)
+        .add_plugins(JuicePlugin)
+        .add_plugins(PetsPlugin)
+        .add_plugins(BlessingsPlugin)
+        // .add_plugins(DiagnosticExplorerAgentPlugin)
+        .add_systems(Startup, setup)
+        .add_systems(Update, update_pixel_perfect_viewport)
         .add_loading_state(
-            LoadingState::new(GameState::Loading).continue_to_state(GameState::MainMenu),
+            LoadingState::new(GameState::Loading)
+                .continue_to_state(GameState::MainMenu)
+                .load_collection::<ImageAssets>(),
         )
-        .add_collection_to_loading_state::<_, ImageAssets>(GameState::Loading)
-        .add_system(display_main_menu.in_schedule(OnEnter(GameState::MainMenu)))
-        .add_system(
-            cleanup_loading_screen
-                .in_schedule(OnEnter(GameState::MainMenu))
-                .after(display_main_menu),
+        .add_systems(OnEnter(GameState::MainMenu), display_main_menu)
+        .add_systems(
+            OnEnter(GameState::MainMenu),
+            cleanup_loading_screen.after(display_main_menu),
         )
-        .add_system(
+        .add_systems(
+            Update,
             set_start_of_run_action_resource_true
                 .run_if(run_once_per_run())
-                .in_set(OnUpdate(GameState::Main)),
+                .run_if(in_state(GameState::Main)),
         )
-        .add_systems((
-            set_start_of_run_action_resource_false.in_schedule(OnEnter(GameState::GameOver)),
-            set_start_of_run_action_resource_false.in_schedule(OnEnter(GameState::MainMenu)),
-        ))
-        .add_system(spawn_menu_text_buttons.in_schedule(OnEnter(GameState::MainMenu)))
-        .add_system(handle_menu_button_click_events.run_if(not(in_state(GameState::Loading))))
-        .add_system(remove_main_menu.in_schedule(OnExit(GameState::MainMenu)));
+        .add_systems(
+            OnEnter(GameState::GameOver),
+            set_start_of_run_action_resource_false,
+        )
+        .add_systems(
+            OnEnter(GameState::MainMenu),
+            set_start_of_run_action_resource_false,
+        )
+        .add_systems(OnEnter(GameState::MainMenu), spawn_menu_text_buttons)
+        .add_systems(
+            Update,
+            handle_menu_button_click_events.run_if(not(in_state(GameState::Loading))),
+        )
+        .add_systems(OnExit(GameState::MainMenu), remove_main_menu);
 
     if *COLLIDER_LOAD_TEST {
-        app.add_plugin(collider_load_test::ColliderLoadTestPlugin);
+        app.add_plugins(collider_load_test::ColliderLoadTestPlugin);
     }
     if *HEIRLOOM_LOAD_TEST {
-        app.add_plugin(gameplay_load_tests::HeirloomLoadTestPlugin);
+        app.add_plugins(gameplay_load_tests::HeirloomLoadTestPlugin);
     }
     if *PARTICLE_LOAD_TEST {
-        app.add_plugin(gameplay_load_tests::ParticleLoadTestPlugin);
+        app.add_plugins(gameplay_load_tests::ParticleLoadTestPlugin);
     }
     if *POISON_LOAD_TEST {
-        app.add_plugin(gameplay_load_tests::PoisonLoadTestPlugin);
+        app.add_plugins(gameplay_load_tests::PoisonLoadTestPlugin);
     }
     if *WEAPON_LOAD_TEST {
-        app.add_plugin(gameplay_load_tests::WeaponLoadTestPlugin);
+        app.add_plugins(gameplay_load_tests::WeaponLoadTestPlugin);
     }
     if *LOOT_CYCLE_LOAD_TEST {
-        app.add_plugin(gameplay_load_tests::LootCycleLoadTestPlugin);
+        app.add_plugins(gameplay_load_tests::LootCycleLoadTestPlugin);
     }
     if *COLLIDER_LOAD_TEST
         || *HEIRLOOM_LOAD_TEST
@@ -368,24 +389,28 @@ fn main() {
         || *WEAPON_LOAD_TEST
         || *LOOT_CYCLE_LOAD_TEST
     {
-        app.add_system(
-            gameplay_load_tests::unified_load_tests_f9_toggle.in_set(OnUpdate(GameState::Main)),
+        app.add_systems(
+            Update,
+            gameplay_load_tests::unified_load_tests_f9_toggle.run_if(in_state(GameState::Main)),
         );
     }
 
     if *DIAGNOSTICS {
-        app.add_system(gameplay_load_tests::diagnostics_tick.in_set(OnUpdate(GameState::Main)));
+        app.add_systems(
+            Update,
+            gameplay_load_tests::diagnostics_tick.run_if(in_state(GameState::Main)),
+        );
         // Archetype diagnostic runs in every state so we can see whether
         // archetype counts persist across MainMenu <-> Main transitions.
-        app.add_system(gameplay_load_tests::archetype_diagnostics_tick);
+        app.add_systems(Update, gameplay_load_tests::archetype_diagnostics_tick);
     }
 
     if *COLLIDERS {
-        app.add_plugin(RapierDebugRenderPlugin::default());
+        app.add_plugins(RapierDebugRenderPlugin::default());
     }
 
     if *DEBUG {
-        app.add_system(log_entity_count);
+        app.add_systems(Update, log_entity_count);
     }
 
     app.run();
@@ -472,7 +497,7 @@ impl Default for Game {
         Self {
             player_state: PlayerState::default(),
             home_pos: None,
-            player: Entity::from_raw(0),
+            player: Entity::PLACEHOLDER,
         }
     }
 }
@@ -613,9 +638,6 @@ pub struct GameParam<'w, 's> {
     >,
     pub blessings_query: Query<'w, 's, &'static OwnedBlessings, With<Player>>,
     pub stealth_query: Query<'w, 's, Option<&'static Stealthed>, With<Player>>,
-
-    #[system_param(ignore)]
-    marker: PhantomData<&'s ()>,
 }
 
 impl<'w, 's> GameParam<'w, 's> {
@@ -623,16 +645,19 @@ impl<'w, 's> GameParam<'w, 's> {
         self.game.player_state.clone()
     }
     pub fn get_player_level(&self) -> u8 {
-        self.player_query.single().2.level
+        self.player_query.single().map(|q| q.2.level).unwrap_or(1)
     }
     pub fn get_player_level_mut(&mut self) -> Mut<PlayerLevel> {
-        self.player_query.single_mut().2
+        self.player_query.single_mut().expect("player query").2
     }
     pub fn get_player_skills(&self) -> PlayerSkills {
-        self.player_query.single().1.clone()
+        self.player_query
+            .single()
+            .map(|q| q.1.clone())
+            .unwrap_or_default()
     }
     pub fn get_xp_rate_bonus(&self) -> i32 {
-        self.player_stats.get_single().map(|s| s.13 .0).unwrap_or(0)
+        self.player_stats.single().map(|s| s.13 .0).unwrap_or(0)
     }
     pub fn player_mut(&mut self) -> &mut PlayerState {
         &mut self.game.player_state
@@ -714,8 +739,13 @@ impl<'w, 's> GameParam<'w, 's> {
 
     pub fn get_tile_entity(&self, tile: TileMapPosition) -> Option<Entity> {
         if let Some(chunk_e) = self.get_chunk_entity(tile.chunk_pos) {
-            let tile_collection = self.tile_collection_query.get(chunk_e).unwrap();
-            return tile_collection.map.get(&tile.tile_pos.into()).copied();
+            let Ok(tile_collection) = self.tile_collection_query.get(chunk_e) else {
+                return None;
+            };
+            return tile_collection
+                .map
+                .get(&ReflectedPos::from(tile.tile_pos))
+                .copied();
         }
         None
     }
@@ -803,8 +833,11 @@ impl<'w, 's> GameParam<'w, 's> {
         // and is eligible for the Telescope (DodgeCrit) "next weapon hit does 2x" bonus.
         is_weapon_attack: bool,
     ) -> (u32, bool, bool) {
-        let (attack, max_health, _, crit_chance, crit_dmg, bonus_dmg, combo_option, ..) =
-            self.player_stats.single();
+        let Ok((attack, max_health, _, crit_chance, crit_dmg, bonus_dmg, combo_option, ..)) =
+            self.player_stats.single()
+        else {
+            return (0, false, false);
+        };
         let skills = self.get_player_skills();
         let mut rng = rand::thread_rng();
         let dmg_mult = dmg_mult.unwrap_or(1.);
@@ -822,7 +855,7 @@ impl<'w, 's> GameParam<'w, 's> {
         // StandStill: Standing still increases damage (ramps up over 3s)
         let stand_still_stacks = skills.get_count(Heirloom::StandStill);
         if stand_still_stacks > 0 {
-            if let Ok(Some(stand_still_state)) = self.stand_still_query.get_single() {
+            if let Ok(Some(stand_still_state)) = self.stand_still_query.single() {
                 let stand_still_mult = stand_still_state.get_damage_multiplier(stand_still_stacks);
 
                 bonus_damage_multiplier *= stand_still_mult;
@@ -830,14 +863,14 @@ impl<'w, 's> GameParam<'w, 's> {
         }
 
         // CrateBreakDamage: Bonus damage from breaking crates
-        if let Ok(Some(crate_tracker)) = self.crate_break_damage_query.get_single() {
+        if let Ok(Some(crate_tracker)) = self.crate_break_damage_query.single() {
             if crate_tracker.bonus_damage_percent > 0.0 {
                 bonus_damage_multiplier += crate_tracker.bonus_damage_percent / 100.0;
             }
         }
 
         // AttackManaCost blessing: +10% damage when attacks cost mana
-        if let Ok(blessings) = self.blessings_query.get_single() {
+        if let Ok(blessings) = self.blessings_query.single() {
             bonus_damage_multiplier += blessings.get_attack_mana_cost_damage_bonus();
         }
 
@@ -857,8 +890,7 @@ impl<'w, 's> GameParam<'w, 's> {
         // DodgeCrit (Telescope): the next source of weapon damage after a dodge does 2x.
         // Only weapon hits are eligible; the bonus is consumed in
         // `handle_dodge_crit_next_hit_reset` on the matching weapon HitEvent.
-        let dodge_crit_next_hit_bonus = if let Ok(Some(state)) = self.dodge_crit_query.get_single()
-        {
+        let dodge_crit_next_hit_bonus = if let Ok(Some(state)) = self.dodge_crit_query.single() {
             state.next_hit_bonus
         } else {
             false
@@ -873,7 +905,7 @@ impl<'w, 's> GameParam<'w, 's> {
         let mana_charge_bonus = {
             let mana_charge_stacks = skills.get_count(Heirloom::MPBarDMG);
             if mana_charge_stacks > 0 {
-                if let Ok(Some(state)) = self.mana_charge_damage_query.get_single() {
+                if let Ok(Some(state)) = self.mana_charge_damage_query.single() {
                     state.get_damage(mana_charge_stacks)
                 } else {
                     0
@@ -891,7 +923,7 @@ impl<'w, 's> GameParam<'w, 's> {
         // Stealth: Force all damage to be crits
         let is_stealthed = self
             .stealth_query
-            .get_single()
+            .single()
             .map(|s| s.is_some())
             .unwrap_or(false);
 
@@ -948,10 +980,16 @@ impl<'w, 's> GameParam<'w, 's> {
         }
     }
     pub fn has_skill(&self, skill: Heirloom) -> bool {
-        self.player_query.single().1.has(skill)
+        self.player_query
+            .single()
+            .map(|q| q.1.has(skill))
+            .unwrap_or(false)
     }
     pub fn skill_count(&self, skill: Heirloom) -> i32 {
-        self.player_query.single().1.get_count(skill)
+        self.player_query
+            .single()
+            .map(|q| q.1.get_count(skill))
+            .unwrap_or(0)
     }
 }
 
@@ -1119,7 +1157,7 @@ fn setup(
     window_query: Query<&Window, With<PrimaryWindow>>,
     display_scale: Res<DisplayScaleSettings>,
 ) {
-    let window = window_query.get_single().ok();
+    let window = window_query.single().ok();
     let resolution = if let Some(window) = window {
         let phys_w = window.resolution.physical_width() as f32;
         let phys_h = window.resolution.physical_height() as f32;
@@ -1143,22 +1181,20 @@ fn setup(
     // Game camera — renders the game world directly to the full window.
     // No viewport: `world_view_height` is derived from `window_height / world_scale`, so the
     // scaling is guaranteed integer. Zoom is driven by [`DisplayScaleSettings`].
+    let mut game_projection = OrthographicProjection::default_2d();
+    game_projection.scaling_mode = ScalingMode::FixedVertical {
+        viewport_height: resolution.world_view_height,
+    };
+    game_projection.scale = 1.0;
     commands.spawn((
-        Camera2dBundle {
-            camera: Camera {
-                order: 0,
-                ..default()
-            },
-            camera_2d: Camera2d {
-                clear_color: ClearColorConfig::Custom(Color::BLACK),
-            },
-            projection: OrthographicProjection {
-                scaling_mode: ScalingMode::FixedVertical(resolution.world_view_height),
-                scale: 1.0,
-                ..default()
-            },
+        Camera2d,
+        Camera {
+            order: 0,
+            clear_color: ClearColorConfig::Custom(Color::BLACK),
             ..default()
         },
+        Projection::Orthographic(game_projection),
+        Msaa::Off,
         DoNotDespawnOnGameOver,
         MainCamera,
         TextureCamera,
@@ -1168,22 +1204,20 @@ fn setup(
     // UI camera — renders UI elements (layer 3) on top. Uses the UI bucket (`scale`,
     // `game_height`) so every existing HUD layout / screen-edge calculation keeps working
     // regardless of how the world camera is zoomed.
+    let mut ui_projection = OrthographicProjection::default_2d();
+    ui_projection.scaling_mode = ScalingMode::FixedVertical {
+        viewport_height: resolution.game_height,
+    };
+    ui_projection.scale = 1.0;
     commands.spawn((
-        Camera2dBundle {
-            camera: Camera {
-                order: 1,
-                ..default()
-            },
-            camera_2d: Camera2d {
-                clear_color: ClearColorConfig::None,
-            },
-            projection: OrthographicProjection {
-                scaling_mode: ScalingMode::FixedVertical(resolution.game_height),
-                scale: 1.0,
-                ..default()
-            },
+        Camera2d,
+        Camera {
+            order: 1,
+            clear_color: ClearColorConfig::None,
             ..default()
         },
+        Projection::Orthographic(ui_projection),
+        Msaa::Off,
         DoNotDespawnOnGameOver,
         UICamera,
         RenderLayers::from_layers(&[3]),
@@ -1200,14 +1234,14 @@ fn setup(
 pub fn update_pixel_perfect_viewport(
     windows: Query<&Window, With<PrimaryWindow>>,
     mut cameras: Query<
-        (&Camera, &mut OrthographicProjection, Option<&UICamera>),
+        (&Camera, &mut Projection, Option<&UICamera>),
         Or<(With<TextureCamera>, With<UICamera>)>,
     >,
     mut last_key: Local<(UVec2, i8, i8)>,
     display_scale: Res<DisplayScaleSettings>,
     mut resolution: ResMut<ScreenResolution>,
 ) {
-    let Ok(window) = windows.get_single() else {
+    let Ok(window) = windows.single() else {
         return;
     };
 
@@ -1278,11 +1312,18 @@ pub fn update_pixel_perfect_viewport(
         }
     }
 
-    for (_, mut proj, ui_marker) in cameras.iter_mut() {
+    for (_, mut projection, ui_marker) in cameras.iter_mut() {
+        let Projection::Orthographic(proj) = projection.as_mut() else {
+            continue;
+        };
         proj.scaling_mode = if ui_marker.is_some() {
-            ScalingMode::FixedVertical(new_res.game_height)
+            ScalingMode::FixedVertical {
+                viewport_height: new_res.game_height,
+            }
         } else {
-            ScalingMode::FixedVertical(new_res.world_view_height)
+            ScalingMode::FixedVertical {
+                viewport_height: new_res.world_view_height,
+            }
         };
     }
 
@@ -1296,13 +1337,11 @@ trait AppExt {
 impl AppExt for App {
     fn with_default_schedule(
         &mut self,
-        schedule: impl ScheduleLabel,
+        _schedule: impl ScheduleLabel,
         f: impl Fn(&mut App),
     ) -> &mut App {
-        let orig_default = self.default_schedule_label.clone();
-        self.default_schedule_label = Box::new(schedule);
+        // Bevy 0.19: `add_message` is schedule-independent; keep the helper for call sites.
         f(self);
-        self.default_schedule_label = orig_default;
         self
     }
 }

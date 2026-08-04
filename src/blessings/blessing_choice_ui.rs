@@ -1,4 +1,5 @@
-use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
+use bevy::text::Justify;
+use bevy::{camera::visibility::RenderLayers, prelude::*, sprite::Anchor};
 
 use crate::{
     assets::Graphics,
@@ -32,11 +33,13 @@ use crate::{
     ui::{
         clamp_tooltip_center_x, clamp_tooltip_center_y,
         damage_numbers::spawn_floating_text_with_shadow,
+        desc_spans::{blessing_desc_line, skill_desc_line, spawn_desc_line},
         game_fonts::{self as gf, FLOATING_TEXT, HEIRLOOM_CARD_DESC_LINE_STEP},
         player_hud::{
             active_skill_tooltip_params_from_player, spawn_skill_tooltip_content,
             spawn_skill_tooltip_shell, SKILL_TOOLTIP_ICON_SIZE,
         },
+        set_sprite_image,
         ui_helpers::{self, spawn_full_screen_ui_overlay},
         Focusable, HeirloomDynamicTooltip, HeirloomTooltipRequest, HeirloomTooltipShow,
         Interactable, Interaction, ItemOrRecipeTooltip, ToolTipUpdateEvent, UIElement, UIState,
@@ -52,6 +55,7 @@ pub struct BlessingChoiceUI {
     pub choice: ResolvedAncestorBlessing,
 }
 
+#[derive(Message)]
 pub struct AncestorBlessingSelectEvent {
     pub ancestor: Ancestor,
     pub choice: ResolvedAncestorBlessing,
@@ -171,17 +175,13 @@ fn fade_blessing_card_descendants(
     alpha: f32,
     children: &Query<&Children>,
     sprites: &mut Query<&mut Sprite>,
-    atlas_sprites: &mut Query<&mut TextureAtlasSprite>,
     visibility_set: &mut ParamSet<(
-        Query<'_, '_, &mut Visibility, With<Text>>,
+        Query<'_, '_, &mut Visibility, With<Text2d>>,
         Query<'_, '_, &mut Visibility, With<UiShadowChild>>,
     )>,
 ) {
     if let Ok(mut sprite) = sprites.get_mut(entity) {
-        sprite.color.set_a(alpha);
-    }
-    if let Ok(mut atlas) = atlas_sprites.get_mut(entity) {
-        atlas.color.set_a(alpha);
+        sprite.color = sprite.color.with_alpha(alpha);
     }
     {
         let mut texts = visibility_set.p0();
@@ -203,11 +203,10 @@ fn fade_blessing_card_descendants(
     if let Ok(kids) = children.get(entity) {
         for child in kids.iter() {
             fade_blessing_card_descendants(
-                *child,
+                child,
                 alpha,
                 children,
                 sprites,
-                atlas_sprites,
                 visibility_set,
             );
         }
@@ -250,18 +249,17 @@ fn spawn_ancestor_blessing_card(
     let (ui_element, size) = blessing_choice_card_ui(choice);
 
     let card_e = commands
-        .spawn(SpriteBundle {
-            texture: graphics.get_ui_element_texture(ui_element.clone()),
-            sprite: Sprite {
+        .spawn((
+            Sprite {
+                image: graphics.get_ui_element_texture(ui_element.clone()),
                 custom_size: Some(size),
-                ..Default::default()
+                ..default()
             },
-            transform: Transform {
+            Transform {
                 translation: position,
                 ..Default::default()
             },
-            ..Default::default()
-        })
+        ))
         .insert(ui_element)
         .insert(Name::new("BLESSING CHOICE UI"))
         .insert(RenderLayers::from_layers(&[3]))
@@ -273,23 +271,18 @@ fn spawn_ancestor_blessing_card(
     }
 
     let mut text_title = commands.spawn((
-        Text2dBundle {
-            text: Text::from_section(
-                choice.title.clone(),
-                gf::HEIRLOOM_CARD_TITLE.text_style(&asset_server, WHITE),
-            ),
-            text_anchor: Anchor::Center,
-            transform: Transform {
+        gf::HEIRLOOM_CARD_TITLE
+            .text(&asset_server, choice.title.clone(), WHITE)
+            .anchor(Anchor::CENTER)
+            .with_transform(Transform {
                 translation: Vec3::new(0., 24. + BLESSING_CARD_TITLE_Y_OFFSET, 1.),
                 scale: gf::HEIRLOOM_CARD_TITLE.transform_scale(),
                 ..Default::default()
-            },
-            ..default()
-        },
+            }),
         Name::new("Blessing Title"),
         RenderLayers::from_layers(&[3]),
     ));
-    text_title.set_parent(card_e);
+    text_title.insert(ChildOf(card_e));
 
     let desc_lines: Vec<&str> = choice.description.iter().map(String::as_str).collect();
     let has_chaos = choice.blessing.max_hp_penalty_pct() > 0.0;
@@ -315,26 +308,21 @@ fn spawn_ancestor_blessing_card(
         })
         .unwrap_or(BLESSING_CARD_DESC_Y_OFFSET);
 
+    let highlight_phrases = choice.description_highlight_phrases();
     for (line_index, desc) in desc_lines.iter().enumerate() {
         let y = block_line_ys[line_index] + block_center_offset;
-        let mut text_desc = commands.spawn((
-            Text2dBundle {
-                text: Text::from_section(
-                    *desc,
-                    gf::HEIRLOOM_CARD_BODY.text_style(&asset_server, YELLOW_2),
-                ),
-                text_anchor: Anchor::Center,
-                transform: Transform {
-                    translation: Vec3::new(2., y, 1.),
-                    scale: gf::HEIRLOOM_CARD_BODY.transform_scale(),
-                    ..Default::default()
-                },
-                ..default()
-            },
-            Name::new("Blessing Desc"),
-            RenderLayers::from_layers(&[3]),
-        ));
-        text_desc.set_parent(card_e);
+        spawn_desc_line(
+            commands,
+            asset_server,
+            gf::HEIRLOOM_CARD_BODY,
+            &blessing_desc_line(*desc, &highlight_phrases),
+            YELLOW_2,
+            Vec3::new(2., y, 1.),
+            Anchor::CENTER,
+            Justify::Center,
+            3,
+            card_e,
+        );
     }
 
     if has_chaos {
@@ -348,24 +336,18 @@ fn spawn_ancestor_blessing_card(
 
         for (line_index, line) in chaos_lines.iter().enumerate() {
             let y = block_line_ys[desc_lines.len() + line_index] + block_center_offset;
-            let mut text_chaos = commands.spawn((
-                Text2dBundle {
-                    text: Text::from_section(
-                        line.clone(),
-                        gf::HEIRLOOM_CARD_BODY.text_style(&asset_server, LIGHT_RED),
-                    ),
-                    text_anchor: Anchor::Center,
-                    transform: Transform {
-                        translation: Vec3::new(2., y, 1.),
-                        scale: gf::HEIRLOOM_CARD_BODY.transform_scale(),
-                        ..Default::default()
-                    },
-                    ..default()
-                },
-                Name::new("Blessing Chaos Desc"),
-                RenderLayers::from_layers(&[3]),
-            ));
-            text_chaos.set_parent(card_e);
+            spawn_desc_line(
+                commands,
+                asset_server,
+                gf::HEIRLOOM_CARD_BODY,
+                &skill_desc_line(line),
+                LIGHT_RED,
+                Vec3::new(2., y, 1.),
+                Anchor::CENTER,
+                Justify::Center,
+                3,
+                card_e,
+            );
         }
     }
 
@@ -383,38 +365,28 @@ fn spawn_blessing_card_icon(
         AncestorBlessingIcon::Mystery => {
             commands
                 .spawn((
-                    Text2dBundle {
-                        text: Text::from_section(
-                            "?",
-                            gf::GLOBAL_MESSAGE.text_style(&asset_server, SHIELD_BLUE),
-                        ),
-                        text_anchor: Anchor::Center,
-                        transform: Transform {
+                    gf::GLOBAL_MESSAGE
+                        .text(&asset_server, "?", SHIELD_BLUE)
+                        .anchor(Anchor::CENTER)
+                        .with_transform(Transform {
                             translation: Vec3::new(2., 52., 4.),
                             scale: gf::GLOBAL_MESSAGE.transform_scale(),
                             ..Default::default()
-                        },
-                        ..default()
-                    },
+                        }),
                     RenderLayers::from_layers(&[3]),
                     Name::new("BLESSING MYSTERY ICON"),
                 ))
-                .set_parent(card_e);
+                .insert(ChildOf(card_e));
         }
         AncestorBlessingIcon::Heirloom(heirloom, rarity) => {
+            let mut icon_sprite =
+                graphics.get_heirloom_icon(heirloom.clone());
+            icon_sprite.custom_size = Some(Vec2::new(32., 32.));
             let skill_icon = commands
                 .spawn((
-                    SpriteSheetBundle {
-                        sprite: graphics.get_heirloom_icon(heirloom.clone()),
-                        texture_atlas: graphics.texture_atlas.as_ref().unwrap().clone(),
-                        transform: Transform {
-                            translation: Vec2::new(2., 52.).extend(4.),
-                            ..Default::default()
-                        },
-                        ..Default::default()
-                    },
-                    Sprite {
-                        custom_size: Some(Vec2::new(32., 32.)),
+                    icon_sprite,
+                    Transform {
+                        translation: Vec2::new(2., 52.).extend(4.),
                         ..Default::default()
                     },
                     RenderLayers::from_layers(&[3]),
@@ -422,48 +394,46 @@ fn spawn_blessing_card_icon(
                     Name::new("BLESSING HEIRLOOM ICON"),
                 ))
                 .id();
-            commands.entity(skill_icon).set_parent(card_e);
+            commands.entity(skill_icon).insert(ChildOf(card_e));
 
             if let Some(glow) = rarity.get_item_glow() {
                 commands
-                    .spawn(SpriteBundle {
-                        texture: graphics.get_item_glow(glow),
-                        sprite: Sprite {
+                    .spawn((
+                        Sprite {
+                            image: graphics.get_item_glow(glow),
                             custom_size: Some(Vec2::new(32., 32.)),
-                            ..Default::default()
+                            ..default()
                         },
-                        transform: Transform {
+                        Transform {
                             translation: Vec2::new(0., 0.).extend(-1.),
                             ..Default::default()
                         },
-                        ..Default::default()
-                    })
+                    ))
                     .insert(RenderLayers::from_layers(&[3]))
-                    .set_parent(skill_icon);
+                    .insert(ChildOf(skill_icon));
             }
         }
         AncestorBlessingIcon::Skill(active_skill) => {
             commands
                 .spawn((
-                    SpriteBundle {
-                        texture: graphics.get_active_skill_icon(active_skill.clone()),
-                        sprite: Sprite {
+                    (
+                        Sprite {
+                            image: graphics.get_active_skill_icon(active_skill.clone()),
                             custom_size: Some(Vec2::new(32., 32.)),
-                            ..Default::default()
+                            ..default()
                         },
-                        transform: Transform {
+                        Transform {
                             translation: Vec3::new(2., 52., 4.),
                             ..Default::default()
                         },
-                        ..Default::default()
-                    },
+                    ),
                     RenderLayers::from_layers(&[3]),
                     Name::new("BLESSING SKILL ICON"),
                 ))
-                .set_parent(card_e);
+                .insert(ChildOf(card_e));
         }
         AncestorBlessingIcon::Item(item) => {
-            let sprite = graphics
+            let mut sprite = graphics
                 .icons
                 .as_ref()
                 .and_then(|icons| icons.get(item).cloned())
@@ -473,20 +443,21 @@ fn spawn_blessing_card_icon(
                         .as_ref()
                         .and_then(|map| map.get(item).cloned())
                 });
-            if let Some(sprite) = sprite {
+            if let Some(ref mut sprite) = sprite {
+                // Inventory / sheet item size. Skill & heirloom card icons use 32×32; leaving
+                // world-object icons at that size 2×-upscales the 16px frames.
+                sprite.custom_size = Some(Vec2::splat(16.));
                 commands
-                    .spawn(SpriteSheetBundle {
-                        sprite,
-                        texture_atlas: graphics.texture_atlas.as_ref().unwrap().clone(),
-                        transform: Transform {
+                    .spawn((
+                        sprite.clone(),
+                        Transform {
                             translation: Vec2::new(2., 52.).extend(4.),
                             ..Default::default()
                         },
-                        ..Default::default()
-                    })
+                    ))
                     .insert(RenderLayers::from_layers(&[3]))
                     .insert(Name::new("BLESSING ITEM ICON"))
-                    .set_parent(card_e);
+                    .insert(ChildOf(card_e));
             }
         }
     }
@@ -502,8 +473,13 @@ pub fn setup_blessing_choice_ui(
     player_level: Query<&PlayerLevel>,
     player_class: Option<Res<PlayerClass>>,
 ) {
-    let player_level = player_level.single().level;
-    let player_skills = player_skills.single();
+    let Ok(player_level) = player_level.single() else {
+        return;
+    };
+    let player_level = player_level.level;
+    let Ok(player_skills) = player_skills.single() else {
+        return;
+    };
     let starting_weapon = player_class
         .as_ref()
         .map(|pc| pc.class.get_starting_wep())
@@ -520,18 +496,17 @@ pub fn setup_blessing_choice_ui(
 
     let _title_text = commands
         .spawn((
-            Text2dBundle {
-                text: Text::from_section(
+            gf::GLOBAL_MESSAGE
+                .text(
+                    &asset_server,
                     offer.ancestor.title().to_string(),
-                    gf::GLOBAL_MESSAGE.text_style(&asset_server, offer.ancestor.title_color()),
-                ),
-                transform: Transform {
+                    offer.ancestor.title_color(),
+                )
+                .with_transform(Transform {
                     translation: Vec3::new(0., 144., 20.),
                     scale: gf::GLOBAL_MESSAGE.transform_scale(),
                     ..Default::default()
-                },
-                ..default()
-            },
+                }),
             RenderLayers::from_layers(&[3]),
             UIState::BlessingChoice,
         ))
@@ -539,36 +514,30 @@ pub fn setup_blessing_choice_ui(
 
     let _subtitle = commands
         .spawn((
-            Text2dBundle {
-                text: Text::from_section(
+            gf::BODY
+                .text(
+                    &asset_server,
                     "Back again...? You hear the voice of your distant ancestor...".to_string(),
-                    gf::BODY.text_style(&asset_server, WHITE),
-                ),
-                transform: Transform {
+                    WHITE,
+                )
+                .with_transform(Transform {
                     translation: Vec3::new(0., 110., 20.),
                     scale: gf::BODY.transform_scale(),
                     ..Default::default()
-                },
-                ..default()
-            },
+                }),
             RenderLayers::from_layers(&[3]),
             UIState::BlessingChoice,
         ))
         .id();
     let _subtitle2 = commands
         .spawn((
-            Text2dBundle {
-                text: Text::from_section(
-                    "\n\nChoose a blessing".to_string(),
-                    gf::BODY.text_style(&asset_server, WHITE),
-                ),
-                transform: Transform {
+            gf::BODY
+                .text(&asset_server, "\n\nChoose a blessing".to_string(), WHITE)
+                .with_transform(Transform {
                     translation: Vec3::new(0., 90., 20.),
                     scale: gf::BODY.transform_scale(),
                     ..Default::default()
-                },
-                ..default()
-            },
+                }),
             RenderLayers::from_layers(&[3]),
             UIState::BlessingChoice,
         ))
@@ -610,13 +579,15 @@ pub fn setup_blessing_choice_ui(
                 group: UIState::BlessingChoice,
                 index: card_index,
             })
-            .insert(BounceOnHit::with_strength_fraction(BLESSING_CARD_BOUNCE_STRENGTH));
+            .insert(BounceOnHit::with_strength_fraction(
+                BLESSING_CARD_BOUNCE_STRENGTH,
+            ));
     }
 }
 
 pub fn handle_blessing_choice_card_interactions(
     cursor_pos: Res<CursorPos>,
-    mouse_input: Res<Input<MouseButton>>,
+    mouse_input: Res<ButtonInput<MouseButton>>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     mut blessing_choices: Query<(
         Entity,
@@ -627,7 +598,7 @@ pub fn handle_blessing_choice_card_interactions(
     )>,
     mut commands: Commands,
     graphics: Res<Graphics>,
-    mut blessing_event: EventWriter<AncestorBlessingSelectEvent>,
+    mut blessing_event: MessageWriter<AncestorBlessingSelectEvent>,
     ui_focus: Res<crate::ui::focus::UiFocus>,
 ) {
     let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None);
@@ -646,10 +617,8 @@ pub fn handle_blessing_choice_card_interactions(
                     interactable.change(Interaction::Hovering);
                     commands.spawn(SoundSpawner::new(AudioSoundEffect::UISkillHover, 0.2));
 
-                    commands
-                        .entity(e)
-                        .insert(hover_ui.clone())
-                        .insert(graphics.get_ui_element_texture(hover_ui));
+                    commands.entity(e).insert(hover_ui.clone());
+                    set_sprite_image(&mut commands, e, graphics.get_ui_element_texture(hover_ui));
                     ui_helpers::apply_ui_hover_scale(&mut transform, Some(&mut bounce), true);
                     bounce.activate();
                 }
@@ -660,7 +629,7 @@ pub fn handle_blessing_choice_card_interactions(
                             state.choice.blessing, state.ancestor
                         );
                         state.selected = true;
-                        blessing_event.send(AncestorBlessingSelectEvent {
+                        blessing_event.write(AncestorBlessingSelectEvent {
                             ancestor: state.ancestor,
                             choice: state.choice.clone(),
                         });
@@ -686,10 +655,12 @@ pub fn handle_blessing_choice_card_interactions(
             let ui_element = default_ui;
 
             interactable.change(Interaction::None);
-            commands
-                .entity(e)
-                .insert(ui_element.clone())
-                .insert(graphics.get_ui_element_texture(ui_element));
+            commands.entity(e).insert(ui_element.clone());
+            set_sprite_image(
+                &mut commands,
+                e,
+                graphics.get_ui_element_texture(ui_element),
+            );
             ui_helpers::apply_ui_hover_scale(&mut transform, Some(&mut bounce), false);
         }
     }
@@ -712,8 +683,8 @@ pub fn handle_blessing_choice_icon_tooltips(
     existing_heirloom_tooltips: Query<Entity, With<HeirloomDynamicTooltip>>,
     existing_skill_tooltips: Query<Entity, With<BlessingChoiceSkillTooltip>>,
     existing_item_tooltips: Query<Entity, With<ItemOrRecipeTooltip>>,
-    mut tooltip_requests: EventWriter<HeirloomTooltipRequest>,
-    mut item_tooltip_events: EventWriter<ToolTipUpdateEvent>,
+    mut tooltip_requests: MessageWriter<HeirloomTooltipRequest>,
+    mut item_tooltip_events: MessageWriter<ToolTipUpdateEvent>,
     player_class: Option<Res<PlayerClass>>,
     class_ranks: Option<Res<ClassRankSystem>>,
     skill_power: Query<
@@ -772,18 +743,18 @@ pub fn handle_blessing_choice_icon_tooltips(
     }
 
     for tooltip_e in existing_heirloom_tooltips.iter() {
-        commands.entity(tooltip_e).despawn_recursive();
+        commands.entity(tooltip_e).despawn();
     }
     for tooltip_e in existing_skill_tooltips.iter() {
-        commands.entity(tooltip_e).despawn_recursive();
+        commands.entity(tooltip_e).despawn();
     }
     for tooltip_e in existing_item_tooltips.iter() {
-        commands.entity(tooltip_e).despawn_recursive();
+        commands.entity(tooltip_e).despawn();
     }
 
     match &currently_hovered {
         None => {
-            tooltip_requests.send(HeirloomTooltipRequest::Clear);
+            tooltip_requests.write(HeirloomTooltipRequest::Clear);
         }
         Some((
             _choice,
@@ -811,7 +782,7 @@ pub fn handle_blessing_choice_icon_tooltips(
             let icon_y = card_pos.y + BLESSING_CARD_ICON_OFFSET.y;
             // `spawn_heirloom_tooltip_card` adds [`HEIRLOOM_TOOLTIP_CARD_Z`] on top of this z.
             let tooltip_pos = Vec3::new(clamped_x, icon_y, 0.);
-            tooltip_requests.send(HeirloomTooltipRequest::Show(HeirloomTooltipShow {
+            tooltip_requests.write(HeirloomTooltipRequest::Show(HeirloomTooltipShow {
                 heirloom: heirloom.clone(),
                 rarity: *rarity,
                 position: tooltip_pos,
@@ -820,8 +791,14 @@ pub fn handle_blessing_choice_icon_tooltips(
                 ui_state: Some(UIState::BlessingChoice),
             }));
         }
-        Some((_, BlessingChoiceTooltipTarget::Skill(skill), card_pos, card_index, card_half_width)) => {
-            tooltip_requests.send(HeirloomTooltipRequest::Clear);
+        Some((
+            _,
+            BlessingChoiceTooltipTarget::Skill(skill),
+            card_pos,
+            card_index,
+            card_half_width,
+        )) => {
+            tooltip_requests.write(HeirloomTooltipRequest::Clear);
             // The visible skill panel background is offset +72 in x from the container and is
             // 246 wide, so clamp its *center* to the screen then back out the container x.
             const TOOLTIP_EDGE_PAD: f32 = 8.;
@@ -880,8 +857,14 @@ pub fn handle_blessing_choice_icon_tooltips(
                 SKILL_TOOLTIP_ICON_SIZE,
             );
         }
-        Some((choice, BlessingChoiceTooltipTarget::Item(item), card_pos, card_index, card_half_width)) => {
-            tooltip_requests.send(HeirloomTooltipRequest::Clear);
+        Some((
+            choice,
+            BlessingChoiceTooltipTarget::Item(item),
+            card_pos,
+            card_index,
+            card_half_width,
+        )) => {
+            tooltip_requests.write(HeirloomTooltipRequest::Clear);
             let item_stack = blessing_item_stack_for_tooltip(
                 *item,
                 choice,
@@ -892,8 +875,13 @@ pub fn handle_blessing_choice_icon_tooltips(
             const TOOLTIP_EDGE_PAD: f32 = 8.;
             let half_w = ITEM_TOOLTIP_LARGE_CARD_SIZE.x * 0.5;
             let half_h = ITEM_TOOLTIP_LARGE_CARD_SIZE.y * 0.5;
-            let desired_x =
-                blessing_tooltip_dock_x(card_pos.x, *card_half_width, half_w, *card_index, card_count);
+            let desired_x = blessing_tooltip_dock_x(
+                card_pos.x,
+                *card_half_width,
+                half_w,
+                *card_index,
+                card_count,
+            );
             let icon_y = card_pos.y + BLESSING_CARD_ICON_OFFSET.y;
             let panel_center = Vec3::new(
                 clamp_tooltip_center_x(desired_x, half_w, res.game_width, TOOLTIP_EDGE_PAD),
@@ -902,7 +890,7 @@ pub fn handle_blessing_choice_icon_tooltips(
             );
             // Reuse the real inventory item tooltip renderer (`handle_spawn_inv_item_tooltip`),
             // placing the card unparented in world space at `panel_center`.
-            item_tooltip_events.send(ToolTipUpdateEvent {
+            item_tooltip_events.write(ToolTipUpdateEvent {
                 item_stack,
                 is_recipe: false,
                 show_range: false,
@@ -936,9 +924,8 @@ pub fn transition_blessing_ui_after_choice(
     mut state: ResMut<BlessingTransitionState>,
     mut blessing_cards: Query<(Entity, &BlessingChoiceUI, &GlobalTransform)>,
     mut sprites: Query<&mut Sprite>,
-    mut atlas_sprites: Query<&mut TextureAtlasSprite>,
     mut visibility_set: ParamSet<(
-        Query<'_, '_, &mut Visibility, With<Text>>,
+        Query<'_, '_, &mut Visibility, With<Text2d>>,
         Query<'_, '_, &mut Visibility, With<UiShadowChild>>,
     )>,
     child_hierarchy: Query<&Children>,
@@ -946,7 +933,7 @@ pub fn transition_blessing_ui_after_choice(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
 ) {
-    let timer_percent = state.timer.percent();
+    let timer_percent = state.timer.fraction();
     for (ent, blessing_choice_ui, transform) in blessing_cards.iter_mut() {
         if blessing_choice_ui.selected {
             for (i, heirloom) in state
@@ -969,16 +956,14 @@ pub fn transition_blessing_ui_after_choice(
                     .entity(floating_text)
                     .insert(RenderLayers::from_layers(&[3]));
                 let icon = commands
-                    .spawn(SpriteSheetBundle {
-                        sprite: graphics.get_heirloom_icon(heirloom.heirloom.clone()),
-                        texture_atlas: graphics.texture_atlas.as_ref().unwrap().clone(),
-                        transform: Transform {
+                    .spawn((
+                        graphics.get_heirloom_icon(heirloom.heirloom.clone()),
+                        Transform {
                             translation: Vec2::new(12., 0.).extend(4.),
                             scale: Vec3::new(1., 1., 1.),
                             ..Default::default()
                         },
-                        ..Default::default()
-                    })
+                    ))
                     .insert(RenderLayers::from_layers(&[3]))
                     .insert(HeirloomIconOutline::new(
                         heirloom.rarity,
@@ -986,25 +971,24 @@ pub fn transition_blessing_ui_after_choice(
                     ))
                     .insert(Name::new("HEIRLOOM ICON"))
                     .id();
-                commands.entity(icon).set_parent(floating_text);
+                commands.entity(icon).insert(ChildOf(floating_text));
 
                 if let Some(glow) = heirloom.rarity.get_item_glow() {
                     commands
-                        .spawn(SpriteBundle {
-                            texture: graphics.get_item_glow(glow),
-                            sprite: Sprite {
+                        .spawn((
+                            Sprite {
+                                image: graphics.get_item_glow(glow),
                                 custom_size: Some(Vec2::new(32., 32.)),
-                                ..Default::default()
+                                ..default()
                             },
-                            transform: Transform {
+                            Transform {
                                 translation: Vec2::new(0., 0.).extend(-1.),
                                 scale: Vec3::new(1., 1., 1.),
                                 ..Default::default()
                             },
-                            ..Default::default()
-                        })
+                        ))
                         .insert(RenderLayers::from_layers(&[3]))
-                        .set_parent(icon);
+                        .insert(ChildOf(icon));
                 }
             }
             state.heirlooms = None;
@@ -1015,7 +999,6 @@ pub fn transition_blessing_ui_after_choice(
                 alpha,
                 &child_hierarchy,
                 &mut sprites,
-                &mut atlas_sprites,
                 &mut visibility_set,
             );
         }

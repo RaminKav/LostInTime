@@ -4,10 +4,7 @@
 
 use std::ops::{Range, RangeInclusive};
 
-use bevy::{
-    prelude::*,
-    utils::HashMap,
-};
+use bevy::{platform::collections::HashMap, prelude::*};
 
 pub mod proto_param;
 
@@ -148,6 +145,6 @@ impl Plugin for ProtoPlugin {
             .register_type::<Mob>()
             .register_type_data::<Range<i32>, ReflectDeserialize>()
             .register_type_data::<RangeInclusive<i32>, ReflectDeserialize>()
-            .add_system(apply_system_buffers.in_set(CustomFlush));
+            .add_systems(Update, ApplyDeferred.in_set(CustomFlush));
     }
 }

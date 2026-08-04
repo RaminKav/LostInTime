@@ -1,5 +1,6 @@
+use bevy::text::Justify;
+use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
-use bevy::render::view::RenderLayers;
 use bevy::sprite::Anchor;
 use rand::Rng;
 
@@ -16,7 +17,7 @@ use crate::{
     ui::{
         focus::ModalFocusable,
         game_fonts as gf,
-        interactions::{Interactable, Interaction},
+        interactions::{set_sprite_image, Interactable, Interaction},
         inventory_ui::{mark_slot_dirty, spawn_item_stack_icon},
         main_menu::{spawn_back_button, MAIN_MENU_WIDE_BUTTON_SIZE},
         tooltips::{ToolTipUpdateEvent, TooltipTeardownEvent},
@@ -154,62 +155,60 @@ pub fn setup_well_shrine_ui(
     selection.0 = None;
 
     let container = commands
-        .spawn(SpatialBundle {
-            transform: Transform::from_translation(Vec3::new(0., 0., 50.)),
-            ..Default::default()
-        })
+        .spawn((
+            Transform::from_translation(Vec3::new(0., 0., 50.)),
+            Visibility::default(),
+        ))
         .insert(WellShrineUI)
         .insert(UIState::WellShrine)
         .insert(RenderLayers::from_layers(&[3]))
         .id();
 
     commands
-        .spawn(SpriteBundle {
-            sprite: Sprite {
-                color: Color::rgba(0.1, 0.1, 0.1, 0.95),
+        .spawn((
+            Sprite {
+                color: Color::srgba(0.1, 0.1, 0.1, 0.95),
                 custom_size: Some(crate::ui::ui_helpers::full_screen_overlay_size(&res)),
                 ..default()
             },
-            ..default()
-        })
+            Transform::default(),
+        ))
         .insert(RenderLayers::from_layers(&[3]))
-        .set_parent(container);
+        .insert(ChildOf(container));
 
     commands
-        .spawn(Text2dBundle {
-            text: Text::from_section(
-                "Well Shrine",
-                gf::MENU_TITLE.text_style(&asset_server, WHITE),
-            )
-            .with_alignment(TextAlignment::Center),
-            transform: Transform {
-                translation: Vec3::new(0., GAME_HEIGHT / 2. - 60., 2.),
-                scale: gf::MENU_TITLE.transform_scale(),
-                ..Default::default()
-            },
-            ..Default::default()
-        })
+        .spawn(
+            gf::MENU_TITLE
+                .text(&asset_server, "Well Shrine", WHITE)
+                .justify(Justify::Center)
+                .with_transform(Transform {
+                    translation: Vec3::new(0., GAME_HEIGHT / 2. - 60., 2.),
+                    scale: gf::MENU_TITLE.transform_scale(),
+                    ..Default::default()
+                }),
+        )
         .insert(RenderLayers::from_layers(&[3]))
-        .set_parent(container);
+        .insert(ChildOf(container));
 
     commands
-        .spawn(Text2dBundle {
-            text: Text::from_section(
-                "Select spare equipment to throw into the well.",
-                gf::BODY.text_style(&asset_server, WHITE),
-            )
-            .with_alignment(TextAlignment::Center),
-            transform: Transform {
-                translation: Vec3::new(0., GAME_HEIGHT / 2. - 88., 2.),
-                scale: gf::BODY.transform_scale(),
-                ..Default::default()
-            },
-            ..Default::default()
-        })
+        .spawn(
+            gf::BODY
+                .text(
+                    &asset_server,
+                    "Select spare equipment to throw into the well.",
+                    WHITE,
+                )
+                .justify(Justify::Center)
+                .with_transform(Transform {
+                    translation: Vec3::new(0., GAME_HEIGHT / 2. - 88., 2.),
+                    scale: gf::BODY.transform_scale(),
+                    ..Default::default()
+                }),
+        )
         .insert(RenderLayers::from_layers(&[3]))
-        .set_parent(container);
+        .insert(ChildOf(container));
 
-    let Ok(inv) = inventory.get_single() else {
+    let Ok(inv) = inventory.single() else {
         return;
     };
     spawn_well_equipment_grid(
@@ -232,7 +231,7 @@ pub fn setup_well_shrine_ui(
     );
     commands
         .entity(back_button)
-        .set_parent(container)
+        .insert(ChildOf(container))
         .insert(UIState::WellShrine)
         .insert(Focusable {
             group: UIState::WellShrine,
@@ -266,15 +265,14 @@ fn spawn_well_equipment_grid(
         );
 
         let slot_e = commands
-            .spawn(SpriteBundle {
-                texture: graphics.get_ui_element_texture(UIElement::InventorySlot),
-                sprite: Sprite {
+            .spawn((
+                Sprite {
+                    image: graphics.get_ui_element_texture(UIElement::InventorySlot),
                     custom_size: Some(UI_SLOT_SIZE),
-                    ..Default::default()
+                    ..default()
                 },
-                transform: Transform::from_translation(pos),
-                ..Default::default()
-            })
+                Transform::from_translation(pos),
+            ))
             .insert(RenderLayers::from_layers(&[3]))
             .insert(Interactable::default())
             .insert(WellEquipmentSlot {
@@ -285,7 +283,7 @@ fn spawn_well_equipment_grid(
                 index: i as u32,
             })
             .insert(Name::new("Well Equipment Slot"))
-            .set_parent(container)
+            .insert(ChildOf(container))
             .id();
 
         let icon = spawn_item_stack_icon(
@@ -309,21 +307,20 @@ fn spawn_well_salvage_area(
     selected_stack: Option<&ItemStack>,
 ) {
     let salvage_e = commands
-        .spawn(SpriteBundle {
-            texture: graphics.get_ui_element_texture(UIElement::PetSelectSlot),
-            sprite: Sprite {
+        .spawn((
+            Sprite {
+                image: graphics.get_ui_element_texture(UIElement::PetSelectSlot),
                 custom_size: Some(WELL_SALVAGE_SLOT_SIZE),
-                ..Default::default()
+                ..default()
             },
-            transform: Transform::from_translation(Vec3::new(0., -40., 5.)),
-            ..Default::default()
-        })
+            Transform::from_translation(Vec3::new(0., -40., 5.)),
+        ))
         .insert(RenderLayers::from_layers(&[3]))
         .insert(UIElement::PetSelectSlot)
         .insert(Interactable::default())
         .insert(WellSalvageSlot)
         .insert(Name::new("Well Salvage Slot"))
-        .set_parent(container)
+        .insert(ChildOf(container))
         .id();
 
     // Empty selected slot isn't a focus target — nothing to clear/confirm.
@@ -357,16 +354,15 @@ fn spawn_well_salvage_button(
 ) {
     let button_e = commands
         .spawn((
-            SpriteBundle {
-                texture: graphics.get_ui_element_texture(UIElement::MainMenuStartButton),
-                sprite: Sprite {
+            (
+                Sprite {
+                    image: graphics.get_ui_element_texture(UIElement::MainMenuStartButton),
                     custom_size: Some(MAIN_MENU_WIDE_BUTTON_SIZE),
                     color: Color::WHITE,
-                    ..Default::default()
+                    ..default()
                 },
-                transform: Transform::from_translation(Vec3::new(0., -90., 5.)),
-                ..Default::default()
-            },
+                Transform::from_translation(Vec3::new(0., -90., 5.)),
+            ),
             Interactable::default(),
             UIElement::MainMenuStartButton,
             WellSalvageButton { active },
@@ -374,7 +370,7 @@ fn spawn_well_salvage_button(
             RenderLayers::from_layers(&[3]),
             Name::new("Well Salvage Button"),
         ))
-        .set_parent(container)
+        .insert(ChildOf(container))
         .id();
 
     // Disabled Salvage isn't focus-navigable — Confirm would do nothing.
@@ -387,22 +383,19 @@ fn spawn_well_salvage_button(
 
     let label_color = if active { WHITE } else { GREY };
     commands
-        .spawn(Text2dBundle {
-            text: Text::from_section(
-                "Salvage",
-                gf::MENU_TITLE.text_style(asset_server, label_color),
-            )
-            .with_alignment(TextAlignment::Center),
-            text_anchor: Anchor::Center,
-            transform: Transform {
-                translation: Vec3::new(0., -1., 1.),
-                scale: gf::MENU_TITLE.transform_scale(),
-                ..Default::default()
-            },
-            ..Default::default()
-        })
+        .spawn(
+            gf::MENU_TITLE
+                .text(asset_server, "Salvage", label_color)
+                .justify(Justify::Center)
+                .anchor(Anchor::CENTER)
+                .with_transform(Transform {
+                    translation: Vec3::new(0., -1., 1.),
+                    scale: gf::MENU_TITLE.transform_scale(),
+                    ..Default::default()
+                }),
+        )
         .insert(RenderLayers::from_layers(&[3]))
-        .set_parent(button_e);
+        .insert(ChildOf(button_e));
 }
 
 pub fn refresh_well_ui_displays(
@@ -423,22 +416,22 @@ pub fn refresh_well_ui_displays(
     }
     commands.remove_resource::<WellUiNeedsRefresh>();
 
-    let Ok(container_e) = container.get_single() else {
+    let Ok(container_e) = container.single() else {
         return;
     };
-    let Ok(inv) = inventory.get_single() else {
+    let Ok(inv) = inventory.single() else {
         return;
     };
     let selected = selection.0;
 
     for e in equipment_slots.iter() {
-        commands.entity(e).despawn_recursive();
+        commands.entity(e).despawn();
     }
     for e in salvage_slots.iter() {
-        commands.entity(e).despawn_recursive();
+        commands.entity(e).despawn();
     }
     for e in salvage_buttons.iter() {
-        commands.entity(e).despawn_recursive();
+        commands.entity(e).despawn();
     }
 
     spawn_well_equipment_grid(
@@ -483,14 +476,14 @@ fn well_focus_driving(
 pub fn handle_well_equipment_click(
     mut commands: Commands,
     cursor_pos: Res<CursorPos>,
-    mouse_input: Res<Input<MouseButton>>,
+    mouse_input: Res<ButtonInput<MouseButton>>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     slots: Query<(Entity, &WellEquipmentSlot)>,
     mut selection: ResMut<WellSalvageSelection>,
     reward_modal: Query<(), With<WellRewardModal>>,
     ui_focus: Res<crate::ui::focus::UiFocus>,
     mouseless: Res<crate::inputs::MouselessModeState>,
-    mut tooltip_teardown: EventWriter<TooltipTeardownEvent>,
+    mut tooltip_teardown: MessageWriter<TooltipTeardownEvent>,
 ) {
     if !reward_modal.is_empty() {
         return;
@@ -506,7 +499,7 @@ pub fn handle_well_equipment_click(
 
         if (left_pressed && is_hit) || (is_focused && ui_focus.confirm_just_pressed) {
             selection.0 = Some(slot.inv_slot);
-            tooltip_teardown.send_default();
+            tooltip_teardown.write_default();
             commands.insert_resource(WellUiNeedsRefresh);
             commands.spawn(crate::audio::SoundSpawner::new(
                 crate::audio::AudioSoundEffect::ButtonClick,
@@ -520,14 +513,14 @@ pub fn handle_well_equipment_click(
 pub fn handle_well_salvage_slot_click(
     mut commands: Commands,
     cursor_pos: Res<CursorPos>,
-    mouse_input: Res<Input<MouseButton>>,
+    mouse_input: Res<ButtonInput<MouseButton>>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     slots: Query<Entity, With<WellSalvageSlot>>,
     mut selection: ResMut<WellSalvageSelection>,
     reward_modal: Query<(), With<WellRewardModal>>,
     ui_focus: Res<crate::ui::focus::UiFocus>,
     mouseless: Res<crate::inputs::MouselessModeState>,
-    mut tooltip_teardown: EventWriter<TooltipTeardownEvent>,
+    mut tooltip_teardown: MessageWriter<TooltipTeardownEvent>,
 ) {
     if !reward_modal.is_empty() || selection.0.is_none() {
         return;
@@ -543,7 +536,7 @@ pub fn handle_well_salvage_slot_click(
 
         if (left_pressed && is_hit) || (is_focused && ui_focus.confirm_just_pressed) {
             selection.0 = None;
-            tooltip_teardown.send_default();
+            tooltip_teardown.write_default();
             commands.insert_resource(WellUiNeedsRefresh);
             commands.spawn(crate::audio::SoundSpawner::new(
                 crate::audio::AudioSoundEffect::ButtonClick,
@@ -557,13 +550,13 @@ pub fn handle_well_salvage_slot_click(
 pub fn handle_well_equipment_tooltip(
     mut commands: Commands,
     cursor_pos: Res<CursorPos>,
-    key_input: Res<Input<KeyCode>>,
+    key_input: Res<ButtonInput<KeyCode>>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     slot_transforms: Query<&GlobalTransform>,
     mut slots: Query<(Entity, &mut Interactable, &WellEquipmentSlot)>,
     inventory: Query<&Inventory>,
     graphics: Res<Graphics>,
-    mut tooltip_update: EventWriter<ToolTipUpdateEvent>,
+    mut tooltip_update: MessageWriter<ToolTipUpdateEvent>,
     reward_modal: Query<(), With<WellRewardModal>>,
     ui_focus: Res<crate::ui::focus::UiFocus>,
     mouseless: Res<crate::inputs::MouselessModeState>,
@@ -571,11 +564,11 @@ pub fn handle_well_equipment_tooltip(
     if !reward_modal.is_empty() {
         return;
     }
-    let Ok(inv) = inventory.get_single() else {
+    let Ok(inv) = inventory.single() else {
         return;
     };
     let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None);
-    let shift = key_input.pressed(KeyCode::LShift);
+    let shift = key_input.pressed(KeyCode::ShiftLeft);
     let focus_driving = well_focus_driving(&mouseless, &cursor_pos);
 
     // Teardown is deferred to [`finalize_well_tooltip_hover`] so equipment↔salvage
@@ -587,11 +580,13 @@ pub fn handle_well_equipment_tooltip(
         match (hovering, interactable.current()) {
             (true, Interaction::None) => {
                 interactable.change(Interaction::Hovering);
-                commands
-                    .entity(e)
-                    .insert(graphics.get_ui_element_texture(UIElement::InventorySlotHover));
+                set_sprite_image(
+                    &mut commands,
+                    e,
+                    graphics.get_ui_element_texture(UIElement::InventorySlotHover),
+                );
                 if let Some(Some(inv_stack)) = inv.items.items.get(slot.inv_slot) {
-                    tooltip_update.send(ToolTipUpdateEvent {
+                    tooltip_update.write(ToolTipUpdateEvent {
                         item_stack: inv_stack.item_stack.clone(),
                         is_recipe: false,
                         show_range: shift,
@@ -606,9 +601,11 @@ pub fn handle_well_equipment_tooltip(
             }
             (false, Interaction::Hovering) => {
                 interactable.change(Interaction::None);
-                commands
-                    .entity(e)
-                    .insert(graphics.get_ui_element_texture(UIElement::InventorySlot));
+                set_sprite_image(
+                    &mut commands,
+                    e,
+                    graphics.get_ui_element_texture(UIElement::InventorySlot),
+                );
             }
             _ => {}
         }
@@ -618,14 +615,14 @@ pub fn handle_well_equipment_tooltip(
 pub fn handle_well_salvage_tooltip(
     mut commands: Commands,
     cursor_pos: Res<CursorPos>,
-    key_input: Res<Input<KeyCode>>,
+    key_input: Res<ButtonInput<KeyCode>>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     slot_transforms: Query<&GlobalTransform>,
     mut slots: Query<(Entity, &mut Interactable), With<WellSalvageSlot>>,
     selection: Res<WellSalvageSelection>,
     inventory: Query<&Inventory>,
     graphics: Res<Graphics>,
-    mut tooltip_update: EventWriter<ToolTipUpdateEvent>,
+    mut tooltip_update: MessageWriter<ToolTipUpdateEvent>,
     reward_modal: Query<(), With<WellRewardModal>>,
     ui_focus: Res<crate::ui::focus::UiFocus>,
     mouseless: Res<crate::inputs::MouselessModeState>,
@@ -636,14 +633,14 @@ pub fn handle_well_salvage_tooltip(
     let Some(inv_slot) = selection.0 else {
         return;
     };
-    let Ok(inv) = inventory.get_single() else {
+    let Ok(inv) = inventory.single() else {
         return;
     };
     let Some(Some(inv_stack)) = inv.items.items.get(inv_slot) else {
         return;
     };
     let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None);
-    let shift = key_input.pressed(KeyCode::LShift);
+    let shift = key_input.pressed(KeyCode::ShiftLeft);
     let focus_driving = well_focus_driving(&mouseless, &cursor_pos);
 
     for (e, mut interactable) in slots.iter_mut() {
@@ -653,10 +650,12 @@ pub fn handle_well_salvage_tooltip(
         match (hovering, interactable.current()) {
             (true, Interaction::None) => {
                 interactable.change(Interaction::Hovering);
-                commands
-                    .entity(e)
-                    .insert(graphics.get_ui_element_texture(UIElement::PetSelectSlotHover));
-                tooltip_update.send(ToolTipUpdateEvent {
+                set_sprite_image(
+                    &mut commands,
+                    e,
+                    graphics.get_ui_element_texture(UIElement::PetSelectSlotHover),
+                );
+                tooltip_update.write(ToolTipUpdateEvent {
                     item_stack: inv_stack.item_stack.clone(),
                     is_recipe: false,
                     show_range: shift,
@@ -670,9 +669,11 @@ pub fn handle_well_salvage_tooltip(
             }
             (false, Interaction::Hovering) => {
                 interactable.change(Interaction::None);
-                commands
-                    .entity(e)
-                    .insert(graphics.get_ui_element_texture(UIElement::PetSelectSlot));
+                set_sprite_image(
+                    &mut commands,
+                    e,
+                    graphics.get_ui_element_texture(UIElement::PetSelectSlot),
+                );
             }
             _ => {}
         }
@@ -688,18 +689,18 @@ pub fn finalize_well_tooltip_hover(
     inventory: Query<&Inventory>,
     selection: Res<WellSalvageSelection>,
     reward_modal: Query<(), With<WellRewardModal>>,
-    mut tooltip_teardown: EventWriter<TooltipTeardownEvent>,
+    mut tooltip_teardown: MessageWriter<TooltipTeardownEvent>,
     mut had_tooltip_hover: Local<bool>,
 ) {
     if !reward_modal.is_empty() {
         if *had_tooltip_hover {
-            tooltip_teardown.send_default();
+            tooltip_teardown.write_default();
             *had_tooltip_hover = false;
         }
         return;
     }
 
-    let Ok(inv) = inventory.get_single() else {
+    let Ok(inv) = inventory.single() else {
         return;
     };
 
@@ -714,7 +715,7 @@ pub fn finalize_well_tooltip_hover(
 
     let any_tooltip_hover = equipment_item_hover || salvage_item_hover;
     if *had_tooltip_hover && !any_tooltip_hover {
-        tooltip_teardown.send_default();
+        tooltip_teardown.write_default();
     }
     *had_tooltip_hover = any_tooltip_hover;
 }
@@ -722,13 +723,11 @@ pub fn finalize_well_tooltip_hover(
 pub fn handle_well_salvage_button(
     mut commands: Commands,
     cursor_pos: Res<CursorPos>,
-    mouse_input: Res<Input<MouseButton>>,
-    ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
-    mut buttons: Query<(
-        Entity,
-        &mut Interactable,
-        &WellSalvageButton,
-        &mut Handle<Image>,
+    mouse_input: Res<ButtonInput<MouseButton>>,
+    // Bevy 0.19 B0001: hit-test `&Sprite` must not overlap `&mut Sprite` outside a ParamSet.
+    mut button_queries: ParamSet<(
+        Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
+        Query<(Entity, &mut Interactable, &WellSalvageButton, &mut Sprite)>,
     )>,
     mut selection: ResMut<WellSalvageSelection>,
     mut inventory: Query<&mut Inventory>,
@@ -745,21 +744,24 @@ pub fn handle_well_salvage_button(
         return;
     };
 
-    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None);
+    let hit_test = {
+        let ui_sprites = button_queries.p0();
+        ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None).map(|(e, _, _)| e)
+    };
     let left_pressed = mouse_input.just_pressed(MouseButton::Left);
     let focus_driving = well_focus_driving(&mouseless, &cursor_pos);
 
-    for (e, mut interactable, btn, mut texture) in buttons.iter_mut() {
+    for (e, mut interactable, btn, mut sprite) in button_queries.p1().iter_mut() {
         if !btn.active {
             continue;
         }
-        let is_hit = hit_test.map(|(ent, _, _)| ent == e).unwrap_or(false);
+        let is_hit = matches!(hit_test, Some(ent) if ent == e);
         let is_focused = focus_driving && ui_focus.is_focused(e);
 
         if is_hit || is_focused {
             if !matches!(interactable.current(), Interaction::Hovering) {
                 interactable.change(Interaction::Hovering);
-                *texture = params
+                sprite.image = params
                     .p0()
                     .graphics
                     .get_ui_element_texture(UIElement::MainMenuStartButtonHover);
@@ -769,7 +771,7 @@ pub fn handle_well_salvage_button(
             }
         } else if matches!(interactable.current(), Interaction::Hovering) {
             interactable.change(Interaction::None);
-            *texture = params
+            sprite.image = params
                 .p0()
                 .graphics
                 .get_ui_element_texture(UIElement::MainMenuStartButton);
@@ -780,7 +782,7 @@ pub fn handle_well_salvage_button(
             continue;
         }
 
-        let Ok(mut inv) = inventory.get_single_mut() else {
+        let Ok(mut inv) = inventory.single_mut() else {
             continue;
         };
         let Some(Some(inv_stack)) = inv.items.items.get(slot).cloned() else {
@@ -800,7 +802,7 @@ pub fn handle_well_salvage_button(
             roll_well_salvage_rewards(&rarity, &proto, &mut rng)
         };
         let player_pos = player_tf
-            .get_single()
+            .single()
             .map(|t| t.translation().truncate())
             .unwrap_or(Vec2::ZERO);
 
@@ -855,15 +857,14 @@ fn spawn_well_reward_modal(
     let panel_size = Vec2::new(140., 80.);
     let panel = commands
         .spawn((
-            SpriteBundle {
-                sprite: Sprite {
-                    color: Color::rgba(0.15, 0.12, 0.10, 0.98),
+            (
+                Sprite {
+                    color: Color::srgba(0.15, 0.12, 0.10, 0.98),
                     custom_size: Some(panel_size),
                     ..default()
                 },
-                transform: Transform::from_translation(Vec3::new(0., 10., 80.)),
-                ..default()
-            },
+                Transform::from_translation(Vec3::new(0., 10., 80.)),
+            ),
             RenderLayers::from_layers(&[3]),
             WellRewardModal,
             UIState::WellShrine,
@@ -872,19 +873,19 @@ fn spawn_well_reward_modal(
         .id();
 
     commands
-        .spawn(Text2dBundle {
-            text: Text::from_section("You gained:", gf::BODY.text_style(asset_server, WHITE))
-                .with_alignment(TextAlignment::Center),
-            text_anchor: Anchor::Center,
-            transform: Transform {
-                translation: Vec3::new(-26., 18., 1.),
-                scale: gf::BODY.transform_scale(),
-                ..Default::default()
-            },
-            ..Default::default()
-        })
+        .spawn(
+            gf::BODY
+                .text(asset_server, "You gained:", WHITE)
+                .justify(Justify::Center)
+                .anchor(Anchor::CENTER)
+                .with_transform(Transform {
+                    translation: Vec3::new(-26., 18., 1.),
+                    scale: gf::BODY.transform_scale(),
+                    ..Default::default()
+                }),
+        )
         .insert(RenderLayers::from_layers(&[3]))
-        .set_parent(panel);
+        .insert(ChildOf(panel));
 
     for (i, reward) in rewards.iter().enumerate() {
         let icon = spawn_item_stack_icon(
@@ -908,15 +909,14 @@ fn spawn_well_reward_modal(
 
     let ok = commands
         .spawn((
-            SpriteBundle {
-                sprite: Sprite {
+            (
+                Sprite {
                     color: BLACK,
                     custom_size: Some(Vec2::new(54., 16.)),
                     ..default()
                 },
-                transform: Transform::from_translation(Vec3::new(0., -18., 1.)),
-                ..default()
-            },
+                Transform::from_translation(Vec3::new(0., -18., 1.)),
+            ),
             Interactable::default(),
             WellRewardOkButton,
             SkipFocusSelectedIndicator,
@@ -928,29 +928,29 @@ fn spawn_well_reward_modal(
             RenderLayers::from_layers(&[3]),
             Name::new("Well Reward OK"),
         ))
-        .set_parent(panel)
+        .insert(ChildOf(panel))
         .id();
 
     commands
-        .spawn(Text2dBundle {
-            text: Text::from_section("OK", gf::BODY.text_style(asset_server, YELLOW))
-                .with_alignment(TextAlignment::Center),
-            text_anchor: Anchor::Center,
-            transform: Transform {
-                translation: Vec3::new(0., 0., 1.),
-                scale: gf::BODY.transform_scale(),
-                ..Default::default()
-            },
-            ..Default::default()
-        })
+        .spawn(
+            gf::BODY
+                .text(asset_server, "OK", YELLOW)
+                .justify(Justify::Center)
+                .anchor(Anchor::CENTER)
+                .with_transform(Transform {
+                    translation: Vec3::new(0., 0., 1.),
+                    scale: gf::BODY.transform_scale(),
+                    ..Default::default()
+                }),
+        )
         .insert(RenderLayers::from_layers(&[3]))
-        .set_parent(ok);
+        .insert(ChildOf(ok));
 }
 
 pub fn handle_well_reward_ok(
     mut commands: Commands,
     cursor_pos: Res<CursorPos>,
-    mouse_input: Res<Input<MouseButton>>,
+    mouse_input: Res<ButtonInput<MouseButton>>,
     mut button_queries: ParamSet<(
         Query<(Entity, &Sprite, &GlobalTransform), With<WellRewardOkButton>>,
         Query<(Entity, &mut Interactable, &mut Sprite), With<WellRewardOkButton>>,
@@ -1008,7 +1008,7 @@ pub fn handle_well_reward_ok(
 
         if (left_pressed && is_hit) || (is_focused && ui_focus.confirm_just_pressed) {
             for modal in modals.iter() {
-                commands.entity(modal).despawn_recursive();
+                commands.entity(modal).despawn();
             }
             commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.2));
             break;
@@ -1021,7 +1021,7 @@ pub fn cleanup_well_shrine_selection(
     mut commands: Commands,
     curr_ui_state: Res<State<UIState>>,
 ) {
-    if curr_ui_state.0 != UIState::WellShrine {
+    if *curr_ui_state.get() != UIState::WellShrine {
         selection.0 = None;
         commands.remove_resource::<WellUiNeedsRefresh>();
     }

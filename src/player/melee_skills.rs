@@ -1,5 +1,6 @@
+use crate::aseprite_assets::Echo;
 use bevy::prelude::*;
-use bevy_aseprite::{anim::AsepriteAnimation, aseprite, Aseprite};
+use bevy_aseprite_ultra::prelude::Aseprite;
 use bevy_rapier2d::prelude::{Collider, KinematicCharacterController};
 use rand::Rng;
 
@@ -39,7 +40,6 @@ use crate::{
 
 use super::combat_heirlooms::TriggerSummonsEvent;
 use super::{ActiveSkill, ActiveSkillUsedEvent, Heirloom, Player, PlayerSkills};
-aseprite!(pub Echo, "textures/effects/OnHitAoE.aseprite");
 
 /// Brief marker on a mob that was just hit and is queued for a follow-up
 /// split-damage hit a few frames later. Removed as soon as the follow-up
@@ -60,7 +60,7 @@ pub fn handle_second_split_attack(
     mobs: Query<Option<&MobStatusEffects>, With<Mob>>,
     game: GameParam,
     mut second_hit_query: Query<(Entity, &mut SecondHitDelay)>,
-    mut hit_event: EventWriter<HitEvent>,
+    mut hit_event: MessageWriter<HitEvent>,
     time: Res<Time>,
     mut commands: Commands,
 ) {
@@ -85,7 +85,7 @@ pub fn handle_second_split_attack(
 
         let split_damage = f32::floor(damage as f32 / 2.) as i32;
 
-        hit_event.send(HitEvent {
+        hit_event.write(HitEvent {
             hit_by_pet: None,
             hit_entity: e,
             damage: split_damage,
@@ -159,7 +159,7 @@ pub fn handle_echo_after_heal(
         Changed<CurrentHealth>,
     >,
     asset_server: Res<AssetServer>,
-    mut trigger_summons_events: EventWriter<TriggerSummonsEvent>,
+    mut trigger_summons_events: MessageWriter<TriggerSummonsEvent>,
     mut trigger_counts: ResMut<crate::player::skills::HeirloomTriggerCounts>,
 ) {
     for (
@@ -181,7 +181,7 @@ pub fn handle_echo_after_heal(
         let count = skills.get_count(Heirloom::HealEcho);
         if count > 0 && rng.gen_bool((count as f64 * 0.1).clamp(0.0, 1.0)) {
             let chalice_ready = cooldowns.as_ref().map_or(true, |c| {
-                c.chalice_echo.as_ref().map_or(true, |t| t.finished())
+                c.chalice_echo.as_ref().map_or(true, |t| t.is_finished())
             });
             if chalice_ready {
                 let mana_cost = Heirloom::HealEcho.get_mana_cost();
@@ -213,14 +213,14 @@ pub fn handle_echo_after_heal(
         let count = skills.get_count(Heirloom::HealSummons);
         if count > 0 && rng.gen_bool((0.1 * count as f64).clamp(0.0, 1.0)) {
             let summons_ready = cooldowns.as_ref().map_or(true, |c| {
-                c.heal_summons.as_ref().map_or(true, |t| t.finished())
+                c.heal_summons.as_ref().map_or(true, |t| t.is_finished())
             });
             if summons_ready {
                 let mana_cost = Heirloom::HealSummons.get_mana_cost();
                 if current_mana.0 >= mana_cost {
                     current_mana.0 -= mana_cost;
                     trigger_counts.record_mana(Heirloom::HealSummons, mana_cost);
-                    trigger_summons_events.send(TriggerSummonsEvent(e));
+                    trigger_summons_events.write(TriggerSummonsEvent(e));
                     if let Some(ref mut cooldowns) = cooldowns {
                         cooldowns.heal_summons = Some(new_heal_summons_trigger_timer());
                     } else {
@@ -287,7 +287,7 @@ pub struct Parried {
     pub kb_applied: bool,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Message)]
 pub struct ParrySuccessEvent(pub Entity);
 
 #[derive(Component)]
@@ -295,19 +295,19 @@ pub struct SpearAttack;
 
 pub fn handle_parry(
     mut player: Query<(Entity, &PlayerSkills, &PlayerAnimation, &mut ParryState), (With<Player>,)>,
-    key_input: Res<Input<KeyCode>>,
-    mouse_input: Res<Input<MouseButton>>,
+    key_input: Res<ButtonInput<KeyCode>>,
+    mouse_input: Res<ButtonInput<MouseButton>>,
     mut commands: Commands,
     time: Res<Time>,
     keybinds: Res<crate::keybinds::InputMappings>,
 ) {
-    let Ok((e, skills, curr_anim, mut parry_state)) = player.get_single_mut() else {
+    let Ok((e, skills, curr_anim, mut parry_state)) = player.single_mut() else {
         return;
     };
 
     if let Some(parry_slot) = skills.has_active_skill(ActiveSkill::Parry) {
         if keybinds.check_skill_input(parry_slot, &key_input, &mouse_input)
-            && parry_state.cooldown_timer.finished()
+            && parry_state.cooldown_timer.is_finished()
             && !curr_anim.is_parrying()
         {
             commands.entity(e).insert(PlayerAnimation::Parry);
@@ -320,7 +320,7 @@ pub fn handle_parry(
     }
     parry_state.cooldown_timer.tick(time.delta());
 
-    if parry_state.parry_timer.percent() != 0. {
+    if parry_state.parry_timer.fraction() != 0. {
         parry_state.parry_timer.tick(time.delta());
         if parry_state.parry_timer.just_finished() {
             parry_state.success = false;
@@ -329,7 +329,7 @@ pub fn handle_parry(
     }
 }
 pub fn handle_spear(
-    mut active_skill_events: EventReader<ActiveSkillUsedEvent>,
+    mut active_skill_events: MessageReader<ActiveSkillUsedEvent>,
     mut player: Query<
         (
             Entity,
@@ -346,10 +346,10 @@ pub fn handle_spear(
     mut commands: Commands,
     time: Res<Time>,
     cursor_pos: Res<CursorPos>,
-    mut ranged_attack_events: EventWriter<RangedAttackEvent>,
+    mut ranged_attack_events: MessageWriter<RangedAttackEvent>,
 ) {
     let Ok((e, player_pos, skills, _dmg, projectile_size, mut spear_state, mut kcc, mut mv)) =
-        player.get_single_mut()
+        player.single_mut()
     else {
         return;
     };
@@ -357,7 +357,7 @@ pub fn handle_spear(
     // Collect activated slots from events this frame (event-driven, no direct input check)
     let spear_slot = skills.has_active_skill(ActiveSkill::ParrySpear);
     let should_activate = spear_slot
-        .map(|slot| active_skill_events.iter().any(|ev| ev.slot == slot))
+        .map(|slot| active_skill_events.read().any(|ev| ev.slot == slot))
         .unwrap_or(false);
 
     if should_activate {
@@ -379,7 +379,7 @@ pub fn handle_spear(
             epicenter,
             pull_radius,
         });
-        ranged_attack_events.send(RangedAttackEvent {
+        ranged_attack_events.write(RangedAttackEvent {
             projectile: Projectile::SpearGravity,
             direction: Vec2::ZERO,
             mana_cost: None,
@@ -393,7 +393,7 @@ pub fn handle_spear(
         });
     }
 
-    if spear_state.spear_timer.percent() != 0. {
+    if spear_state.spear_timer.fraction() != 0. {
         spear_state.spear_timer.tick(time.delta());
         if spear_state.spear_timer.just_finished() {
             spear_state.spear_timer.reset();
@@ -416,14 +416,17 @@ pub fn handle_parry_success(
         ),
         With<Player>,
     >,
-    mut parry_success_event: EventReader<ParrySuccessEvent>,
+    mut parry_success_event: MessageReader<ParrySuccessEvent>,
     mut commands: Commands,
     asset_server: Res<AssetServer>,
-    mut modify_health_event: EventWriter<ModifyHealthEvent>,
+    mut modify_health_event: MessageWriter<ModifyHealthEvent>,
 ) {
-    for _ in parry_success_event.iter() {
-        let (player_e, attack, health_regen, player_txfm, skills, projectile_size) =
-            player.single();
+    for _ in parry_success_event.read() {
+        let Ok((player_e, attack, health_regen, player_txfm, skills, projectile_size)) =
+            player.single()
+        else {
+            continue;
+        };
         spawn_floating_text_with_shadow(
             &mut commands,
             &asset_server,
@@ -433,7 +436,7 @@ pub fn handle_parry_success(
             FLOATING_TEXT,
         );
         if skills.has(Heirloom::ParryHPRegen) {
-            modify_health_event.send(ModifyHealthEvent(health_regen.0));
+            modify_health_event.write(ModifyHealthEvent(health_regen.0));
         }
         if skills.has(Heirloom::ParryEcho) {
             spawn_echo_hitbox(
@@ -467,9 +470,6 @@ pub fn spawn_echo_hitbox(
     dmg: i32,
     size_multiplier: f32,
 ) {
-    // Use default animation to ensure it starts at frame 0
-    let anim = AsepriteAnimation::default();
-
     // NOTE: do NOT pre-scale the collider radius by `size_multiplier`. The entity's
     // Transform scale below is applied to the collider by Rapier, so multiplying the
     // radius here as well would scale the hitbox twice (it would grow ~size^2).
@@ -482,8 +482,8 @@ pub fn spawn_echo_hitbox(
         10.5,
         dmg,
         Collider::capsule(Vec2::ZERO, Vec2::ZERO, base_radius),
-        asset_server.load::<Aseprite, _>(Echo::PATH),
-        anim,
+        asset_server.load::<Aseprite>(Echo::PATH),
+        "",
         false,
         Projectile::Echo,
         vec![],       // No extra components needed
@@ -569,7 +569,7 @@ pub fn handle_spear_gravity(
             continue;
         }
 
-        kcc.translation = Some(delta * 300. * time.delta_seconds());
+        kcc.translation = Some(delta * 300. * time.delta_secs());
     }
 }
 

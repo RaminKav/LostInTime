@@ -1,3 +1,5 @@
+use bevy::text::Justify;
+use bevy::color::Alpha;
 use bevy::prelude::*;
 use serde::Serialize;
 use std::collections::HashMap;
@@ -9,7 +11,7 @@ use crate::item::{projectile::Projectile, WorldObject};
 use crate::player::skills::Heirloom;
 use crate::ui::game_fonts as gf;
 use crate::Player;
-use bevy::render::view::RenderLayers;
+use bevy::camera::visibility::RenderLayers;
 use bevy::sprite::Anchor;
 
 /// Categories for sorting damage sources in the game over display.
@@ -414,17 +416,17 @@ pub fn format_damage(damage: i64) -> String {
 
 /// System that reads HitEvents and tracks all player-dealt damage
 pub fn track_player_damage(
-    mut hit_events: EventReader<HitEvent>,
+    mut hit_events: MessageReader<HitEvent>,
     mut tracker: ResMut<DamageTracker>,
     player_query: Query<Entity, With<Player>>,
     in_i_frame: Query<&InvincibilityTimer>,
     mob_query: Query<(), With<Mob>>,
 ) {
-    let Ok(player_entity) = player_query.get_single() else {
+    let Ok(player_entity) = player_query.single() else {
         return;
     };
 
-    for hit in hit_events.iter() {
+    for hit in hit_events.read() {
         if hit.hit_entity == player_entity {
             continue;
         }
@@ -490,14 +492,13 @@ pub fn spawn_damage_tracker_ui(
 
     let panel = commands
         .spawn((
-            SpriteBundle {
-                sprite: Sprite {
-                    color: Color::rgba(0., 0., 0., 0.),
+            (
+                Sprite {
+                    color: Color::srgba(0., 0., 0., 0.),
                     ..Default::default()
                 },
-                transform: parent_transform,
-                ..default()
-            },
+                parent_transform,
+            ),
             RenderLayers::from_layers(&[3]),
             Name::new("Damage Tracker Panel"),
         ))
@@ -511,20 +512,19 @@ pub fn spawn_damage_tracker_ui(
 
     let title = commands
         .spawn((
-            Text2dBundle {
-                text: Text::from_section(
+            gf::BODY
+                .text(
+                    &asset_server,
                     "Damage Dealt",
-                    gf::BODY.text_style(&asset_server, YELLOW_2.with_a(base_alpha)),
+                    YELLOW_2.with_alpha(base_alpha),
                 )
-                .with_alignment(TextAlignment::Left),
-                text_anchor: Anchor::CenterLeft,
-                transform: Transform {
-                translation: Vec3::new(-hw, cursor_y, 1.),
-                scale: gf::BODY.transform_scale(),
-                ..default()
-            },
-                ..default()
-            },
+                .justify(Justify::Left)
+                .anchor(Anchor::CENTER_LEFT)
+                .with_transform(Transform {
+                    translation: Vec3::new(-hw, cursor_y, 1.),
+                    scale: gf::BODY.transform_scale(),
+                    ..default()
+                }),
             RenderLayers::from_layers(&[3]),
             Name::new("Damage Tracker Title"),
         ))
@@ -536,20 +536,19 @@ pub fn spawn_damage_tracker_ui(
     for (category, entries) in &groups {
         let header = commands
             .spawn((
-                Text2dBundle {
-                    text: Text::from_section(
+                gf::BODY
+                    .text(
+                        &asset_server,
                         category.display_name(),
-                        gf::BODY.text_style(&asset_server, LEVEL_BLUE.with_a(base_alpha)),
+                        LEVEL_BLUE.with_alpha(base_alpha),
                     )
-                    .with_alignment(TextAlignment::Left),
-                    text_anchor: Anchor::CenterLeft,
-                    transform: Transform {
-                translation: Vec3::new(-hw, cursor_y, 1.),
-                scale: gf::BODY.transform_scale(),
-                ..default()
-            },
-                    ..default()
-                },
+                    .justify(Justify::Left)
+                    .anchor(Anchor::CENTER_LEFT)
+                    .with_transform(Transform {
+                        translation: Vec3::new(-hw, cursor_y, 1.),
+                        scale: gf::BODY.transform_scale(),
+                        ..default()
+                    }),
                 RenderLayers::from_layers(&[3]),
             ))
             .id();
@@ -560,20 +559,19 @@ pub fn spawn_damage_tracker_ui(
         for (source, amount) in entries {
             let name = commands
                 .spawn((
-                    Text2dBundle {
-                        text: Text::from_section(
+                    gf::BODY
+                        .text(
+                            &asset_server,
                             format!(" {}", source.display_name()),
-                            gf::BODY.text_style(&asset_server, WHITE.with_a(base_alpha)),
+                            WHITE.with_alpha(base_alpha),
                         )
-                        .with_alignment(TextAlignment::Left),
-                        text_anchor: Anchor::CenterLeft,
-                        transform: Transform {
-                translation: Vec3::new(-hw, cursor_y, 1.),
-                scale: gf::BODY.transform_scale(),
-                ..default()
-            },
-                        ..default()
-                    },
+                        .justify(Justify::Left)
+                        .anchor(Anchor::CENTER_LEFT)
+                        .with_transform(Transform {
+                            translation: Vec3::new(-hw, cursor_y, 1.),
+                            scale: gf::BODY.transform_scale(),
+                            ..default()
+                        }),
                     RenderLayers::from_layers(&[3]),
                 ))
                 .id();
@@ -582,20 +580,19 @@ pub fn spawn_damage_tracker_ui(
 
             let value = commands
                 .spawn((
-                    Text2dBundle {
-                        text: Text::from_section(
+                    gf::BODY
+                        .text(
+                            &asset_server,
                             format_damage(*amount),
-                            gf::BODY.text_style(&asset_server, WHITE.with_a(base_alpha)),
+                            WHITE.with_alpha(base_alpha),
                         )
-                        .with_alignment(TextAlignment::Right),
-                        text_anchor: Anchor::CenterRight,
-                        transform: Transform {
-                translation: Vec3::new(hw + 10., cursor_y, 1.),
-                scale: gf::BODY.transform_scale(),
-                ..default()
-            },
-                        ..default()
-                    },
+                        .justify(Justify::Right)
+                        .anchor(Anchor::CENTER_RIGHT)
+                        .with_transform(Transform {
+                            translation: Vec3::new(hw + 10., cursor_y, 1.),
+                            scale: gf::BODY.transform_scale(),
+                            ..default()
+                        }),
                     RenderLayers::from_layers(&[3]),
                 ))
                 .id();
@@ -611,22 +608,15 @@ pub fn spawn_damage_tracker_ui(
                 if ps.shields_generated > 0 {
                     let name = commands
                         .spawn((
-                            Text2dBundle {
-                                text: Text::from_section(
-                                    " Shields",
-                                    gf::BODY.text_style(&asset_server, WHITE.with_a(base_alpha)),
-                                )
-                                .with_alignment(TextAlignment::Left),
-                                text_anchor: Anchor::CenterLeft,
-                                transform: Transform {
-                translation: Vec3::new(
-                                    -hw, cursor_y, 1.,
-                                ),
-                scale: gf::BODY.transform_scale(),
-                ..default()
-            },
-                                ..default()
-                            },
+                            gf::BODY
+                                .text(&asset_server, " Shields", WHITE.with_alpha(base_alpha))
+                                .justify(Justify::Left)
+                                .anchor(Anchor::CENTER_LEFT)
+                                .with_transform(Transform {
+                                    translation: Vec3::new(-hw, cursor_y, 1.),
+                                    scale: gf::BODY.transform_scale(),
+                                    ..default()
+                                }),
                             RenderLayers::from_layers(&[3]),
                         ))
                         .id();
@@ -634,24 +624,19 @@ pub fn spawn_damage_tracker_ui(
                     spawned_entities.push(name);
                     let value = commands
                         .spawn((
-                            Text2dBundle {
-                                text: Text::from_section(
+                            gf::BODY
+                                .text(
+                                    &asset_server,
                                     format_damage(ps.shields_generated as i64),
-                                    gf::BODY.text_style(&asset_server, WHITE.with_a(base_alpha)),
+                                    WHITE.with_alpha(base_alpha),
                                 )
-                                .with_alignment(TextAlignment::Right),
-                                text_anchor: Anchor::CenterRight,
-                                transform: Transform {
-                translation: Vec3::new(
-                                    hw + 10.,
-                                    cursor_y,
-                                    1.,
-                                ),
-                scale: gf::BODY.transform_scale(),
-                ..default()
-            },
-                                ..default()
-                            },
+                                .justify(Justify::Right)
+                                .anchor(Anchor::CENTER_RIGHT)
+                                .with_transform(Transform {
+                                    translation: Vec3::new(hw + 10., cursor_y, 1.),
+                                    scale: gf::BODY.transform_scale(),
+                                    ..default()
+                                }),
                             RenderLayers::from_layers(&[3]),
                         ))
                         .id();
@@ -662,22 +647,15 @@ pub fn spawn_damage_tracker_ui(
                 if ps.healing > 0 {
                     let name = commands
                         .spawn((
-                            Text2dBundle {
-                                text: Text::from_section(
-                                    " Healing",
-                                    gf::BODY.text_style(&asset_server, WHITE.with_a(base_alpha)),
-                                )
-                                .with_alignment(TextAlignment::Left),
-                                text_anchor: Anchor::CenterLeft,
-                                transform: Transform {
-                translation: Vec3::new(
-                                    -hw, cursor_y, 1.,
-                                ),
-                scale: gf::BODY.transform_scale(),
-                ..default()
-            },
-                                ..default()
-                            },
+                            gf::BODY
+                                .text(&asset_server, " Healing", WHITE.with_alpha(base_alpha))
+                                .justify(Justify::Left)
+                                .anchor(Anchor::CENTER_LEFT)
+                                .with_transform(Transform {
+                                    translation: Vec3::new(-hw, cursor_y, 1.),
+                                    scale: gf::BODY.transform_scale(),
+                                    ..default()
+                                }),
                             RenderLayers::from_layers(&[3]),
                         ))
                         .id();
@@ -685,24 +663,19 @@ pub fn spawn_damage_tracker_ui(
                     spawned_entities.push(name);
                     let value = commands
                         .spawn((
-                            Text2dBundle {
-                                text: Text::from_section(
+                            gf::BODY
+                                .text(
+                                    &asset_server,
                                     format_damage(ps.healing),
-                                    gf::BODY.text_style(&asset_server, WHITE.with_a(base_alpha)),
+                                    WHITE.with_alpha(base_alpha),
                                 )
-                                .with_alignment(TextAlignment::Right),
-                                text_anchor: Anchor::CenterRight,
-                                transform: Transform {
-                translation: Vec3::new(
-                                    hw + 10.,
-                                    cursor_y,
-                                    1.,
-                                ),
-                scale: gf::BODY.transform_scale(),
-                ..default()
-            },
-                                ..default()
-                            },
+                                .justify(Justify::Right)
+                                .anchor(Anchor::CENTER_RIGHT)
+                                .with_transform(Transform {
+                                    translation: Vec3::new(hw + 10., cursor_y, 1.),
+                                    scale: gf::BODY.transform_scale(),
+                                    ..default()
+                                }),
                             RenderLayers::from_layers(&[3]),
                         ))
                         .id();
@@ -713,22 +686,15 @@ pub fn spawn_damage_tracker_ui(
                 if ps.coins > 0 {
                     let name = commands
                         .spawn((
-                            Text2dBundle {
-                                text: Text::from_section(
-                                    " Coins",
-                                    gf::BODY.text_style(&asset_server, WHITE.with_a(base_alpha)),
-                                )
-                                .with_alignment(TextAlignment::Left),
-                                text_anchor: Anchor::CenterLeft,
-                                transform: Transform {
-                translation: Vec3::new(
-                                    -hw, cursor_y, 1.,
-                                ),
-                scale: gf::BODY.transform_scale(),
-                ..default()
-            },
-                                ..default()
-                            },
+                            gf::BODY
+                                .text(&asset_server, " Coins", WHITE.with_alpha(base_alpha))
+                                .justify(Justify::Left)
+                                .anchor(Anchor::CENTER_LEFT)
+                                .with_transform(Transform {
+                                    translation: Vec3::new(-hw, cursor_y, 1.),
+                                    scale: gf::BODY.transform_scale(),
+                                    ..default()
+                                }),
                             RenderLayers::from_layers(&[3]),
                         ))
                         .id();
@@ -736,24 +702,19 @@ pub fn spawn_damage_tracker_ui(
                     spawned_entities.push(name);
                     let value = commands
                         .spawn((
-                            Text2dBundle {
-                                text: Text::from_section(
+                            gf::BODY
+                                .text(
+                                    &asset_server,
                                     format_damage(ps.coins as i64),
-                                    gf::BODY.text_style(&asset_server, WHITE.with_a(base_alpha)),
+                                    WHITE.with_alpha(base_alpha),
                                 )
-                                .with_alignment(TextAlignment::Right),
-                                text_anchor: Anchor::CenterRight,
-                                transform: Transform {
-                translation: Vec3::new(
-                                    hw + 10.,
-                                    cursor_y,
-                                    1.,
-                                ),
-                scale: gf::BODY.transform_scale(),
-                ..default()
-            },
-                                ..default()
-                            },
+                                .justify(Justify::Right)
+                                .anchor(Anchor::CENTER_RIGHT)
+                                .with_transform(Transform {
+                                    translation: Vec3::new(hw + 10., cursor_y, 1.),
+                                    scale: gf::BODY.transform_scale(),
+                                    ..default()
+                                }),
                             RenderLayers::from_layers(&[3]),
                         ))
                         .id();
@@ -764,22 +725,15 @@ pub fn spawn_damage_tracker_ui(
                 if ps.self_damage > 0 {
                     let name = commands
                         .spawn((
-                            Text2dBundle {
-                                text: Text::from_section(
-                                    " Self damage",
-                                    gf::BODY.text_style(&asset_server, WHITE.with_a(base_alpha)),
-                                )
-                                .with_alignment(TextAlignment::Left),
-                                text_anchor: Anchor::CenterLeft,
-                                transform: Transform {
-                translation: Vec3::new(
-                                    -hw, cursor_y, 1.,
-                                ),
-                scale: gf::BODY.transform_scale(),
-                ..default()
-            },
-                                ..default()
-                            },
+                            gf::BODY
+                                .text(&asset_server, " Self damage", WHITE.with_alpha(base_alpha))
+                                .justify(Justify::Left)
+                                .anchor(Anchor::CENTER_LEFT)
+                                .with_transform(Transform {
+                                    translation: Vec3::new(-hw, cursor_y, 1.),
+                                    scale: gf::BODY.transform_scale(),
+                                    ..default()
+                                }),
                             RenderLayers::from_layers(&[3]),
                         ))
                         .id();
@@ -787,24 +741,19 @@ pub fn spawn_damage_tracker_ui(
                     spawned_entities.push(name);
                     let value = commands
                         .spawn((
-                            Text2dBundle {
-                                text: Text::from_section(
+                            gf::BODY
+                                .text(
+                                    &asset_server,
                                     format_damage(ps.self_damage),
-                                    gf::BODY.text_style(&asset_server, WHITE.with_a(base_alpha)),
+                                    WHITE.with_alpha(base_alpha),
                                 )
-                                .with_alignment(TextAlignment::Right),
-                                text_anchor: Anchor::CenterRight,
-                                transform: Transform {
-                translation: Vec3::new(
-                                    hw + 10.,
-                                    cursor_y,
-                                    1.,
-                                ),
-                scale: gf::BODY.transform_scale(),
-                ..default()
-            },
-                                ..default()
-                            },
+                                .justify(Justify::Right)
+                                .anchor(Anchor::CENTER_RIGHT)
+                                .with_transform(Transform {
+                                    translation: Vec3::new(hw + 10., cursor_y, 1.),
+                                    scale: gf::BODY.transform_scale(),
+                                    ..default()
+                                }),
                             RenderLayers::from_layers(&[3]),
                         ))
                         .id();
@@ -842,14 +791,13 @@ pub fn spawn_mob_stat_tracker_ui(
 
     let panel = commands
         .spawn((
-            SpriteBundle {
-                sprite: Sprite {
-                    color: Color::rgba(0., 0., 0., 0.),
+            (
+                Sprite {
+                    color: Color::srgba(0., 0., 0., 0.),
                     ..Default::default()
                 },
-                transform: parent_transform,
-                ..default()
-            },
+                parent_transform,
+            ),
             RenderLayers::from_layers(&[3]),
             Name::new("Mob Kills Tracker Panel"),
         ))
@@ -858,20 +806,15 @@ pub fn spawn_mob_stat_tracker_ui(
 
     let title = commands
         .spawn((
-            Text2dBundle {
-                text: Text::from_section(
-                    "Mob kills",
-                    gf::BODY.text_style(&asset_server, YELLOW_2.with_a(base_alpha)),
-                )
-                .with_alignment(TextAlignment::Left),
-                text_anchor: Anchor::CenterLeft,
-                transform: Transform {
-                translation: Vec3::new(-hw, cursor_y, 1.),
-                scale: gf::BODY.transform_scale(),
-                ..default()
-            },
-                ..default()
-            },
+            gf::BODY
+                .text(&asset_server, "Mob kills", YELLOW_2.with_alpha(base_alpha))
+                .justify(Justify::Left)
+                .anchor(Anchor::CENTER_LEFT)
+                .with_transform(Transform {
+                    translation: Vec3::new(-hw, cursor_y, 1.),
+                    scale: gf::BODY.transform_scale(),
+                    ..default()
+                }),
             RenderLayers::from_layers(&[3]),
             Name::new("Mob Kills Tracker Title"),
         ))
@@ -883,20 +826,19 @@ pub fn spawn_mob_stat_tracker_ui(
     for (mob, stats) in entries {
         let mob_name = commands
             .spawn((
-                Text2dBundle {
-                    text: Text::from_section(
+                gf::BODY
+                    .text(
+                        &asset_server,
                         format!(" {}", mob.stat_tracker_display_name()),
-                        gf::BODY.text_style(&asset_server, WHITE.with_a(base_alpha)),
+                        WHITE.with_alpha(base_alpha),
                     )
-                    .with_alignment(TextAlignment::Left),
-                    text_anchor: Anchor::CenterLeft,
-                    transform: Transform {
-                translation: Vec3::new(-hw, cursor_y, 1.),
-                scale: gf::BODY.transform_scale(),
-                ..default()
-            },
-                    ..default()
-                },
+                    .justify(Justify::Left)
+                    .anchor(Anchor::CENTER_LEFT)
+                    .with_transform(Transform {
+                        translation: Vec3::new(-hw, cursor_y, 1.),
+                        scale: gf::BODY.transform_scale(),
+                        ..default()
+                    }),
                 RenderLayers::from_layers(&[3]),
             ))
             .id();
@@ -905,20 +847,19 @@ pub fn spawn_mob_stat_tracker_ui(
 
         let kills_val = commands
             .spawn((
-                Text2dBundle {
-                    text: Text::from_section(
+                gf::BODY
+                    .text(
+                        &asset_server,
                         format_damage(stats.kills as i64),
-                        gf::BODY.text_style(&asset_server, WHITE.with_a(base_alpha)),
+                        WHITE.with_alpha(base_alpha),
                     )
-                    .with_alignment(TextAlignment::Right),
-                    text_anchor: Anchor::CenterRight,
-                    transform: Transform {
-                translation: Vec3::new(hw + 10., cursor_y, 1.),
-                scale: gf::BODY.transform_scale(),
-                ..default()
-            },
-                    ..default()
-                },
+                    .justify(Justify::Right)
+                    .anchor(Anchor::CENTER_RIGHT)
+                    .with_transform(Transform {
+                        translation: Vec3::new(hw + 10., cursor_y, 1.),
+                        scale: gf::BODY.transform_scale(),
+                        ..default()
+                    }),
                 RenderLayers::from_layers(&[3]),
             ))
             .id();

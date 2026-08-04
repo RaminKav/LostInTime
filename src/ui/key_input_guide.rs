@@ -1,10 +1,14 @@
-use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
+use bevy::text::Justify;
+use bevy::{camera::visibility::RenderLayers, prelude::*, sprite::Anchor};
 
 use crate::{
     assets::SpriteAnchor,
     colors::{BLACK, RED, WHITE},
-    ecs_helpers::{safe_push_children, safe_set_parent, SafeHierarchyExt},
-    gamepad_bindings::{binding_labels_dirty, format_binding_label, BindingLabel, GamepadMappings},
+    ecs_helpers::{safe_push_children, safe_set_parent},
+    gamepad_bindings::{
+        binding_labels_dirty, format_binding_label, gamepad_connected, BindingLabel,
+        ConnectedGamepads, GamepadMappings,
+    },
     inventory::{Inventory, ItemStack},
     item::{
         boss_shrine::BossSummonTracker,
@@ -28,7 +32,8 @@ use super::{
 
 /// Interact-guide key badge — larger than the default HUD keybind badge, with darker fill.
 const INTERACT_GUIDE_KEY_BADGE_SIZE: Vec2 = Vec2::new(26., 18.);
-const INTERACT_GUIDE_KEY_BADGE_COLOR: Color = Color::rgba(18. / 255., 16. / 255., 16. / 255., 0.88);
+const INTERACT_GUIDE_KEY_BADGE_COLOR: Color =
+    Color::srgba(18. / 255., 16. / 255., 16. / 255., 0.88);
 
 fn spawn_interact_guide_keybind_badge(
     commands: &mut Commands,
@@ -38,33 +43,36 @@ fn spawn_interact_guide_keybind_badge(
     parent: Entity,
 ) -> (Entity, Entity) {
     let key_bg = commands
-        .spawn(SpriteBundle {
-            sprite: Sprite {
+        .spawn((
+            Sprite {
                 color: INTERACT_GUIDE_KEY_BADGE_COLOR,
                 custom_size: Some(INTERACT_GUIDE_KEY_BADGE_SIZE),
                 ..default()
             },
             transform,
-            ..default()
-        })
-        .insert(RenderLayers::from_layers(&[INTERACT_GUIDE_RENDER_LAYER]))
-        .set_parent(parent)
+        ))
+        .insert(RenderLayers::from_layers(&[
+            INTERACT_GUIDE_RENDER_LAYER as usize
+        ]))
+        .insert(ChildOf(parent))
         .id();
 
     let key_text = commands
-        .spawn(Text2dBundle {
-            text: Text::from_section(label.into(), gf::DISPLAY.text_style(&asset_server, WHITE))
-                .with_alignment(TextAlignment::Center),
-            text_anchor: Anchor::Center,
-            transform: Transform {
-                translation: Vec3::new(0., -1., 1.),
-                scale: gf::DISPLAY.transform_scale(),
-                ..default()
-            },
-            ..default()
-        })
-        .insert(RenderLayers::from_layers(&[INTERACT_GUIDE_RENDER_LAYER]))
-        .set_parent(key_bg)
+        .spawn(
+            gf::DISPLAY
+                .text(&asset_server, label.into(), WHITE)
+                .justify(Justify::Center)
+                .anchor(Anchor::CENTER)
+                .with_transform(Transform {
+                    translation: Vec3::new(0., -1., 1.),
+                    scale: gf::DISPLAY.transform_scale(),
+                    ..default()
+                }),
+        )
+        .insert(RenderLayers::from_layers(&[
+            INTERACT_GUIDE_RENDER_LAYER as usize
+        ]))
+        .insert(ChildOf(key_bg))
         .id();
 
     (key_bg, key_text)
@@ -103,7 +111,7 @@ pub fn add_guide_to_unique_objs(
             &WorldObject,
             &Transform,
             Option<&SpriteAnchor>,
-            Option<&Parent>,
+            Option<&ChildOf>,
         ),
         Added<WorldObject>,
     >,
@@ -275,7 +283,7 @@ pub fn spawn_shrine_interact_key_guide(
     asset_server: Res<AssetServer>,
     keybinds: Res<InputMappings>,
     gamepad_mappings: Res<GamepadMappings>,
-    gamepads: Res<Gamepads>,
+    gamepads: ConnectedGamepads,
     player_query: Query<(Entity, &GlobalTransform), With<Player>>,
     player_inv: Query<&Inventory, With<Player>>,
     inv_changed: Query<Entity, (With<Player>, With<Inventory>, Changed<Inventory>)>,
@@ -296,10 +304,14 @@ pub fn spawn_shrine_interact_key_guide(
         BindingLabel::Interact,
         &keybinds,
         &gamepad_mappings,
-        &gamepads,
+        gamepad_connected(&gamepads),
     );
-    let (player_e, player_t) = player_query.single();
-    let inv = player_inv.single();
+    let Ok((player_e, player_t)) = player_query.single() else {
+        return;
+    };
+    let Ok(inv) = player_inv.single() else {
+        return;
+    };
     let key_count = inv.items.get_item_count_in_container(WorldObject::Key);
     let summon_cost = summon_tracker.current_cost();
     let inventory_changed = !inv_changed.is_empty();
@@ -325,13 +337,14 @@ pub fn spawn_shrine_interact_key_guide(
                     )
                 };
                 let parent_entity = commands
-                    .spawn(SpatialBundle::from_transform(Transform::from_translation(
-                        Vec3::new(0., 57.5, INTERACT_GUIDE_LOCAL_Z),
-                    )))
+                    .spawn((
+                        Transform::from_translation(Vec3::new(0., 57.5, INTERACT_GUIDE_LOCAL_Z)),
+                        Visibility::default(),
+                    ))
                     .insert(InteractGuide)
                     .insert(Name::new("Interact Guide"))
-                    .safe_set_parent(player_e)
                     .id();
+                safe_set_parent(&mut commands, parent_entity, player_e);
 
                 match display_text {
                     Some(text) => {
@@ -343,7 +356,7 @@ pub fn spawn_shrine_interact_key_guide(
                             Vec3::new(text_x, -1., 1.),
                             Color::WHITE,
                             text,
-                            Anchor::Center,
+                            Anchor::CENTER,
                             FLOATING_TEXT,
                             INTERACT_GUIDE_RENDER_LAYER,
                             None,
@@ -382,12 +395,17 @@ pub fn spawn_shrine_interact_key_guide(
                 if !repairing {
                     if let Some(repair) = repair_costs {
                         let repair_row = commands
-                            .spawn(SpatialBundle::from_transform(Transform::from_translation(
-                                Vec3::new(0., REPAIR_COST_ROW_GAP_ABOVE_LABEL, 1.),
-                            )))
+                            .spawn((
+                                Transform::from_translation(Vec3::new(
+                                    0.,
+                                    REPAIR_COST_ROW_GAP_ABOVE_LABEL,
+                                    1.,
+                                )),
+                                Visibility::default(),
+                            ))
                             .insert(Name::new("Repair Cost Row"))
-                            .safe_set_parent(parent_entity)
                             .id();
+                        safe_set_parent(&mut commands, repair_row, parent_entity);
                         spawn_repair_cost_icons(
                             &mut commands,
                             &game,
@@ -413,20 +431,21 @@ pub fn spawn_shrine_interact_key_guide(
                         );
 
                         let slot_entity = commands
-                            .spawn(SpriteBundle {
-                                texture: game
-                                    .graphics
-                                    .get_ui_element_texture(UIElement::ScreenIconSlot),
-                                transform: Transform::from_translation(Vec3::new(0., 18.5, 1.)),
-                                sprite: Sprite {
+                            .spawn((
+                                Sprite {
+                                    image: game
+                                        .graphics
+                                        .get_ui_element_texture(UIElement::ScreenIconSlot),
                                     custom_size: Some(Vec2::new(16., 16.)),
                                     ..Default::default()
                                 },
-                                ..Default::default()
-                            })
-                            .insert(RenderLayers::from_layers(&[INTERACT_GUIDE_RENDER_LAYER]))
-                            .safe_set_parent(parent_entity)
+                                Transform::from_translation(Vec3::new(0., 18.5, 1.)),
+                            ))
+                            .insert(RenderLayers::from_layers(&[
+                                INTERACT_GUIDE_RENDER_LAYER as usize
+                            ]))
                             .id();
+                        safe_set_parent(&mut commands, slot_entity, parent_entity);
                         safe_push_children(&mut commands, slot_entity, &[icon]);
                     }
                 }
@@ -445,14 +464,14 @@ pub fn spawn_shrine_interact_key_guide(
                     && !is_shrine_repairing(channel, pending)
                 {
                     for t in already_exists.iter() {
-                        commands.entity(t).despawn_recursive();
+                        commands.entity(t).despawn();
                     }
                 }
                 return;
             }
         }
         for t in already_exists.iter() {
-            commands.entity(t).despawn_recursive();
+            commands.entity(t).despawn();
         }
     }
 }
@@ -467,17 +486,14 @@ pub fn refresh_interact_guide_on_shrine_repair(
     mut removed_pending: RemovedComponents<PendingShrineRepairFinish>,
     guides: Query<Entity, With<InteractGuide>>,
 ) {
-    let channel_removed = removed_channel.iter().next().is_some();
-    let pending_removed = removed_pending.iter().next().is_some();
-    if added_channel.is_empty()
-        && added_pending.is_empty()
-        && !channel_removed
-        && !pending_removed
+    let channel_removed = removed_channel.read().next().is_some();
+    let pending_removed = removed_pending.read().next().is_some();
+    if added_channel.is_empty() && added_pending.is_empty() && !channel_removed && !pending_removed
     {
         return;
     }
     for guide in guides.iter() {
-        commands.entity(guide).despawn_recursive();
+        commands.entity(guide).despawn();
     }
 }
 
@@ -518,10 +534,10 @@ fn spawn_repair_cost_icons(
             INTERACT_GUIDE_RENDER_LAYER,
         );
         // Grey out when the player cannot afford this material.
-        commands.add(move |world: &mut World| {
-            if let Some(mut entity) = world.get_entity_mut(icon) {
-                if let Some(mut sprite) = entity.get_mut::<TextureAtlasSprite>() {
-                    sprite.color.set_a(alpha);
+        commands.queue(move |world: &mut World| {
+            if let Ok(mut entity) = world.get_entity_mut(icon) {
+                if let Some(mut sprite) = entity.get_mut::<Sprite>() {
+                    sprite.color.set_alpha(alpha);
                 }
             }
         });
@@ -535,7 +551,7 @@ fn spawn_repair_cost_icons(
             Vec3::new(1., -1., -1.),
             BLACK,
             count_label.clone(),
-            Anchor::Center,
+            Anchor::CENTER,
             gf::TITLE,
             INTERACT_GUIDE_RENDER_LAYER,
             Some(Vec3::ONE),
@@ -546,7 +562,7 @@ fn spawn_repair_cost_icons(
             Vec3::new(0., -18., 3.),
             count_color,
             count_label,
-            Anchor::Center,
+            Anchor::CENTER,
             gf::TITLE,
             INTERACT_GUIDE_RENDER_LAYER,
             None,
@@ -557,21 +573,22 @@ fn spawn_repair_cost_icons(
             .add_child(count_shadow);
 
         let slot_entity = commands
-            .spawn(SpriteBundle {
-                texture: game
-                    .graphics
-                    .get_ui_element_texture(UIElement::InventorySlot),
-                transform: Transform::from_translation(Vec3::new(x, REPAIR_COST_ROW_Y, 1.)),
-                sprite: Sprite {
+            .spawn((
+                Sprite {
+                    image: game
+                        .graphics
+                        .get_ui_element_texture(UIElement::InventorySlot),
                     custom_size: Some(UI_SLOT_SIZE),
                     color: Color::WHITE,
                     ..Default::default()
                 },
-                ..Default::default()
-            })
-            .insert(RenderLayers::from_layers(&[INTERACT_GUIDE_RENDER_LAYER]))
-            .safe_set_parent(parent_entity)
+                Transform::from_translation(Vec3::new(x, REPAIR_COST_ROW_Y, 1.)),
+            ))
+            .insert(RenderLayers::from_layers(&[
+                INTERACT_GUIDE_RENDER_LAYER as usize
+            ]))
             .id();
+        safe_set_parent(commands, slot_entity, parent_entity);
         safe_push_children(commands, slot_entity, &[icon, count_text]);
     }
 }
@@ -579,14 +596,14 @@ fn spawn_repair_cost_icons(
 pub fn update_interact_guide_keybind_text(
     keybinds: Res<InputMappings>,
     gamepad_mappings: Res<GamepadMappings>,
-    gamepads: Res<Gamepads>,
-    mut texts: Query<&mut Text, With<InteractGuideKeybindText>>,
+    gamepads: ConnectedGamepads,
+    mut texts: Query<&mut Text2d, With<InteractGuideKeybindText>>,
     mut last_gamepad_connected: Local<Option<bool>>,
 ) {
     if !binding_labels_dirty(
         keybinds.is_changed(),
         gamepad_mappings.is_changed(),
-        &gamepads,
+        gamepad_connected(&gamepads),
         &mut last_gamepad_connected,
     ) {
         return;
@@ -596,9 +613,9 @@ pub fn update_interact_guide_keybind_text(
         BindingLabel::Interact,
         &keybinds,
         &gamepad_mappings,
-        &gamepads,
+        gamepad_connected(&gamepads),
     );
     for mut text in texts.iter_mut() {
-        text.sections[0].value = label.clone();
+        text.0 = label.clone();
     }
 }

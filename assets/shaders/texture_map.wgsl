@@ -1,24 +1,24 @@
+#import bevy_sprite::mesh2d_vertex_output::VertexOutput
 // #import bevy_sprite::mesh2d_view_bindings
 // #import bevy_pbr::utils
 
-@group(1) @binding(0)
+@group(#{MATERIAL_BIND_GROUP}) @binding(0)
 var source_color_texture: texture_2d<f32>;
-@group(1) @binding(1)
+@group(#{MATERIAL_BIND_GROUP}) @binding(1)
 var source_texture_sampler: sampler;
-@group(1) @binding(2)
+@group(#{MATERIAL_BIND_GROUP}) @binding(2)
 var lookup_color_texture: texture_2d<f32>;
-@group(1) @binding(3)
+@group(#{MATERIAL_BIND_GROUP}) @binding(3)
 var lookup_texture_sampler: sampler;
-@group(1) @binding(4)
+@group(#{MATERIAL_BIND_GROUP}) @binding(4)
 var<uniform> flip: f32;
-@group(1) @binding(5)
+@group(#{MATERIAL_BIND_GROUP}) @binding(5)
 var<uniform> opacity: f32;
 
 
 @fragment
-fn fragment(
-    #import bevy_sprite::mesh2d_vertex_output
-) -> @location(0) vec4<f32> {
+fn fragment(mesh: VertexOutput) -> @location(0) vec4<f32> {
+    let uv = mesh.uv;
     let uv_map_dims = vec2<f32>(textureDimensions(source_color_texture));
     let palette_dims = vec2<f32>(textureDimensions(lookup_color_texture));
     var flipped_uv: vec2<f32>;

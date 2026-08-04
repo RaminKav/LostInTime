@@ -3,19 +3,19 @@
 
 // NOTE: Bindings must come before functions that use them!
 #import bevy_sprite::mesh2d_functions
+#import bevy_sprite::mesh2d_vertex_output::VertexOutput
 
-@group(1) @binding(0)
+@group(#{MATERIAL_BIND_GROUP}) @binding(0)
 var<uniform> opacity: f32; 
 
-@group(1) @binding(1)
+@group(#{MATERIAL_BIND_GROUP}) @binding(1)
 var _MainTex: texture_2d<f32>; //("Base (RGB) Trans (A)", 2D) = "white" {}
-@group(1) @binding(2)
+@group(#{MATERIAL_BIND_GROUP}) @binding(2)
 var _MainTexSampler: sampler; //("Base (RGB) Trans (A)", 2D) = "white" {}
 
 @fragment
-fn fragment(
-    #import bevy_sprite::mesh2d_vertex_output
-    ) -> @location(0) vec4<f32>{
+fn fragment(mesh: VertexOutput) -> @location(0) vec4<f32> {
+    let uv = mesh.uv;
     let sampled = textureSample(_MainTex, _MainTexSampler, uv);
     let alpha = (sampled.a * opacity);
     let color = sampled.rgb * alpha;

@@ -25,7 +25,7 @@ pub mod vectorize {
     }
 }
 pub mod vectorize_inner {
-    use bevy::utils::HashMap;
+    use bevy::platform::collections::HashMap;
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
     use std::iter::FromIterator;
 

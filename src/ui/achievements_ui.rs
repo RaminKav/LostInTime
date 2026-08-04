@@ -1,6 +1,7 @@
+use bevy::text::Justify;
+use bevy::camera::visibility::RenderLayers;
 use bevy::ecs::system::ParamSet;
 use bevy::prelude::*;
-use bevy::render::view::RenderLayers;
 use bevy::sprite::Anchor;
 use strum::IntoEnumIterator;
 
@@ -109,7 +110,7 @@ fn achievement_has_counter(achievement: Achievement) -> bool {
 
 fn name_text_color(is_completed: bool, is_claimed: bool) -> Color {
     if is_claimed {
-        Color::rgba(0.5, 0.5, 0.5, 1.0)
+        Color::srgba(0.5, 0.5, 0.5, 1.0)
     } else if is_completed {
         LIGHT_GREEN
     } else {
@@ -119,7 +120,7 @@ fn name_text_color(is_completed: bool, is_claimed: bool) -> Color {
 
 fn status_text_color(is_completed: bool, is_claimed: bool) -> Color {
     if is_claimed {
-        Color::rgba(0.5, 0.5, 0.5, 1.0)
+        Color::srgba(0.5, 0.5, 0.5, 1.0)
     } else if is_completed {
         LIGHT_GREEN
     } else {
@@ -130,15 +131,14 @@ fn status_text_color(is_completed: bool, is_claimed: bool) -> Color {
 fn spawn_achievement_button(pos: Vec3, commands: &mut Commands, graphics: &Graphics) -> Entity {
     commands
         .spawn((
-            SpriteBundle {
-                texture: graphics.get_ui_element_texture(UIElement::AchievementButton),
-                sprite: Sprite {
+            (
+                Sprite {
+                    image: graphics.get_ui_element_texture(UIElement::AchievementButton),
                     custom_size: Some(ACHIEVEMENT_BUTTON_SIZE),
                     ..Default::default()
                 },
-                transform: Transform::from_translation(pos),
-                ..Default::default()
-            },
+                Transform::from_translation(pos),
+            ),
             Interactable::default(),
             UIElement::AchievementButton,
             RenderLayers::from_layers(&[3]),
@@ -154,19 +154,19 @@ fn spawn_achievement_button_label(
     label: &str,
 ) {
     commands
-        .spawn(Text2dBundle {
-            text: Text::from_section(label, gf::DISPLAY.text_style(&asset_server, WHITE))
-                .with_alignment(TextAlignment::Center),
-            text_anchor: Anchor::Center,
-            transform: Transform {
-                translation: Vec3::new(0., -1., 1.),
-                scale: gf::DISPLAY.transform_scale(),
-                ..Default::default()
-            },
-            ..Default::default()
-        })
+        .spawn(
+            gf::DISPLAY
+                .text(&asset_server, label, WHITE)
+                .justify(Justify::Center)
+                .anchor(Anchor::CENTER)
+                .with_transform(Transform {
+                    translation: Vec3::new(0., -1., 1.),
+                    scale: gf::DISPLAY.transform_scale(),
+                    ..Default::default()
+                }),
+        )
         .insert(RenderLayers::from_layers(&[3]))
-        .set_parent(button);
+        .insert(ChildOf(button));
 }
 
 pub fn setup_achievements_ui(
@@ -188,20 +188,19 @@ pub fn setup_achievements_ui(
     commands.entity(overlay).insert(AchievementsUI);
 
     commands.spawn((
-        Text2dBundle {
-            text: Text::from_section(
+        gf::DISPLAY
+            .text(
+                &asset_server,
                 "Achievements",
-                gf::DISPLAY.text_style(&asset_server, crate::colors::DARK_WOOD_BROWN),
+                crate::colors::DARK_WOOD_BROWN,
             )
-            .with_alignment(TextAlignment::Center),
-            text_anchor: bevy::sprite::Anchor::Center,
-            transform: Transform {
+            .justify(Justify::Center)
+            .anchor(bevy::sprite::Anchor::CENTER)
+            .with_transform(Transform {
                 translation: Vec3::new(0., ACHIEVEMENTS_TITLE_Y, 11.),
                 scale: gf::DISPLAY.transform_scale(),
                 ..Default::default()
-            },
-            ..Default::default()
-        },
+            }),
         RenderLayers::from_layers(&[3]),
         AchievementsUI,
         UIState::Achievements,
@@ -209,14 +208,15 @@ pub fn setup_achievements_ui(
     ));
 
     commands.spawn((
-        Text2dBundle {
-            text: Text::from_section(
+        gf::BODY
+            .text(
+                &asset_server,
                 achievements_completion_label(&achievements),
-                gf::BODY.text_style(&asset_server, crate::colors::LIGHT_BROWN),
+                crate::colors::LIGHT_BROWN,
             )
-            .with_alignment(TextAlignment::Right),
-            text_anchor: Anchor::CenterRight,
-            transform: Transform {
+            .justify(Justify::Right)
+            .anchor(Anchor::CENTER_RIGHT)
+            .with_transform(Transform {
                 translation: Vec3::new(
                     ACHIEVEMENTS_COMPLETION_TRACKER_X,
                     ACHIEVEMENTS_COMPLETION_TRACKER_Y,
@@ -224,9 +224,7 @@ pub fn setup_achievements_ui(
                 ),
                 scale: gf::BODY.transform_scale(),
                 ..Default::default()
-            },
-            ..Default::default()
-        },
+            }),
         RenderLayers::from_layers(&[3]),
         AchievementsUI,
         UIState::Achievements,
@@ -236,10 +234,10 @@ pub fn setup_achievements_ui(
 
     let achievements_bg = commands
         .spawn((
-            SpatialBundle {
-                transform: Transform::from_translation(Vec3::new(0., 0., 10.)),
-                ..Default::default()
-            },
+            (
+                Transform::from_translation(Vec3::new(0., 0., 10.)),
+                Visibility::default(),
+            ),
             UIState::Achievements,
             AchievementsUI,
             RenderLayers::from_layers(&[3]),
@@ -248,22 +246,21 @@ pub fn setup_achievements_ui(
         .id();
 
     commands
-        .spawn(SpriteBundle {
-            texture: graphics
-                .get_ui_element_texture(UIElement::AchievementsContainer)
-                .clone(),
-            sprite: Sprite {
+        .spawn((
+            Sprite {
+                image: graphics
+                    .get_ui_element_texture(UIElement::AchievementsContainer)
+                    .clone(),
                 custom_size: Some(Vec2::new(482., 340.)),
                 ..Default::default()
             },
-            transform: Transform::from_translation(Vec3::new(0., 0., CONTAINER_Z)),
-            ..Default::default()
-        })
+            Transform::from_translation(Vec3::new(0., 0., CONTAINER_Z)),
+        ))
         .insert(AchievementsUI)
         .insert(UIState::Achievements)
         .insert(RenderLayers::from_layers(&[3]))
         .insert(Name::new("Achievements Container"))
-        .set_parent(achievements_bg);
+        .insert(ChildOf(achievements_bg));
 
     let mut all_achievements: Vec<Achievement> = Achievement::iter().collect();
     all_achievements.sort_by_key(|achievement| {
@@ -325,20 +322,19 @@ pub fn setup_achievements_ui(
 
         let row_bg = commands
             .spawn((
-                SpriteBundle {
-                    texture: graphics.get_ui_element_texture(row_ui_element.clone()),
-                    sprite: Sprite {
+                (
+                    Sprite {
+                        image: graphics.get_ui_element_texture(row_ui_element.clone()),
                         custom_size: Some(Vec2::new(434., ROW_HEIGHT)),
                         ..Default::default()
                     },
-                    transform: Transform::from_translation(Vec3::new(0., y_pos, ROW_BG_Z)),
-                    visibility: if row_visible {
+                    Transform::from_translation(Vec3::new(0., y_pos, ROW_BG_Z)),
+                    if row_visible {
                         Visibility::Visible
                     } else {
                         Visibility::Hidden
                     },
-                    ..Default::default()
-                },
+                ),
                 RenderLayers::from_layers(&[3]),
                 AchievementsUI,
                 UIState::Achievements,
@@ -353,30 +349,27 @@ pub fn setup_achievements_ui(
                 Name::new("Achievement Row Background"),
             ))
             .id();
-        commands.entity(row_bg).set_parent(achievements_bg);
+        commands.entity(row_bg).insert(ChildOf(achievements_bg));
 
         let name_pos = Vec3::new(-134., y_pos, ROW_TEXT_Z);
         let name_entity = commands
             .spawn((
-                Text2dBundle {
-                    text: Text::from_section(
-                        name_text,
-                        gf::ACHIEVEMENT_NAME.text_style(&asset_server, name_color),
-                    )
-                    .with_alignment(TextAlignment::Left),
-                    text_anchor: Anchor::Center,
-                    transform: Transform {
-                        translation: name_pos,
-                        scale: gf::ACHIEVEMENT_NAME.transform_scale(),
-                        ..Default::default()
-                    },
-                    visibility: if row_visible {
+                (
+                    gf::ACHIEVEMENT_NAME
+                        .text(&asset_server, name_text, name_color)
+                        .justify(Justify::Left)
+                        .anchor(Anchor::CENTER)
+                        .with_transform(Transform {
+                            translation: name_pos,
+                            scale: gf::ACHIEVEMENT_NAME.transform_scale(),
+                            ..Default::default()
+                        }),
+                    if row_visible {
                         Visibility::Visible
                     } else {
                         Visibility::Hidden
                     },
-                    ..Default::default()
-                },
+                ),
                 RenderLayers::from_layers(&[3]),
                 AchievementsUI,
                 UIState::Achievements,
@@ -387,21 +380,21 @@ pub fn setup_achievements_ui(
             .id();
 
         let desc_entity = commands
-            .spawn(Text2dBundle {
-                text: Text::from_section(desc_text, gf::BODY.text_style(&asset_server, desc_color)),
-                transform: Transform {
-                    translation: Vec3::new(-52., y_pos, ROW_TEXT_Z),
-                    scale: gf::BODY.transform_scale(),
-                    ..Default::default()
-                },
-                text_anchor: Anchor::CenterLeft,
-                visibility: if row_visible {
+            .spawn((
+                gf::BODY
+                    .text(&asset_server, desc_text, desc_color)
+                    .anchor(Anchor::CENTER_LEFT)
+                    .with_transform(Transform {
+                        translation: Vec3::new(-52., y_pos, ROW_TEXT_Z),
+                        scale: gf::BODY.transform_scale(),
+                        ..Default::default()
+                    }),
+                if row_visible {
                     Visibility::Visible
                 } else {
                     Visibility::Hidden
                 },
-                ..Default::default()
-            })
+            ))
             .insert(RenderLayers::from_layers(&[3]))
             .insert((
                 AchievementsUI,
@@ -412,8 +405,12 @@ pub fn setup_achievements_ui(
             ))
             .id();
 
-        commands.entity(desc_entity).set_parent(achievements_bg);
-        commands.entity(name_entity).set_parent(achievements_bg);
+        commands
+            .entity(desc_entity)
+            .insert(ChildOf(achievements_bg));
+        commands
+            .entity(name_entity)
+            .insert(ChildOf(achievements_bg));
 
         let reward_amount = maybe_achievement
             .copied()
@@ -427,81 +424,79 @@ pub fn setup_achievements_ui(
 
         let reward_entity = commands
             .spawn((
-                Text2dBundle {
-                    text: Text::from_section(
-                        reward_text,
-                        gf::BODY.text_style(&asset_server, desc_color),
-                    )
-                    .with_alignment(TextAlignment::Center),
-                    text_anchor: Anchor::Center,
-                    transform: Transform {
-                        translation: Vec3::new(194., y_pos - 9., ROW_TEXT_Z),
-                        scale: gf::BODY.transform_scale(),
-                        ..Default::default()
-                    },
-                    visibility: if row_visible && reward_amount > 0 {
+                (
+                    gf::BODY
+                        .text(&asset_server, reward_text, desc_color)
+                        .justify(Justify::Center)
+                        .anchor(Anchor::CENTER)
+                        .with_transform(Transform {
+                            translation: Vec3::new(194., y_pos - 9., ROW_TEXT_Z),
+                            scale: gf::BODY.transform_scale(),
+                            ..Default::default()
+                        }),
+                    if row_visible && reward_amount > 0 {
                         Visibility::Visible
                     } else {
                         Visibility::Hidden
                     },
-                    ..Default::default()
-                },
+                ),
                 RenderLayers::from_layers(&[3]),
                 AchievementsUI,
                 UIState::Achievements,
                 AchievementRow { index: row_index },
                 AchievementRewardText,
-                Name::new("Achievement Reward Text"),
+                Name::new("Achievement Reward Text2d"),
             ))
             .id();
-        commands.entity(reward_entity).set_parent(achievements_bg);
+        commands
+            .entity(reward_entity)
+            .insert(ChildOf(achievements_bg));
 
         let progress_text_entity = commands
             .spawn((
-                Text2dBundle {
-                    text: Text::from_section("", gf::BODY.text_style(&asset_server, WHITE))
-                        .with_alignment(TextAlignment::Right),
-                    text_anchor: Anchor::Center,
-                    transform: Transform {
-                        translation: Vec3::new(135., y_pos - 1., ROW_TEXT_Z),
-                        scale: gf::BODY.transform_scale(),
-                        ..Default::default()
-                    },
-                    visibility: if row_visible && has_counter {
+                (
+                    gf::BODY
+                        .text(&asset_server, "", WHITE)
+                        .justify(Justify::Right)
+                        .anchor(Anchor::CENTER)
+                        .with_transform(Transform {
+                            translation: Vec3::new(135., y_pos - 1., ROW_TEXT_Z),
+                            scale: gf::BODY.transform_scale(),
+                            ..Default::default()
+                        }),
+                    if row_visible && has_counter {
                         Visibility::Visible
                     } else {
                         Visibility::Hidden
                     },
-                    ..Default::default()
-                },
+                ),
                 RenderLayers::from_layers(&[3]),
                 AchievementsUI,
                 UIState::Achievements,
                 AchievementRow { index: row_index },
                 AchievementProgressText,
-                Name::new("Achievement Progress Text"),
+                Name::new("Achievement Progress Text2d"),
             ))
             .id();
         commands
             .entity(progress_text_entity)
-            .set_parent(achievements_bg);
+            .insert(ChildOf(achievements_bg));
 
         let checkbox_entity = commands
             .spawn((
-                SpriteBundle {
-                    texture: graphics.get_ui_element_texture(checkbox_texture.clone()),
-                    sprite: Sprite {
+                (
+                    Sprite {
+                        image: graphics.get_ui_element_texture(checkbox_texture.clone()),
                         custom_size: Some(Vec2::new(16., 16.)),
                         ..Default::default()
                     },
-                    transform: Transform::from_translation(Vec3::new(-68.5, 0., 1.) + name_pos),
-                    visibility: if row_visible {
+                    Transform::from_translation(Vec3::new(-68.5, 0., 1.) + name_pos),
+                    if row_visible {
                         Visibility::Visible
                     } else {
                         Visibility::Hidden
                     },
-                    ..Default::default()
-                },
+                ),
                 RenderLayers::from_layers(&[3]),
                 AchievementsUI,
                 AchievementCheckbox,
@@ -510,7 +505,9 @@ pub fn setup_achievements_ui(
             ))
             .id();
 
-        commands.entity(checkbox_entity).set_parent(achievements_bg);
+        commands
+            .entity(checkbox_entity)
+            .insert(ChildOf(achievements_bg));
 
         if let Some(achievement) = maybe_achievement {
             let is_completed = achievements.is_completed(*achievement);
@@ -555,7 +552,7 @@ pub fn setup_achievements_ui(
             Name::new("Achievements Prev Button"),
             Visibility::Hidden,
         ))
-        .set_parent(achievements_bg);
+        .insert(ChildOf(achievements_bg));
     spawn_achievement_button_label(&mut commands, &asset_server, prev_button, "Prev");
 
     let next_button = spawn_achievement_button(
@@ -581,7 +578,7 @@ pub fn setup_achievements_ui(
                 Visibility::Hidden
             },
         ))
-        .set_parent(achievements_bg);
+        .insert(ChildOf(achievements_bg));
     spawn_achievement_button_label(&mut commands, &asset_server, next_button, "Next");
 
     let exit_button = spawn_exit_icon_button(
@@ -600,7 +597,7 @@ pub fn setup_achievements_ui(
             },
             Name::new("Achievements Exit Button"),
         ))
-        .set_parent(achievements_bg);
+        .insert(ChildOf(achievements_bg));
 }
 
 pub fn cleanup_achievements_ui(
@@ -608,7 +605,7 @@ pub fn cleanup_achievements_ui(
     achievements_ui: Query<Entity, With<AchievementsUI>>,
 ) {
     for entity in achievements_ui.iter() {
-        commands.entity(entity).despawn_recursive();
+        commands.entity(entity).despawn();
     }
 }
 
@@ -622,7 +619,7 @@ pub fn update_achievements_page_display(
     bounce_tracker: Option<Res<crate::player::achievements::BounceAchievementTracker>>,
     meteor_shower_state: Query<&crate::player::skills::MeteorShowerSkillState, With<crate::Player>>,
     mut completion_text: Query<
-        &mut Text,
+        &mut Text2d,
         (
             With<AchievementsCompletionText>,
             Without<AchievementNameText>,
@@ -635,16 +632,28 @@ pub fn update_achievements_page_display(
     achievements_bg_query: Query<Entity, (With<AchievementsUI>, With<UIState>)>,
     warning_animations: Query<(Entity, &AchievementRow), With<AchievementWarningAnimation>>,
     mut param_set: ParamSet<(
-        Query<(&AchievementRow, &mut Text, &mut Visibility), With<AchievementNameText>>,
-        Query<(&AchievementRow, &mut Text, &mut Visibility), With<AchievementDescText>>,
-        Query<(&AchievementRow, &mut Handle<Image>, &mut Visibility), With<AchievementCheckbox>>,
+        Query<
+            (&AchievementRow, &mut Text2d, &mut TextColor, &mut Visibility),
+            With<AchievementNameText>,
+        >,
+        Query<
+            (&AchievementRow, &mut Text2d, &mut TextColor, &mut Visibility),
+            With<AchievementDescText>,
+        >,
+        Query<(&AchievementRow, &mut Sprite, &mut Visibility), With<AchievementCheckbox>>,
         Query<(&AchievementRow, &mut Visibility), With<AchievementCrossout>>,
-        Query<(&AchievementRow, &mut Text, &mut Visibility), With<AchievementRewardText>>,
-        Query<(&AchievementRow, &mut Text, &mut Visibility), With<AchievementProgressText>>,
+        Query<
+            (&AchievementRow, &mut Text2d, &mut TextColor, &mut Visibility),
+            With<AchievementRewardText>,
+        >,
+        Query<
+            (&AchievementRow, &mut Text2d, &mut TextColor, &mut Visibility),
+            With<AchievementProgressText>,
+        >,
         Query<
             (
                 &AchievementRow,
-                &mut Handle<Image>,
+                &mut Sprite,
                 &mut UIElement,
                 &mut Visibility,
                 &Interactable,
@@ -670,8 +679,8 @@ pub fn update_achievements_page_display(
 
     let mut row_states = Vec::with_capacity(ACHIEVEMENTS_PER_PAGE);
 
-    if let Ok(mut text) = completion_text.get_single_mut() {
-        text.sections[0].value = achievements_completion_label(&achievements);
+    if let Ok(mut text) = completion_text.single_mut() {
+        text.0 = achievements_completion_label(&achievements);
     }
 
     for offset in 0..ACHIEVEMENTS_PER_PAGE {
@@ -683,7 +692,7 @@ pub fn update_achievements_page_display(
                 .as_ref()
                 .and_then(|gd| gd.cumulative_analytics.as_ref());
             let current_run_analytics = analytics.as_deref();
-            let meteor_state = meteor_shower_state.get_single().ok();
+            let meteor_state = meteor_shower_state.single().ok();
             let progress = achievement.get_progress(
                 cumulative_analytics,
                 current_run_analytics,
@@ -696,15 +705,15 @@ pub fn update_achievements_page_display(
 
     {
         let mut name_query = param_set.p0();
-        for (row, mut text, mut visibility) in name_query.iter_mut() {
+        for (row, mut text, mut text_color, mut visibility) in name_query.iter_mut() {
             match row_states.get(row.index).and_then(|state| *state) {
                 Some((achievement, is_completed, is_claimed, _)) => {
-                    text.sections[0].value = achievement.get_name();
-                    text.sections[0].style.color = name_text_color(is_completed, is_claimed);
+                    text.0 = achievement.get_name();
+                    text_color.0 = name_text_color(is_completed, is_claimed);
                     *visibility = Visibility::Visible;
                 }
                 None => {
-                    text.sections[0].value.clear();
+                    text.0.clear();
                     *visibility = Visibility::Hidden;
                 }
             }
@@ -713,15 +722,15 @@ pub fn update_achievements_page_display(
 
     {
         let mut desc_query = param_set.p1();
-        for (row, mut text, mut visibility) in desc_query.iter_mut() {
+        for (row, mut text, mut text_color, mut visibility) in desc_query.iter_mut() {
             match row_states.get(row.index).and_then(|state| *state) {
                 Some((achievement, is_completed, is_claimed, _)) => {
-                    text.sections[0].value = achievement.get_desc();
-                    text.sections[0].style.color = status_text_color(is_completed, is_claimed);
+                    text.0 = achievement.get_desc();
+                    text_color.0 = status_text_color(is_completed, is_claimed);
                     *visibility = Visibility::Visible;
                 }
                 None => {
-                    text.sections[0].value.clear();
+                    text.0.clear();
                     *visibility = Visibility::Hidden;
                 }
             }
@@ -738,7 +747,7 @@ pub fn update_achievements_page_display(
                     } else {
                         UIElement::CheckBox
                     };
-                    *texture = graphics.get_ui_element_texture(checkbox_type).clone();
+                    texture.image = graphics.get_ui_element_texture(checkbox_type).clone();
                     *visibility = Visibility::Visible;
                 }
                 None => {
@@ -768,27 +777,26 @@ pub fn update_achievements_page_display(
 
     {
         let mut reward_query = param_set.p4();
-        for (row, mut text, mut visibility) in reward_query.iter_mut() {
+        for (row, mut text, mut text_color, mut visibility) in reward_query.iter_mut() {
             match row_states.get(row.index).and_then(|state| *state) {
                 Some((achievement, is_completed, is_claimed, _)) => {
                     if is_claimed {
-                        text.sections[0].value.clear();
+                        text.0.clear();
                         *visibility = Visibility::Hidden;
                     } else {
                         let reward = achievement.reward_currency();
                         if reward > 0 {
-                            text.sections[0].value = reward.to_string();
-                            text.sections[0].style.color =
-                                status_text_color(is_completed, is_claimed);
+                            text.0 = reward.to_string();
+                            text_color.0 = status_text_color(is_completed, is_claimed);
                             *visibility = Visibility::Visible;
                         } else {
-                            text.sections[0].value.clear();
+                            text.0.clear();
                             *visibility = Visibility::Hidden;
                         }
                     }
                 }
                 None => {
-                    text.sections[0].value.clear();
+                    text.0.clear();
                     *visibility = Visibility::Hidden;
                 }
             }
@@ -797,29 +805,29 @@ pub fn update_achievements_page_display(
 
     {
         let mut progress_text_query = param_set.p5();
-        for (row, mut text, mut visibility) in progress_text_query.iter_mut() {
+        for (row, mut text, mut text_color, mut visibility) in progress_text_query.iter_mut() {
             match row_states.get(row.index).and_then(|state| *state) {
                 Some((achievement, is_completed, is_claimed, Some((current, target)))) => {
                     if is_claimed {
-                        text.sections[0].value.clear();
+                        text.0.clear();
                         *visibility = Visibility::Hidden;
                     } else {
-                        text.sections[0].value = format!(
+                        text.0 = format!(
                             "{}/{}",
                             format_damage(current as i64),
                             format_damage(target as i64)
                         );
-                        text.sections[0].style.color = status_text_color(is_completed, is_claimed);
+                        text_color.0 = status_text_color(is_completed, is_claimed);
                         *visibility = Visibility::Visible;
                     }
                 }
                 Some((_, is_completed, is_claimed, None)) => {
-                    text.sections[0].value.clear();
-                    text.sections[0].style.color = status_text_color(is_completed, is_claimed);
+                    text.0.clear();
+                    text_color.0 = status_text_color(is_completed, is_claimed);
                     *visibility = Visibility::Hidden;
                 }
                 None => {
-                    text.sections[0].value.clear();
+                    text.0.clear();
                     *visibility = Visibility::Hidden;
                 }
             }
@@ -840,13 +848,13 @@ pub fn update_achievements_page_display(
                     } else {
                         base
                     };
-                    *texture = graphics.get_ui_element_texture(element.clone());
+                    texture.image = graphics.get_ui_element_texture(element.clone());
                     *ui_element = element;
                     *visibility = Visibility::Visible;
                 }
                 None => {
                     let base = get_row_ui_element(row.index, false);
-                    *texture = graphics.get_ui_element_texture(base.clone());
+                    texture.image = graphics.get_ui_element_texture(base.clone());
                     *ui_element = base;
                     *visibility = Visibility::Hidden;
                 }
@@ -870,7 +878,7 @@ pub fn update_achievements_page_display(
                 .unwrap_or(false);
 
             if !should_have_warning {
-                commands.entity(*entity).despawn_recursive();
+                commands.entity(*entity).despawn();
             }
         }
 
@@ -959,18 +967,10 @@ pub fn handle_achievement_row_hover(
     mouseless: Res<MouselessModeState>,
     focus_input: FocusInput,
     graphics: Res<Graphics>,
-    computed_visibility: Query<&ComputedVisibility>,
+    computed_visibility: Query<&ViewVisibility>,
     mut row_queries: ParamSet<(
         Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
-        Query<
-            (
-                Entity,
-                &mut Interactable,
-                &mut UIElement,
-                &mut Handle<Image>,
-            ),
-            With<AchievementRowBg>,
-        >,
+        Query<(Entity, &mut Interactable, &mut UIElement, &mut Sprite), With<AchievementRowBg>>,
     )>,
     mut commands: Commands,
 ) {
@@ -980,16 +980,16 @@ pub fn handle_achievement_row_hover(
     };
     let focus_driving = mouseless.0 || cursor_pos.suppress_ui_hover;
 
-    for (entity, mut interactable, mut ui_element, mut texture) in row_queries.p1().iter_mut() {
+    for (entity, mut interactable, mut ui_element, mut sprite) in row_queries.p1().iter_mut() {
         if computed_visibility
             .get(entity)
             .ok()
-            .is_some_and(|visibility| !visibility.is_visible())
+            .is_some_and(|visibility| !visibility.get())
         {
             if matches!(interactable.current(), Interaction::Hovering) {
                 interactable.change(Interaction::None);
                 if let Some(normal) = ui_element.get_normal_state() {
-                    *texture = graphics.get_ui_element_texture(normal.clone());
+                    sprite.image = graphics.get_ui_element_texture(normal.clone());
                     *ui_element = normal;
                 }
             }
@@ -1002,7 +1002,7 @@ pub fn handle_achievement_row_hover(
             if matches!(interactable.current(), Interaction::None) {
                 interactable.change(Interaction::Hovering);
                 if let Some(hover) = ui_element.get_hover_state() {
-                    *texture = graphics.get_ui_element_texture(hover.clone());
+                    sprite.image = graphics.get_ui_element_texture(hover.clone());
                     *ui_element = hover;
                     commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonHover, 0.05));
                 }
@@ -1010,7 +1010,7 @@ pub fn handle_achievement_row_hover(
         } else if matches!(interactable.current(), Interaction::Hovering) {
             interactable.change(Interaction::None);
             if let Some(normal) = ui_element.get_normal_state() {
-                *texture = graphics.get_ui_element_texture(normal.clone());
+                sprite.image = graphics.get_ui_element_texture(normal.clone());
                 *ui_element = normal;
             }
         }
@@ -1019,7 +1019,7 @@ pub fn handle_achievement_row_hover(
 
 pub fn handle_achievement_row_clicks(
     cursor_pos: Res<crate::cursor::CursorPos>,
-    mouse_input: Res<Input<MouseButton>>,
+    mouse_input: Res<ButtonInput<MouseButton>>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     mut achievements: ResMut<Achievements>,
     mut currency: ResMut<crate::player::TimeFragmentCurrency>,

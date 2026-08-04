@@ -1,6 +1,7 @@
+use bevy::text::Justify;
+use crate::aseprite_assets::SkillChoiceFlash;
 use bevy::ecs::system::SystemParam;
-use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
-use bevy_aseprite::aseprite;
+use bevy::{camera::visibility::RenderLayers, prelude::*, sprite::Anchor};
 use itertools::Itertools;
 use rand::{seq::SliceRandom, Rng};
 use strum::IntoEnumIterator;
@@ -35,6 +36,7 @@ use super::{
     UIState, CURRENCY_BACKGROUND_SIZE, KEYBIND_BADGE_COLOR,
 };
 
+
 /// Background container art size (`assets/ui/ChestContainer.png`).
 pub const CHEST_CONTAINER_UI_SIZE: Vec2 = Vec2::new(130., 148.);
 /// Per-button art size (`assets/ui/ChestButton.png`).
@@ -60,8 +62,6 @@ const CHEST_REROLL_COUNTER_POS: Vec2 = Vec2::new(116., 20.);
 const CHEST_REVEAL_TITLE_Y: f32 = 48.;
 const CHEST_REVEAL_RARITY_Y: f32 = 26.;
 const CHEST_REVEAL_TYPE_Y: f32 = 14.;
-
-aseprite!(pub SkillChoiceFlash, "ui/SkillChoiceFlash.aseprite");
 
 /// Type of chest being opened - determines what content is picked and how it's granted
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -248,6 +248,7 @@ pub fn equipment_type_display_name(et: &EquipmentType) -> &'static str {
     }
 }
 
+#[derive(Message)]
 pub struct ItemChestAnimChangeEvent {
     pub state: ItemChestAnimState,
     pub set_ui_rarity: Option<ItemRarity>,
@@ -283,19 +284,18 @@ pub fn spawn_chest_button(
     let color = if enabled {
         Color::WHITE
     } else {
-        Color::rgb(0.5, 0.5, 0.5)
+        Color::srgb(0.5, 0.5, 0.5)
     };
 
-    let mut button = commands.spawn(SpriteBundle {
-        texture: graphics.get_ui_element_texture(ui_element.clone()),
-        sprite: Sprite {
+    let mut button = commands.spawn((
+        Sprite {
+            image: graphics.get_ui_element_texture(ui_element.clone()),
             custom_size: Some(CHEST_BUTTON_SIZE),
             color,
-            ..Default::default()
+            ..default()
         },
-        transform: Transform::from_translation(translation),
-        ..Default::default()
-    });
+        Transform::from_translation(translation),
+    ));
     button
         .insert(ui_element)
         .insert(ui_state.clone())
@@ -313,7 +313,7 @@ pub fn spawn_chest_button(
     let text_color = if enabled {
         WHITE
     } else {
-        Color::rgb(0.7, 0.7, 0.7)
+        Color::srgb(0.7, 0.7, 0.7)
     };
     let pos = if kind == ChestButtonKind::Equip {
         Vec3::new(1., 0., 1.)
@@ -322,26 +322,21 @@ pub fn spawn_chest_button(
     };
     commands
         .spawn((
-            Text2dBundle {
-                text: Text::from_section(
-                    label,
-                    gf::SKILL_CHOICE_MICRO.text_style(&asset_server, text_color),
-                )
-                .with_alignment(TextAlignment::Center),
-                text_anchor: Anchor::Center,
-                transform: Transform {
+            gf::SKILL_CHOICE_MICRO
+                .text(&asset_server, label, text_color)
+                .justify(Justify::Center)
+                .anchor(Anchor::CENTER)
+                .with_transform(Transform {
                     translation: pos,
                     scale: gf::SKILL_CHOICE_MICRO.transform_scale(),
                     ..Default::default()
-                },
-                ..Default::default()
-            },
+                }),
             RenderLayers::from_layers(&[3]),
             ui_state.clone(),
             ChestButtonLabel,
             Name::new(format!("ITEM CHEST BUTTON LABEL {label}")),
         ))
-        .set_parent(button_entity);
+        .insert(ChildOf(button_entity));
 
     commands.entity(parent).add_child(button_entity);
     button_entity
@@ -351,16 +346,14 @@ pub fn spawn_chest_button(
 /// pointer leaves. Disabled buttons have no `Interactable` so they keep their dim color.
 pub fn update_chest_button_label_hover(
     buttons: Query<(&Interactable, &Children), With<ItemChestButton>>,
-    mut labels: Query<&mut Text, With<ChestButtonLabel>>,
+    mut labels: Query<&mut TextColor, With<ChestButtonLabel>>,
 ) {
     for (interactable, children) in buttons.iter() {
         let hovered = matches!(interactable.current(), Interaction::Hovering);
         let color = if hovered { YELLOW } else { WHITE };
         for child in children.iter() {
-            if let Ok(mut text) = labels.get_mut(*child) {
-                for section in text.sections.iter_mut() {
-                    section.style.color = color;
-                }
+            if let Ok(mut text_color) = labels.get_mut(child) {
+                text_color.0 = color;
             }
         }
     }
@@ -378,7 +371,7 @@ pub fn setup_item_chest_ui(
     // // title bar
     // let title_sprite = commands
     //     .spawn(SpriteBundle {
-    //         texture: graphics.get_ui_element_texture(UIElement::TitleBar).clone(),
+    //         sprite: Sprite { image: graphics.get_ui_element_texture(UIElement::TitleBar).clone(), ..default() },
     //         sprite: Sprite {
     //             custom_size: Some(Vec2::new(168., 16.)),
     //             ..Default::default()
@@ -402,33 +395,32 @@ pub fn setup_item_chest_ui(
     //     Vec3::new(0., 0., 1.),
     //     BLACK,
     //     "Choose a new skill".to_string(),
-    //     Anchor::Center,
+    //     Anchor::CENTER,
     //     2.,
     //     3,
     // );
     // commands
     //     .entity(title_text)
     //     .insert(UIState::Skills)
-    //     .set_parent(title_sprite);
+    //     .insert(ChildOf(title_sprite));
 
     ui_helpers::spawn_full_screen_ui_overlay_tuned(&mut commands, &res, 0.0, 0.95, 9.);
 
     let ui_element = UIElement::ChestContainer;
 
     let item_chest_ui = commands
-        .spawn(SpriteBundle {
-            texture: graphics.get_ui_element_texture(ui_element.clone()),
-            sprite: Sprite {
+        .spawn((
+            Sprite {
+                image: graphics.get_ui_element_texture(ui_element.clone()),
                 custom_size: Some(CHEST_CONTAINER_UI_SIZE),
-                ..Default::default()
+                ..default()
             },
-            transform: Transform {
+            Transform {
                 translation: Vec3::new(0., 0., 10.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
-            ..Default::default()
-        })
+        ))
         .insert(ui_element)
         .insert(UIState::ItemChest)
         .insert(ItemChestUI)
@@ -439,30 +431,27 @@ pub fn setup_item_chest_ui(
 
     // closed chest icon (replaced when the open animation starts)
     commands
-        .spawn(SpriteSheetBundle {
-            sprite: graphics
-                .spritesheet_map
-                .as_ref()
-                .unwrap()
-                .get(match item_chest_state.chest_type {
-                    ChestType::Item => &WorldObject::ChestBlock,
-                    ChestType::Heirloom => &WorldObject::HeirloomChest,
-                })
-                .unwrap()
-                .clone(),
-            texture_atlas: graphics.texture_atlas.as_ref().unwrap().clone(),
-
-            transform: Transform {
+        .spawn((
+            (graphics
+                    .spritesheet_map
+                    .as_ref()
+                    .unwrap()
+                    .get(match item_chest_state.chest_type {
+                        ChestType::Item => &WorldObject::ChestBlock,
+                        ChestType::Heirloom => &WorldObject::HeirloomChest,
+                    })
+                    .unwrap()
+                    .clone()),
+            Transform {
                 translation: Vec2::new(0., CHEST_OPENING_Y).extend(4.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
-            ..Default::default()
-        })
+        ))
         .insert(ItemChest)
         .insert(RenderLayers::from_layers(&[3]))
         .insert(Name::new("Chest Icon"))
-        .set_parent(item_chest_ui);
+        .insert(ChildOf(item_chest_ui));
 
     spawn_chest_button(
         &mut commands,
@@ -492,11 +481,11 @@ pub fn toggle_item_chest_visibility(
     mut next_inv_state: ResMut<NextState<UIState>>,
     curr_ui_state: Res<State<UIState>>,
     chest_state: Option<Res<ItemChestState>>,
-    mut tutorial_popup_events: EventWriter<crate::ui::tutorial_ui::TutorialPopupEvent>,
+    mut tutorial_popup_events: MessageWriter<crate::ui::tutorial_ui::TutorialPopupEvent>,
     seen_tutorial_chunks: Option<Res<crate::ui::tutorial_ui::SeenTutorialChunks>>,
     tutorial_ui: Query<(), With<crate::ui::tutorial_ui::TutorialUI>>,
 ) {
-    if curr_ui_state.0 == UIState::ActiveSkills || curr_ui_state.0 == UIState::ItemChest {
+    if *curr_ui_state.get() == UIState::ActiveSkills || *curr_ui_state.get() == UIState::ItemChest {
         return;
     }
     if chest_state
@@ -520,7 +509,7 @@ pub fn shuffle_items(
     time: Res<Time>,
     mut commands: Commands,
     graphics: Res<Graphics>,
-    mut events: EventWriter<ItemChestAnimChangeEvent>,
+    mut events: MessageWriter<ItemChestAnimChangeEvent>,
     choices_queue: Res<HeirloomChoiceQueue>,
 ) {
     if item_chest_state.state != ItemChestAnimState::Opening {
@@ -532,7 +521,7 @@ pub fn shuffle_items(
         if let Some(current_entity) = item_chest_state.current_entity {
             commands.entity(current_entity).despawn();
             item_chest_state.current_entity = None;
-            events.send(ItemChestAnimChangeEvent {
+            events.write(ItemChestAnimChangeEvent {
                 state: ItemChestAnimState::Done,
                 set_ui_rarity: None,
             });
@@ -541,40 +530,40 @@ pub fn shuffle_items(
     }
     // Use unified rarity getter that works for both chest types
     let picked_rarity = item_chest_state.get_picked_rarity();
-    if item_chest_state.shuffle_duration_timer.percent() >= 0.25
+    if item_chest_state.shuffle_duration_timer.fraction() >= 0.25
         && item_chest_state.current_ui_rarity == ItemRarity::Common
         && picked_rarity != ItemRarity::Common
     {
         item_chest_state.current_ui_rarity = ItemRarity::Uncommon;
 
-        events.send(ItemChestAnimChangeEvent {
+        events.write(ItemChestAnimChangeEvent {
             state: ItemChestAnimState::Opening,
             set_ui_rarity: Some(ItemRarity::Uncommon),
         });
-    } else if item_chest_state.shuffle_duration_timer.percent() >= 0.48
+    } else if item_chest_state.shuffle_duration_timer.fraction() >= 0.48
         && item_chest_state.current_ui_rarity == ItemRarity::Uncommon
         && picked_rarity != ItemRarity::Uncommon
     {
         item_chest_state.current_ui_rarity = ItemRarity::Rare;
-        events.send(ItemChestAnimChangeEvent {
+        events.write(ItemChestAnimChangeEvent {
             state: ItemChestAnimState::Opening,
             set_ui_rarity: Some(ItemRarity::Rare),
         });
-    } else if item_chest_state.shuffle_duration_timer.percent() >= 0.7
+    } else if item_chest_state.shuffle_duration_timer.fraction() >= 0.7
         && item_chest_state.current_ui_rarity == ItemRarity::Rare
         && picked_rarity != ItemRarity::Rare
     {
         item_chest_state.current_ui_rarity = ItemRarity::Legendary;
-        events.send(ItemChestAnimChangeEvent {
+        events.write(ItemChestAnimChangeEvent {
             state: ItemChestAnimState::Opening,
             set_ui_rarity: Some(ItemRarity::Legendary),
         });
     }
-    if item_chest_state.shuffle_timer.finished()
-        && !item_chest_state.shuffle_duration_timer.finished()
+    if item_chest_state.shuffle_timer.is_finished()
+        && !item_chest_state.shuffle_duration_timer.is_finished()
     {
         if let Some(current_entity) = item_chest_state.current_entity {
-            if commands.get_entity(current_entity).is_some() {
+            if commands.get_entity(current_entity).is_ok() {
                 commands.entity(current_entity).despawn();
             }
         }
@@ -596,22 +585,20 @@ pub fn shuffle_items(
                 let pick_new_item = filtered_items.choose(&mut rng).expect("No items found");
                 item_chest_state.current_item = Some(pick_new_item.clone());
                 commands
-                    .spawn(SpriteSheetBundle {
-                        sprite: graphics
-                            .spritesheet_map
-                            .as_ref()
-                            .unwrap()
-                            .get(&pick_new_item.clone())
-                            .unwrap()
-                            .clone(),
-                        texture_atlas: graphics.texture_atlas.as_ref().unwrap().clone(),
-                        transform: Transform {
+                    .spawn((
+                        (graphics
+                                .spritesheet_map
+                                .as_ref()
+                                .unwrap()
+                                .get(&pick_new_item.clone())
+                                .unwrap()
+                                .clone()),
+                        Transform {
                             translation: Vec3::new(-1., CHEST_ICON_Y, 15.),
                             scale: Vec3::new(1., 1., 1.),
                             ..Default::default()
                         },
-                        ..Default::default()
-                    })
+                    ))
                     .insert(UIState::ItemChest)
                     .insert(RenderLayers::from_layers(&[3]))
                     .insert(Name::new("Chest Icon!!"))
@@ -671,16 +658,14 @@ pub fn shuffle_items(
                 item_chest_state.current_heirloom = Some(picked_heirloom.clone());
 
                 commands
-                    .spawn(SpriteSheetBundle {
-                        sprite: graphics.get_heirloom_icon(picked_heirloom),
-                        texture_atlas: graphics.texture_atlas.as_ref().unwrap().clone(),
-                        transform: Transform {
+                    .spawn((
+                        graphics.get_heirloom_icon(picked_heirloom),
+                        Transform {
                             translation: Vec3::new(-1., CHEST_ICON_Y, 15.),
                             scale: Vec3::new(1., 1., 1.),
                             ..Default::default()
                         },
-                        ..Default::default()
-                    })
+                    ))
                     .insert(UIState::ItemChest)
                     .insert(RenderLayers::from_layers(&[3]))
                     .insert(Name::new("Chest Icon!!"))
@@ -705,68 +690,60 @@ fn spawn_chest_reveal_text(
 ) {
     // Parented to the chest UI root so the text inherits its world transform (the
     // container sprite renders at z=10; local z values here stack above it).
-    let title_style = gf::TOOLTIP_ITEM_TITLE.text_style(&asset_server, rarity.get_color());
     commands
         .spawn((
-            Text2dBundle {
-                text: Text::from_section(name, title_style).with_alignment(TextAlignment::Center),
-                text_anchor: Anchor::Center,
-                transform: Transform {
+            gf::TOOLTIP_ITEM_TITLE
+                .text(&asset_server, name, rarity.get_color())
+                .justify(Justify::Center)
+                .anchor(Anchor::CENTER)
+                .with_transform(Transform {
                     translation: Vec3::new(0., CHEST_REVEAL_TITLE_Y, 2.),
                     scale: gf::TOOLTIP_ITEM_TITLE.transform_scale(),
                     ..Default::default()
-                },
-                ..Default::default()
-            },
+                }),
             RenderLayers::from_layers(&[3]),
             UIState::ItemChest,
             ChestRevealUI,
             Name::new("CHEST REVEAL TITLE"),
         ))
-        .set_parent(parent);
+        .insert(ChildOf(parent));
 
-    let rarity_style = gf::TOOLTIP_CARD_LINE.text_style(&asset_server, rarity.get_color());
     commands
         .spawn((
-            Text2dBundle {
-                text: Text::from_section(rarity.get_name(), rarity_style)
-                    .with_alignment(TextAlignment::Center),
-                text_anchor: Anchor::Center,
-                transform: Transform {
+            gf::TOOLTIP_CARD_LINE
+                .text(&asset_server, rarity.get_name(), rarity.get_color())
+                .justify(Justify::Center)
+                .anchor(Anchor::CENTER)
+                .with_transform(Transform {
                     translation: Vec3::new(0., CHEST_REVEAL_RARITY_Y, 2.),
                     scale: gf::TOOLTIP_CARD_LINE.transform_scale(),
                     ..Default::default()
-                },
-                ..Default::default()
-            },
+                }),
             RenderLayers::from_layers(&[3]),
             UIState::ItemChest,
             ChestRevealUI,
             Name::new("CHEST REVEAL RARITY"),
         ))
-        .set_parent(parent);
+        .insert(ChildOf(parent));
 
     if !type_label.is_empty() {
-        let type_style = gf::TOOLTIP_CARD_LINE.text_style(&asset_server, WHITE);
         commands
             .spawn((
-                Text2dBundle {
-                    text: Text::from_section(type_label, type_style)
-                        .with_alignment(TextAlignment::Center),
-                    text_anchor: Anchor::Center,
-                    transform: Transform {
+                gf::TOOLTIP_CARD_LINE
+                    .text(&asset_server, type_label, WHITE)
+                    .justify(Justify::Center)
+                    .anchor(Anchor::CENTER)
+                    .with_transform(Transform {
                         translation: Vec3::new(0., CHEST_REVEAL_TYPE_Y, 2.),
                         scale: gf::TOOLTIP_CARD_LINE.transform_scale(),
                         ..Default::default()
-                    },
-                    ..Default::default()
-                },
+                    }),
                 RenderLayers::from_layers(&[3]),
                 UIState::ItemChest,
                 ChestRevealUI,
                 Name::new("CHEST REVEAL TYPE"),
             ))
-            .set_parent(parent);
+            .insert(ChildOf(parent));
     }
 }
 
@@ -779,18 +756,17 @@ fn spawn_heirloom_chest_reroll_button(
     let color = if enabled {
         Color::WHITE
     } else {
-        Color::rgb(0.45, 0.45, 0.45)
+        Color::srgb(0.45, 0.45, 0.45)
     };
 
-    let mut btn = commands.spawn(SpriteBundle {
-        sprite: Sprite {
+    let mut btn = commands.spawn((
+        Sprite {
             color: KEYBIND_BADGE_COLOR,
             custom_size: Some(CHEST_REROLL_BADGE_SIZE),
             ..default()
         },
-        transform: Transform::from_translation(Vec3::new(0., CHEST_REROLL_BUTTON_Y, 3.)),
-        ..default()
-    });
+        Transform::from_translation(Vec3::new(0., CHEST_REROLL_BUTTON_Y, 3.)),
+    ));
     btn.insert(RenderLayers::from_layers(&[3]))
         .insert(UIState::ItemChest)
         .insert(HeirloomChestRerollButton)
@@ -806,21 +782,20 @@ fn spawn_heirloom_chest_reroll_button(
     let btn_e = btn.id();
 
     commands
-        .spawn(SpriteBundle {
-            texture: asset_server.load(MERCHANT_REROLL_ICON_PATH),
-            sprite: Sprite {
+        .spawn((
+            Sprite {
+                image: asset_server.load(MERCHANT_REROLL_ICON_PATH),
                 custom_size: Some(MERCHANT_REROLL_ICON_SIZE),
                 color,
                 ..default()
             },
-            transform: Transform::from_translation(Vec3::new(0., 0., 1.)),
-            ..default()
-        })
+            Transform::from_translation(Vec3::new(0., 0., 1.)),
+        ))
         .insert(RenderLayers::from_layers(&[3]))
         .insert(HeirloomChestRerollIcon)
-        .set_parent(btn_e);
+        .insert(ChildOf(btn_e));
 
-    commands.entity(btn_e).set_parent(parent);
+    commands.entity(btn_e).insert(ChildOf(parent));
 }
 
 fn spawn_heirloom_chest_reroll_counter(
@@ -831,19 +806,18 @@ fn spawn_heirloom_chest_reroll_counter(
     rerolls_remaining: u32,
 ) {
     let bg = commands
-        .spawn(SpriteBundle {
-            texture: graphics.get_ui_element_texture(UIElement::CurrencyBackground),
-            sprite: Sprite {
+        .spawn((
+            Sprite {
+                image: graphics.get_ui_element_texture(UIElement::CurrencyBackground),
                 custom_size: Some(CURRENCY_BACKGROUND_SIZE),
                 ..default()
             },
-            transform: Transform::from_translation(Vec3::new(
+            Transform::from_translation(Vec3::new(
                 CHEST_REROLL_COUNTER_POS.x,
                 CHEST_REROLL_COUNTER_POS.y,
                 2.,
             )),
-            ..default()
-        })
+        ))
         .insert(RenderLayers::from_layers(&[3]))
         .insert(UIState::ItemChest)
         .insert(Name::new("Heirloom Chest Rerolls Counter"))
@@ -851,41 +825,35 @@ fn spawn_heirloom_chest_reroll_counter(
 
     let text = commands
         .spawn((
-            Text2dBundle {
-                text: Text::from_section(
-                    rerolls_remaining.to_string(),
-                    gf::DISPLAY.text_style(&asset_server, WHITE),
-                )
-                .with_alignment(TextAlignment::Center),
-                text_anchor: Anchor::CenterLeft,
-                transform: Transform {
+            gf::DISPLAY
+                .text(&asset_server, rerolls_remaining.to_string(), WHITE)
+                .justify(Justify::Center)
+                .anchor(Anchor::CENTER_LEFT)
+                .with_transform(Transform {
                     translation: Vec3::new(-4., 0., 2.),
                     scale: gf::DISPLAY.transform_scale(),
                     ..Default::default()
-                },
-                ..default()
-            },
+                }),
             RenderLayers::from_layers(&[3]),
             HeirloomChestRerollsText,
-            Name::new("Heirloom Chest Rerolls Text"),
+            Name::new("Heirloom Chest Rerolls Text2d"),
         ))
         .id();
 
     commands
-        .spawn(SpriteBundle {
-            texture: asset_server.load(MERCHANT_REROLL_ICON_PATH),
-            sprite: Sprite {
+        .spawn((
+            Sprite {
+                image: asset_server.load(MERCHANT_REROLL_ICON_PATH),
                 custom_size: Some(MERCHANT_REROLL_ICON_SIZE),
                 ..default()
             },
-            transform: Transform::from_translation(Vec3::new(-12., 0., 2.)),
-            ..default()
-        })
+            Transform::from_translation(Vec3::new(-12., 0., 2.)),
+        ))
         .insert(RenderLayers::from_layers(&[3]))
-        .set_parent(text);
+        .insert(ChildOf(text));
 
-    commands.entity(text).set_parent(bg);
-    commands.entity(bg).set_parent(parent);
+    commands.entity(text).insert(ChildOf(bg));
+    commands.entity(bg).insert(ChildOf(parent));
 }
 
 /// Re-roll the revealed heirloom prize in place (same rarity), refreshing icon + reveal text.
@@ -899,8 +867,8 @@ pub fn reroll_heirloom_chest_reward(
     chest_root: Entity,
     final_items: &Query<Entity, With<ItemChestFinalItem>>,
     reveal_ui: &Query<Entity, With<ChestRevealUI>>,
-    tooltip_teardown: &mut EventWriter<TooltipTeardownEvent>,
-    heirloom_tooltip_clear: &mut EventWriter<HeirloomTooltipRequest>,
+    tooltip_teardown: &mut MessageWriter<TooltipTeardownEvent>,
+    heirloom_tooltip_clear: &mut MessageWriter<HeirloomTooltipRequest>,
 ) {
     let Some(current) = item_chest_state.picked_heirloom.clone() else {
         return;
@@ -931,30 +899,23 @@ pub fn reroll_heirloom_chest_reward(
     item_chest_state.current_heirloom = Some(picked.heirloom.clone());
 
     for e in final_items.iter() {
-        commands.entity(e).despawn_recursive();
+        commands.entity(e).despawn();
     }
     for e in reveal_ui.iter() {
-        commands.entity(e).despawn_recursive();
+        commands.entity(e).despawn();
     }
-    tooltip_teardown.send_default();
-    heirloom_tooltip_clear.send(HeirloomTooltipRequest::Clear);
+    tooltip_teardown.write_default();
+    heirloom_tooltip_clear.write(HeirloomTooltipRequest::Clear);
 
     commands
-        .spawn(SpriteBundle {
-            sprite: Sprite {
-                color: Color::NONE,
-                custom_size: Some(Vec2::new(32., 32.)),
-                ..default()
-            },
-            transform: Transform {
+        .spawn((
+            graphics.get_heirloom_icon(picked.heirloom.clone()),
+            Transform {
                 translation: Vec3::new(-1., CHEST_ICON_Y, 15.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
-            ..Default::default()
-        })
-        .insert(graphics.get_heirloom_icon(picked.heirloom.clone()))
-        .insert(graphics.texture_atlas.as_ref().unwrap().clone())
+        ))
         .insert(UIState::ItemChest)
         .insert(RenderLayers::from_layers(&[3]))
         .insert(ItemChestFinalItem)
@@ -1016,7 +977,7 @@ pub(crate) fn displaced_equipped_item_stack(
 
 pub fn handle_anim_events(
     mut commands: Commands,
-    mut events: EventReader<ItemChestAnimChangeEvent>,
+    mut events: MessageReader<ItemChestAnimChangeEvent>,
     mut item_chest_state: ResMut<ItemChestState>,
     query: Query<Entity, With<ItemChest>>,
     chest_ui_root: Query<Entity, With<ItemChestUI>>,
@@ -1030,7 +991,7 @@ pub fn handle_anim_events(
     run_unlocks: Res<RunUnlockState>,
     time_crystals: Res<TimeCrystals>,
 ) {
-    for event in events.iter() {
+    for event in events.read() {
         match event.state {
             ItemChestAnimState::Opening => {
                 // Pick content based on chest type (only if not already picked)
@@ -1062,7 +1023,7 @@ pub fn handle_anim_events(
                             let level = rng.gen_range(1..=max_item_level);
                             stack.metadata.level = Some(level);
 
-                            let loot_bonus = player_atts.get_single().map(|a| a.0).unwrap_or(0);
+                            let loot_bonus = player_atts.single().map(|a| a.0).unwrap_or(0);
                             item_chest_state.picked_item =
                                 Some(create_new_random_item_stack_with_attributes(
                                     &stack,
@@ -1076,7 +1037,7 @@ pub fn handle_anim_events(
                     ChestType::Heirloom => {
                         if item_chest_state.picked_heirloom.is_none() {
                             let mut rng = rand::thread_rng();
-                            let loot_bonus = player_atts.get_single().map(|a| a.0).unwrap_or(0);
+                            let loot_bonus = player_atts.single().map(|a| a.0).unwrap_or(0);
 
                             // Generate rarity first (same as heirloom shrine)
                             let target_rarity = if item_chest_state.target_heirloom_rarity.is_none()
@@ -1120,7 +1081,7 @@ pub fn handle_anim_events(
                 // Handle opening animation (same for both chest types)
                 item_chest_state.state = ItemChestAnimState::Opening;
                 for entity in query.iter() {
-                    commands.entity(entity).despawn_recursive();
+                    commands.entity(entity).despawn();
                 }
                 let rarity = event.set_ui_rarity.clone().unwrap_or(ItemRarity::Common);
                 spawn_rarity_animation(
@@ -1145,19 +1106,18 @@ pub fn handle_anim_events(
                     },
                 };
                 commands
-                    .spawn(SpriteBundle {
-                        texture: graphics.get_ui_element_texture(ui_element.clone()),
-                        sprite: Sprite {
+                    .spawn((
+                        Sprite {
+                            image: graphics.get_ui_element_texture(ui_element.clone()),
                             custom_size: Some(Vec2::splat(40.)),
-                            ..Default::default()
+                            ..default()
                         },
-                        transform: Transform {
+                        Transform {
                             translation: Vec3::new(0., CHEST_OPENING_Y + 9., 14.),
                             scale: Vec3::new(1., 1., 1.),
                             ..Default::default()
                         },
-                        ..Default::default()
-                    })
+                    ))
                     .insert(ui_element)
                     .insert(ItemChest)
                     .insert(UIState::ItemChest)
@@ -1176,10 +1136,10 @@ pub fn handle_anim_events(
                 // Swap the OPEN button for the action buttons (Take/Equip or Take/Banish).
                 for (btn_e, btn) in open_buttons.iter() {
                     if btn.kind == ChestButtonKind::Open {
-                        commands.entity(btn_e).despawn_recursive();
+                        commands.entity(btn_e).despawn();
                     }
                 }
-                if let Ok(root) = chest_ui_root.get_single() {
+                if let Ok(root) = chest_ui_root.single() {
                     let (left_kind, right_kind) = match item_chest_state.chest_type {
                         ChestType::Item => (ChestButtonKind::Take, ChestButtonKind::Equip),
                         ChestType::Heirloom => (ChestButtonKind::Take, ChestButtonKind::Banish),
@@ -1221,14 +1181,15 @@ pub fn handle_anim_events(
                     if matches!(item_chest_state.chest_type, ChestType::Heirloom) {
                         commands
                             .spawn((
-                                Text2dBundle {
-                                    text: Text::from_section(
+                                gf::SKILL_CHOICE_MICRO
+                                    .text(
+                                        &asset_server,
                                         format!("{}", run_unlocks.banishes_remaining),
-                                        gf::SKILL_CHOICE_MICRO.text_style(&asset_server, WHITE),
+                                        WHITE,
                                     )
-                                    .with_alignment(TextAlignment::Center),
-                                    text_anchor: Anchor::Center,
-                                    transform: Transform {
+                                    .justify(Justify::Center)
+                                    .anchor(Anchor::CENTER)
+                                    .with_transform(Transform {
                                         translation: Vec3::new(
                                             CHEST_BUTTON_X_OFFSET,
                                             CHEST_BANISH_COUNT_Y,
@@ -1236,15 +1197,13 @@ pub fn handle_anim_events(
                                         ),
                                         scale: gf::SKILL_CHOICE_MICRO.transform_scale(),
                                         ..Default::default()
-                                    },
-                                    ..Default::default()
-                                },
+                                    }),
                                 RenderLayers::from_layers(&[3]),
                                 UIState::ItemChest,
                                 ChestBanishCountText,
                                 Name::new("CHEST BANISH COUNT TEXT"),
                             ))
-                            .set_parent(root);
+                            .insert(ChildOf(root));
 
                         let reroll_enabled = run_unlocks.rerolls_remaining > 0;
                         spawn_heirloom_chest_reroll_button(
@@ -1268,29 +1227,27 @@ pub fn handle_anim_events(
                     ChestType::Item => {
                         let picked_item = item_chest_state.picked_item.clone().unwrap();
                         commands
-                            .spawn(SpriteBundle {
-                                sprite: Sprite {
+                            .spawn((
+                                Sprite {
                                     color: Color::NONE,
                                     custom_size: Some(Vec2::new(32., 32.)),
                                     ..default()
                                 },
-                                transform: Transform {
+                                Transform {
                                     translation: Vec3::new(-1., CHEST_ICON_Y, 15.),
                                     scale: Vec3::new(1., 1., 1.),
                                     ..Default::default()
                                 },
-                                ..Default::default()
-                            })
+                            ))
                             .insert(
-                                graphics
-                                    .spritesheet_map
-                                    .as_ref()
-                                    .unwrap()
-                                    .get(&picked_item.obj_type)
-                                    .unwrap()
-                                    .clone(),
+                                (graphics
+                                        .spritesheet_map
+                                        .as_ref()
+                                        .unwrap()
+                                        .get(&picked_item.obj_type)
+                                        .unwrap()
+                                        .clone()),
                             )
-                            .insert(graphics.texture_atlas.as_ref().unwrap().clone())
                             .insert(UIState::ItemChest)
                             .insert(RenderLayers::from_layers(&[3]))
                             .insert(ItemChestFinalItem)
@@ -1302,7 +1259,7 @@ pub fn handle_anim_events(
                         // since heirloom rewards use their own hover-tooltip card.
                         // The currently-equipped side tooltip is spawned on hover (see
                         // `handle_item_chest_final_item_hover`) rather than here.
-                        if let Ok(root) = chest_ui_root.get_single() {
+                        if let Ok(root) = chest_ui_root.single() {
                             let type_label = proto
                                 .get_component::<EquipmentType, _>(picked_item.obj_type)
                                 .map(equipment_type_display_name)
@@ -1322,23 +1279,19 @@ pub fn handle_anim_events(
                         // Defensive: Heirloom::None has no icon and must not be shown (e.g. from contaminated pool)
                         if picked_heirloom.heirloom != Heirloom::None {
                             commands
-                                .spawn(SpriteBundle {
-                                    sprite: Sprite {
+                                .spawn((
+                                    Sprite {
                                         color: Color::NONE,
                                         custom_size: Some(Vec2::new(32., 32.)),
                                         ..default()
                                     },
-                                    transform: Transform {
+                                    Transform {
                                         translation: Vec3::new(-1., CHEST_ICON_Y, 15.),
                                         scale: Vec3::new(1., 1., 1.),
                                         ..Default::default()
                                     },
-                                    ..Default::default()
-                                })
-                                .insert(
-                                    graphics.get_heirloom_icon(picked_heirloom.heirloom.clone()),
-                                )
-                                .insert(graphics.texture_atlas.as_ref().unwrap().clone())
+                                ))
+                                .insert(graphics.get_heirloom_icon(picked_heirloom.heirloom.clone()))
                                 .insert(UIState::ItemChest)
                                 .insert(RenderLayers::from_layers(&[3]))
                                 .insert(ItemChestFinalItem)
@@ -1350,7 +1303,7 @@ pub fn handle_anim_events(
 
                             // Reveal text stack — same layout as item chests; "Heirloom"
                             // stands in for the equipment-type label.
-                            if let Ok(root) = chest_ui_root.get_single() {
+                            if let Ok(root) = chest_ui_root.single() {
                                 spawn_chest_reveal_text(
                                     &mut commands,
                                     &asset_server,
@@ -1382,8 +1335,8 @@ pub fn handle_item_chest_final_item_hover(
         (Entity, &mut Interactable, &ItemStack),
         (With<ItemChestFinalItem>, Without<ItemChestFinalHeirloom>),
     >,
-    mut tooltip_update_events: EventWriter<ToolTipUpdateEvent>,
-    mut tooltip_teardown_events: EventWriter<TooltipTeardownEvent>,
+    mut tooltip_update_events: MessageWriter<ToolTipUpdateEvent>,
+    mut tooltip_teardown_events: MessageWriter<TooltipTeardownEvent>,
     player_inv: Query<&Inventory, With<crate::player::Player>>,
     proto: ProtoParam,
 ) {
@@ -1399,7 +1352,7 @@ pub fn handle_item_chest_final_item_hover(
                         // Primary tooltip — picked item, uses default ItemChest position
                         // (left side of the chest container) as resolved by
                         // `handle_spawn_inv_item_tooltip`.
-                        tooltip_update_events.send(ToolTipUpdateEvent {
+                        tooltip_update_events.write(ToolTipUpdateEvent {
                             item_stack: item_stack.clone(),
                             is_recipe: false,
                             show_range: false,
@@ -1409,11 +1362,11 @@ pub fn handle_item_chest_final_item_hover(
                         // Secondary "Currently Equipped" tooltip — only when equipping
                         // would displace an existing piece. Same spacing as the primary
                         // card but mirrored to the right of the chest container.
-                        if let Ok(inv) = player_inv.get_single() {
+                        if let Ok(inv) = player_inv.single() {
                             if let Some(displaced) =
                                 displaced_equipped_item_stack(inv, item_stack, &proto)
                             {
-                                tooltip_update_events.send(ToolTipUpdateEvent {
+                                tooltip_update_events.write(ToolTipUpdateEvent {
                                     item_stack: displaced,
                                     is_recipe: false,
                                     show_range: false,
@@ -1438,7 +1391,7 @@ pub fn handle_item_chest_final_item_hover(
             _ => {
                 if matches!(interactable.current(), Interaction::Hovering) {
                     interactable.change(Interaction::None);
-                    tooltip_teardown_events.send_default();
+                    tooltip_teardown_events.write_default();
                 }
             }
         }
@@ -1447,7 +1400,7 @@ pub fn handle_item_chest_final_item_hover(
 
 /// Handle hovering on the final heirloom in the heirloom chest to show tooltip
 pub fn handle_heirloom_chest_final_item_hover(
-    mut tooltip_requests: EventWriter<HeirloomTooltipRequest>,
+    mut tooltip_requests: MessageWriter<HeirloomTooltipRequest>,
     cursor_pos: Res<CursorPos>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     mut final_heirlooms: Query<
@@ -1473,7 +1426,7 @@ pub fn handle_heirloom_chest_final_item_hover(
                     let icon_pos = transform.translation();
                     let tooltip_pos = Vec3::new(icon_pos.x - 140., icon_pos.y + 12., 15.);
 
-                    tooltip_requests.send(HeirloomTooltipRequest::Show(HeirloomTooltipShow {
+                    tooltip_requests.write(HeirloomTooltipRequest::Show(HeirloomTooltipShow {
                         heirloom: heirloom_data.heirloom.heirloom.clone(),
                         rarity: heirloom_data.heirloom.rarity,
                         position: tooltip_pos,
@@ -1488,7 +1441,7 @@ pub fn handle_heirloom_chest_final_item_hover(
             _ => {
                 if matches!(interactable.current(), Interaction::Hovering) {
                     interactable.change(Interaction::None);
-                    tooltip_requests.send(HeirloomTooltipRequest::Clear);
+                    tooltip_requests.write(HeirloomTooltipRequest::Clear);
                 }
             }
         }
@@ -1507,14 +1460,14 @@ pub struct HeirloomChestRerollParams<'w, 's> {
     pub reveal_ui: Query<'w, 's, Entity, With<ChestRevealUI>>,
     pub player_level:
         Query<'w, 's, &'static crate::player::levels::PlayerLevel, With<crate::player::Player>>,
-    pub tooltip_teardown: EventWriter<'w, TooltipTeardownEvent>,
-    pub heirloom_tooltip_clear: EventWriter<'w, HeirloomTooltipRequest>,
+    pub tooltip_teardown: MessageWriter<'w, TooltipTeardownEvent>,
+    pub heirloom_tooltip_clear: MessageWriter<'w, HeirloomTooltipRequest>,
     pub focus_input: crate::ui::focus::FocusInput<'w>,
 }
 
 pub fn handle_heirloom_chest_reroll_button(
     cursor_pos: Res<CursorPos>,
-    mouse_input: Res<Input<MouseButton>>,
+    mouse_input: Res<ButtonInput<MouseButton>>,
     mut sprites: ParamSet<(
         Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
         Query<&mut Sprite, With<HeirloomChestRerollIcon>>,
@@ -1523,7 +1476,7 @@ pub fn handle_heirloom_chest_reroll_button(
         (Entity, &mut Interactable, &Children),
         With<HeirloomChestRerollButton>,
     >,
-    mut reroll_text: Query<&mut Text, With<HeirloomChestRerollsText>>,
+    mut reroll_text: Query<&mut Text2d, With<HeirloomChestRerollsText>>,
     mut commands: Commands,
     mut params: HeirloomChestRerollParams,
 ) {
@@ -1551,21 +1504,17 @@ pub fn handle_heirloom_chest_reroll_button(
                 Interaction::None if enabled => {
                     interactable.change(Interaction::Hovering);
                     for child in children.iter() {
-                        if let Ok(mut sprite) = sprites.p1().get_mut(*child) {
+                        if let Ok(mut sprite) = sprites.p1().get_mut(child) {
                             sprite.color = YELLOW;
                         }
                     }
                 }
                 Interaction::Hovering => {
                     if confirm_pressed && enabled {
-                        let Ok(root) = params.chest_ui_root.get_single() else {
+                        let Ok(root) = params.chest_ui_root.single() else {
                             return;
                         };
-                        let level = params
-                            .player_level
-                            .get_single()
-                            .map(|l| l.level)
-                            .unwrap_or(1);
+                        let level = params.player_level.single().map(|l| l.level).unwrap_or(1);
 
                         params.run_unlocks.rerolls_remaining =
                             params.run_unlocks.rerolls_remaining.saturating_sub(1);
@@ -1589,19 +1538,17 @@ pub fn handle_heirloom_chest_reroll_button(
                         );
 
                         for mut text in reroll_text.iter_mut() {
-                            if let Some(section) = text.sections.first_mut() {
-                                section.value = params.run_unlocks.rerolls_remaining.to_string();
-                            }
+                            text.0 = params.run_unlocks.rerolls_remaining.to_string();
                         }
 
                         interactable.change(Interaction::None);
                         let icon_color = if params.run_unlocks.rerolls_remaining > 0 {
                             Color::WHITE
                         } else {
-                            Color::rgb(0.45, 0.45, 0.45)
+                            Color::srgb(0.45, 0.45, 0.45)
                         };
                         for child in children.iter() {
-                            if let Ok(mut sprite) = sprites.p1().get_mut(*child) {
+                            if let Ok(mut sprite) = sprites.p1().get_mut(child) {
                                 sprite.color = icon_color;
                             }
                         }
@@ -1620,10 +1567,10 @@ pub fn handle_heirloom_chest_reroll_button(
             let icon_color = if enabled {
                 Color::WHITE
             } else {
-                Color::rgb(0.45, 0.45, 0.45)
+                Color::srgb(0.45, 0.45, 0.45)
             };
             for child in children.iter() {
-                if let Ok(mut sprite) = sprites.p1().get_mut(*child) {
+                if let Ok(mut sprite) = sprites.p1().get_mut(child) {
                     sprite.color = icon_color;
                 }
             }

@@ -1,5 +1,5 @@
-pub use bevy::prelude::*;
-use bevy::{render::view::RenderLayers, utils::HashMap};
+use bevy::prelude::*;
+use bevy::{camera::visibility::RenderLayers, platform::collections::HashMap};
 use rand::Rng;
 use serde::Deserialize;
 
@@ -15,19 +15,25 @@ use crate::{
 };
 
 use super::{
-    game_fonts as gf,
-    interactions::Interaction, spawn_inv_slot, Interactable, InventorySlotState, InventorySlotType,
-    InventoryState, InventoryUI, MenuButton, UIElement, UIState,
+    game_fonts as gf, interactions::Interaction, spawn_inv_slot, Interactable, InventorySlotState,
+    InventorySlotType, InventoryState, InventoryUI, MenuButton, UIElement, UIState,
 };
 
 pub const SCRAPPER_SIZE: usize = 6 * 2;
 
-#[derive(Component, Resource, Debug, Clone)]
+/// World-entity scrapper storage. Must NOT be a [`Resource`] (see [`super::ChestInventory`]).
+#[derive(Component, Debug, Clone)]
+pub struct ScrapperInventory {
+    pub items: Container,
+}
+
+/// Open-scrapper UI resource (copied from / written back to [`ScrapperInventory`]).
+#[derive(Resource, Debug, Clone)]
 pub struct ScrapperContainer {
     pub items: Container,
     pub parent: Entity,
 }
-#[derive(Component, Clone, Reflect, FromReflect, Debug, Deserialize)]
+#[derive(Component, Clone, Reflect, Debug, Deserialize)]
 pub struct Scrap {
     pub obj: WorldObject,
     pub chance: f32,
@@ -37,10 +43,10 @@ impl Scrap {
         Self { obj, chance }
     }
 }
-#[derive(Component, Clone, Reflect, FromReflect, Debug, Deserialize)]
+#[derive(Component, Clone, Reflect, Debug, Deserialize)]
 pub struct ScrapsInto(pub Vec<Scrap>);
 
-#[derive(Default)]
+#[derive(Default, Message)]
 pub struct ScrapperEvent;
 
 pub fn setup_scrapper_slots_ui(
@@ -55,10 +61,10 @@ pub fn setup_scrapper_slots_ui(
     inv: Res<ScrapperContainer>,
     resolution: Res<ScreenResolution>,
 ) {
-    if inv_spawn_check.get_single().is_err() {
+    if inv_spawn_check.single().is_err() {
         return;
     }
-    if inv_state.0 != UIState::Scrapper {
+    if *inv_state != UIState::Scrapper {
         return;
     };
     for (slot_index, item) in inv.items.items.iter().enumerate() {
@@ -76,22 +82,19 @@ pub fn setup_scrapper_slots_ui(
             &resolution,
         );
     }
-    let parent = inv_spawn_check.single();
+    let Ok(parent) = inv_spawn_check.single() else {
+        return;
+    };
     // SCRAP BUTTON
     commands
         .spawn((
-            Text2dBundle {
-                text: Text::from_section(
-                    "Scrap",
-                    gf::MENU_TITLE.text_style(&asset_server, WHITE),
-                ),
-                transform: Transform {
+            gf::MENU_TITLE
+                .text(&asset_server, "Scrap", WHITE)
+                .with_transform(Transform {
                     translation: Vec3::new(90., 34.5, 1.),
                     scale: gf::MENU_TITLE.transform_scale(),
                     ..Default::default()
-                },
-                ..default()
-            },
+                }),
             Name::new("SCRAPPER TEXT"),
             RenderLayers::from_layers(&[3]),
             Interactable::default(),
@@ -102,15 +105,15 @@ pub fn setup_scrapper_slots_ui(
                 ..default()
             },
         ))
-        .set_parent(parent);
+        .insert(ChildOf(parent));
 }
 pub fn handle_scrap_items_in_scrapper(
     mut scrapper_inv: ResMut<ScrapperContainer>,
     mut inv_slots: Query<&mut InventorySlotState>,
     proto_param: ProtoParam,
-    mut scrapper_event: EventReader<ScrapperEvent>,
+    mut scrapper_event: MessageReader<ScrapperEvent>,
 ) {
-    if scrapper_event.iter().len() > 0 {
+    if scrapper_event.read().len() > 0 {
         scrapper_event.clear();
         let mut rng = rand::thread_rng();
         let mut new_items = HashMap::new();
@@ -149,7 +152,7 @@ pub fn change_ui_state_to_scrapper_when_resource_added(
 
 pub fn add_inv_to_new_scrapper_objs(
     mut commands: Commands,
-    new_chests: Query<(Entity, &GlobalTransform, &WorldObject), Without<ScrapperContainer>>,
+    new_chests: Query<(Entity, &GlobalTransform, &WorldObject), Without<ScrapperInventory>>,
     container_reg: Res<ContainerRegistry>,
 ) {
     for (e, t, obj) in new_chests.iter() {
@@ -157,11 +160,10 @@ pub fn add_inv_to_new_scrapper_objs(
             let existing_cont_option = container_reg
                 .containers
                 .get(&world_pos_to_tile_pos(t.translation().truncate()));
-            commands.entity(e).insert(ScrapperContainer {
+            commands.entity(e).insert(ScrapperInventory {
                 items: existing_cont_option
                     .unwrap_or(&Container::with_size(SCRAPPER_SIZE))
                     .clone(),
-                parent: e,
             });
         }
     }

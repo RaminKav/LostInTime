@@ -1,4 +1,4 @@
-use bevy::{prelude::*, reflect::TypeUuid, utils::HashMap};
+use bevy::{platform::collections::HashMap, prelude::*};
 use itertools::Itertools;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
@@ -31,8 +31,9 @@ pub struct CraftingPlugin;
 impl Plugin for CraftingPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(Recipes::default())
-            .add_event::<CraftedItemEvent>()
+            .add_message::<CraftedItemEvent>()
             .add_systems(
+                Update,
                 (
                     initialize_all_recipes,
                     process_queued_floating_texts
@@ -42,7 +43,7 @@ impl Plugin for CraftingPlugin {
                     handle_inv_changed_update_crafting_tracker,
                     handle_furnace_slot_update.after(handle_hovering),
                 )
-                    .in_set(OnUpdate(GameState::Main)),
+                    .run_if(in_state(GameState::Main)),
             );
     }
 }
@@ -75,7 +76,7 @@ pub fn process_queued_floating_texts(
         return;
     }
 
-    let Ok(player_t) = player.get_single() else {
+    let Ok(player_t) = player.single() else {
         return;
     };
 
@@ -143,8 +144,7 @@ pub struct Recipes {
     pub upgradeable_items: Vec<WorldObject>,
 }
 
-#[derive(Default, Clone, Debug, Deserialize, PartialEq, Eq, TypeUuid)]
-#[uuid = "413bd529-bfeb-41b3-9db0-4b8b380a2c36"]
+#[derive(Default, Clone, Debug, Deserialize, PartialEq, Eq)]
 pub struct RecipeItem {
     pub item: WorldObject,
     pub count: usize,
@@ -153,10 +153,11 @@ pub struct RecipeItem {
 pub type RecipeList = HashMap<WorldObject, (Vec<RecipeItem>, CraftingContainerType, usize)>;
 pub type FurnaceRecipeList = HashMap<WorldObject, WorldObject>;
 
-pub type RecipeListProto = (
-    Vec<(WorldObject, (Vec<RecipeItem>, CraftingContainerType, usize))>,
-    Vec<(WorldObject, WorldObject)>,
-    Vec<WorldObject>,
+#[derive(Asset, TypePath, Deserialize, Clone)]
+pub struct RecipeListProto(
+    pub Vec<(WorldObject, (Vec<RecipeItem>, CraftingContainerType, usize))>,
+    pub Vec<(WorldObject, WorldObject)>,
+    pub Vec<WorldObject>,
 );
 
 #[derive(Resource, Default, Clone, Serialize, Deserialize)]
@@ -168,6 +169,7 @@ pub struct CraftingTracker {
     pub crafting_type_map: HashMap<CraftingContainerType, Vec<WorldObject>>,
 }
 
+#[derive(Message)]
 pub struct CraftedItemEvent {
     pub obj: WorldObject,
 }
@@ -181,13 +183,15 @@ pub fn handle_crafting_update_when_inv_changes(
     recipes: Res<Recipes>,
     mut craft_tracker: ResMut<CraftingTracker>,
 ) {
-    if inv.get_single().is_err() {
+    if inv.single().is_err() {
         return;
     }
 
     for (result, recipe) in recipes.crafting_list.clone() {
         let mut can_craft = true;
-        let inv = inv.single();
+        let Ok(inv) = inv.single() else {
+            return;
+        };
         for ingredient in recipe.0.clone() {
             if inv.items.get_item_count_in_container(ingredient.item) < ingredient.count {
                 can_craft = false;
@@ -205,12 +209,14 @@ pub fn handle_crafting_update_when_inv_changes(
 }
 pub fn handle_crafted_item(
     mut inv: Query<&mut Inventory>,
-    mut events: EventReader<CraftedItemEvent>,
+    mut events: MessageReader<CraftedItemEvent>,
     recipes: Res<Recipes>,
-    mut analytics: EventWriter<AnalyticsUpdateEvent>,
+    mut analytics: MessageWriter<AnalyticsUpdateEvent>,
 ) {
-    for event in events.iter() {
-        let mut inv = inv.single_mut();
+    for event in events.read() {
+        let Ok(mut inv) = inv.single_mut() else {
+            return;
+        };
         let mut remaining_cost = recipes
             .crafting_list
             .get(&event.obj)
@@ -238,7 +244,7 @@ pub fn handle_crafted_item(
                 }
             }
         }
-        analytics.send(AnalyticsUpdateEvent {
+        analytics.write(AnalyticsUpdateEvent {
             update_type: AnalyticsTrigger::RecipeCrafted(event.obj),
         });
     }
@@ -292,15 +298,17 @@ pub fn handle_furnace_slot_update(
     mut inv: Query<&mut Inventory>,
     mut inv_state: ResMut<InventoryState>,
     mut inv_slots: Query<(Entity, &mut InventorySlotState)>,
-    mut tooltip_update_events: EventWriter<ToolTipUpdateEvent>,
+    mut tooltip_update_events: MessageWriter<ToolTipUpdateEvent>,
     asset_server: Res<AssetServer>,
     mut game_camera: Query<Entity, With<TextureCamera>>,
     player_skills: Query<&crate::player::skills::PlayerSkills, With<Player>>,
-    mut legendary_rank_events: EventWriter<
+    mut legendary_rank_events: MessageWriter<
         crate::player::combat_heirlooms::LegendaryEquipmentRankedEvent,
     >,
 ) {
-    let mut inv = inv.single_mut();
+    let Ok(mut inv) = inv.single_mut() else {
+        return;
+    };
 
     if inv_state.furnace_state.ready_to_upgrade {
         inv_state.furnace_state.upgrade_timer.tick(time.delta());
@@ -308,7 +316,7 @@ pub fn handle_furnace_slot_update(
         if inv_state.furnace_state.upgrade_timer.just_finished() {
             // Check for TomeDoubleUpgrade heirloom
             let tome_double_count = player_skills
-                .get_single()
+                .single()
                 .map(|s| s.get_count(crate::player::skills::Heirloom::TomeDoubleUpgrade))
                 .unwrap_or(0);
 
@@ -361,7 +369,7 @@ pub fn handle_furnace_slot_update(
                         if new_rarity == ItemRarity::Legendary
                             && old_item.item_stack.rarity != ItemRarity::Legendary
                         {
-                            legendary_rank_events.send(
+                            legendary_rank_events.write(
                                 crate::player::combat_heirlooms::LegendaryEquipmentRankedEvent,
                             );
                             let mut rng = rand::thread_rng();
@@ -393,7 +401,7 @@ pub fn handle_furnace_slot_update(
             }
             inv_state.furnace_state.upgrade_timer.reset();
             inv_state.furnace_state.ready_to_upgrade = false;
-            tooltip_update_events.send(ToolTipUpdateEvent {
+            tooltip_update_events.write(ToolTipUpdateEvent {
                 item_stack: inv.furnace_items.items[1].clone().unwrap().item_stack,
                 is_recipe: false,
                 show_range: false,
@@ -410,13 +418,17 @@ pub fn handle_inv_changed_update_crafting_tracker(
     proto: ProtoParam,
     player: Query<(&GlobalTransform, &PlayerLevel), With<Player>>,
 ) {
-    let (player_t, player_level) = player.single();
+    let Ok((player_t, player_level)) = player.single() else {
+        return;
+    };
 
     // detect new items in inventory
-    if inv.get_single().is_err() {
+    if inv.single().is_err() {
         return;
     }
-    let mut inv = inv.single_mut();
+    let Ok(mut inv) = inv.single_mut() else {
+        return;
+    };
     for slot in inv.items.items.iter() {
         if let Some(item) = slot {
             let new_obj = item.item_stack.obj_type;

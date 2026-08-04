@@ -336,12 +336,10 @@ impl Achievement {
         // Helper to get combined mob kills from both cumulative and current run
         let get_mob_kills = |mob: &Mob| -> u32 {
             let cumulative_kills = cumulative_analytics
-                .and_then(|c| c.mobs_killed.get(mob))
-                .copied()
+                .and_then(|c| c.mobs_killed.get(mob).copied())
                 .unwrap_or(0);
             let current_kills = current_run_analytics
-                .and_then(|c| c.mobs_killed.get(mob))
-                .copied()
+                .and_then(|c| c.mobs_killed.get(mob).copied())
                 .unwrap_or(0);
             // Add current run kills to cumulative total
             cumulative_kills + current_kills
@@ -454,11 +452,11 @@ pub fn persist_achievements_state(achievements: &Achievements) {
 fn try_unlock(
     achievements: &mut Achievements,
     achievement: Achievement,
-    achievement_events: &mut EventWriter<AchievementUnlockedEvent>,
+    achievement_events: &mut MessageWriter<AchievementUnlockedEvent>,
 ) -> bool {
     if achievements.complete(achievement) {
         persist_achievements_state(achievements);
-        achievement_events.send(AchievementUnlockedEvent {
+        achievement_events.write(AchievementUnlockedEvent {
             achievement,
             reward_currency: achievement.reward_currency(),
         });
@@ -473,11 +471,12 @@ pub struct AchievementsPlugin;
 
 impl Plugin for AchievementsPlugin {
     fn build(&self, app: &mut App) {
-        app.add_event::<AchievementUnlockedEvent>()
-            .add_event::<DeathDefianceSurvivedEvent>()
-            .add_event::<LegendaryEquipmentRankedEvent>()
+        app.add_message::<AchievementUnlockedEvent>()
+            .add_message::<DeathDefianceSurvivedEvent>()
+            .add_message::<LegendaryEquipmentRankedEvent>()
             .init_resource::<BounceAchievementTracker>()
             .add_systems(
+                Update,
                 (
                     track_bounce_achievements,
                     track_death_defiance_achievement,
@@ -486,7 +485,7 @@ impl Plugin for AchievementsPlugin {
                     check_first_run_achievement.before(handle_append_run_data_after_death),
                     handle_achievement_rewards,
                 )
-                    .in_set(OnUpdate(GameState::Main)),
+                    .run_if(in_state(GameState::Main)),
             );
     }
 }
@@ -500,7 +499,7 @@ pub fn check_achievements(
     damage_tracker: Option<Res<DamageTracker>>,
     coins: Option<Res<CoinCurrency>>,
     infinite_mode: Option<Res<InfiniteMode>>,
-    mut achievement_events: EventWriter<AchievementUnlockedEvent>,
+    mut achievement_events: MessageWriter<AchievementUnlockedEvent>,
     game_data: Option<Res<crate::client::GameData>>,
     player_stats: Query<(&Thorns, &CritChance, &MaxHealth), With<Player>>,
     meteor_shower_state: Query<&MeteorShowerSkillState, With<Player>>,
@@ -519,12 +518,10 @@ pub fn check_achievements(
     // We ADD them together to get the true total
     let get_mob_kills = |mob: &Mob| -> u32 {
         let cumulative_kills = cumulative
-            .and_then(|c| c.mobs_killed.get(mob))
-            .copied()
+            .and_then(|c| c.mobs_killed.get(mob).copied())
             .unwrap_or(0);
         let current_kills = current_run
-            .and_then(|c| c.mobs_killed.get(mob))
-            .copied()
+            .and_then(|c| c.mobs_killed.get(mob).copied())
             .unwrap_or(0);
         // Add current run kills to cumulative total
         cumulative_kills + current_kills
@@ -532,12 +529,10 @@ pub fn check_achievements(
 
     let get_item_collected = |object: &WorldObject| -> u32 {
         let cumulative_count = cumulative
-            .and_then(|c| c.items_collected.get(object))
-            .copied()
+            .and_then(|c| c.items_collected.get(object).copied())
             .unwrap_or(0);
         let current_count = current_run
-            .and_then(|c| c.items_collected.get(object))
-            .copied()
+            .and_then(|c| c.items_collected.get(object).copied())
             .unwrap_or(0);
         // Add current run items to cumulative total
         cumulative_count + current_count
@@ -605,7 +600,7 @@ pub fn check_achievements(
         }
     }
 
-    if let Ok((thorns, crit_chance, max_health)) = player_stats.get_single() {
+    if let Ok((thorns, crit_chance, max_health)) = player_stats.single() {
         if thorns.0 >= 500 {
             try_unlock(
                 &mut achievements,
@@ -629,7 +624,7 @@ pub fn check_achievements(
         }
     }
 
-    if let Ok(state) = meteor_shower_state.get_single() {
+    if let Ok(state) = meteor_shower_state.single() {
         if state.meteor_count >= 100 {
             try_unlock(
                 &mut achievements,
@@ -681,11 +676,12 @@ pub fn check_achievements(
         }
     }
 
-    if let Ok(player_e) = player_entity.get_single() {
+    if let Ok(player_e) = player_entity.single() {
         let active_boulders = orbiting_stones
             .iter()
             .filter(|(stone, lifetime)| {
-                stone.owner == player_e && lifetime.map(|l| !l.lifetime.finished()).unwrap_or(false)
+                stone.owner == player_e
+                    && lifetime.map(|l| !l.lifetime.is_finished()).unwrap_or(false)
             })
             .count();
         if active_boulders >= 10 {
@@ -760,10 +756,10 @@ pub fn check_achievements(
 /// System to award FirstRunComplete achievement when player dies for the first time
 pub fn check_first_run_achievement(
     mut achievements: ResMut<Achievements>,
-    mut game_over_events: EventReader<crate::client::GameOverEvent>,
-    mut achievement_events: EventWriter<AchievementUnlockedEvent>,
+    mut game_over_events: MessageReader<crate::client::GameOverEvent>,
+    mut achievement_events: MessageWriter<AchievementUnlockedEvent>,
 ) {
-    for _ in game_over_events.iter() {
+    for _ in game_over_events.read() {
         try_unlock(
             &mut achievements,
             Achievement::FirstRunComplete,
@@ -773,11 +769,11 @@ pub fn check_first_run_achievement(
 }
 
 pub fn track_death_defiance_achievement(
-    mut events: EventReader<DeathDefianceSurvivedEvent>,
+    mut events: MessageReader<DeathDefianceSurvivedEvent>,
     mut achievements: ResMut<Achievements>,
-    mut achievement_events: EventWriter<AchievementUnlockedEvent>,
+    mut achievement_events: MessageWriter<AchievementUnlockedEvent>,
 ) {
-    for _ in events.iter() {
+    for _ in events.read() {
         try_unlock(
             &mut achievements,
             Achievement::SurviveDeath,
@@ -787,11 +783,11 @@ pub fn track_death_defiance_achievement(
 }
 
 pub fn track_legendary_equipment_achievement(
-    mut events: EventReader<LegendaryEquipmentRankedEvent>,
+    mut events: MessageReader<LegendaryEquipmentRankedEvent>,
     mut achievements: ResMut<Achievements>,
-    mut achievement_events: EventWriter<AchievementUnlockedEvent>,
+    mut achievement_events: MessageWriter<AchievementUnlockedEvent>,
 ) {
-    for _ in events.iter() {
+    for _ in events.read() {
         try_unlock(
             &mut achievements,
             Achievement::LegendaryEquipment,
@@ -801,11 +797,11 @@ pub fn track_legendary_equipment_achievement(
 }
 
 pub fn track_bounce_achievements(
-    mut bounce_events: EventReader<BounceEvent>,
+    mut bounce_events: MessageReader<BounceEvent>,
     time: Res<Time>,
     mut tracker: ResMut<BounceAchievementTracker>,
     mut achievements: ResMut<Achievements>,
-    mut achievement_events: EventWriter<AchievementUnlockedEvent>,
+    mut achievement_events: MessageWriter<AchievementUnlockedEvent>,
 ) {
     const MIN_BOUNCE_INTERVAL_SECS: f64 = 0.2;
     const CONSECUTIVE_INTERVAL_SECS: f64 = 0.38;
@@ -813,8 +809,8 @@ pub fn track_bounce_achievements(
     let mut unlocked_bouncy = false;
     let mut unlocked_bouncy2 = false;
 
-    for _event in bounce_events.iter() {
-        let now = time.elapsed_seconds_f64();
+    for _event in bounce_events.read() {
+        let now = time.elapsed_secs_f64();
 
         if let Some(last) = tracker.last_bounce_time {
             let delta = now - last;
@@ -862,12 +858,13 @@ pub fn track_bounce_achievements(
 // This function is kept for backwards compatibility but does nothing
 pub fn handle_achievement_rewards(
     mut _commands: Commands,
-    mut _events: EventReader<AchievementUnlockedEvent>,
+    mut _events: MessageReader<AchievementUnlockedEvent>,
     _currency: Option<ResMut<TimeFragmentCurrency>>,
 ) {
     // Rewards are now claimed when player clicks on achievement row in UI
 }
 
+#[derive(Message)]
 pub struct AchievementUnlockedEvent {
     pub achievement: Achievement,
     pub reward_currency: u32,

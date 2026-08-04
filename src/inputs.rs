@@ -24,9 +24,10 @@ use crate::player::skills::{
 };
 use crate::ui::key_input_guide::{InteractionGuideTrigger, SHRINE_INTERACT_GUIDE_DISTANCE};
 use crate::world::dimension::{DimensionSpawnEvent, Era};
+use bevy::audio::{AudioPlayer, PlaybackSettings, Volume};
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
-use bevy::transform::TransformSystem;
+use bevy::transform::TransformSystems;
 use bevy::window::PrimaryWindow;
 
 use bevy_hanabi::EffectSpawner;
@@ -61,7 +62,7 @@ use crate::ui::{
     class_selection::{ClassUnlockConfirmState, SkillUnlockConfirmState},
     focus::UiFocus,
     tutorial_ui::PendingInventoryTutorialCheck,
-    ActiveOptionsTab, EssenceShopChoices, FlashExpBarEvent, MenuButton, MenuButtonClickEvent,
+    ActiveOptionsTab, FlashExpBarEvent, MenuButton, MenuButtonClickEvent, MerchantShop,
     OptionsTabButton, UIState, WaitingForKeyInput, WipeDataPopup,
 };
 use crate::world::chunk::Chunk;
@@ -93,14 +94,15 @@ impl Plugin for InputsPlugin {
             .init_resource::<PendingGroundAimSkill>()
             .insert_resource(crate::bounce::NaturalTornadoSpawner::default())
             .register_type::<CursorPos>()
-            .add_event::<BounceEvent>()
+            .add_message::<BounceEvent>()
             // AttackEvent must live on Update (default schedule), not FixedUpdate. Writers
             // (`mouse_click_system`, sprint run-attack) and readers (`handle_attack_cooldowns`,
             // stealth break, item abilities) all run on Update. FixedUpdate catch-up rotates
             // the event buffer multiple times per render frame when FPS drops, dropping events
             // before `handle_attack_cooldowns` inserts `AttackTimer` — causing burst attacks.
-            .add_event::<AttackEvent>()
+            .add_message::<AttackEvent>()
             .add_systems(
+                Update,
                 (
                     bounce_player.run_if(is_not_paused),
                     update_shadow.run_if(is_not_paused),
@@ -109,9 +111,10 @@ impl Plugin for InputsPlugin {
                     crate::bounce::handle_tornado_player_overlap.run_if(is_not_paused),
                     crate::bounce::spawn_natural_desert_tornadoes.run_if(is_not_paused),
                 )
-                    .in_set(OnUpdate(GameState::Main)),
+                    .run_if(in_state(GameState::Main)),
             )
             .add_systems(
+                Update,
                 (
                     player_move_inputs.run_if(is_not_paused),
                     turn_player.run_if(is_not_paused),
@@ -136,19 +139,22 @@ impl Plugin for InputsPlugin {
                         .after(handle_broken_shrine_interact),
                     toggle_attack_auto_target.run_if(is_not_paused),
                 )
-                    .in_set(OnUpdate(GameState::Main)),
+                    .run_if(in_state(GameState::Main)),
             )
-            .add_systems((
-                toggle_inventory.run_if(in_state(GameState::Main)),
-                close_container
-                    .run_if(in_state(GameState::Main).or_else(in_state(GameState::MainMenu))),
-                toggle_gamepad_pause.run_if(in_state(GameState::Main)),
-            ))
-            .add_system(
+            .add_systems(
+                Update,
+                (
+                    toggle_inventory.run_if(in_state(GameState::Main)),
+                    close_container
+                        .run_if(in_state(GameState::Main).or_else(in_state(GameState::MainMenu))),
+                    toggle_gamepad_pause.run_if(in_state(GameState::Main)),
+                ),
+            )
+            .add_systems(
+                Update,
                 move_camera_with_player
-                    .after(PhysicsSet::SyncBackendFlush)
-                    .before(TransformSystem::TransformPropagate)
-                    .in_base_set(CoreSet::PostUpdate)
+                    .after(PhysicsSet::SyncBackend)
+                    .before(TransformSystems::Propagate)
                     .run_if(in_state(GameState::Main)),
             );
     }
@@ -361,20 +367,20 @@ pub fn weapon_projectile_spawn_delay(obj: &WorldObject, burst_index: usize) -> f
 }
 
 fn toggle_attack_auto_target(
-    key_input: Res<Input<KeyCode>>,
-    mouse_input: Res<Input<MouseButton>>,
+    key_input: Res<ButtonInput<KeyCode>>,
+    mouse_input: Res<ButtonInput<MouseButton>>,
     keybinds: Res<InputMappings>,
     ui_state: Res<State<UIState>>,
     mut auto_target: ResMut<AttackAutoTargetState>,
     mut commands: Commands,
     gamepad_action_q: Query<&ActionState<GamepadAction>, With<Player>>,
 ) {
-    if ui_state.0 != UIState::Closed {
+    if *ui_state != UIState::Closed {
         return;
     }
     let gamepad_pressed = gamepad_action_q
-        .get_single()
-        .map(|a| a.just_pressed(GamepadAction::AutoTarget))
+        .single()
+        .map(|a| a.just_pressed(&GamepadAction::AutoTarget))
         .unwrap_or(false);
     if !keybinds.check_attack_auto_target_input(&key_input, &mouse_input) && !gamepad_pressed {
         return;
@@ -436,7 +442,7 @@ pub fn skill_aim_direction(movement: Vec2, aim_facing: Vec2, facing: Vec2) -> Ve
 #[derive(Component, Debug, Default)]
 pub struct MovementVector(pub Vec2);
 
-#[derive(Debug, Clone, PartialEq, Component, Eq, Default, FromReflect, Reflect)]
+#[derive(Debug, Clone, PartialEq, Component, Eq, Default, Reflect)]
 #[reflect(Component, Default)]
 pub enum FacingDirection {
     Left,
@@ -521,10 +527,14 @@ fn turn_player(
         return;
     }
     let dir = FacingDirection::from_translation(aim);
-    let curr_dir = player_query.single();
+    let Ok(curr_dir) = player_query.single() else {
+        return;
+    };
     if &dir != curr_dir {
-        commands.entity(game.player).insert(dir.clone());
-        game.player_state.direction = dir.clone();
+        if let Ok(mut entity_commands) = commands.get_entity(game.player) {
+            entity_commands.try_insert(dir.clone());
+            game.player_state.direction = dir.clone();
+        }
     }
 }
 /// Groups the movement/aim scheme resources together purely to stay under Bevy's per-system
@@ -561,11 +571,10 @@ pub fn player_move_inputs(
         ),
     >,
     time: Res<Time>,
-    key_input: Res<Input<KeyCode>>,
+    key_input: Res<ButtonInput<KeyCode>>,
     mut commands: Commands,
     mut particle: Query<&mut EffectSpawner, With<DustParticles>>,
     asset_server: Res<AssetServer>,
-    audio: Res<Audio>,
     audio_volume: Res<AudioVolume>,
     mut audio_timer: Local<Timer>,
     mut ammo_query: Query<&mut Ammo>,
@@ -580,7 +589,7 @@ pub fn player_move_inputs(
     if audio_timer.duration() == Duration::ZERO {
         *audio_timer = Timer::from_seconds(0.2, TimerMode::Once);
     }
-    let (
+    let Ok((
         player_e,
         mut player_kcc,
         mut mv,
@@ -592,7 +601,10 @@ pub fn player_move_inputs(
         consumable_buffs,
         hit_tracker_option,
         kcc_output,
-    ) = player_query.single_mut();
+    )) = player_query.single_mut()
+    else {
+        return;
+    };
     if bounce_option.is_some() {
         return;
     }
@@ -608,7 +620,7 @@ pub fn player_move_inputs(
     let movement_speed_multiplier = consumable_buffs.movement_multiplier_product();
 
     let s = PLAYER_MOVE_SPEED
-        * time.delta_seconds()
+        * time.delta_secs()
         * (1. + speed.0 as f32 / 100.)
         * (if hunger.is_starving() { 0.7 } else { 1. })
         * movement_speed_multiplier;
@@ -618,12 +630,12 @@ pub fn player_move_inputs(
     // stops a stray/phantom controller connection (or a real pad drifting slightly off-center)
     // from silently overriding real, currently-held keyboard input.
     let gamepad_move = (active_device.0 == crate::gamepad_input::InputDeviceKind::Gamepad)
-        .then(|| gamepad_action_q.get_single().ok())
+        .then(|| gamepad_action_q.single().ok())
         .flatten()
         .and_then(|action_state| {
-            action_state
-                .clamped_axis_pair(GamepadAction::Move)
-                .map(|pair| pair.xy())
+            let stick = action_state.clamped_axis_pair(&GamepadAction::Move);
+            (stick.length_squared() > crate::gamepad_input::GAMEPAD_STICK_DEADZONE.powi(2))
+                .then_some(stick)
         });
     if let Some(stick) = gamepad_move
         .filter(|v| v.length_squared() > crate::gamepad_input::GAMEPAD_STICK_DEADZONE.powi(2))
@@ -640,26 +652,26 @@ pub fn player_move_inputs(
         } else {
             (true, true)
         };
-        if (wasd_moves && key_input.pressed(KeyCode::A))
-            || (arrows_move && key_input.pressed(KeyCode::Left))
+        if (wasd_moves && key_input.pressed(KeyCode::KeyA))
+            || (arrows_move && key_input.pressed(KeyCode::ArrowLeft))
         {
             d_raw.x -= 1.;
             player.is_moving = true;
         }
-        if (wasd_moves && key_input.pressed(KeyCode::D))
-            || (arrows_move && key_input.pressed(KeyCode::Right))
+        if (wasd_moves && key_input.pressed(KeyCode::KeyD))
+            || (arrows_move && key_input.pressed(KeyCode::ArrowRight))
         {
             d_raw.x += 1.;
             player.is_moving = true;
         }
-        if (wasd_moves && key_input.pressed(KeyCode::W))
-            || (arrows_move && key_input.pressed(KeyCode::Up))
+        if (wasd_moves && key_input.pressed(KeyCode::KeyW))
+            || (arrows_move && key_input.pressed(KeyCode::ArrowUp))
         {
             d_raw.y += 1.;
             player.is_moving = true;
         }
-        if (wasd_moves && key_input.pressed(KeyCode::S))
-            || (arrows_move && key_input.pressed(KeyCode::Down))
+        if (wasd_moves && key_input.pressed(KeyCode::KeyS))
+            || (arrows_move && key_input.pressed(KeyCode::ArrowDown))
         {
             d_raw.y -= 1.;
             player.is_moving = true;
@@ -684,13 +696,13 @@ pub fn player_move_inputs(
         on_ice,
         d_raw,
         s,
-        time.delta_seconds(),
+        time.delta_secs(),
         is_dashing,
         hit_active,
     );
 
-    if (key_input.any_just_released([KeyCode::A, KeyCode::D, KeyCode::S, KeyCode::W])
-        && !key_input.any_pressed([KeyCode::A, KeyCode::D, KeyCode::S, KeyCode::W]))
+    if (key_input.any_just_released([KeyCode::KeyA, KeyCode::KeyD, KeyCode::KeyS, KeyCode::KeyW])
+        && !key_input.any_pressed([KeyCode::KeyA, KeyCode::KeyD, KeyCode::KeyS, KeyCode::KeyW]))
         || (d_raw.x == 0. && d_raw.y == 0.)
     {
         let sliding_ice = on_ice && player.ice_slide_direction.is_some();
@@ -702,7 +714,7 @@ pub fn player_move_inputs(
     }
 
     // Manual reload on R key for current ranged weapon
-    if key_input.just_pressed(KeyCode::R) {
+    if key_input.just_pressed(KeyCode::KeyR) {
         if let Some(main_hand) = player.main_hand_slot.clone() {
             if let Ok(mut ammo) = ammo_query.get_mut(main_hand.entity) {
                 if !ammo.reloading && ammo.current < ammo.max {
@@ -711,32 +723,23 @@ pub fn player_move_inputs(
             }
         }
     }
-    let is_speeding_up = player.player_dash_duration.percent() < 0.5;
+    let is_speeding_up = player.player_dash_duration.fraction() < 0.5;
     if player.is_dashing {
-        if curr_anim != &PlayerAnimation::Roll && player.player_dash_duration.percent() == 0. {
+        if curr_anim != &PlayerAnimation::Roll && player.player_dash_duration.fraction() == 0. {
             commands.entity(player_e).insert(PlayerAnimation::Roll);
         }
+        let dash_t = player.player_dash_duration.fraction();
+        let dash_target_x = d.x * PLAYER_DASH_SPEED * TIME_STEP;
+        let dash_target_y = d.y * PLAYER_DASH_SPEED * TIME_STEP;
         d.x = if is_speeding_up {
-            d.x.lerp(
-                &(d.x * PLAYER_DASH_SPEED * TIME_STEP),
-                &(player.player_dash_duration.percent() * 2.),
-            )
+            d.x.lerp(dash_target_x, dash_t * 2.)
         } else {
-            d.x.lerp(
-                &(d.x * PLAYER_DASH_SPEED * TIME_STEP),
-                &(1. - (player.player_dash_duration.percent())),
-            )
+            d.x.lerp(dash_target_x, 1. - dash_t)
         };
         d.y = if is_speeding_up {
-            d.y.lerp(
-                &(d.y * PLAYER_DASH_SPEED * TIME_STEP),
-                &(player.player_dash_duration.percent() * 2.),
-            )
+            d.y.lerp(dash_target_y, dash_t * 2.)
         } else {
-            d.y.lerp(
-                &(d.y * PLAYER_DASH_SPEED * TIME_STEP),
-                &(1. - (player.player_dash_duration.percent())),
-            )
+            d.y.lerp(dash_target_y, 1. - dash_t)
         };
     }
     mv.0 = d;
@@ -748,20 +751,20 @@ pub fn player_move_inputs(
             commands.entity(player_e).insert(PlayerAnimation::Walk);
         }
 
-        if run_dust_timer.0.percent() == 0. {
-            if let Ok(mut p) = particle.get_single_mut() {
+        if run_dust_timer.0.fraction() == 0. {
+            if let Ok(mut p) = particle.single_mut() {
                 p.reset();
             }
             run_dust_timer.0.tick(time.delta());
         } else {
             run_dust_timer.0.tick(time.delta());
-            if run_dust_timer.0.finished() {
+            if run_dust_timer.0.is_finished() {
                 run_dust_timer.0.reset()
             }
         }
         //audio
         audio_timer.tick(time.delta());
-        if audio_timer.finished() {
+        if audio_timer.is_finished() {
             audio_timer.reset();
             let walk1 = asset_server.load("sounds/walk_grass1.ogg");
             let walk2 = asset_server.load("sounds/walk_grass2.ogg");
@@ -770,12 +773,12 @@ pub fn player_move_inputs(
             let walk5 = asset_server.load("sounds/walk_grass5.ogg");
             let walks = vec![walk1, walk2, walk3, walk4, walk5];
             let sfx = audio_volume.sfx_fraction();
-            walks.iter().choose(&mut rand::thread_rng()).map(|sound| {
-                audio.play_with_settings(
-                    sound.clone(),
-                    PlaybackSettings::ONCE.with_volume(0.35 * sfx),
-                )
-            });
+            if let Some(sound) = walks.iter().choose(&mut rand::thread_rng()) {
+                commands.spawn((
+                    AudioPlayer::new(sound.clone()),
+                    PlaybackSettings::DESPAWN.with_volume(Volume::Linear(0.35 * sfx)),
+                ));
+            }
         }
     } else if curr_anim.is_walking() {
         commands.entity(player_e).insert(PlayerAnimation::Idle);
@@ -783,9 +786,9 @@ pub fn player_move_inputs(
 }
 
 pub fn dispatch_active_skill_events(
-    mut ev: EventWriter<ActiveSkillUsedEvent>,
-    key_input: Res<Input<KeyCode>>,
-    mouse_input: Res<Input<MouseButton>>,
+    mut ev: MessageWriter<ActiveSkillUsedEvent>,
+    key_input: Res<ButtonInput<KeyCode>>,
+    mouse_input: Res<ButtonInput<MouseButton>>,
     player_q: Query<(&PlayerSkills, &ClassSkillSlots), With<Player>>,
     blessings_q: Query<&OwnedBlessings, With<Player>>,
     keybinds: Res<crate::keybinds::InputMappings>,
@@ -797,13 +800,13 @@ pub fn dispatch_active_skill_events(
     if bridge_mode.active {
         return;
     }
-    let Ok((skills, class_slots)) = player_q.get_single() else {
+    let Ok((skills, class_slots)) = player_q.single() else {
         return;
     };
-    let Ok(blessings) = blessings_q.get_single() else {
+    let Ok(blessings) = blessings_q.single() else {
         return;
     };
-    let gamepad_action_state = gamepad_action_q.get_single().ok();
+    let gamepad_action_state = gamepad_action_q.single().ok();
 
     // Already charging a ground-targeted skill's hold-to-aim reticle: only watch for the
     // button being released (fire) — don't look for a new press until this resolves. Checked
@@ -818,7 +821,7 @@ pub fn dispatch_active_skill_events(
                 let effective_cd = skills.effective_skill_cooldown(&skill, blessings);
                 let s = &class_slots.0[slot];
                 if s.max_charges > 0 && s.current_charges > 0 {
-                    ev.send(ActiveSkillUsedEvent {
+                    ev.write(ActiveSkillUsedEvent {
                         slot,
                         cooldown: effective_cd,
                     });
@@ -858,7 +861,7 @@ pub fn dispatch_active_skill_events(
                 return;
             }
             let effective_cd = skills.effective_skill_cooldown(&skill, blessings);
-            ev.send(ActiveSkillUsedEvent {
+            ev.write(ActiveSkillUsedEvent {
                 slot,
                 cooldown: effective_cd,
             });
@@ -870,7 +873,7 @@ pub fn dispatch_active_skill_events(
 /// `handle_active_skill_event`. This system only reacts to the event by starting the dash —
 /// `player_move_inputs` then applies the actual movement from `is_dashing`.
 pub fn handle_roll(
-    mut active_skill_events: EventReader<ActiveSkillUsedEvent>,
+    mut active_skill_events: MessageReader<ActiveSkillUsedEvent>,
     mut commands: Commands,
     mut game: GameParam,
     player_q: Query<(Entity, &PlayerSkills), With<Player>>,
@@ -879,7 +882,7 @@ pub fn handle_roll(
     if bridge_mode.active {
         return;
     }
-    let Ok((player_e, skills)) = player_q.get_single() else {
+    let Ok((player_e, skills)) = player_q.single() else {
         return;
     };
     let Some(roll_slot) = skills.has_active_skill(ActiveSkill::Roll) else {
@@ -887,7 +890,7 @@ pub fn handle_roll(
         return;
     };
     let mut should_dash = false;
-    for ev in active_skill_events.iter() {
+    for ev in active_skill_events.read() {
         if ev.slot == roll_slot {
             should_dash = true;
         }
@@ -938,14 +941,14 @@ pub fn manage_ability_phasing(
     >,
     time: Res<Time>,
 ) {
-    let Ok((entity, mut kcc, phasing_opt)) = player_query.get_single_mut() else {
+    let Ok((entity, mut kcc, phasing_opt)) = player_query.single_mut() else {
         return;
     };
 
     if let Some(mut phasing) = phasing_opt {
         phasing.timer.tick(time.delta());
 
-        if phasing.timer.finished() {
+        if phasing.timer.is_finished() {
             commands
                 .entity(entity)
                 .insert(CollisionGroups::new(Group::ALL, Group::ALL))
@@ -966,7 +969,7 @@ pub fn manage_ability_phasing(
 /// alternate trigger here rather than in every screen's own handler — see `src/ui/focus.rs`'s
 /// module doc for why Confirm needed per-handler plumbing but Cancel didn't.
 pub fn close_container(
-    key_input: Res<Input<KeyCode>>,
+    key_input: Res<ButtonInput<KeyCode>>,
     ui_gamepad_q: Query<&ActionState<UiGamepadAction>, With<UiGamepadInputMarker>>,
     curr_state: Res<State<UIState>>,
     game_state: Res<State<GameState>>,
@@ -974,7 +977,7 @@ pub fn close_container(
     wipe_popup: Query<(), With<WipeDataPopup>>,
     class_confirm: Res<ClassUnlockConfirmState>,
     skill_confirm: Res<SkillUnlockConfirmState>,
-    mut menu_button_events: EventWriter<MenuButtonClickEvent>,
+    mut menu_button_events: MessageWriter<MenuButtonClickEvent>,
     mut commands: Commands,
     mut ui_focus: ResMut<UiFocus>,
     active_options_tab: Res<ActiveOptionsTab>,
@@ -982,8 +985,8 @@ pub fn close_container(
     controller_carry: Res<crate::ui::ControllerCarry>,
 ) {
     let gamepad_cancel_pressed = ui_gamepad_q
-        .get_single()
-        .map(|a| a.just_pressed(UiGamepadAction::Cancel))
+        .single()
+        .map(|a| a.just_pressed(&UiGamepadAction::Cancel))
         .unwrap_or(false);
     if !key_input.just_pressed(KeyCode::Escape) && !gamepad_cancel_pressed {
         return;
@@ -1002,7 +1005,7 @@ pub fn close_container(
 
     // Options: first cancel from content/bottom controls returns focus to the tab bar;
     // a second cancel while a tab is focused closes the menu (Back below).
-    if curr_state.0 == UIState::Options && wipe_popup.is_empty() {
+    if *curr_state.get() == UIState::Options && wipe_popup.is_empty() {
         let on_tab_bar = ui_focus
             .focused
             .map(|entity| tab_buttons.get(entity).is_ok())
@@ -1019,11 +1022,11 @@ pub fn close_container(
         }
     }
 
-    let button = if game_state.0 == GameState::Main && curr_state.0 == UIState::Closed {
+    let button = if *game_state == GameState::Main && *curr_state.get() == UIState::Closed {
         MenuButton::Options
-    } else if curr_state.0 == UIState::Closed {
+    } else if *curr_state.get() == UIState::Closed {
         return;
-    } else if matches!(curr_state.0, UIState::ItemChest | UIState::Skills) {
+    } else if matches!(*curr_state.get(), UIState::ItemChest | UIState::Skills) {
         return;
     } else if !wipe_popup.is_empty() {
         MenuButton::WipeDataCancel
@@ -1035,7 +1038,7 @@ pub fn close_container(
         MenuButton::Back
     };
 
-    menu_button_events.send(MenuButtonClickEvent { button });
+    menu_button_events.write(MenuButtonClickEvent { button });
     commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.2));
 }
 
@@ -1044,24 +1047,24 @@ pub fn close_container(
 /// `close_container`'s generic `MenuButton::Back` fallback) just returns to `UIState::Closed`
 /// — see `UIState::Pause`'s doc comment for what this state is for.
 pub fn toggle_gamepad_pause(
-    key_input: Res<Input<KeyCode>>,
+    key_input: Res<ButtonInput<KeyCode>>,
     ui_gamepad_q: Query<&ActionState<UiGamepadAction>, With<UiGamepadInputMarker>>,
     game_state: Res<State<GameState>>,
     curr_ui_state: Res<State<UIState>>,
     mut next_ui_state: ResMut<NextState<UIState>>,
 ) {
-    if game_state.0 != GameState::Main {
+    if *game_state != GameState::Main {
         return;
     }
-    let pause_pressed = key_input.just_pressed(KeyCode::P)
+    let pause_pressed = key_input.just_pressed(KeyCode::KeyP)
         || ui_gamepad_q
-            .get_single()
-            .map(|a| a.just_pressed(UiGamepadAction::Pause))
+            .single()
+            .map(|a| a.just_pressed(&UiGamepadAction::Pause))
             .unwrap_or(false);
     if !pause_pressed {
         return;
     }
-    match curr_ui_state.0 {
+    match *curr_ui_state.get() {
         UIState::Closed => next_ui_state.set(UIState::Pause),
         UIState::Pause => next_ui_state.set(UIState::Closed),
         _ => {}
@@ -1071,36 +1074,36 @@ pub fn toggle_gamepad_pause(
 pub fn toggle_inventory(
     mut commands: Commands,
     mut game: GameParam,
-    key_input: Res<Input<KeyCode>>,
-    mouse_input: Res<Input<MouseButton>>,
-    mut dim_event: EventWriter<DimensionSpawnEvent>,
+    key_input: Res<ButtonInput<KeyCode>>,
+    mouse_input: Res<ButtonInput<MouseButton>>,
+    mut dim_event: MessageWriter<DimensionSpawnEvent>,
     proto: ProtoParam,
     inv: Query<&Inventory>,
     mut next_ui_state: ResMut<NextState<UIState>>,
     curr_ui_state: Res<State<UIState>>,
     cursor: Res<CursorPos>,
-    mut flash_event: EventWriter<FlashExpBarEvent>,
+    mut flash_event: MessageWriter<FlashExpBarEvent>,
     keybinds: Res<InputMappings>,
     mut chaos_tracker: ResMut<ChaosTracker>,
     gamepad_action_q: Query<&ActionState<GamepadAction>, With<Player>>,
 ) {
     let gamepad_pressed = crate::gamepad_input::gamepad_action_just_pressed(
-        gamepad_action_q.get_single().ok(),
+        gamepad_action_q.single().ok(),
         GamepadAction::ToggleInventory,
     );
     if keybinds.check_inv_input(&key_input, &mouse_input) || gamepad_pressed {
         // Don't allow opening inventory while item chest is open
-        if curr_ui_state.0 != UIState::ItemChest {
+        if *curr_ui_state.get() != UIState::ItemChest {
             // Closing the inventory from `InventoryCrafting` still acts as a toggle off.
             // `handle_new_ui_state` maps a no-op transition (next == current) to `Closed`,
             // so re-using the current state here hands that off correctly.
-            let target = if curr_ui_state.0 == UIState::InventoryCrafting {
+            let target = if *curr_ui_state.get() == UIState::InventoryCrafting {
                 UIState::InventoryCrafting
             } else {
                 UIState::Inventory
             };
             let opening_inventory =
-                curr_ui_state.0 == UIState::Closed && target == UIState::Inventory;
+                *curr_ui_state.get() == UIState::Closed && target == UIState::Inventory;
             next_ui_state.set(target);
 
             if opening_inventory {
@@ -1109,37 +1112,37 @@ pub fn toggle_inventory(
         }
     }
     if *DEBUG {
-        if key_input.just_pressed(KeyCode::P) {
-            dim_event.send(DimensionSpawnEvent {
+        if key_input.just_pressed(KeyCode::KeyP) {
+            dim_event.write(DimensionSpawnEvent {
                 swap_to_dim_now: true,
                 new_era: Some(Era::DungeonMain),
             });
         }
-        if key_input.just_pressed(KeyCode::O) {
-            dim_event.send(DimensionSpawnEvent {
+        if key_input.just_pressed(KeyCode::KeyO) {
+            dim_event.write(DimensionSpawnEvent {
                 swap_to_dim_now: true,
                 new_era: Some(Era::Third),
             });
         }
-        if key_input.just_pressed(KeyCode::C) {
+        if key_input.just_pressed(KeyCode::KeyC) {
             let xp_rate_bonus = game.get_xp_rate_bonus();
             let (did_level, gained_xp) =
                 game.get_player_level_mut()
                     .add_xp(200, xp_rate_bonus, &mut chaos_tracker);
 
-            flash_event.send(FlashExpBarEvent {
+            flash_event.write(FlashExpBarEvent {
                 amount: gained_xp,
                 did_level,
             });
         }
-        if key_input.just_pressed(KeyCode::K) {
-            dim_event.send(DimensionSpawnEvent {
+        if key_input.just_pressed(KeyCode::KeyK) {
+            dim_event.write(DimensionSpawnEvent {
                 swap_to_dim_now: true,
                 new_era: Some(Era::Main),
             });
         }
 
-        if key_input.just_pressed(KeyCode::L) {
+        if key_input.just_pressed(KeyCode::KeyL) {
             let pos = cursor.world_coords.truncate();
             if !can_spawn_mob_here(pos, &game, &proto, false) {
                 return;
@@ -1177,8 +1180,8 @@ pub fn toggle_inventory(
 ///
 /// Slots 4-5 are still part of the hotbar container for passive storage but have no binding.
 pub fn handle_hotbar_consume_keys(
-    key_input: Res<Input<KeyCode>>,
-    mut mouse_input: ResMut<Input<MouseButton>>,
+    key_input: Res<ButtonInput<KeyCode>>,
+    mut mouse_input: ResMut<ButtonInput<MouseButton>>,
     keybinds: Res<InputMappings>,
     mut game: GameParam,
     proto_param: ProtoParam,
@@ -1192,11 +1195,11 @@ pub fn handle_hotbar_consume_keys(
     mut bridge_mode: ResMut<BridgePlacementMode>,
     gamepad_action_q: Query<&ActionState<GamepadAction>, With<Player>>,
 ) {
-    let gamepad_action_state = gamepad_action_q.get_single().ok();
+    let gamepad_action_state = gamepad_action_q.single().ok();
     // Left-clicking a HUD hotbar slot (while the inventory is closed) triggers the same
     // consume action as pressing that slot's bound key.
     let mut clicked_slot: Option<usize> = None;
-    if ui_state.0 == UIState::Closed && mouse_input.just_pressed(MouseButton::Left) {
+    if *ui_state == UIState::Closed && mouse_input.just_pressed(MouseButton::Left) {
         let cursor = cursor_pos.ui_coords.truncate();
         let slot_y = -resolution.game_height * 0.5 + crate::ui::HUD_ACTION_ROW_Y_FROM_BOTTOM;
         let half = crate::ui::UI_SLOT_SIZE * 0.5;
@@ -1222,7 +1225,10 @@ pub fn handle_hotbar_consume_keys(
         {
             continue;
         }
-        let held_item_option = inv.single().items.items[slot].clone();
+        let Ok(inv) = inv.single() else {
+            continue;
+        };
+        let held_item_option = inv.items.items[slot].clone();
         let Some(held_item) = held_item_option else {
             continue;
         };
@@ -1256,14 +1262,20 @@ pub fn handle_hotbar_consume_keys(
 pub fn cursor_pos_in_world(
     windows: &Query<&Window, With<PrimaryWindow>>,
     cursor_pos: Vec2,
-    cam_t: &Transform,
+    cam_t: &GlobalTransform,
     cam: &Camera,
 ) -> Vec3 {
-    let window = windows.single();
+    let Ok(window) = windows.single() else {
+        return Vec3::ZERO;
+    };
+    // Match pre-0.19 NDC mapping (logical window px → orthographic world). Prefer
+    // viewport_to_world_2d when the camera's computed matrices are ready.
+    if let Ok(world_pos) = cam.viewport_to_world_2d(cam_t, cursor_pos) {
+        return world_pos.extend(cam_t.translation().z);
+    }
     let window_size = Vec2::new(window.width(), window.height());
-
-    let ndc_to_world = cam_t.compute_matrix() * cam.projection_matrix().inverse();
     let ndc = (cursor_pos / window_size) * 2.0 - Vec2::ONE;
+    let ndc_to_world = cam_t.to_matrix() * cam.clip_from_view().inverse();
     ndc_to_world.project_point3(ndc.extend(0.0))
 }
 pub fn cursor_pos_in_ui(
@@ -1271,16 +1283,20 @@ pub fn cursor_pos_in_ui(
     cursor_pos: Vec2,
     cam: &Camera,
 ) -> Vec3 {
-    let window = windows.single();
+    let Ok(window) = windows.single() else {
+        return Vec3::ZERO;
+    };
+    let gt = GlobalTransform::from(Transform::from_translation(Vec3::ZERO));
+    if let Ok(world_pos) = cam.viewport_to_world_2d(&gt, cursor_pos) {
+        return world_pos.extend(0.0);
+    }
     let window_size = Vec2::new(window.width(), window.height());
-
-    let t = Transform::from_translation(Vec3::ZERO);
-    let ndc_to_world = t.compute_matrix() * cam.projection_matrix().inverse();
     let ndc = (cursor_pos / window_size) * 2.0 - Vec2::ONE;
+    let ndc_to_world = gt.to_matrix() * cam.clip_from_view().inverse();
     ndc_to_world.project_point3(ndc.extend(0.0))
 }
 pub fn diagnostics(
-    mouse_button_input: Res<Input<MouseButton>>,
+    mouse_button_input: Res<ButtonInput<MouseButton>>,
     entities: Query<Entity>,
     mobs: Query<&Mob>,
     spawners: Res<GlobalSpawners>,
@@ -1293,12 +1309,12 @@ pub fn diagnostics(
 }
 pub fn mouse_click_system(
     mut commands: Commands,
-    mouse_button_input: Res<Input<MouseButton>>,
+    mouse_button_input: Res<ButtonInput<MouseButton>>,
     cursor_pos: Res<CursorPos>,
     mut game: GameParam,
     mut proto_param: ProtoParam,
-    mut attack_event: EventWriter<AttackEvent>,
-    mut hit_event: EventWriter<HitEvent>,
+    mut attack_event: MessageWriter<AttackEvent>,
+    mut hit_event: MessageWriter<HitEvent>,
 
     mut player_query: Query<
         (
@@ -1313,13 +1329,13 @@ pub fn mouse_click_system(
     >,
     ui_state: Res<State<UIState>>,
     ranged_query: Query<(&WorldObject, &RangedAttack), With<Equipment>>,
-    mut ranged_attack_event: EventWriter<RangedAttackEvent>,
+    mut ranged_attack_event: MessageWriter<RangedAttackEvent>,
     ammo_query_any: Query<&Ammo>,
     auto_attack: Res<AutoAttackState>,
     aim_params: AttackAimParams,
     bridge_mode: Res<BridgePlacementMode>,
 ) {
-    if ui_state.0 != UIState::Closed {
+    if *ui_state != UIState::Closed {
         return;
     }
     if bridge_placement_blocks_player_attack(bridge_mode) {
@@ -1328,16 +1344,19 @@ pub fn mouse_click_system(
 
     let cursor_tile_pos = world_pos_to_tile_pos(cursor_pos.world_coords.truncate());
     let player_pos = game.player().position;
-    let (
+    let Ok((
         player_e,
         attack_timer_option,
         player_anim,
         blessings,
         mut current_mana,
         gamepad_action_state,
-    ) = player_query.single_mut();
+    )) = player_query.single_mut()
+    else {
+        return;
+    };
     let gamepad_attack_pressed = gamepad_action_state
-        .map(|a| a.pressed(GamepadAction::Attack))
+        .map(|a| a.pressed(&GamepadAction::Attack))
         .unwrap_or(false);
 
     // Hit Item, send attack event
@@ -1349,7 +1368,17 @@ pub fn mouse_click_system(
                 cursor_pos.ui_coords,
             );
         }
-        if attack_timer_option.is_some() || player_anim.is_one_time_anim() {
+        // Weapon AttackTimer is the real cadence gate. Attack/Bow clips must NOT
+        // block the next swing — long class sheets (wizard ~600ms) are longer than
+        // typical cooldowns, so gating on `is_one_time_anim` desyncs anim from hits.
+        // Roll/parry/etc. still block.
+        if attack_timer_option.is_some() {
+            return;
+        }
+        if player_anim.is_one_time_anim()
+            && !player_anim.is_an_attack()
+            && !player_anim.is_shooting_bow()
+        {
             return;
         }
 
@@ -1369,7 +1398,7 @@ pub fn mouse_click_system(
         }
         let direction =
             aim_params.direction(player_pos.truncate(), cursor_pos.world_coords.truncate());
-        if let Ok((obj, ranged_tool)) = ranged_query.get_single() {
+        if let Ok((obj, ranged_tool)) = ranged_query.single() {
             // Gate ranged attacks on ammo availability for non-magic ranged weapons
             if obj.is_ranged_weapon() && !obj.is_magic_weapon() {
                 if let Some(main_hand) = game.player().main_hand_slot.clone() {
@@ -1407,7 +1436,7 @@ pub fn mouse_click_system(
                 1
             };
             for i in 0..trigger_count {
-                ranged_attack_event.send(RangedAttackEvent {
+                let _ = ranged_attack_event.write(RangedAttackEvent {
                     projectile: ranged_tool.0.clone(),
                     direction,
                     from_enemy: false,
@@ -1422,19 +1451,24 @@ pub fn mouse_click_system(
                         None
                     },
                     spawn_delay: weapon_projectile_spawn_delay(obj, i),
-                })
+                });
             }
         }
         let mut did_attack = false;
         if let Some(main_hand) = main_hand_option {
             if main_hand == WorldObject::WoodBow {
+                if player_anim.is_shooting_bow() {
+                    commands
+                        .entity(player_e)
+                        .insert(crate::animations::player_sprite::RestartPlayerAttackAnim);
+                }
                 commands
                     .entity(player_e)
                     .insert(PlayerAnimation::Bow)
                     .insert(crate::animations::player_sprite::AttackAnimationTimer(
                         Timer::from_seconds(1.0, TimerMode::Once),
                     ));
-                attack_event.send(AttackEvent {
+                attack_event.write(AttackEvent {
                     direction,
                     ignore_cooldown: false,
                 });
@@ -1448,6 +1482,12 @@ pub fn mouse_click_system(
             }
         }
         if did_attack {
+            // Already in Attack → `Changed<PlayerAnimation>` won't fire; force clip restart.
+            if player_anim.is_an_attack() {
+                commands
+                    .entity(player_e)
+                    .insert(crate::animations::player_sprite::RestartPlayerAttackAnim);
+            }
             commands
                 .entity(player_e)
                 .insert(PlayerAnimation::Attack)
@@ -1455,7 +1495,7 @@ pub fn mouse_click_system(
                     Timer::from_seconds(1.0, TimerMode::Once),
                 ));
         }
-        attack_event.send(AttackEvent {
+        attack_event.write(AttackEvent {
             direction,
             ignore_cooldown: false,
         });
@@ -1472,7 +1512,7 @@ pub fn mouse_click_system(
             }
             let (damage, was_crit, was_overcrit) =
                 game.calculate_player_damage(0, None, 0, None, 0, 0, true);
-            hit_event.send(HitEvent {
+            hit_event.write(HitEvent {
                 hit_by_pet: None,
                 hit_entity: hit_obj,
                 damage: damage as i32,
@@ -1514,21 +1554,23 @@ pub fn handle_interact_objects(
     mut proto_param: ProtoParam,
     mut item_action_param: ItemActionParam,
     mut commands: Commands,
-    key_input: Res<Input<KeyCode>>,
-    mouse_input: Res<Input<MouseButton>>,
+    key_input: Res<ButtonInput<KeyCode>>,
+    mouse_input: Res<ButtonInput<MouseButton>>,
     keybinds: Res<InputMappings>,
     gamepad_action_q: Query<&ActionState<GamepadAction>, With<Player>>,
 ) {
     let gamepad_pressed = gamepad_action_q
-        .get_single()
-        .map(|a| a.just_pressed(GamepadAction::Interact))
+        .single()
+        .map(|a| a.just_pressed(&GamepadAction::Interact))
         .unwrap_or(false);
     if !keybinds.check_interact_input(&key_input, &mouse_input) && !gamepad_pressed {
         return;
     }
     for (obj_e, t, obj_action, obj, anchor, guide) in objs.iter() {
         let obj_t = t.translation().truncate() - anchor.0;
-        let (player_t, mut inv) = player_query.single_mut();
+        let Ok((player_t, mut inv)) = player_query.single_mut() else {
+            return;
+        };
         if obj_t.distance(player_t.translation().truncate()) <= guide.activation_distance {
             obj_action.run_action(
                 obj_e,
@@ -1546,12 +1588,12 @@ pub fn handle_interact_objects(
 
 pub fn handle_open_essence_ui(
     mut commands: Commands,
-    key_input: Res<Input<KeyCode>>,
-    mouse_input: Res<Input<MouseButton>>,
+    key_input: Res<ButtonInput<KeyCode>>,
+    mouse_input: Res<ButtonInput<MouseButton>>,
     keybinds: Res<InputMappings>,
     player_query: Query<&GlobalTransform, With<Player>>,
     nearby_merchant_query: Query<
-        (Entity, &GlobalTransform, &EssenceShopChoices),
+        (Entity, &GlobalTransform, &MerchantShop),
         (
             Without<crate::item::shrine_visuals::ShrineNeedsRepair>,
             Without<PendingShrineRepairFinish>,
@@ -1564,21 +1606,24 @@ pub fn handle_open_essence_ui(
     gamepad_action_q: Query<&ActionState<GamepadAction>, With<Player>>,
 ) {
     let gamepad_pressed = gamepad_action_q
-        .get_single()
-        .map(|a| a.just_pressed(GamepadAction::Interact))
+        .single()
+        .map(|a| a.just_pressed(&GamepadAction::Interact))
         .unwrap_or(false);
     if !keybinds.check_interact_input(&key_input, &mouse_input) && !gamepad_pressed {
         return;
     }
     // Re-pressing interact while the shop is open toggles `Essence` closed in
     // `handle_new_ui_state`; ignore repeat presses until the player closes via Done.
-    if curr_ui_state.0 == UIState::Essence || open_lock.is_some() {
+    if *curr_ui_state.get() == UIState::Essence || open_lock.is_some() {
         return;
     }
-    let player_t = player_query.single().translation().truncate();
-    for (_entity, transform, choices) in nearby_merchant_query.iter() {
+    let Ok(player_t) = player_query.single() else {
+        return;
+    };
+    let player_t = player_t.translation().truncate();
+    for (_entity, transform, shop) in nearby_merchant_query.iter() {
         if player_t.distance(transform.translation().truncate()) < SHRINE_INTERACT_GUIDE_DISTANCE {
-            commands.insert_resource(choices.clone());
+            commands.insert_resource(shop.to_resource());
             commands.insert_resource(crate::ui::MerchantShopOpenLock(Timer::from_seconds(
                 0.45,
                 TimerMode::Once,
@@ -1602,14 +1647,16 @@ pub fn move_camera_with_player(
     time: Res<Time>,
     resolution: Res<ScreenResolution>,
 ) {
-    let (mut game_camera_transform, mut raw_camera_pos) = game_camera.single_mut();
-    let Ok((_player_pos, raw_player_pos, _player_movement_vec)) = player_query.get_single() else {
+    let Ok((mut game_camera_transform, mut raw_camera_pos)) = game_camera.single_mut() else {
+        return;
+    };
+    let Ok((_player_pos, raw_player_pos, _player_movement_vec)) = player_query.single() else {
         return;
     };
 
     let camera_lookahead_scale = 4.0;
     let delta = raw_player_pos.0 - raw_camera_pos.0;
-    raw_camera_pos.0 += delta * camera_lookahead_scale * time.delta_seconds();
+    raw_camera_pos.0 += delta * camera_lookahead_scale * time.delta_secs();
 
     let pixel_step = 1.0 / resolution.scale as f32;
     game_camera_transform.translation.x = (raw_camera_pos.x / pixel_step).round() * pixel_step;

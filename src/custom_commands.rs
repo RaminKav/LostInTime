@@ -1,3 +1,5 @@
+use crate::aseprite_assets::Electricity;
+use crate::aseprite_helpers::ase_animation;
 use crate::{
     animations::AnimationTimer,
     assets::{SpriteAnchor, SpriteSize},
@@ -11,7 +13,6 @@ use crate::{
         projectile::{ArcProjectileData, Projectile},
         EquipmentType, ItemDrop, Wall, WorldObject,
     },
-    player::mage_skills::Electricity,
     proto::proto_param::ProtoParam,
     world::{
         wall_auto_tile::Dirty,
@@ -20,7 +21,7 @@ use crate::{
     },
 };
 use bevy::prelude::*;
-use bevy_aseprite::{anim::AsepriteAnimation, Aseprite};
+use bevy_aseprite_ultra::prelude::Aseprite;
 use bevy_rapier2d::prelude::{ActiveCollisionTypes, ActiveEvents, Collider, Sensor};
 use core::fmt::Display;
 use std::f32::consts::PI;
@@ -69,7 +70,7 @@ impl CommandsExt for Commands<'_, '_> {
         level: Option<u8>,
     ) -> Option<Entity> {
         if let Some(spawned_entity) = self.spawn_from_proto(obj.clone(), &params.defs, pos) {
-            let Some(mut spawned_entity_commands) = self.get_entity(spawned_entity) else {
+            let Ok(mut spawned_entity_commands) = self.get_entity(spawned_entity) else {
                 return None;
             };
 
@@ -104,17 +105,10 @@ impl CommandsExt for Commands<'_, '_> {
                         // Full SpriteSheetBundle (not bare atlas+sprite) so GlobalTransform
                         // is always present even if spawn_from_def regresses.
                         spawned_entity_commands
-                            .insert(SpriteSheetBundle {
-                                texture_atlas: params
-                                    .graphics
-                                    .texture_atlas
-                                    .as_ref()
-                                    .unwrap()
-                                    .clone(),
-                                sprite: sprite.clone(),
-                                transform: Transform::from_translation(pos.extend(0.)),
-                                ..default()
-                            })
+                            .insert((
+                                sprite.clone(),
+                                Transform::from_translation(pos.extend(0.)),
+                            ))
                             .remove::<PendingSpriteSheet>()
                             .remove::<PendingSpriteTexture>();
                     }
@@ -141,7 +135,7 @@ impl CommandsExt for Commands<'_, '_> {
         scale_up: f32,
     ) -> Option<Entity> {
         if let Some(spawned_entity) = self.spawn_from_proto(obj.clone(), &params.defs, pos) {
-            let Some(mut spawned_entity_commands) = self.get_entity(spawned_entity) else {
+            let Ok(mut spawned_entity_commands) = self.get_entity(spawned_entity) else {
                 return None;
             };
 
@@ -171,7 +165,7 @@ impl CommandsExt for Commands<'_, '_> {
             proto_data.mana_bar_full = mana_bar_full;
             spawned_entity_commands
                 .insert(proto_data)
-                .insert(TransformBundle::from_transform(Transform {
+                .insert(Transform {
                     translation: pos.extend(0.)
                         + Vec3::new(
                             x_offset + (angle.cos() * proj_state.spawn_offset.x * scale_up),
@@ -181,19 +175,23 @@ impl CommandsExt for Commands<'_, '_> {
                     rotation: Quat::from_rotation_z(angle + custom_rotation.unwrap_or(0.)),
                     scale: Vec3::splat(scale_up),
                     ..default()
-                }))
+                })
                 .insert(ActiveEvents::COLLISION_EVENTS)
                 .insert(Name::new("Projectile"))
                 .insert(ActiveCollisionTypes::all())
                 .remove::<ItemStack>();
 
+            // Sprite only — do not re-insert Transform here. A bare
+            // `Transform::from_translation` was wiping the aimed `rotation` /
+            // spawn offset set above (Bevy 0.19 Sprite migration footgun; 0.10
+            // only swapped atlas/sprite handles).
             if let Some(sprite_map) = &params.graphics.spritesheet_map {
                 if let Some(obj_type) = params.get_component::<WorldObject, _>(obj.clone()) {
                     if let Some(sprite) = sprite_map.get(obj_type) {
                         spawned_entity_commands
-                            .insert(params.graphics.texture_atlas.as_ref().unwrap().clone())
                             .insert(sprite.clone())
-                            .remove::<PendingSpriteSheet>();
+                            .remove::<PendingSpriteSheet>()
+                            .remove::<PendingSpriteTexture>();
                     }
                 }
             }
@@ -201,7 +199,7 @@ impl CommandsExt for Commands<'_, '_> {
                 spawned_entity_commands.with_children(|parent| {
                     let angle = arc_data.col_points[0];
                     parent.spawn((
-                        TransformBundle::from_transform(Transform {
+                        Transform {
                             translation: (Vec3::new(
                                 (angle.cos() * (arc_data.size.x) + angle.cos() * (arc_data.size.y))
                                     / 2.,
@@ -211,7 +209,7 @@ impl CommandsExt for Commands<'_, '_> {
                             )),
                             rotation: Quat::from_rotation_z((arc_data.col_points[0]) - PI / 2.),
                             ..default()
-                        }),
+                        },
                         Sensor,
                         Collider::cuboid(
                             arc_data.col_size.x * scale_up,
@@ -225,24 +223,36 @@ impl CommandsExt for Commands<'_, '_> {
             if let Some(proj) = params.get_component::<Projectile, _>(obj.clone()) {
                 if proj == &Projectile::Electricity {
                     spawned_entity_commands
-                        .insert(AsepriteAnimation::from(Electricity::tags::ELECTRICITY))
-                        .insert(asset_server.load::<Aseprite, _>(Electricity::PATH))
-                        .remove::<TextureAtlasSprite>()
-                        .remove::<Handle<TextureAtlas>>()
+                        .insert((
+                            ase_animation(
+                                asset_server.load::<Aseprite>(Electricity::PATH),
+                                Electricity::tags::ELECTRICITY,
+                                false,
+                            ),
+                            Sprite::default(),
+                        ))
                         .remove::<AnimationTimer>();
                 } else if proj == &Projectile::EnergyBall {
                     spawned_entity_commands
-                        .insert(AsepriteAnimation::from("Bullet"))
-                        .insert(asset_server.load::<Aseprite, _>("textures/effects/EnergyBall.ase"))
-                        .remove::<TextureAtlasSprite>()
-                        .remove::<Handle<TextureAtlas>>()
+                        .insert((
+                            ase_animation(
+                                asset_server.load::<Aseprite>("textures/effects/EnergyBall.ase"),
+                                "Bullet",
+                                false,
+                            ),
+                            Sprite::default(),
+                        ))
                         .remove::<AnimationTimer>();
                 } else if proj == &Projectile::Bomb {
                     spawned_entity_commands
-                        .insert(AsepriteAnimation::from("Bomb"))
-                        .insert(asset_server.load::<Aseprite, _>("textures/effects/Bomb.ase"))
-                        .remove::<TextureAtlasSprite>()
-                        .remove::<Handle<TextureAtlas>>()
+                        .insert((
+                            ase_animation(
+                                asset_server.load::<Aseprite>("textures/effects/Bomb.ase"),
+                                "Bomb",
+                                false,
+                            ),
+                            Sprite::default(),
+                        ))
                         .remove::<AnimationTimer>();
                 }
             }
@@ -279,7 +289,7 @@ impl CommandsExt for Commands<'_, '_> {
             return None;
         };
         let spawned_entity = spawn_from_def(self, def, pos);
-        let Some(mut spawned_entity_commands) = self.get_entity(spawned_entity) else {
+        let Ok(mut spawned_entity_commands) = self.get_entity(spawned_entity) else {
             return None;
         };
         let relative_tile_pos = world_pos_to_chunk_relative_tile_pos(pos);
@@ -292,29 +302,19 @@ impl CommandsExt for Commands<'_, '_> {
         if let Some(anchor) = proto_param.get_component::<SpriteAnchor, _>(obj.clone()) {
             final_transform.translation = pos + anchor.0.extend(0.);
         }
-        spawned_entity_commands
-            .insert(TransformBundle::from_transform(final_transform));
+        spawned_entity_commands.insert(final_transform);
 
         if let Some(_wall) = proto_param.get_component::<Wall, _>(obj.clone()) {
             let sprite_data = proto_param
                 .get_component::<WallTextureData, _>(obj.clone())
                 .unwrap();
+            let wall_index =
+                (sprite_data.obj_bit_index + sprite_data.texture_offset * 32) as usize;
             spawned_entity_commands
-                .insert(SpriteSheetBundle {
-                    texture_atlas: proto_param
-                        .graphics
-                        .wall_texture_atlas
-                        .as_ref()
-                        .unwrap()
-                        .clone(),
-                    sprite: TextureAtlasSprite {
-                        index: (sprite_data.obj_bit_index + sprite_data.texture_offset * 32)
-                            as usize,
-                        ..default()
-                    },
-                    transform: final_transform,
-                    ..default()
-                })
+                .insert((
+                    proto_param.graphics.wall_sprite(wall_index),
+                    final_transform,
+                ))
                 .remove::<PendingSpriteSheet>()
                 .remove::<PendingSpriteTexture>();
             if is_dirty {
@@ -323,24 +323,27 @@ impl CommandsExt for Commands<'_, '_> {
         } else if let Some(texture_path) = def.sprite_texture.as_ref() {
             // Match old SpriteBundle: use native image size, except BossShrine which
             // was always forced to 128² by the spawn failsafe.
+            let texture_path = texture_path.clone();
             let custom_size = proto_param
                 .get_world_object(obj.clone())
                 .filter(|o| **o == WorldObject::BossShrine)
                 .map(|_| Vec2::new(128., 128.));
-            spawned_entity_commands
-                .insert(SpriteBundle {
-                    texture: proto_param.asset_server.load::<Image, _>(texture_path.as_str()),
-                    sprite: Sprite {
-                        custom_size,
-                        ..default()
-                    },
-                    transform: final_transform,
+            let image: Handle<Image> = proto_param.asset_server.load(texture_path);
+            let sprite_bundle = (
+                Sprite {
+                    image,
+                    custom_size,
                     ..default()
-                })
+                },
+                final_transform,
+            );
+            // Standalone PNG objects (trees, large cactuses, etc.). Do not remove
+            // `Sprite` — that was a 0.19 migration mistake (old code removed atlas
+            // handles only) and left these entities invisible.
+            spawned_entity_commands
+                .insert(sprite_bundle)
                 .remove::<PendingSpriteSheet>()
-                .remove::<PendingSpriteTexture>()
-                .remove::<TextureAtlasSprite>()
-                .remove::<Handle<TextureAtlas>>();
+                .remove::<PendingSpriteTexture>();
         } else if let Some(sprite_map) = &proto_param.graphics.spritesheet_map {
             if let Some(obj_type) = proto_param.get_component::<WorldObject, _>(obj.clone()) {
                 if crate::item::shrine_visuals::uses_standalone_shrine_texture(obj_type)
@@ -349,17 +352,7 @@ impl CommandsExt for Commands<'_, '_> {
                     // Art applied by shrine_visuals / special systems.
                 } else if let Some(sprite) = sprite_map.get(obj_type) {
                     spawned_entity_commands
-                        .insert(SpriteSheetBundle {
-                            texture_atlas: proto_param
-                                .graphics
-                                .texture_atlas
-                                .as_ref()
-                                .unwrap()
-                                .clone(),
-                            sprite: sprite.clone(),
-                            transform: final_transform,
-                            ..default()
-                        })
+                        .insert((sprite.clone(), final_transform))
                         .remove::<PendingSpriteSheet>()
                         .remove::<PendingSpriteTexture>();
                 }

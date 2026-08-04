@@ -1,3 +1,4 @@
+use bevy::text::Justify;
 use crate::{
     assets::Graphics,
     audio::{AudioSoundEffect, SoundSpawner},
@@ -6,13 +7,15 @@ use crate::{
     cursor::CursorPos,
     datafiles,
     ui::{
-        interactions::Interaction, minimap::IslandMapOpen, ui_helpers, game_fonts as gf,
-        Interactable, UIElement, UIState,
+        game_fonts as gf,
+        interactions::{set_sprite_image, Interaction},
+        minimap::IslandMapOpen,
+        ui_helpers, Interactable, UIElement, UIState,
     },
     GameState,
 };
 
-use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
+use bevy::{camera::visibility::RenderLayers, prelude::*, sprite::Anchor};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashSet,
@@ -53,6 +56,7 @@ impl Tip {
     }
 }
 
+#[derive(Message)]
 pub struct TipEvent {
     pub tip: Tip,
     pub pos: Vec3,
@@ -109,27 +113,28 @@ pub struct TipPlugin;
 impl Plugin for TipPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<SeenTips>()
-            .add_event::<TipEvent>()
+            .add_message::<TipEvent>()
             .add_systems(
+                Update,
                 (
                     spawn_tip_handler,
                     handle_tip_ok_button_click,
                     test_tip,
                     handle_tip_box_pause_state,
                 )
-                    .in_set(OnUpdate(GameState::Main)),
+                    .run_if(in_state(GameState::Main)),
             );
     }
 }
 
 pub fn spawn_tip_handler(
-    mut events: EventReader<TipEvent>,
+    mut events: MessageReader<TipEvent>,
     mut commands: Commands,
     graphics: Res<Graphics>,
     asset_server: Res<AssetServer>,
     seen_tips: Res<SeenTips>,
 ) {
-    for event in events.iter() {
+    for event in events.read() {
         let tip = &event.tip;
 
         // if seen_tips.has_seen(tip) {
@@ -139,74 +144,66 @@ pub fn spawn_tip_handler(
         let tip_text = tip.get_tip_text();
 
         let tipbox = commands
-            .spawn(SpriteBundle {
-                texture: graphics.get_ui_element_texture(UIElement::TipBox),
-                sprite: Sprite {
+            .spawn((
+                Sprite {
+                    image: graphics.get_ui_element_texture(UIElement::TipBox),
                     custom_size: Some(Vec2::new(198.5, 102.5)),
-                    ..Default::default()
+                    ..default()
                 },
-                transform: Transform {
+                Transform {
                     translation: event.pos,
                     scale: Vec3::new(1., 1., 1.),
                     ..Default::default()
                 },
-                ..Default::default()
-            })
+            ))
             .insert(RenderLayers::from_layers(&[3]))
             .insert(TipBox { tip: tip.clone() })
             .insert(Name::new(format!("TIP {:?}", tip)))
             .id();
 
         commands
-            .spawn(Text2dBundle {
-                text: Text::from_section(
-                    "Tip!",
-                    gf::TOOLTIP_HEADER_BOLD.text_style(&asset_server, DARK_WOOD_BROWN),
-                )
-                .with_alignment(TextAlignment::Left),
-                text_anchor: Anchor::CenterLeft,
-                transform: Transform {
-                    translation: Vec3::new(-14., 31., 1.),
-                    scale: gf::TOOLTIP_HEADER_BOLD.transform_scale(),
-                    ..Default::default()
-                },
-                ..Default::default()
-            })
+            .spawn(
+                gf::TOOLTIP_HEADER_BOLD
+                    .text(&asset_server, "Tip!", DARK_WOOD_BROWN)
+                    .justify(Justify::Left)
+                    .anchor(Anchor::CENTER_LEFT)
+                    .with_transform(Transform {
+                        translation: Vec3::new(-14., 31., 1.),
+                        scale: gf::TOOLTIP_HEADER_BOLD.transform_scale(),
+                        ..Default::default()
+                    }),
+            )
             .insert(RenderLayers::from_layers(&[3]))
-            .set_parent(tipbox);
+            .insert(ChildOf(tipbox));
         // Spawn tip text
         commands
-            .spawn(Text2dBundle {
-                text: Text::from_section(
-                    tip_text,
-                    gf::TOOLTIP_BODY.text_style(&asset_server, DARK_WOOD_BROWN),
-                )
-                .with_alignment(TextAlignment::Left),
-                text_anchor: Anchor::CenterLeft,
-                transform: Transform {
-                    translation: Vec3::new(-78., -4., 1.),
-                    scale: gf::TOOLTIP_BODY.transform_scale(),
-                    ..Default::default()
-                },
-                ..Default::default()
-            })
+            .spawn(
+                gf::TOOLTIP_BODY
+                    .text(&asset_server, tip_text, DARK_WOOD_BROWN)
+                    .justify(Justify::Left)
+                    .anchor(Anchor::CENTER_LEFT)
+                    .with_transform(Transform {
+                        translation: Vec3::new(-78., -4., 1.),
+                        scale: gf::TOOLTIP_BODY.transform_scale(),
+                        ..Default::default()
+                    }),
+            )
             .insert(RenderLayers::from_layers(&[3]))
-            .set_parent(tipbox);
+            .insert(ChildOf(tipbox));
 
         // Spawn OK button
         let ok_button = commands
-            .spawn(SpriteBundle {
-                texture: graphics.get_ui_element_texture(UIElement::BackButton),
-                sprite: Sprite {
+            .spawn((
+                Sprite {
+                    image: graphics.get_ui_element_texture(UIElement::BackButton),
                     custom_size: Some(Vec2::new(50., 20.)),
-                    ..Default::default()
+                    ..default()
                 },
-                transform: Transform {
+                Transform {
                     translation: Vec3::new(0., -50., 1.),
                     ..Default::default()
                 },
-                ..Default::default()
-            })
+            ))
             .insert(Interactable::default())
             .insert(UIElement::BackButton)
             .insert(TipOkButton)
@@ -216,32 +213,29 @@ pub fn spawn_tip_handler(
             .id();
 
         commands
-            .spawn(Text2dBundle {
-                text: Text::from_section(
-                    "OK",
-                    gf::MENU_TITLE.text_style(&asset_server, WHITE),
-                ),
-                text_anchor: Anchor::Center,
-                transform: Transform {
-                    translation: Vec3::new(0., 0., 1.),
-                    scale: gf::MENU_TITLE.transform_scale(),
-                    ..default()
-                },
-                ..Default::default()
-            })
+            .spawn(
+                gf::MENU_TITLE
+                    .text(&asset_server, "OK", WHITE)
+                    .anchor(Anchor::CENTER)
+                    .with_transform(Transform {
+                        translation: Vec3::new(0., 0., 1.),
+                        scale: gf::MENU_TITLE.transform_scale(),
+                        ..default()
+                    }),
+            )
             .insert(RenderLayers::from_layers(&[3]))
-            .set_parent(ok_button);
+            .insert(ChildOf(ok_button));
 
-        commands.entity(tipbox).push_children(&[ok_button]);
+        commands.entity(tipbox).add_children(&[ok_button]);
     }
 }
 
 pub fn handle_tip_ok_button_click(
     cursor_pos: Res<CursorPos>,
-    mouse_input: Res<Input<MouseButton>>,
+    mouse_input: Res<ButtonInput<MouseButton>>,
     ui_focus: Res<crate::ui::focus::UiFocus>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
-    mut ok_buttons: Query<(Entity, &mut Interactable, &Parent), With<TipOkButton>>,
+    mut ok_buttons: Query<(Entity, &mut Interactable, &ChildOf), With<TipOkButton>>,
     tip_boxes: Query<(Entity, &TipBox)>,
     mut commands: Commands,
     graphics: Res<Graphics>,
@@ -263,18 +257,22 @@ pub fn handle_tip_ok_button_click(
                     commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonHover, 0.05));
                     commands
                         .entity(button_entity)
-                        .insert(UIElement::BackButtonHover)
-                        .insert(graphics.get_ui_element_texture(UIElement::BackButtonHover));
+                        .insert(UIElement::BackButtonHover);
+                    set_sprite_image(
+                        &mut commands,
+                        button_entity,
+                        graphics.get_ui_element_texture(UIElement::BackButtonHover),
+                    );
                 }
                 Interaction::Hovering => {
                     if confirm_pressed {
                         commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.2));
-                        if let Ok((tip_box_entity, tip_box)) = tip_boxes.get(parent.get()) {
+                        if let Ok((tip_box_entity, tip_box)) = tip_boxes.get(parent.parent()) {
                             seen_tips.mark_seen(tip_box.tip.clone());
 
                             persist_seen_tips(&seen_tips);
 
-                            commands.entity(tip_box_entity).despawn_recursive();
+                            commands.entity(tip_box_entity).despawn();
                         }
                     }
                 }
@@ -282,39 +280,41 @@ pub fn handle_tip_ok_button_click(
             }
         } else if matches!(interactable.current(), Interaction::Hovering) {
             interactable.change(Interaction::None);
-            commands
-                .entity(button_entity)
-                .insert(UIElement::BackButton)
-                .insert(graphics.get_ui_element_texture(UIElement::BackButton));
+            commands.entity(button_entity).insert(UIElement::BackButton);
+            set_sprite_image(
+                &mut commands,
+                button_entity,
+                graphics.get_ui_element_texture(UIElement::BackButton),
+            );
         }
     }
 }
 
-pub fn test_tip(mut events: EventWriter<TipEvent>, mut done: Local<bool>) {
+pub fn test_tip(mut events: MessageWriter<TipEvent>, mut done: Local<bool>) {
     // if !*done {
     //     *done = true;
-    //     events.send(TipEvent {
+    //     events.write(TipEvent {
     //         tip: Tip::Chaos,
     //         pos: Vec3::new(-200., -100., 30.),
     //     });
-    //     events.send(TipEvent {
+    //     events.write(TipEvent {
     //         tip: Tip::EndlessMode,
     //         pos: Vec3::new(0., -100., 30.),
     //     });
-    //     events.send(TipEvent {
+    //     events.write(TipEvent {
     //         tip: Tip::PeacefulPeriod,
     //         pos: Vec3::new(196., -100., 30.),
     //     });
 
-    //     events.send(TipEvent {
+    //     events.write(TipEvent {
     //         tip: Tip::Night,
     //         pos: Vec3::new(-200., 120., 30.),
     //     });
-    //     events.send(TipEvent {
+    //     events.write(TipEvent {
     //         tip: Tip::PinkFlowers,
     //         pos: Vec3::new(0., 120., 30.),
     //     });
-    //     events.send(TipEvent {
+    //     events.write(TipEvent {
     //         tip: Tip::InventoryStats,
     //         pos: Vec3::new(196., 120., 30.),
     //     });
@@ -334,19 +334,19 @@ pub fn handle_tip_box_pause_state(
     minimap_open: Res<IslandMapOpen>,
 ) {
     let has_tip_boxes = !tip_boxes.is_empty();
-    let ui_is_closed = curr_ui_state.0 == UIState::Closed;
+    let ui_is_closed = *curr_ui_state.get() == UIState::Closed;
     // `State<UIState>` may still be Closed this frame while input already queued a menu open.
-    let pending_opens_ui = next_ui_state
-        .0
-        .as_ref()
-        .map_or(false, |s| *s != UIState::Closed);
+    let pending_opens_ui = match &*next_ui_state {
+        NextState::Pending(s) | NextState::PendingIfNeq(s) => *s != UIState::Closed,
+        NextState::Unchanged => false,
+    };
 
     if has_tip_boxes || minimap_open.0 {
-        if curr_client_state.0 != ClientState::Paused {
+        if *curr_client_state.get() != ClientState::Paused {
             next_client_state.set(ClientState::Paused);
         }
     } else if ui_is_closed && !pending_opens_ui {
-        if curr_client_state.0 != ClientState::Unpaused {
+        if *curr_client_state.get() != ClientState::Unpaused {
             next_client_state.set(ClientState::Unpaused);
         }
     }

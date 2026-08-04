@@ -35,54 +35,52 @@ pub fn spawn_tile_hover_on_cursor_move(
     main_hand: Query<&WorldObject, With<MainHand>>,
 ) {
     if !cheat_settings.show_tile_hover {
-        if let Ok((e, _)) = tile_hover_check.get_single() {
+        if let Ok((e, _)) = tile_hover_check.single() {
             commands.entity(e).despawn();
         }
         return;
     }
 
     let tile_pos = world_pos_to_tile_pos(cursor.world_coords.truncate());
-    if let Ok((e, tile_hover)) = tile_hover_check.get_single() {
+    if let Ok((e, tile_hover)) = tile_hover_check.single() {
         if tile_hover.pos == tile_pos && !game.world_obj_cache.is_changed() {
             return;
         }
         commands.entity(e).despawn();
     }
-    let main_hand_obj = main_hand.get_single();
+    let Ok(main_hand_obj) = main_hand.single() else {
+        return;
+    };
     let mut hover = UIElement::TileHover;
 
-    if let Ok(main_hand) = main_hand_obj {
-        // check space for placing
-        if let Some(actions) = proto_param.get_component::<ItemActions, _>(*main_hand) {
-            for action in actions.actions.clone() {
-                hover = match action {
-                    ItemAction::PlacesInto(obj) => {
-                        if !can_object_be_placed_here(tile_pos, &mut game, obj, &proto_param) {
-                            UIElement::BlockedTileHover
-                        } else {
-                            UIElement::TileHover
-                        }
+    if let Some(actions) = proto_param.get_component::<ItemActions, _>(*main_hand_obj) {
+        for action in actions.actions.clone() {
+            hover = match action {
+                ItemAction::PlacesInto(obj) => {
+                    if !can_object_be_placed_here(tile_pos, &mut game, obj, &proto_param) {
+                        UIElement::BlockedTileHover
+                    } else {
+                        UIElement::TileHover
                     }
-                    _ => UIElement::TileHover,
-                };
-            }
+                }
+                _ => UIElement::TileHover,
+            };
         }
     }
 
     commands
-        .spawn(SpriteBundle {
-            texture: graphics.get_ui_element_texture(hover),
-            transform: Transform {
+        .spawn((
+            Sprite {
+                image: graphics.get_ui_element_texture(hover),
+                custom_size: Some(Vec2::new(16., 16.)),
+                ..default()
+            },
+            Transform {
                 translation: tile_pos_to_world_pos(tile_pos, false).extend(1.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
-            sprite: Sprite {
-                custom_size: Some(Vec2::new(16., 16.)),
-                ..Default::default()
-            },
-            ..Default::default()
-        })
+        ))
         .insert(TileHover { pos: tile_pos })
         .insert(YSort(-0.2));
 }

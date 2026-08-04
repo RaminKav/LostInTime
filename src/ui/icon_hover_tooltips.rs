@@ -1,4 +1,5 @@
-use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
+use bevy::text::Justify;
+use bevy::{camera::visibility::RenderLayers, prelude::*, sprite::Anchor};
 
 use crate::{
     colors::WHITE,
@@ -10,8 +11,10 @@ use crate::{
     ScreenResolution,
 };
 
+
 /// Grey translucent backdrop (same fill as HUD keybind badges).
-pub const ICON_HOVER_TOOLTIP_BG_COLOR: Color = Color::rgba(62. / 255., 58. / 255., 58. / 255., 0.9);
+pub const ICON_HOVER_TOOLTIP_BG_COLOR: Color =
+    Color::srgba(62. / 255., 58. / 255., 58. / 255., 0.9);
 
 /// World-space Z for icon hover tooltips (above inventory panels and slots).
 pub const ICON_HOVER_TOOLTIP_Z: f32 = 30.0;
@@ -79,7 +82,7 @@ pub fn spawn_icon_hover_tooltip(
 
     let root = commands
         .spawn((
-            SpatialBundle::from_transform(Transform::from_translation(pos)),
+            (Transform::from_translation(pos), Visibility::default()),
             RenderLayers::from_layers(&[3]),
             IconHoverTooltip,
             Name::new("Icon Hover Tooltip"),
@@ -87,16 +90,16 @@ pub fn spawn_icon_hover_tooltip(
         .id();
 
     commands
-        .spawn(SpriteBundle {
-            sprite: Sprite {
+        .spawn((
+            Sprite {
                 color: ICON_HOVER_TOOLTIP_BG_COLOR,
                 custom_size: Some(size),
                 ..default()
             },
-            ..default()
-        })
+            Transform::default(),
+        ))
         .insert(RenderLayers::from_layers(&[3]))
-        .set_parent(root);
+        .insert(ChildOf(root));
 
     // Stack each line top-down so the block is vertically centered inside the backdrop.
     let line_count = lines.len().max(1) as f32;
@@ -104,22 +107,19 @@ pub fn spawn_icon_hover_tooltip(
     for (i, line) in lines.iter().enumerate() {
         let y = block_top - i as f32 * TOOLTIP_LINE_HEIGHT;
         commands
-            .spawn(Text2dBundle {
-                text: Text::from_section(
-                    *line,
-                    gf::ICON_HOVER_TOOLTIP.text_style(&asset_server, WHITE),
-                )
-                .with_alignment(TextAlignment::Center),
-                text_anchor: Anchor::Center,
-                transform: Transform {
-                    translation: Vec3::new(0., y, 1.),
-                    scale: gf::ICON_HOVER_TOOLTIP.transform_scale(),
-                    ..default()
-                },
-                ..default()
-            })
+            .spawn(
+                gf::ICON_HOVER_TOOLTIP
+                    .text(&asset_server, *line, WHITE)
+                    .justify(Justify::Center)
+                    .anchor(Anchor::CENTER)
+                    .with_transform(Transform {
+                        translation: Vec3::new(0., y, 1.),
+                        scale: gf::ICON_HOVER_TOOLTIP.transform_scale(),
+                        ..default()
+                    }),
+            )
             .insert(RenderLayers::from_layers(&[3]))
-            .set_parent(root);
+            .insert(ChildOf(root));
     }
 
     root
@@ -144,28 +144,29 @@ pub fn handle_icon_hover_tooltips(
     existing: Query<Entity, With<IconHoverTooltip>>,
     mut last_hovered: Local<Option<Entity>>,
 ) {
-    if !inventory_family_ui_open(&ui_state.0) {
+    if !inventory_family_ui_open(&*ui_state) {
         for tooltip_e in existing.iter() {
-            commands.entity(tooltip_e).despawn_recursive();
+            commands.entity(tooltip_e).despawn();
         }
         *last_hovered = None;
         return;
     }
 
-    let hovered =
-        ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None).and_then(|(entity, _, _)| {
+    let hovered = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None).and_then(
+        |(entity, _, _)| {
             tooltip_targets
                 .get(entity)
                 .ok()
                 .map(|(transform, text)| (entity, transform.translation(), text.0))
-        });
+        },
+    );
 
     if *last_hovered == hovered.map(|(e, _, _)| e) {
         return;
     }
 
     for tooltip_e in existing.iter() {
-        commands.entity(tooltip_e).despawn_recursive();
+        commands.entity(tooltip_e).despawn();
     }
 
     if let Some((_, icon_center, lines)) = hovered {

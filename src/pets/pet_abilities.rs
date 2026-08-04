@@ -2,9 +2,9 @@ use bevy::prelude::*;
 use rand::Rng;
 
 use crate::attributes::CurrentHealth;
-use crate::ecs_helpers::SafeHierarchyExt;
 use crate::combat::damage_tracker::PetAbilityStats;
 use crate::custom_commands::CommandsExt;
+use crate::ecs_helpers::SafeHierarchyExt;
 use crate::item::WorldObject;
 use crate::player::Player;
 use crate::proto::proto_param::ProtoParam;
@@ -58,27 +58,26 @@ pub fn slime_shield_ability(
         timer.0.tick(time.delta());
 
         // When timer finishes, grant shield if needed
-        if timer.0.finished() {
-            if let Ok((player_e, temp_shield_opt)) = player_query.get_single_mut() {
+        if timer.0.is_finished() {
+            if let Ok((player_e, temp_shield_opt)) = player_query.single_mut() {
                 // Grant a temporary 1-point shield only if player currently has none
                 if temp_shield_opt.is_none() {
                     pet_stats.shields_generated += 1;
                     commands.entity(player_e).insert(SlimeTempShield);
 
                     commands
-                        .spawn(SpriteBundle {
-                            texture: asset_server.load("textures/effects/SlimeShield.png"),
-                            sprite: Sprite {
+                        .spawn((
+                            Sprite {
+                                image: asset_server.load("textures/effects/SlimeShield.png"),
                                 custom_size: Some(Vec2::new(34., 34.)),
-                                ..Default::default()
+                                ..default()
                             },
-                            transform: Transform {
+                            Transform {
                                 translation: Vec3::new(0., 0., 1.),
                                 scale: Vec3::new(1., 1., 1.),
                                 ..Default::default()
                             },
-                            ..Default::default()
-                        })
+                        ))
                         .insert(SlimeTempShieldSprite)
                         .safe_set_parent(player_e);
                 }
@@ -91,7 +90,7 @@ pub fn slime_shield_ability(
 pub fn fairy_heal_ability(
     time: Res<Time>,
     mut fairy_pets: Query<&mut FairyHealTimer, With<Pet>>,
-    mut heal_events: EventWriter<ModifyHealthEvent>,
+    mut heal_events: MessageWriter<ModifyHealthEvent>,
     player_health: Query<&CurrentHealth, With<Player>>,
     mut pet_stats: ResMut<PetAbilityStats>,
 ) {
@@ -101,10 +100,10 @@ pub fn fairy_heal_ability(
         timer.0.tick(time.delta());
 
         // When timer finishes, heal the player
-        if timer.0.finished() {
-            if player_health.get_single().is_ok() {
+        if timer.0.is_finished() {
+            if player_health.single().is_ok() {
                 pet_stats.healing += HEAL_AMOUNT as i64;
-                heal_events.send(ModifyHealthEvent(HEAL_AMOUNT));
+                heal_events.write(ModifyHealthEvent(HEAL_AMOUNT));
             }
         }
     }
@@ -114,16 +113,16 @@ pub fn fairy_heal_ability(
 pub fn porkipine_damage_ability(
     time: Res<Time>,
     mut porkipine_pets: Query<&mut PorkipineDamageTimer, With<Pet>>,
-    mut damage_events: EventWriter<ModifyHealthEvent>,
+    mut damage_events: MessageWriter<ModifyHealthEvent>,
     health_percent: Res<crate::PlayerHealthPercent>,
     mut pet_stats: ResMut<PetAbilityStats>,
 ) {
     for mut timer in porkipine_pets.iter_mut() {
         timer.0.tick(time.delta());
 
-        if timer.0.finished() && health_percent.percent > 0.30 {
+        if timer.0.is_finished() && health_percent.percent > 0.30 {
             pet_stats.self_damage += 1;
-            damage_events.send(ModifyHealthEvent(-1));
+            damage_events.write(ModifyHealthEvent(-1));
         }
     }
 }
@@ -139,7 +138,7 @@ pub fn golden_pig_coin_ability(
     for (pet_txfm, mut timer) in golden_pig_pets.iter_mut() {
         timer.0.tick(time.delta());
 
-        if timer.0.finished() {
+        if timer.0.is_finished() {
             let mut rng = rand::thread_rng();
             let count = if rng.gen_ratio(5, 100) {
                 25

@@ -1,6 +1,11 @@
 #![allow(dead_code, unused_imports, unused_variables)]
 
-use bevy::{prelude::*, sprite::MaterialMesh2dBundle, utils::HashMap};
+use bevy::{
+    math::primitives::Rectangle,
+    platform::collections::HashMap,
+    prelude::*,
+    sprite_render::{ColorMaterial, MeshMaterial2d},
+};
 use bevy_rapier2d::prelude::Collider;
 use itertools::Itertools;
 use std::fmt::Debug;
@@ -28,7 +33,7 @@ impl PathfindingCache {
     }
 }
 
-#[derive(Default, Eq, PartialEq, Hash, Clone, Reflect, FromReflect, Copy)]
+#[derive(Default, Eq, PartialEq, Hash, Clone, Reflect, Copy)]
 /// Tile position split into quadrants, without chunking. Positions are relative to [0,0].
 /// Used to give more fine-grained control over pathfinding, compared to [TileMapPosition]
 pub struct AIPos {
@@ -56,6 +61,7 @@ pub struct DebugPath;
 #[derive(Component)]
 pub struct DebugPathDelete;
 
+#[derive(Message)]
 pub struct DebugPathResetEvent {
     pub path: Vec<AIPos>,
 }
@@ -83,24 +89,11 @@ pub fn cache_ai_path_on_new_obj_spawn(
             cache.set_validity(ai_pos, false);
             if *DEBUG_AI {
                 commands
-                    .spawn(MaterialMesh2dBundle {
-                        mesh: meshes
-                            .add(
-                                shape::Quad {
-                                    size: Vec2::new(7.0, 7.0),
-                                    ..Default::default()
-                                }
-                                .into(),
-                            )
-                            .into(),
-                        transform: Transform::from_translation(Vec3::new(
-                            offset_pos.x,
-                            offset_pos.y,
-                            0.,
-                        )),
-                        material: materials.add(Color::RED.into()),
-                        ..default()
-                    })
+                    .spawn((
+                        Mesh2d(meshes.add(Mesh::from(Rectangle::new(7.0, 7.0)))),
+                        MeshMaterial2d(materials.add(Color::srgb(1.0, 0.0, 0.0))),
+                        Transform::from_translation(Vec3::new(offset_pos.x, offset_pos.y, 0.)),
+                    ))
                     .insert(YSort(-0.1))
                     .insert(Name::new("debug chunk border x"));
             }
@@ -109,42 +102,33 @@ pub fn cache_ai_path_on_new_obj_spawn(
 }
 pub fn spawn_new_debug_path(
     mut commands: Commands,
-    mut events: EventReader<DebugPathResetEvent>,
+    mut events: MessageReader<DebugPathResetEvent>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
     old_paths: Query<Entity, With<DebugPath>>,
     old_paths_to_delete: Query<Entity, With<DebugPathDelete>>,
 ) {
-    for path in events.iter() {
+    for path in events.read() {
         for old_path in old_paths.iter() {
             commands.entity(old_path).insert(DebugPathDelete);
         }
         for old_path in old_paths_to_delete.iter() {
-            commands.entity(old_path).despawn_recursive();
+            commands.entity(old_path).despawn();
         }
         for quad in path.path.clone() {
             let pos = AIPos_to_world_pos(quad);
             let is_last_pos = quad == *path.path.last().unwrap();
 
             commands
-                .spawn(MaterialMesh2dBundle {
-                    mesh: meshes
-                        .add(
-                            shape::Quad {
-                                size: Vec2::new(7.0, 7.0),
-                                ..Default::default()
-                            }
-                            .into(),
-                        )
-                        .into(),
-                    transform: Transform::from_translation(Vec3::new(pos.x + 4., pos.y - 4., 0.)),
-                    material: materials.add(if is_last_pos {
-                        Color::GREEN.into()
+                .spawn((
+                    Mesh2d(meshes.add(Mesh::from(Rectangle::new(7.0, 7.0)))),
+                    MeshMaterial2d(materials.add(if is_last_pos {
+                        Color::srgb(0.0, 1.0, 0.0)
                     } else {
-                        Color::RED.into()
-                    }),
-                    ..default()
-                })
+                        Color::srgb(1.0, 0.0, 0.0)
+                    })),
+                    Transform::from_translation(Vec3::new(pos.x + 4., pos.y - 4., 0.)),
+                ))
                 .insert(YSort(0.1))
                 .insert(DebugPath)
                 .insert(Name::new("AI PATH"));
@@ -188,7 +172,11 @@ pub fn get_next_tile_A_star(target: &Vec2, start: &Vec2, cache: &PathfindingCach
     }
 }
 
-pub fn get_valid_adjacent_tiles(pos: &AIPos, _target: &AIPos, cache: &PathfindingCache) -> Vec<AIPos> {
+pub fn get_valid_adjacent_tiles(
+    pos: &AIPos,
+    _target: &AIPos,
+    cache: &PathfindingCache,
+) -> Vec<AIPos> {
     let mut valid_tiles = Vec::new();
     let mut valid_offsets = Vec::new();
     for offset in &[

@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 
 use crate::blessings::PendingRunStartChaos;
-use bevy::utils::HashMap;
+use bevy::platform::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 use crate::{enemy::Mob, run_once_per_run};
@@ -31,7 +31,7 @@ impl Default for EraTransitionState {
 impl EraTransitionState {
     pub fn is_mob_unlocked(&self, mob: &Mob) -> bool {
         if let Some(timer) = self.mob_unlock_timers.get(mob) {
-            timer.finished()
+            timer.is_finished()
         } else {
             true
         }
@@ -62,6 +62,7 @@ pub fn hp_multiplier_for_total_chaos(total_chaos: f32) -> f32 {
     (1. - blend) * early + blend * late
 }
 
+#[derive(Message)]
 pub struct IncreaseChaosEvent {
     pub amount: f32,
 }
@@ -73,14 +74,18 @@ impl Plugin for ChaosPlugin {
         app.register_type::<ChaosTracker>()
             .init_resource::<ChaosTracker>()
             .init_resource::<EraTransitionState>()
-            .add_event::<IncreaseChaosEvent>()
-            .add_system(handle_increase_chaos_event)
-            .add_system(
+            .add_message::<IncreaseChaosEvent>()
+            .add_systems(OnEnter(crate::GameState::Main), handle_increase_chaos_event)
+            .add_systems(
+                Update,
                 initialize_chaos_from_era
                     .run_if(run_once_per_run())
-                    .in_schedule(OnEnter(crate::GameState::Main)),
+                    .run_if(in_state(crate::GameState::Main)),
             )
-            .add_system(update_mob_unlock_timers.in_set(OnUpdate(crate::GameState::Main)));
+            .add_systems(
+                Update,
+                update_mob_unlock_timers.run_if(in_state(crate::GameState::Main)),
+            );
     }
 }
 
@@ -103,10 +108,10 @@ fn initialize_chaos_from_era(
 }
 
 fn handle_increase_chaos_event(
-    mut events: EventReader<IncreaseChaosEvent>,
+    mut events: MessageReader<IncreaseChaosEvent>,
     mut chaos_tracker: ResMut<ChaosTracker>,
 ) {
-    for event in events.iter() {
+    for event in events.read() {
         chaos_tracker.add_chaos(event.amount);
     }
 }

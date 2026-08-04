@@ -1,19 +1,21 @@
+use bevy::ecs::lifecycle::HookContext;
+use bevy::ecs::world::DeferredWorld;
 use bevy::prelude::*;
 use serde::Deserialize;
 use strum_macros::{Display, EnumIter};
 
 use crate::assets::Graphics;
-use crate::ecs_helpers::SafeHierarchyExt;
-use crate::ui::game_fonts as gf;
 use crate::attributes::{BonusDamage, CritChance, CritDamage};
+use crate::ecs_helpers::SafeHierarchyExt;
 use crate::enemy::red_mushking::DeathState;
 use crate::player::skills::{Heirloom, PlayerSkills};
+use crate::ui::game_fonts as gf;
 use crate::Player;
 use rand::Rng;
 
 use super::{HitEvent, MarkedForDeath};
 
-#[derive(Deserialize, Debug, EnumIter, Display, Hash, Clone, Reflect, FromReflect, Eq, PartialEq)]
+#[derive(Deserialize, Debug, EnumIter, Display, Hash, Clone, Reflect, Eq, PartialEq)]
 pub enum StatusEffect {
     Slow,
     Frail,
@@ -21,20 +23,21 @@ pub enum StatusEffect {
     Frozen,
 }
 
-#[derive(Deserialize, Debug, Clone, Reflect, FromReflect)]
+#[derive(Deserialize, Debug, Clone, Reflect)]
 pub struct StatusEffectState {
     pub effect: StatusEffect,
     pub num_stacks: i32,
     pub index: usize,
 }
 
-#[derive(Component, Deserialize, Debug, Clone, Reflect, FromReflect)]
+#[derive(Component, Deserialize, Debug, Clone, Reflect)]
 pub struct StatusEffectTracker {
     pub effects: Vec<StatusEffectState>,
 }
 #[derive(Component)]
 pub struct StatusEffectIcon;
 
+#[derive(Message)]
 pub struct StatusEffectEvent {
     pub effect: StatusEffect,
     pub num_stacks: i32,
@@ -79,26 +82,68 @@ pub struct Slow {
 }
 
 /// Shared blue tint for freeze-style status effects (Freeze blessing, Death Defiance, Rapidfire).
-pub const STATUS_EFFECT_BLUE_TINT: Color = Color::rgba(0.5, 0.7, 1.0, 1.0);
+pub const STATUS_EFFECT_BLUE_TINT: Color = Color::srgba(0.5, 0.7, 1.0, 1.0);
 
-/// Stores the mob's pre-tint color while Rapidfire is slowing all enemies.
+/// Untinted sprite color captured while any status blue tint marker is present.
+#[derive(Component, Clone, Copy)]
+pub struct BaseSpriteColor(pub Color);
+
+/// Freeze-blessing tint marker. Nesting-safe with other blue-tint markers below.
 #[derive(Component)]
-#[component(storage = "SparseSet")]
-pub struct RapidfireSlowTint {
-    pub original_color: Color,
-}
+#[component(
+    storage = "SparseSet",
+    on_insert = refresh_status_sprite_tint,
+    on_remove = refresh_status_sprite_tint
+)]
+pub struct FrozenTint;
 
-pub fn apply_status_blue_tint(sprite: &mut TextureAtlasSprite) -> Color {
-    let original = sprite.color;
-    sprite.color = STATUS_EFFECT_BLUE_TINT;
-    original
+/// Present while Rapidfire is slowing all enemies (drives shared blue tint).
+#[derive(Component)]
+#[component(
+    storage = "SparseSet",
+    on_insert = refresh_status_sprite_tint,
+    on_remove = refresh_status_sprite_tint
+)]
+pub struct RapidfireSlowTint;
+
+/// Death Defiance proc tint. Separate from [`DeathDefianceFrozen`] so this module
+/// does not depend on combat heirlooms.
+#[derive(Component)]
+#[component(
+    storage = "SparseSet",
+    on_insert = refresh_status_sprite_tint,
+    on_remove = refresh_status_sprite_tint
+)]
+pub struct DeathDefianceTint;
+
+fn refresh_status_sprite_tint(mut world: DeferredWorld, context: HookContext) {
+    let entity = context.entity;
+    let has_tint = world.get::<FrozenTint>(entity).is_some()
+        || world.get::<RapidfireSlowTint>(entity).is_some()
+        || world.get::<DeathDefianceTint>(entity).is_some();
+
+    if has_tint {
+        let Some(current) = world.get::<Sprite>(entity).map(|s| s.color) else {
+            return;
+        };
+        if world.get::<BaseSpriteColor>(entity).is_none() {
+            world.commands().entity(entity).insert(BaseSpriteColor(current));
+        }
+        if let Some(mut sprite) = world.get_mut::<Sprite>(entity) {
+            sprite.color = STATUS_EFFECT_BLUE_TINT;
+        }
+    } else if let Some(base) = world.get::<BaseSpriteColor>(entity).map(|b| b.0) {
+        if let Some(mut sprite) = world.get_mut::<Sprite>(entity) {
+            sprite.color = base;
+        }
+        world.commands().entity(entity).remove::<BaseSpriteColor>();
+    }
 }
 
 /// Frozen status effect from Freeze blessing - mob is completely frozen when at 3 stacks
 #[derive(Debug, Clone)]
 pub struct Frozen {
     pub timer: Timer,
-    pub original_color: Color,
 }
 
 /// Consolidated per-mob status state. Always present on mobs; mutate the
@@ -181,9 +226,9 @@ pub fn ensure_mob_status_effects(
 
 pub fn handle_new_status_effect_event(
     mut query: Query<&mut StatusEffectTracker>,
-    mut events: EventReader<StatusEffectEvent>,
+    mut events: MessageReader<StatusEffectEvent>,
 ) {
-    for event in events.iter() {
+    for event in events.read() {
         let Ok(mut tracker) = query.get_mut(event.entity) else {
             continue;
         };
@@ -227,8 +272,8 @@ pub fn update_status_effect_icons(
         // remove old icons
         if let Some(children) = maybe_children {
             for prev_icon in prev_status_icons.iter() {
-                if children.iter().any(|c| c == &prev_icon.0) {
-                    commands.entity(prev_icon.0).despawn_recursive();
+                if children.iter().any(|c| c == prev_icon.0) {
+                    commands.entity(prev_icon.0).despawn();
                 }
             }
         }
@@ -242,38 +287,34 @@ pub fn update_status_effect_icons(
                 let s = 5.;
                 let translation = Vec3::new(-s / 2., 7. * h + 12., 1.);
                 let icon_entity = commands
-                    .spawn(SpriteBundle {
-                        texture: icon,
-                        sprite: Sprite {
+                    .spawn((
+                        Sprite {
+                            image: icon,
                             custom_size: Some(Vec2::new(5., 5.)),
-                            ..Default::default()
+                            ..default()
                         },
-                        transform: Transform {
+                        Transform {
                             translation,
                             scale: Vec3::new(1., 1., 1.),
                             ..Default::default()
                         },
-                        ..Default::default()
-                    })
+                    ))
                     .insert(StatusEffectIcon)
                     .safe_set_parent(entity)
                     .id();
 
                 // Add text count next to the icon
                 commands
-                    .spawn(Text2dBundle {
-                        text: Text::from_section(
-                            effect.num_stacks.to_string(),
-                            gf::MICRO.text_style(&asset_server, Color::WHITE),
-                        ),
-                        transform: Transform {
-                            translation: Vec3::new(3.0, 0., 1.),
-                            scale: gf::MICRO.transform_scale(),
-                            ..Default::default()
-                        },
-                        text_anchor: bevy::sprite::Anchor::CenterLeft,
-                        ..Default::default()
-                    })
+                    .spawn(
+                        gf::MICRO
+                            .text(&asset_server, effect.num_stacks.to_string(), Color::WHITE)
+                            .anchor(bevy::sprite::Anchor::CENTER_LEFT)
+                            .with_transform(Transform {
+                                translation: Vec3::new(3.0, 0., 1.),
+                                scale: gf::MICRO.transform_scale(),
+                                ..Default::default()
+                            }),
+                    )
                     // .insert(RenderLayers::from_layers(&[1]))
                     .safe_set_parent(icon_entity);
             } else {
@@ -289,19 +330,18 @@ pub fn update_status_effect_icons(
                         1.,
                     );
                     commands
-                        .spawn(SpriteBundle {
-                            texture: icon,
-                            sprite: Sprite {
+                        .spawn((
+                            Sprite {
+                                image: icon,
                                 custom_size: Some(Vec2::new(5., 5.)),
-                                ..Default::default()
+                                ..default()
                             },
-                            transform: Transform {
+                            Transform {
                                 translation,
                                 scale: Vec3::new(1., 1., 1.),
                                 ..Default::default()
                             },
-                            ..Default::default()
-                        })
+                        ))
                         .insert(StatusEffectIcon)
                         .safe_set_parent(entity);
                 }
@@ -316,12 +356,12 @@ pub fn handle_burning_ticks(
         (Without<DeathState>, Without<MarkedForDeath>),
     >,
     time: Res<Time>,
-    mut status_event: EventWriter<StatusEffectEvent>,
-    mut hit_event: EventWriter<HitEvent>,
+    mut status_event: MessageWriter<StatusEffectEvent>,
+    mut hit_event: MessageWriter<HitEvent>,
     player_skills: Query<(&PlayerSkills, &BonusDamage, &CritChance, &CritDamage), With<Player>>,
 ) {
     // Get poison strength and crit from player (if player exists)
-    let Ok((skills, bonus_damage, crit_chance, crit_damage)) = player_skills.get_single() else {
+    let Ok((skills, bonus_damage, crit_chance, crit_damage)) = player_skills.single() else {
         return;
     };
 
@@ -360,7 +400,7 @@ pub fn handle_burning_ticks(
                 }
                 damage = damage.max(1);
 
-                hit_event.send(HitEvent {
+                hit_event.write(HitEvent {
                     hit_by_pet: None,
                     hit_entity: e,
                     damage,
@@ -383,14 +423,14 @@ pub fn handle_burning_ticks(
 
             if burning.stacks == 0 {
                 status.burning = None;
-                status_event.send(StatusEffectEvent {
+                status_event.write(StatusEffectEvent {
                     entity: e,
                     effect: StatusEffect::Poison,
                     num_stacks: 0,
                 });
             } else {
                 let stacks = burning.stacks as i32;
-                status_event.send(StatusEffectEvent {
+                status_event.write(StatusEffectEvent {
                     entity: e,
                     effect: StatusEffect::Poison,
                     num_stacks: stacks,
@@ -405,7 +445,7 @@ pub fn handle_frail_stack_ticks(
         (Without<DeathState>, Without<MarkedForDeath>),
     >,
     time: Res<Time>,
-    mut status_event: EventWriter<StatusEffectEvent>,
+    mut status_event: MessageWriter<StatusEffectEvent>,
 ) {
     for (e, mut status) in frailed.iter_mut() {
         let Some(frail) = status.frail.as_mut() else {
@@ -418,7 +458,7 @@ pub fn handle_frail_stack_ticks(
             if frail.num_stacks == 0 {
                 status.frail = None;
             }
-            status_event.send(StatusEffectEvent {
+            status_event.write(StatusEffectEvent {
                 entity: e,
                 effect: StatusEffect::Frail,
                 num_stacks: remaining,
@@ -432,7 +472,7 @@ pub fn handle_slow_stack_ticks(
         (Without<DeathState>, Without<MarkedForDeath>),
     >,
     time: Res<Time>,
-    mut status_event: EventWriter<StatusEffectEvent>,
+    mut status_event: MessageWriter<StatusEffectEvent>,
 ) {
     for (e, mut status) in slowed.iter_mut() {
         let Some(slow) = status.slow.as_mut() else {
@@ -445,7 +485,7 @@ pub fn handle_slow_stack_ticks(
             if slow.num_stacks == 0 {
                 status.slow = None;
             }
-            status_event.send(StatusEffectEvent {
+            status_event.write(StatusEffectEvent {
                 entity: e,
                 effect: StatusEffect::Slow,
                 num_stacks: remaining,
@@ -459,13 +499,13 @@ pub fn handle_slow_stack_ticks(
 pub fn try_add_slow_stacks(
     hit_e: Entity,
     status: &mut MobStatusEffects,
-    status_event: &mut EventWriter<StatusEffectEvent>,
+    status_event: &mut MessageWriter<StatusEffectEvent>,
 ) {
     if let Some(slow) = status.slow.as_mut() {
         if slow.num_stacks < 3 {
             slow.num_stacks += 1;
             slow.timer.reset();
-            status_event.send(StatusEffectEvent {
+            status_event.write(StatusEffectEvent {
                 entity: hit_e,
                 effect: StatusEffect::Slow,
                 num_stacks: slow.num_stacks as i32,
@@ -476,7 +516,7 @@ pub fn try_add_slow_stacks(
             num_stacks: 1,
             timer: Timer::from_seconds(1.7, TimerMode::Repeating),
         });
-        status_event.send(StatusEffectEvent {
+        status_event.write(StatusEffectEvent {
             entity: hit_e,
             effect: StatusEffect::Slow,
             num_stacks: 1,
@@ -486,41 +526,42 @@ pub fn try_add_slow_stacks(
 
 /// Handle frozen status effect ticks - mobs are frozen with blue tint
 pub fn handle_frozen_ticks(
+    mut commands: Commands,
     time: Res<Time>,
     mut frozen_mobs: Query<
-        (&mut MobStatusEffects, &mut TextureAtlasSprite),
+        (Entity, &mut MobStatusEffects),
         (Without<DeathState>, Without<MarkedForDeath>),
     >,
 ) {
-    for (mut status, mut sprite) in frozen_mobs.iter_mut() {
+    for (entity, mut status) in frozen_mobs.iter_mut() {
         let Some(frozen) = status.frozen.as_mut() else {
             continue;
         };
         frozen.timer.tick(time.delta());
 
         if frozen.timer.just_finished() {
-            // Restore original color and clear freeze
-            sprite.color = frozen.original_color;
             status.frozen = None;
+            commands.entity(entity).remove::<FrozenTint>();
         }
     }
 }
 
 /// Check if a mob should become frozen when reaching 3 slow stacks (Freeze blessing)
 pub fn check_freeze_on_slow_stacks(
+    mut commands: Commands,
     blessings: Query<&crate::blessings::OwnedBlessings>,
     mut slow_query: Query<
-        (Entity, &mut MobStatusEffects, &mut TextureAtlasSprite),
+        (Entity, &mut MobStatusEffects),
         (
             Changed<MobStatusEffects>,
             Without<DeathState>,
             Without<MarkedForDeath>,
         ),
     >,
-    mut status_event: EventWriter<StatusEffectEvent>,
+    mut status_event: MessageWriter<StatusEffectEvent>,
 ) {
     let has_freeze_blessing = blessings
-        .get_single()
+        .single()
         .map(|b| b.has_blessing(crate::blessings::Blessing::Freeze))
         .unwrap_or(false);
 
@@ -528,7 +569,7 @@ pub fn check_freeze_on_slow_stacks(
         return;
     }
 
-    for (entity, mut status, mut sprite) in slow_query.iter_mut() {
+    for (entity, mut status) in slow_query.iter_mut() {
         if status.frozen.is_some() {
             continue;
         }
@@ -540,14 +581,11 @@ pub fn check_freeze_on_slow_stacks(
         if !should_freeze {
             continue;
         }
-        let original_color = sprite.color;
         status.frozen = Some(Frozen {
             timer: Timer::from_seconds(2.0, TimerMode::Once),
-            original_color,
         });
-        // Apply blue tint directly to the sprite
-        sprite.color = STATUS_EFFECT_BLUE_TINT;
-        status_event.send(StatusEffectEvent {
+        commands.entity(entity).insert(FrozenTint);
+        status_event.write(StatusEffectEvent {
             entity,
             effect: StatusEffect::Frozen,
             num_stacks: 1,

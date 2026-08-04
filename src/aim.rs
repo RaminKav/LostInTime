@@ -32,7 +32,9 @@ use bevy::prelude::*;
 use leafwing_input_manager::prelude::ActionState;
 use serde::{Deserialize, Serialize};
 
-use crate::gamepad_input::{ActiveInputDevice, GamepadAction, InputDeviceKind, GAMEPAD_STICK_DEADZONE};
+use crate::gamepad_input::{
+    ActiveInputDevice, GamepadAction, InputDeviceKind, GAMEPAD_STICK_DEADZONE,
+};
 use crate::inputs::{MouselessModeState, PendingGroundAimSkill, SwapMovementAimKeysState};
 use crate::player::Player;
 use crate::{cursor::CursorPos, world::y_sort::YSort, Game, GameState};
@@ -122,7 +124,7 @@ pub struct ManualAimOverride {
 /// Mouseless Mode is on.
 fn update_aim_state(
     mouseless_mode: Res<MouselessModeState>,
-    key_input: Res<Input<KeyCode>>,
+    key_input: Res<ButtonInput<KeyCode>>,
     gamepad_action_q: Query<&ActionState<GamepadAction>, With<Player>>,
     active_device: Res<ActiveInputDevice>,
     pending: Res<PendingGroundAimSkill>,
@@ -144,10 +146,9 @@ fn update_aim_state(
     }
 
     let gamepad_dir = (active_device.0 == InputDeviceKind::Gamepad)
-        .then(|| gamepad_action_q.get_single().ok())
+        .then(|| gamepad_action_q.single().ok())
         .flatten()
-        .and_then(|action_state| action_state.clamped_axis_pair(GamepadAction::Aim))
-        .map(|pair| pair.xy())
+        .map(|action_state| action_state.clamped_axis_pair(&GamepadAction::Aim))
         .filter(|v| v.length_squared() > GAMEPAD_STICK_DEADZONE.powi(2));
 
     // `SwapMovementAimKeysState` (options: "Swap Move/Aim Keys") picks whether arrow keys or
@@ -156,9 +157,14 @@ fn update_aim_state(
         (stick.clamp_length_max(1.0), true)
     } else if mouseless_mode.0 {
         let (left, right, up, down) = if swap_keys.0 {
-            (KeyCode::A, KeyCode::D, KeyCode::W, KeyCode::S)
+            (KeyCode::KeyA, KeyCode::KeyD, KeyCode::KeyW, KeyCode::KeyS)
         } else {
-            (KeyCode::Left, KeyCode::Right, KeyCode::Up, KeyCode::Down)
+            (
+                KeyCode::ArrowLeft,
+                KeyCode::ArrowRight,
+                KeyCode::ArrowUp,
+                KeyCode::ArrowDown,
+            )
         };
         let mut d = Vec2::ZERO;
         if key_input.pressed(left) {
@@ -190,7 +196,7 @@ fn update_aim_state(
         // than a full push; keyboard is digital, so it's always normalized (full speed).
         if pending.0.is_some() {
             let step = if analog_magnitude { dir } else { normalized };
-            aim.ground_aim_offset += step * sensitivity.speed_px_per_sec() * time.delta_seconds();
+            aim.ground_aim_offset += step * sensitivity.speed_px_per_sec() * time.delta_secs();
         }
     }
 }
@@ -248,22 +254,15 @@ fn setup_aim_reticle(
         return;
     }
     commands.spawn((
-        SpriteBundle {
-            // Lowercase "icons" — must match the git-tracked path exactly (`git ls-files`),
-            // not just what's on disk locally. On Windows/Linux, `bevy_embedded_assets` bakes
-            // assets into a case-*sensitive* in-memory map at build time keyed by the checked
-            // out path, so a mismatched case silently fails to load there even though it works
-            // fine on macOS (which skips embedding and reads the case-insensitive filesystem
-            // directly — see the `EmbeddedAssetPlugin` setup in `main.rs`).
-            texture: asset_server.load("ui/icons/Crosshair.png"),
-            sprite: Sprite {
+        (
+            Sprite {
+                image: asset_server.load("ui/icons/Crosshair.png"),
                 custom_size: Some(Vec2::new(20., 20.)),
                 ..default()
             },
-            transform: Transform::from_translation(Vec3::new(0., 0., 15.)),
-            visibility: Visibility::Hidden,
-            ..default()
-        },
+            Transform::from_translation(Vec3::new(0., 0., 15.)),
+            Visibility::Hidden,
+        ),
         YSort(AIM_RETICLE_Y_SORT_BIAS),
         AimReticle,
         Name::new("AimReticle"),
@@ -276,7 +275,7 @@ fn update_aim_reticle(
     game: Res<Game>,
     mut crosshair_query: Query<(&mut Transform, &mut Visibility), With<AimReticle>>,
 ) {
-    let Ok((mut transform, mut visibility)) = crosshair_query.get_single_mut() else {
+    let Ok((mut transform, mut visibility)) = crosshair_query.single_mut() else {
         return;
     };
     let show = pending.0.is_some();
@@ -301,17 +300,15 @@ impl Plugin for AimPlugin {
         app.init_resource::<AimState>()
             .init_resource::<ManualAimOverride>()
             .insert_resource(AimSensitivity::load())
-            .add_system(setup_aim_reticle.in_schedule(OnEnter(GameState::Main)))
+            .add_systems(OnEnter(GameState::Main), setup_aim_reticle)
             .add_systems(
-                (
-                    update_aim_state,
-                    update_aim_reticle.after(update_aim_state),
-                )
-                    .in_set(OnUpdate(GameState::Main)),
+                Update,
+                (update_aim_state, update_aim_reticle.after(update_aim_state))
+                    .run_if(in_state(GameState::Main)),
             )
-            .add_system(
+            .add_systems(
+                Update,
                 apply_aim_to_cursor_world_pos
-                    .in_base_set(CoreSet::PostUpdate)
                     .after(crate::cursor::update_cursor_pos)
                     .run_if(in_state(GameState::Main)),
             );

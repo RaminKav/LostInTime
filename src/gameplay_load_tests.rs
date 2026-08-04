@@ -20,8 +20,8 @@
 use std::f32::consts::TAU;
 
 use bevy::prelude::*;
-use bevy_hanabi::prelude::{graph, ParticleEffect, ParticleEffectBundle};
-use bevy_rapier2d::prelude::{Collider, RapierContext};
+use bevy_hanabi::prelude::*;
+use bevy_rapier2d::prelude::{Collider, RapierContext, ReadRapierContext, WriteRapierContext};
 use rand::Rng;
 
 use crate::{
@@ -32,7 +32,6 @@ use crate::{
     collider_load_test::WAVE_INTERVAL_SECS as COLLIDER_WAVE_INTERVAL_SECS,
     collider_load_test::{ColliderLoadTestActive, ColliderLoadTestState},
     combat::{
-        combat_helpers::SpawnAsepriteAnimationCollider,
         pickup_radius::BeingPulledToPlayer,
         status_effects::{Burning, MobStatusEffects, StatusEffect, StatusEffectEvent},
         MarkedForDeath,
@@ -195,14 +194,16 @@ impl Plugin for HeirloomLoadTestPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<HeirloomLoadTestActive>()
             .init_resource::<HeirloomLoadTestState>()
-            .add_system(
+            .add_systems(
+                Update,
                 heirloom_load_test_burst
-                    .in_set(OnUpdate(GameState::Main))
+                    .run_if(in_state(GameState::Main))
                     .run_if(is_not_paused),
             )
-            .add_system(
+            .add_systems(
+                Update,
                 heirloom_load_test_diag
-                    .in_set(OnUpdate(GameState::Main))
+                    .run_if(in_state(GameState::Main))
                     .run_if(heirloom_load_test_diag_enabled),
             );
         info!(
@@ -220,9 +221,10 @@ impl Plugin for ParticleLoadTestPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<ParticleLoadTestActive>()
             .init_resource::<ParticleLoadTestState>()
-            .add_system(
+            .add_systems(
+                Update,
                 particle_load_test_burst
-                    .in_set(OnUpdate(GameState::Main))
+                    .run_if(in_state(GameState::Main))
                     .run_if(is_not_paused),
             );
         info!(
@@ -238,9 +240,10 @@ impl Plugin for PoisonLoadTestPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<PoisonLoadTestActive>()
             .init_resource::<PoisonLoadTestState>()
-            .add_system(
+            .add_systems(
+                Update,
                 poison_load_test_tick
-                    .in_set(OnUpdate(GameState::Main))
+                    .run_if(in_state(GameState::Main))
                     .run_if(is_not_paused),
             );
         info!(
@@ -256,9 +259,10 @@ impl Plugin for WeaponLoadTestPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<WeaponLoadTestActive>()
             .init_resource::<WeaponLoadTestState>()
-            .add_system(
+            .add_systems(
+                Update,
                 weapon_load_test_burst
-                    .in_set(OnUpdate(GameState::Main))
+                    .run_if(in_state(GameState::Main))
                     .run_if(is_not_paused),
             );
         info!(
@@ -274,9 +278,10 @@ impl Plugin for LootCycleLoadTestPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<LootCycleLoadTestActive>()
             .init_resource::<LootCycleLoadTestState>()
-            .add_system(
+            .add_systems(
+                Update,
                 loot_cycle_load_test_burst
-                    .in_set(OnUpdate(GameState::Main))
+                    .run_if(in_state(GameState::Main))
                     .run_if(is_not_paused),
             );
         info!(
@@ -296,7 +301,7 @@ enum HeirloomSimKind {
 }
 
 pub fn unified_load_tests_f9_toggle(
-    keys: Res<Input<KeyCode>>,
+    keys: Res<ButtonInput<KeyCode>>,
     mut collider_active: Option<ResMut<ColliderLoadTestActive>>,
     mut collider_state: Option<ResMut<ColliderLoadTestState>>,
     mut heirloom_active: Option<ResMut<HeirloomLoadTestActive>>,
@@ -388,11 +393,10 @@ fn heirloom_load_test_diag(
     mut elapsed: Local<f32>,
     all_entities: Query<Entity>,
     ants: Query<(), With<AntFarmAnt>>,
-    deferred_markers: Query<(), With<SpawnAsepriteAnimationCollider>>,
     item_drops: Query<&WorldObject, With<ItemDrop>>,
     projectiles: Query<&Projectile>,
 ) {
-    *elapsed += time.delta_seconds();
+    *elapsed += time.delta_secs();
     if *elapsed < 5.0 {
         return;
     }
@@ -404,7 +408,6 @@ fn heirloom_load_test_diag(
         .filter(|wo| **wo == WorldObject::ManaOrb)
         .count();
     let ant_count = ants.iter().count();
-    let deferred = deferred_markers.iter().count();
 
     let (mut echo_p, mut lightning_p, mut ice_aoe) = (0usize, 0usize, 0usize);
     for p in projectiles.iter() {
@@ -417,8 +420,8 @@ fn heirloom_load_test_diag(
     }
 
     info!(
-        "[HEIRLOOM_DIAG] entities={} mana_orb_drops={} ants={} deferred_aseprite_markers={} proj_echo={} proj_lightning={} proj_ice_aoe={}",
-        total, mana_orbs, ant_count, deferred, echo_p, lightning_p, ice_aoe
+        "[HEIRLOOM_DIAG] entities={} mana_orb_drops={} ants={} proj_echo={} proj_lightning={} proj_ice_aoe={}",
+        total, mana_orbs, ant_count, echo_p, lightning_p, ice_aoe
     );
 }
 
@@ -437,16 +440,16 @@ fn heirloom_load_test_burst(
     asset_server: Res<AssetServer>,
     graphics: Res<Graphics>,
     proto_param: ProtoParam,
-    mut ranged_attack: EventWriter<RangedAttackEvent>,
+    mut ranged_attack: MessageWriter<RangedAttackEvent>,
     dungeon: Query<&Dungeon, With<ActiveDimension>>,
 ) {
     if !active.active {
         return;
     }
-    if dungeon.get_single().is_ok() {
+    if dungeon.single().is_ok() {
         return;
     }
-    let Ok((player_e, player_txfm)) = player.get_single() else {
+    let Ok((player_e, player_txfm)) = player.single() else {
         return;
     };
     let player_pos = player_txfm.translation();
@@ -460,10 +463,9 @@ fn heirloom_load_test_burst(
         }
     }
 
-    let atlas = match &graphics.texture_atlas {
-        Some(a) => a.clone(),
-        None => return,
-    };
+    if graphics.texture_atlas_layout.is_none() || graphics.texture_atlas_image.is_none() {
+        return;
+    }
 
     let mut rng = rand::thread_rng();
     let n = rng.gen_range(HEIRLOOM_EFFECTS_PER_WAVE_MIN..=HEIRLOOM_EFFECTS_PER_WAVE_MAX);
@@ -493,7 +495,7 @@ fn heirloom_load_test_burst(
             }
             HeirloomSimKind::Lightning => {
                 let strike = world.truncate() + Vec2::new(0., 48.);
-                ranged_attack.send(RangedAttackEvent {
+                ranged_attack.write(RangedAttackEvent {
                     projectile: Projectile::Lightning,
                     direction: Vec2::ZERO,
                     mana_cost: None,
@@ -539,7 +541,6 @@ fn heirloom_load_test_burst(
                 let mut mana_none: Option<&mut i32> = None;
                 spawn_ant_farm_ants(
                     &mut commands,
-                    &atlas,
                     &graphics,
                     world,
                     rng.gen_range(6..14),
@@ -564,10 +565,10 @@ fn particle_load_test_burst(
     if !active.active {
         return;
     }
-    if dungeon.get_single().is_ok() {
+    if dungeon.single().is_ok() {
         return;
     }
-    let Ok(player_txfm) = player.get_single() else {
+    let Ok(player_txfm) = player.single() else {
         return;
     };
     let base = player_txfm.translation();
@@ -599,16 +600,12 @@ fn particle_load_test_burst(
 
         commands.spawn((
             Name::new("load_test_enemy_hit_particles"),
-            ParticleEffectBundle {
-                effect: ParticleEffect::new(particles.enemy_hit_particles.clone())
-                    .with_properties::<ParticleEffect>(vec![(
-                        "my_color".to_string(),
-                        graph::Value::Uint(color.as_linear_rgba_u32()),
-                    )])
-                    .with_z_layer_2d(Some(999.)),
-                transform: Transform::from_translation(Vec3::new(p.x, p.y + 4., 2.)),
-                ..Default::default()
-            },
+            ParticleEffect::new(particles.enemy_hit_particles.clone()),
+            EffectProperties::default().with_properties([
+                ("my_color".to_string(), color.to_linear().as_u32().into()),
+                ("my_accel".to_string(), Vec3::ZERO.into()),
+            ]),
+            Transform::from_translation(Vec3::new(p.x, p.y + 4., 999.)),
             YSort(1.),
             ObjectHitParticles {
                 despawn_timer: Timer::from_seconds(0.23, TimerMode::Once),
@@ -624,12 +621,10 @@ fn particle_load_test_burst(
 
         commands.spawn((
             Name::new("load_test_enemy_death_particles"),
-            ParticleEffectBundle {
-                effect: ParticleEffect::new(particles.enemy_death_particle.clone())
-                    .with_z_layer_2d(Some(999.)),
-                transform: Transform::from_translation(Vec3::new(p.x, p.y + 4., 2.)),
-                ..Default::default()
-            },
+            ParticleEffect::new(particles.enemy_death_particle.clone()),
+            EffectProperties::default()
+                .with_properties([("my_accel".to_string(), Vec3::ZERO.into())]),
+            Transform::from_translation(Vec3::new(p.x, p.y + 4., 999.)),
             YSort(1.),
             ObjectHitParticles {
                 despawn_timer: Timer::from_seconds(1.1, TimerMode::Once),
@@ -649,7 +644,7 @@ fn poison_load_test_tick(
     active: Res<PoisonLoadTestActive>,
     enemies: Query<Entity, (With<Mob>, Without<Player>)>,
     mut mob_status: Query<&mut MobStatusEffects, With<Mob>>,
-    mut status_event: EventWriter<StatusEffectEvent>,
+    mut status_event: MessageWriter<StatusEffectEvent>,
 ) {
     if !active.active {
         return;
@@ -672,7 +667,7 @@ fn poison_load_test_tick(
             burning.stacks = burning.stacks.saturating_add(1);
             burning.duration_timer.reset();
             let stacks = burning.stacks as i32;
-            status_event.send(StatusEffectEvent {
+            status_event.write(StatusEffectEvent {
                 entity: enemy_entity,
                 effect: StatusEffect::Poison,
                 num_stacks: stacks,
@@ -683,7 +678,7 @@ fn poison_load_test_tick(
                 duration_timer: Timer::from_seconds(3.0, TimerMode::Once),
                 stacks: 1,
             });
-            status_event.send(StatusEffectEvent {
+            status_event.write(StatusEffectEvent {
                 entity: enemy_entity,
                 effect: StatusEffect::Poison,
                 num_stacks: 1,
@@ -701,16 +696,16 @@ fn weapon_load_test_burst(
     mut state: ResMut<WeaponLoadTestState>,
     active: Res<WeaponLoadTestActive>,
     player: Query<(Entity, &GlobalTransform), With<Player>>,
-    mut ranged_attack: EventWriter<RangedAttackEvent>,
+    mut ranged_attack: MessageWriter<RangedAttackEvent>,
     dungeon: Query<&Dungeon, With<ActiveDimension>>,
 ) {
     if !active.active {
         return;
     }
-    if dungeon.get_single().is_ok() {
+    if dungeon.single().is_ok() {
         return;
     }
-    let Ok((player_e, player_txfm)) = player.get_single() else {
+    let Ok((player_e, player_txfm)) = player.single() else {
         return;
     };
     let player_pos = player_txfm.translation().truncate();
@@ -729,7 +724,7 @@ fn weapon_load_test_burst(
     for _ in 0..WEAPON_SWORD_PER_WAVE {
         let angle = rng.gen_range(0.0..TAU);
         let dir = Vec2::new(angle.cos(), angle.sin());
-        ranged_attack.send(RangedAttackEvent {
+        ranged_attack.write(RangedAttackEvent {
             projectile: Projectile::SwordProjectile,
             direction: dir,
             mana_cost: None,
@@ -745,7 +740,7 @@ fn weapon_load_test_burst(
 
     for _ in 0..WEAPON_SHOUT_PER_WAVE {
         let offset = random_offset(&mut rng, 60.0);
-        ranged_attack.send(RangedAttackEvent {
+        ranged_attack.write(RangedAttackEvent {
             projectile: Projectile::Shout,
             direction: Vec2::ZERO,
             mana_cost: None,
@@ -788,10 +783,10 @@ fn loot_cycle_load_test_burst(
     if !active.active {
         return;
     }
-    if dungeon.get_single().is_ok() {
+    if dungeon.single().is_ok() {
         return;
     }
-    let Ok(player_txfm) = player.get_single() else {
+    let Ok(player_txfm) = player.single() else {
         return;
     };
     let player_pos = player_txfm.translation().truncate();
@@ -859,9 +854,12 @@ pub fn diagnostics_tick(
     // churn signal on the item side.
     burning_and_pulled: Query<(), With<BeingPulledToPlayer>>,
     queued_texts: Query<(), With<QueueFloatingText>>,
-    rapier: Res<RapierContext>,
+    rapier: ReadRapierContext,
 ) {
-    *elapsed += time.delta_seconds();
+    let Ok(rapier) = rapier.single() else {
+        return;
+    };
+    *elapsed += time.delta_secs();
     if *elapsed < 5.0 {
         return;
     }
@@ -871,8 +869,8 @@ pub fn diagnostics_tick(
     let delta: i64 = total as i64 - *prev_total as i64;
     *prev_total = total;
 
-    let rapier_bodies = rapier.bodies.len();
-    let rapier_colliders = rapier.colliders.len();
+    let rapier_bodies = rapier.rigidbody_set.bodies.len();
+    let rapier_colliders = rapier.colliders.colliders.len();
 
     info!(
         "\n[DIAG] === Entity / Component Snapshot ===\n\
@@ -913,7 +911,7 @@ pub fn diagnostics_tick(
 pub fn archetype_diagnostics_tick(world: &mut World, mut elapsed: Local<f32>) {
     use std::collections::HashMap;
 
-    let dt = world.resource::<Time>().delta_seconds();
+    let dt = world.resource::<Time>().delta_secs();
     *elapsed += dt;
     if *elapsed < 5.0 {
         return;
@@ -926,7 +924,7 @@ pub fn archetype_diagnostics_tick(world: &mut World, mut elapsed: Local<f32>) {
 
     let archetype_count = archetypes.len();
     let component_count = components.len();
-    let entity_total = entities.total_count();
+    let entity_total = entities.len() as usize;
     let entity_live = entities.len();
 
     // Archetype-size histogram + per-component appearance counts.
@@ -941,7 +939,7 @@ pub fn archetype_diagnostics_tick(world: &mut World, mut elapsed: Local<f32>) {
         HashMap::new();
 
     for a in archetypes.iter() {
-        let n = a.len();
+        let n = a.len() as usize;
         let is_empty = n == 0;
         if is_empty {
             empty_archetypes += 1;
@@ -958,7 +956,7 @@ pub fn archetype_diagnostics_tick(world: &mut World, mut elapsed: Local<f32>) {
         };
         size_buckets[bucket] += 1;
         for cid in a.components() {
-            let entry = per_component.entry(cid).or_insert((0, 0));
+            let entry = per_component.entry(*cid).or_insert((0, 0));
             entry.0 += 1;
             if is_empty {
                 entry.1 += 1;
@@ -974,9 +972,9 @@ pub fn archetype_diagnostics_tick(world: &mut World, mut elapsed: Local<f32>) {
         .map(|(cid, (total, empty))| {
             let name = components
                 .get_info(cid)
-                .map(|i| i.name())
-                .unwrap_or("<unknown>");
-            (name.to_string(), total, empty)
+                .map(|i| i.name().to_string())
+                .unwrap_or_else(|| "<unknown>".to_string());
+            (name, total, empty)
         })
         .collect();
     ranked.sort_by(|a, b| b.2.cmp(&a.2).then_with(|| b.1.cmp(&a.1)));

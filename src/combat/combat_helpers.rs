@@ -1,11 +1,12 @@
 use bevy::prelude::*;
-use bevy_aseprite::{anim::AsepriteAnimation, Aseprite};
+use bevy_aseprite_ultra::prelude::{AnimationRepeat, AseAnimation, Aseprite};
 use bevy_rapier2d::prelude::{
     ActiveCollisionTypes, ActiveEvents, Collider, CollisionGroups, Group, RigidBody, Sensor,
 };
 
 use crate::{
     animations::DoneAnimation,
+    aseprite_helpers::ase_animation,
     attributes::Attack,
     ecs_helpers::SafeHierarchyExt,
     item::projectile::{Projectile, ProjectileState},
@@ -16,23 +17,7 @@ use super::collisions::PlayerAttackCollider;
 #[derive(Component)]
 pub struct DespawnTimer(pub Timer);
 
-/// Marker component for deferred Aseprite animation spawning
-/// This allows systems to queue animation spawns that will be processed in PreUpdate
-#[derive(Component)]
-pub struct SpawnAsepriteAnimationCollider {
-    pub transform: Transform,
-    pub duration: f32,
-    pub attack: i32,
-    pub collider: Collider,
-    pub handle: Handle<Aseprite>,
-    pub animation: AsepriteAnimation,
-    pub repeating_anim: bool,
-    pub projectile: Projectile,
-    pub extra_components: Vec<DeferredComponent>,
-    pub parent: Option<Entity>,
-}
-
-/// Enum for extra components that can be added to the spawned entity
+/// Extra components that can be added when spawning an aseprite collider.
 #[derive(Clone)]
 pub enum DeferredComponent {
     EnemyProjectile {
@@ -40,7 +25,6 @@ pub enum DeferredComponent {
         mob: crate::enemy::Mob,
     },
     IceExplosionDmg,
-    // Add more as needed
 }
 
 pub fn spawn_temp_collider(
@@ -53,7 +37,7 @@ pub fn spawn_temp_collider(
 ) -> Entity {
     let category = projectile.animation_category();
     commands
-        .spawn(TransformBundle::from_transform(transform))
+        .spawn(transform)
         .insert(DespawnTimer(Timer::from_seconds(duration, TimerMode::Once)))
         .insert(Attack(attack))
         .insert(projectile)
@@ -110,6 +94,67 @@ pub fn spawn_enemy_melee_hitbox(
     entity
 }
 
+/// Spawn a collider entity with a native aseprite animation.
+///
+/// Returns the real entity id (not a marker). `Commands` are already deferred to the
+/// next sync point — enough for ultra's PostUpdate render / next PreUpdate tick.
+pub fn spawn_aseprite_collider(
+    commands: &mut Commands,
+    transform: Transform,
+    duration: f32,
+    attack: i32,
+    collider: Collider,
+    handle: Handle<Aseprite>,
+    tag: &str,
+    repeating_anim: bool,
+    projectile: Projectile,
+    extra_components: Vec<DeferredComponent>,
+    parent: Option<Entity>,
+) -> Entity {
+    let hitbox_e = spawn_temp_collider(commands, transform, duration, attack, collider, projectile);
+
+    let animation = ase_animation(handle, tag, !repeating_anim);
+
+    commands.entity(hitbox_e).insert((
+        animation,
+        Sprite::default(),
+        PlayerAttackCollider,
+        Visibility::default(),
+    ));
+
+    if !repeating_anim {
+        commands.entity(hitbox_e).insert(DoneAnimation);
+    }
+
+    if let Some(parent_entity) = parent {
+        commands.entity(hitbox_e).safe_set_parent(parent_entity);
+    }
+
+    for component in extra_components {
+        match component {
+            DeferredComponent::EnemyProjectile {
+                entity: parent_entity,
+                mob,
+            } => {
+                commands
+                    .entity(hitbox_e)
+                    .insert(crate::item::projectile::EnemyProjectile {
+                        entity: parent_entity,
+                        mob,
+                    });
+            }
+            DeferredComponent::IceExplosionDmg => {
+                commands
+                    .entity(hitbox_e)
+                    .insert(crate::player::mage_skills::IceExplosionDmg);
+            }
+        }
+    }
+
+    hitbox_e
+}
+
+/// Spawn using an existing [`AseAnimation`] (tag/repeat already configured).
 pub fn spawn_one_time_aseprite_collider(
     commands: &mut Commands,
     transform: Transform,
@@ -117,19 +162,24 @@ pub fn spawn_one_time_aseprite_collider(
     attack: i32,
     collider: Collider,
     handle: Handle<Aseprite>,
-    mut animation: AsepriteAnimation,
+    mut animation: AseAnimation,
     repeating_anim: bool,
     projectile: Projectile,
 ) -> Entity {
     let hitbox_e = spawn_temp_collider(commands, transform, duration, attack, collider, projectile);
 
-    // Force animation to start at frame 0
-    animation.current_frame = 0;
+    animation.aseprite = handle;
+    if !repeating_anim {
+        animation.animation.repeat = AnimationRepeat::Count(1);
+        animation.animation.start();
+    }
 
-    commands
-        .entity(hitbox_e)
-        .insert((handle, animation, PlayerAttackCollider))
-        .insert(VisibilityBundle::default());
+    commands.entity(hitbox_e).insert((
+        animation,
+        Sprite::default(),
+        PlayerAttackCollider,
+        Visibility::default(),
+    ));
 
     if !repeating_anim {
         commands.entity(hitbox_e).insert(DoneAnimation);
@@ -137,8 +187,7 @@ pub fn spawn_one_time_aseprite_collider(
     hitbox_e
 }
 
-/// Helper to queue an Aseprite animation collider spawn for PreUpdate processing
-/// Returns the marker entity that will be replaced with the actual entity
+/// Preferred call-site API — spawns the real entity immediately via `Commands`.
 pub fn spawn_deferred_aseprite_collider(
     commands: &mut Commands,
     transform: Transform,
@@ -146,89 +195,25 @@ pub fn spawn_deferred_aseprite_collider(
     attack: i32,
     collider: Collider,
     handle: Handle<Aseprite>,
-    animation: AsepriteAnimation,
+    tag: &str,
     repeating_anim: bool,
     projectile: Projectile,
     extra_components: Vec<DeferredComponent>,
     parent: Option<Entity>,
 ) -> Entity {
-    commands
-        .spawn(SpawnAsepriteAnimationCollider {
-            transform,
-            duration,
-            attack,
-            collider,
-            handle,
-            animation,
-            repeating_anim,
-            projectile,
-            extra_components,
-            parent,
-        })
-        .id()
-}
-
-/// System to process deferred Aseprite animation spawns in PreUpdate
-/// This ensures animations are spawned before bevy_aseprite processes them
-pub fn handle_deferred_aseprite_spawns(
-    mut commands: Commands,
-    mut query: Query<(Entity, &mut SpawnAsepriteAnimationCollider)>,
-) {
-    for (marker_entity, mut spawn_data) in query.iter_mut() {
-        // Take ownership of the data to avoid cloning
-        let transform = spawn_data.transform;
-        let duration = spawn_data.duration;
-        let attack = spawn_data.attack;
-        let collider = std::mem::replace(&mut spawn_data.collider, Collider::ball(0.0));
-        let handle = spawn_data.handle.clone();
-        let animation = std::mem::replace(&mut spawn_data.animation, AsepriteAnimation::default());
-        let repeating_anim = spawn_data.repeating_anim;
-        let projectile = std::mem::replace(&mut spawn_data.projectile, Projectile::None);
-        let extra_components = std::mem::take(&mut spawn_data.extra_components);
-        let parent = spawn_data.parent;
-
-        // Spawn the actual entity with animation
-        let entity = spawn_one_time_aseprite_collider(
-            &mut commands,
-            transform,
-            duration,
-            attack,
-            collider,
-            handle,
-            animation,
-            repeating_anim,
-            projectile,
-        );
-
-        if let Some(parent_entity) = parent {
-            commands.entity(entity).safe_set_parent(parent_entity);
-        }
-
-        // Add extra components based on the deferred data
-        for component in extra_components {
-            match component {
-                DeferredComponent::EnemyProjectile {
-                    entity: parent_entity,
-                    mob,
-                } => {
-                    commands
-                        .entity(entity)
-                        .insert(crate::item::projectile::EnemyProjectile {
-                            entity: parent_entity,
-                            mob,
-                        });
-                }
-                DeferredComponent::IceExplosionDmg => {
-                    commands
-                        .entity(entity)
-                        .insert(crate::player::mage_skills::IceExplosionDmg);
-                }
-            }
-        }
-
-        // Despawn the marker entity
-        commands.entity(marker_entity).despawn();
-    }
+    spawn_aseprite_collider(
+        commands,
+        transform,
+        duration,
+        attack,
+        collider,
+        handle,
+        tag,
+        repeating_anim,
+        projectile,
+        extra_components,
+        parent,
+    )
 }
 
 pub fn tick_despawn_timer(
@@ -238,8 +223,8 @@ pub fn tick_despawn_timer(
 ) {
     for (entity, mut timer) in query.iter_mut() {
         timer.0.tick(time.delta());
-        if timer.0.finished() {
-            commands.entity(entity).despawn_recursive();
+        if timer.0.is_finished() {
+            commands.entity(entity).despawn();
         }
     }
 }

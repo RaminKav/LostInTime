@@ -1,10 +1,11 @@
+use bevy::camera::visibility::RenderLayers;
+use bevy::mesh::Mesh2d;
+use bevy::platform::collections::{HashMap, HashSet};
 use bevy::prelude::*;
-use bevy::reflect::TypeUuid;
-use bevy::render::render_resource::{AsBindGroup, ShaderRef};
-use bevy::render::view::RenderLayers;
-use bevy::sprite::{Material2d, Material2dPlugin, Mesh2dHandle};
-use bevy::utils::{HashMap, HashSet};
-use bevy_aseprite::anim::AsepriteAnimation;
+use bevy::render::render_resource::AsBindGroup;
+use bevy::shader::ShaderRef;
+use bevy::sprite_render::{AlphaMode2d, Material2d, Material2dPlugin, MeshMaterial2d};
+use bevy_aseprite_ultra::prelude::AseAnimation;
 
 use crate::assets::Graphics;
 use crate::assets::SpriteAnchor;
@@ -34,7 +35,7 @@ pub const HUD_HEIRLOOM_OUTLINE_ALPHA: f32 = 0.42;
 pub const TOOLTIP_CARD_HEIRLOOM_OUTLINE_ALPHA: f32 = 0.12;
 
 /// Default outline for floor item drops and the in-game cursor (#cdceee).
-pub const DEFAULT_OUTLINE_COLOR: Color = Color::rgba(0.804, 0.808, 0.933, DEFAULT_OUTLINE_ALPHA);
+pub const DEFAULT_OUTLINE_COLOR: Color = Color::srgba(0.804, 0.808, 0.933, DEFAULT_OUTLINE_ALPHA);
 
 /// Near-black shadow tint for UI container / tooltip outlines.
 pub const UI_SHADOW_OUTLINE_COLOR_RGB: (f32, f32, f32) = (0.0, 0.0, 0.0);
@@ -75,6 +76,29 @@ pub struct HeirloomIconOutline {
     pub style: HeirloomIconOutlineStyle,
 }
 
+/// Parent already has a non-destructive outline child (keeps [`Sprite`] for hit-testing).
+#[derive(Component)]
+pub struct HeirloomIconOutlineApplied;
+
+/// Child mesh spawned behind a [`HeirloomIconOutline`] sprite.
+#[derive(Component)]
+pub struct HeirloomIconOutlineChild;
+
+/// Floor [`ItemDrop`] already has a non-destructive outline child.
+///
+/// Drops must keep their [`Sprite`]: converting them to `Mesh2d` alone put them in a
+/// different 2D pass than world sprites (shrines, trees), so tall art painted over
+/// pickable rewards even when XY cleared the silhouette.
+#[derive(Component)]
+pub struct ItemDropOutlineApplied;
+
+/// Outline mesh child behind an [`ItemDrop`] sprite.
+#[derive(Component)]
+pub struct ItemDropOutlineChild;
+
+/// Local Z of the item-drop outline child — behind the parent sprite so only rings show.
+const ITEM_DROP_OUTLINE_CHILD_Z: f32 = -0.1;
+
 impl HeirloomIconOutline {
     pub fn new(rarity: HeirloomRarity, style: HeirloomIconOutlineStyle) -> Self {
         Self { rarity, style }
@@ -92,10 +116,10 @@ impl HeirloomIconOutline {
 /// colors are intentionally pastel; at low outline alpha they wash out to white.
 fn heirloom_rarity_outline_base(rarity: HeirloomRarity) -> Color {
     match rarity {
-        HeirloomRarity::Common => Color::rgba(148. / 255., 152. / 255., 178. / 255., 1.),
-        HeirloomRarity::Uncommon => Color::rgba(58. / 255., 188. / 255., 172. / 255., 1.),
-        HeirloomRarity::Rare => Color::rgba(204. / 255., 88. / 255., 228. / 255., 1.),
-        HeirloomRarity::Legendary => Color::rgba(245. / 255., 158. / 255., 24. / 255., 1.),
+        HeirloomRarity::Common => Color::srgba(148. / 255., 152. / 255., 178. / 255., 1.),
+        HeirloomRarity::Uncommon => Color::srgba(58. / 255., 188. / 255., 172. / 255., 1.),
+        HeirloomRarity::Rare => Color::srgba(204. / 255., 88. / 255., 228. / 255., 1.),
+        HeirloomRarity::Legendary => Color::srgba(245. / 255., 158. / 255., 24. / 255., 1.),
     }
 }
 
@@ -118,7 +142,7 @@ impl UiShadow {
     pub fn container() -> Self {
         let (r, g, b) = UI_SHADOW_OUTLINE_COLOR_RGB;
         Self {
-            color: Color::rgba(r, g, b, UI_CONTAINER_SHADOW_ALPHA),
+            color: Color::srgba(r, g, b, UI_CONTAINER_SHADOW_ALPHA),
             ring_count: UI_CONTAINER_SHADOW_RINGS,
             falloff: UI_SHADOW_RING_FALLOFF,
         }
@@ -126,7 +150,7 @@ impl UiShadow {
     pub fn hud() -> Self {
         let (r, g, b) = UI_SHADOW_OUTLINE_COLOR_RGB;
         Self {
-            color: Color::rgba(r, g, b, UI_CONTAINER_SHADOW_ALPHA),
+            color: Color::srgba(r, g, b, UI_CONTAINER_SHADOW_ALPHA),
             ring_count: UI_CONTAINER_SHADOW_RINGS,
             falloff: UI_SHADOW_RING_FALLOFF - 0.2,
         }
@@ -136,7 +160,7 @@ impl UiShadow {
     pub fn tooltip_card() -> Self {
         let (r, g, b) = UI_SHADOW_OUTLINE_COLOR_RGB;
         Self {
-            color: Color::rgba(r, g, b, UI_TOOLTIP_SHADOW_ALPHA),
+            color: Color::srgba(r, g, b, UI_TOOLTIP_SHADOW_ALPHA),
             ring_count: UI_TOOLTIP_SHADOW_RINGS,
             falloff: UI_SHADOW_RING_FALLOFF,
         }
@@ -147,7 +171,7 @@ impl UiShadow {
 /// `UpgradeTome` / `OrbOfTransformation` via focus navigation, every inventory item icon that
 /// the material can be applied to gets a bright 1px outline so gamepad players can see where the
 /// upgrade will land (the mouse relies on hovering, which the controller can't do).
-pub const UPGRADE_TARGET_OUTLINE_COLOR: Color = Color::rgba(1.0, 0.85, 0.15, 1.0);
+pub const UPGRADE_TARGET_OUTLINE_COLOR: Color = Color::srgba(1.0, 0.85, 0.15, 1.0);
 
 /// Marker on an item-icon entity that currently has a spawned upgrade-target highlight child.
 #[derive(Component)]
@@ -190,8 +214,7 @@ pub struct HeirloomIconAtlasLookup {
     pub indices: HashSet<usize>,
 }
 
-#[derive(AsBindGroup, TypeUuid, Debug, Clone)]
-#[uuid = "c8e4f1a2-3b6d-4e9f-a1c2-d5e6f708192a"]
+#[derive(Asset, TypePath, AsBindGroup, Debug, Clone)]
 pub struct AtlasSpriteOutlineMaterial {
     /// Sub-rect of the atlas this sprite occupies, in UV space:
     /// (min_u, min_v, max_u, max_v). Neighbor samples outside this are ignored.
@@ -211,6 +234,10 @@ impl Material2d for AtlasSpriteOutlineMaterial {
     fn fragment_shader() -> ShaderRef {
         "shaders/item_drop_outline.wgsl".into()
     }
+
+    fn alpha_mode(&self) -> AlphaMode2d {
+        AlphaMode2d::Blend
+    }
 }
 
 pub struct ItemDropOutlinePlugin;
@@ -222,16 +249,20 @@ impl Plugin for ItemDropOutlinePlugin {
             .init_resource::<UpgradeHighlightState>()
             .init_resource::<ShrineProximityOutlineState>()
             .init_resource::<HeirloomIconAtlasLookup>()
-            .add_plugin(Material2dPlugin::<AtlasSpriteOutlineMaterial>::default())
-            .add_system(init_heirloom_icon_atlas_lookup)
-            .add_system(tag_heirloom_icon_outlines.before(apply_atlas_sprite_outlines))
-            .add_system(
+            .add_plugins(Material2dPlugin::<AtlasSpriteOutlineMaterial>::default())
+            .add_systems(Update, init_heirloom_icon_atlas_lookup)
+            .add_systems(
+                Update,
+                tag_heirloom_icon_outlines.before(apply_atlas_sprite_outlines),
+            )
+            .add_systems(
+                Update,
                 refresh_outlined_cursor_on_settings_change.before(apply_atlas_sprite_outlines),
             )
-            .add_system(apply_atlas_sprite_outlines)
-            .add_system(update_upgrade_target_highlights)
-            .add_system(update_shrine_proximity_outlines)
-            .add_system(spawn_ui_shadows);
+            .add_systems(Update, apply_atlas_sprite_outlines)
+            .add_systems(Update, update_upgrade_target_highlights)
+            .add_systems(Update, update_shrine_proximity_outlines)
+            .add_systems(Update, spawn_ui_shadows);
     }
 }
 
@@ -246,10 +277,13 @@ fn init_heirloom_icon_atlas_lookup(
         return;
     };
     for (heirloom, sprite) in heirloom_sprites {
-        lookup.indices.insert(sprite.index);
+        let Some(atlas) = sprite.texture_atlas.as_ref() else {
+            continue;
+        };
+        lookup.indices.insert(atlas.index);
         lookup
             .index_to_heirloom
-            .insert(sprite.index, heirloom.clone());
+            .insert(atlas.index, heirloom.clone());
     }
 }
 
@@ -260,7 +294,7 @@ fn tag_heirloom_icon_outlines(
     player_skills: Query<&PlayerSkills>,
     choice_queue: Option<Res<HeirloomChoiceQueue>>,
     item_chest_state: Option<Res<ItemChestState>>,
-    parents: Query<&Parent>,
+    parents: Query<&ChildOf>,
     crystal_icons: Query<&CrystalUnlockIcon>,
     banish_icons: Query<&BanishTrackerIcon>,
     final_heirlooms: Query<&ItemChestFinalHeirloom>,
@@ -270,37 +304,40 @@ fn tag_heirloom_icon_outlines(
     skill_choice_cards: Query<&SkillChoiceUI>,
     blessing_cards: Query<&BlessingChoiceUI>,
     candidates: Query<
-        (Entity, &TextureAtlasSprite, &Handle<TextureAtlas>),
+        (Entity, &Sprite),
         (
             Without<HeirloomIconOutline>,
-            Without<Mesh2dHandle>,
+            Without<Mesh2d>,
             Without<ItemDrop>,
             Without<CustomCursor>,
             Without<Player>,
-            Without<AsepriteAnimation>,
+            Without<AseAnimation>,
         ),
     >,
 ) {
     if lookup.indices.is_empty() {
         return;
     }
-    let Some(main_atlas) = graphics.texture_atlas.as_ref() else {
+    let Some(main_atlas) = graphics.texture_atlas_layout.as_ref() else {
         return;
     };
 
-    let player_skills = player_skills.get_single().ok();
+    let player_skills = player_skills.single().ok();
 
-    for (entity, sprite, atlas_handle) in &candidates {
+    for (entity, sprite) in &candidates {
         // Atlas indices are only meaningful within a specific sheet. Aseprite entities
         // (player, enemies, pets) reuse small indices in their own atlases and must
         // never be matched by heirloom icon indices from the main world/UI atlas.
-        if atlas_handle != main_atlas {
+        let Some(atlas) = sprite.texture_atlas.as_ref() else {
+            continue;
+        };
+        if &atlas.layout != main_atlas {
             continue;
         }
-        if !lookup.indices.contains(&sprite.index) {
+        if !lookup.indices.contains(&atlas.index) {
             continue;
         }
-        let Some(heirloom) = lookup.index_to_heirloom.get(&sprite.index) else {
+        let Some(heirloom) = lookup.index_to_heirloom.get(&atlas.index) else {
             continue;
         };
 
@@ -327,9 +364,11 @@ fn tag_heirloom_icon_outlines(
             HeirloomIconOutlineStyle::Default
         };
 
-        commands
-            .entity(entity)
-            .insert(HeirloomIconOutline::new(rarity, style));
+        // Chest take/banish (and other UI teardown) may despawn this icon in the
+        // same frame after we queued the insert — Bevy 0.19 panics on apply.
+        if let Ok(mut entity_commands) = commands.get_entity(entity) {
+            entity_commands.try_insert(HeirloomIconOutline::new(rarity, style));
+        }
     }
 }
 
@@ -340,7 +379,7 @@ fn resolve_heirloom_outline_rarity(
     player_skills: Option<&PlayerSkills>,
     choice_queue: Option<&HeirloomChoiceQueue>,
     item_chest_state: Option<&ItemChestState>,
-    parents: &Query<&Parent>,
+    parents: &Query<&ChildOf>,
     crystal_icons: &Query<&CrystalUnlockIcon>,
     banish_icons: &Query<&BanishTrackerIcon>,
     final_heirlooms: &Query<&ItemChestFinalHeirloom>,
@@ -390,7 +429,7 @@ fn resolve_heirloom_outline_rarity(
     }
 
     if let Ok(parent) = parents.get(entity) {
-        let parent_entity = parent.get();
+        let parent_entity = parent.parent();
         if let Ok(hover) = merchant_hovers.get(parent_entity) {
             if hover.heirloom == *heirloom {
                 return hover.rarity;
@@ -446,14 +485,14 @@ fn refresh_outlined_cursor_on_settings_change(
     cursor_color: Res<CursorColorSettings>,
     graphics: Res<Graphics>,
     mut commands: Commands,
-    cursors: Query<Entity, (With<CustomCursor>, With<Mesh2dHandle>)>,
+    cursors: Query<Entity, (With<CustomCursor>, With<Mesh2d>)>,
 ) {
     if !cursor_color.is_changed() {
         return;
     }
-    let Some(texture_atlas) = graphics.texture_atlas.as_ref() else {
+    if graphics.texture_atlas_layout.is_none() || graphics.texture_atlas_image.is_none() {
         return;
-    };
+    }
     let Some(base_sprite) = graphics.get_cursor_color_sprite(cursor_color.index) else {
         return;
     };
@@ -463,9 +502,9 @@ fn refresh_outlined_cursor_on_settings_change(
     for entity in &cursors {
         commands
             .entity(entity)
-            .remove::<Mesh2dHandle>()
-            .remove::<Handle<AtlasSpriteOutlineMaterial>>()
-            .insert((sprite.clone(), texture_atlas.clone()));
+            .remove::<Mesh2d>()
+            .remove::<MeshMaterial2d<AtlasSpriteOutlineMaterial>>()
+            .insert(sprite.clone());
     }
 }
 
@@ -480,18 +519,10 @@ fn spawn_ui_shadows(
     mut materials: ResMut<Assets<AtlasSpriteOutlineMaterial>>,
     mut state: ResMut<UiShadowState>,
     images: Res<Assets<Image>>,
-    tagged: Query<
-        (
-            Entity,
-            &Sprite,
-            &Handle<Image>,
-            &UiShadow,
-            Option<&RenderLayers>,
-        ),
-        Without<UiShadowApplied>,
-    >,
+    tagged: Query<(Entity, &Sprite, &UiShadow, Option<&RenderLayers>), Without<UiShadowApplied>>,
 ) {
-    for (entity, sprite, image_handle, shadow, render_layers) in &tagged {
+    for (entity, sprite, shadow, render_layers) in tagged.iter() {
+        let image_handle = &sprite.image;
         let Some(image) = images.get(image_handle) else {
             // Texture not loaded yet; retry next frame (no `UiShadowApplied` inserted).
             continue;
@@ -508,7 +539,7 @@ fn spawn_ui_shadows(
             .or_insert_with(|| {
                 materials.add(AtlasSpriteOutlineMaterial {
                     uv_bounds: Vec4::new(0., 0., 1., 1.),
-                    outline_color: shadow.color.into(),
+                    outline_color: outline_color_uniform(shadow.color),
                     ring_params: Vec4::new(ring_count as f32, shadow.falloff, 1.0, 0.0),
                     source_texture: Some(image_handle.clone()),
                 })
@@ -523,21 +554,22 @@ fn spawn_ui_shadows(
         let child = commands
             .spawn((
                 mesh,
-                material,
-                SpatialBundle::from_transform(Transform::from_xyz(0., 0., UI_SHADOW_CHILD_Z)),
+                MeshMaterial2d(material),
+                (
+                    Transform::from_xyz(0., 0., UI_SHADOW_CHILD_Z),
+                    Visibility::default(),
+                ),
                 layers,
                 UiShadowChild,
                 Name::new("UI Shadow"),
             ))
             .id();
         safe_add_child(&mut commands, entity, child);
-        commands.add(move |world: &mut World| {
-            if world.get_entity(entity).is_some() {
-                if let Some(mut entity_commands) = world.get_entity_mut(entity) {
-                    entity_commands.insert(UiShadowApplied);
-                }
-            }
-        });
+        // Parent may have been despawned this frame (e.g. inventory UI teardown).
+        // `get_entity` only checks at queue time — use try_insert so apply is silenced.
+        if let Ok(mut entity_commands) = commands.get_entity(entity) {
+            entity_commands.try_insert(UiShadowApplied);
+        }
     }
 }
 
@@ -546,116 +578,237 @@ fn apply_atlas_sprite_outlines(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<AtlasSpriteOutlineMaterial>>,
     mut state: ResMut<AtlasSpriteOutlineState>,
-    atlases: Res<Assets<TextureAtlas>>,
-    item_drops: Query<
-        (Entity, &TextureAtlasSprite, &Handle<TextureAtlas>),
-        (With<ItemDrop>, Without<Mesh2dHandle>),
-    >,
+    layouts: Res<Assets<TextureAtlasLayout>>,
+    item_drops: Query<(Entity, &Sprite), (With<ItemDrop>, Without<ItemDropOutlineApplied>)>,
     heirloom_icons: Query<
-        (
-            Entity,
-            &TextureAtlasSprite,
-            &Handle<TextureAtlas>,
-            &HeirloomIconOutline,
-        ),
-        Without<Mesh2dHandle>,
+        (Entity, &Sprite, &HeirloomIconOutline, Option<&RenderLayers>),
+        (Without<Mesh2d>, Without<HeirloomIconOutlineApplied>),
     >,
-    cursors: Query<
-        (Entity, &TextureAtlasSprite, &Handle<TextureAtlas>),
-        (With<CustomCursor>, Without<Mesh2dHandle>),
-    >,
+    cursors: Query<(Entity, &Sprite), (With<CustomCursor>, Without<Mesh2d>)>,
 ) {
-    for (entity, sprite, atlas_handle) in &item_drops {
-        apply_outline_to_entity(
+    for (entity, sprite) in &item_drops {
+        apply_item_drop_outline_child(
             &mut commands,
             &mut meshes,
             &mut materials,
             &mut state,
-            &atlases,
+            &layouts,
             entity,
             sprite,
-            atlas_handle,
             DEFAULT_OUTLINE_COLOR,
         );
     }
 
-    for (entity, sprite, atlas_handle, outline) in &heirloom_icons {
-        apply_outline_to_entity(
+    for (entity, sprite, outline, render_layers) in &heirloom_icons {
+        // Keep `Sprite` on the icon — hover/tooltips (time-crystal tracker, HUD, etc.)
+        // hit-test against `Sprite::custom_size`. Destructive Mesh2d conversion broke that.
+        apply_heirloom_icon_outline_child(
             &mut commands,
             &mut meshes,
             &mut materials,
             &mut state,
-            &atlases,
+            &layouts,
             entity,
             sprite,
-            atlas_handle,
             outline.outline_color(),
+            render_layers.cloned(),
         );
     }
 
-    for (entity, sprite, atlas_handle) in &cursors {
+    for (entity, sprite) in &cursors {
         apply_outline_to_entity(
             &mut commands,
             &mut meshes,
             &mut materials,
             &mut state,
-            &atlases,
+            &layouts,
             entity,
             sprite,
-            atlas_handle,
             DEFAULT_OUTLINE_COLOR,
         );
     }
 }
 
+/// Destructive outline for the cursor only: replace [`Sprite`] with `Mesh2d`.
+/// Floor drops must use [`apply_item_drop_outline_child`] instead.
 fn apply_outline_to_entity(
     commands: &mut Commands,
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<AtlasSpriteOutlineMaterial>,
     state: &mut AtlasSpriteOutlineState,
-    atlases: &Assets<TextureAtlas>,
+    layouts: &Assets<TextureAtlasLayout>,
     entity: Entity,
-    sprite: &TextureAtlasSprite,
-    atlas_handle: &Handle<TextureAtlas>,
+    sprite: &Sprite,
     outline_color: Color,
 ) {
-    let Some(atlas) = atlases.get(atlas_handle) else {
+    let Some(atlas) = sprite.texture_atlas.as_ref() else {
+        return;
+    };
+    let Some(layout) = layouts.get(&atlas.layout) else {
         return;
     };
 
-    let rect = atlas.textures[sprite.index];
-    let atlas_size = atlas.size;
+    let Some(rect) = layout.textures.get(atlas.index).copied() else {
+        return;
+    };
+    let atlas_size = layout.size.as_vec2();
     let uv_bounds = Vec4::new(
-        rect.min.x / atlas_size.x,
-        rect.min.y / atlas_size.y,
-        rect.max.x / atlas_size.x,
-        rect.max.y / atlas_size.y,
+        rect.min.x as f32 / atlas_size.x,
+        rect.min.y as f32 / atlas_size.y,
+        rect.max.x as f32 / atlas_size.x,
+        rect.max.y as f32 / atlas_size.y,
     );
     let outline_key = color_cache_key(outline_color);
 
     let material = state
         .materials
-        .entry((sprite.index, outline_key))
+        .entry((atlas.index, outline_key))
         .or_insert_with(|| {
             materials.add(AtlasSpriteOutlineMaterial {
                 uv_bounds,
-                outline_color: outline_color.into(),
+                outline_color: outline_color_uniform(outline_color),
                 ring_params: Vec4::new(1.0, 0.0, 0.0, 0.0),
-                source_texture: Some(atlas.texture.clone()),
+                source_texture: Some(sprite.image.clone()),
             })
         })
         .clone();
 
-    let mesh = mesh_from_atlas_sprite(meshes, atlas, sprite);
+    let mesh = mesh_from_atlas_sprite(meshes, layout, sprite);
 
     // Insert only the mesh + material, NOT the full MaterialMesh2dBundle.
     // The bundle carries a default Transform/Visibility which would clobber
     // the entity's real spawn position and rotation.
     commands
         .entity(entity)
-        .insert((mesh, material))
-        .remove::<TextureAtlasSprite>()
-        .remove::<Handle<TextureAtlas>>();
+        .insert((mesh, MeshMaterial2d(material)))
+        .remove::<Sprite>();
+}
+
+/// Non-destructive floor-drop outline: parent keeps [`Sprite`] (same pass as shrines / YSort).
+fn apply_item_drop_outline_child(
+    commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    materials: &mut Assets<AtlasSpriteOutlineMaterial>,
+    state: &mut AtlasSpriteOutlineState,
+    layouts: &Assets<TextureAtlasLayout>,
+    entity: Entity,
+    sprite: &Sprite,
+    outline_color: Color,
+) {
+    let Some(atlas) = sprite.texture_atlas.as_ref() else {
+        return;
+    };
+    let Some(layout) = layouts.get(&atlas.layout) else {
+        return;
+    };
+
+    let Some(rect) = layout.textures.get(atlas.index).copied() else {
+        return;
+    };
+    let atlas_size = layout.size.as_vec2();
+    let uv_bounds = Vec4::new(
+        rect.min.x as f32 / atlas_size.x,
+        rect.min.y as f32 / atlas_size.y,
+        rect.max.x as f32 / atlas_size.x,
+        rect.max.y as f32 / atlas_size.y,
+    );
+    let outline_key = color_cache_key(outline_color);
+
+    let material = state
+        .materials
+        .entry((atlas.index, outline_key))
+        .or_insert_with(|| {
+            materials.add(AtlasSpriteOutlineMaterial {
+                uv_bounds,
+                outline_color: outline_color_uniform(outline_color),
+                // Same as cursor/heirloom cache entries (shadow_only = 0). Parent Sprite
+                // covers the child interior; only the outline rings peek out.
+                ring_params: Vec4::new(1.0, 0.0, 0.0, 0.0),
+                source_texture: Some(sprite.image.clone()),
+            })
+        })
+        .clone();
+
+    let mesh = mesh_from_atlas_sprite(meshes, layout, sprite);
+    let child = commands
+        .spawn((
+            mesh,
+            MeshMaterial2d(material),
+            (
+                Transform::from_xyz(0., 0., ITEM_DROP_OUTLINE_CHILD_Z),
+                Visibility::default(),
+            ),
+            ItemDropOutlineChild,
+            Name::new("Item Drop Outline"),
+        ))
+        .id();
+    safe_add_child(commands, entity, child);
+    if let Ok(mut entity_commands) = commands.get_entity(entity) {
+        entity_commands.try_insert(ItemDropOutlineApplied);
+    }
+}
+
+/// Non-destructive outline for UI heirloom icons: parent keeps [`Sprite`] for pointcasts.
+fn apply_heirloom_icon_outline_child(
+    commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    materials: &mut Assets<AtlasSpriteOutlineMaterial>,
+    state: &mut AtlasSpriteOutlineState,
+    layouts: &Assets<TextureAtlasLayout>,
+    entity: Entity,
+    sprite: &Sprite,
+    outline_color: Color,
+    render_layers: Option<RenderLayers>,
+) {
+    let Some(atlas) = sprite.texture_atlas.as_ref() else {
+        return;
+    };
+    let Some(layout) = layouts.get(&atlas.layout) else {
+        return;
+    };
+
+    let Some(rect) = layout.textures.get(atlas.index).copied() else {
+        return;
+    };
+    let atlas_size = layout.size.as_vec2();
+    let uv_bounds = Vec4::new(
+        rect.min.x as f32 / atlas_size.x,
+        rect.min.y as f32 / atlas_size.y,
+        rect.max.x as f32 / atlas_size.x,
+        rect.max.y as f32 / atlas_size.y,
+    );
+    let outline_key = color_cache_key(outline_color);
+
+    let material = state
+        .materials
+        .entry((atlas.index, outline_key))
+        .or_insert_with(|| {
+            materials.add(AtlasSpriteOutlineMaterial {
+                uv_bounds,
+                outline_color: outline_color_uniform(outline_color),
+                ring_params: Vec4::new(1.0, 0.0, 0.0, 0.0),
+                source_texture: Some(sprite.image.clone()),
+            })
+        })
+        .clone();
+
+    let mesh = mesh_from_atlas_sprite(meshes, layout, sprite);
+    let layers = render_layers.unwrap_or_else(|| RenderLayers::layer(3));
+    let child = commands
+        .spawn((
+            mesh,
+            MeshMaterial2d(material),
+            (Transform::from_xyz(0., 0., -0.1), Visibility::default()),
+            layers,
+            HeirloomIconOutlineChild,
+            Name::new("Heirloom Icon Outline"),
+        ))
+        .id();
+    safe_add_child(commands, entity, child);
+    // Same deferred-despawn race as UI shadows — never panic on apply.
+    if let Ok(mut entity_commands) = commands.get_entity(entity) {
+        entity_commands.try_insert(HeirloomIconOutlineApplied);
+    }
 }
 
 /// Proximity outline for overworld shrine body art (not eye / ring children).
@@ -705,7 +858,6 @@ fn update_shrine_proximity_outlines(
         &WorldObject,
         &GlobalTransform,
         &Sprite,
-        &Handle<Image>,
         Option<&SpriteAnchor>,
         Option<&InteractionGuideTrigger>,
         Option<&ShrineNeedsRepair>,
@@ -713,22 +865,21 @@ fn update_shrine_proximity_outlines(
     )>,
     outlined: Query<&ShrineProximityOutlined>,
     outline_children: Query<(), With<ShrineProximityOutlineChild>>,
-    changed_images: Query<Entity, (With<ShrineProximityOutlined>, Changed<Handle<Image>>)>,
+    changed_images: Query<Entity, (With<ShrineProximityOutlined>, Changed<Sprite>)>,
     done_eyes: Query<(), With<ShrineEyeDoneVisual>>,
 ) {
-    let Ok(player_t) = player_query.get_single() else {
+    let Ok(player_t) = player_query.single() else {
         return;
     };
     let player_pos = player_t.translation().truncate();
 
-    for (entity, obj, gtf, sprite, image_handle, anchor, guide, needs_repair, children) in &shrines
-    {
+    for (entity, obj, gtf, sprite, anchor, guide, needs_repair, children) in shrines.iter() {
         if !uses_standalone_shrine_texture(obj) {
             continue;
         }
 
         let eye_done = children.map_or(false, |c| {
-            c.iter().any(|child| done_eyes.get(*child).is_ok())
+            c.iter().any(|child| done_eyes.get(child).is_ok())
         });
         let shrine_done = shrine_is_consumed(obj) || eye_done;
         let needs_repair = needs_repair.is_some();
@@ -764,6 +915,7 @@ fn update_shrine_proximity_outlines(
             continue;
         }
 
+        let image_handle = &sprite.image;
         let Some(image) = images.get(image_handle) else {
             continue;
         };
@@ -774,7 +926,7 @@ fn update_shrine_proximity_outlines(
             .or_insert_with(|| {
                 materials.add(AtlasSpriteOutlineMaterial {
                     uv_bounds: Vec4::new(0., 0., 1., 1.),
-                    outline_color: outline_color.into(),
+                    outline_color: outline_color_uniform(outline_color),
                     ring_params: Vec4::new(
                         SHRINE_PROXIMITY_OUTLINE_RINGS as f32,
                         SHRINE_PROXIMITY_OUTLINE_FALLOFF,
@@ -795,12 +947,11 @@ fn update_shrine_proximity_outlines(
         let child = commands
             .spawn((
                 mesh,
-                material,
-                SpatialBundle::from_transform(Transform::from_xyz(
-                    0.,
-                    0.,
-                    SHRINE_PROXIMITY_OUTLINE_CHILD_Z,
-                )),
+                MeshMaterial2d(material),
+                (
+                    Transform::from_xyz(0., 0., SHRINE_PROXIMITY_OUTLINE_CHILD_Z),
+                    Visibility::default(),
+                ),
                 ShrineProximityOutlineChild,
                 Name::new("Shrine Proximity Outline"),
             ))
@@ -822,8 +973,8 @@ fn despawn_shrine_proximity_outline_children(
         return;
     };
     for child in children.iter() {
-        if outline_children.get(*child).is_ok() {
-            commands.entity(*child).despawn_recursive();
+        if outline_children.get(child).is_ok() {
+            commands.entity(child).despawn();
         }
     }
 }
@@ -840,21 +991,17 @@ fn update_upgrade_target_highlights(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<AtlasSpriteOutlineMaterial>>,
     mut state: ResMut<UpgradeHighlightState>,
-    atlases: Res<Assets<TextureAtlas>>,
+    layouts: Res<Assets<TextureAtlasLayout>>,
     ui_state: Res<State<crate::ui::UIState>>,
     inv_state: Res<crate::ui::InventoryState>,
     dragged: Query<&crate::inventory::ItemStack, With<crate::ui::DraggedItem>>,
     slots: Query<&crate::ui::InventorySlotState>,
-    icon_sprites: Query<(
-        &TextureAtlasSprite,
-        &Handle<TextureAtlas>,
-        Option<&RenderLayers>,
-    )>,
+    icon_sprites: Query<(&Sprite, Option<&RenderLayers>)>,
     highlighted: Query<Entity, With<UpgradeTargetHighlighted>>,
     children_q: Query<&Children>,
     highlight_children: Query<(), With<UpgradeTargetHighlightChild>>,
 ) {
-    let carrying_material = ui_state.0.is_inv_open()
+    let carrying_material = ui_state.is_inv_open()
         && dragged.iter().any(|s| {
             matches!(
                 s.obj_type,
@@ -876,7 +1023,8 @@ fn update_upgrade_target_highlights(
     }
 
     // Collect icon entities of every slot that can currently receive the material.
-    let mut valid_icons: bevy::utils::HashSet<Entity> = bevy::utils::HashSet::new();
+    let mut valid_icons: bevy::platform::collections::HashSet<Entity> =
+        bevy::platform::collections::HashSet::new();
     for slot in slots.iter() {
         let Some(icon) = slot.item else {
             continue;
@@ -914,49 +1062,53 @@ fn update_upgrade_target_highlights(
         if highlighted.get(icon).is_ok() {
             continue;
         }
-        let Ok((sprite, atlas_handle, render_layers)) = icon_sprites.get(icon) else {
+        let Ok((sprite, render_layers)) = icon_sprites.get(icon) else {
             continue;
         };
-        let Some(atlas) = atlases.get(atlas_handle) else {
+        let Some(atlas) = sprite.texture_atlas.as_ref() else {
+            continue;
+        };
+        let Some(layout) = layouts.get(&atlas.layout) else {
             continue;
         };
 
-        let rect = atlas.textures[sprite.index];
-        let atlas_size = atlas.size;
+        let Some(rect) = layout.textures.get(atlas.index).copied() else {
+            continue;
+        };
+        let atlas_size = layout.size.as_vec2();
         let uv_bounds = Vec4::new(
-            rect.min.x / atlas_size.x,
-            rect.min.y / atlas_size.y,
-            rect.max.x / atlas_size.x,
-            rect.max.y / atlas_size.y,
+            rect.min.x as f32 / atlas_size.x,
+            rect.min.y as f32 / atlas_size.y,
+            rect.max.x as f32 / atlas_size.x,
+            rect.max.y as f32 / atlas_size.y,
         );
 
         let material = state
             .materials
-            .entry(sprite.index)
+            .entry(atlas.index)
             .or_insert_with(|| {
                 materials.add(AtlasSpriteOutlineMaterial {
                     uv_bounds,
-                    outline_color: UPGRADE_TARGET_OUTLINE_COLOR.into(),
+                    outline_color: outline_color_uniform(UPGRADE_TARGET_OUTLINE_COLOR),
                     // shadow_only = 1.0 → draw only the outline rings, not the sprite itself.
                     ring_params: Vec4::new(1.0, 0.0, 1.0, 0.0),
-                    source_texture: Some(atlas.texture.clone()),
+                    source_texture: Some(sprite.image.clone()),
                 })
             })
             .clone();
 
-        let mesh = mesh_from_atlas_sprite(&mut meshes, atlas, sprite);
+        let mesh = mesh_from_atlas_sprite(&mut meshes, layout, sprite);
         let layers = render_layers
             .cloned()
             .unwrap_or_else(|| RenderLayers::layer(3));
         let child = commands
             .spawn((
                 mesh,
-                material,
-                SpatialBundle::from_transform(Transform::from_xyz(
-                    0.,
-                    0.,
-                    UPGRADE_HIGHLIGHT_CHILD_Z,
-                )),
+                MeshMaterial2d(material),
+                (
+                    Transform::from_xyz(0., 0., UPGRADE_HIGHLIGHT_CHILD_Z),
+                    Visibility::default(),
+                ),
                 layers,
                 UpgradeTargetHighlightChild,
                 Name::new("Upgrade Target Highlight"),
@@ -975,17 +1127,11 @@ fn despawn_upgrade_highlight_children(
 ) {
     if let Ok(children) = children_q.get(icon) {
         for child in children.iter() {
-            if highlight_children.get(*child).is_ok() {
-                commands.entity(*child).despawn_recursive();
+            if highlight_children.get(child).is_ok() {
+                commands.entity(child).despawn();
             }
         }
     }
-}
-
-fn color_cache_key(color: Color) -> u32 {
-    let [r, g, b, a]: [f32; 4] = color.into();
-    let to_byte = |v: f32| (v.clamp(0.0, 1.0) * 255.0).round() as u32;
-    to_byte(r) | (to_byte(g) << 8) | (to_byte(b) << 16) | (to_byte(a) << 24)
 }
 
 /// World-space margin added around the sprite so the 1px outline has room to
@@ -993,12 +1139,34 @@ fn color_cache_key(color: Color) -> u32 {
 /// is one texel, so the quad stays at 1:1 pixel scale.
 const OUTLINE_MARGIN_PX: f32 = 1.0;
 
+fn outline_color_uniform(color: Color) -> Vec4 {
+    let c = color.to_srgba();
+    Vec4::new(c.red, c.green, c.blue, c.alpha)
+}
+
+fn color_cache_key(color: Color) -> u32 {
+    let c = color.to_srgba();
+    let to_byte = |v: f32| (v.clamp(0.0, 1.0) * 255.0).round() as u32;
+    to_byte(c.red) | (to_byte(c.green) << 8) | (to_byte(c.blue) << 16) | (to_byte(c.alpha) << 24)
+}
+
+/// UV corners for Bevy 0.19 `Rectangle` meshes: vertices are TR, TL, BL, BR
+/// with V=0 at +Y (top) and V=1 at -Y (bottom).
+fn rectangle_uvs(lu: f32, ru: f32, v_at_top: f32, v_at_bottom: f32) -> Vec<[f32; 2]> {
+    vec![
+        [ru, v_at_top],    // TR
+        [lu, v_at_top],    // TL
+        [lu, v_at_bottom], // BL
+        [ru, v_at_bottom], // BR
+    ]
+}
+
 fn mesh_from_standalone_image(
     meshes: &mut Assets<Mesh>,
     image: &Image,
     sprite: &Sprite,
     ring_count: f32,
-) -> Mesh2dHandle {
+) -> Mesh2d {
     let dims = Vec2::new(
         image.texture_descriptor.size.width as f32,
         image.texture_descriptor.size.height as f32,
@@ -1009,22 +1177,22 @@ fn mesh_from_standalone_image(
     let margin = ring_count.max(1.0);
     let size = sprite.custom_size.unwrap_or(dims) + Vec2::splat(margin * 2.0);
 
-    let lu = 0.0 - margin * texel.x;
-    let ru = 1.0 + margin * texel.x;
-    let bottom_v = 0.0 - margin * texel.y;
-    let top_v = 1.0 + margin * texel.y;
+    let mut lu = 0.0 - margin * texel.x;
+    let mut ru = 1.0 + margin * texel.x;
+    let mut v_at_top = 0.0 - margin * texel.y;
+    let mut v_at_bottom = 1.0 + margin * texel.y;
 
-    let (lu, ru) = if sprite.flip_x { (ru, lu) } else { (lu, ru) };
-    let (bottom_v, top_v) = if sprite.flip_y {
-        (top_v, bottom_v)
-    } else {
-        (bottom_v, top_v)
-    };
+    if sprite.flip_x {
+        std::mem::swap(&mut lu, &mut ru);
+    }
+    if sprite.flip_y {
+        std::mem::swap(&mut v_at_top, &mut v_at_bottom);
+    }
 
-    let mut mesh = Mesh::from(shape::Quad::new(size));
+    let mut mesh = Mesh::from(Rectangle::new(size.x, size.y));
     mesh.insert_attribute(
         Mesh::ATTRIBUTE_UV_0,
-        vec![[lu, top_v], [lu, bottom_v], [ru, bottom_v], [ru, top_v]],
+        rectangle_uvs(lu, ru, v_at_top, v_at_bottom),
     );
 
     meshes.add(mesh).into()
@@ -1032,43 +1200,48 @@ fn mesh_from_standalone_image(
 
 fn mesh_from_atlas_sprite(
     meshes: &mut Assets<Mesh>,
-    atlas: &TextureAtlas,
-    sprite: &TextureAtlasSprite,
-) -> Mesh2dHandle {
-    let rect = atlas.textures[sprite.index];
-    let atlas_size = atlas.size;
+    layout: &TextureAtlasLayout,
+    sprite: &Sprite,
+) -> Mesh2d {
+    let Some(atlas) = sprite.texture_atlas.as_ref() else {
+        return meshes.add(Mesh::from(Rectangle::new(1.0, 1.0))).into();
+    };
+    let Some(rect) = layout.textures.get(atlas.index).copied() else {
+        return meshes.add(Mesh::from(Rectangle::new(1.0, 1.0))).into();
+    };
+    let atlas_size = layout.size.as_vec2();
 
     let texel = Vec2::new(1.0 / atlas_size.x, 1.0 / atlas_size.y);
 
     // Unexpanded sprite rect in UV space.
-    let u0 = rect.min.x / atlas_size.x;
-    let u1 = rect.max.x / atlas_size.x;
-    let v0 = rect.min.y / atlas_size.y;
-    let v1 = rect.max.y / atlas_size.y;
+    let u0 = rect.min.x as f32 / atlas_size.x;
+    let u1 = rect.max.x as f32 / atlas_size.x;
+    let v0 = rect.min.y as f32 / atlas_size.y;
+    let v1 = rect.max.y as f32 / atlas_size.y;
 
     // Expand UVs outward by one texel so the quad has a 1px margin ring. The
     // shader clamps neighbor sampling to `uv_bounds`, so this margin reads as
     // transparent for the base sprite and only ever shows the outline.
-    let (lu, ru) = if sprite.flip_x {
-        (u1 + texel.x, u0 - texel.x)
-    } else {
-        (u0 - texel.x, u1 + texel.x)
-    };
-    let bottom_v = v0 - texel.y;
-    let top_v = v1 + texel.y;
+    let mut lu = u0 - texel.x;
+    let mut ru = u1 + texel.x;
+    let mut v_at_top = v0 - texel.y;
+    let mut v_at_bottom = v1 + texel.y;
+    if sprite.flip_x {
+        std::mem::swap(&mut lu, &mut ru);
+    }
+    if sprite.flip_y {
+        std::mem::swap(&mut v_at_top, &mut v_at_bottom);
+    }
 
     let size = sprite
         .custom_size
-        .unwrap_or_else(|| Vec2::new(rect.width(), rect.height()))
+        .unwrap_or_else(|| Vec2::new(rect.width() as f32, rect.height() as f32))
         + Vec2::splat(OUTLINE_MARGIN_PX * 2.0);
 
-    // Match the vertex winding of `shape::Quad`, whose default UVs are
-    // [0,0], [0,1], [1,1], [1,0] (top-left, bottom-left, bottom-right, top-right).
-    // V is flipped relative to the atlas rect, so top vertices use the larger v.
-    let mut mesh = Mesh::from(shape::Quad::new(size));
+    let mut mesh = Mesh::from(Rectangle::new(size.x, size.y));
     mesh.insert_attribute(
         Mesh::ATTRIBUTE_UV_0,
-        vec![[lu, top_v], [lu, bottom_v], [ru, bottom_v], [ru, top_v]],
+        rectangle_uvs(lu, ru, v_at_top, v_at_bottom),
     );
 
     meshes.add(mesh).into()

@@ -30,7 +30,9 @@
 //! Decision: shelved for now rather than sunk-cost debugging `gilrs` internals. Revisit
 //! gamepad hardware testing on macOS after the planned Bevy 0.19 upgrade; this module
 //! should still be a solid starting point for wiring gameplay to that newer backend.
-use bevy::input::gamepad::{GamepadConnection, GamepadConnectionEvent, GamepadEvent};
+use bevy::input::gamepad::{
+    Gamepad, GamepadAxis, GamepadConnection, GamepadConnectionEvent, GamepadEvent,
+};
 use bevy::prelude::*;
 use leafwing_input_manager::prelude::*;
 
@@ -41,27 +43,41 @@ use crate::{player::Player, GameState};
 pub const GAMEPAD_STICK_DEADZONE: f32 = 0.2;
 
 /// Gameplay actions bound to a fixed Xbox-style layout.
-#[derive(Actionlike, PartialEq, Eq, Clone, Copy, Hash, Debug)]
+#[derive(Actionlike, Reflect, PartialEq, Eq, Clone, Copy, Hash, Debug)]
 pub enum GamepadAction {
+    #[actionlike(DualAxis)]
     Move,
+    #[actionlike(DualAxis)]
     Aim,
     /// Basic weapon attack (mirrors the hardcoded Left Mouse Button check).
+    #[actionlike(Button)]
     Attack,
     /// Only 3 skill slots are ever reachable in normal play (`VISIBLE_CLASS_SKILL_COUNT`
     /// in `player/skills.rs`) — slot 3 is permanently disabled dead code and slot 4 is a
     /// rare blessing-only bonus, so neither gets a gamepad binding.
+    #[actionlike(Button)]
     Skill0,
+    #[actionlike(Button)]
     Skill1,
+    #[actionlike(Button)]
     Skill2,
+    #[actionlike(Button)]
     Interact,
+    #[actionlike(Button)]
     AutoTarget,
+    #[actionlike(Button)]
     Hotbar0,
+    #[actionlike(Button)]
     Hotbar1,
+    #[actionlike(Button)]
     Hotbar2,
+    #[actionlike(Button)]
     Hotbar3,
     /// Left Bumper — opens/closes the inventory (mirrors the keyboard inventory keybind).
+    #[actionlike(Button)]
     ToggleInventory,
     /// Right Bumper — opens/closes the island map (mirrors the keyboard map keybind).
+    #[actionlike(Button)]
     ToggleMap,
 }
 
@@ -96,23 +112,24 @@ pub fn gamepad_skill_just_pressed(
     action_state: Option<&ActionState<GamepadAction>>,
     slot: usize,
 ) -> bool {
-    let (Some(action_state), Some(action)) = (action_state, GamepadAction::skill_slot(slot))
-    else {
+    let (Some(action_state), Some(action)) = (action_state, GamepadAction::skill_slot(slot)) else {
         return false;
     };
-    action_state.just_pressed(action)
+    action_state.just_pressed(&action)
 }
 
 /// True when `slot`'s gamepad button is currently held down (not just this frame) —
 /// gamepad-side counterpart to `InputMappings::check_skill_input_held`. Used to detect
 /// release for the ground-targeted skill hold-to-aim flow (see `dispatch_active_skill_events`
 /// in `inputs.rs`).
-pub fn gamepad_skill_pressed(action_state: Option<&ActionState<GamepadAction>>, slot: usize) -> bool {
-    let (Some(action_state), Some(action)) = (action_state, GamepadAction::skill_slot(slot))
-    else {
+pub fn gamepad_skill_pressed(
+    action_state: Option<&ActionState<GamepadAction>>,
+    slot: usize,
+) -> bool {
+    let (Some(action_state), Some(action)) = (action_state, GamepadAction::skill_slot(slot)) else {
         return false;
     };
-    action_state.pressed(action)
+    action_state.pressed(&action)
 }
 
 /// True when `action` was just pressed this frame on the player's gamepad — generic
@@ -123,7 +140,7 @@ pub fn gamepad_action_just_pressed(
     action: GamepadAction,
 ) -> bool {
     action_state
-        .map(|a| a.just_pressed(action))
+        .map(|a| a.just_pressed(&action))
         .unwrap_or(false)
 }
 
@@ -136,7 +153,7 @@ pub fn gamepad_hotbar_just_pressed(
     else {
         return false;
     };
-    action_state.just_pressed(action)
+    action_state.just_pressed(&action)
 }
 
 /// Attaches saved gamepad bindings to the player as soon as it spawns (start of every run).
@@ -147,12 +164,7 @@ fn insert_gamepad_input_on_player(
 ) {
     let input_map = mappings.to_input_map();
     for player_e in added_players.iter() {
-        commands
-            .entity(player_e)
-            .insert(InputManagerBundle::<GamepadAction> {
-                action_state: ActionState::default(),
-                input_map: input_map.clone(),
-            });
+        commands.entity(player_e).insert(input_map.clone());
         info!("[Gamepad] Input bindings attached to player entity {player_e:?}");
     }
 }
@@ -182,29 +194,39 @@ pub fn sync_player_gamepad_input_map(
 /// same pattern as `RightTrigger2` already doing double duty for `Attack`/`Skill1`. There's no
 /// real conflict since focus navigation only ever runs while gameplay itself is *not* consuming
 /// D-pad/South for hotbar/skills (see `focus_nav_should_run` in `src/ui/focus.rs`).
-#[derive(Actionlike, PartialEq, Eq, Clone, Copy, Hash, Debug)]
+#[derive(Actionlike, Reflect, PartialEq, Eq, Clone, Copy, Hash, Debug)]
 pub enum UiGamepadAction {
     /// A button — activates whatever's currently focused (mirrors a mouse click).
+    #[actionlike(Button)]
     Confirm,
     /// B button — back/close (mirrors the keyboard Escape handling in `close_container`).
     /// While carrying an item in the inventory (Track 4), B first drops the carried item back
     /// onto its origin slot instead of closing the menu.
+    #[actionlike(Button)]
     Cancel,
     /// Y button — context "quick action" on the focused inventory slot: quick-equip / transfer
     /// the item the same way a shift-click does with the mouse.
+    #[actionlike(Button)]
     QuickAction,
     /// X button — mark / unmark the focused merchant shop item to track its price. While the
     /// inventory is open, the same button consumes the focused consumable (mirrors right-click).
+    #[actionlike(Button)]
     Mark,
     /// Left stick, read as a `Vec2` for continuous analog nav (see `focus_nav_should_run`'s
     /// caller for the discrete-step logic built on top of it).
+    #[actionlike(DualAxis)]
     NavStick,
+    #[actionlike(Button)]
     NavUp,
+    #[actionlike(Button)]
     NavDown,
+    #[actionlike(Button)]
     NavLeft,
+    #[actionlike(Button)]
     NavRight,
     /// Start button — toggles the gamepad pause overlay (`UIState::Pause`) while playing with
     /// no other menu open. See `toggle_gamepad_pause` in `src/inputs.rs`.
+    #[actionlike(Button)]
     Pause,
 }
 
@@ -215,16 +237,16 @@ pub struct UiGamepadInputMarker;
 
 fn default_ui_gamepad_input_map() -> InputMap<UiGamepadAction> {
     let mut map = InputMap::default();
-    map.insert(DualAxis::left_stick(), UiGamepadAction::NavStick);
-    map.insert(GamepadButtonType::South, UiGamepadAction::Confirm);
-    map.insert(GamepadButtonType::East, UiGamepadAction::Cancel);
-    map.insert(GamepadButtonType::North, UiGamepadAction::QuickAction);
-    map.insert(GamepadButtonType::West, UiGamepadAction::Mark);
-    map.insert(GamepadButtonType::DPadUp, UiGamepadAction::NavUp);
-    map.insert(GamepadButtonType::DPadDown, UiGamepadAction::NavDown);
-    map.insert(GamepadButtonType::DPadLeft, UiGamepadAction::NavLeft);
-    map.insert(GamepadButtonType::DPadRight, UiGamepadAction::NavRight);
-    map.insert(GamepadButtonType::Start, UiGamepadAction::Pause);
+    map.insert_dual_axis(UiGamepadAction::NavStick, GamepadStick::LEFT);
+    map.insert(UiGamepadAction::Confirm, GamepadButton::South);
+    map.insert(UiGamepadAction::Cancel, GamepadButton::East);
+    map.insert(UiGamepadAction::QuickAction, GamepadButton::North);
+    map.insert(UiGamepadAction::Mark, GamepadButton::West);
+    map.insert(UiGamepadAction::NavUp, GamepadButton::DPadUp);
+    map.insert(UiGamepadAction::NavDown, GamepadButton::DPadDown);
+    map.insert(UiGamepadAction::NavLeft, GamepadButton::DPadLeft);
+    map.insert(UiGamepadAction::NavRight, GamepadButton::DPadRight);
+    map.insert(UiGamepadAction::Pause, GamepadButton::Start);
     map
 }
 
@@ -232,10 +254,7 @@ fn default_ui_gamepad_input_map() -> InputMap<UiGamepadAction> {
 /// the `Player` existing — see [`UiGamepadAction`]'s doc comment).
 fn setup_ui_gamepad_input(mut commands: Commands) {
     commands.spawn((
-        InputManagerBundle::<UiGamepadAction> {
-            action_state: ActionState::default(),
-            input_map: default_ui_gamepad_input_map(),
-        },
+        default_ui_gamepad_input_map(),
         UiGamepadInputMarker,
         Name::new("UiGamepadInput"),
     ));
@@ -246,14 +265,11 @@ fn setup_ui_gamepad_input(mut commands: Commands) {
 /// bindings/deadzones not registering it as active — see `update_active_input_device`).
 /// Bevy's own `gamepad_connection_system` also logs a bare `Connected`/`Disconnected` line;
 /// this one is easier to grep for and includes the reported device name.
-fn log_gamepad_connections(mut events: EventReader<GamepadConnectionEvent>) {
-    for event in events.iter() {
+fn log_gamepad_connections(mut events: MessageReader<GamepadConnectionEvent>) {
+    for event in events.read() {
         match &event.connection {
-            GamepadConnection::Connected(info) => {
-                info!(
-                    "[Gamepad] Connected: {:?} ({})",
-                    event.gamepad, info.name
-                );
+            GamepadConnection::Connected { name, .. } => {
+                info!("[Gamepad] Connected: {:?} ({name})", event.gamepad,);
             }
             GamepadConnection::Disconnected => {
                 info!("[Gamepad] Disconnected: {:?}", event.gamepad);
@@ -314,7 +330,7 @@ const MOUSE_MOTION_JITTER_THRESHOLD: f32 = 1.0;
 
 /// Some setups (certain Bluetooth peripherals, USB dongles, virtual/ghost HID devices, driver
 /// quirks) make gilrs report a "gamepad" that's sending noise even though the player has no real
-/// controller — we've seen logs where `Input<GamepadButton>`/the stick axes flip on and off every
+/// controller — we've seen logs where `ButtonInput<GamepadButton>`/the stick axes flip on and off every
 /// single frame with zero real controller plugged in. A single frame of gamepad evidence is
 /// therefore not trustworthy on its own. Switching *to* Gamepad requires this many consecutive
 /// frames of evidence (with no competing fresh keyboard/mouse input in between) before we commit
@@ -330,16 +346,17 @@ const KEYBOARD_MOUSE_HOLD_FRAMES: u8 = 45;
 
 fn update_active_input_device(
     mut device: ResMut<ActiveInputDevice>,
-    key_input: Res<Input<KeyCode>>,
-    mouse_button_input: Res<Input<MouseButton>>,
-    mut mouse_motion: EventReader<bevy::input::mouse::MouseMotion>,
-    gamepad_buttons: Res<Input<GamepadButton>>,
+    key_input: Res<ButtonInput<KeyCode>>,
+    mouse_button_input: Res<ButtonInput<MouseButton>>,
+    mut mouse_motion: MessageReader<bevy::input::mouse::MouseMotion>,
+    gamepads: Query<&Gamepad>,
     action_query: Query<&ActionState<GamepadAction>, With<Player>>,
+    ui_gamepad_q: Query<&ActionState<UiGamepadAction>, With<UiGamepadInputMarker>>,
     mut gamepad_evidence_streak: Local<u8>,
     mut keyboard_mouse_hold: Local<u8>,
 ) {
     let real_mouse_motion = mouse_motion
-        .iter()
+        .read()
         .any(|ev| ev.delta.length() > MOUSE_MOTION_JITTER_THRESHOLD);
     let fresh_keyboard_mouse = real_mouse_motion
         || key_input.get_just_pressed().next().is_some()
@@ -354,30 +371,38 @@ fn update_active_input_device(
         return;
     }
 
-    let fresh_gamepad_button = gamepad_buttons.get_just_pressed().next().is_some();
-    let stick_active = action_query.get_single().is_ok_and(|action_state| {
+    // Held buttons count too — `just_pressed` is only true for one frame, so a 5-frame
+    // debounce never completed on menus when the player taps/holds D-pad to move focus.
+    let gamepad_button_active = gamepads.iter().any(|gamepad| {
+        gamepad.get_just_pressed().next().is_some() || gamepad.get_pressed().next().is_some()
+    });
+    // Player gameplay sticks (in-run)…
+    let player_stick_active = action_query.single().is_ok_and(|action_state| {
         [GamepadAction::Move, GamepadAction::Aim]
             .into_iter()
-            .any(|action| {
-                action_state
-                    .clamped_axis_pair(action)
-                    .map(|pair| pair.xy().length() > GAMEPAD_STICK_DEADZONE)
-                    .unwrap_or(false)
-            })
+            .any(|action| action_state.clamped_axis_pair(&action).length() > GAMEPAD_STICK_DEADZONE)
     });
+    // …and UI nav stick (main menu / class select — no Player entity yet).
+    let ui_stick_active = ui_gamepad_q.iter().any(|action_state| {
+        action_state
+            .clamped_axis_pair(&UiGamepadAction::NavStick)
+            .length()
+            > GAMEPAD_STICK_DEADZONE
+    });
+    let stick_active = player_stick_active || ui_stick_active;
 
     // During the post-mouse hold, stick drift alone cannot reclaim Gamepad — a real button
     // press still can, so deliberate controller use switches immediately.
     if *keyboard_mouse_hold > 0 {
         *keyboard_mouse_hold = keyboard_mouse_hold.saturating_sub(1);
-        if !fresh_gamepad_button {
+        if !gamepad_button_active {
             device.0 = InputDeviceKind::KeyboardMouse;
             *gamepad_evidence_streak = 0;
             return;
         }
     }
 
-    if fresh_gamepad_button || stick_active {
+    if gamepad_button_active || stick_active {
         *gamepad_evidence_streak = gamepad_evidence_streak.saturating_add(1);
         if *gamepad_evidence_streak >= GAMEPAD_SWITCH_DEBOUNCE_FRAMES {
             device.0 = InputDeviceKind::Gamepad;
@@ -403,37 +428,36 @@ fn update_active_input_device(
 /// e.g. some Nintendo Switch Pro Controller / gilrs version combos), vs "it's seen and firing,
 /// but mapped to the wrong layout".
 fn debug_log_raw_gamepad_state(
-    gamepads: Res<Gamepads>,
-    gamepad_buttons: Res<Input<GamepadButton>>,
-    gamepad_axes: Res<Axis<GamepadAxis>>,
+    gamepad_query: Query<(Entity, &Gamepad)>,
     mut timer: Local<Option<Timer>>,
     time: Res<Time>,
 ) {
     let timer = timer.get_or_insert_with(|| Timer::from_seconds(3.0, TimerMode::Repeating));
     timer.tick(time.delta());
     if timer.just_finished() {
-        let connected: Vec<Gamepad> = gamepads.iter().collect();
+        let connected: Vec<Entity> = gamepad_query.iter().map(|(entity, _)| entity).collect();
         info!("[Gamepad] Currently connected: {connected:?}");
     }
-    for button in gamepad_buttons.get_just_pressed() {
-        info!("[Gamepad] Raw button just pressed: {button:?}");
+    for (entity, gamepad) in &gamepad_query {
+        for button in gamepad.get_just_pressed() {
+            info!("[Gamepad] Raw button just pressed on {entity:?}: {button:?}");
+        }
     }
     // Raw axis noise threshold, deliberately smaller than GAMEPAD_STICK_DEADZONE so we can
     // see axis events arriving at all even if the stick mapping/deadzone logic is wrong.
     const RAW_AXIS_THRESHOLD: f32 = 0.05;
-    for gamepad in gamepads.iter() {
-        for axis_type in [
-            GamepadAxisType::LeftStickX,
-            GamepadAxisType::LeftStickY,
-            GamepadAxisType::RightStickX,
-            GamepadAxisType::RightStickY,
-            GamepadAxisType::LeftZ,
-            GamepadAxisType::RightZ,
+    for (entity, gamepad) in &gamepad_query {
+        for axis in [
+            GamepadAxis::LeftStickX,
+            GamepadAxis::LeftStickY,
+            GamepadAxis::RightStickX,
+            GamepadAxis::RightStickY,
+            GamepadAxis::LeftZ,
+            GamepadAxis::RightZ,
         ] {
-            let axis = GamepadAxis { gamepad, axis_type };
-            if let Some(value) = gamepad_axes.get(axis) {
+            if let Some(value) = gamepad.get(axis) {
                 if value.abs() > RAW_AXIS_THRESHOLD {
-                    info!("[Gamepad] Raw axis {axis_type:?} = {value:.2}");
+                    info!("[Gamepad] Raw axis {axis:?} on {entity:?} = {value:.2}");
                 }
             }
         }
@@ -443,7 +467,7 @@ fn debug_log_raw_gamepad_state(
 /// `DEBUG=1` only: logs every raw `GamepadEvent` completely unfiltered — no deadzone, no
 /// press-threshold, no mapping. This is the earliest tap point Bevy exposes: `bevy_gilrs`
 /// pushes these directly from whatever `gilrs` itself reports, before any
-/// `ButtonSettings`/`AxisSettings` filtering is applied to build `Input<GamepadButton>` /
+/// `ButtonSettings`/`AxisSettings` filtering is applied to build `ButtonInput<GamepadButton>` /
 /// `Axis<GamepadAxis>`. If a button mash produces zero lines here, gilrs itself is not
 /// receiving/decoding HID reports from the device (a driver/OS-level gap), not a filtering or
 /// mapping issue in this game's code.
@@ -451,11 +475,11 @@ fn debug_log_raw_gamepad_state(
 /// Axis events are deduped/throttled (gilrs re-sends the same reading many times a second even
 /// when nothing moves) so real signal — especially button presses — doesn't get buried in spam.
 fn debug_log_raw_gamepad_events(
-    mut events: EventReader<GamepadEvent>,
-    mut last_axis: Local<std::collections::HashMap<(Gamepad, GamepadAxisType), f32>>,
+    mut events: MessageReader<GamepadEvent>,
+    mut last_axis: Local<std::collections::HashMap<(Entity, GamepadAxis), f32>>,
 ) {
     const AXIS_LOG_CHANGE_THRESHOLD: f32 = 0.05;
-    for event in events.iter() {
+    for event in events.read() {
         match event {
             GamepadEvent::Connection(e) => {
                 info!("[Gamepad][raw] Connection: {e:?}");
@@ -463,11 +487,11 @@ fn debug_log_raw_gamepad_events(
             GamepadEvent::Button(e) => {
                 info!(
                     "[Gamepad][raw] Button {:?} on {:?} = {:.3}",
-                    e.button_type, e.gamepad, e.value
+                    e.button, e.entity, e.value
                 );
             }
             GamepadEvent::Axis(e) => {
-                let key = (e.gamepad, e.axis_type);
+                let key = (e.entity, e.axis);
                 let changed = match last_axis.get(&key) {
                     Some(prev) => (prev - e.value).abs() > AXIS_LOG_CHANGE_THRESHOLD,
                     None => true,
@@ -476,7 +500,7 @@ fn debug_log_raw_gamepad_events(
                     last_axis.insert(key, e.value);
                     info!(
                         "[Gamepad][raw] Axis {:?} on {:?} = {:.3}",
-                        e.axis_type, e.gamepad, e.value
+                        e.axis, e.entity, e.value
                     );
                 }
             }
@@ -492,17 +516,11 @@ fn debug_log_gamepad_action_state(
     action_query: Query<&ActionState<GamepadAction>, With<Player>>,
     mut last: Local<(Vec2, Vec2)>,
 ) {
-    let Ok(action_state) = action_query.get_single() else {
+    let Ok(action_state) = action_query.single() else {
         return;
     };
-    let move_v = action_state
-        .clamped_axis_pair(GamepadAction::Move)
-        .map(|p| p.xy())
-        .unwrap_or(Vec2::ZERO);
-    let aim_v = action_state
-        .clamped_axis_pair(GamepadAction::Aim)
-        .map(|p| p.xy())
-        .unwrap_or(Vec2::ZERO);
+    let move_v = action_state.clamped_axis_pair(&GamepadAction::Move);
+    let aim_v = action_state.clamped_axis_pair(&GamepadAction::Aim);
     if move_v.distance(last.0) > 0.05 || aim_v.distance(last.1) > 0.05 {
         *last = (move_v, aim_v);
         info!("[Gamepad][action_state] Move={move_v:?} Aim={aim_v:?}");
@@ -513,29 +531,33 @@ pub struct GamepadInputPlugin;
 
 impl Plugin for GamepadInputPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugin(InputManagerPlugin::<GamepadAction>::default())
-            .add_plugin(InputManagerPlugin::<UiGamepadAction>::default())
+        app.add_plugins(InputManagerPlugin::<GamepadAction>::default())
+            .add_plugins(InputManagerPlugin::<UiGamepadAction>::default())
             .init_resource::<ActiveInputDevice>()
-            .add_startup_system(setup_ui_gamepad_input)
+            .add_systems(Startup, setup_ui_gamepad_input)
             // Connection logging runs unconditionally (not gated to GameState::Main) since a
             // controller can be plugged in from the main menu, before a Player even exists.
-            .add_system(log_gamepad_connections)
-            .add_system(insert_gamepad_input_on_player)
-            .add_system(
-                sync_player_gamepad_input_map.in_set(OnUpdate(GameState::Main)),
+            .add_systems(Update, log_gamepad_connections)
+            .add_systems(Update, insert_gamepad_input_on_player)
+            .add_systems(
+                Update,
+                sync_player_gamepad_input_map.run_if(in_state(GameState::Main)),
             )
             // Also unconditional (not gated to GameState::Main): the active device needs to stay
             // accurate in menus/pause too, so a stray/phantom gamepad connection detected while
             // paused doesn't leave stale state once gameplay resumes.
-            .add_systems((
-                update_active_input_device,
-                log_active_input_device_changes.after(update_active_input_device),
-            ));
+            .add_systems(
+                Update,
+                (
+                    update_active_input_device,
+                    log_active_input_device_changes.after(update_active_input_device),
+                ),
+            );
 
         if *crate::DEBUG {
-            app.add_system(debug_log_raw_gamepad_state)
-                .add_system(debug_log_raw_gamepad_events)
-                .add_system(debug_log_gamepad_action_state);
+            app.add_systems(Update, debug_log_raw_gamepad_state)
+                .add_systems(Update, debug_log_raw_gamepad_events)
+                .add_systems(Update, debug_log_gamepad_action_state);
         }
     }
 }

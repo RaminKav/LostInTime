@@ -1,4 +1,4 @@
-use bevy::{prelude::*, transform::TransformSystem};
+use bevy::{prelude::*, transform::TransformSystems};
 use bevy_hanabi::HanabiPlugin;
 
 pub mod bounce;
@@ -21,12 +21,13 @@ pub struct JuicePlugin;
 impl Plugin for JuicePlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(Particles::default())
-            .add_event::<UseItemEvent>()
-            .add_plugin(HanabiPlugin)
+            .add_message::<UseItemEvent>()
+            .add_plugins(HanabiPlugin)
             .add_systems(
+                Update,
                 (
                     test_flash,
-                    screen_flash_effect.run_if(resource_exists::<FlashEffect>()),
+                    screen_flash_effect.run_if(resource_exists::<FlashEffect>),
                     test_shake,
                     update_dust_particle_dir,
                     setup_particles,
@@ -42,24 +43,22 @@ impl Plugin for JuicePlugin {
                         .before(CustomFlush)
                         .before(handle_break_object),
                 )
-                    .in_set(OnUpdate(GameState::Main)),
-            )
-            .add_system(
-                sync_hanabi_z_layer_from_y_sort
-                    .in_base_set(CoreSet::PostUpdate)
                     .run_if(in_state(GameState::Main)),
             )
-            .add_system(
+            .add_systems(
+                Update,
                 shake_effect
                     .after(move_camera_with_player)
-                    .before(TransformSystem::TransformPropagate)
-                    .in_base_set(CoreSet::PostUpdate)
+                    .before(TransformSystems::Propagate)
                     .run_if(in_state(GameState::Main)),
             )
             // Also run the bounce animation system on the main menu so UI
             // elements (e.g. the bestiary card cells) can play hover bounces.
-            .add_system(bounce_on_hit.in_set(OnUpdate(GameState::MainMenu)))
+            .add_systems(Update, bounce_on_hit.run_if(in_state(GameState::MainMenu)))
             // Blessing choice is its own game state but uses the same hover bounce/scale UI.
-            .add_system(bounce_on_hit.in_set(OnUpdate(GameState::BlessingChoice)));
+            .add_systems(
+                Update,
+                bounce_on_hit.run_if(in_state(GameState::BlessingChoice)),
+            );
     }
 }
