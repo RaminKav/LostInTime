@@ -94,23 +94,35 @@ impl Ancestor {
         }
     }
 
-    pub fn roll_weighted(rng: &mut impl Rng) -> Self {
-        let ancestors = [
+    pub fn all() -> [Self; 5] {
+        [
             Ancestor::Resources,
             Ancestor::Heirlooms,
             Ancestor::Weapons,
             Ancestor::Skills,
             Ancestor::Chaos,
-        ];
-        let total_weight: u32 = ancestors.iter().map(|a| a.weight()).sum();
+        ]
+    }
+
+    pub fn roll_weighted(rng: &mut impl Rng) -> Self {
+        Self::roll_weighted_from(rng, &Self::all())
+    }
+
+    /// Weighted roll restricted to `candidates`. Falls back to the first candidate
+    /// if weights somehow sum to zero.
+    pub fn roll_weighted_from(rng: &mut impl Rng, candidates: &[Self]) -> Self {
+        let total_weight: u32 = candidates.iter().map(|a| a.weight()).sum();
+        if total_weight == 0 {
+            return candidates.first().copied().unwrap_or(Ancestor::Resources);
+        }
         let mut roll = rng.gen_range(0..total_weight);
-        for ancestor in ancestors {
+        for &ancestor in candidates {
             if roll < ancestor.weight() {
                 return ancestor;
             }
             roll -= ancestor.weight();
         }
-        Ancestor::Resources
+        candidates.first().copied().unwrap_or(Ancestor::Resources)
     }
 }
 
@@ -437,9 +449,12 @@ impl ResolvedAncestorBlessing {
 
 #[derive(Resource, Clone, Debug)]
 pub struct AncestorBlessingOffer {
-    pub ancestor: Ancestor,
-    pub choices: Vec<ResolvedAncestorBlessing>,
+    /// Each choice pairs its own rolled ancestor with a resolved blessing.
+    pub choices: Vec<(Ancestor, ResolvedAncestorBlessing)>,
 }
+
+/// Max times any single ancestor may appear among the 3 offer slots.
+const MAX_ANCESTOR_COPIES_PER_OFFER: u32 = 2;
 
 pub fn build_ancestor_blessing_offer(
     heirloom_queue: &HeirloomChoiceQueue,
@@ -448,9 +463,8 @@ pub fn build_ancestor_blessing_offer(
     starting_weapon: WorldObject,
 ) -> AncestorBlessingOffer {
     let mut rng = rand::thread_rng();
-    let ancestor = Ancestor::roll_weighted(&mut rng);
-    let pool = ancestor.pool();
-    let mut counts: HashMap<AncestorBlessing, u32> = HashMap::new();
+    let mut blessing_counts: HashMap<AncestorBlessing, u32> = HashMap::new();
+    let mut ancestor_counts: HashMap<Ancestor, u32> = HashMap::new();
     let mut choices = Vec::new();
     // Track random rolls already shown to the player so repeatable blessings
     // don't offer the same visible option twice (e.g. two "Chosen Skill"
@@ -459,11 +473,35 @@ pub fn build_ancestor_blessing_offer(
     let mut used_heirlooms: Vec<Heirloom> = Vec::new();
 
     for _ in 0..3 {
-        let available: Vec<AncestorBlessing> = pool
-            .iter()
-            .copied()
+        let eligible_ancestors: Vec<Ancestor> = Ancestor::all()
+            .into_iter()
+            .filter(|ancestor| {
+                ancestor_counts.get(ancestor).copied().unwrap_or(0) < MAX_ANCESTOR_COPIES_PER_OFFER
+            })
+            .filter(|ancestor| {
+                ancestor.pool().iter().any(|blessing| {
+                    let count = blessing_counts.get(blessing).copied().unwrap_or(0);
+                    if blessing.is_repeatable() {
+                        count < 2
+                    } else {
+                        count < 1
+                    }
+                })
+            })
+            .collect();
+
+        if eligible_ancestors.is_empty() {
+            break;
+        }
+
+        let ancestor = Ancestor::roll_weighted_from(&mut rng, &eligible_ancestors);
+        *ancestor_counts.entry(ancestor).or_insert(0) += 1;
+
+        let available: Vec<AncestorBlessing> = ancestor
+            .pool()
+            .into_iter()
             .filter(|blessing| {
-                let count = counts.get(blessing).copied().unwrap_or(0);
+                let count = blessing_counts.get(blessing).copied().unwrap_or(0);
                 if blessing.is_repeatable() {
                     count < 2
                 } else {
@@ -477,7 +515,7 @@ pub fn build_ancestor_blessing_offer(
         }
 
         let picked = *available.choose(&mut rng).unwrap();
-        *counts.entry(picked).or_insert(0) += 1;
+        *blessing_counts.entry(picked).or_insert(0) += 1;
         let resolved = resolve_ancestor_blessing(
             picked,
             &mut rng,
@@ -494,10 +532,10 @@ pub fn build_ancestor_blessing_offer(
         if let Some(heirloom) = resolved.resolved_heirloom.as_ref() {
             used_heirlooms.push(heirloom.heirloom.clone());
         }
-        choices.push(resolved);
+        choices.push((ancestor, resolved));
     }
 
-    AncestorBlessingOffer { ancestor, choices }
+    AncestorBlessingOffer { choices }
 }
 
 pub fn resolve_ancestor_blessing(

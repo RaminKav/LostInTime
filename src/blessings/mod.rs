@@ -45,10 +45,15 @@ impl Plugin for BlessingsPlugin {
             .add_systems(OnEnter(UIState::BlessingChoice), setup_blessing_choice_ui)
             .add_systems(
                 Update,
-                handle_blessing_choice_card_interactions.run_if(
-                    in_state(UIState::BlessingChoice)
-                        .and_then(not(resource_exists::<BlessingTransitionState>)),
-                ),
+                (
+                    debug_reroll_blessing_choices,
+                    handle_blessing_choice_card_interactions,
+                )
+                    .chain()
+                    .run_if(
+                        in_state(UIState::BlessingChoice)
+                            .and_then(not(resource_exists::<BlessingTransitionState>)),
+                    ),
             )
             .add_systems(
                 Update,
