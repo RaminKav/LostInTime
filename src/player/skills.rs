@@ -407,7 +407,16 @@ pub fn effective_player_attack_speed_multiplier(
     attack_speed_stat: i32,
     bonus_attack_speed_mult: f32,
 ) -> f32 {
-    (1.0 + attack_speed_stat as f32 / 100.0) * bonus_attack_speed_mult
+    effective_player_attack_speed_multiplier_with_major(attack_speed_stat, bonus_attack_speed_mult, 1.0)
+}
+
+/// Same as [`effective_player_attack_speed_multiplier`], with the major blessing AS multiplier.
+pub fn effective_player_attack_speed_multiplier_with_major(
+    attack_speed_stat: i32,
+    bonus_attack_speed_mult: f32,
+    major_attack_speed_mult: f32,
+) -> f32 {
+    (1.0 + attack_speed_stat as f32 / 100.0) * bonus_attack_speed_mult * major_attack_speed_mult
 }
 
 /// Approximate kunai spawned over one Fury (duration matches [`FURY_DURATION_SECS`]).
@@ -1526,7 +1535,7 @@ impl Heirloom {
             }
             Heirloom::SlowStacks => vec![
                 "Damage you deal has".to_string(),
-                "a +15% chance to".to_string(),
+                "a +25% chance to".to_string(),
                 "apply a Freeze".to_string(),
                 "stack.".to_string(),
             ],
@@ -1828,7 +1837,7 @@ impl Heirloom {
                         DescSpan::keyword(TooltipDefinition::IceExplosion, "Ice Explosion"),
                         DescSpan::plain("."),
                     ]),
-                    HeirloomDescLine::stat("+15% freeze chance"),
+                    HeirloomDescLine::stat("+25% freeze chance"),
                     HeirloomDescLine::mana(format!(
                         "Costs {} mana",
                         Heirloom::FrozenAoE.get_mana_cost()
@@ -1847,7 +1856,7 @@ impl Heirloom {
                 "enemies gives you".to_string(),
                 "a +25% critical hit".to_string(),
                 "chance.".to_string(),
-                "+15% freeze chance".to_string(),
+                "+25% freeze chance".to_string(),
             ],
             Heirloom::MPBarDMG => {
                 use crate::ui::desc_spans::DescSpan;
@@ -1879,7 +1888,7 @@ impl Heirloom {
                         DescSpan::keyword(TooltipDefinition::ManaRegen, "Mana Regen"),
                         DescSpan::plain("."),
                     ]),
-                    HeirloomDescLine::stat("+15% freeze chance"),
+                    HeirloomDescLine::stat("+25% freeze chance"),
                 ]);
             }
             Heirloom::DodgeCrit => vec![
@@ -2337,9 +2346,10 @@ impl Heirloom {
                 });
             }
             Heirloom::AntFarm => {
-                commands
-                    .entity(entity)
-                    .insert(crate::player::combat_heirlooms::AntFarmState::default());
+                // Don't reset the cooldown when gaining extra copies.
+                commands.entity(entity).insert_if_new(
+                    crate::player::combat_heirlooms::AntFarmState::default(),
+                );
             }
             Heirloom::MagnetPull => {
                 commands.entity(entity).insert(MagnetPullTimer {
@@ -2359,9 +2369,9 @@ impl Heirloom {
                     .insert(crate::player::combat_heirlooms::StoneToothState::default());
             }
             Heirloom::SummonRing => {
-                commands
-                    .entity(entity)
-                    .insert(crate::player::combat_heirlooms::SummonRingState::default());
+                commands.entity(entity).insert_if_new(
+                    crate::player::combat_heirlooms::SummonRingState::default(),
+                );
             }
             Heirloom::Reaper => {
                 commands
@@ -3309,37 +3319,54 @@ impl PlayerSkills {
         skill: &ActiveSkill,
         blessings: &crate::blessings::OwnedBlessings,
     ) -> f32 {
-        skill.get_base_cooldown()
-            * self.skill_cooldown_multiplier()
-            * blessings.get_skill_cooldown_increase()
+        self.effective_skill_cooldown_with_majors(
+            skill,
+            blessings,
+            &crate::blessings::OwnedMajorBlessings::default(),
+        )
+    }
+
+    pub fn effective_skill_cooldown_with_majors(
+        &self,
+        skill: &ActiveSkill,
+        blessings: &crate::blessings::OwnedBlessings,
+        majors: &crate::blessings::OwnedMajorBlessings,
+    ) -> f32 {
+        let base = (skill.get_base_cooldown() - majors.skill_base_cooldown_reduction()).max(0.5);
+        base * self.skill_cooldown_multiplier() * blessings.get_skill_cooldown_increase()
     }
     pub fn skill_extra_charges(&self) -> u32 {
         self.get_count(Heirloom::SkillChargeIncrease).max(0) as u32
     }
     pub fn calculate_freeze_chance(&self) -> f64 {
         let mut chance = 0.0;
-        let freeze_skills = vec![
+        let freeze_skills = [
             Heirloom::FrozenAoE,
             // Heirloom::IceStaffFloor,
             Heirloom::FrozenCrit,
             Heirloom::FrozenMPRegen,
             Heirloom::SlowStacks,
         ];
-        for skill in freeze_skills.iter() {
-            chance += self.get_count(skill.clone()) as f64 * 0.15;
+        for skill in freeze_skills {
+            chance += self.get_count(skill) as f64 * 0.25;
         }
         chance
     }
+
+    pub fn calculate_frail_chance(&self) -> f64 {
+        self.get_count(Heirloom::FrailStacks) as f64 * 0.25
+    }
+
     pub fn calculate_poison_chance(&self) -> f64 {
         let mut chance = 0.0;
-        let poison_skills = vec![
+        let poison_skills = [
             Heirloom::PoisonDuration,
             Heirloom::PoisonStrength,
             Heirloom::ViralVenum,
             Heirloom::PoisonStacks,
         ];
-        for skill in poison_skills.iter() {
-            chance += self.get_count(skill.clone()) as f64 * 0.25;
+        for skill in poison_skills {
+            chance += self.get_count(skill) as f64 * 0.25;
         }
         chance
     }
@@ -3358,6 +3385,15 @@ impl PlayerSkills {
         Self::roll_stacks_from_chance(self.calculate_poison_chance(), rng)
     }
 
+    pub fn roll_freeze_stacks_from_chance(&self, rng: &mut impl rand::Rng) -> u32 {
+        Self::roll_stacks_from_chance(self.calculate_freeze_chance(), rng)
+    }
+
+    pub fn roll_frail_stacks_from_chance(&self, rng: &mut impl rand::Rng) -> u32 {
+        Self::roll_stacks_from_chance(self.calculate_frail_chance(), rng)
+    }
+
+    /// Values above 100% guarantee extra stacks (250% → 2 + 50% for a 3rd).
     pub fn roll_stacks_from_chance(chance: f64, rng: &mut impl rand::Rng) -> u32 {
         if chance <= 0.0 {
             return 0;

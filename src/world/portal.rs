@@ -1,5 +1,6 @@
 use crate::aseprite_assets::Portal;
 use crate::aseprite_helpers::play_loop;
+use crate::blessings::PendingMajorBlessings;
 use crate::combat::EnemyDeathEvent;
 use crate::custom_commands::CommandsExt;
 use crate::enemy::{spawner::MobSpawningPaused, Mob};
@@ -218,6 +219,7 @@ pub fn track_boss_kills(
     mut commands: Commands,
     proto_param: ProtoParam,
     player_level: Query<&PlayerLevel, With<Player>>,
+    mut pending_major_blessings: ResMut<PendingMajorBlessings>,
 ) {
     for death_event in death_events.read() {
         if let Ok(mob) = mob_query.get(death_event.entity) {
@@ -246,6 +248,16 @@ pub fn track_boss_kills(
                     death_event.enemy_pos,
                     level,
                 );
+
+                // Major blessings: first clear of Era 1 / Era 2 bosses only (not Era 3).
+                if matches!(era, Era::Main | Era::Second) {
+                    pending_major_blessings.0 =
+                        pending_major_blessings.0.saturating_add(1);
+                    info!(
+                        "Queued major blessing (pending={})",
+                        pending_major_blessings.0
+                    );
+                }
             }
 
             if (era == Era::Main || era == Era::Second) && era_timer.remaining_seconds > 0.0 {

@@ -19,10 +19,15 @@ use crate::{
         ManaRegen, MaxHealth, ProjectileSize,
     },
     audio::{AudioSoundEffect, SoundSpawner},
+    blessings::{
+        overclock_mana_cost, BlessingTriggerCounts, HeirloomManaOverclock, MajorBlessing,
+        OwnedMajorBlessings,
+    },
     combat::{
         combat_helpers::{spawn_deferred_aseprite_collider, DespawnTimer},
         status_effects::{
-            Burning, DeathDefianceTint, MobStatusEffects, StatusEffect, StatusEffectEvent,
+            try_add_frail_stacks, try_add_poison_stacks, DeathDefianceTint, MobStatusEffects,
+            StatusEffectEvent,
         },
         EnemyDeathEvent, HitEvent, ObjBreakEvent,
     },
@@ -84,10 +89,12 @@ struct MobSnapshot {
 }
 
 /// Tracks the AntFarm heirloom's spawn cooldown on the player. Added when the
-/// heirloom is granted and removed when it's cleared — stored `SparseSet` so
-/// granting/clearing doesn't move the player between archetypes.
+/// heirloom is granted and removed when it's cleared.
+///
+/// Table storage (not SparseSet): `Option<&mut AntFarmState>` in player queries must
+/// reliably see the component. Missing-state was treated as "spawn immediately", which
+/// could fire every frame if the component was invisible to the query.
 #[derive(Component)]
-#[component(storage = "SparseSet")]
 pub struct AntFarmState {
     pub timer: Timer,
 }
@@ -279,7 +286,13 @@ fn calculate_summon_damage(
 ) -> (i32, bool, bool) {
     let (damage, was_crit, was_overcrit) =
         game.calculate_player_damage(0, None, 0, None, frail_stacks, 0, false);
-    (i32::max(1, damage as i32), was_crit, was_overcrit)
+    let mult = game
+        .major_blessings_query
+        .single()
+        .map(|m| m.heirloom_damage_multiplier())
+        .unwrap_or(1.0);
+    let damage = ((damage as f32) * mult).round() as i32;
+    (i32::max(1, damage), was_crit, was_overcrit)
 }
 
 fn get_world_object_sprite(graphics: &Graphics, object: WorldObject) -> Option<Sprite> {
@@ -293,6 +306,9 @@ fn get_world_object_sprite(graphics: &Graphics, object: WorldObject) -> Option<S
 
 /// Spawns up to `count` Ant Farm ants. Deducts mana per ant if `mana_value` is `Some`.
 /// Returns the number actually spawned.
+///
+/// `delay_index_offset` shifts the chain-delay index (used so SummonRetrigger batches
+/// don't all activate on the same frame as the primary wave).
 pub fn spawn_ant_farm_ants(
     commands: &mut Commands,
     graphics: &Graphics,
@@ -301,6 +317,28 @@ pub fn spawn_ant_farm_ants(
     mana_value: &mut Option<&mut i32>,
     mana_cost_per: i32,
     size_multiplier: f32,
+) -> usize {
+    spawn_ant_farm_ants_with_delay(
+        commands,
+        graphics,
+        player_pos,
+        count,
+        mana_value,
+        mana_cost_per,
+        size_multiplier,
+        0,
+    )
+}
+
+fn spawn_ant_farm_ants_with_delay(
+    commands: &mut Commands,
+    graphics: &Graphics,
+    player_pos: Vec3,
+    count: usize,
+    mana_value: &mut Option<&mut i32>,
+    mana_cost_per: i32,
+    size_multiplier: f32,
+    delay_index_offset: usize,
 ) -> usize {
     let mut rng = rand::thread_rng();
     let mut spawned = 0;
@@ -317,6 +355,7 @@ pub fn spawn_ant_farm_ants(
         let offset = Vec2::from_angle(angle) * distance;
         let mut sprite = graphics.get_heirloom_icon(Heirloom::AntFarm);
         sprite.custom_size = Some(Vec2::splat(12.0 * size_multiplier));
+        let delay_index = delay_index_offset + i;
         commands.spawn((
             sprite.clone(),
             Transform::from_translation(player_pos + Vec3::new(offset.x, offset.y, 0.2)),
@@ -325,7 +364,10 @@ pub fn spawn_ant_farm_ants(
                 damage_fraction: 2.0,
                 speed: ANT_SPEED,
                 lifetime: Timer::from_seconds(ANT_LIFETIME, TimerMode::Once),
-                spawn_delay: Timer::from_seconds(i as f32 * ANT_CHAIN_DELAY, TimerMode::Once),
+                spawn_delay: Timer::from_seconds(
+                    delay_index as f32 * ANT_CHAIN_DELAY,
+                    TimerMode::Once,
+                ),
                 size_multiplier,
             },
             AnimVisualCategory::Heirloom,
@@ -456,6 +498,18 @@ pub fn spawn_summon_ring_rings(
     spawned
 }
 
+fn roll_summon_retrigger(
+    majors: &OwnedMajorBlessings,
+    blessing_triggers: &mut BlessingTriggerCounts,
+) -> bool {
+    if majors.has(MajorBlessing::SummonRetrigger) && rand::thread_rng().gen_bool(0.3) {
+        blessing_triggers.increment(MajorBlessing::SummonRetrigger);
+        true
+    } else {
+        false
+    }
+}
+
 pub fn handle_ant_farm_state(
     mut commands: Commands,
     time: Res<Time>,
@@ -467,14 +521,23 @@ pub fn handle_ant_farm_state(
             &ProjectileSize,
             Option<&mut AntFarmState>,
             &mut CurrentMana,
+            &OwnedMajorBlessings,
         ),
         With<Player>,
     >,
     graphics: Res<Graphics>,
     mut trigger_counts: ResMut<HeirloomTriggerCounts>,
+    mut blessing_triggers: ResMut<BlessingTriggerCounts>,
 ) {
-    let Ok((player_e, player_txfm, skills, projectile_size, mut state_option, mut curr_mana)) =
-        player_query.single_mut()
+    let Ok((
+        player_e,
+        player_txfm,
+        skills,
+        projectile_size,
+        mut state_option,
+        mut curr_mana,
+        majors,
+    )) = player_query.single_mut()
     else {
         return;
     };
@@ -491,13 +554,16 @@ pub fn handle_ant_farm_state(
                 spawn_count = Some(stacks);
             }
         } else {
+            // First acquisition this frame: spawn once and attach cooldown state.
+            // AntFarmState uses table storage so the next frame sees `had_state` and does
+            // not re-enter this branch (SparseSet + Option previously could miss it and
+            // spawn every frame — especially after run-start blessing grants).
             spawn_count = Some(stacks);
+            commands
+                .entity(player_e)
+                .insert_if_new(AntFarmState::default());
         }
-    }
-
-    if stacks > 0 && !had_state {
-        commands.entity(player_e).insert(AntFarmState::default());
-    } else if stacks <= 0 && had_state {
+    } else if had_state {
         commands.entity(player_e).remove::<AntFarmState>();
     }
 
@@ -524,6 +590,19 @@ pub fn handle_ant_farm_state(
     if spawned > 0 {
         trigger_counts.record_mana(Heirloom::AntFarm, mana_cost_per * spawned as i32);
         trigger_counts.increment(Heirloom::AntFarm);
+        if roll_summon_retrigger(majors, &mut blessing_triggers) {
+            let mut no_mana = None;
+            spawn_ant_farm_ants_with_delay(
+                &mut commands,
+                &graphics,
+                player_pos,
+                count_usize,
+                &mut no_mana,
+                0,
+                size_mult,
+                count_usize,
+            );
+        }
     }
 }
 
@@ -538,14 +617,23 @@ pub fn handle_summon_ring_state(
             &ProjectileSize,
             Option<&mut SummonRingState>,
             &mut CurrentMana,
+            &OwnedMajorBlessings,
         ),
         With<Player>,
     >,
     graphics: Res<Graphics>,
     mut trigger_counts: ResMut<HeirloomTriggerCounts>,
+    mut blessing_triggers: ResMut<BlessingTriggerCounts>,
 ) {
-    let Ok((player_e, player_txfm, skills, projectile_size, mut state_option, mut curr_mana)) =
-        player_query.single_mut()
+    let Ok((
+        player_e,
+        player_txfm,
+        skills,
+        projectile_size,
+        mut state_option,
+        mut curr_mana,
+        majors,
+    )) = player_query.single_mut()
     else {
         return;
     };
@@ -563,12 +651,11 @@ pub fn handle_summon_ring_state(
             }
         } else {
             spawn_count = Some(stacks);
+            commands
+                .entity(player_e)
+                .insert_if_new(SummonRingState::default());
         }
-    }
-
-    if stacks > 0 && !had_state {
-        commands.entity(player_e).insert(SummonRingState::default());
-    } else if stacks <= 0 && had_state {
+    } else if had_state {
         commands.entity(player_e).remove::<SummonRingState>();
     }
 
@@ -596,6 +683,19 @@ pub fn handle_summon_ring_state(
     if spawned > 0 {
         trigger_counts.record_mana(Heirloom::SummonRing, mana_cost_per * spawned as i32);
         trigger_counts.increment(Heirloom::SummonRing);
+        if roll_summon_retrigger(majors, &mut blessing_triggers) {
+            let mut no_mana = None;
+            spawn_summon_ring_rings(
+                &mut commands,
+                &graphics,
+                player_e,
+                player_pos,
+                count_usize,
+                &mut no_mana,
+                0,
+                size_mult,
+            );
+        }
     }
 }
 
@@ -1045,6 +1145,26 @@ pub fn update_stone_tooth(
         game.heirloom_trigger_counts
             .record_mana(Heirloom::StoneTooth, mana_cost_per * spawned as i32);
         game.heirloom_trigger_counts.increment(Heirloom::StoneTooth);
+        let majors = game
+            .major_blessings_query
+            .single()
+            .ok()
+            .cloned()
+            .unwrap_or_default();
+        if roll_summon_retrigger(&majors, &mut game.blessing_trigger_counts) {
+            let mut no_mana = None;
+            spawn_stone_tooth_rocks(
+                &mut commands,
+                &graphics,
+                player_e,
+                player_pos,
+                stacks as usize,
+                &mut no_mana,
+                0,
+                size_mult,
+                active_rock_count + spawned,
+            );
+        }
     }
 }
 
@@ -1058,6 +1178,7 @@ pub fn handle_trigger_summons_on_heal(
             &PlayerSkills,
             &ProjectileSize,
             &mut CurrentMana,
+            &OwnedMajorBlessings,
             Option<&mut AntFarmState>,
             Option<&mut StoneToothState>,
             Option<&mut SummonRingState>,
@@ -1067,6 +1188,7 @@ pub fn handle_trigger_summons_on_heal(
     stones: Query<(&OrbitingStone, Option<&StoneToothRockLifetime>)>,
     graphics: Res<Graphics>,
     mut trigger_counts: ResMut<HeirloomTriggerCounts>,
+    mut blessing_triggers: ResMut<BlessingTriggerCounts>,
 ) {
     if graphics.texture_atlas_layout.is_none() || graphics.texture_atlas_image.is_none() {
         return;
@@ -1078,6 +1200,7 @@ pub fn handle_trigger_summons_on_heal(
             skills,
             projectile_size,
             mut curr_mana,
+            majors,
             mut ant_state,
             mut stone_state,
             mut ring_state,
@@ -1088,6 +1211,7 @@ pub fn handle_trigger_summons_on_heal(
         let size_mult = projectile_size.get_multiplier();
         let player_pos = player_txfm.translation();
         trigger_counts.increment(Heirloom::HealSummons);
+        let retrigger = roll_summon_retrigger(majors, &mut blessing_triggers);
 
         // Finish the cooldown: trigger one "tick" of each summon (same count as timer would spawn), then reset timers.
         let ant_stacks = skills.get_count(Heirloom::AntFarm).max(0) as usize;
@@ -1102,6 +1226,19 @@ pub fn handle_trigger_summons_on_heal(
                 0,
                 size_mult,
             );
+            if retrigger {
+                let mut no_mana = None;
+                spawn_ant_farm_ants_with_delay(
+                    &mut commands,
+                    &graphics,
+                    player_pos,
+                    ant_stacks,
+                    &mut no_mana,
+                    0,
+                    size_mult,
+                    ant_stacks,
+                );
+            }
             if let Some(ref mut state) = ant_state {
                 state.timer.reset();
             }
@@ -1119,7 +1256,7 @@ pub fn handle_trigger_summons_on_heal(
                 })
                 .count();
             let mut mana_opt = Some(&mut curr_mana.0);
-            spawn_stone_tooth_rocks(
+            let spawned = spawn_stone_tooth_rocks(
                 &mut commands,
                 &graphics,
                 player_e,
@@ -1130,6 +1267,20 @@ pub fn handle_trigger_summons_on_heal(
                 size_mult,
                 active_rock_count,
             );
+            if retrigger {
+                let mut no_mana = None;
+                spawn_stone_tooth_rocks(
+                    &mut commands,
+                    &graphics,
+                    player_e,
+                    player_pos,
+                    stone_stacks,
+                    &mut no_mana,
+                    0,
+                    size_mult,
+                    active_rock_count + spawned,
+                );
+            }
             if let Some(ref mut state) = stone_state {
                 state.elapsed = 0.0;
             }
@@ -1149,6 +1300,19 @@ pub fn handle_trigger_summons_on_heal(
                 0,
                 size_mult,
             );
+            if retrigger {
+                let mut no_mana = None;
+                spawn_summon_ring_rings(
+                    &mut commands,
+                    &graphics,
+                    player_e,
+                    player_pos,
+                    ring_stacks,
+                    &mut no_mana,
+                    0,
+                    size_mult,
+                );
+            }
             if let Some(ref mut state) = ring_state {
                 state.timer.reset();
             }
@@ -1843,7 +2007,7 @@ pub fn hit_is_weapon_damage(hit: &crate::combat::HitEvent) -> bool {
 pub struct HallucinationStats(pub crate::attributes::ItemAttributes);
 
 /// List of stats that can be buffed by hallucinations
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum HallucinationStatType {
     Attack,
     Health,
@@ -2197,14 +2361,21 @@ impl ManaRegenPoisonTracker {
 /// System to track mana regen and apply poison to all enemies when 100 is reached
 pub fn handle_mana_regen_poison(
     mut mana_events: MessageReader<ModifyManaEvent>,
-    mut player_query: Query<(&PlayerSkills, Option<&mut ManaRegenPoisonTracker>), With<Player>>,
+    mut player_query: Query<
+        (
+            &PlayerSkills,
+            Option<&mut ManaRegenPoisonTracker>,
+            &OwnedMajorBlessings,
+        ),
+        With<Player>,
+    >,
     enemies: Query<Entity, (With<Mob>, Without<Player>)>,
     mut mob_status: Query<&mut MobStatusEffects, With<Mob>>,
     player_skills: Query<&PlayerSkills, With<Player>>,
     mut status_event: MessageWriter<StatusEffectEvent>,
     mut trigger_counts: ResMut<HeirloomTriggerCounts>,
 ) {
-    let Ok((skills, state_option)) = player_query.single_mut() else {
+    let Ok((skills, state_option, majors)) = player_query.single_mut() else {
         return;
     };
 
@@ -2213,6 +2384,8 @@ pub fn handle_mana_regen_poison(
     if heirloom_count <= 0 {
         return;
     }
+    let apply_extra = majors.has(MajorBlessing::StatusApplyExtra);
+    let poison_tick_secs = 0.5 / majors.poison_tick_multiplier();
 
     let poison_duration_bonus = player_skills
         .single()
@@ -2235,30 +2408,15 @@ pub fn handle_mana_regen_poison(
                     let Ok(mut status) = mob_status.get_mut(enemy_entity) else {
                         continue;
                     };
-                    if let Some(burning) = status.burning.as_mut() {
-                        burning.stacks = burning.stacks.saturating_add(heirloom_count as u128);
-                        burning.duration_timer.reset();
-                        let stacks = burning.stacks as i32;
-                        status_event.write(StatusEffectEvent {
-                            entity: enemy_entity,
-                            effect: StatusEffect::Poison,
-                            num_stacks: stacks,
-                        });
-                    } else {
-                        status.burning = Some(Burning {
-                            tick_timer: Timer::from_seconds(0.5, TimerMode::Repeating),
-                            duration_timer: Timer::from_seconds(
-                                3.0 * poison_duration_bonus,
-                                TimerMode::Once,
-                            ),
-                            stacks: 1,
-                        });
-                        status_event.write(StatusEffectEvent {
-                            entity: enemy_entity,
-                            effect: StatusEffect::Poison,
-                            num_stacks: 1,
-                        });
-                    }
+                    try_add_poison_stacks(
+                        enemy_entity,
+                        status.as_mut(),
+                        &mut status_event,
+                        heirloom_count as u32,
+                        poison_tick_secs,
+                        3.0 * poison_duration_bonus,
+                        apply_extra,
+                    );
                 }
             }
         }
@@ -2702,7 +2860,7 @@ pub fn roll_stacked_proc_count(chance_pct: u32, rng: &mut impl Rng) -> u32 {
     guaranteed + extra
 }
 
-fn random_cherry_bomb_target(player_pos: Vec2, rng: &mut impl Rng) -> Vec2 {
+pub(crate) fn random_cherry_bomb_target(player_pos: Vec2, rng: &mut impl Rng) -> Vec2 {
     let min_dist = CHERRY_BOMB_MIN_TILES * TILE_SIZE.x;
     let max_dist = CHERRY_BOMB_MAX_TILES * TILE_SIZE.x;
     let angle = rng.gen_range(0.0..TAU);
@@ -2809,12 +2967,31 @@ fn spawn_cherry_bomb_explosion(
 
 pub fn handle_cherry_bomb_on_attack(
     mut attacks: MessageReader<AttackEvent>,
-    mut player: Query<(&PlayerSkills, &Attack, &GlobalTransform, &mut CurrentMana), With<Player>>,
+    mut player: Query<
+        (
+            &PlayerSkills,
+            &Attack,
+            &GlobalTransform,
+            &mut CurrentMana,
+            &OwnedMajorBlessings,
+            Option<&mut HeirloomManaOverclock>,
+        ),
+        With<Player>,
+    >,
     graphics: Res<Graphics>,
     mut commands: Commands,
     mut trigger_counts: ResMut<HeirloomTriggerCounts>,
+    mut blessing_triggers: ResMut<BlessingTriggerCounts>,
 ) {
-    let Ok((skills, attack, player_transform, mut current_mana)) = player.single_mut() else {
+    let Ok((
+        skills,
+        attack,
+        player_transform,
+        mut current_mana,
+        majors,
+        mut overclock,
+    )) = player.single_mut()
+    else {
         return;
     };
 
@@ -2823,13 +3000,13 @@ pub fn handle_cherry_bomb_on_attack(
         return;
     }
 
-    let mana_cost_per_bomb = (Heirloom::CherryBomb.get_mana_cost() as f32
+    let base_mana_cost_per_bomb = (Heirloom::CherryBomb.get_mana_cost() as f32
         * if skills.has(Heirloom::DiscountMP) {
             0.75
         } else {
             1.
         }) as i32;
-    if mana_cost_per_bomb <= 0 {
+    if base_mana_cost_per_bomb <= 0 {
         return;
     }
 
@@ -2845,12 +3022,21 @@ pub fn handle_cherry_bomb_on_attack(
         }
 
         let mut bombs_spawned = 0u32;
+        let mut spawned_bombs = Vec::new();
         for _ in 0..proc_count {
-            if current_mana.0 < mana_cost_per_bomb {
+            let mana_cost_per_bomb = overclock_mana_cost(
+                majors,
+                overclock.as_deref_mut(),
+                base_mana_cost_per_bomb,
+                Some(&mut blessing_triggers),
+            );
+            if mana_cost_per_bomb > 0 && current_mana.0 < mana_cost_per_bomb {
                 break;
             }
-            current_mana.0 -= mana_cost_per_bomb;
-            trigger_counts.record_mana(Heirloom::CherryBomb, mana_cost_per_bomb);
+            if mana_cost_per_bomb > 0 {
+                current_mana.0 -= mana_cost_per_bomb;
+                trigger_counts.record_mana(Heirloom::CherryBomb, mana_cost_per_bomb);
+            }
 
             let target_pos = random_cherry_bomb_target(player_pos, &mut rng);
             spawn_cherry_bomb_flight(
@@ -2860,11 +3046,29 @@ pub fn handle_cherry_bomb_on_attack(
                 target_pos,
                 explosion_damage,
             );
+            spawned_bombs.push((target_pos, explosion_damage));
             bombs_spawned += 1;
         }
 
         if bombs_spawned > 0 {
             trigger_counts.increment(Heirloom::CherryBomb);
+            if majors.has(MajorBlessing::WeaponHeirloomDoubleTrigger) {
+                use crate::player::melee_skills::{
+                    spawn_delayed_heirloom_cast, DelayedCastType, HEIRLOOM_EXTRA_CAST_DELAY,
+                };
+                let _ = spawned_bombs;
+                for _ in 0..bombs_spawned {
+                    blessing_triggers.increment(MajorBlessing::WeaponHeirloomDoubleTrigger);
+                    spawn_delayed_heirloom_cast(
+                        &mut commands,
+                        HEIRLOOM_EXTRA_CAST_DELAY,
+                        DelayedCastType::CherryBomb {
+                            start_pos: player_pos,
+                            dmg: explosion_damage,
+                        },
+                    );
+                }
+            }
         }
     }
 }
@@ -2874,6 +3078,7 @@ pub fn update_lob_arcs(
     time: Res<Time>,
     graphics: Res<Graphics>,
     player_size: Query<&ProjectileSize, With<Player>>,
+    majors: Query<&OwnedMajorBlessings, With<Player>>,
     mut bombs: Query<(Entity, &mut LobArc, &mut Transform)>,
     mut ranged_attack_events: MessageWriter<RangedAttackEvent>,
     enemies: Query<(Entity, &GlobalTransform), With<Mob>>,
@@ -2884,6 +3089,10 @@ pub fn update_lob_arcs(
         .single()
         .map(|s| s.get_multiplier())
         .unwrap_or(1.0);
+    let apply_extra = majors
+        .single()
+        .map(|m| m.has(MajorBlessing::StatusApplyExtra))
+        .unwrap_or(false);
 
     for (entity, mut arc, mut transform) in bombs.iter_mut() {
         arc.timer.tick(time.delta());
@@ -2923,6 +3132,7 @@ pub fn update_lob_arcs(
                         &enemies,
                         &mut mob_status,
                         &mut status_event,
+                        apply_extra,
                     );
                 }
             }
@@ -2938,6 +3148,7 @@ pub fn apply_bomb_frail_at_position(
     enemies: &Query<(Entity, &GlobalTransform), With<Mob>>,
     mob_status: &mut Query<&mut MobStatusEffects, With<Mob>>,
     status_event: &mut MessageWriter<StatusEffectEvent>,
+    apply_extra: bool,
 ) {
     for (enemy_entity, enemy_transform) in enemies.iter() {
         let enemy_pos = enemy_transform.translation().truncate();
@@ -2945,15 +3156,13 @@ pub fn apply_bomb_frail_at_position(
             continue;
         }
         if let Ok(mut status) = mob_status.get_mut(enemy_entity) {
-            status.frail = Some(crate::combat::status_effects::Frail {
-                num_stacks: 3,
-                timer: Timer::from_seconds(1.2, TimerMode::Repeating),
-            });
+            try_add_frail_stacks(
+                enemy_entity,
+                status.as_mut(),
+                status_event,
+                3,
+                apply_extra,
+            );
         }
-        status_event.write(StatusEffectEvent {
-            entity: enemy_entity,
-            effect: StatusEffect::Frail,
-            num_stacks: 3,
-        });
     }
 }

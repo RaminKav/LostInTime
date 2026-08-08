@@ -5,10 +5,14 @@ use crate::animations::player_sprite::PlayerAnimation;
 use crate::animations::AttackEvent;
 use crate::assets::Graphics;
 use crate::attributes::{
-    modifiers::ModifyHealthEvent, CurrentHealth, CurrentMana, ItemAttributes, ProjectileSize,
+    modifiers::ModifyHealthEvent, CurrentHealth, CurrentMana, CurrentShield, ItemAttributes,
+    ProjectileSize,
 };
 use crate::audio::{AudioSoundEffect, SoundSpawner};
-use crate::blessings::OwnedBlessings;
+use crate::blessings::{
+    overclock_mana_cost, BlessingTriggerCounts, HeirloomManaOverclock, MajorBlessing,
+    OwnedBlessings, OwnedMajorBlessings,
+};
 use crate::custom_commands::CommandsExt;
 use crate::enemy::Mob;
 use crate::inputs::{attack_aim_direction, AttackAutoTargetState, AutoAttackState};
@@ -18,7 +22,8 @@ use crate::player::combat_heirlooms::hit_is_weapon_damage;
 use crate::player::mage_skills::spawn_ice_explosion_hitbox;
 use crate::player::skills::{Heirloom, PlayerSkills};
 use crate::status_effects::{
-    try_add_slow_stacks, Burning, Frail, MobStatusEffects, StatusEffect, StatusEffectEvent,
+    try_add_frail_stacks, try_add_poison_stacks, try_add_slow_stacks, MobStatusEffects,
+    StatusEffectEvent,
 };
 use crate::Game;
 use crate::{
@@ -210,6 +215,8 @@ pub fn handle_on_hit_upgrades(
             &ProjectileSize,
             Option<&AttackTimer>,
             &mut CurrentMana,
+            Option<&mut CurrentShield>,
+            Option<&mut HeirloomManaOverclock>,
         ),
         With<Player>,
     >,
@@ -220,7 +227,15 @@ pub fn handle_on_hit_upgrades(
     mut burn_or_venom_mobs: Query<&mut MobStatusEffects>,
     mut elec_count: Local<u8>,
     graphics: Res<Graphics>,
-    player_att_blessings: Query<(&ItemAttributes, &OwnedBlessings, &CurrentHealth), With<Player>>,
+    player_att_blessings: Query<
+        (
+            &ItemAttributes,
+            &OwnedBlessings,
+            &OwnedMajorBlessings,
+            &CurrentHealth,
+        ),
+        With<Player>,
+    >,
     asset_server: Res<AssetServer>,
     mut events: ParamSet<(
         MessageWriter<RangedAttackEvent>,
@@ -230,23 +245,36 @@ pub fn handle_on_hit_upgrades(
     )>,
     mut throttle: Local<IceExplosionThrottle>, // Track explosions spawned this frame
     mut trigger_counts: ResMut<crate::player::skills::HeirloomTriggerCounts>,
+    mut blessing_triggers: ResMut<BlessingTriggerCounts>,
 ) {
     // Reset counters at start of frame
     throttle.count = 0;
     throttle.sound_played = false;
 
-    let Ok((player_e, skills, projectile_size, att_cooldown, mut current_mana)) =
-        upgrades.single_mut()
+    let Ok((
+        player_e,
+        skills,
+        projectile_size,
+        att_cooldown,
+        mut current_mana,
+        mut current_shield,
+        mut overclock,
+    )) = upgrades.single_mut()
     else {
         return;
     };
     if *elec_count > 0 && att_cooldown.is_none() {
         *elec_count = 0;
     }
-    let Ok((player_attributes, player_blessings, current_hp)) = player_att_blessings.single()
+    let Ok((player_attributes, player_blessings, major_blessings, current_hp)) =
+        player_att_blessings.single()
     else {
         return;
     };
+    let poison_tick_secs = 0.5 / major_blessings.poison_tick_multiplier();
+    let shared_affliction_poison_tick_secs = major_blessings
+        .has(MajorBlessing::SharedAffliction)
+        .then_some(poison_tick_secs);
     for hit in hits.read() {
         // Skip DoT tick damage (e.g. poison) so it does not re-trigger on-hit effects.
         if matches!(hit.from_heirloom_effect, Some(Heirloom::PoisonStacks)) {
@@ -308,33 +336,72 @@ pub fn handle_on_hit_upgrades(
             && skills.has(Heirloom::IceStaffAoE)
             && rng.gen_bool((skills.get_count(Heirloom::IceStaffAoE) as f64 * 0.07).clamp(0., 1.))
         {
-            let mana_cost = Heirloom::IceStaffAoE.get_mana_cost();
-            if current_mana.0 >= mana_cost {
-                current_mana.0 -= mana_cost;
-                trigger_counts.record_mana(Heirloom::IceStaffAoE, mana_cost);
+            let base_mana_cost = (Heirloom::IceStaffAoE.get_mana_cost() as f32
+                * if skills.has(Heirloom::DiscountMP) {
+                    0.75
+                } else {
+                    1.
+                }) as i32;
+            let mana_cost = overclock_mana_cost(
+                major_blessings,
+                overclock.as_deref_mut(),
+                base_mana_cost,
+                Some(&mut blessing_triggers),
+            );
+            if mana_cost == 0 || current_mana.0 >= mana_cost {
+                if mana_cost > 0 {
+                    current_mana.0 -= mana_cost;
+                    trigger_counts.record_mana(Heirloom::IceStaffAoE, mana_cost);
+                }
                 // Throttle explosions per frame to prevent lag when hitting many enemies
                 const MAX_ICE_EXPLOSIONS_PER_FRAME: u8 = 8;
                 if throttle.count < MAX_ICE_EXPLOSIONS_PER_FRAME {
                     trigger_counts.increment(Heirloom::IceStaffAoE);
                     throttle.count += 1;
-                    spawn_ice_explosion_hitbox(
-                        &mut commands,
-                        &graphics,
-                        hit_entity_txfm.translation(),
-                        hit.damage / 2,
-                        projectile_size.get_multiplier(),
-                    );
-                    // Only play sound once per frame to avoid audio spam
-                    if !throttle.sound_played {
-                        throttle.sound_played = true;
-                        commands.spawn(SoundSpawner::new(AudioSoundEffect::IceExplosion, 0.2));
+                    let pos = hit_entity_txfm.translation();
+                    let dmg = hit.damage / 2;
+                    let size_mult = projectile_size.get_multiplier();
+                    spawn_ice_explosion_hitbox(&mut commands, &graphics, pos, dmg, size_mult);
+                    if major_blessings.has(MajorBlessing::WeaponHeirloomDoubleTrigger)
+                        && throttle.count < MAX_ICE_EXPLOSIONS_PER_FRAME
+                    {
+                        use crate::player::melee_skills::{
+                            spawn_delayed_heirloom_cast, DelayedCastType, HEIRLOOM_EXTRA_CAST_DELAY,
+                        };
+                        throttle.count += 1;
+                        blessing_triggers
+                            .increment(MajorBlessing::WeaponHeirloomDoubleTrigger);
+                        spawn_delayed_heirloom_cast(
+                            &mut commands,
+                            HEIRLOOM_EXTRA_CAST_DELAY,
+                            DelayedCastType::IceExplosion {
+                                pos,
+                                dmg,
+                                size_multiplier: size_mult,
+                            },
+                        );
                     }
+                }
+                // Only play sound once per frame to avoid audio spam
+                if !throttle.sound_played {
+                    throttle.sound_played = true;
+                    commands.spawn(SoundSpawner::new(AudioSoundEffect::IceExplosion, 0.2));
                 }
             }
         }
         let Ok(mut status) = burn_or_venom_mobs.get_mut(hit.hit_entity) else {
             continue;
         };
+        let is_skill_hit = hit.from_active_skill
+            || hit
+                .hit_with_projectile
+                .as_ref()
+                .map(|p| p.is_skill_projectile())
+                .unwrap_or(false);
+        let mut applied_poison = false;
+        let mut applied_frail = false;
+        let mut applied_slow = false;
+        let apply_extra = major_blessings.has(MajorBlessing::StatusApplyExtra);
         // Calculate poison chance with blessing bonus
         let blessing_poison = player_blessings.get_poison_bonus_chance();
         let bonus_stack = if rng.gen_bool(blessing_poison) { 1 } else { 0 };
@@ -343,69 +410,131 @@ pub fn handle_on_hit_upgrades(
         if is_dart && stacks_to_apply == 0 {
             stacks_to_apply = 1;
         }
+        let skill_poison_stacks = if major_blessings
+            .has(crate::blessings::MajorBlessing::SkillPoisonStacks)
+            && (hit.from_active_skill
+                || hit
+                    .hit_with_projectile
+                    .as_ref()
+                    .map(|p| p.is_skill_projectile())
+                    .unwrap_or(false))
+        {
+            5
+        } else {
+            0
+        };
+        stacks_to_apply = stacks_to_apply.saturating_add(skill_poison_stacks);
+        if skill_poison_stacks > 0 {
+            blessing_triggers.increment(MajorBlessing::SkillPoisonStacks);
+        }
+
         if is_dart || stacks_to_apply > 0 {
-            if let Some(burning) = status.burning.as_mut() {
-                // Increment stacks and reset duration
-                burning.stacks = burning
-                    .stacks
-                    .saturating_add(stacks_to_apply as u128 + bonus_stack as u128);
-                burning.duration_timer.reset();
-                let stacks = burning.stacks as i32;
-                events.p1().write(StatusEffectEvent {
-                    entity: hit_e,
-                    effect: StatusEffect::Poison,
-                    num_stacks: stacks,
-                });
-            } else if Heirloom::PoisonStacks.is_obj_valid(main_hand.get_obj()) {
+            let can_apply_poison = status.burning.is_some()
+                || skill_poison_stacks > 0
+                || Heirloom::PoisonStacks.is_obj_valid(main_hand.get_obj());
+            if can_apply_poison {
                 let duration_bonus = skills.get_count(Heirloom::PoisonDuration) as f32 * 0.5 + 1.;
-                let initial_stacks = stacks_to_apply.max(1) as u128;
-                status.burning = Some(Burning {
-                    tick_timer: Timer::from_seconds(0.5, TimerMode::Repeating),
-                    duration_timer: Timer::from_seconds(3.0 * duration_bonus, TimerMode::Once),
-                    stacks: initial_stacks,
-                });
-                events.p1().write(StatusEffectEvent {
-                    entity: hit_e,
-                    effect: StatusEffect::Poison,
-                    num_stacks: initial_stacks as i32,
-                });
-            }
-        }
-        if main_hand.get_obj() == WorldObject::Hammer
-            || (skills.has(Heirloom::FrailStacks)
-                && rng.gen_bool(
-                    (skills.get_count(Heirloom::FrailStacks) as f64 * 0.25).clamp(0.0, 0.99),
-                ))
-        {
-            if let Some(frail_stacks) = status.frail.as_mut() {
-                if frail_stacks.num_stacks < 3
-                    && Heirloom::FrailStacks.is_obj_valid(main_hand.get_obj())
-                {
-                    frail_stacks.num_stacks += 1;
-                    frail_stacks.timer.reset();
-                    let stacks = frail_stacks.num_stacks as i32;
-                    events.p1().write(StatusEffectEvent {
-                        entity: hit_e,
-                        effect: StatusEffect::Frail,
-                        num_stacks: stacks,
-                    });
+                let stacks = if status.burning.is_some() {
+                    stacks_to_apply.saturating_add(bonus_stack)
+                } else {
+                    stacks_to_apply.max(1)
+                };
+                if try_add_poison_stacks(
+                    hit_e,
+                    status.as_mut(),
+                    &mut events.p1(),
+                    stacks,
+                    poison_tick_secs,
+                    3.0 * duration_bonus,
+                    apply_extra,
+                ) {
+                    applied_poison = true;
                 }
-            } else {
-                status.frail = Some(Frail {
-                    num_stacks: 1,
-                    timer: Timer::from_seconds(1.2, TimerMode::Repeating),
-                });
-                events.p1().write(StatusEffectEvent {
-                    entity: hit_e,
-                    effect: StatusEffect::Frail,
-                    num_stacks: 1,
-                });
             }
         }
-        if main_hand.get_obj() == WorldObject::IceStaff
-            || rng.gen_bool(skills.calculate_freeze_chance().clamp(0., 1.))
+        // Frail: roll stacks from chance (>100% can apply multiple); Hammer guarantees ≥1.
+        let mut frail_stacks_to_apply = skills.roll_frail_stacks_from_chance(&mut rng);
+        if main_hand.get_obj() == WorldObject::Hammer {
+            frail_stacks_to_apply = frail_stacks_to_apply.max(1);
+        }
+        if frail_stacks_to_apply > 0
+            && (main_hand.get_obj() == WorldObject::Hammer
+                || Heirloom::FrailStacks.is_obj_valid(main_hand.get_obj()))
         {
-            try_add_slow_stacks(hit_e, status.as_mut(), &mut events.p1());
+            if try_add_frail_stacks(
+                hit_e,
+                status.as_mut(),
+                &mut events.p1(),
+                frail_stacks_to_apply,
+                apply_extra,
+            ) {
+                applied_frail = true;
+            }
+        }
+
+        // Freeze: roll stacks from chance (>100% can apply multiple); Ice Staff guarantees ≥1.
+        let mut freeze_stacks_to_apply = skills.roll_freeze_stacks_from_chance(&mut rng);
+        if main_hand.get_obj() == WorldObject::IceStaff {
+            freeze_stacks_to_apply = freeze_stacks_to_apply.max(1);
+        }
+        if freeze_stacks_to_apply > 0
+            && try_add_slow_stacks(
+                hit_e,
+                status.as_mut(),
+                &mut events.p1(),
+                freeze_stacks_to_apply,
+                shared_affliction_poison_tick_secs,
+                apply_extra,
+            )
+        {
+            applied_slow = true;
+            if shared_affliction_poison_tick_secs.is_some() {
+                blessing_triggers.increment(MajorBlessing::SharedAffliction);
+            }
+        }
+
+        if is_skill_hit && major_blessings.has(MajorBlessing::SkillsApplyAllStatuses) {
+            blessing_triggers.increment(MajorBlessing::SkillsApplyAllStatuses);
+            if try_add_slow_stacks(
+                hit_e,
+                status.as_mut(),
+                &mut events.p1(),
+                1,
+                shared_affliction_poison_tick_secs,
+                apply_extra,
+            ) {
+                applied_slow = true;
+                if shared_affliction_poison_tick_secs.is_some() {
+                    blessing_triggers.increment(MajorBlessing::SharedAffliction);
+                }
+            }
+            if try_add_poison_stacks(
+                hit_e,
+                status.as_mut(),
+                &mut events.p1(),
+                1,
+                poison_tick_secs,
+                3.0,
+                apply_extra,
+            ) {
+                applied_poison = true;
+            }
+            if try_add_frail_stacks(hit_e, status.as_mut(), &mut events.p1(), 1, apply_extra) {
+                applied_frail = true;
+            }
+        }
+        if apply_extra && (applied_poison || applied_frail || applied_slow) {
+            blessing_triggers.increment(MajorBlessing::StatusApplyExtra);
+        }
+        if major_blessings.has(MajorBlessing::StatusApplyShield)
+            && (applied_poison || applied_frail || applied_slow)
+        {
+            blessing_triggers.increment(MajorBlessing::StatusApplyShield);
+            if let Some(shield) = current_shield.as_deref_mut() {
+                shield.0 = shield.0.saturating_add(1);
+            } else {
+                commands.entity(player_e).insert(CurrentShield(1));
+            }
         }
 
         events.p2().write(LifestealEvent {

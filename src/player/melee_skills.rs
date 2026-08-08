@@ -12,7 +12,10 @@ use crate::{
         CurrentHealth, CurrentMana, HealthRegen, ProjectileSize, SkillPower,
     },
     audio::{AudioSoundEffect, SoundSpawner},
-    blessings::OwnedBlessings,
+    blessings::{
+        HeirloomManaOverclock, MajorBlessing, OwnedBlessings, OwnedMajorBlessings,
+        overclock_mana_cost,
+    },
     colors::LIGHT_RED,
     combat_helpers::{spawn_deferred_aseprite_collider, spawn_temp_collider},
     cursor::CursorPos,
@@ -38,7 +41,9 @@ use crate::{
     GameParam, HitEvent,
 };
 
-use super::combat_heirlooms::TriggerSummonsEvent;
+use super::combat_heirlooms::{
+    random_cherry_bomb_target, spawn_cherry_bomb_flight, TriggerSummonsEvent,
+};
 use super::{ActiveSkill, ActiveSkillUsedEvent, Heirloom, Player, PlayerSkills};
 
 /// Brief marker on a mob that was just hit and is queued for a follow-up
@@ -153,14 +158,18 @@ pub fn handle_echo_after_heal(
             &PlayerSkills,
             &Attack,
             &ProjectileSize,
+            &GlobalTransform,
+            Option<&OwnedMajorBlessings>,
             &mut CurrentMana,
             Option<&mut HeirloomTriggerCooldowns>,
+            Option<&mut HeirloomManaOverclock>,
         ),
         Changed<CurrentHealth>,
     >,
     asset_server: Res<AssetServer>,
     mut trigger_summons_events: MessageWriter<TriggerSummonsEvent>,
     mut trigger_counts: ResMut<crate::player::skills::HeirloomTriggerCounts>,
+    mut blessing_triggers: ResMut<crate::blessings::BlessingTriggerCounts>,
 ) {
     for (
         e,
@@ -169,8 +178,11 @@ pub fn handle_echo_after_heal(
         skills,
         attack,
         projectile_size,
+        player_txfm,
+        majors,
         mut current_mana,
         mut cooldowns,
+        mut overclock,
     ) in changed_health.iter_mut()
     {
         let delta = changed_health.0 - prev_health.0;
@@ -184,16 +196,41 @@ pub fn handle_echo_after_heal(
                 c.chalice_echo.as_ref().map_or(true, |t| t.is_finished())
             });
             if chalice_ready {
-                let mana_cost = Heirloom::HealEcho.get_mana_cost();
-                if current_mana.0 >= mana_cost {
-                    current_mana.0 -= mana_cost;
-                    trigger_counts.record_mana(Heirloom::HealEcho, mana_cost);
+                let base_mana_cost = (Heirloom::HealEcho.get_mana_cost() as f32
+                    * if skills.has(Heirloom::DiscountMP) {
+                        0.75
+                    } else {
+                        1.
+                    }) as i32;
+                let mana_cost = majors
+                    .map(|m| {
+                        overclock_mana_cost(
+                            m,
+                            overclock.as_deref_mut(),
+                            base_mana_cost,
+                            Some(&mut blessing_triggers),
+                        )
+                    })
+                    .unwrap_or(base_mana_cost);
+                if mana_cost == 0 || current_mana.0 >= mana_cost {
+                    if mana_cost > 0 {
+                        current_mana.0 -= mana_cost;
+                        trigger_counts.record_mana(Heirloom::HealEcho, mana_cost);
+                    }
+                    let aftershock = majors
+                        .map(|m| m.has(MajorBlessing::EchoAftershock))
+                        .unwrap_or(false);
+                    if aftershock {
+                        blessing_triggers.increment(MajorBlessing::EchoAftershock);
+                    }
                     spawn_echo_hitbox(
                         &mut commands,
                         &asset_server,
                         e,
+                        player_txfm.translation(),
                         attack.0,
                         projectile_size.get_multiplier(),
+                        aftershock,
                     );
                     trigger_counts.increment(Heirloom::HealEcho);
                     if let Some(ref mut cooldowns) = cooldowns {
@@ -413,6 +450,7 @@ pub fn handle_parry_success(
             &GlobalTransform,
             &PlayerSkills,
             &ProjectileSize,
+            Option<&OwnedMajorBlessings>,
         ),
         With<Player>,
     >,
@@ -420,9 +458,10 @@ pub fn handle_parry_success(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     mut modify_health_event: MessageWriter<ModifyHealthEvent>,
+    mut blessing_triggers: ResMut<crate::blessings::BlessingTriggerCounts>,
 ) {
     for _ in parry_success_event.read() {
-        let Ok((player_e, attack, health_regen, player_txfm, skills, projectile_size)) =
+        let Ok((player_e, attack, health_regen, player_txfm, skills, projectile_size, majors)) =
             player.single()
         else {
             continue;
@@ -439,12 +478,20 @@ pub fn handle_parry_success(
             modify_health_event.write(ModifyHealthEvent(health_regen.0));
         }
         if skills.has(Heirloom::ParryEcho) {
+            let aftershock = majors
+                .map(|m| m.has(MajorBlessing::EchoAftershock))
+                .unwrap_or(false);
+            if aftershock {
+                blessing_triggers.increment(MajorBlessing::EchoAftershock);
+            }
             spawn_echo_hitbox(
                 &mut commands,
                 &asset_server,
                 player_e,
+                player_txfm.translation(),
                 attack.0,
                 projectile_size.get_multiplier(),
+                aftershock,
             );
         }
     }
@@ -467,18 +514,71 @@ pub fn spawn_echo_hitbox(
     commands: &mut Commands,
     asset_server: &AssetServer,
     player: Entity,
+    player_world_pos: Vec3,
     dmg: i32,
     size_multiplier: f32,
+    echo_aftershock: bool,
+) {
+    spawn_echo_hitbox_scaled(
+        commands,
+        asset_server,
+        player,
+        player_world_pos,
+        dmg,
+        size_multiplier,
+        1.0,
+        echo_aftershock,
+    );
+}
+
+/// Stationary echo at a world position (not parented to the player).
+pub fn spawn_world_echo_hitbox(
+    commands: &mut Commands,
+    asset_server: &AssetServer,
+    world_pos: Vec3,
+    dmg: i32,
+    size_multiplier: f32,
+    major_echo_size_mult: f32,
+) {
+    let base_radius = 24.0;
+    let size_multiplier = size_multiplier * major_echo_size_mult;
+    spawn_deferred_aseprite_collider(
+        commands,
+        Transform::from_translation(world_pos).with_scale(Vec3::splat(size_multiplier)),
+        10.5,
+        dmg,
+        Collider::capsule(Vec2::ZERO, Vec2::ZERO, base_radius),
+        asset_server.load::<Aseprite>(Echo::PATH),
+        "",
+        false,
+        Projectile::Echo,
+        vec![],
+        None,
+    );
+}
+
+/// Like [`spawn_echo_hitbox`], with an extra multiplicative size from major blessings.
+/// When `echo_aftershock` is true, also spawns a stationary copy at `player_world_pos`.
+pub fn spawn_echo_hitbox_scaled(
+    commands: &mut Commands,
+    asset_server: &AssetServer,
+    player: Entity,
+    player_world_pos: Vec3,
+    dmg: i32,
+    size_multiplier: f32,
+    major_echo_size_mult: f32,
+    echo_aftershock: bool,
 ) {
     // NOTE: do NOT pre-scale the collider radius by `size_multiplier`. The entity's
     // Transform scale below is applied to the collider by Rapier, so multiplying the
     // radius here as well would scale the hitbox twice (it would grow ~size^2).
     let base_radius = 24.0;
+    let combined_size = size_multiplier * major_echo_size_mult;
 
     // Queue deferred spawn with parent - actual entity will be created in PreUpdate and parented
     spawn_deferred_aseprite_collider(
         commands,
-        Transform::from_translation(Vec3::ZERO).with_scale(Vec3::splat(size_multiplier)),
+        Transform::from_translation(Vec3::ZERO).with_scale(Vec3::splat(combined_size)),
         10.5,
         dmg,
         Collider::capsule(Vec2::ZERO, Vec2::ZERO, base_radius),
@@ -489,6 +589,17 @@ pub fn spawn_echo_hitbox(
         vec![],       // No extra components needed
         Some(player), // Parent to player entity
     );
+
+    if echo_aftershock {
+        spawn_world_echo_hitbox(
+            commands,
+            asset_server,
+            player_world_pos,
+            dmg,
+            size_multiplier,
+            major_echo_size_mult,
+        );
+    }
 }
 
 pub fn handle_spear_pull_delay(
@@ -499,6 +610,7 @@ pub fn handle_spear_pull_delay(
             &Attack,
             &SkillPower,
             &OwnedBlessings,
+            &crate::blessings::OwnedMajorBlessings,
         ),
         With<Player>,
     >,
@@ -506,7 +618,8 @@ pub fn handle_spear_pull_delay(
     time: Res<Time>,
     mut commands: Commands,
 ) {
-    for (player_e, mut pull_delay, attack, skill_power, blessings) in player_query.iter_mut() {
+    for (player_e, mut pull_delay, attack, skill_power, blessings, majors) in player_query.iter_mut()
+    {
         pull_delay.delay_timer.tick(time.delta());
         if !pull_delay.delay_timer.just_finished() {
             continue;
@@ -528,8 +641,10 @@ pub fn handle_spear_pull_delay(
                 });
             }
         }
-        let skill_power_mult =
-            skill_power_multiplier(skill_power, blessings.get_skill_power_bonus());
+        let skill_power_mult = skill_power_multiplier(
+            skill_power,
+            blessings.get_skill_power_bonus_with_majors(majors),
+        );
         // Spawn 20px damage hitbox at epicenter
         let hitbox = spawn_temp_collider(
             &mut commands,
@@ -582,8 +697,15 @@ pub enum DelayedCastType {
     },
     Echo {
         player: Entity,
+        world_pos: Vec3,
         dmg: i32,
         size_multiplier: f32,
+        aftershock: bool,
+    },
+    /// Twin Strike Relics: second cherry bomb with a freshly rolled target.
+    CherryBomb {
+        start_pos: Vec2,
+        dmg: i32,
     },
 }
 
@@ -601,7 +723,16 @@ pub fn handle_delayed_heirloom_casts(
     time: Res<Time>,
     graphics: Res<Graphics>,
     asset_server: Res<AssetServer>,
+    majors: Query<&crate::blessings::OwnedMajorBlessings, With<crate::player::Player>>,
 ) {
+    let echo_size_mult = majors
+        .single()
+        .map(|m| m.echo_size_multiplier())
+        .unwrap_or(1.0);
+    let heirloom_dmg_mult = majors
+        .single()
+        .map(|m| m.heirloom_damage_multiplier())
+        .unwrap_or(1.0);
     for (entity, mut cast) in query.iter_mut() {
         cast.delay.tick(time.delta());
         if !cast.delay.just_finished() {
@@ -613,20 +744,32 @@ pub fn handle_delayed_heirloom_casts(
                 dmg,
                 size_multiplier,
             } => {
-                spawn_ice_explosion_hitbox(&mut commands, &graphics, *pos, *dmg, *size_multiplier);
+                let dmg = ((*dmg as f32) * heirloom_dmg_mult).round() as i32;
+                spawn_ice_explosion_hitbox(&mut commands, &graphics, *pos, dmg, *size_multiplier);
             }
             DelayedCastType::Echo {
                 player,
+                world_pos,
                 dmg,
                 size_multiplier,
+                aftershock,
             } => {
-                spawn_echo_hitbox(
+                let dmg = ((*dmg as f32) * heirloom_dmg_mult).round() as i32;
+                spawn_echo_hitbox_scaled(
                     &mut commands,
                     &asset_server,
                     *player,
-                    *dmg,
+                    *world_pos,
+                    dmg,
                     *size_multiplier,
+                    echo_size_mult,
+                    *aftershock,
                 );
+            }
+            DelayedCastType::CherryBomb { start_pos, dmg } => {
+                let mut rng = rand::thread_rng();
+                let target_pos = random_cherry_bomb_target(*start_pos, &mut rng);
+                spawn_cherry_bomb_flight(&mut commands, &graphics, *start_pos, target_pos, *dmg);
             }
         }
         commands.entity(entity).despawn();

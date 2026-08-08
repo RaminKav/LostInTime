@@ -134,6 +134,7 @@ pub fn handle_skill_choice_info_box_hover(
             half_width: size.x * 0.5,
             half_height: size.y * 0.5,
             game_width: resolution.game_width,
+            prefer_left: false,
         },
         &specs,
     ) {

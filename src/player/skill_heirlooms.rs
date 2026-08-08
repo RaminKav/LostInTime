@@ -14,7 +14,7 @@ use crate::{
         CurrentHealth, CurrentMana, MaxHealth, ProjectileSize, SkillPower, Speed,
     },
     audio::{AudioSoundEffect, SoundSpawner},
-    blessings::{Blessing, OwnedBlessings},
+    blessings::{Blessing, MajorBlessing, OwnedBlessings, OwnedMajorBlessings},
     combat::{
         status_effects::{
             Frail, FrozenTint, MobStatusEffects, RapidfireSlowTint,
@@ -99,6 +99,7 @@ pub struct Stealthed;
 fn restart_charge_regen_if_below_max(
     skills: Option<&PlayerSkills>,
     blessings: Option<&OwnedBlessings>,
+    majors: Option<&OwnedMajorBlessings>,
     slot: &mut crate::player::skills::SlotSkillRuntime,
 ) {
     if slot.current_charges >= slot.max_charges {
@@ -106,7 +107,11 @@ fn restart_charge_regen_if_below_max(
     }
     let cd = match (skills, blessings) {
         (Some(sk), Some(bl)) => sk
-            .effective_skill_cooldown(&slot.tracked_skill, bl)
+            .effective_skill_cooldown_with_majors(
+                &slot.tracked_skill,
+                bl,
+                majors.unwrap_or(&OwnedMajorBlessings::default()),
+            )
             .max(0.0),
         _ => slot.base_cooldown.max(0.0),
     };
@@ -181,6 +186,7 @@ pub fn handle_active_skill_event(
             &mut CurrentHealth,
             &MaxHealth,
             &OwnedBlessings,
+            &OwnedMajorBlessings,
             &mut CurrentMana,
             &SkillPower,
             Option<&Stealthed>,
@@ -198,9 +204,13 @@ pub fn handle_active_skill_event(
     proto_param: ProtoParam,
     defs: Res<crate::defs::GameDefs>,
     enemies: Query<(Entity, &GlobalTransform), With<Mob>>,
-    mut trigger_counts: ResMut<HeirloomTriggerCounts>,
+    mut trigger_counts: ParamSet<(
+        ResMut<HeirloomTriggerCounts>,
+        ResMut<crate::blessings::BlessingTriggerCounts>,
+    )>,
     mut attribute_change: MessageWriter<AttributeChangeEvent>,
     mut consumable_buffs_q: Query<&mut ActiveConsumableBuffs, With<Player>>,
+    mut trigger_summons: MessageWriter<crate::player::combat_heirlooms::TriggerSummonsEvent>,
 ) {
     for ev in events.read() {
         for (
@@ -211,6 +221,7 @@ pub fn handle_active_skill_event(
             mut health,
             max_health,
             blessings,
+            major_blessings,
             mut current_mana,
             skill_power,
             stealthed_option,
@@ -247,7 +258,7 @@ pub fn handle_active_skill_event(
                     1,
                     None,
                 );
-                trigger_counts.increment(Heirloom::CreditCard);
+                trigger_counts.p0().increment(Heirloom::CreditCard);
             }
 
             // Get legacy skill states from separate queries
@@ -303,8 +314,20 @@ pub fn handle_active_skill_event(
                         should_start_cooldown = s.current_charges < s.max_charges;
                     }
                 }
-                let power_mult =
-                    skill_power_multiplier(skill_power, blessings.get_skill_power_bonus());
+                let power_mult = skill_power_multiplier(
+                    skill_power,
+                    blessings.get_skill_power_bonus_with_majors(major_blessings),
+                );
+                if major_blessings.has(crate::blessings::MajorBlessing::MovementSkillSummons)
+                    && active.active_skill.is_movement_skill()
+                {
+                    trigger_summons.write(crate::player::combat_heirlooms::TriggerSummonsEvent(
+                        player_e,
+                    ));
+                    trigger_counts
+                        .p1()
+                        .increment(MajorBlessing::MovementSkillSummons);
+                }
                 match active.active_skill {
                     ActiveSkill::Stealth => {
                         if !should_start_cooldown {
@@ -1318,22 +1341,36 @@ pub fn handle_active_skill_event(
                         .single()
                         .map(|s| s.get_multiplier())
                         .unwrap_or(1.0);
+                    let player_world_pos = player_txfm.translation();
+                    let aftershock = major_blessings.has(MajorBlessing::EchoAftershock);
 
                     for i in 0..echo_count {
                         if current_mana.0 < mana_cost {
                             break;
                         }
                         current_mana.0 -= mana_cost;
-                        trigger_counts.record_mana(Heirloom::SkillEcho, mana_cost);
-                        trigger_counts.increment(Heirloom::SkillEcho);
+                        {
+                            let mut counts = trigger_counts.p0();
+                            counts.record_mana(Heirloom::SkillEcho, mana_cost);
+                            counts.increment(Heirloom::SkillEcho);
+                        }
 
+                        let echo_size_mult = major_blessings.echo_size_multiplier();
+                        if aftershock {
+                            trigger_counts
+                                .p1()
+                                .increment(MajorBlessing::EchoAftershock);
+                        }
                         if i == 0 {
-                            spawn_echo_hitbox(
+                            crate::player::melee_skills::spawn_echo_hitbox_scaled(
                                 &mut commands,
                                 &asset_server,
                                 player_e,
+                                player_world_pos,
                                 echo_dmg,
                                 size_mult,
+                                echo_size_mult,
+                                aftershock,
                             );
                         } else {
                             spawn_delayed_heirloom_cast(
@@ -1341,8 +1378,10 @@ pub fn handle_active_skill_event(
                                 HEIRLOOM_EXTRA_CAST_DELAY * i as f32,
                                 DelayedCastType::Echo {
                                     player: player_e,
+                                    world_pos: player_world_pos,
                                     dmg: echo_dmg,
                                     size_multiplier: size_mult,
+                                    aftershock,
                                 },
                             );
                         }
@@ -1528,6 +1567,7 @@ pub fn tick_class_skill_slots(
     time: Res<Time>,
     player_skills: Query<&PlayerSkills, With<Player>>,
     blessings: Query<&OwnedBlessings, With<Player>>,
+    majors: Query<&OwnedMajorBlessings, With<Player>>,
     mut q: Query<
         (
             Entity,
@@ -1541,6 +1581,7 @@ pub fn tick_class_skill_slots(
 ) {
     let skills_single = player_skills.single().ok();
     let blessings_single = blessings.single().ok();
+    let majors_single = majors.single().ok();
     for (entity, mut slots, stealthed, rapidfire_state, fury_state) in q.iter_mut() {
         for i in 0..4 {
             let skill = slots.0[i].tracked_skill;
@@ -1566,7 +1607,12 @@ pub fn tick_class_skill_slots(
             // Restart regen for the next charge if we're still below max. Without this,
             // skills boosted past 1 max charge (e.g. via Paintbrush) only ever regen one
             // charge after a burst of casts, leaving them stuck below max indefinitely.
-            restart_charge_regen_if_below_max(skills_single, blessings_single, &mut slots.0[i]);
+            restart_charge_regen_if_below_max(
+                skills_single,
+                blessings_single,
+                majors_single,
+                &mut slots.0[i],
+            );
         }
     }
 }
@@ -1871,7 +1917,15 @@ pub fn tick_arrow_volley(
     time: Res<Time>,
     mut commands: Commands,
     mut volley_q: Query<(Entity, &mut ArrowVolleyState, &GlobalTransform), With<Player>>,
-    player_skills: Query<(&SkillPower, &Attack, &OwnedBlessings), With<Player>>,
+    player_skills: Query<
+        (
+            &SkillPower,
+            &Attack,
+            &OwnedBlessings,
+            &OwnedMajorBlessings,
+        ),
+        With<Player>,
+    >,
     cursor: Res<CursorPos>,
     mut ranged_attack_events: MessageWriter<RangedAttackEvent>,
 ) {
@@ -1886,12 +1940,12 @@ pub fn tick_arrow_volley(
         }
         state.waves_remaining -= 1;
 
-        let Ok((skill_power, attack, blessings)) = player_skills.single() else {
+        let Ok((skill_power, attack, blessings, majors)) = player_skills.single() else {
             continue;
         };
         let power_mult = crate::attributes::attribute_helpers::skill_power_multiplier(
             skill_power,
-            blessings.get_skill_power_bonus(),
+            blessings.get_skill_power_bonus_with_majors(majors),
         );
 
         let player_pos = player_txfm.translation().truncate();
@@ -1975,6 +2029,7 @@ pub fn finalize_rapidfire_fury_charges(
     mut commands: Commands,
     player_skills: Query<&PlayerSkills, With<Player>>,
     blessings: Query<&OwnedBlessings, With<Player>>,
+    majors: Query<&OwnedMajorBlessings, With<Player>>,
     mut q: Query<
         (
             Entity,
@@ -1985,6 +2040,7 @@ pub fn finalize_rapidfire_fury_charges(
         With<Player>,
     >,
 ) {
+    let majors_single = majors.single().ok();
     let skills_single = player_skills.single().ok();
     let blessings_single = blessings.single().ok();
     for (e, mut slots, rapid, fury) in q.iter_mut() {
@@ -2007,6 +2063,7 @@ pub fn finalize_rapidfire_fury_charges(
                         restart_charge_regen_if_below_max(
                             skills_single,
                             blessings_single,
+                            majors_single,
                             &mut slots.0[si],
                         );
                     }
@@ -2030,6 +2087,7 @@ pub fn finalize_rapidfire_fury_charges(
                         restart_charge_regen_if_below_max(
                             skills_single,
                             blessings_single,
+                            majors_single,
                             &mut slots.0[si],
                         );
                     }
@@ -2307,7 +2365,12 @@ pub fn reduce_skill_cooldown_on_crit(
                     }
                     grant_skill_charge_after_cooldown_complete(player_e, skill, slots.as_mut());
                     remove_skill_state_after_slot_cooldown(&mut commands, player_e, skill);
-                    restart_charge_regen_if_below_max(Some(skills), blessings_ref, &mut slots.0[i]);
+                    restart_charge_regen_if_below_max(
+                        Some(skills),
+                        blessings_ref,
+                        None,
+                        &mut slots.0[i],
+                    );
                 }
             }
 
@@ -2382,7 +2445,15 @@ pub fn handle_crit_heal(
 pub fn handle_fury_skill(
     fury_states: Query<(&FuryState, &GlobalTransform), With<Player>>,
     enemies: Query<(Entity, &GlobalTransform), With<Mob>>,
-    player_skills: Query<(&SkillPower, &Attack, &OwnedBlessings), With<Player>>,
+    player_skills: Query<
+        (
+            &SkillPower,
+            &Attack,
+            &OwnedBlessings,
+            &OwnedMajorBlessings,
+        ),
+        With<Player>,
+    >,
     mut ranged_attack_events: MessageWriter<RangedAttackEvent>,
 ) {
     for (fury_state, player_transform) in fury_states.iter() {
@@ -2392,11 +2463,14 @@ pub fn handle_fury_skill(
 
         if fury_state.throw_timer.just_finished() {
             let player_pos = player_transform.translation().truncate();
-            let Ok((skill_power, attack, blessings)) = player_skills.single() else {
+            let Ok((skill_power, attack, blessings, majors)) = player_skills.single() else {
                 continue;
             };
 
-            let power_mult = skill_power_multiplier(skill_power, blessings.get_skill_power_bonus());
+            let power_mult = skill_power_multiplier(
+                skill_power,
+                blessings.get_skill_power_bonus_with_majors(majors),
+            );
             let base_dmg: i32 = attack.0;
             let dmg = (base_dmg as f32 * power_mult * attack_damage_multiplier(FURY)) as i32;
 

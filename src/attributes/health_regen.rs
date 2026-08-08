@@ -87,15 +87,54 @@ pub fn handle_health_regen(
 #[derive(Component)]
 pub struct ManaRegenTimer(pub Timer);
 
+/// Brief delay before Overflowing Mind's bonus +1 MP pulse, so floating text / heirloom
+/// procs stay visually and mechanically separate from the natural regen tick.
+const EXTRA_MANA_REGEN_DELAY_SECS: f32 = 0.12;
+
+/// Queued Overflowing Mind bonus regen pulses. Only scheduled from the natural mana
+/// regen timer — never from these pulses themselves (no self-trigger loop).
+#[derive(Component)]
+pub struct PendingExtraManaRegen {
+    pub remaining: u32,
+    pub timer: Timer,
+}
+
+impl PendingExtraManaRegen {
+    fn new_pulse() -> Self {
+        Self {
+            remaining: 1,
+            timer: Timer::from_seconds(EXTRA_MANA_REGEN_DELAY_SECS, TimerMode::Once),
+        }
+    }
+
+    fn enqueue_pulse(&mut self) {
+        self.remaining = self.remaining.saturating_add(1);
+        if self.timer.is_finished() {
+            self.timer = Timer::from_seconds(EXTRA_MANA_REGEN_DELAY_SECS, TimerMode::Once);
+        }
+    }
+}
+
 pub fn handle_mana_regen(
     mut player_regen: Query<
-        (&ManaRegen, &mut ManaRegenTimer, &Hunger, &PlayerSkills),
+        (
+            Entity,
+            &ManaRegen,
+            &mut ManaRegenTimer,
+            &Hunger,
+            &PlayerSkills,
+            &crate::blessings::OwnedMajorBlessings,
+            Option<&mut PendingExtraManaRegen>,
+        ),
         With<Player>,
     >,
     mut modify_mana_event: MessageWriter<ModifyManaEvent>,
+    mut commands: Commands,
     time: Res<Time>,
 ) {
-    let Ok((mana_regen, mut timer, hunger, skills)) = player_regen.single_mut() else {
+    let Ok((entity, mana_regen, mut timer, hunger, skills, majors, pending_extra)) =
+        player_regen.single_mut()
+    else {
         return;
     };
     let d = time.delta();
@@ -116,6 +155,42 @@ pub fn handle_mana_regen(
             mana_regen.0,
             ManaGainSource::ManaRegen,
         ));
+        // Schedule a delayed separate regen pulse (+1) so floating numbers and
+        // ManaRegenLightning / ManaRegenPoison see it as its own trigger.
+        if majors.has(crate::blessings::MajorBlessing::ExtraManaRegen) {
+            if let Some(mut pending) = pending_extra {
+                pending.enqueue_pulse();
+            } else {
+                commands.entity(entity).insert(PendingExtraManaRegen::new_pulse());
+            }
+        }
         timer.0.reset();
+    }
+}
+
+/// Fires Overflowing Mind's delayed +1 as a full mana-regen event (floating text + heirlooms).
+pub fn handle_pending_extra_mana_regen(
+    mut player: Query<(Entity, &mut PendingExtraManaRegen), With<Player>>,
+    mut modify_mana_event: MessageWriter<ModifyManaEvent>,
+    mut commands: Commands,
+    time: Res<Time>,
+) {
+    let Ok((entity, mut pending)) = player.single_mut() else {
+        return;
+    };
+    if pending.remaining == 0 {
+        commands.entity(entity).remove::<PendingExtraManaRegen>();
+        return;
+    }
+    pending.timer.tick(time.delta());
+    if !pending.timer.just_finished() {
+        return;
+    }
+    modify_mana_event.write(ModifyManaEvent::gain(1, ManaGainSource::ManaRegen));
+    pending.remaining -= 1;
+    if pending.remaining > 0 {
+        pending.timer = Timer::from_seconds(EXTRA_MANA_REGEN_DELAY_SECS, TimerMode::Once);
+    } else {
+        commands.entity(entity).remove::<PendingExtraManaRegen>();
     }
 }

@@ -1061,6 +1061,7 @@ pub fn handle_spawn_inv_item_tooltip(
                     half_width: size.x * 0.5,
                     half_height: size.y * 0.5,
                     game_width: resolution.game_width,
+                    prefer_left: false,
                 },
                 &item.info_boxes,
             ) {

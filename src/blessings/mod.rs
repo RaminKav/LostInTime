@@ -11,17 +11,35 @@ use crate::{
 mod ancestors;
 mod blessing_choice_ui;
 mod blessing_effects;
+mod major_blessings;
+mod major_effect_systems;
+mod major_new_effects;
+mod stat_conversion;
 
 pub use ancestors::*;
 pub use blessing_choice_ui::*;
 pub use blessing_effects::*;
+pub use major_blessings::*;
+pub use major_effect_systems::*;
+pub use major_new_effects::*;
+pub use stat_conversion::*;
 
 pub struct BlessingsPlugin;
 
 impl Plugin for BlessingsPlugin {
     fn build(&self, app: &mut App) {
-        app.add_message::<AncestorBlessingSelectEvent>()
+        app.add_plugins((
+            MajorEffectSystemsPlugin,
+            MajorNewEffectsPlugin,
+            StatConversionPlugin,
+        ))
+            .add_message::<AncestorBlessingSelectEvent>()
+            .add_message::<MajorBlessingSelectEvent>()
             .init_resource::<BlessingItemRewards>()
+            .init_resource::<PendingMajorBlessings>()
+            .init_resource::<CurrentBlessingTier>()
+            .init_resource::<DeferredEraSwap>()
+            .init_resource::<BlessingTriggerCounts>()
             .add_systems(
                 Update,
                 handle_ancestor_blessing_selected
@@ -31,10 +49,19 @@ impl Plugin for BlessingsPlugin {
                             .and_then(resource_exists::<BlessingTransitionState>),
                     ),
             )
+            .add_systems(
+                Update,
+                handle_major_blessing_selected
+                    .after(handle_blessing_choice_card_interactions)
+                    .run_if(
+                        in_state(UIState::MajorBlessingChoice)
+                            .and_then(resource_exists::<BlessingTransitionState>),
+                    ),
+            )
             .add_systems(OnEnter(GameState::BlessingChoice), enter_blessing_ui)
             .add_systems(
                 Update,
-                transition_to_main_after_blessing
+                transition_after_blessing_choice
                     .run_if(resource_exists::<BlessingTransitionState>),
             )
             .add_systems(
@@ -42,7 +69,24 @@ impl Plugin for BlessingsPlugin {
                 transition_blessing_ui_after_choice
                     .run_if(resource_exists::<BlessingTransitionState>),
             )
-            .add_systems(OnEnter(UIState::BlessingChoice), setup_blessing_choice_ui)
+            .add_systems(
+                OnEnter(UIState::BlessingChoice),
+                setup_minor_blessing_choice_ui,
+            )
+            .add_systems(
+                OnEnter(UIState::MajorBlessingChoice),
+                setup_major_blessing_choice_ui,
+            )
+            .add_systems(
+                OnExit(UIState::MajorBlessingChoice),
+                apply_deferred_era_swap_after_major_blessing,
+            )
+            .add_systems(
+                Update,
+                debug_open_major_blessing_ui
+                    .run_if(in_state(GameState::Main))
+                    .run_if(in_state(UIState::Closed)),
+            )
             .add_systems(
                 Update,
                 (
@@ -52,18 +96,19 @@ impl Plugin for BlessingsPlugin {
                     .chain()
                     .run_if(
                         in_state(UIState::BlessingChoice)
-                            .and_then(not(resource_exists::<BlessingTransitionState>)),
-                    ),
+                            .or_else(in_state(UIState::MajorBlessingChoice)),
+                    )
+                    .run_if(not(resource_exists::<BlessingTransitionState>)),
             )
             .add_systems(
                 Update,
                 handle_blessing_choice_icon_tooltips
                     .after(handle_blessing_choice_card_interactions)
                     .run_if(
-                        in_state(GameState::BlessingChoice)
-                            .and_then(in_state(UIState::BlessingChoice))
-                            .and_then(not(resource_exists::<BlessingTransitionState>)),
-                    ),
+                        in_state(UIState::BlessingChoice)
+                            .or_else(in_state(UIState::MajorBlessingChoice)),
+                    )
+                    .run_if(not(resource_exists::<BlessingTransitionState>)),
             )
             .add_systems(
                 Update,
@@ -75,6 +120,7 @@ impl Plugin for BlessingsPlugin {
                             .and_then(not(resource_exists::<BlessingTransitionState>)),
                     ),
             )
+            // Major blessing runs in GameState::Main; heirloom tooltips already run there.
             // Reuse the real inventory item-tooltip renderer for blessing item cards. It is
             // event-driven; the blessing hover system emits `ToolTipUpdateEvent` with a
             // `world_anchor`, and this dispatcher (normally Main-only) must also run here.

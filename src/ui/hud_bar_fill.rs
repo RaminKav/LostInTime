@@ -20,8 +20,11 @@ pub struct HudBarFillMaterial {
     /// How strongly to brighten the surface line, in [0, 1].
     #[uniform(2)]
     pub highlight_strength: f32,
-    #[texture(3)]
-    #[sampler(4)]
+    /// Shield fill level in [0, 1], drawn as a yellow overlay (may exceed HP fill).
+    #[uniform(3)]
+    pub shield_fill: f32,
+    #[texture(4)]
+    #[sampler(5)]
     pub texture: Option<Handle<Image>>,
 }
 
@@ -44,6 +47,7 @@ impl HudBarFillMaterial {
             fill,
             highlight_thickness: 1.0 / pixel_height.max(1) as f32,
             highlight_strength: 0.2,
+            shield_fill: 0.0,
             texture: Some(texture),
         }
     }

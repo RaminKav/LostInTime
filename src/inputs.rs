@@ -789,8 +789,15 @@ pub fn dispatch_active_skill_events(
     mut ev: MessageWriter<ActiveSkillUsedEvent>,
     key_input: Res<ButtonInput<KeyCode>>,
     mouse_input: Res<ButtonInput<MouseButton>>,
-    player_q: Query<(&PlayerSkills, &ClassSkillSlots), With<Player>>,
-    blessings_q: Query<&OwnedBlessings, With<Player>>,
+    player_q: Query<
+        (
+            &PlayerSkills,
+            &ClassSkillSlots,
+            &OwnedBlessings,
+            &crate::blessings::OwnedMajorBlessings,
+        ),
+        With<Player>,
+    >,
     keybinds: Res<crate::keybinds::InputMappings>,
     bridge_mode: Res<BridgePlacementMode>,
     gamepad_action_q: Query<&ActionState<GamepadAction>, With<Player>>,
@@ -800,10 +807,7 @@ pub fn dispatch_active_skill_events(
     if bridge_mode.active {
         return;
     }
-    let Ok((skills, class_slots)) = player_q.single() else {
-        return;
-    };
-    let Ok(blessings) = blessings_q.single() else {
+    let Ok((skills, class_slots, blessings, major_blessings)) = player_q.single() else {
         return;
     };
     let gamepad_action_state = gamepad_action_q.single().ok();
@@ -818,7 +822,8 @@ pub fn dispatch_active_skill_events(
         if !still_held {
             pending_ground_aim.0 = None;
             if let Some(skill) = skills.get_active_skill_in_slot(slot) {
-                let effective_cd = skills.effective_skill_cooldown(&skill, blessings);
+                let effective_cd =
+                    skills.effective_skill_cooldown_with_majors(&skill, blessings, major_blessings);
                 let s = &class_slots.0[slot];
                 if s.max_charges > 0 && s.current_charges > 0 {
                     ev.write(ActiveSkillUsedEvent {
@@ -860,7 +865,8 @@ pub fn dispatch_active_skill_events(
                 pending_ground_aim.0 = Some(slot);
                 return;
             }
-            let effective_cd = skills.effective_skill_cooldown(&skill, blessings);
+            let effective_cd =
+                skills.effective_skill_cooldown_with_majors(&skill, blessings, major_blessings);
             ev.write(ActiveSkillUsedEvent {
                 slot,
                 cooldown: effective_cd,
@@ -1026,7 +1032,14 @@ pub fn close_container(
         MenuButton::Options
     } else if *curr_state.get() == UIState::Closed {
         return;
-    } else if matches!(*curr_state.get(), UIState::ItemChest | UIState::Skills) {
+    } else if matches!(
+        *curr_state.get(),
+        UIState::ItemChest
+            | UIState::Skills
+            | UIState::BlessingChoice
+            | UIState::MajorBlessingChoice
+            | UIState::MajorHeirloomPick
+    ) {
         return;
     } else if !wipe_popup.is_empty() {
         MenuButton::WipeDataCancel

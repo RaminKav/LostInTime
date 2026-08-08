@@ -489,8 +489,10 @@ fn heirloom_load_test_burst(
                     &mut commands,
                     &asset_server,
                     player_e,
+                    Vec3::ZERO,
                     1000,
                     rng.gen_range(0.85..1.15),
+                    false,
                 );
             }
             HeirloomSimKind::Lightning => {

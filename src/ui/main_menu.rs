@@ -1342,6 +1342,7 @@ pub fn cleanup_run_state(
     commands.insert_resource(PetAbilityStats::default());
     commands.remove_resource::<XpBarFadeIn>();
     commands.insert_resource(crate::player::skills::HeirloomTriggerCounts::default());
+    commands.insert_resource(crate::blessings::BlessingTriggerCounts::default());
     commands.insert_resource(crate::player::skills::ManaTrackerResetTimer::default());
     if !cheat_settings.persist_item_filters {
         commands.insert_resource(crate::inventory::BreakDropFilter::default());

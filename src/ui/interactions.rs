@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use crate::{
     attributes::MAX_GEAR_LEVEL,
-    blessings::{Blessing, HeirloomStatsBonuses},
+    blessings::{Blessing, HeirloomStatsBonuses, MajorBlessing, OwnedMajorBlessings},
     chaos::ChaosTracker,
     colors::WHITE,
     player::Player,
@@ -3597,6 +3597,7 @@ pub fn handle_merchant_category_reroll_buttons(
     mut commands: Commands,
     mut run_unlocks: ResMut<RunUnlockState>,
     shop: Res<EssenceShopChoices>,
+    majors: Query<&OwnedMajorBlessings, With<Player>>,
     mut reroll_event: MessageWriter<MerchantCategoryRerollEvent>,
     focus_input: crate::ui::focus::FocusInput,
     mouseless: Res<crate::inputs::MouselessModeState>,
@@ -3607,13 +3608,19 @@ pub fn handle_merchant_category_reroll_buttons(
     };
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
     let focus_driving = focus_driving(&mouseless, &cursor_pos);
+    let replenish_purchased = majors
+        .single()
+        .map(|m| m.has(MajorBlessing::MerchantSlotReplenish))
+        .unwrap_or(false);
 
     let mut any_hovered = false;
 
     for (e, mut interactable, btn, btn_children) in reroll_buttons.iter_mut() {
-        let rerolls_available = run_unlocks.rerolls_remaining > 0;
-        let category_available = !shop.category_fully_purchased(btn.0);
-        let enabled = rerolls_available && category_available;
+        let enabled = shop.category_reroll_enabled(
+            btn.0,
+            run_unlocks.rerolls_remaining,
+            replenish_purchased,
+        );
         let icon_color = if enabled {
             Color::WHITE
         } else {

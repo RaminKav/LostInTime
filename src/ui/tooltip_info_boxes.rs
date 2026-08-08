@@ -59,14 +59,14 @@ impl TooltipDefinition {
             TooltipDefinition::Lightning => ["Lightning Strike:", "Strikes a random enemy"],
             TooltipDefinition::IceExplosion => ["Ice Explosion:", "AoE damage at target"],
             TooltipDefinition::Poison => ["Poisoned enemies take", "damage over time"],
-            TooltipDefinition::FreezeChance => ["Frozen enemies are slowed", "by 15% per stack"],
+            TooltipDefinition::FreezeChance => ["Frozen enemies are slowed", "by 2% per stack"],
             TooltipDefinition::CritChance => ["Crit Chance", "Chance to crit on hit."],
             TooltipDefinition::CritDamage => ["Crit Damage", "Bonus crit hit damage."],
             TooltipDefinition::Attack => ["Damage & Attack scale", "all sources of damage."],
             TooltipDefinition::AttackSpeed => ["Attack Speed scales your", "weapon attack rate"],
             TooltipDefinition::Defence => ["Defence Reduces incoming", "damage."],
             TooltipDefinition::Speed => ["Speed", "Movement speed."],
-            TooltipDefinition::Frail => ["Frail enemies take", "+10% Damage per stack"],
+            TooltipDefinition::Frail => ["Frail enemies take", "+3% Damage per stack"],
             TooltipDefinition::Health => ["Health", "Maximum hit points."],
             TooltipDefinition::Mana => ["Mana is used to trigger", "Heirloom effects"],
             TooltipDefinition::ManaRegen => ["Mana Regen:", "Restores mana over time"],
@@ -165,9 +165,16 @@ impl HeirloomDescLine {
     }
 
     pub fn as_desc_line(&self) -> crate::ui::desc_spans::DescLine {
-        use crate::ui::desc_spans::{DescLine, DescSpan};
+        use crate::ui::desc_spans::{spans_highlighting_body_keywords, DescLine};
         if let Some(spans) = &self.spans {
             DescLine::spans(spans.clone())
+        } else if matches!(
+            self.kind,
+            HeirloomDescLineKind::Effect | HeirloomDescLineKind::Stat
+        ) && !self.text.is_empty()
+        {
+            // Color Freeze / Poison / Frail / etc. the same way blessing body text does.
+            DescLine::spans(spans_highlighting_body_keywords(&self.text))
         } else {
             DescLine::plain(self.text.clone())
         }
@@ -194,6 +201,8 @@ pub struct TooltipInfoBoxAnchor {
     pub half_width: f32,
     pub half_height: f32,
     pub game_width: f32,
+    /// When true, place boxes on the left of the card (blessing HUD / right-edge UI).
+    pub prefer_left: bool,
 }
 
 fn info_box_text_lines(kind: &TooltipInfoBoxKind) -> [String; 2] {
@@ -233,8 +242,8 @@ pub fn build_tooltip_info_boxes(heirloom: Heirloom, trigger_count: u32) -> Vec<T
     specs
 }
 
-/// Card-local X for the info-box column: prefer right of the card, flip left if it would
-/// not fit (avoid edge-clamping on the right, which overlaps the card).
+/// Card-local X for the info-box column: prefer right of the card (unless `prefer_left`),
+/// flip to the other side if it would not fit.
 fn info_boxes_local_x(anchor: &TooltipInfoBoxAnchor) -> f32 {
     let box_half_w = TOOLTIP_INFO_BOX_SIZE.x * 0.5;
     let screen_half_w = anchor.game_width * 0.5;
@@ -246,7 +255,15 @@ fn info_boxes_local_x(anchor: &TooltipInfoBoxAnchor) -> f32 {
     let left_center_x =
         anchor.center.x - anchor.half_width - INFO_BOX_GAP_FROM_TOOLTIP - box_half_w;
 
-    let world_x = if right_center_x + box_half_w <= screen_right {
+    let world_x = if anchor.prefer_left {
+        if left_center_x - box_half_w >= screen_left {
+            left_center_x
+        } else if right_center_x + box_half_w <= screen_right {
+            right_center_x
+        } else {
+            left_center_x
+        }
+    } else if right_center_x + box_half_w <= screen_right {
         right_center_x
     } else if left_center_x - box_half_w >= screen_left {
         left_center_x
@@ -255,6 +272,22 @@ fn info_boxes_local_x(anchor: &TooltipInfoBoxAnchor) -> f32 {
     };
 
     world_x - anchor.center.x
+}
+
+/// Trigger-count info box for a major blessing (glossary defs omitted for now).
+pub fn build_blessing_tooltip_info_boxes(
+    blessing: crate::blessings::MajorBlessing,
+    trigger_count: u32,
+) -> Vec<TooltipInfoBoxSpec> {
+    let mut specs = Vec::new();
+    if blessing.tracks_triggers() && trigger_count > 0 {
+        specs.push(TooltipInfoBoxSpec {
+            kind: TooltipInfoBoxKind::TriggerCount {
+                count: trigger_count,
+            },
+        });
+    }
+    specs
 }
 
 pub fn spawn_tooltip_info_boxes(

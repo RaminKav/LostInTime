@@ -18,7 +18,7 @@ use crate::attributes::{CurrentMana, Lifesteal, ProjectileSize};
 use crate::NO_DROPS;
 
 pub mod combat_helpers;
-use crate::blessings::OwnedBlessings;
+use crate::blessings::{HeirloomManaOverclock, MajorBlessing, OwnedBlessings, OwnedMajorBlessings, overclock_mana_cost};
 use crate::enemy::EliteMob;
 use crate::night::InfiniteMode;
 use crate::player::melee_skills::{
@@ -106,7 +106,7 @@ pub struct MarkedForDeath;
 /// `MarkedForDeath`, so also stored as `SparseSet`.
 #[derive(Component, Debug, Clone)]
 #[component(storage = "SparseSet")]
-pub struct KilledByHeirloomEffect;
+pub struct KilledByHeirloomEffect(pub Heirloom);
 #[derive(Debug, Clone, Message)]
 pub struct EnemyDeathEvent {
     pub entity: Entity,
@@ -334,7 +334,12 @@ fn handle_enemy_death(
     mut death_events: MessageReader<EnemyDeathEvent>,
     loot_tables: Query<&LootTable>,
     mob_data: Query<(&Mob, &MobLevel, Option<&EliteMob>)>,
-    mut player_xp: Query<(&PlayerLevel, &PlayerSkills, &OwnedBlessings)>,
+    mut player_xp: Query<(
+        &PlayerLevel,
+        &PlayerSkills,
+        &OwnedBlessings,
+        &crate::blessings::OwnedMajorBlessings,
+    )>,
     mut commands: Commands,
     infinite_mode: Res<InfiniteMode>,
     enemies: Query<(Entity, &GlobalTransform), (With<Mob>, Without<Player>)>,
@@ -347,7 +352,8 @@ fn handle_enemy_death(
         let Ok((mob, mob_lvl, elite_option)) = mob_data.get(death_event.entity) else {
             continue;
         };
-        let Ok((player_level, player_skills, blessings)) = player_xp.single_mut() else {
+        let Ok((player_level, player_skills, blessings, major_blessings)) = player_xp.single_mut()
+        else {
             return;
         };
         let is_infinite_mode = infinite_mode.active;
@@ -357,11 +363,12 @@ fn handle_enemy_death(
         // extra coin. Rolled separately from (and only after) a successful base coin loot roll.
         let golden_tooth_stacks =
             player_skills.get_count(crate::player::skills::Heirloom::GoldenTooth);
+        let coin_rate_multiplier = major_blessings.coin_drop_rate_multiplier();
 
         // drop loot
         if !*NO_DROPS {
             if let Ok(loot_table) = loot_tables.get(death_event.entity) {
-                for drop in LootTablePlugin::get_drops(
+                for drop in LootTablePlugin::get_drops_with_coin_rate(
                     loot_table,
                     &proto_param,
                     // loot_bonus.single().0,
@@ -369,6 +376,7 @@ fn handle_enemy_death(
                     Some(mob_lvl.0),
                     is_infinite_mode,
                     mob.is_boss(),
+                    coin_rate_multiplier,
                 )
                 .iter()
                 .collect::<Vec<_>>()
@@ -579,7 +587,15 @@ pub fn handle_hits(
     slime_shields: Query<Entity, With<SlimeTempShieldSprite>>,
     mut hallucination_query: Query<&mut HallucinationStats, With<Player>>,
     asset_server: Res<AssetServer>,
-    mut player_blessing_mana_query: Query<(&OwnedBlessings, &mut CurrentMana), With<Player>>,
+    mut player_blessing_mana_query: Query<
+        (
+            &OwnedBlessings,
+            &mut CurrentMana,
+            &OwnedMajorBlessings,
+            Option<&mut HeirloomManaOverclock>,
+        ),
+        With<Player>,
+    >,
     mut run_beastiary: ResMut<crate::player::beastiary::RunBeastiary>,
     mut last_attacker: ResMut<crate::player::beastiary::LastPlayerAttackerMob>,
 ) {
@@ -740,7 +756,7 @@ pub fn handle_hits(
                     // ManaGuard blessing: 80% of damage comes from mana instead of health
                     let mana_guard_percentage = player_blessing_mana_query
                         .single()
-                        .map(|(b, _)| b.get_mana_guard_percentage())
+                        .map(|(b, _, _, _)| b.get_mana_guard_percentage())
                         .unwrap_or(0.0);
 
                     if is_player && mana_guard_percentage > 0.0 {
@@ -748,7 +764,9 @@ pub fn handle_hits(
                         let health_damage = damage_to_apply - mana_damage;
 
                         // Apply mana damage first
-                        if let Ok((_, mut current_mana)) = player_blessing_mana_query.single_mut() {
+                        if let Ok((_, mut current_mana, _, _)) =
+                            player_blessing_mana_query.single_mut()
+                        {
                             let actual_mana_damage = mana_damage.min(current_mana.0);
                             current_mana.0 -= actual_mana_damage;
                             // Any overflow goes to health
@@ -770,17 +788,27 @@ pub fn handle_hits(
                             }
                         }
 
-                        if let Ok((_, mut current_mana)) = player_blessing_mana_query.single_mut() {
+                        if let Ok((_, mut current_mana, majors, mut overclock)) =
+                            player_blessing_mana_query.single_mut()
+                        {
                             let skills = game.get_player_skills();
+                            let echo_size_mult = majors.echo_size_multiplier();
+                            let aftershock = majors.has(MajorBlessing::EchoAftershock);
                             trigger_on_hit_echo(
                                 e,
                                 &skills,
                                 attack.unwrap_or(&Attack(0)).0,
                                 proj_size.unwrap_or(&ProjectileSize(0)).get_multiplier(),
+                                echo_size_mult,
+                                t.translation(),
+                                aftershock,
                                 &mut current_mana,
                                 &mut commands,
                                 &asset_server,
                                 &mut game.heirloom_trigger_counts,
+                                Some(majors),
+                                overclock.as_deref_mut(),
+                                Some(&mut game.blessing_trigger_counts),
                             );
                         }
                     }
@@ -845,8 +873,8 @@ pub fn handle_hits(
                     commands.entity(e).insert(MarkedForDeath);
 
                     // Mark if killed by heirloom effect to prevent chaining
-                    if hit.from_heirloom_effect.is_some() {
-                        commands.entity(e).insert(KilledByHeirloomEffect);
+                    if let Some(heirloom) = hit.from_heirloom_effect.clone() {
+                        commands.entity(e).insert(KilledByHeirloomEffect(heirloom));
                     }
 
                     hit_outcome.enemy_death.write(EnemyDeathEvent {
@@ -959,6 +987,7 @@ pub fn cleanup_marked_for_death_entities(
         &ManaRegen,
         &mut CurrentMana,
         &ProjectileSize,
+        &crate::blessings::OwnedMajorBlessings,
     )>,
     graphics: Res<Graphics>,
     mut modify_mana_event: MessageWriter<ModifyManaEvent>,
@@ -975,6 +1004,7 @@ pub fn cleanup_marked_for_death_entities(
     aoe_attack_states: Query<&AoEAttackState>,
     spike_warnings: Query<(Entity, &SpikeWarning)>,
     mut trigger_counts: ResMut<HeirloomTriggerCounts>,
+    mut blessing_triggers: ResMut<crate::blessings::BlessingTriggerCounts>,
 ) {
     // Collect boss/non-boss deaths first to avoid overlapping mutable borrows
     // of `neaby_mobs` from inside the loop.
@@ -1018,11 +1048,32 @@ pub fn cleanup_marked_for_death_entities(
                 .remove::<ClawAttackCollider>()
                 .remove::<MarkedForDeath>();
         } else {
-            let Ok((skills, attack, mana_regen, mut current_mana, projectile_size)) =
+            let Ok((skills, attack, mana_regen, mut current_mana, projectile_size, majors)) =
                 player.single_mut()
             else {
                 continue;
             };
+
+            // Major: ice-explosion kills can chain (bypasses KilledByHeirloomEffect gate).
+            if majors.has(crate::blessings::MajorBlessing::IceExplosionChain)
+                && matches!(killed_by_heirloom.map(|k| &k.0), Some(Heirloom::FrozenAoE))
+            {
+                let mut rng = rand::thread_rng();
+                if rng.gen_bool(0.40) {
+                    blessing_triggers
+                        .increment(crate::blessings::MajorBlessing::IceExplosionChain);
+                    let pos = mob_pos.translation();
+                    let dmg = ((attack.0 / 2) as f32 * majors.heirloom_damage_multiplier())
+                        .round() as i32;
+                    spawn_ice_explosion_hitbox(
+                        &mut commands,
+                        &graphics,
+                        pos,
+                        dmg.max(1),
+                        projectile_size.get_multiplier(),
+                    );
+                }
+            }
 
             // Only trigger heirloom on-kill effects if the kill wasn't from a heirloom effect
             // This prevents chaining (e.g., ice explosion killing enemies that trigger more ice explosions)
@@ -1116,31 +1167,26 @@ pub fn cleanup_marked_for_death_entities(
 
     // Apply deferred ViralVenum spreads after we've released read access above.
     if !nearby_venom_targets.is_empty() {
+        let apply_extra = player
+            .single()
+            .map(|(_, _, _, _, _, majors)| majors.has(MajorBlessing::StatusApplyExtra))
+            .unwrap_or(false);
         for (_source_e, source_pos, source_burning) in nearby_venom_targets.into_iter() {
             for (mob_e, txfm, mut status) in neaby_mobs.iter_mut() {
                 if source_pos.distance(txfm.translation().truncate()) < 3. * TILE_SIZE.x {
                     let stacks_to_add = source_burning
                         .stacks
-                        .min(500 * poison_sceptor_count as u128);
-                    if let Some(existing) = status.burning.as_mut() {
-                        existing.stacks = existing.stacks.saturating_add(stacks_to_add);
-                        existing.duration_timer.reset();
-                    } else {
-                        status.burning = Some(crate::combat::status_effects::Burning {
-                            stacks: stacks_to_add,
-                            duration_timer: Timer::from_seconds(
-                                source_burning.duration_timer.duration().as_secs_f32(),
-                                TimerMode::Once,
-                            ),
-                            tick_timer: source_burning.tick_timer.clone(),
-                        });
-                    }
-                    let total_stacks = status.burning.as_ref().unwrap().stacks as i32;
-                    status_event.write(StatusEffectEvent {
-                        entity: mob_e,
-                        effect: StatusEffect::Poison,
-                        num_stacks: total_stacks,
-                    });
+                        .min(500 * poison_sceptor_count as u128)
+                        as u32;
+                    try_add_poison_stacks(
+                        mob_e,
+                        status.as_mut(),
+                        &mut status_event,
+                        stacks_to_add,
+                        source_burning.tick_timer.duration().as_secs_f32(),
+                        source_burning.duration_timer.duration().as_secs_f32(),
+                        apply_extra,
+                    );
                 }
             }
         }
@@ -1278,37 +1324,78 @@ pub fn trigger_on_hit_echo(
     skills: &PlayerSkills,
     attack: i32,
     size_mult: f32,
+    echo_size_mult: f32,
+    player_world_pos: Vec3,
+    aftershock: bool,
     current_mana: &mut CurrentMana,
     commands: &mut Commands,
     asset_server: &AssetServer,
     trigger_counts: &mut HeirloomTriggerCounts,
+    majors: Option<&OwnedMajorBlessings>,
+    mut overclock: Option<&mut HeirloomManaOverclock>,
+    mut blessing_triggers: Option<&mut crate::blessings::BlessingTriggerCounts>,
 ) {
     let echo_count = skills.get_count(Heirloom::OnHitEcho);
     if echo_count <= 0 {
         return;
     }
-    let mana_cost = Heirloom::OnHitEcho.get_mana_cost();
+    let base_mana_cost = (Heirloom::OnHitEcho.get_mana_cost() as f32
+        * if skills.has(Heirloom::DiscountMP) {
+            0.75
+        } else {
+            1.
+        }) as i32;
 
+    let mut spawned_any = false;
     for i in 0..echo_count {
-        if current_mana.0 < mana_cost {
+        let mana_cost = majors
+            .map(|m| {
+                overclock_mana_cost(
+                    m,
+                    overclock.as_deref_mut(),
+                    base_mana_cost,
+                    blessing_triggers.as_deref_mut(),
+                )
+            })
+            .unwrap_or(base_mana_cost);
+        if mana_cost > 0 && current_mana.0 < mana_cost {
             break;
         }
-        current_mana.0 -= mana_cost;
+        if mana_cost > 0 {
+            current_mana.0 -= mana_cost;
+        }
         trigger_counts.record_mana(Heirloom::OnHitEcho, mana_cost);
         trigger_counts.increment(Heirloom::OnHitEcho);
+        spawned_any = true;
 
         if i == 0 {
-            spawn_echo_hitbox(commands, asset_server, player_e, attack, size_mult);
+            crate::player::melee_skills::spawn_echo_hitbox_scaled(
+                commands,
+                asset_server,
+                player_e,
+                player_world_pos,
+                attack,
+                size_mult,
+                echo_size_mult,
+                aftershock,
+            );
         } else {
             spawn_delayed_heirloom_cast(
                 commands,
                 HEIRLOOM_EXTRA_CAST_DELAY * i as f32,
                 DelayedCastType::Echo {
                     player: player_e,
+                    world_pos: player_world_pos,
                     dmg: attack,
                     size_multiplier: size_mult,
+                    aftershock,
                 },
             );
+        }
+    }
+    if spawned_any && aftershock {
+        if let Some(triggers) = blessing_triggers {
+            triggers.increment(MajorBlessing::EchoAftershock);
         }
     }
 }
@@ -1372,22 +1459,38 @@ pub fn handle_thorns_on_self_damage(
             &Attack,
             &PlayerSkills,
             &ProjectileSize,
+            &GlobalTransform,
             &mut CurrentMana,
             Option<&mut ThornsOnDamageTracker>,
+            &OwnedMajorBlessings,
+            Option<&mut HeirloomManaOverclock>,
         ),
         With<Player>,
     >,
     mut ranged_attack_event: MessageWriter<RangedAttackEvent>,
     mut trigger_counts: ResMut<HeirloomTriggerCounts>,
+    mut blessing_triggers: ResMut<crate::blessings::BlessingTriggerCounts>,
     mut attribute_events: MessageWriter<AttributeChangeEvent>,
     mut commands: Commands,
     asset_server: Res<AssetServer>,
 ) {
-    let Ok((player_e, thorns, attack, skills, projectile_size, mut current_mana, mut tracker_opt)) =
-        player.single_mut()
+    let Ok((
+        player_e,
+        thorns,
+        attack,
+        skills,
+        projectile_size,
+        player_txfm,
+        mut current_mana,
+        mut tracker_opt,
+        majors,
+        mut overclock,
+    )) = player.single_mut()
     else {
         return;
     };
+    let echo_size_mult = majors.echo_size_multiplier();
+    let aftershock = majors.has(MajorBlessing::EchoAftershock);
 
     for event in events.read() {
         if event.0 >= 0 {
@@ -1399,10 +1502,16 @@ pub fn handle_thorns_on_self_damage(
             skills,
             attack.0,
             projectile_size.get_multiplier(),
+            echo_size_mult,
+            player_txfm.translation(),
+            aftershock,
             &mut current_mana,
             &mut commands,
             &asset_server,
             &mut trigger_counts,
+            Some(majors),
+            overclock.as_deref_mut(),
+            Some(&mut blessing_triggers),
         );
 
         if thorns.0 > 0 {

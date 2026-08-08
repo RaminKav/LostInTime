@@ -546,6 +546,8 @@ fn spawn_player(
         .insert(PlayerStats::new())
         .insert(Sensor)
         .insert(OwnedBlessings::default())
+        .insert(crate::blessings::OwnedMajorBlessings::default())
+        .insert(crate::blessings::OwnedBlessingHudSlots::default())
         .insert(HeirloomStatsBonuses::default())
         .insert(PlayerSkills::default())
         .insert(skills::ClassSkillSlots::default())

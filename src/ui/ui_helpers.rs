@@ -93,6 +93,10 @@ impl Material2d for RadialOverlayMaterial {
 /// Typical full-screen UI overlays (inventory, shrines, class select, etc.) use z ≈ 9–15.
 /// Active skill hotbar: above those modals, below the heirloom pick screen.
 pub const Z_DEPTH_HUD_ACTIVE_SKILLS: f32 = 4.0;
+/// Boss HP bar + name: gameplay HUD, below inventory/shrine overlays (z ≈ 9+).
+pub const Z_DEPTH_BOSS_HEALTH_BAR: f32 = 5.0;
+/// Global announcement banners (day/era text): below inventory/shrine overlays.
+pub const Z_DEPTH_GLOBAL_TEXT_MESSAGE: f32 = 6.0;
 /// Bottom icon/text row on the main menu — must stay below [`Z_DEPTH_MAIN_MENU_MODAL_OVERLAY`].
 pub const Z_DEPTH_MAIN_MENU_BUTTONS: f32 = 1.0;
 /// Full-screen dim behind sub-menus opened from the main menu (achievements, archives, etc.).

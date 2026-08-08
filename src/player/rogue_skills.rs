@@ -9,7 +9,7 @@ use crate::{
     animations::{player_sprite::PlayerAnimation, AttackEvent, DoneAnimation},
     attributes::{attribute_helpers::skill_power_multiplier, Attack, CurrentMana, SkillPower},
     audio::{AudioSoundEffect, SoundSpawner},
-    blessings::OwnedBlessings,
+    blessings::{HeirloomManaOverclock, MajorBlessing, OwnedBlessings, overclock_mana_cost},
     colors::BLACK,
     combat_helpers::spawn_temp_collider,
     cursor::CursorPos,
@@ -221,15 +221,18 @@ pub fn handle_lunge(
         &FacingDirection,
         &Attack,
         &OwnedBlessings,
+        &crate::blessings::OwnedMajorBlessings,
         &mut CurrentMana,
         &SkillPower,
         &GlobalTransform,
         Option<&mut LungeDashInfo>,
+        Option<&mut HeirloomManaOverclock>,
     )>,
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     projectile_size: Query<&crate::attributes::ProjectileSize, With<Player>>,
     mut trigger_counts: ResMut<crate::player::skills::HeirloomTriggerCounts>,
+    mut blessing_triggers: ResMut<crate::blessings::BlessingTriggerCounts>,
     aim: Res<crate::aim::AimState>,
 ) {
     let activated_slots: Vec<usize> = active_skill_events.read().map(|ev| ev.slot).collect();
@@ -243,10 +246,12 @@ pub fn handle_lunge(
         dir,
         dmg,
         blessings,
+        majors,
         mut current_mana,
         skill_power,
         global_transform,
         dash_info_opt,
+        mut overclock,
     ) in query.iter_mut()
     {
         let lunge_slot = skills.has_active_skill(ActiveSkill::SprintLunge);
@@ -284,8 +289,11 @@ pub fn handle_lunge(
                 FacingDirection::Left => PI / 2.,
                 FacingDirection::Right => PI / 2.,
             };
-            let skill_power_mult =
-                skill_power_multiplier(skill_power, blessings.get_skill_power_bonus());
+            let skill_power_mult = skill_power_multiplier(
+                skill_power,
+                blessings.get_skill_power_bonus_with_majors(majors),
+            );
+            let echo_size_mult = majors.echo_size_multiplier();
             let lunge_e = spawn_temp_collider(
                 &mut commands,
                 Transform::from_translation(Vec3::new(0., 0., 0.))
@@ -299,27 +307,48 @@ pub fn handle_lunge(
 
             {
                 let echo_count = skills.get_count(Heirloom::SkillEcho);
-                let mana_cost = Heirloom::SkillEcho.get_mana_cost();
+                let base_mana_cost = (Heirloom::SkillEcho.get_mana_cost() as f32
+                    * if skills.has(Heirloom::DiscountMP) {
+                        0.75
+                    } else {
+                        1.
+                    }) as i32;
                 let echo_dmg = (dmg.0 as f32 * 1.) as i32;
                 let size_mult = projectile_size
                     .single()
                     .map(|s| s.get_multiplier())
                     .unwrap_or(1.0);
+                let player_world_pos = global_transform.translation();
+                let aftershock = majors.has(MajorBlessing::EchoAftershock);
+                if aftershock && echo_count > 0 {
+                    blessing_triggers.increment(MajorBlessing::EchoAftershock);
+                }
 
                 for i in 0..echo_count {
-                    if current_mana.0 < mana_cost {
+                    let mana_cost = overclock_mana_cost(
+                        majors,
+                        overclock.as_deref_mut(),
+                        base_mana_cost,
+                        Some(&mut blessing_triggers),
+                    );
+                    if mana_cost > 0 && current_mana.0 < mana_cost {
                         break;
                     }
-                    current_mana.0 -= mana_cost;
-                    trigger_counts.record_mana(Heirloom::SkillEcho, mana_cost);
+                    if mana_cost > 0 {
+                        current_mana.0 -= mana_cost;
+                        trigger_counts.record_mana(Heirloom::SkillEcho, mana_cost);
+                    }
 
                     if i == 0 {
-                        crate::player::melee_skills::spawn_echo_hitbox(
+                        crate::player::melee_skills::spawn_echo_hitbox_scaled(
                             &mut commands,
                             &asset_server,
                             e,
+                            player_world_pos,
                             echo_dmg,
                             size_mult,
+                            echo_size_mult,
+                            aftershock,
                         );
                     } else {
                         spawn_delayed_heirloom_cast(
@@ -327,8 +356,10 @@ pub fn handle_lunge(
                             HEIRLOOM_EXTRA_CAST_DELAY * i as f32,
                             DelayedCastType::Echo {
                                 player: e,
+                                world_pos: player_world_pos,
                                 dmg: echo_dmg,
                                 size_multiplier: size_mult,
+                                aftershock,
                             },
                         );
                     }
@@ -726,6 +757,7 @@ pub fn handle_recall(
             &Attack,
             &SkillPower,
             &OwnedBlessings,
+            &crate::blessings::OwnedMajorBlessings,
         ),
         With<Player>,
     >,
@@ -734,7 +766,8 @@ pub fn handle_recall(
     mut ranged_attack_events: bevy::ecs::message::MessageWriter<RangedAttackEvent>,
     mut commands: Commands,
 ) {
-    let Ok((player_e, tf, skills, mut hist, atk, skill_power, blessings)) = q.single_mut() else {
+    let Ok((player_e, tf, skills, mut hist, atk, skill_power, blessings, majors)) = q.single_mut()
+    else {
         return;
     };
     let Some(slot) = skills.has_active_skill(ActiveSkill::Recall) else {
@@ -785,7 +818,10 @@ pub fn handle_recall(
     let dash_duration = (path_length / RECALL_DASH_SPEED_PX_PER_SEC)
         .clamp(RECALL_DASH_DURATION_MIN_SECS, RECALL_DASH_DURATION_MAX_SECS);
 
-    let power_mult = skill_power_multiplier(skill_power, blessings.get_skill_power_bonus());
+    let power_mult = skill_power_multiplier(
+        skill_power,
+        blessings.get_skill_power_bonus_with_majors(majors),
+    );
     let dmg = (atk.0 as f32 * power_mult * attack_damage_multiplier(RECALL)) as i32;
 
     // One line hitbox per edge so damage matches the actual retrace path.

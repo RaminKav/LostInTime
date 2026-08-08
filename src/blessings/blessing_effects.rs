@@ -1,15 +1,19 @@
 use bevy::prelude::*;
-use rand::seq::SliceRandom;
+use rand::seq::{IteratorRandom, SliceRandom};
 use rand::Rng;
 use strum::IntoEnumIterator;
 
 use crate::{
-    attributes::{AttributeChangeEvent, ItemRarity},
+    attributes::{AttributeChangeEvent, FoodAttributeBonuses, ItemRarity},
     blessings::{
         ancestors::{stat_food_pool, AncestorBlessing},
         AncestorBlessingSelectEvent, BlessingMaxHpPenalty, BlessingTransitionState,
-        PendingRunStartChaos, ResolvedAncestorBlessing, StartingWeaponOverride,
+        DeferredEraSwap, EffectPoolStatusChance, EffectPoolStatusChances, HeirloomManaOverclock,
+        MajorBlessing, MajorBlessingOffer, MajorBlessingSelectEvent, MajorBlessingStatBonuses,
+        OwnedMajorBlessings, PendingRunStartChaos, ResolvedAncestorBlessing, ResolvedMajorBlessing,
+        StartingWeaponOverride, StatConversion,
     },
+    chaos::ChaosTracker,
     colors::LIGHT_GREEN,
     custom_commands::CommandsExt,
     item::{active_skill_shrine::roll_active_skill_shrine_offer_skills, WorldObject},
@@ -25,11 +29,93 @@ use crate::{
     },
     proto::proto_param::ProtoParam,
     ui::{damage_numbers::spawn_floating_text_with_shadow, game_fonts::FLOATING_TEXT},
+    world::dimension::DimensionSpawnEvent,
 };
 
 #[derive(Component, Default)]
 pub struct OwnedBlessings {
     pub blessings: Vec<crate::blessings::Blessing>,
+}
+
+/// Display info for a picked blessing shown on the HUD (B1 / B2 / B3).
+#[derive(Clone, Debug)]
+pub struct OwnedBlessingCard {
+    pub title: String,
+    pub description: Vec<String>,
+    /// Extra chaos tradeoff lines (minor blessings), shown in red like the choice card.
+    pub chaos_lines: Vec<String>,
+    /// Card frame rarity; `None` uses the base SkillChoice frame.
+    pub card_rarity: Option<crate::player::skills::HeirloomRarity>,
+    /// Major blessing identity for trigger tracking (HUD tooltips).
+    pub major: Option<MajorBlessing>,
+}
+
+/// HUD blessing slots: B1 = run-start minor, B2/B3 = majors in pick order.
+#[derive(Component, Default, Debug, Clone)]
+pub struct OwnedBlessingHudSlots {
+    pub minor: Option<OwnedBlessingCard>,
+    pub majors: Vec<OwnedBlessingCard>,
+}
+
+impl OwnedBlessingHudSlots {
+    pub const MAX_MAJORS: usize = 2;
+
+    pub fn set_minor(&mut self, card: OwnedBlessingCard) {
+        self.minor = Some(card);
+    }
+
+    pub fn add_major(&mut self, card: OwnedBlessingCard) {
+        if self.majors.len() < Self::MAX_MAJORS {
+            self.majors.push(card);
+        }
+    }
+
+    /// Slot 0 = minor (B1), 1 = first major (B2), 2 = second major (B3).
+    pub fn slot(&self, index: usize) -> Option<&OwnedBlessingCard> {
+        match index {
+            0 => self.minor.as_ref(),
+            1 => self.majors.get(0),
+            2 => self.majors.get(1),
+            _ => None,
+        }
+    }
+}
+
+impl OwnedBlessingCard {
+    pub fn from_minor(choice: &ResolvedAncestorBlessing) -> Self {
+        let mut chaos_lines = Vec::new();
+        let penalty = choice.blessing.max_hp_penalty_pct();
+        if penalty > 0.0 {
+            chaos_lines.push(format!("-{}% Max HP", (penalty * 100.0) as i32));
+            chaos_lines.push(format!(
+                "+{} Chaos",
+                choice.blessing.starting_chaos() as i32
+            ));
+        }
+        let card_rarity = choice.blessing.display_card_rarity().or_else(|| {
+            choice
+                .resolved_heirloom
+                .as_ref()
+                .map(|h| h.rarity)
+        });
+        Self {
+            title: choice.title.clone(),
+            description: choice.description.clone(),
+            chaos_lines,
+            card_rarity,
+            major: None,
+        }
+    }
+
+    pub fn from_major(choice: &ResolvedMajorBlessing) -> Self {
+        Self {
+            title: choice.title.clone(),
+            description: choice.description.clone(),
+            chaos_lines: Vec::new(),
+            card_rarity: choice.display_card_rarity(),
+            major: Some(choice.blessing),
+        }
+    }
 }
 
 #[derive(Component, Default, Debug, Clone)]
@@ -79,11 +165,17 @@ impl OwnedBlessings {
         }
     }
     pub fn get_skill_power_bonus(&self) -> f32 {
-        let mut bonus = 1.0;
         if self.has_blessing(crate::blessings::Blessing::SkillCooldownPower) {
-            bonus = 2.0;
+            2.0
+        } else {
+            1.0
         }
-        bonus
+    }
+
+    /// Legacy helper; major skill-power mult is applied on the `SkillPower` component
+    /// in attribute updates (`OwnedMajorBlessings::skill_damage_multiplier`).
+    pub fn get_skill_power_bonus_with_majors(&self, _majors: &OwnedMajorBlessings) -> f32 {
+        self.get_skill_power_bonus()
     }
     pub fn get_skill_cooldown_increase(&self) -> f32 {
         let mut increase = 1.0;
@@ -179,6 +271,7 @@ pub fn handle_ancestor_blessing_selected(
         &mut PlayerSkills,
         &GlobalTransform,
         &crate::player::levels::PlayerLevel,
+        &mut OwnedBlessingHudSlots,
     )>,
     mut commands: Commands,
     asset_server: Res<AssetServer>,
@@ -191,7 +284,7 @@ pub fn handle_ancestor_blessing_selected(
 ) {
     for event in blessing_event.read() {
         let mut rng = rand::thread_rng();
-        let (player_entity, mut player_skills, player_transform, player_level) =
+        let (player_entity, mut player_skills, player_transform, player_level, mut hud_slots) =
             player.single_mut().unwrap();
         let player_level = player_level.level;
 
@@ -212,6 +305,7 @@ pub fn handle_ancestor_blessing_selected(
             player_class.as_deref(),
             class_ranks.as_deref(),
         );
+        hud_slots.set_minor(OwnedBlessingCard::from_minor(&event.choice));
 
         attribute_event.write(AttributeChangeEvent);
     }
@@ -632,11 +726,11 @@ fn grant_specific_heirloom(
     blessing_item_rewards: &mut BlessingItemRewards,
     blessing_transition_state: &mut BlessingTransitionState,
 ) {
+    if count == 0 {
+        return;
+    }
     for _ in 0..count {
         player_skills.heirlooms.push(heirloom.clone());
-        heirloom
-            .heirloom
-            .add_heirloom_components(player_entity, commands, player_skills.clone());
         if let Some((drop, _)) = heirloom.heirloom.get_instant_drop() {
             blessing_item_rewards.queue_item(drop);
         }
@@ -645,6 +739,268 @@ fn grant_specific_heirloom(
             .get_or_insert_with(Vec::new)
             .push(heirloom.clone());
     }
+    // Attach components once after all copies are pushed so stack-based state
+    // (timers, etc.) is initialized against the final count — not reset per copy.
+    heirloom
+        .heirloom
+        .add_heirloom_components(player_entity, commands, player_skills.clone());
+}
+
+pub fn handle_major_blessing_selected(
+    mut blessing_event: MessageReader<MajorBlessingSelectEvent>,
+    mut blessing_item_rewards: ResMut<BlessingItemRewards>,
+    mut player: Query<(
+        Entity,
+        &mut OwnedMajorBlessings,
+        &mut FoodAttributeBonuses,
+        &PlayerSkills,
+        &mut OwnedBlessingHudSlots,
+        Option<&mut EffectPoolStatusChances>,
+    )>,
+    mut commands: Commands,
+    mut run_unlock_state: ResMut<RunUnlockState>,
+    mut attribute_event: MessageWriter<AttributeChangeEvent>,
+    mut chaos_tracker: ResMut<ChaosTracker>,
+    mut pet_weapon_event: MessageWriter<crate::pets::state::UpdatePetWeaponEvent>,
+    player_class: Option<Res<PlayerClass>>,
+) {
+    for event in blessing_event.read() {
+        let mut rng = rand::thread_rng();
+        let Ok((
+            player_entity,
+            mut owned,
+            mut food_bonuses,
+            _skills,
+            mut hud_slots,
+            mut effect_pool,
+        )) = player.single_mut()
+        else {
+            continue;
+        };
+        apply_major_blessing(
+            &event.choice,
+            &mut rng,
+            player_entity,
+            &mut owned,
+            &mut food_bonuses,
+            &mut blessing_item_rewards,
+            &mut run_unlock_state,
+            &mut chaos_tracker,
+            &mut commands,
+            player_class.as_deref(),
+            effect_pool.as_deref_mut(),
+        );
+        hud_slots.add_major(OwnedBlessingCard::from_major(&event.choice));
+        if event.choice.blessing == MajorBlessing::PetSizeAndAttackSpeed {
+            pet_weapon_event.write(crate::pets::state::UpdatePetWeaponEvent);
+        }
+        attribute_event.write(AttributeChangeEvent);
+    }
+}
+
+fn apply_major_blessing(
+    choice: &ResolvedMajorBlessing,
+    rng: &mut rand::rngs::ThreadRng,
+    player_entity: Entity,
+    owned: &mut OwnedMajorBlessings,
+    food_bonuses: &mut FoodAttributeBonuses,
+    blessing_item_rewards: &mut BlessingItemRewards,
+    run_unlock_state: &mut RunUnlockState,
+    chaos_tracker: &mut ChaosTracker,
+    commands: &mut Commands,
+    player_class: Option<&PlayerClass>,
+    effect_pool: Option<&mut EffectPoolStatusChances>,
+) {
+    let blessing = choice.blessing;
+    owned.add(blessing);
+
+    match blessing {
+        MajorBlessing::RandomLegendaryWeapon => {
+            if let Some(weapon) = WorldObject::iter()
+                .filter(|o| o.is_weapon() && *o != WorldObject::PlasmaStaff)
+                .choose(rng)
+            {
+                blessing_item_rewards.queue_item_with_rarity(weapon, ItemRarity::Legendary);
+            }
+        }
+        MajorBlessing::RandomLegendaryArmor => {
+            if let Some(armor) = WorldObject::iter()
+                .filter(|o| o.is_armor())
+                .choose(rng)
+            {
+                blessing_item_rewards.queue_item_with_rarity(armor, ItemRarity::Legendary);
+            }
+        }
+        MajorBlessing::RandomLegendaryAccessory => {
+            if let Some(acc) = WorldObject::iter()
+                .filter(|o| o.is_accessory())
+                .choose(rng)
+            {
+                blessing_item_rewards.queue_item_with_rarity(acc, ItemRarity::Legendary);
+            }
+        }
+        MajorBlessing::TomesAndOrbs => {
+            for _ in 0..10 {
+                blessing_item_rewards.queue_item(WorldObject::UpgradeTome);
+                blessing_item_rewards.queue_item(WorldObject::OrbOfTransformation);
+            }
+        }
+        MajorBlessing::RerollsAndBanishes => {
+            run_unlock_state.rerolls_remaining =
+                run_unlock_state.rerolls_remaining.saturating_add(7);
+            run_unlock_state.rerolls_total = run_unlock_state.rerolls_total.saturating_add(7);
+            run_unlock_state.banishes_remaining =
+                run_unlock_state.banishes_remaining.saturating_add(3);
+            run_unlock_state.banishes_total = run_unlock_state.banishes_total.saturating_add(3);
+        }
+        MajorBlessing::MerchantSlotReplenish => {
+            run_unlock_state.rerolls_remaining =
+                run_unlock_state.rerolls_remaining.saturating_add(3);
+            run_unlock_state.rerolls_total = run_unlock_state.rerolls_total.saturating_add(3);
+        }
+        MajorBlessing::LuckChaosTradeoff => {
+            food_bonuses.add("loot_rate", 50);
+            let selected_class = player_class
+                .map(|pc| pc.class.clone())
+                .unwrap_or(SkillClass::None);
+            let starting_hp = crate::player::get_max_health_for_class(selected_class);
+            let flat_penalty = (starting_hp as f32 * blessing.max_hp_penalty_pct()) as i32;
+            commands
+                .entity(player_entity)
+                .insert(BlessingMaxHpPenalty(flat_penalty));
+            chaos_tracker.add_chaos(blessing.starting_chaos());
+        }
+        MajorBlessing::TripleUncommonHeirloom => {
+            commands.insert_resource(PendingMajorHeirloomPick {
+                mode: MajorHeirloomPickMode::TripleCopyLoseOne,
+            });
+        }
+        MajorBlessing::ConvertUncommons => {
+            commands.insert_resource(PendingMajorHeirloomPick {
+                mode: MajorHeirloomPickMode::ConvertAllToChosen,
+            });
+        }
+        MajorBlessing::OverhealToShield => {
+            let selected_class = player_class
+                .map(|pc| pc.class.clone())
+                .unwrap_or(SkillClass::None);
+            let starting_hp = crate::player::get_max_health_for_class(selected_class);
+            let flat_penalty = (starting_hp as f32 * blessing.max_hp_penalty_pct()) as i32;
+            commands
+                .entity(player_entity)
+                .insert(BlessingMaxHpPenalty(flat_penalty));
+        }
+        MajorBlessing::HeirloomOverclock => {
+            commands
+                .entity(player_entity)
+                .insert(HeirloomManaOverclock::default());
+        }
+        MajorBlessing::EffectPoolApplyFreeze
+        | MajorBlessing::EffectPoolApplyFrail
+        | MajorBlessing::EffectPoolApplyPoison => {
+            if let (Some(family), Some(status)) = (
+                choice.resolved_effect_family,
+                blessing.rolls_effect_family(),
+            ) {
+                let entry = EffectPoolStatusChance { family, status };
+                if let Some(pool) = effect_pool {
+                    pool.push(entry);
+                } else {
+                    commands.entity(player_entity).insert(EffectPoolStatusChances {
+                        entries: vec![entry],
+                    });
+                }
+            }
+        }
+        MajorBlessing::StatConversion => {
+            if let Some(rolled) = choice.resolved_stat_conversion {
+                info!(
+                    "StatConversion applied from card: {}",
+                    crate::blessings::format_stat_conversion(&rolled)
+                );
+                commands
+                    .entity(player_entity)
+                    .insert(StatConversion {
+                        source: rolled.source,
+                        target: rolled.target,
+                        gain: rolled.gain,
+                        per: rolled.per,
+                        last_granted: 0,
+                        last_chaos: 0.0,
+                    })
+                    .insert(MajorBlessingStatBonuses::default());
+            } else {
+                // Offer path always pre-rolls; keep fallback for safety.
+                commands
+                    .entity(player_entity)
+                    .insert(PendingStatConversionRoll);
+            }
+        }
+        // Passive effects are checked via OwnedMajorBlessings::has at their call sites.
+        MajorBlessing::LightningCoinChance
+        | MajorBlessing::EchoSizeBoost
+        | MajorBlessing::PoisonTickFaster
+        | MajorBlessing::HeirloomDamageBoost
+        | MajorBlessing::ExtraManaRegen
+        | MajorBlessing::SummonRetrigger
+        | MajorBlessing::TouchThorns
+        | MajorBlessing::EchoAftershock
+        | MajorBlessing::ViralConductor
+        | MajorBlessing::SharedAffliction
+        | MajorBlessing::WeaponHeirloomDoubleTrigger
+        | MajorBlessing::AttackSpeedBoost
+        | MajorBlessing::SkillDamageBoost
+        | MajorBlessing::SkillCooldownCut
+        | MajorBlessing::SkillPoisonStacks
+        | MajorBlessing::MovementSkillSummons
+        | MajorBlessing::IceExplosionChain
+        | MajorBlessing::ManaDrainShield
+        | MajorBlessing::PetSizeAndAttackSpeed
+        | MajorBlessing::CoinDropRate
+        | MajorBlessing::StatusApplyShield
+        | MajorBlessing::ManaRegenHeal
+        | MajorBlessing::SkillsApplyAllStatuses
+        | MajorBlessing::StatusApplyExtra
+        | MajorBlessing::LargeObjectEcho
+        | MajorBlessing::ObjectBreakLoot => {}
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum MajorHeirloomPickMode {
+    #[default]
+    TripleCopyLoseOne,
+    ConvertAllToChosen,
+}
+
+/// Set when a major blessing needs the uncommon heirloom pick UI.
+#[derive(Resource, Debug, Clone)]
+pub struct PendingMajorHeirloomPick {
+    pub mode: MajorHeirloomPickMode,
+}
+
+/// Set when StatConversion major is picked; consumed by the conversion roller.
+#[derive(Component, Default)]
+pub struct PendingStatConversionRoll;
+
+/// After the major blessing UI closes, fire any deferred era swap from the Time Portal.
+/// Skips temporary leaves (inventory/map/options) while a choice is still pending —
+/// [`MajorBlessingOffer`] is only removed after a completed pick.
+pub fn apply_deferred_era_swap_after_major_blessing(
+    mut deferred: ResMut<DeferredEraSwap>,
+    mut dim_event: MessageWriter<DimensionSpawnEvent>,
+    pending_offer: Option<Res<MajorBlessingOffer>>,
+) {
+    if pending_offer.is_some() {
+        return;
+    }
+    let Some(era) = deferred.era.take() else {
+        return;
+    };
+    dim_event.write(DimensionSpawnEvent {
+        swap_to_dim_now: true,
+        new_era: Some(era),
+    });
 }
 
 pub fn spawn_blessing_item_drops(

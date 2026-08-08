@@ -127,6 +127,7 @@ pub fn handle_teleport(
             &mut KinematicCharacterController,
             &mut TeleportState,
             &OwnedBlessings,
+            &crate::blessings::OwnedMajorBlessings,
         ),
         (With<Player>, With<TeleportState>),
     >,
@@ -149,6 +150,7 @@ pub fn handle_teleport(
         mut kcc,
         mut teleport_state,
         blessings,
+        majors,
     )) = player.single_mut()
     else {
         return;
@@ -184,7 +186,10 @@ pub fn handle_teleport(
         if direction == Vec2::ZERO {
             return;
         }
-        let power_mult = skill_power_multiplier(skill_power, blessings.get_skill_power_bonus());
+        let power_mult = skill_power_multiplier(
+            skill_power,
+            blessings.get_skill_power_bonus_with_majors(majors),
+        );
         let base_distance = 4.5 * TILE_SIZE.x;
         let distance = direction * base_distance;
         let intended_tile = world_pos_to_tile_pos(player_pos.truncate() + distance);

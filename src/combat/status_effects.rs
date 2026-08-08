@@ -81,6 +81,18 @@ pub struct Slow {
     pub timer: Timer,
 }
 
+/// Movement slow per freeze/slow stack (2%).
+pub const SLOW_SPEED_REDUCTION_PER_STACK: f32 = 0.02;
+/// Floor so extreme stacks cannot fully stop movement on their own.
+pub const SLOW_SPEED_MULTIPLIER_MIN: f32 = 0.05;
+/// Bonus damage per frail stack (3%, additive).
+pub const FRAIL_DAMAGE_BONUS_PER_STACK: f32 = 0.03;
+
+#[inline]
+pub fn frail_damage_multiplier(stacks: u8) -> f32 {
+    1.0 + stacks as f32 * FRAIL_DAMAGE_BONUS_PER_STACK
+}
+
 /// Shared blue tint for freeze-style status effects (Freeze blessing, Death Defiance, Rapidfire).
 pub const STATUS_EFFECT_BLUE_TINT: Color = Color::srgba(0.5, 0.7, 1.0, 1.0);
 
@@ -187,7 +199,8 @@ impl MobStatusEffects {
     /// mob.
     #[inline]
     pub fn movement_speed_multiplier(&self) -> f32 {
-        let slow_mult = 1.0 - self.slow_stacks() as f32 * 0.15;
+        let slow_mult = (1.0 - self.slow_stacks() as f32 * SLOW_SPEED_REDUCTION_PER_STACK)
+            .max(SLOW_SPEED_MULTIPLIER_MIN);
         let rapidfire_mult = if self.rapidfire_slow { 0.5 } else { 1.0 };
         slow_mult * rapidfire_mult
     }
@@ -281,8 +294,12 @@ pub fn update_status_effect_icons(
             let total_stacks = effect.num_stacks as f32;
             let h = height as f32;
 
-            // For poison stacks > 5, show 1 icon + text count
-            if effect.effect == StatusEffect::Poison && effect.num_stacks > 5 {
+            // High stack counts: show 1 icon + text instead of one icon per stack.
+            let use_count_badge = matches!(
+                effect.effect,
+                StatusEffect::Poison | StatusEffect::Frail | StatusEffect::Slow
+            ) && effect.num_stacks > 5;
+            if use_count_badge {
                 let icon = graphics.get_status_effect_icon(effect.effect.clone());
                 let s = 5.;
                 let translation = Vec3::new(-s / 2., 7. * h + 12., 1.);
@@ -391,7 +408,7 @@ pub fn handle_burning_ticks(
 
                 // Frail multiplier: 1.1x per stack (same as other damage)
                 if frail_stacks > 0 {
-                    damage = (damage as f32 * 1.1_f32.powi(frail_stacks as i32)).round() as i32;
+                    damage = (damage as f32 * frail_damage_multiplier(frail_stacks)).round() as i32;
                 }
 
                 // Poison can crit internally (extra damage) but we don't set was_crit so other systems don't react
@@ -494,34 +511,151 @@ pub fn handle_slow_stack_ticks(
     }
 }
 
-/// Adds a slow stack (up to 3) via mutating [`MobStatusEffects`] in-place.
-/// Replaces the previous insert-component path; no archetype transitions.
+/// Compounding Malady: each status application gains one extra stack.
+fn with_status_apply_extra(stacks_to_add: u32, apply_extra_stack: bool) -> u32 {
+    if stacks_to_add == 0 {
+        0
+    } else if apply_extra_stack {
+        stacks_to_add.saturating_add(1)
+    } else {
+        stacks_to_add
+    }
+}
+
+/// Adds `stacks_to_add` freeze/slow stacks (no cap; stacks like poison).
+/// When `shared_affliction_poison_tick_secs` is `Some`, also applies the same number of poison stacks.
+/// When `apply_extra_stack` is true (Compounding Malady), adds one more stack.
 pub fn try_add_slow_stacks(
     hit_e: Entity,
     status: &mut MobStatusEffects,
     status_event: &mut MessageWriter<StatusEffectEvent>,
-) {
+    stacks_to_add: u32,
+    shared_affliction_poison_tick_secs: Option<f32>,
+    apply_extra_stack: bool,
+) -> bool {
+    let stacks_to_add = with_status_apply_extra(stacks_to_add, apply_extra_stack);
+    if stacks_to_add == 0 {
+        return false;
+    }
+    let add = stacks_to_add.min(u8::MAX as u32) as u8;
     if let Some(slow) = status.slow.as_mut() {
-        if slow.num_stacks < 3 {
-            slow.num_stacks += 1;
-            slow.timer.reset();
-            status_event.write(StatusEffectEvent {
-                entity: hit_e,
-                effect: StatusEffect::Slow,
-                num_stacks: slow.num_stacks as i32,
-            });
-        }
+        slow.num_stacks = slow.num_stacks.saturating_add(add);
+        slow.timer.reset();
+        status_event.write(StatusEffectEvent {
+            entity: hit_e,
+            effect: StatusEffect::Slow,
+            num_stacks: slow.num_stacks as i32,
+        });
     } else {
         status.slow = Some(Slow {
-            num_stacks: 1,
+            num_stacks: add,
             timer: Timer::from_seconds(1.7, TimerMode::Repeating),
         });
         status_event.write(StatusEffectEvent {
             entity: hit_e,
             effect: StatusEffect::Slow,
-            num_stacks: 1,
+            num_stacks: add as i32,
         });
     }
+
+    if let Some(tick_secs) = shared_affliction_poison_tick_secs {
+        if let Some(burning) = status.burning.as_mut() {
+            burning.stacks = burning.stacks.saturating_add(add as u128);
+            burning.duration_timer.reset();
+            status_event.write(StatusEffectEvent {
+                entity: hit_e,
+                effect: StatusEffect::Poison,
+                num_stacks: burning.stacks as i32,
+            });
+        } else {
+            status.burning = Some(Burning {
+                tick_timer: Timer::from_seconds(tick_secs, TimerMode::Repeating),
+                duration_timer: Timer::from_seconds(3.0, TimerMode::Once),
+                stacks: add as u128,
+            });
+            status_event.write(StatusEffectEvent {
+                entity: hit_e,
+                effect: StatusEffect::Poison,
+                num_stacks: add as i32,
+            });
+        }
+    }
+    true
+}
+
+/// Adds `stacks_to_add` frail stacks (no cap; stacks like poison).
+/// When `apply_extra_stack` is true (Compounding Malady), adds one more stack.
+pub fn try_add_frail_stacks(
+    hit_e: Entity,
+    status: &mut MobStatusEffects,
+    status_event: &mut MessageWriter<StatusEffectEvent>,
+    stacks_to_add: u32,
+    apply_extra_stack: bool,
+) -> bool {
+    let stacks_to_add = with_status_apply_extra(stacks_to_add, apply_extra_stack);
+    if stacks_to_add == 0 {
+        return false;
+    }
+    let add = stacks_to_add.min(u8::MAX as u32) as u8;
+    if let Some(frail) = status.frail.as_mut() {
+        frail.num_stacks = frail.num_stacks.saturating_add(add);
+        frail.timer.reset();
+        status_event.write(StatusEffectEvent {
+            entity: hit_e,
+            effect: StatusEffect::Frail,
+            num_stacks: frail.num_stacks as i32,
+        });
+    } else {
+        status.frail = Some(Frail {
+            num_stacks: add,
+            timer: Timer::from_seconds(1.2, TimerMode::Repeating),
+        });
+        status_event.write(StatusEffectEvent {
+            entity: hit_e,
+            effect: StatusEffect::Frail,
+            num_stacks: add as i32,
+        });
+    }
+    true
+}
+
+/// Adds `stacks_to_add` poison stacks.
+/// When `apply_extra_stack` is true (Compounding Malady), adds one more stack.
+pub fn try_add_poison_stacks(
+    hit_e: Entity,
+    status: &mut MobStatusEffects,
+    status_event: &mut MessageWriter<StatusEffectEvent>,
+    stacks_to_add: u32,
+    poison_tick_secs: f32,
+    duration_secs: f32,
+    apply_extra_stack: bool,
+) -> bool {
+    let stacks_to_add = with_status_apply_extra(stacks_to_add, apply_extra_stack);
+    if stacks_to_add == 0 {
+        return false;
+    }
+    let add = stacks_to_add as u128;
+    if let Some(burning) = status.burning.as_mut() {
+        burning.stacks = burning.stacks.saturating_add(add);
+        burning.duration_timer.reset();
+        status_event.write(StatusEffectEvent {
+            entity: hit_e,
+            effect: StatusEffect::Poison,
+            num_stacks: burning.stacks as i32,
+        });
+    } else {
+        status.burning = Some(Burning {
+            tick_timer: Timer::from_seconds(poison_tick_secs, TimerMode::Repeating),
+            duration_timer: Timer::from_seconds(duration_secs, TimerMode::Once),
+            stacks: add,
+        });
+        status_event.write(StatusEffectEvent {
+            entity: hit_e,
+            effect: StatusEffect::Poison,
+            num_stacks: add as i32,
+        });
+    }
+    true
 }
 
 /// Handle frozen status effect ticks - mobs are frozen with blue tint

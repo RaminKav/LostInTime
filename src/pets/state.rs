@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use strum_macros::EnumIter;
 
 use crate::{
-    blessings::{Blessing, OwnedBlessings},
+    blessings::{Blessing, MajorBlessing, OwnedBlessings, OwnedMajorBlessings},
     enemy::Mob,
     inventory::{Inventory, ItemStack},
     item::projectile::{Projectile, RangedAttack, RangedAttackEvent},
@@ -350,17 +350,26 @@ pub fn update_pet_weapon_on_inv_change(
     proto: ProtoParam,
     mut events: MessageReader<UpdatePetWeaponEvent>,
     blessings: Query<&OwnedBlessings>,
+    majors: Query<&OwnedMajorBlessings, With<Player>>,
 ) {
     for _ in events.read() {
         if let Ok(inventory) = player_inventory.single() {
             let Ok(blessings) = blessings.single() else {
                 return;
             };
-            let attack_speed_buff = if blessings.has_blessing(Blessing::PetAttackSpeed) {
+            let mut attack_speed_buff = if blessings.has_blessing(Blessing::PetAttackSpeed) {
                 0.75
             } else {
                 1.0
             };
+            // Major: 50% attack speed => 0.5× cooldown.
+            if majors
+                .single()
+                .map(|m| m.has(MajorBlessing::PetSizeAndAttackSpeed))
+                .unwrap_or(false)
+            {
+                attack_speed_buff *= 0.5;
+            }
             let pet_weapon = inventory
                 .pet_items
                 .items

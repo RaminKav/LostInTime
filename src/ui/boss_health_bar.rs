@@ -6,8 +6,11 @@ use crate::{
     attributes::{CurrentHealth, MaxHealth},
     colors::{BLACK, RED, YELLOW},
     enemy::Mob,
-    ui::game_fonts as gf,
-    GameState, ScreenResolution, GAME_HEIGHT,
+    ui::{
+        game_fonts as gf,
+        ui_helpers::Z_DEPTH_BOSS_HEALTH_BAR,
+    },
+    GAME_HEIGHT,
 };
 
 #[derive(Component)]
@@ -72,7 +75,7 @@ pub fn spawn_boss_health_bar(
                     .text(&asset_server, boss_name.clone(), BLACK)
                     .anchor(Anchor::CENTER)
                     .with_transform(Transform {
-                        translation: Vec3::new(0., y_offset + 12.0, 10.),
+                        translation: Vec3::new(0., y_offset + 12.0, Z_DEPTH_BOSS_HEALTH_BAR + 1.),
                         scale: gf::DISPLAY.transform_scale(),
                         ..Default::default()
                     }),
@@ -92,7 +95,7 @@ pub fn spawn_boss_health_bar(
                         ..default()
                     },
                     Transform {
-                        translation: Vec3::new(0., y_offset, 9.),
+                        translation: Vec3::new(0., y_offset, Z_DEPTH_BOSS_HEALTH_BAR),
                         ..Default::default()
                     },
                     Visibility::Visible,
@@ -105,7 +108,7 @@ pub fn spawn_boss_health_bar(
             .id();
 
         // Spawn health bar fill with initial health - starts from left edge, scales to right
-        let bar_fill = commands
+        let _bar_fill = commands
             .spawn((
                 (
                     Sprite {
@@ -114,7 +117,11 @@ pub fn spawn_boss_health_bar(
                         ..default()
                     },
                     Transform {
-                        translation: Vec3::new(-BOSS_BAR_WIDTH / 2.0, y_offset, 10.),
+                        translation: Vec3::new(
+                            -BOSS_BAR_WIDTH / 2.0,
+                            y_offset,
+                            Z_DEPTH_BOSS_HEALTH_BAR + 1.,
+                        ),
                         scale: Vec3::new(health_percent, 1.0, 1.0),
                         ..Default::default()
                     },

@@ -7,7 +7,7 @@ use rand::Rng;
 use std::collections::HashMap;
 
 use super::{
-    desc_spans::{skill_desc_line, spawn_desc_line},
+    desc_spans::{blessing_desc_line, skill_desc_line, spawn_desc_line},
     focus::{Focusable, UiFocus},
     heirloom_tooltip::{
         heirloom_hud_hover_tooltip_position, HeirloomTooltipRequest, HeirloomTooltipShow,
@@ -40,7 +40,9 @@ use crate::{
         ProjectileSize, SkillPower, Speed,
     },
     audio::{AudioSoundEffect, SoundSpawner},
-    blessings::OwnedBlessings,
+    blessings::{
+        BlessingTriggerCounts, OwnedBlessingCard, OwnedBlessingHudSlots, OwnedBlessings,
+    },
     chaos::ChaosTracker,
     client::GameOverEvent,
     colors::{
@@ -74,7 +76,9 @@ use crate::{
         CoinCurrency, Player, RunScore, TimeFragmentCurrency,
     },
     proto::proto_param::ProtoParam,
-    ui::{game_fonts as gf, CheatSettings, Interactable, SKILL_TOOLTIP_SIZE},
+    ui::{
+        game_fonts as gf, CheatSettings, Interactable, SKILLS_CHOICE_UI_SIZE, SKILL_TOOLTIP_SIZE,
+    },
     GameState, InputMappings, Pet, ScreenResolution,
 };
 use std::time::Duration;
@@ -303,6 +307,33 @@ pub fn hud_bag_icon_x(game_width: f32) -> f32 {
 /// World-space x for the options/settings HUD corner icon.
 pub fn hud_settings_icon_x(game_width: f32) -> f32 {
     hud_bag_icon_x(game_width) + HUD_CORNER_ICON_SPACING
+}
+
+/// Square dark-grey blessing slot icons (B1 / B2 / B3) on the bottom-right HUD.
+pub const HUD_BLESSING_ICON_SIZE: Vec2 = Vec2::new(18., 18.);
+const HUD_BLESSING_ICON_SPACING: f32 = 30.0;
+const HUD_CORNER_RIGHT_PADDING: f32 = 6.0;
+/// Shift the whole B1–B3 row left from the right screen edge.
+const HUD_BLESSING_ROW_LEFT_NUDGE: f32 = 30.0;
+const HUD_BLESSING_SLOT_COUNT: usize = 3;
+
+/// Bottom-right HUD blessing slot (B1 = minor, B2/B3 = majors).
+#[derive(Component, Clone, Copy, Debug, PartialEq, Eq)]
+pub struct HudBlessingSlotIcon {
+    pub index: usize,
+}
+
+#[derive(Component)]
+pub struct BlessingHudTooltip;
+
+/// World-space x for blessing slot `index` (0=B1 … 2=B3). B3 sits nearest the right edge.
+pub fn hud_blessing_icon_x(game_width: f32, index: usize) -> f32 {
+    let rightmost = game_width * 0.5
+        - HUD_CORNER_RIGHT_PADDING
+        - HUD_BLESSING_ICON_SIZE.x * 0.5
+        - HUD_BLESSING_ROW_LEFT_NUDGE;
+    let from_right = (HUD_BLESSING_SLOT_COUNT - 1).saturating_sub(index) as f32;
+    rightmost - from_right * HUD_BLESSING_ICON_SPACING
 }
 
 #[derive(Component)]
@@ -885,6 +916,41 @@ pub fn setup_currency_ui(
     commands
         .entity(settings_key_text)
         .insert(OptionsKeybindText);
+
+    // Blessing slots B1–B3 (bottom-right), mirroring the left corner icon row.
+    for index in 0..HUD_BLESSING_SLOT_COUNT {
+        let label = format!("B{}", index + 1);
+        let x = hud_blessing_icon_x(res.game_width, index);
+        let slot = commands
+            .spawn((
+                Sprite {
+                    color: crate::ui::KEYBIND_BADGE_COLOR,
+                    custom_size: Some(HUD_BLESSING_ICON_SIZE),
+                    ..default()
+                },
+                Transform::from_translation(Vec3::new(x, corner_y, 6.)),
+                RenderLayers::from_layers(&[3]),
+                HudBlessingSlotIcon { index },
+                Interactable::default(),
+                UIElement::HeirloomHudIcon,
+                Name::new(format!("BLESSING HUD SLOT {label}")),
+            ))
+            .id();
+        commands
+            .spawn(
+                gf::MICRO
+                    .text(&asset_server, label, WHITE)
+                    .justify(Justify::Center)
+                    .anchor(Anchor::CENTER)
+                    .with_transform(Transform {
+                        translation: Vec3::new(0., 0., 1.),
+                        scale: gf::MICRO.transform_scale(),
+                        ..Default::default()
+                    }),
+            )
+            .insert(RenderLayers::from_layers(&[3]))
+            .insert(ChildOf(slot));
+    }
 }
 
 /// Chaos label is spawned inside [`setup_currency_ui`] on the progress bar; this stub
@@ -954,11 +1020,12 @@ pub fn update_score_text(score: Res<RunScore>, mut text_query: Query<&mut Text2d
 }
 pub fn update_healthbar(
     player_health_query: Query<
-        (&CurrentHealth, &MaxHealth),
         (
-            Or<(Changed<CurrentHealth>, Changed<MaxHealth>)>,
-            With<Player>,
+            &CurrentHealth,
+            &MaxHealth,
+            Option<&crate::attributes::CurrentShield>,
         ),
+        With<Player>,
     >,
     health_bar_query: Query<
         &MeshMaterial2d<crate::ui::hud_bar_fill::HudBarFillMaterial>,
@@ -968,18 +1035,24 @@ pub fn update_healthbar(
     mut materials: ResMut<Assets<crate::ui::hud_bar_fill::HudBarFillMaterial>>,
 ) {
     use bevy::sprite_render::MeshMaterial2d;
-    let Ok((player_health, player_max_health)) = player_health_query.single() else {
+    let Ok((player_health, player_max_health, shield)) = player_health_query.single() else {
         return;
     };
     let Ok(material_handle) = health_bar_query.single() else {
         return;
     };
+    let max_hp = player_max_health.0.max(1) as f32;
+    let shield_amount = shield.map(|s| s.0.max(0)).unwrap_or(0);
     if let Some(mut material) = materials.get_mut(&material_handle.0) {
-        material.fill =
-            (player_health.0 as f32 / player_max_health.0.max(1) as f32).clamp(0.0, 1.0);
+        material.fill = (player_health.0 as f32 / max_hp).clamp(0.0, 1.0);
+        material.shield_fill = (shield_amount as f32 / max_hp).clamp(0.0, 1.5);
     }
     if let Ok(mut text) = health_text.single_mut() {
-        text.0 = format!("{}", player_health.0);
+        if shield_amount > 0 {
+            text.0 = format!("{}({})", player_health.0, shield_amount);
+        } else {
+            text.0 = format!("{}", player_health.0);
+        }
     }
 }
 /// Hide the XP bar (progress, background, level text) when in GameOver; show it again in Main.
@@ -1559,6 +1632,248 @@ fn hud_skill_tooltip_world_position(icon_pos: Vec3, ui_scale: u32, pause_menu: b
         ),
         Z_DEPTH_HUD_ORB_TRACKERS_FOREGROUND + HUD_SKILL_TOOLTIP_Z_BUMP,
     )
+}
+
+/// Matches blessing choice card title / body layout (`spawn_blessing_choice_card`).
+const BLESSING_HUD_CARD_TITLE_Y_OFFSET: f32 = -4.;
+const BLESSING_HUD_CARD_DESC_Y_OFFSET: f32 = -2.;
+const BLESSING_HUD_CHAOS_DESC_GAP: f32 = 4.0;
+/// Gap from icon top to card bottom; card center sits above the B1–B3 icons.
+const HUD_BLESSING_TOOLTIP_GAP_Y: f32 = 10.;
+
+fn blessing_hud_card_ui(card: &OwnedBlessingCard) -> (UIElement, Vec2) {
+    if let Some(rarity) = card.card_rarity {
+        return Heirloom::None.get_ui_element(rarity);
+    }
+    (UIElement::SkillChoice, SKILLS_CHOICE_UI_SIZE)
+}
+
+fn hud_blessing_tooltip_world_position(
+    icon_pos: Vec3,
+    card_size: Vec2,
+    game_width: f32,
+    ui_scale: u32,
+) -> Vec3 {
+    let half_card_x = card_size.x * 0.5;
+    let margin = 8.0;
+    let max_x = game_width * 0.5 - half_card_x - margin;
+    let min_x = -game_width * 0.5 + half_card_x + margin;
+    let x = icon_pos.x.clamp(min_x, max_x);
+    let y = icon_pos.y
+        + HUD_BLESSING_ICON_SIZE.y * 0.5
+        + HUD_BLESSING_TOOLTIP_GAP_Y
+        + card_size.y * 0.5;
+    Vec3::new(
+        super::snap_world_to_pixel_grid(x, ui_scale),
+        super::snap_world_to_pixel_grid(y, ui_scale),
+        Z_DEPTH_HUD_ORB_TRACKERS_FOREGROUND + HUD_SKILL_TOOLTIP_Z_BUMP,
+    )
+}
+
+/// Blessing choice-card lookalike for B1–B3 HUD hover (same frame + title/desc layout).
+fn spawn_blessing_hud_tooltip_card(
+    commands: &mut Commands,
+    graphics: &Graphics,
+    asset_server: &AssetServer,
+    resolution: &ScreenResolution,
+    card: &OwnedBlessingCard,
+    position: Vec3,
+    trigger_count: u32,
+) -> Entity {
+    let (ui_element, size) = blessing_hud_card_ui(card);
+
+    let card_e = commands
+        .spawn((
+            Sprite {
+                image: graphics.get_ui_element_texture(ui_element.clone()),
+                custom_size: Some(size),
+                ..default()
+            },
+            Transform {
+                translation: position,
+                ..Default::default()
+            },
+            BlessingHudTooltip,
+            ui_element,
+            Name::new("BLESSING HUD TOOLTIP"),
+            RenderLayers::from_layers(&[3]),
+            UiShadow::container(),
+        ))
+        .id();
+
+    commands
+        .spawn((
+            gf::HEIRLOOM_CARD_TITLE
+                .text(asset_server, card.title.as_str(), WHITE)
+                .anchor(Anchor::CENTER)
+                .with_transform(Transform {
+                    translation: Vec3::new(0., 24. + BLESSING_HUD_CARD_TITLE_Y_OFFSET, 1.),
+                    scale: gf::HEIRLOOM_CARD_TITLE.transform_scale(),
+                    ..Default::default()
+                }),
+            Name::new("Blessing HUD Tooltip Title"),
+            RenderLayers::from_layers(&[3]),
+            ChildOf(card_e),
+        ));
+
+    let desc_lines: Vec<&str> = card.description.iter().map(String::as_str).collect();
+    let chaos_line_count = card.chaos_lines.len();
+    let has_chaos = chaos_line_count > 0;
+
+    let mut block_line_ys: Vec<f32> = (0..desc_lines.len())
+        .map(|i| gf::heirloom_desc_first_line_y() - i as f32 * gf::HEIRLOOM_CARD_DESC_LINE_STEP)
+        .collect();
+    if has_chaos {
+        let chaos_first_y = gf::heirloom_desc_first_line_y()
+            - desc_lines.len() as f32 * gf::HEIRLOOM_CARD_DESC_LINE_STEP
+            - BLESSING_HUD_CHAOS_DESC_GAP;
+        for i in 0..chaos_line_count {
+            block_line_ys.push(chaos_first_y - i as f32 * gf::HEIRLOOM_CARD_DESC_LINE_STEP);
+        }
+    }
+
+    let block_center_offset = block_line_ys
+        .first()
+        .zip(block_line_ys.last())
+        .map(|(top, bottom)| {
+            gf::heirloom_desc_text_center_y() - (top + bottom) * 0.5 + BLESSING_HUD_CARD_DESC_Y_OFFSET
+        })
+        .unwrap_or(BLESSING_HUD_CARD_DESC_Y_OFFSET);
+
+    for (line_index, desc) in desc_lines.iter().enumerate() {
+        let y = block_line_ys[line_index] + block_center_offset;
+        spawn_desc_line(
+            commands,
+            asset_server,
+            gf::HEIRLOOM_CARD_BODY,
+            &blessing_desc_line(*desc, &[]),
+            YELLOW_2,
+            Vec3::new(2., y, 1.),
+            Anchor::CENTER,
+            Justify::Center,
+            3,
+            card_e,
+        );
+    }
+
+    for (line_index, line) in card.chaos_lines.iter().enumerate() {
+        let y = block_line_ys[desc_lines.len() + line_index] + block_center_offset;
+        spawn_desc_line(
+            commands,
+            asset_server,
+            gf::HEIRLOOM_CARD_BODY,
+            &skill_desc_line(line),
+            LIGHT_RED,
+            Vec3::new(2., y, 1.),
+            Anchor::CENTER,
+            Justify::Center,
+            3,
+            card_e,
+        );
+    }
+
+    if let Some(major) = card.major {
+        use super::tooltip_info_boxes::{
+            build_blessing_tooltip_info_boxes, spawn_tooltip_info_boxes_with_resolution,
+            TooltipInfoBoxAnchor,
+        };
+        let info_boxes = build_blessing_tooltip_info_boxes(major, trigger_count);
+        if let Some(info_root) = spawn_tooltip_info_boxes_with_resolution(
+            commands,
+            graphics,
+            asset_server,
+            resolution,
+            TooltipInfoBoxAnchor {
+                center: position,
+                half_width: size.x * 0.5,
+                half_height: size.y * 0.5,
+                game_width: resolution.game_width,
+                prefer_left: true,
+            },
+            &info_boxes,
+        ) {
+            commands.entity(info_root).insert(ChildOf(card_e));
+        }
+    }
+
+    card_e
+}
+
+/// Hover tooltips for bottom-right blessing slots (B1–B3).
+pub fn handle_blessing_hud_tooltip(
+    mut commands: Commands,
+    graphics: Res<Graphics>,
+    asset_server: Res<AssetServer>,
+    cursor_pos: Res<CursorPos>,
+    hit_detection_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
+    mut slot_icons: Query<(
+        Entity,
+        &GlobalTransform,
+        &mut Interactable,
+        &HudBlessingSlotIcon,
+    )>,
+    existing_tooltips: Query<Entity, With<BlessingHudTooltip>>,
+    mut last_hovered: Local<Option<usize>>,
+    res: Res<ScreenResolution>,
+    hud_slots: Query<&OwnedBlessingHudSlots, With<Player>>,
+    blessing_triggers: Res<BlessingTriggerCounts>,
+) {
+    let hit_entity =
+        super::ui_helpers::pointcast_2d(&cursor_pos, &hit_detection_sprites, None, None);
+
+    for (entity, _, mut interactable, _) in slot_icons.iter_mut() {
+        let is_hit = hit_entity
+            .as_ref()
+            .map(|(e, _, _)| *e == entity)
+            .unwrap_or(false);
+        set_interactable_hover(is_hit, &mut interactable);
+    }
+
+    let currently_hovered = slot_icons
+        .iter()
+        .find(|(_, _, interactable, _)| matches!(interactable.current(), Interaction::Hovering))
+        .map(|(_, transform, _, slot)| (slot.index, transform.translation()));
+
+    let hovered_index = currently_hovered.as_ref().map(|(i, _)| *i);
+    if *last_hovered == hovered_index {
+        return;
+    }
+    *last_hovered = hovered_index;
+
+    for e in existing_tooltips.iter() {
+        commands.entity(e).despawn();
+    }
+
+    let Some((index, icon_pos)) = currently_hovered else {
+        return;
+    };
+    let Ok(slots) = hud_slots.single() else {
+        return;
+    };
+    let Some(card) = slots.slot(index) else {
+        return;
+    };
+
+    let (_, card_size) = blessing_hud_card_ui(card);
+    let tooltip_pos = hud_blessing_tooltip_world_position(
+        icon_pos,
+        card_size,
+        res.game_width,
+        res.scale,
+    );
+    let trigger_count = card
+        .major
+        .map(|m| blessing_triggers.get(&m))
+        .unwrap_or(0);
+    spawn_blessing_hud_tooltip_card(
+        &mut commands,
+        &graphics,
+        &asset_server,
+        &res,
+        card,
+        tooltip_pos,
+        trigger_count,
+    );
 }
 
 /// Rootless tooltip container + shared [`UIElement::SkillTooltip`] background.
@@ -4674,6 +4989,7 @@ pub fn sync_player_hud_layout_to_resolution(
         Query<(&mut Transform, &mut Sprite), (With<XPBarBg>, Without<XPBar>, Without<XPBarText>)>,
         Query<&mut Transform, (With<XPBarText>, Without<XPBar>, Without<XPBarBg>)>,
         Query<(&HudBottomCornerIcon, &mut Transform)>,
+        Query<(&HudBlessingSlotIcon, &mut Transform)>,
     )>,
 ) {
     if !super::layout_sync::ui_layout_needs_sync(&res, &sync_state) {
@@ -4712,6 +5028,10 @@ pub fn sync_player_hud_layout_to_resolution(
             HudBottomCornerIcon::Inventory => bag_x,
             HudBottomCornerIcon::Settings => settings_x,
         };
+    }
+    for (slot, mut transform) in layout.p5().iter_mut() {
+        transform.translation.y = corner_y;
+        transform.translation.x = hud_blessing_icon_x(res.game_width, slot.index);
     }
 }
 

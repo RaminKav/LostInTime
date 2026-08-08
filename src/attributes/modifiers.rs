@@ -1,4 +1,5 @@
 use crate::{
+    blessings::{BlessingTriggerCounts, MajorBlessing, OwnedMajorBlessings},
     colors::BLUE,
     player::{
         skills::{HeirloomTriggerCounts, ManaGainSource, PlayerSkills},
@@ -10,7 +11,7 @@ use crate::{
     },
 };
 
-use super::{CurrentHealth, CurrentMana, Healing, MaxMana};
+use super::{CurrentHealth, CurrentMana, CurrentShield, Healing, MaxHealth, MaxMana};
 
 use bevy::prelude::*;
 
@@ -19,10 +20,30 @@ pub struct ModifyHealthEvent(pub i32);
 
 pub fn handle_modify_health_event(
     mut event: MessageReader<ModifyHealthEvent>,
-    mut query: Query<(&mut CurrentHealth, &Healing), With<Player>>,
+    mut query: Query<
+        (
+            Entity,
+            &mut CurrentHealth,
+            &Healing,
+            &MaxHealth,
+            Option<&mut CurrentShield>,
+            Option<&OwnedMajorBlessings>,
+        ),
+        With<Player>,
+    >,
+    mut commands: Commands,
+    mut blessing_triggers: ResMut<BlessingTriggerCounts>,
 ) {
     for event in event.read() {
-        let Ok((mut health, bonus_healing_rate)) = query.single_mut() else {
+        let Ok((
+            player_e,
+            mut health,
+            bonus_healing_rate,
+            max_health,
+            mut shield,
+            majors,
+        )) = query.single_mut()
+        else {
             return;
         };
 
@@ -33,7 +54,25 @@ pub fn handle_modify_health_event(
             event.0
         };
 
-        health.0 += final_delta;
+        if final_delta > 0 && majors.is_some_and(|m| m.has(MajorBlessing::OverhealToShield)) {
+            let hp_room = (max_health.0 - health.0).max(0);
+            let heal_to_hp = final_delta.min(hp_room);
+            health.0 += heal_to_hp;
+            let overflow = final_delta - heal_to_hp;
+            if overflow > 0 {
+                blessing_triggers.increment(MajorBlessing::OverhealToShield);
+                let shield_cap = max_health.0 / 2;
+                if let Some(shield) = shield.as_deref_mut() {
+                    shield.0 = (shield.0 + overflow).min(shield_cap);
+                } else {
+                    commands
+                        .entity(player_e)
+                        .insert(CurrentShield(overflow.min(shield_cap)));
+                }
+            }
+        } else {
+            health.0 += final_delta;
+        }
     }
 }
 /// Modifies the player's current mana. The optional [`ManaGainSource`] attributes positive

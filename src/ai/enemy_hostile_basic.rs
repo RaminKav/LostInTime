@@ -468,7 +468,7 @@ pub fn leap_attack(
                         * attack.speed
                         * time.delta_secs()
                         * status_option
-                            .map(|s| 1.0 - s.slow_stacks() as f32 * 0.15)
+                            .map(|s| s.movement_speed_multiplier())
                             .unwrap_or(1.0),
                 );
             }

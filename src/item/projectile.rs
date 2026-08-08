@@ -8,6 +8,7 @@ use crate::{
         modifiers::ModifyManaEvent, Attack, CurrentMana, ManaRegen, MaxMana, ProjectileSize,
     },
     audio::{AudioSoundEffect, SoundSpawner},
+    blessings::{HeirloomManaOverclock, MajorBlessing, OwnedMajorBlessings, overclock_mana_cost},
     client::is_not_paused,
     combat::AttackTimer,
     cursor::CursorPos,
@@ -331,6 +332,8 @@ pub struct ProjectileSpawnMarker {
     pub track_player_aim: bool,
     /// Extra scale on top of `ProjectileSize` (e.g. Goliath pet 1% double-size proc).
     pub extra_scale: f32,
+    /// Set when this lightning was spawned by CoinLightning.
+    pub from_coin_lightning: bool,
 }
 
 #[derive(Component)]
@@ -395,7 +398,7 @@ pub struct HomingEnergyBall {
 
 fn handle_ranged_attack_event(
     mut events: MessageReader<RangedAttackEvent>,
-    player_query: Query<
+    mut player_query: Query<
         (
             Entity,
             &CurrentMana,
@@ -405,15 +408,19 @@ fn handle_ranged_attack_event(
             &ProjectileSize,
             Option<&AttackTimer>,
             Option<&JustTeleported>,
+            Option<&mut HeirloomManaOverclock>,
         ),
         With<Player>,
     >,
+    majors: Query<&OwnedMajorBlessings, With<Player>>,
+    pet_entities: Query<Entity, With<Pet>>,
     transforms: Query<&GlobalTransform>,
     game: Res<Game>,
     player_class: Res<PlayerClass>,
     mut commands: Commands,
     mut modify_mana_event: MessageWriter<ModifyManaEvent>,
     mut trigger_counts: ResMut<HeirloomTriggerCounts>,
+    mut blessing_triggers: ResMut<crate::blessings::BlessingTriggerCounts>,
 ) {
     for proj_event in events.read() {
         let Ok((
@@ -425,7 +432,8 @@ fn handle_ranged_attack_event(
             proj_size,
             player_cooldown,
             teleported_option,
-        )) = player_query.single()
+            mut overclock,
+        )) = player_query.single_mut()
         else {
             continue;
         };
@@ -468,16 +476,29 @@ fn handle_ranged_attack_event(
         // }
 
         if let Some(mana_cost) = proj_event.mana_cost {
-            if mana_cost.abs() > current_mana.0 {
-                continue;
-            }
-            let actual_cost = (mana_cost as f32
+            let base_cost = (mana_cost as f32
                 * if skills.has(Heirloom::DiscountMP) {
                     0.75
                 } else {
                     1.
                 }) as i32;
-            modify_mana_event.write(ModifyManaEvent::new(-actual_cost));
+            let actual_cost = majors
+                .single()
+                .map(|m| {
+                    overclock_mana_cost(
+                        m,
+                        overclock.as_deref_mut(),
+                        base_cost,
+                        Some(&mut blessing_triggers),
+                    )
+                })
+                .unwrap_or(base_cost);
+            if actual_cost > 0 && actual_cost > current_mana.0 {
+                continue;
+            }
+            if actual_cost != 0 {
+                modify_mana_event.write(ModifyManaEvent::new(-actual_cost));
+            }
             if let Some(heirloom) = proj_event.mana_cost_heirloom.clone() {
                 trigger_counts.record_mana(heirloom, actual_cost);
             } else if proj_event.projectile == Projectile::PlasmaBall {
@@ -513,12 +534,26 @@ fn handle_ranged_attack_event(
         let track_player_pos = track_player_aim
             && proj_event.pos_override.is_none()
             && !proj_event.projectile.is_anchored_to_player_pos();
-        let goliath_extra = goliath_spawn_scale_multiplier(
+        let mut extra_scale = goliath_spawn_scale_multiplier(
             &player_class,
             &proj_event.projectile,
             proj_event.from_enemy,
             proj_event.from_entity,
         );
+        let is_pet_shot = proj_event
+            .from_entity
+            .map(|e| pet_entities.contains(e))
+            .unwrap_or(false);
+        if is_pet_shot
+            && majors
+                .single()
+                .map(|m| m.has(MajorBlessing::PetSizeAndAttackSpeed))
+                .unwrap_or(false)
+        {
+            extra_scale *= 2.0;
+        }
+        let from_coin_lightning = proj_event.mana_cost_heirloom == Some(Heirloom::CoinLightning)
+            && proj_event.projectile == Projectile::Lightning;
         commands.spawn(ProjectileSpawnMarker {
             timer: Timer::from_seconds(proj_event.spawn_delay, TimerMode::Once),
             proj: proj_event.projectile.clone(),
@@ -534,16 +569,25 @@ fn handle_ranged_attack_event(
             is_followup_proj: proj_event.is_followup_proj,
             track_player_pos,
             track_player_aim,
-            extra_scale: goliath_extra,
+            extra_scale,
+            from_coin_lightning,
         });
 
         if proj_event.projectile == Projectile::DaggerProjectile1 {
-            let goliath_extra_d2 = goliath_spawn_scale_multiplier(
+            let mut goliath_extra_d2 = goliath_spawn_scale_multiplier(
                 &player_class,
                 &Projectile::DaggerProjectile2,
                 proj_event.from_enemy,
                 proj_event.from_entity,
             );
+            if is_pet_shot
+                && majors
+                    .single()
+                    .map(|m| m.has(MajorBlessing::PetSizeAndAttackSpeed))
+                    .unwrap_or(false)
+            {
+                goliath_extra_d2 *= 2.0;
+            }
             commands.spawn(ProjectileSpawnMarker {
                 timer: Timer::from_seconds(proj_event.spawn_delay + 0.2, TimerMode::Once),
                 proj: Projectile::DaggerProjectile2,
@@ -560,6 +604,7 @@ fn handle_ranged_attack_event(
                 track_player_pos,
                 track_player_aim,
                 extra_scale: goliath_extra_d2,
+                from_coin_lightning: false,
             });
         }
 
@@ -723,6 +768,11 @@ fn handle_spawn_projectiles_after_delay(
                     } else if !proj.from_enemy {
                         commands.entity(p).insert(FromActiveSkill);
                     }
+                }
+                if proj.from_coin_lightning {
+                    commands
+                        .entity(p)
+                        .insert(crate::blessings::FromCoinLightning);
                 }
 
                 let Ok((attack, ..)) = game.player_stats.single() else {

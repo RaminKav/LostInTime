@@ -76,6 +76,8 @@ mod tooltips;
 pub use icon_hover_tooltips::*;
 pub mod microwave_shrine_ui;
 pub use microwave_shrine_ui::*;
+pub mod major_blessing_heirloom_pick_ui;
+pub use major_blessing_heirloom_pick_ui::*;
 pub mod well_shrine_ui;
 pub use well_shrine_ui::*;
 pub mod ui_helpers;
@@ -1067,6 +1069,10 @@ impl Plugin for UIPlugin {
             // Closed); setup then missed its one `state_changed` frame and never ran on MainMenu.
             .add_systems(OnEnter(UIState::EnterName), setup_name_entry_ui)
             .add_systems(OnExit(UIState::EnterName), cleanup_name_entry_ui)
+            .add_systems(
+                OnExit(UIState::MajorHeirloomPick),
+                cleanup_major_heirloom_pick_ui,
+            )
             .add_systems(Update, (
                     handle_name_entry_input
                         .run_if(in_state(UIState::EnterName)),
@@ -1276,6 +1282,7 @@ impl Plugin for UIPlugin {
                     handle_heirloom_hud_tooltip,
                     player_hud::handle_consumable_buff_hud_tooltip,
                     player_hud::handle_active_skill_hud_tooltip,
+                    player_hud::handle_blessing_hud_tooltip,
                     player_hud::handle_mana_tracker_hud_tooltip,
                     player_hud::handle_health_tracker_hud_tooltip,
                     player_hud::update_skill_tooltip_cooldown.after(player_hud::handle_active_skill_hud_tooltip),
@@ -1368,6 +1375,9 @@ impl Plugin for UIPlugin {
                     setup_microwave_shrine_ui.before(CustomFlush).run_if(
                         state_changed::<UIState>.and_then(in_state(UIState::MicrowaveShrine)),
                     ),
+                    setup_major_heirloom_pick_ui.before(CustomFlush).run_if(
+                        state_changed::<UIState>.and_then(in_state(UIState::MajorHeirloomPick)),
+                    ),
                     tick_active_skill_shrine_ui_interaction_lock_timers
                         .run_if(in_state(UIState::ActiveSkillShrine)),
                     handle_microwave_shrine_rarity_click
@@ -1376,6 +1386,12 @@ impl Plugin for UIPlugin {
                         .run_if(in_state(UIState::MicrowaveShrine)),
                     handle_microwave_shrine_heirloom_tooltip
                         .run_if(in_state(UIState::MicrowaveShrine)),
+                    handle_major_heirloom_pick_click
+                        .run_if(in_state(UIState::MajorHeirloomPick)),
+                    handle_major_heirloom_pick_tooltip
+                        .run_if(in_state(UIState::MajorHeirloomPick)),
+                    open_major_heirloom_pick_after_blessing
+                        .run_if(resource_exists::<crate::blessings::PendingMajorHeirloomPick>),
                     // Selection is removed on pick; CustomFlush can apply that between
                     // chained systems — skip when the resource is already gone.
                     handle_active_skill_shrine_ui_interaction.run_if(
@@ -1877,22 +1893,30 @@ pub fn handle_new_ui_state(
     }
 }
 
-/// System that checks for pending level-up rewards when closing menus.
-/// If there are pending heirloom choices from level-ups, redirect to the Skills UI instead of closing.
-/// This prevents players from accidentally missing their level-up rewards when they level up
-/// while in another menu.
+/// When menus close to [`UIState::Closed`], reopen any pending choice UI so players can
+/// temporarily open inventory/map/options without losing a level-up or major blessing pick.
+/// Priority: major blessing offer → major heirloom pick → heirloom skill choice queue.
 pub fn check_pending_levelup_rewards_on_menu_close(
     heirloom_queue: Res<HeirloomChoiceQueue>,
+    major_offer: Option<Res<crate::blessings::MajorBlessingOffer>>,
+    blessing_transition: Option<Res<crate::blessings::BlessingTransitionState>>,
+    pending_major_heirloom: Option<Res<crate::blessings::PendingMajorHeirloomPick>>,
     mut next_inv_state: ResMut<NextState<UIState>>,
 ) {
-    // This system runs when we just entered UIState::Closed (via run conditions)
-    // Check if there are pending heirloom choices from level-ups
+    // Offer survives temporary leave; cleared only after a completed pick transition.
+    if major_offer.is_some() && blessing_transition.is_none() {
+        next_inv_state.set(UIState::MajorBlessingChoice);
+        return;
+    }
+    if pending_major_heirloom.is_some() {
+        next_inv_state.set(UIState::MajorHeirloomPick);
+        return;
+    }
     if !heirloom_queue.queue.is_empty() {
         info!(
             "Detected {} pending level-up rewards! Redirecting to Skills UI.",
             heirloom_queue.queue.len()
         );
-        // Override the transition to Closed - go to Skills instead
         next_inv_state.set(UIState::Skills);
     }
 }

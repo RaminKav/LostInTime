@@ -125,7 +125,7 @@ use world::{dimension::EraManager, WorldGeneration};
 use crate::player::{skill_heirlooms::Stealthed, skills::HeirloomTriggerCounts, ClassUnlockConfig};
 use crate::{
     assets::{ClassPetData, SpriteAnchor},
-    blessings::OwnedBlessings,
+    blessings::{BlessingTriggerCounts, OwnedBlessings, OwnedMajorBlessings},
 };
 use lazy_static::lazy_static;
 
@@ -609,6 +609,7 @@ pub struct GameParam<'w, 's> {
     pub inv_slot_query: Query<'w, 's, &'static mut InventorySlotState>,
     pub coins: ResMut<'w, crate::player::currency::CoinCurrency>,
     pub heirloom_trigger_counts: ResMut<'w, HeirloomTriggerCounts>,
+    pub blessing_trigger_counts: ResMut<'w, BlessingTriggerCounts>,
 
     pub time_fragments: ResMut<'w, crate::player::currency::TimeFragmentCurrency>,
     pub player_health_percent: Res<'w, PlayerHealthPercent>,
@@ -637,6 +638,7 @@ pub struct GameParam<'w, 's> {
         With<Player>,
     >,
     pub blessings_query: Query<'w, 's, &'static OwnedBlessings, With<Player>>,
+    pub major_blessings_query: Query<'w, 's, &'static OwnedMajorBlessings, With<Player>>,
     pub stealth_query: Query<'w, 's, Option<&'static Stealthed>, With<Player>>,
 }
 
@@ -818,7 +820,7 @@ impl<'w, 's> GameParam<'w, 's> {
     /// Returns (damage, was_crit, was_overcrit)
     /// Overcrit happens when crit chance > 100% and a second roll succeeds
     /// Overcrit does an additional 30% damage on top of crit damage
-    /// frail_stacks: Number of frail stacks on target (each stack increases damage by 10%)
+    /// frail_stacks: Number of frail stacks on target (each stack increases damage by 3%)
     /// bonus_crit_damage: Extra crit damage % added on top of `crit_dmg` when the
     /// hit crits (does not affect crit *chance*; non-crit damage is unaffected).
     pub fn calculate_player_damage(
@@ -942,12 +944,9 @@ impl<'w, 's> GameParam<'w, 's> {
                 (is_crit, false)
             };
 
-        // Frail multiplier: 1.1x damage per stack (applied multiplicatively at the end)
-        let frail_multiplier = if frail_stacks > 0 {
-            1.1_f32.powi(frail_stacks as i32)
-        } else {
-            1.0
-        };
+        // Frail: +3% damage per stack (additive), applied at the end.
+        let frail_multiplier =
+            crate::combat::status_effects::frail_damage_multiplier(frail_stacks);
 
         // Total flat bonus damage (including mana charge)
         let total_dmg_bonus = dmg_bonus as i32 + mana_charge_bonus;

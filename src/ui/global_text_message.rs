@@ -16,6 +16,7 @@ use crate::{
 use super::{
     game_fonts::{FontStyle, GLOBAL_MESSAGE, GLOBAL_MESSAGE_SUBTEXT},
     spawn_item_stack_icon,
+    ui_helpers::Z_DEPTH_GLOBAL_TEXT_MESSAGE,
 };
 
 const MESSAGE_DISPLAY_SECS: f32 = 5.;
@@ -339,7 +340,11 @@ pub fn handle_global_text_message_events(
             commands.entity(entity).despawn();
         }
 
-        let pos = Vec3::new(0., resolution.game_height / 2. - TOP_MARGIN, 25.);
+        let pos = Vec3::new(
+            0.,
+            resolution.game_height / 2. - TOP_MARGIN,
+            Z_DEPTH_GLOBAL_TEXT_MESSAGE,
+        );
         let root = commands
             .spawn((
                 (Transform::from_translation(pos), Visibility::default()),
@@ -392,7 +397,7 @@ pub fn handle_global_text_message_events(
             commands.entity(icon).insert((
                 GlobalTextMessagePart,
                 Transform {
-                    translation: Vec3::new(icon_x, layout.main_center_y, 26.),
+                    translation: Vec3::new(icon_x, layout.main_center_y, 2.),
                     scale: Vec3::splat(ICON_SCALE),
                     ..Default::default()
                 },

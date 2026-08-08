@@ -282,6 +282,8 @@ fn group_defers_default_focus(group: &UIState) -> bool {
         UIState::Pause
             | UIState::Skills
             | UIState::BlessingChoice
+            | UIState::MajorBlessingChoice
+            | UIState::MajorHeirloomPick
             | UIState::WellShrine
             | UIState::Essence
             | UIState::Inventory

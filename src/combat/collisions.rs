@@ -1,6 +1,9 @@
 use super::{try_add_slow_stacks, HitEvent, HitMarker, InvincibilityTimer, StatusEffectEvent};
 use crate::aseprite_helpers::start;
-use crate::blessings::OwnedBlessings;
+use crate::blessings::{
+    FromCoinLightning, LightningStrikeHitEvent, MajorBlessing, OwnedBlessings,
+    OwnedMajorBlessings,
+};
 use crate::client::is_not_paused;
 use crate::combat::LifestealEvent;
 use crate::player::combat_heirlooms::ThornsOnDamageTracker;
@@ -45,6 +48,7 @@ use crate::{
     player::beastiary::mob_display_name,
     ui::{damage_numbers::FloatingTextQueue, global_text_message::GlobalTextMessageEvent},
 };
+use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 use bevy_rapier2d::prelude::{
     Collider, CollisionEvent, RapierContext, ReadRapierContext, WriteRapierContext,
@@ -53,6 +57,15 @@ use rand::Rng;
 
 use crate::pets::state::Pet;
 use crate::world::chunk::WaterCollider;
+
+/// Bundles hit writers for projectile→mob collisions (SystemParam tuple limit).
+#[derive(SystemParam)]
+struct ProjectileMobHitWriters<'w> {
+    hit_event: MessageWriter<'w, HitEvent>,
+    lightning_strikes: MessageWriter<'w, LightningStrikeHitEvent>,
+    status_event: MessageWriter<'w, StatusEffectEvent>,
+    lifesteal_events: MessageWriter<'w, LifestealEvent>,
+}
 
 pub struct CollisionPlugion;
 
@@ -279,7 +292,7 @@ fn check_projectile_hit_mob_collisions(
             Without<WaterCollider>, // Don't hit water tile colliders
         ),
     >,
-    mut hit_event: MessageWriter<HitEvent>,
+    mut hit_writers: ProjectileMobHitWriters,
     mut collisions: MessageReader<CollisionEvent>,
     mut projectiles: Query<
         (
@@ -289,6 +302,7 @@ fn check_projectile_hit_mob_collisions(
             &Attack,
             Option<&IceExplosionDmg>,
             Option<&SpearAttack>,
+            Option<&FromCoinLightning>,
         ),
         Without<EnemyProjectile>,
     >,
@@ -297,38 +311,69 @@ fn check_projectile_hit_mob_collisions(
     mut status_check: Query<&mut crate::combat::status_effects::MobStatusEffects>,
     nearby_mobs: Query<(Entity, &GlobalTransform), With<Mob>>,
     mut game: GameParam,
-    mut status_event: MessageWriter<StatusEffectEvent>,
     pet_check: Query<Entity, With<PetProjectileMarker>>,
     from_active_skill_q: Query<(), With<FromActiveSkill>>,
     player_skills: Query<&PlayerSkills, With<Player>>,
-    mut lifesteal_events: MessageWriter<LifestealEvent>,
+    major_blessings: Query<&OwnedMajorBlessings, With<Player>>,
 ) {
+    let (shared_affliction_poison_tick_secs, apply_extra) = match major_blessings.single() {
+        Ok(m) => (
+            m.has(MajorBlessing::SharedAffliction)
+                .then(|| 0.5 / m.poison_tick_multiplier()),
+            m.has(MajorBlessing::StatusApplyExtra),
+        ),
+        Err(_) => (None, false),
+    };
     for evt in collisions.read() {
         let CollisionEvent::Started(e1, e2, _) = evt else {
             continue;
         };
         for (e1, e2) in [(e1, e2), (e2, e1)] {
             //TODO: fr gotta refasctor this...
-            let (proj_entity, mut state, proj, att, ice_aoe, spear_att) =
+            let (proj_entity, mut state, proj, att, ice_aoe, spear_att, from_coin_lightning) =
                 if let Ok(parent_e) = children.get_mut(*e1) {
-                    if let Ok((proj_entity, state, proj, att, ice_aoe, spear_att)) =
+                    if let Ok((proj_entity, state, proj, att, ice_aoe, spear_att, from_coin)) =
                         projectiles.get_mut(parent_e.parent())
                     {
                         //collider is on the child, proj data on the parent
-                        (proj_entity, state, proj, att, ice_aoe, spear_att)
-                    } else if let Ok((proj_entity, state, proj, att, ice_aoe, spear_att)) =
+                        (
+                            proj_entity,
+                            state,
+                            proj,
+                            att,
+                            ice_aoe,
+                            spear_att,
+                            from_coin.is_some(),
+                        )
+                    } else if let Ok((proj_entity, state, proj, att, ice_aoe, spear_att, from_coin)) =
                         projectiles.get_mut(*e1)
                     {
                         //collider and proj data are on the same entity
-                        (proj_entity, state, proj, att, ice_aoe, spear_att)
+                        (
+                            proj_entity,
+                            state,
+                            proj,
+                            att,
+                            ice_aoe,
+                            spear_att,
+                            from_coin.is_some(),
+                        )
                     } else {
                         continue;
                     }
-                } else if let Ok((proj_entity, state, proj, att, ice_aoe, spear_att)) =
+                } else if let Ok((proj_entity, state, proj, att, ice_aoe, spear_att, from_coin)) =
                     projectiles.get_mut(*e1)
                 {
                     //collider and proj data are on the same entity
-                    (proj_entity, state, proj, att, ice_aoe, spear_att)
+                    (
+                        proj_entity,
+                        state,
+                        proj,
+                        att,
+                        ice_aoe,
+                        spear_att,
+                        from_coin.is_some(),
+                    )
                 } else {
                     continue;
                 };
@@ -395,7 +440,18 @@ fn check_projectile_hit_mob_collisions(
             // The SpearAttack component is still used to identify the damage source
             if ice_aoe.is_some() {
                 if let Some(mut status) = status_result {
-                    try_add_slow_stacks(*e2, status.as_mut(), &mut status_event);
+                    if try_add_slow_stacks(
+                        *e2,
+                        status.as_mut(),
+                        &mut hit_writers.status_event,
+                        1,
+                        shared_affliction_poison_tick_secs,
+                        apply_extra,
+                    ) && shared_affliction_poison_tick_secs.is_some()
+                    {
+                        game.blessing_trigger_counts
+                            .increment(MajorBlessing::SharedAffliction);
+                    }
                 }
             }
 
@@ -423,6 +479,7 @@ fn check_projectile_hit_mob_collisions(
                 Projectile::Echo => Some(Heirloom::OnHitEcho),
                 Projectile::EnergyBall => Some(Heirloom::EnergyBallBarrage),
                 Projectile::CherryBombExplosion => Some(Heirloom::CherryBomb),
+                Projectile::Lightning if from_coin_lightning => Some(Heirloom::CoinLightning),
                 _ => None,
             };
 
@@ -434,7 +491,7 @@ fn check_projectile_hit_mob_collisions(
                     if thorns_lifesteal_stacks > 0 {
                         game.heirloom_trigger_counts
                             .increment(Heirloom::ThornsLifesteal);
-                        lifesteal_events.write(LifestealEvent {
+                        hit_writers.lifesteal_events.write(LifestealEvent {
                             thorns_lifesteal_stacks,
                             is_direct_player_damage: false,
                         });
@@ -442,7 +499,7 @@ fn check_projectile_hit_mob_collisions(
                 }
             }
 
-            hit_event.write(HitEvent {
+            hit_writers.hit_event.write(HitEvent {
                 hit_by_pet: pet_check.get(*e1).ok(),
                 hit_entity: *e2,
                 damage: damage as i32,
@@ -456,6 +513,11 @@ fn check_projectile_hit_mob_collisions(
                 from_heirloom_effect: heirloom_source,
                 from_active_skill: from_active_skill_q.get(proj_entity).is_ok(),
             });
+            if *proj == Projectile::Lightning {
+                hit_writers
+                    .lightning_strikes
+                    .write(LightningStrikeHitEvent { pos: enemy_pos });
+            }
 
             if matches!(*proj, Projectile::Arrow | Projectile::ArrowVolleyShot)
                 && nearby_mobs.get(*e2).is_err()
@@ -523,13 +585,22 @@ fn check_multihit_projectile_ongoing_collisions(
     children: Query<&Children>,
     mut status_check: Query<&mut crate::combat::status_effects::MobStatusEffects>,
     nearby_mobs: Query<(Entity, &GlobalTransform), With<Mob>>,
-    game: GameParam,
+    mut game: GameParam,
     mut status_event: MessageWriter<StatusEffectEvent>,
     pet_check: Query<Entity, With<PetProjectileMarker>>,
     from_active_skill_q: Query<(), With<FromActiveSkill>>,
+    major_blessings: Query<&OwnedMajorBlessings, With<Player>>,
 ) {
     let Ok(rapier_context) = rapier_context.single() else {
         return;
+    };
+    let (shared_affliction_poison_tick_secs, apply_extra) = match major_blessings.single() {
+        Ok(m) => (
+            m.has(MajorBlessing::SharedAffliction)
+                .then(|| 0.5 / m.poison_tick_multiplier()),
+            m.has(MajorBlessing::StatusApplyExtra),
+        ),
+        Err(_) => (None, false),
     };
     // Only process multi-hit projectiles (FireRing, LaserBeam)
     for (proj_entity, mut state, proj, att, ice_aoe, spear_att) in projectiles.iter_mut() {
@@ -623,7 +694,18 @@ fn check_multihit_projectile_ongoing_collisions(
 
                     if ice_aoe.is_some() {
                         if let Some(mut status) = status_result {
-                            try_add_slow_stacks(target_e, status.as_mut(), &mut status_event);
+                            if try_add_slow_stacks(
+                                target_e,
+                                status.as_mut(),
+                                &mut status_event,
+                                1,
+                                shared_affliction_poison_tick_secs,
+                                apply_extra,
+                            ) && shared_affliction_poison_tick_secs.is_some()
+                            {
+                                game.blessing_trigger_counts
+                                    .increment(MajorBlessing::SharedAffliction);
+                            }
                         }
                     }
 

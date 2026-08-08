@@ -252,6 +252,9 @@ pub struct ItemActionParam<'w, 's> {
     pub asset_server: Res<'w, AssetServer>,
     pub beacon_guidance: ResMut<'w, crate::ui::damage_numbers::BeaconGuidanceRegistry>,
     pub boss_kill_tracker: Option<Res<'w, BossKillTracker>>,
+    pub pending_major_blessings: ResMut<'w, crate::blessings::PendingMajorBlessings>,
+    pub current_blessing_tier: ResMut<'w, crate::blessings::CurrentBlessingTier>,
+    pub deferred_era_swap: ResMut<'w, crate::blessings::DeferredEraSwap>,
     pub achievements: Option<ResMut<'w, crate::player::achievements::Achievements>>,
     pub player_class: Option<ResMut<'w, crate::player::skills::PlayerClass>>,
     pub achievement_events:

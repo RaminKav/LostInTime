@@ -13,6 +13,7 @@ use crate::{
         attribute_helpers::create_new_random_item_stack_with_attributes, AttributeChangeEvent,
         ItemGlow, ItemRarity, LootRateBonus,
     },
+    blessings::{MajorBlessing, OwnedMajorBlessings},
     chaos::ChaosTracker,
     colors::{LIGHT_RED, RED, SHRINE_GREEN, WHITE},
     custom_commands::CommandsExt,
@@ -267,6 +268,18 @@ impl EssenceShopChoices {
             .slot_indices()
             .iter()
             .all(|i| self.slots[*i].purchased)
+    }
+
+    /// Reroll is allowed when the player has charges and either the category still has
+    /// unsold slots, or they own Merchant's Favor (sold slots restock on reroll).
+    pub fn category_reroll_enabled(
+        &self,
+        category: MerchantCategory,
+        rerolls_remaining: u32,
+        replenish_purchased: bool,
+    ) -> bool {
+        rerolls_remaining > 0
+            && (replenish_purchased || !self.category_fully_purchased(category))
     }
 
     pub fn to_world(&self) -> MerchantShop {
@@ -1291,6 +1304,7 @@ pub fn refresh_merchant_category_ui(
     run_unlocks: &RunUnlockState,
     slot_ui: &Query<(Entity, &MerchantSlotUi)>,
     reroll_buttons: &Query<(Entity, &MerchantCategoryRerollButton)>,
+    replenish_purchased: bool,
 ) {
     for (e, ui) in slot_ui.iter() {
         if category.slot_indices().contains(&ui.slot_index) {
@@ -1314,8 +1328,11 @@ pub fn refresh_merchant_category_ui(
         );
     }
 
-    let reroll_enabled =
-        run_unlocks.rerolls_remaining > 0 && !shop.category_fully_purchased(category);
+    let reroll_enabled = shop.category_reroll_enabled(
+        category,
+        run_unlocks.rerolls_remaining,
+        replenish_purchased,
+    );
     spawn_merchant_category_reroll_button(
         commands,
         asset_server,
@@ -1537,6 +1554,7 @@ pub fn update_blacksmith_reroll_display(
 pub fn update_merchant_reroll_button_states(
     run_unlocks: Res<RunUnlockState>,
     shop: Res<EssenceShopChoices>,
+    majors: Query<&OwnedMajorBlessings, With<Player>>,
     mut sprites: ParamSet<(
         Query<(&mut Sprite, &MerchantCategoryRerollButton), With<Interactable>>,
         Query<&mut Sprite, With<MerchantCategoryRerollIcon>>,
@@ -1546,8 +1564,17 @@ pub fn update_merchant_reroll_button_states(
         return;
     }
 
+    let replenish_purchased = majors
+        .single()
+        .map(|m| m.has(MajorBlessing::MerchantSlotReplenish))
+        .unwrap_or(false);
+
     for (mut sprite, btn) in sprites.p0().iter_mut() {
-        let enabled = run_unlocks.rerolls_remaining > 0 && !shop.category_fully_purchased(btn.0);
+        let enabled = shop.category_reroll_enabled(
+            btn.0,
+            run_unlocks.rerolls_remaining,
+            replenish_purchased,
+        );
         sprite.color = if enabled {
             KEYBIND_BADGE_COLOR
         } else {
@@ -1572,6 +1599,7 @@ pub fn setup_essence_ui(
     resolution: Res<ScreenResolution>,
     coins: Res<CoinCurrency>,
     run_unlocks: Res<RunUnlockState>,
+    majors: Query<&OwnedMajorBlessings, With<Player>>,
     mouseless: Res<crate::inputs::MouselessModeState>,
     active_device: Res<crate::gamepad_input::ActiveInputDevice>,
     orphan_reroll_flashes: Query<Entity, (With<MerchantCategoryReroll>, Without<UIState>)>,
@@ -1692,12 +1720,20 @@ pub fn setup_essence_ui(
         );
     }
 
+    let replenish_purchased = majors
+        .single()
+        .map(|m| m.has(MajorBlessing::MerchantSlotReplenish))
+        .unwrap_or(false);
     for category in [
         MerchantCategory::Heirlooms,
         MerchantCategory::Equipment,
         MerchantCategory::Materials,
     ] {
-        let enabled = run_unlocks.rerolls_remaining > 0 && !shop.category_fully_purchased(category);
+        let enabled = shop.category_reroll_enabled(
+            category,
+            run_unlocks.rerolls_remaining,
+            replenish_purchased,
+        );
         spawn_merchant_category_reroll_button(
             &mut commands,
             &asset_server,
@@ -1790,6 +1826,7 @@ pub fn handle_submit_merchant_purchase(
     mut inv: Query<&mut Inventory, With<Player>>,
     mut chaos_tracker: ResMut<ChaosTracker>,
     mut analytics: MessageWriter<crate::client::analytics::AnalyticsUpdateEvent>,
+    majors: Query<&OwnedMajorBlessings, With<Player>>,
 ) {
     for purchase in ev.read() {
         let slot_index = purchase.slot_index;
@@ -1903,16 +1940,23 @@ pub fn handle_submit_merchant_purchase(
         sync_merchant_shop_to_world(&shop, &mut commands, &mut cache);
 
         ui_dirty.slots.push(slot_index);
-        for category in [
-            MerchantCategory::Heirlooms,
-            MerchantCategory::Equipment,
-            MerchantCategory::Materials,
-        ] {
-            if category.slot_indices().contains(&slot_index)
-                && shop.category_fully_purchased(category)
-                && !ui_dirty.disable_reroll_categories.contains(&category)
-            {
-                ui_dirty.disable_reroll_categories.push(category);
+        // Merchant's Favor restocks purchased slots on reroll — keep the button usable.
+        let replenish_purchased = majors
+            .single()
+            .map(|m| m.has(MajorBlessing::MerchantSlotReplenish))
+            .unwrap_or(false);
+        if !replenish_purchased {
+            for category in [
+                MerchantCategory::Heirlooms,
+                MerchantCategory::Equipment,
+                MerchantCategory::Materials,
+            ] {
+                if category.slot_indices().contains(&slot_index)
+                    && shop.category_fully_purchased(category)
+                    && !ui_dirty.disable_reroll_categories.contains(&category)
+                {
+                    ui_dirty.disable_reroll_categories.push(category);
+                }
             }
         }
 
@@ -2066,16 +2110,22 @@ fn reroll_merchant_category(
     loot_bonus: i32,
     player_level: u8,
     purchase_multiplier: f32,
+    // When true (MerchantSlotReplenish major), purchased slots are cleared and rerolled too.
+    replenish_purchased: bool,
 ) {
     match category {
         MerchantCategory::Heirlooms => {
             let mut exclude = Vec::new();
             for &idx in category.slot_indices() {
                 if slots[idx].purchased {
-                    if let MerchantItemKind::Heirloom { heirloom, .. } = &slots[idx].kind {
-                        exclude.push(heirloom.clone());
+                    if replenish_purchased {
+                        slots[idx].purchased = false;
+                    } else {
+                        if let MerchantItemKind::Heirloom { heirloom, .. } = &slots[idx].kind {
+                            exclude.push(heirloom.clone());
+                        }
+                        continue;
                     }
-                    continue;
                 }
                 if let Some(new_slot) = generate_heirloom_slot(
                     rng,
@@ -2095,7 +2145,11 @@ fn reroll_merchant_category(
         MerchantCategory::Equipment => {
             for &idx in category.slot_indices() {
                 if slots[idx].purchased {
-                    continue;
+                    if replenish_purchased {
+                        slots[idx].purchased = false;
+                    } else {
+                        continue;
+                    }
                 }
                 slots[idx] = if idx == 3 {
                     generate_weapon_slot(
@@ -2121,7 +2175,11 @@ fn reroll_merchant_category(
         MerchantCategory::Materials => {
             for &idx in category.slot_indices() {
                 if slots[idx].purchased {
-                    continue;
+                    if replenish_purchased {
+                        slots[idx].purchased = false;
+                    } else {
+                        continue;
+                    }
                 }
                 slots[idx] = generate_material_slot(rng, proto, purchase_multiplier);
             }
@@ -2137,6 +2195,7 @@ pub fn handle_merchant_category_reroll_event(
     asset_server: Res<AssetServer>,
     essence_ui: Query<Entity, With<EssenceUI>>,
     player_atts: Query<(&LootRateBonus, &PlayerLevel), With<Player>>,
+    major_blessings: Query<&OwnedMajorBlessings, With<Player>>,
     heirloom_queue: Res<HeirloomChoiceQueue>,
     proto: ProtoParam,
     run_unlocks: Res<RunUnlockState>,
@@ -2147,6 +2206,10 @@ pub fn handle_merchant_category_reroll_event(
     let Ok(ui_root) = essence_ui.single() else {
         return;
     };
+    let replenish_purchased = major_blessings
+        .single()
+        .map(|m| m.has(MajorBlessing::MerchantSlotReplenish))
+        .unwrap_or(false);
 
     for request in ev.read() {
         apply_merchant_category_reroll(
@@ -2163,6 +2226,7 @@ pub fn handle_merchant_category_reroll_event(
             &mut cache,
             &slot_ui,
             &reroll_buttons,
+            replenish_purchased,
         );
     }
 }
@@ -2181,6 +2245,7 @@ pub fn apply_merchant_category_reroll(
     cache: &mut EssenceShopCache,
     slot_ui: &Query<(Entity, &MerchantSlotUi)>,
     reroll_buttons: &Query<(Entity, &MerchantCategoryRerollButton)>,
+    replenish_purchased: bool,
 ) {
     let (loot_bonus, player_level) = player_atts
         .single()
@@ -2199,6 +2264,7 @@ pub fn apply_merchant_category_reroll(
         loot_bonus,
         player_level,
         purchase_multiplier,
+        replenish_purchased,
     );
 
     sync_merchant_shop_to_world(shop, commands, cache);
@@ -2213,6 +2279,7 @@ pub fn apply_merchant_category_reroll(
         run_unlocks,
         slot_ui,
         reroll_buttons,
+        replenish_purchased,
     );
 }
 

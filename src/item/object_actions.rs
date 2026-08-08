@@ -14,6 +14,7 @@ use crate::aseprite_helpers::{play_loop, play_once};
 use bevy_aseprite_ultra::prelude::{AnimationState, AseAnimation, Aseprite};
 
 use crate::assets::SpriteAnchor;
+use crate::blessings::BlessingTier;
 use crate::chaos::IncreaseChaosEvent;
 use crate::colors::{RED, WHITE};
 use crate::container::Container;
@@ -733,10 +734,28 @@ impl ObjectAction {
                 };
 
                 if let Some(era) = next_era {
-                    item_action_param.dim_event.write(DimensionSpawnEvent {
-                        swap_to_dim_now: true,
-                        new_era: Some(era),
-                    });
+                    // Duplicate portal input (click + F, or double interact) in the same
+                    // frame used to fire an immediate DimensionSpawnEvent after the first
+                    // call had already queued a deferred swap via commands.insert_resource
+                    // (invisible until flush). ResMut makes the pending swap visible now.
+                    if item_action_param.deferred_era_swap.era.is_some() {
+                        return;
+                    }
+                    // Offer a major blessing before the era swap when one was earned.
+                    if item_action_param.pending_major_blessings.0 > 0 {
+                        item_action_param.pending_major_blessings.0 =
+                            item_action_param.pending_major_blessings.0.saturating_sub(1);
+                        item_action_param.current_blessing_tier.0 = BlessingTier::Major;
+                        item_action_param.deferred_era_swap.era = Some(era);
+                        item_action_param
+                            .next_inv_state
+                            .set(UIState::MajorBlessingChoice);
+                    } else {
+                        item_action_param.dim_event.write(DimensionSpawnEvent {
+                            swap_to_dim_now: true,
+                            new_era: Some(era),
+                        });
+                    }
                 }
             }
             _ => {}

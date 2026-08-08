@@ -19,7 +19,10 @@ use crate::{
     animations::{AnimatedTextureMaterial, DoneAnimation},
     assets::Graphics,
     attributes::attribute_helpers::{build_item_stack_with_parsed_attributes, get_rarity_rng},
-    blessings::{Blessing, BlessingMaxHpPenalty, HeirloomStatsBonuses, OwnedBlessings},
+    blessings::{
+        Blessing, BlessingMaxHpPenalty, HeirloomStatsBonuses, MajorBlessingStatBonuses,
+        OwnedBlessings, OwnedMajorBlessings,
+    },
     client::{is_not_paused, GameOverEvent},
     colors::{
         COMMON_TOOLTIP_TITLE, GREY, LEGENDARY_TOOLTIP_TITLE, LIGHT_GREY, ORANGE,
@@ -58,7 +61,9 @@ pub use consumable_buffs::{
 use hunger::*;
 pub mod item_abilities;
 
-use self::health_regen::{handle_health_regen, handle_mana_regen};
+use self::health_regen::{
+    handle_health_regen, handle_mana_regen, handle_pending_extra_mana_regen,
+};
 use bevy::sprite_render::MeshMaterial2d;
 pub struct AttributesPlugin;
 pub const MAX_GEAR_LEVEL: u8 = 10;
@@ -508,6 +513,7 @@ impl ItemAttributes {
         old_shield: i32,
         skills: &PlayerSkills,
         blessings: &OwnedBlessings,
+        major_blessings: &OwnedMajorBlessings,
         blessing_max_hp_penalty: i32,
         dodge_crit_buff_active: bool,
         coins: u32,
@@ -572,8 +578,12 @@ impl ItemAttributes {
             entity.insert(MaxShield(skills.get_count(Heirloom::Shield) * 10));
         }
 
-        let total_attack_speed =
+        let base_attack_speed =
             self.attack_speed.value + skills.get_count(Heirloom::AttackSpeed) * 15;
+        // Blazing Tempo: multiply computed attack speed (0 * 1.25 stays 0).
+        let total_attack_speed = (base_attack_speed as f32
+            * major_blessings.attack_speed_multiplier())
+            .round() as i32;
         entity.insert(AttackSpeed(total_attack_speed));
 
         if self.attack_cooldown > 0. {
@@ -703,11 +713,14 @@ impl ItemAttributes {
             self.size.value + skills.get_count(Heirloom::Gigantify) * 8 + gravity_size_bonus,
         ));
         entity.insert(PickupRange(pickup_range_total));
-        entity.insert(SkillPower(
-            self.skill_power.value
-                + skills.get_count(Heirloom::SkillPower) * 15
-                + skill_power_hunt_bonus,
-        ));
+        let base_skill_power = self.skill_power.value
+            + skills.get_count(Heirloom::SkillPower) * 15
+            + skill_power_hunt_bonus;
+        // Arcane Mastery: multiply computed skill power (0 * 1.35 stays 0).
+        let skill_power = (base_skill_power as f32
+            * major_blessings.skill_damage_multiplier())
+            .round() as i32;
+        entity.insert(SkillPower(skill_power));
     }
     pub fn get_random_existing_bonus_attribute_string(
         &self,
@@ -1337,6 +1350,7 @@ impl Plugin for AttributesPlugin {
                     add_current_health_with_max_health,
                     handle_health_regen.run_if(is_not_paused),
                     handle_mana_regen.run_if(is_not_paused),
+                    handle_pending_extra_mana_regen.run_if(is_not_paused),
                     update_attributes_with_held_item_change,
                     update_attributes_and_sprite_with_equipment_change,
                     update_sprite_with_equipment_removed,
@@ -1395,7 +1409,6 @@ pub fn clamp_health(
             &mut CurrentHealth,
             &MaxHealth,
             &mut CurrentShield,
-            &MaxShield,
             Option<&GameOverSent>,
             &mut PlayerSkills,
         ),
@@ -1409,7 +1422,7 @@ pub fn clamp_health(
     mut run_beastiary: Option<ResMut<crate::player::beastiary::RunBeastiary>>,
     last_attacker: Option<Res<crate::player::beastiary::LastPlayerAttackerMob>>,
 ) {
-    for (entity, mut h, max_h, mut s, max_s, game_over_sent, mut skills) in health.iter_mut() {
+    for (entity, mut h, max_h, mut s, game_over_sent, mut skills) in health.iter_mut() {
         if h.0 <= 0 {
             // Check for Death Defiance heirloom
             let defiance_count = skills.get_count(Heirloom::DeathDefiance);
@@ -1461,9 +1474,9 @@ pub fn clamp_health(
         }
         if s.0 < 0 {
             s.0 = 0;
-        } else if s.0 > max_s.0 {
-            s.0 = max_s.0;
         }
+        // Do not clamp CurrentShield to MaxShield. Mana Barrier can grant temporary
+        // overshield above MaxShield; shield regen still only fills up to max.
     }
 }
 fn clamp_mana(mut health: Query<(&mut CurrentMana, &MaxMana), With<Player>>) {
@@ -1642,6 +1655,8 @@ fn handle_player_item_attribute_change_events(
         ),
         With<Player>,
     >,
+    major_blessings_q: Query<&OwnedMajorBlessings, With<Player>>,
+    major_stat_bonuses_q: Query<&MajorBlessingStatBonuses, With<Player>>,
     stat_button: Query<(&UIElement, &StatsButtonState)>,
     ui_state: Res<State<UIState>>,
 
@@ -1667,6 +1682,9 @@ fn handle_player_item_attribute_change_events(
             food_bonuses,
             blessing_max_hp_penalty,
         ) = player_atts.single().expect("player attributes");
+        let Ok(major_blessings) = major_blessings_q.single() else {
+            return;
+        };
         let blessing_max_hp_penalty_flat = blessing_max_hp_penalty.map(|p| p.0).unwrap_or(0);
         let mut new_att = att.clone();
         let Ok((player, inv)) = player.single() else {
@@ -1701,6 +1719,11 @@ fn handle_player_item_attribute_change_events(
         // Combine permanent stat bonuses gained from consuming stat foods (GainStat action)
         if let Some(food) = food_bonuses {
             new_att = new_att.combine(&food.bonuses);
+        }
+
+        // Live StatConversion major bonuses (+X StatA per Y StatB)
+        if let Ok(major_stats) = major_stat_bonuses_q.single() {
+            new_att = new_att.combine(major_stats.as_item_attributes());
         }
 
         // Calculate inventory buffs from items in inventory (not hotbar)
@@ -1743,6 +1766,7 @@ fn handle_player_item_attribute_change_events(
             old_shield.0,
             skills,
             blessings,
+            major_blessings,
             blessing_max_hp_penalty_flat,
             dodge_crit_buff_active,
             coins.coins,
@@ -1781,12 +1805,14 @@ pub fn add_current_health_with_max_health(
         }
     }
 }
-/// Adds a current shield component to all entities with a max shield component
+/// Adds a current shield component when max shield exists but current is missing.
+/// Does not overwrite an existing CurrentShield (e.g. Mana Barrier overshield) when
+/// MaxShield changes.
 pub fn add_current_shield_with_max_shield(
     mut commands: Commands,
-    mut shield: Query<(Entity, &MaxShield), Or<(Changed<MaxShield>, Without<CurrentShield>)>>,
+    shield: Query<(Entity, &MaxShield), Without<CurrentShield>>,
 ) {
-    for (entity, max_shield) in shield.iter_mut() {
+    for (entity, max_shield) in shield.iter() {
         // Check if entity still exists before inserting components
         if let Ok(mut entity_commands) = commands.get_entity(entity) {
             entity_commands.insert(CurrentShield(max_shield.0));

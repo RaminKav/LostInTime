@@ -703,7 +703,7 @@ pub fn aseprite_leap_attack(
                         * attack.speed
                         * time.delta_secs()
                         * status_option
-                            .map(|s| 1.0 - s.slow_stacks() as f32 * 0.15)
+                            .map(|s| s.movement_speed_multiplier())
                             .unwrap_or(1.0),
                 );
             }
@@ -1160,7 +1160,7 @@ pub fn aseprite_multi_leap_attack(
                             * attack.speed
                             * time.delta_secs()
                             * status_option
-                                .map(|s| 1.0 - s.slow_stacks() as f32 * 0.15)
+                                .map(|s| s.movement_speed_multiplier())
                                 .unwrap_or(1.0),
                     );
                 }
@@ -1332,7 +1332,7 @@ pub fn aseprite_bull_charge(
                     let speed = charge.charge_speed
                         * time.delta_secs()
                         * status_option
-                            .map(|s| 1.0 - s.slow_stacks() as f32 * 0.15)
+                            .map(|s| s.movement_speed_multiplier())
                             .unwrap_or(1.0);
                     kcc.translation = Some(dir * speed);
                     kcc.filter_groups = Some(bevy_rapier2d::prelude::CollisionGroups::new(

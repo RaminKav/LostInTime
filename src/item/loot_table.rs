@@ -47,6 +47,29 @@ impl LootTablePlugin {
         is_infinite_mode: bool,
         is_boss: bool,
     ) -> Vec<ItemStack> {
+        Self::get_drops_with_coin_rate(
+            loot_table,
+            proto,
+            loot_bonus,
+            level,
+            is_infinite_mode,
+            is_boss,
+            1.0,
+        )
+    }
+
+    /// Like [`get_drops`], but multiplies coin entry rates by `coin_rate_multiplier`
+    /// (e.g. 1.2 for the major CoinDropRate blessing). Raising the original coin roll
+    /// also increases Golden Tooth procs, which only fire after a successful coin drop.
+    pub fn get_drops_with_coin_rate(
+        loot_table: &LootTable,
+        proto: &ProtoParam,
+        loot_bonus: i32,
+        level: Option<u8>,
+        is_infinite_mode: bool,
+        is_boss: bool,
+        coin_rate_multiplier: f32,
+    ) -> Vec<ItemStack> {
         let mut rng = rand::thread_rng();
         let mut loot = vec![];
         for drop in loot_table.drops.iter() {
@@ -56,7 +79,13 @@ impl LootTablePlugin {
             } else {
                 1.0
             };
-            if r <= (drop.rate * infinite_mode_drop_multiplier) * (1.0 + loot_bonus as f32 / 100.0)
+            let coin_mult = if drop.item == WorldObject::Coin {
+                coin_rate_multiplier
+            } else {
+                1.0
+            };
+            if r <= (drop.rate * coin_mult * infinite_mode_drop_multiplier)
+                * (1.0 + loot_bonus as f32 / 100.0)
             {
                 let mut stack = proto.get_item_data(drop.item).unwrap().clone();
                 stack.metadata.level = level;

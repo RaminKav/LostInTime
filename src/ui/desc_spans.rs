@@ -9,14 +9,14 @@ use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
 use bevy::sprite::Anchor;
 
-use crate::colors::{SHIELD_BLUE, YELLOW};
+use crate::colors::{LIGHT_RED, SHIELD_BLUE, YELLOW};
 use crate::player::skills::HeirloomRarity;
 
 use super::game_fonts::FontStyle;
 use super::tooltip_info_boxes::TooltipDefinition;
 
-/// Brighter purple-blue for numeric values in skill descriptions.
-pub const SKILL_NUMBER_COLOR: Color = Color::srgba(0.55, 0.72, 1.0, 1.0);
+/// Soft lilac for numeric values in skill / blessing descriptions.
+pub const SKILL_NUMBER_COLOR: Color = Color::srgba(0.72, 0.55, 0.98, 1.0);
 
 /// Named reward / currency / rarity highlights in blessing card text.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -107,12 +107,13 @@ pub fn keyword_color(def: TooltipDefinition) -> Color {
         TooltipDefinition::Lightning => Color::srgba(0.95, 0.9, 0.35, 1.0),
         TooltipDefinition::IceExplosion => Color::srgba(0.55, 0.85, 1.0, 1.0),
         TooltipDefinition::Poison => Color::srgba(0.55, 0.95, 0.55, 1.0),
-        TooltipDefinition::FreezeChance => Color::srgba(0.65, 0.9, 1.0, 1.0),
+        // Same bright cyan as Mana Regen / mana-cost lines.
+        TooltipDefinition::FreezeChance => SHIELD_BLUE.with_alpha(1.0),
         TooltipDefinition::Frail => Color::srgba(0.9, 0.3, 0.3, 1.0),
         TooltipDefinition::Thorns => Color::srgba(0.28, 0.65, 0.35, 1.0),
         // Same RGB as mana-cost lines (`SHIELD_BLUE`), full opacity for body text.
         TooltipDefinition::ManaRegen => SHIELD_BLUE.with_alpha(1.0),
-        TooltipDefinition::Chaos => Color::srgba(0.85, 0.35, 0.85, 1.0),
+        TooltipDefinition::Chaos => LIGHT_RED,
         TooltipDefinition::Skills => Color::srgba(0.7, 0.75, 1.0, 1.0),
         TooltipDefinition::Weapons => Color::srgba(0.95, 0.7, 0.45, 1.0),
         // Stats — shared muted gold (usually omitted from body keywords)
@@ -277,9 +278,27 @@ fn starts_number_token(chars: &[char], i: usize) -> bool {
     false
 }
 
+/// Length of an ordinal suffix at `chars[i]` (`st`/`nd`/`rd`/`th`), if present
+/// and not the start of a longer word (`5the`, `2ndary`).
+fn ordinal_suffix_len(chars: &[char], i: usize) -> Option<usize> {
+    if i + 1 >= chars.len() {
+        return None;
+    }
+    let a = chars[i].to_ascii_lowercase();
+    let b = chars[i + 1].to_ascii_lowercase();
+    if !matches!((a, b), ('s', 't') | ('n', 'd') | ('r', 'd') | ('t', 'h')) {
+        return None;
+    }
+    if i + 2 < chars.len() && chars[i + 2].is_ascii_alphabetic() {
+        return None;
+    }
+    Some(2)
+}
+
 /// Split skill description text into plain + number spans.
 ///
-/// Matches signed integers/decimals and common glued suffixes (`%`, `x`, `s`).
+/// Matches signed integers/decimals and common glued suffixes (`%`, `x`, `s`,
+/// ordinals like `5th` / `1st`).
 pub fn spans_highlighting_numbers(text: &str) -> Vec<DescSpan> {
     let mut spans = Vec::new();
     let chars: Vec<char> = text.chars().collect();
@@ -310,15 +329,19 @@ pub fn spans_highlighting_numbers(text: &str) -> Vec<DescSpan> {
                     }
                 }
             }
-            // Trailing unit markers glued to the number (`5%`, `2x`, `2.5s`).
-            // Only absorb `s` when it is not the start of a longer word.
+            // Trailing unit markers glued to the number (`5%`, `2x`, `2.5s`, `5th`).
+            // Only absorb `s` when it is not the start of a longer word / ordinal.
             if i < chars.len() {
                 match chars[i] {
                     '%' | 'x' => i += 1,
                     's' if i + 1 >= chars.len() || !chars[i + 1].is_ascii_alphabetic() => {
                         i += 1;
                     }
-                    _ => {}
+                    _ => {
+                        if let Some(n) = ordinal_suffix_len(&chars, i) {
+                            i += n;
+                        }
+                    }
                 }
             }
             spans.push(DescSpan::number(chars[start..i].iter().collect::<String>()));
@@ -336,11 +359,36 @@ pub fn spans_highlighting_numbers(text: &str) -> Vec<DescSpan> {
     spans
 }
 
-/// Skill-body keywords highlighted after number tokenization (word-boundary, case-insensitive).
-const SKILL_BODY_KEYWORDS: &[(&str, TooltipDefinition)] =
-    &[("Frail", TooltipDefinition::Frail)];
+/// Body keywords highlighted after number tokenization (word-boundary, case-insensitive).
+/// Longer phrases first so "Lightning Strike" wins over "Lightning".
+/// Shared by skill + blessing description text (same palette as heirloom keywords).
+const BODY_KEYWORDS: &[(&str, TooltipDefinition)] = &[
+    ("Lightning Strikes", TooltipDefinition::Lightning),
+    ("Lightning Strike", TooltipDefinition::Lightning),
+    ("Ice Explosions", TooltipDefinition::IceExplosion),
+    ("Ice Explosion", TooltipDefinition::IceExplosion),
+    ("Mana Regen", TooltipDefinition::ManaRegen),
+    ("Echoes", TooltipDefinition::Echo),
+    ("Echo", TooltipDefinition::Echo),
+    ("Summons", TooltipDefinition::Summon),
+    ("Summon", TooltipDefinition::Summon),
+    ("Poison", TooltipDefinition::Poison),
+    ("Thorns", TooltipDefinition::Thorns),
+    ("Lightning", TooltipDefinition::Lightning),
+    ("Frozen", TooltipDefinition::FreezeChance),
+    ("Freeze", TooltipDefinition::FreezeChance),
+    ("Frail", TooltipDefinition::Frail),
+    ("Chaos", TooltipDefinition::Chaos),
+    ("Skills", TooltipDefinition::Skills),
+    ("Weapons", TooltipDefinition::Weapons),
+];
 
-fn expand_plain_with_skill_keywords(plain: &str) -> Vec<DescSpan> {
+/// Highlight body keywords in plain text (no number tokenization).
+pub fn spans_highlighting_body_keywords(text: &str) -> Vec<DescSpan> {
+    expand_plain_with_body_keywords(text)
+}
+
+fn expand_plain_with_body_keywords(plain: &str) -> Vec<DescSpan> {
     let lower = plain.to_ascii_lowercase();
     let mut out = Vec::new();
     let mut cursor = 0;
@@ -348,12 +396,12 @@ fn expand_plain_with_skill_keywords(plain: &str) -> Vec<DescSpan> {
 
     while cursor < plain.len() {
         let mut best: Option<(usize, usize, TooltipDefinition)> = None;
-        for &(needle, def) in SKILL_BODY_KEYWORDS {
+        for &(needle, def) in BODY_KEYWORDS {
             let needle_lower = needle.to_ascii_lowercase();
             let mut search_from = cursor;
             while let Some(rel) = lower[search_from..].find(&needle_lower) {
                 let start = search_from + rel;
-                let end = start + needle.len();
+                let end = start + needle_lower.len();
                 let before_ok = start == 0
                     || !bytes
                         .get(start - 1)
@@ -393,12 +441,12 @@ fn expand_plain_with_skill_keywords(plain: &str) -> Vec<DescSpan> {
     out
 }
 
-/// Numbers first, then skill-body keywords (e.g. Frail on Bomb).
+/// Numbers first, then body keywords (Poison, Echo, Lightning Strike, Frail, …).
 pub fn spans_highlighting_skill_text(text: &str) -> Vec<DescSpan> {
     let mut out = Vec::new();
     for span in spans_highlighting_numbers(text) {
         match span {
-            DescSpan::Plain(plain) => out.extend(expand_plain_with_skill_keywords(&plain)),
+            DescSpan::Plain(plain) => out.extend(expand_plain_with_body_keywords(&plain)),
             other => out.push(other),
         }
     }
@@ -473,7 +521,7 @@ fn expand_plain_with_named_phrases(
     out
 }
 
-/// Blessing card body: numbers, named rewards, rarity words, then "gold".
+/// Blessing card body: numbers, named rewards, rarity/"gold", then effect keywords.
 pub fn spans_highlighting_blessing_text(
     text: &str,
     highlight_phrases: &[(String, NamedSpanKind)],
@@ -509,7 +557,7 @@ pub fn spans_highlighting_blessing_text(
             DescSpan::Plain(plain) => {
                 for named in expand_plain_with_named_phrases(&plain, &phrases) {
                     match named {
-                        DescSpan::Plain(p) => out.extend(expand_plain_with_skill_keywords(&p)),
+                        DescSpan::Plain(p) => out.extend(expand_plain_with_body_keywords(&p)),
                         other => out.push(other),
                     }
                 }

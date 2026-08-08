@@ -124,6 +124,10 @@ pub enum UIState {
     ClassSelection,
     EnterName,
     BlessingChoice,
+    /// Mid-run major blessing pick (same card UI as BlessingChoice; GameState stays Main).
+    MajorBlessingChoice,
+    /// Post-major pick: choose an uncommon heirloom to triple (Collector's Bargain).
+    MajorHeirloomPick,
     TimeCrystalProgress,
     /// Main-menu overview of all time crystals and their heirloom unlocks.
     TimeCrystalsBrowser,

@@ -252,6 +252,7 @@ pub fn spawn_heirloom_tooltip_card(
                 half_width: size.x * 0.5,
                 half_height: size.y * 0.5,
                 game_width: resolution.game_width,
+                prefer_left: false,
             },
             &info_boxes,
         ) {

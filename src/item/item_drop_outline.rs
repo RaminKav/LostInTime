@@ -441,9 +441,11 @@ fn resolve_heirloom_outline_rarity(
             }
         }
         if let Ok(card) = blessing_cards.get(parent_entity) {
-            if let Some(resolved) = card.choice.resolved_heirloom.as_ref() {
-                if resolved.heirloom == *heirloom {
-                    return resolved.rarity;
+            if let Some(minor) = card.choice.as_minor() {
+                if let Some(resolved) = minor.resolved_heirloom.as_ref() {
+                    if resolved.heirloom == *heirloom {
+                        return resolved.rarity;
+                    }
                 }
             }
         }
