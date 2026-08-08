@@ -3210,6 +3210,27 @@ impl HeirloomChoiceQueue {
         }
     }
 
+    /// Reroll every non-banished slot in the current offer (one reroll charge).
+    pub fn handle_reroll_all(
+        &mut self,
+        rng: &mut rand::rngs::ThreadRng,
+        loot_bonus: i32,
+        player_level: u8,
+    ) {
+        if self.queue.is_empty() {
+            return;
+        }
+        let slots: Vec<usize> = self.queue[0]
+            .iter()
+            .enumerate()
+            .filter(|(_, choice)| choice.heirloom != Heirloom::default())
+            .map(|(slot, _)| slot)
+            .collect();
+        for slot in slots {
+            self.handle_reroll_slot(slot, rng, loot_bonus, player_level);
+        }
+    }
+
     pub fn banish_slot(
         &mut self,
         time_crystals: &TimeCrystals,

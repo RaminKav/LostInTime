@@ -1491,7 +1491,7 @@ impl Plugin for UIPlugin {
                         .run_if(in_state(UIState::ItemChest))
                         .run_if(resource_exists::<ItemChestState>),
                     handle_skill_reroll_after_flash.run_if(in_state(UIState::Skills)),
-                    handle_cursor_reroll_dice_buttons.run_if(in_state(UIState::Skills)),
+                    handle_skill_choice_reroll_button.run_if(in_state(UIState::Skills)),
                     handle_cursor_banish_buttons.run_if(in_state(UIState::Skills)),
                     update_skill_choice_button_states.run_if(in_state(UIState::Skills)),
                     update_skill_choice_count_text.run_if(in_state(UIState::Skills)),

@@ -8,17 +8,24 @@ use crate::{
     animations::DoneAnimation,
     assets::Graphics,
     attributes::LootRateBonus,
-    colors::WHITE,
+    audio::{AudioSoundEffect, SoundSpawner},
+    colors::{WHITE, YELLOW_2},
+    cursor::CursorPos,
     item::item_drop_outline::UiShadow,
     juice::bounce::BounceOnHit,
     player::{
         levels::PlayerLevel,
-        skills::{HeirloomChoiceQueue, HeirloomChoiceState},
+        skills::{Heirloom, HeirloomChoiceQueue, HeirloomChoiceState},
         time_crystals::TimeCrystals,
         unlocks::RunUnlockState,
         Player,
     },
-    ui::{game_fonts as gf, ui_helpers::spawn_full_screen_ui_overlay_tuned, CheatSettings},
+    ui::{
+        essence_ui::{MERCHANT_REROLL_ICON_PATH, MERCHANT_REROLL_ICON_SIZE},
+        game_fonts as gf,
+        ui_helpers::{self, spawn_full_screen_ui_overlay_tuned},
+        CheatSettings, KEYBIND_BADGE_COLOR,
+    },
     ScreenResolution, DEBUG,
 };
 
@@ -38,6 +45,12 @@ use super::{
 
 /// Bounce strength for heirloom choice cards on hover (fraction of default mob bounce).
 const HEIRLOOM_CARD_BOUNCE_STRENGTH: f32 = 0.4;
+/// Raised into the old per-slot dice row so banishes sit closer under the cards.
+const SKILL_CHOICE_BANISH_Y: f32 = -120.;
+/// Centered shrine-style reroll badge beneath the banish row.
+const SKILL_CHOICE_REROLL_BUTTON_Y: f32 = -142.;
+const SKILL_CHOICE_REROLL_BADGE_SIZE: Vec2 = Vec2::new(14., 12.);
+const SKILL_CHOICE_COUNT_TEXT_Y: f32 = -142.;
 
 /// Side info boxes spawned on hover for a level-up choice card (despawned on unhover).
 #[derive(Component)]
@@ -50,8 +63,16 @@ pub struct SkillChoiceUI {
     pub interaction_lock_timer: Timer,
 }
 
+/// Centered badge button that rerolls the whole heirloom offer.
 #[derive(Component)]
-pub struct RerollDice(pub usize);
+pub struct SkillChoiceRerollButton;
+
+#[derive(Component)]
+pub struct SkillChoiceRerollIcon;
+
+/// Flash overlay spawned over each card while a global reroll plays out.
+#[derive(Component)]
+pub struct SkillChoiceRerollFlash;
 
 #[derive(Component)]
 pub struct BanishButton(pub usize);
@@ -176,49 +197,11 @@ pub fn setup_skill_choice_ui(
         t_offset,
     );
 
-    for i in -1i32..2 {
-        let slot_index = (i + 1) as usize;
-        let enabled = run_unlocks.rerolls_remaining > 0;
-        let translation = Vec3::new(
-            i as f32 * (SKILLS_CHOICE_UI_SIZE.x + 16.) + 4.5,
-            -110.,
-            Z_DEPTH_HEIRLOOM_SKILL_CHOICE_CONTENT,
-        );
-        let mut reroll_entity = commands.spawn((
-            Sprite {
-                image: graphics
-                    .get_ui_element_texture(UIElement::RerollDice)
-                    .clone(),
-                custom_size: Some(Vec2::new(21., 22.)),
-                color: if enabled {
-                    Color::WHITE
-                } else {
-                    Color::srgb(0.55, 0.55, 0.55)
-                },
-                ..Default::default()
-            },
-            Transform {
-                translation,
-                scale: Vec3::new(1., 1., 1.),
-                ..Default::default()
-            },
-        ));
-        reroll_entity
-            .insert(RenderLayers::from_layers(&[3]))
-            .insert(UIElement::RerollDice)
-            .insert(UIState::Skills)
-            .insert(RerollDice(slot_index))
-            .insert(UiShadow::container())
-            .insert(Name::new(format!("REROLL BUTTON {slot_index}")));
-        if enabled {
-            reroll_entity
-                .insert(Interactable::default())
-                .insert(Focusable {
-                    group: UIState::Skills,
-                    index: 10 + slot_index as u32,
-                });
-        }
-    }
+    spawn_skill_choice_reroll_button(
+        &mut commands,
+        &asset_server,
+        run_unlocks.rerolls_remaining > 0,
+    );
 
     for i in -1i32..2 {
         let slot_index = (i + 1) as usize;
@@ -227,7 +210,7 @@ pub fn setup_skill_choice_ui(
         let banish_enabled = run_unlocks.banishes_remaining > 0 && slot_ok;
         let translation = Vec3::new(
             i as f32 * (SKILLS_CHOICE_UI_SIZE.x + 16.) + 4.,
-            -136.,
+            SKILL_CHOICE_BANISH_Y,
             Z_DEPTH_HEIRLOOM_SKILL_CHOICE_CONTENT,
         );
         let mut banish_button = commands.spawn((
@@ -309,7 +292,11 @@ pub fn setup_skill_choice_ui(
             .justify(Justify::Center)
             .anchor(Anchor::CENTER)
             .with_transform(Transform {
-                translation: Vec3::new(-80.5, -140., Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND),
+                translation: Vec3::new(
+                    -80.5,
+                    SKILL_CHOICE_COUNT_TEXT_Y,
+                    Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND,
+                ),
                 scale: gf::SKILL_CHOICE_MICRO.transform_scale(),
                 ..Default::default()
             }),
@@ -329,7 +316,11 @@ pub fn setup_skill_choice_ui(
             .justify(Justify::Center)
             .anchor(Anchor::CENTER)
             .with_transform(Transform {
-                translation: Vec3::new(80., -140., Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND),
+                translation: Vec3::new(
+                    80.,
+                    SKILL_CHOICE_COUNT_TEXT_Y,
+                    Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND,
+                ),
                 scale: gf::SKILL_CHOICE_MICRO.transform_scale(),
                 ..Default::default()
             }),
@@ -338,6 +329,59 @@ pub fn setup_skill_choice_ui(
         BanishCountText,
         Name::new("Banish Count Text2d"),
     ));
+}
+
+fn spawn_skill_choice_reroll_button(
+    commands: &mut Commands,
+    asset_server: &AssetServer,
+    enabled: bool,
+) {
+    let icon_color = if enabled {
+        Color::WHITE
+    } else {
+        Color::srgb(0.45, 0.45, 0.45)
+    };
+
+    let mut btn = commands.spawn((
+        Sprite {
+            color: KEYBIND_BADGE_COLOR,
+            custom_size: Some(SKILL_CHOICE_REROLL_BADGE_SIZE),
+            ..default()
+        },
+        Transform::from_translation(Vec3::new(
+            0.,
+            SKILL_CHOICE_REROLL_BUTTON_Y,
+            Z_DEPTH_HEIRLOOM_SKILL_CHOICE_CONTENT,
+        )),
+    ));
+    btn.insert(RenderLayers::from_layers(&[3]))
+        .insert(UIState::Skills)
+        .insert(SkillChoiceRerollButton)
+        .insert(UiShadow::container())
+        .insert(Name::new("Skill Choice Reroll"));
+
+    if enabled {
+        btn.insert(Interactable::default()).insert(Focusable {
+            group: UIState::Skills,
+            index: 10,
+        });
+    }
+
+    let btn_e = btn.id();
+
+    commands
+        .spawn((
+            Sprite {
+                image: asset_server.load(MERCHANT_REROLL_ICON_PATH),
+                custom_size: Some(MERCHANT_REROLL_ICON_SIZE),
+                color: icon_color,
+                ..default()
+            },
+            Transform::from_translation(Vec3::new(0., 0., 1.)),
+        ))
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(SkillChoiceRerollIcon)
+        .insert(ChildOf(btn_e));
 }
 
 pub fn tick_skill_choice_interaction_lock_timers(
@@ -455,8 +499,109 @@ pub fn toggle_skills_visibility(
         );
     }
 }
+pub fn handle_skill_choice_reroll_button(
+    cursor_pos: Res<CursorPos>,
+    mouse_input: Res<ButtonInput<MouseButton>>,
+    mut sprites: ParamSet<(
+        Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
+        Query<&mut Sprite, With<SkillChoiceRerollIcon>>,
+    )>,
+    mut reroll_buttons: Query<(
+        Entity,
+        &mut Interactable,
+        &SkillChoiceRerollButton,
+        &Children,
+    )>,
+    skill_cards: Query<&SkillChoiceUI>,
+    pending_flash: Query<Entity, With<SkillChoiceRerollFlash>>,
+    mut reroll_text: Query<(&mut Text2d, &mut TextColor), With<RerollCountText>>,
+    mut commands: Commands,
+    mut run_unlocks: ResMut<RunUnlockState>,
+    asset_server: Res<AssetServer>,
+    focus_input: crate::ui::focus::FocusInput,
+) {
+    let hit_entity = {
+        let ui_sprites = sprites.p0();
+        ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None).map(|(e, _, _)| e)
+    };
+    let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
+    let mut any_hovered = false;
+    let reroll_in_progress = !pending_flash.is_empty();
+
+    for (e, mut interactable, _btn, btn_children) in reroll_buttons.iter_mut() {
+        let enabled = run_unlocks.rerolls_remaining > 0 && !reroll_in_progress;
+        let icon_color = if enabled {
+            Color::WHITE
+        } else {
+            Color::srgb(0.45, 0.45, 0.45)
+        };
+        let is_hit = hit_entity == Some(e);
+        let is_focused = focus_input.is_focused(e);
+        let confirm_pressed =
+            (is_hit && left_mouse_pressed) || (is_focused && focus_input.confirm_just_pressed());
+
+        if is_hit || is_focused {
+            match interactable.current() {
+                Interaction::None if enabled => {
+                    interactable.change(Interaction::Hovering);
+                    for child in btn_children.iter() {
+                        if let Ok(mut sprite) = sprites.p1().get_mut(child) {
+                            sprite.color = YELLOW_2;
+                        }
+                    }
+                }
+                Interaction::Hovering => {
+                    any_hovered = true;
+                    if confirm_pressed && enabled {
+                        run_unlocks.rerolls_remaining =
+                            run_unlocks.rerolls_remaining.saturating_sub(1);
+
+                        interactable.change(Interaction::None);
+                        commands.spawn(SoundSpawner::new(AudioSoundEffect::UISkillReRoll, 0.4));
+
+                        for card in skill_cards.iter() {
+                            if card.skill_choice.heirloom == Heirloom::default() {
+                                continue;
+                            }
+                            spawn_skill_choice_flash(
+                                &mut commands,
+                                &asset_server,
+                                Vec3::new(
+                                    (card.index as f32 - 1.) * (SKILLS_CHOICE_UI_SIZE.x + 16.)
+                                        + 4.,
+                                    4.,
+                                    15.,
+                                ),
+                            );
+                        }
+
+                        for child in btn_children.iter() {
+                            if let Ok(mut sprite) = sprites.p1().get_mut(child) {
+                                sprite.color = icon_color;
+                            }
+                        }
+                    }
+                }
+                _ => (),
+            }
+        } else if matches!(interactable.current(), Interaction::Hovering) {
+            interactable.change(Interaction::None);
+            for child in btn_children.iter() {
+                if let Ok(mut sprite) = sprites.p1().get_mut(child) {
+                    sprite.color = icon_color;
+                }
+            }
+        }
+    }
+
+    for (mut text, mut text_color) in reroll_text.iter_mut() {
+        text.0 = format!("Rerolls: {}", run_unlocks.rerolls_remaining);
+        text_color.0 = if any_hovered { YELLOW_2 } else { WHITE };
+    }
+}
+
 pub fn handle_skill_reroll_after_flash(
-    flashes: Query<(Entity, &RerollDice, &AnimationState), With<DoneAnimation>>,
+    flashes: Query<(Entity, &AnimationState), (With<DoneAnimation>, With<SkillChoiceRerollFlash>)>,
     mut skill_queue: ResMut<HeirloomChoiceQueue>,
     old_skill_entities: Query<Entity, With<SkillChoiceUI>>,
     mut commands: Commands,
@@ -465,39 +610,40 @@ pub fn handle_skill_reroll_after_flash(
     res: Res<ScreenResolution>,
     player_atts: Query<(&LootRateBonus, &PlayerLevel), With<Player>>,
 ) {
-    for (e, slot, state) in flashes.iter() {
+    let mut should_reroll = false;
+    for (e, state) in flashes.iter() {
         if usize::from(state.current_frame()) == 3 {
-            let (loot_bonus, player_level) = player_atts
-                .single()
-                .map(|a| (a.0 .0, a.1.level))
-                .unwrap_or((0, 1));
-            commands.entity(e).remove::<RerollDice>();
-            skill_queue.handle_reroll_slot(
-                slot.0,
-                &mut rand::thread_rng(),
-                loot_bonus,
-                player_level,
-            );
-            for e in old_skill_entities.iter() {
-                commands.entity(e).despawn();
-            }
-            spawn_skill_choice_entities(
-                &graphics,
-                &mut commands,
-                &asset_server,
-                &res,
-                skill_queue.queue[0].clone().to_vec(),
-                Vec2::new(4., 4.),
-            );
+            should_reroll = true;
+            // Clear markers on every flash so a 3-card reroll only applies once.
+            commands.entity(e).remove::<SkillChoiceRerollFlash>();
         }
     }
+    if !should_reroll {
+        return;
+    }
+    for (e, _) in flashes.iter() {
+        commands.entity(e).remove::<SkillChoiceRerollFlash>();
+    }
+
+    let (loot_bonus, player_level) = player_atts
+        .single()
+        .map(|a| (a.0 .0, a.1.level))
+        .unwrap_or((0, 1));
+    skill_queue.handle_reroll_all(&mut rand::thread_rng(), loot_bonus, player_level);
+    for e in old_skill_entities.iter() {
+        commands.entity(e).despawn();
+    }
+    spawn_skill_choice_entities(
+        &graphics,
+        &mut commands,
+        &asset_server,
+        &res,
+        skill_queue.queue[0].clone().to_vec(),
+        Vec2::new(4., 4.),
+    );
 }
-pub fn spawn_skill_choice_flash(
-    commands: &mut Commands,
-    asset_server: &AssetServer,
-    pos: Vec3,
-    slot: usize,
-) {
+
+pub fn spawn_skill_choice_flash(commands: &mut Commands, asset_server: &AssetServer, pos: Vec3) {
     commands
         .spawn(aseprite_bundle(
             asset_server.load(SkillChoiceFlash::PATH),
@@ -511,7 +657,7 @@ pub fn spawn_skill_choice_flash(
         ))
         .insert(RenderLayers::from_layers(&[3]))
         .insert(Visibility::default())
-        .insert(RerollDice(slot))
+        .insert(SkillChoiceRerollFlash)
         .insert(DoneAnimation);
 }
 
@@ -519,21 +665,53 @@ pub fn update_skill_choice_button_states(
     run_unlocks: Res<RunUnlockState>,
     skill_queue: Res<HeirloomChoiceQueue>,
     time_crystals: Res<TimeCrystals>,
-    mut reroll_buttons: Query<&mut Sprite, (With<RerollDice>, Without<BanishButton>)>,
-    mut banish_buttons: Query<(&mut Sprite, &BanishButton), Without<RerollDice>>,
+    mut reroll_buttons: Query<
+        (Entity, &mut Sprite, &Children),
+        (With<SkillChoiceRerollButton>, With<Interactable>),
+    >,
+    mut reroll_icons: Query<
+        &mut Sprite,
+        (
+            With<SkillChoiceRerollIcon>,
+            Without<SkillChoiceRerollButton>,
+            Without<BanishButton>,
+        ),
+    >,
+    mut banish_buttons: Query<
+        (&mut Sprite, &BanishButton),
+        (
+            Without<SkillChoiceRerollButton>,
+            Without<SkillChoiceRerollIcon>,
+        ),
+    >,
     mut banish_labels: Query<(&mut TextColor, &BanishButtonLabel)>,
+    mut commands: Commands,
 ) {
     if !run_unlocks.is_changed() && !skill_queue.is_changed() {
         return;
     }
 
-    let reroll_color = if run_unlocks.rerolls_remaining > 0 {
+    let reroll_enabled = run_unlocks.rerolls_remaining > 0;
+    let badge_color = if reroll_enabled {
+        KEYBIND_BADGE_COLOR
+    } else {
+        Color::srgba(62. / 255., 58. / 255., 58. / 255., 0.45)
+    };
+    let icon_color = if reroll_enabled {
         Color::WHITE
     } else {
-        Color::srgb(0.55, 0.55, 0.55)
+        Color::srgb(0.45, 0.45, 0.45)
     };
-    for mut sprite in reroll_buttons.iter_mut() {
-        sprite.color = reroll_color;
+    for (e, mut sprite, children) in reroll_buttons.iter_mut() {
+        sprite.color = badge_color;
+        if !reroll_enabled {
+            commands.entity(e).remove::<Interactable>();
+        }
+        for child in children.iter() {
+            if let Ok(mut icon) = reroll_icons.get_mut(child) {
+                icon.color = icon_color;
+            }
+        }
     }
 
     for (mut sprite, banish) in banish_buttons.iter_mut() {

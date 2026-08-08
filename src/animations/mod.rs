@@ -279,9 +279,13 @@ fn animate_hit(
         if !hit.is_active {
             continue;
         }
+        // Entity may already be queued for despawn this frame (e.g. lethal hit).
+        // Use try_insert so deferred apply does not panic on a stale entity id.
         if let Some(state) = mob_option {
             if state != &EnemyAnimationState::Hit && state != &EnemyAnimationState::Attack {
-                commands.entity(e).insert(EnemyAnimationState::Hit);
+                if let Ok(mut entity_commands) = commands.get_entity(e) {
+                    entity_commands.try_insert(EnemyAnimationState::Hit);
+                }
             }
         }
         hit.timer.tick(time.delta());
@@ -301,12 +305,17 @@ fn animate_hit(
                 // this entity each frame) until the sprite has cycled back to the
                 // starting frame of the Hit animation. Only then do we transition
                 // back to Walk and deactivate.
-                let (anim_data, sprite) = anim_state.get(e).unwrap();
+                let Ok((anim_data, sprite)) = anim_state.get(e) else {
+                    hit.is_active = false;
+                    continue;
+                };
                 let sprite_index = sprite.texture_atlas.as_ref().map(|a| a.index).unwrap_or(0);
                 if sprite_index == anim_data.get_starting_frame_for_animation(state)
                     && state == &EnemyAnimationState::Hit
                 {
-                    commands.entity(e).insert(EnemyAnimationState::Walk);
+                    if let Ok(mut entity_commands) = commands.get_entity(e) {
+                        entity_commands.try_insert(EnemyAnimationState::Walk);
+                    }
                     hit.is_active = false;
                 }
             } else {

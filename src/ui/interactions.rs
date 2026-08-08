@@ -72,13 +72,12 @@ use crate::{
 
 use super::{
     bounce_merchant_slot_icon, crafting_ui::CraftingContainer, scrapper_ui::ScrapperContainer,
-    spawn_item_stack_icon, spawn_skill_choice_flash, stats_ui::StatsButtonState,
-    sync_merchant_shop_to_world, ui_helpers, BanishButton, BlacksmithRerollsText, ChestContainer,
-    EssenceShopChoices, InfoModal, InventorySlotState, InventorySlotType, MenuButton,
-    MenuButtonClickEvent, MerchantCategoryRerollButton, MerchantCategoryRerollEvent,
-    MerchantCategoryRerollIcon, MerchantDoneButton, MerchantShopSlotIndex, RerollDice,
-    ShowInvPlayerStatsEvent, SkillChoiceUI, SubmitMerchantPurchase, ToolTipUpdateEvent,
-    TooltipTeardownEvent, UIContainersParam, UIState, SKILLS_CHOICE_UI_SIZE,
+    spawn_item_stack_icon, stats_ui::StatsButtonState, sync_merchant_shop_to_world, ui_helpers,
+    BanishButton, BlacksmithRerollsText, ChestContainer, EssenceShopChoices, InfoModal,
+    InventorySlotState, InventorySlotType, MenuButton, MenuButtonClickEvent,
+    MerchantCategoryRerollButton, MerchantCategoryRerollEvent, MerchantCategoryRerollIcon,
+    MerchantDoneButton, MerchantShopSlotIndex, ShowInvPlayerStatsEvent, SkillChoiceUI,
+    SubmitMerchantPurchase, ToolTipUpdateEvent, TooltipTeardownEvent, UIContainersParam, UIState,
 };
 
 #[derive(
@@ -2197,86 +2196,6 @@ pub fn handle_cursor_skills_buttons(
         }
     }
 }
-pub fn handle_cursor_reroll_dice_buttons(
-    cursor_pos: Res<CursorPos>,
-    mouse_input: Res<ButtonInput<MouseButton>>,
-    ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
-    mut reroll_dice: Query<(Entity, &mut Interactable, &RerollDice), Without<InventorySlotState>>,
-    mut commands: Commands,
-    graphics: Res<Graphics>,
-    asset_server: Res<AssetServer>,
-    mut run_unlocks: ResMut<RunUnlockState>,
-    focus_input: crate::ui::focus::FocusInput,
-) {
-    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None);
-    let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
-
-    for (e, mut interactable, state) in reroll_dice.iter_mut() {
-        let rerolls_available = run_unlocks.rerolls_remaining > 0;
-        let is_hit = matches!(hit_test, Some(hit_ent) if hit_ent.0 == e);
-        let is_focused = focus_input.is_focused(e);
-        let confirm_pressed =
-            (is_hit && left_mouse_pressed) || (is_focused && focus_input.confirm_just_pressed());
-
-        if is_hit || is_focused {
-            match interactable.current() {
-                Interaction::None => {
-                    if !rerolls_available {
-                        continue;
-                    }
-                    interactable.change(Interaction::Hovering);
-                    let ui_element = UIElement::RerollDiceHover;
-                    commands.entity(e).insert(ui_element.clone());
-                    set_sprite_image(
-                        &mut commands,
-                        e,
-                        graphics.get_ui_element_texture(ui_element),
-                    );
-                }
-                Interaction::Hovering => {
-                    if confirm_pressed && rerolls_available {
-                        run_unlocks.rerolls_remaining =
-                            run_unlocks.rerolls_remaining.saturating_sub(1);
-                        interactable.change(Interaction::None);
-                        commands.entity(e).insert(UIElement::RerollDice);
-                        set_sprite_image(
-                            &mut commands,
-                            e,
-                            graphics.get_ui_element_texture(UIElement::RerollDice),
-                        );
-                        commands.spawn(SoundSpawner::new(AudioSoundEffect::UISkillReRoll, 0.4));
-
-                        spawn_skill_choice_flash(
-                            &mut commands,
-                            &asset_server,
-                            Vec3::new(
-                                (state.0 as f32 - 1.) * (SKILLS_CHOICE_UI_SIZE.x + 16.) + 4.,
-                                4.,
-                                15.,
-                            ),
-                            state.0,
-                        );
-                    }
-                }
-                _ => (),
-            }
-        } else {
-            let Interaction::Hovering = interactable.current() else {
-                continue;
-            };
-            let ui_element = UIElement::RerollDice;
-
-            interactable.change(Interaction::None);
-            commands.entity(e).insert(ui_element.clone());
-            set_sprite_image(
-                &mut commands,
-                e,
-                graphics.get_ui_element_texture(ui_element),
-            );
-        }
-    }
-}
-
 pub fn handle_cursor_banish_buttons(
     cursor_pos: Res<CursorPos>,
     mouse_input: Res<ButtonInput<MouseButton>>,
@@ -2291,7 +2210,6 @@ pub fn handle_cursor_banish_buttons(
     mut skill_queue: ResMut<HeirloomChoiceQueue>,
     time_crystals: Res<TimeCrystals>,
     skill_ui: Query<(Entity, &SkillChoiceUI), With<SkillChoiceUI>>,
-    dice_buttons: Query<(Entity, &RerollDice), With<RerollDice>>,
     asset_server: Res<AssetServer>,
     focus_input: crate::ui::focus::FocusInput,
 ) {
@@ -2357,11 +2275,6 @@ pub fn handle_cursor_banish_buttons(
 
                             for (entity, skill) in skill_ui.iter() {
                                 if skill.index == banish.0 {
-                                    commands.entity(entity).despawn();
-                                }
-                            }
-                            for (entity, dice) in dice_buttons.iter() {
-                                if dice.0 == banish.0 {
                                     commands.entity(entity).despawn();
                                 }
                             }
