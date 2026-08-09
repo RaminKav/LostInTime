@@ -45,7 +45,7 @@ use bevy::{
     window::{PresentMode, PrimaryWindow, Window, WindowMode, WindowResolution},
 };
 use bevy_common_assets::ron::RonAssetPlugin;
-use bevy_embedded_assets::EmbeddedAssetPlugin;
+use bevy_embedded_assets::{EmbeddedAssetPlugin, PluginMode};
 use chaos::ChaosPlugin;
 use juice::JuicePlugin;
 use night::NightPlugin;
@@ -242,8 +242,12 @@ fn main() {
 
     // macos bundles into a .app anyways, so we don't need to bundle assets.
     // doing it in the universal binary would double it since MacOS does M1 + Intel
+    // ReplaceDefault is required so normal asset paths (not embedded://) resolve from
+    // the binary — AutoLoad only registers the embedded:// source.
     if cfg!(not(target_os = "macos")) {
-        app.add_plugins(EmbeddedAssetPlugin::default());
+        app.add_plugins(EmbeddedAssetPlugin {
+            mode: PluginMode::ReplaceDefault,
+        });
     }
 
     let app = app
