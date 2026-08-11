@@ -201,6 +201,8 @@ pub enum PortalAnimState {
 pub struct PendingGameStart {
     pub class: SkillClass,
     pub pets: Vec<Pet>,
+    /// `None` on pre-unlock runs (baseline only). Set from the difficulty modal after first win.
+    pub difficulty: Option<crate::difficulty::RunDifficulty>,
 }
 
 #[derive(Resource)]
@@ -230,7 +232,13 @@ pub fn setup_class_selection_ui(
     unlock_currency: Option<Res<TimeFragmentCurrency>>,
     _class_unlocks: Option<Res<ClassUnlockData>>,
     cheat_settings: Res<CheatSettings>,
+    existing: Query<Entity, With<ClassSelectionUI>>,
 ) {
+    // Returning from the difficulty modal must not re-spawn a second class-select tree.
+    if !existing.is_empty() {
+        return;
+    }
+
     let overlay = spawn_full_screen_ui_overlay_tuned_colored(
         &mut commands,
         &res,
@@ -241,6 +249,12 @@ pub fn setup_class_selection_ui(
         RADIAL_OVERLAY_DEFAULT_COLOR,
         0.45,
     );
+    // Helper tags overlays as `UIState::Inventory`; retag so class-select teardown / the
+    // difficulty-modal keep-rule preserve this dim instead of exposing the main menu.
+    commands
+        .entity(overlay)
+        .insert(ClassSelectionUI)
+        .insert(UIState::ClassSelection);
 
     let currency_text = commands
         .spawn((
@@ -2284,9 +2298,12 @@ pub fn handle_portal_animation(
 
                         // Add PlayerClass component to the game
                         commands.insert_resource(PlayerClass {
-                            class: pending.class,
-                            pets: pending.pets,
+                            class: pending.class.clone(),
+                            pets: pending.pets.clone(),
                         });
+                        commands.insert_resource(crate::difficulty::ActiveRunDifficulty::new(
+                            pending.difficulty,
+                        ));
 
                         // Initialize game resources
                         commands.init_resource::<crate::Game>();

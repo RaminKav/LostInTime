@@ -72,11 +72,24 @@ impl FontStyle {
     }
 
     /// Native Bevy text font for this role (`FontSmoothing::None` for pixel fonts).
+    ///
+    /// Uses the logical atlas size only — pair with [`Self::transform_scale`] on `Text2d`.
     #[inline]
     pub fn text_font(&self, asset_server: &AssetServer) -> TextFont {
         TextFont {
             font: self.load_font(asset_server).into(),
             font_size: FontSize::Px(self.size),
+            font_smoothing: FontSmoothing::None,
+            ..default()
+        }
+    }
+
+    /// Bevy `Node` UI text font: bakes [`Self::scale`] into `font_size` (no `Transform` scale).
+    #[inline]
+    pub fn ui_text_font(&self, asset_server: &AssetServer) -> TextFont {
+        TextFont {
+            font: self.load_font(asset_server).into(),
+            font_size: FontSize::Px(self.size * self.scale),
             font_smoothing: FontSmoothing::None,
             ..default()
         }

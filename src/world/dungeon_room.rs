@@ -9,8 +9,9 @@ use crate::{
     colors::RED,
     combat::MarkedForDeath,
     custom_commands::CommandsExt,
+    difficulty::{ActiveRunDifficulty, MEGA_ELITE_CHANCE},
     enemy::red_mushling::{MushlingWakeupState, SproutingState, WaitingToSproutState},
-    enemy::{CombatAlignment, EliteMob, Mob},
+    enemy::{CombatAlignment, EliteMob, MegaEliteMob, Mob},
     inputs::FacingDirection,
     inventory::ItemStack,
     item::{
@@ -334,6 +335,7 @@ fn handle_start_dungeon_wave(
     game: GameParam,
     mut global_text: MessageWriter<GlobalTextMessageEvent>,
     mut guides: Query<&mut InteractionGuideTrigger>,
+    difficulty: Res<ActiveRunDifficulty>,
 ) {
     for event in events.read() {
         // Only start a wave from Idle (before wave 1) or Cleared (between waves).
@@ -358,6 +360,7 @@ fn handle_start_dungeon_wave(
             &mut commands,
             &proto,
             &game,
+            &difficulty,
         );
         wave_state.mobs_alive += count as i32;
 
@@ -379,6 +382,7 @@ fn tick_dungeon_waves(
     mut rewards: ResMut<DungeonRewards>,
     mut guides: Query<&mut InteractionGuideTrigger>,
     wave_mobs: Query<(&Mob, &DungeonShrineMob), Without<MarkedForDeath>>,
+    difficulty: Res<ActiveRunDifficulty>,
 ) {
     if wave_state.phase != WavePhase::InProgress {
         return;
@@ -404,6 +408,7 @@ fn tick_dungeon_waves(
                     &mut commands,
                     &proto,
                     &game,
+                    &difficulty,
                 );
                 wave_state.mobs_alive += count as i32;
                 if wave_state.mini_wave == 2 {
@@ -432,6 +437,7 @@ fn tick_dungeon_waves(
                 &mut commands,
                 &proto,
                 &game,
+                &difficulty,
             );
             wave_state.mobs_alive += count as i32;
             wave_state.cycle_mini_wave = (wave_state.cycle_mini_wave + 1) % 3;
@@ -510,6 +516,7 @@ fn spawn_mini_wave(
     commands: &mut Commands,
     proto: &ProtoParam,
     _game: &GameParam,
+    difficulty: &ActiveRunDifficulty,
 ) -> u32 {
     let wave_idx = (wave.saturating_sub(1)).min(2) as usize;
     let mini_idx = (mini_wave).min(2) as usize;
@@ -525,8 +532,11 @@ fn spawn_mini_wave(
             let offset = Vec2::new(rng.gen_range(-170. ..=170.), rng.gen_range(-140. ..=110.));
             let spawn_pos = offset;
             if let Some(mob_e) = commands.spawn_from_proto(mob.clone(), &proto.defs, spawn_pos) {
-                if roll_dungeon_elite(mob, proto, &mut rng) {
+                if roll_dungeon_elite(mob, proto, &mut rng, difficulty.elite_rate_multiplier()) {
                     commands.entity(mob_e).insert(EliteMob);
+                    if difficulty.allows_mega_elites() && rng.gen::<f32>() < MEGA_ELITE_CHANCE {
+                        commands.entity(mob_e).insert(MegaEliteMob);
+                    }
                 }
                 commands
                     .entity(mob_e)

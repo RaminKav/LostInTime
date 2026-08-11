@@ -407,7 +407,11 @@ pub fn effective_player_attack_speed_multiplier(
     attack_speed_stat: i32,
     bonus_attack_speed_mult: f32,
 ) -> f32 {
-    effective_player_attack_speed_multiplier_with_major(attack_speed_stat, bonus_attack_speed_mult, 1.0)
+    effective_player_attack_speed_multiplier_with_major(
+        attack_speed_stat,
+        bonus_attack_speed_mult,
+        1.0,
+    )
 }
 
 /// Same as [`effective_player_attack_speed_multiplier`], with the major blessing AS multiplier.
@@ -779,7 +783,7 @@ impl ActiveSkill {
                 vec![
                     "Scorch the earth at target area,".to_string(),
                     format!(
-                        " dealing {:.1}% damage continuously",
+                        "dealing {:.1}% damage continuously",
                         skill_power * FIRE_PILLAR
                     ),
                     format!("for {:.1}s. Duration scales with", ring_secs),
@@ -2347,9 +2351,9 @@ impl Heirloom {
             }
             Heirloom::AntFarm => {
                 // Don't reset the cooldown when gaining extra copies.
-                commands.entity(entity).insert_if_new(
-                    crate::player::combat_heirlooms::AntFarmState::default(),
-                );
+                commands
+                    .entity(entity)
+                    .insert_if_new(crate::player::combat_heirlooms::AntFarmState::default());
             }
             Heirloom::MagnetPull => {
                 commands.entity(entity).insert(MagnetPullTimer {
@@ -2369,9 +2373,9 @@ impl Heirloom {
                     .insert(crate::player::combat_heirlooms::StoneToothState::default());
             }
             Heirloom::SummonRing => {
-                commands.entity(entity).insert_if_new(
-                    crate::player::combat_heirlooms::SummonRingState::default(),
-                );
+                commands
+                    .entity(entity)
+                    .insert_if_new(crate::player::combat_heirlooms::SummonRingState::default());
             }
             Heirloom::Reaper => {
                 commands

@@ -5,6 +5,7 @@ use crate::{
     chaos::{ChaosTracker, EraTransitionState},
     client::is_not_paused,
     custom_commands::CommandsExt,
+    difficulty::{ActiveRunDifficulty, MEGA_ELITE_CHANCE},
     item::combat_shrine::CombatShrineMob,
     night::{InfiniteMode, InfiniteModeMob, NightTracker},
     player::Player,
@@ -18,7 +19,7 @@ use crate::{
     Game, GameParam, GameState, DEBUG, NO_SPAWN,
 };
 
-use super::{spawn_helpers::can_spawn_mob_here, CombatAlignment, EliteMob, Mob};
+use super::{spawn_helpers::can_spawn_mob_here, CombatAlignment, EliteMob, MegaEliteMob, Mob};
 
 pub const BASE_MAX_MOBS_TOTAL: i32 = 60;
 pub const INFINITE_MAX_MOBS_BONUS: i32 = 100;
@@ -339,6 +340,7 @@ fn handle_spawn_mobs(
     maybe_dungeon: Query<&Dungeon, With<ActiveDimension>>,
     infinite_mode: Res<InfiniteMode>,
     mob_spawning_paused: Res<MobSpawningPaused>,
+    difficulty: Res<ActiveRunDifficulty>,
 ) {
     if *NO_SPAWN {
         return;
@@ -386,8 +388,23 @@ fn handle_spawn_mobs(
                     .get_component::<CombatAlignment, _>(mob.clone())
                     .map(|a| a != &CombatAlignment::Passive)
                     .unwrap_or(false);
-                if rng.gen::<f32>() < ELITE_SPAWN_RATE && can_be_elite {
-                    commands.entity(spawned_mob).insert(EliteMob);
+                // Endless void mobs skip run-difficulty elite scaling entirely.
+                if !infinite_mode.active && can_be_elite {
+                    let elite_rate =
+                        ELITE_SPAWN_RATE * difficulty.elite_rate_multiplier();
+                    if rng.gen::<f32>() < elite_rate {
+                        commands.entity(spawned_mob).insert(EliteMob);
+                        if difficulty.allows_mega_elites()
+                            && rng.gen::<f32>() < MEGA_ELITE_CHANCE
+                        {
+                            commands.entity(spawned_mob).insert(MegaEliteMob);
+                        }
+                    }
+                } else if infinite_mode.active && can_be_elite {
+                    // Endless: keep legacy elite rate (no baseline nerf / ladder mods).
+                    if rng.gen::<f32>() < ELITE_SPAWN_RATE {
+                        commands.entity(spawned_mob).insert(EliteMob);
+                    }
                 }
 
                 // Mark mobs spawned during infinite mode for red tint and speed boost
@@ -638,6 +655,7 @@ fn tick_spawner_timers(
     chaos_tracker: Res<ChaosTracker>,
     mob_spawning_paused: Res<MobSpawningPaused>,
     transition_state: Res<EraTransitionState>,
+    difficulty: Res<ActiveRunDifficulty>,
 ) {
     if *NO_SPAWN {
         return;
@@ -712,17 +730,26 @@ fn tick_spawner_timers(
             continue;
         }
 
-        spawner.spawn_timer.tick(time.delta());
+        // Baseline / ladder spawn-rate scaling for normal overworld spawns only.
+        // Endless keeps legacy tick rates (no baseline nerf or difficulty restore).
+        let spawn_dt = if infinite_mode.active {
+            time.delta()
+        } else {
+            std::time::Duration::from_secs_f32(
+                time.delta_secs() * difficulty.spawn_rate_multiplier(),
+            )
+        };
+        spawner.spawn_timer.tick(spawn_dt);
 
         // Speed up spawns during night or endless mode
         if night_tracker.is_night() || infinite_mode.active {
             // 3x spawn rate at night
-            spawner.spawn_timer.tick(time.delta());
-            spawner.spawn_timer.tick(time.delta());
-            spawner.spawn_timer.tick(time.delta());
+            spawner.spawn_timer.tick(spawn_dt);
+            spawner.spawn_timer.tick(spawn_dt);
+            spawner.spawn_timer.tick(spawn_dt);
             if infinite_mode.active {
                 for _ in 0..5 {
-                    spawner.spawn_timer.tick(time.delta());
+                    spawner.spawn_timer.tick(spawn_dt);
                 }
             }
         }

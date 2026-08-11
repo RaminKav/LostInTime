@@ -23,6 +23,7 @@ use crate::{
     chaos::{hp_multiplier_for_total_chaos, ChaosTracker},
     client::is_not_paused,
     colors::{BLACK, DARK_GREEN, GREY, LIGHT_BROWN, LIGHT_GREEN, PINK, RED},
+    difficulty::{ActiveRunDifficulty, MEGA_ELITE_SPEED_MULT},
     inputs::FacingDirection,
     item::{
         boss_shrine::{BossSummonIndex, BossSummonTracker},
@@ -81,6 +82,10 @@ impl Plugin for EnemyPlugin {
                         .after(crate::defs::spawn::apply_pending_sprite_sheets)
                         .before(add_current_health_with_max_health),
                     juice_up_spawned_mobs_per_day.before(add_current_health_with_max_health),
+                    apply_run_difficulty_to_normal_mobs
+                        .after(juice_up_spawned_mobs_per_day)
+                        .after(juice_up_spawned_elite_mobs)
+                        .before(add_current_health_with_max_health),
                     juice_up_world_object_max_health_by_chaos
                         .before(add_current_health_with_max_health),
                     scale_boss_summon_stats
@@ -269,6 +274,10 @@ pub enum CombatAlignment {
 
 #[derive(Component, Default, Deserialize, Debug, Clone, Reflect)]
 pub struct EliteMob;
+
+/// Max-difficulty elite upgrade: larger, stronger, uses [`UIElement::MegaEliteStar`].
+#[derive(Component, Default, Debug, Clone, Reflect)]
+pub struct MegaEliteMob;
 
 /// Applied after [`juice_up_spawned_elite_mobs`] so juice can retry if the
 /// first `Added<EliteMob>` frame missed optional components.
@@ -608,6 +617,8 @@ fn juice_up_spawned_elite_mobs(
             &mut LootTable,
             &mut Sprite,
             Option<&mut CurrentHealth>,
+            Option<&mut FollowSpeed>,
+            Option<&MegaEliteMob>,
         ),
         (With<EliteMob>, Without<EliteMobJuiced>),
     >,
@@ -615,17 +626,53 @@ fn juice_up_spawned_elite_mobs(
     defs: Res<crate::defs::GameDefs>,
 ) {
     // Sheet mobs spawn with `PendingSpriteSheet`; requiring `Sprite` waits until that resolves.
-    // Visual size must match 0.10: ONLY `custom_size = 48` on 32px sheets (1.5×). Do NOT also
-    // set `Transform.scale` — that compounds to ~2.25×, and `BounceOnHit` then snaps scale back
-    // to `rest_scale` (1.0) after the first hit, which looked like "starts huge, then shrinks".
-    const COLLIDER_AND_STAT_SCALE: f32 = 1.5;
+    // Visual size must match 0.10: ONLY `custom_size` on 32px sheets. Do NOT also set
+    // `Transform.scale` — that compounds, and `BounceOnHit` then snaps scale back to
+    // `rest_scale` (1.0) after the first hit.
+    const ELITE_STAT_SCALE: f32 = 1.5;
     const ELITE_SPRITE_SIZE: Vec2 = Vec2::new(48., 48.);
-    for (e, mob, mut hp, mut att, mut exp, mut loot, mut sprite, maybe_current_hp) in
-        elites.iter_mut()
+    // Mega elites: triple the *gains* of a normal elite (e.g. HP ×5 → ×13), 64px sprite.
+    const MEGA_HP_MULT: f32 = 1. + (5. - 1.) * 3.;
+    const MEGA_ATK_MULT: f32 = 1. + (ELITE_STAT_SCALE - 1.) * 3.;
+    const MEGA_EXP_LOOT_MULT: f32 = 1. + (3. - 1.) * 3.;
+    const MEGA_COLLIDER_SCALE: f32 = 2.0;
+    const MEGA_SPRITE_SIZE: Vec2 = Vec2::new(64., 64.);
+
+    for (
+        e,
+        mob,
+        mut hp,
+        mut att,
+        mut exp,
+        mut loot,
+        mut sprite,
+        maybe_current_hp,
+        maybe_speed,
+        mega,
+    ) in elites.iter_mut()
     {
-        hp.0 = (hp.0 as f32 * 5.) as i32;
-        att.0 = (att.0 as f32 * COLLIDER_AND_STAT_SCALE) as i32;
-        exp.0 = (exp.0 as f32 * 3.) as u32;
+        let is_mega = mega.is_some();
+        let (hp_mult, atk_mult, exp_loot_mult, collider_scale, sprite_size) = if is_mega {
+            (
+                MEGA_HP_MULT,
+                MEGA_ATK_MULT,
+                MEGA_EXP_LOOT_MULT,
+                MEGA_COLLIDER_SCALE,
+                MEGA_SPRITE_SIZE,
+            )
+        } else {
+            (
+                5.0,
+                ELITE_STAT_SCALE,
+                3.0,
+                ELITE_STAT_SCALE,
+                ELITE_SPRITE_SIZE,
+            )
+        };
+
+        hp.0 = (hp.0 as f32 * hp_mult) as i32;
+        att.0 = (att.0 as f32 * atk_mult) as i32;
+        exp.0 = (exp.0 as f32 * exp_loot_mult) as u32;
         loot.drops = loot
             .drops
             .iter()
@@ -633,16 +680,22 @@ fn juice_up_spawned_elite_mobs(
                 item: l.item,
                 min: l.min,
                 max: l.max,
-                rate: l.rate * 3.,
+                rate: l.rate * exp_loot_mult,
             })
             .collect();
         if let Some(collider) = defs
             .get_mob_def(mob.clone())
-            .and_then(|d| d.scaled_capsule_collider(COLLIDER_AND_STAT_SCALE))
+            .and_then(|d| d.scaled_capsule_collider(collider_scale))
         {
             commands.entity(e).insert(collider);
         }
-        sprite.custom_size = Some(ELITE_SPRITE_SIZE);
+        sprite.custom_size = Some(sprite_size);
+        if is_mega {
+            if let Some(mut speed) = maybe_speed {
+                // Chase reads live `FollowSpeed` each tick (see `follow` / boss follow systems).
+                speed.0 *= MEGA_ELITE_SPEED_MULT;
+            }
+        }
         if let Some(mut current_hp) = maybe_current_hp {
             current_hp.0 = hp.0;
         } else {
@@ -650,11 +703,54 @@ fn juice_up_spawned_elite_mobs(
         }
         commands.entity(e).insert(EliteMobJuiced);
         info!(
-            "Elite juiced: {mob:?} e={e:?} hp={} atk={} sprite_size={ELITE_SPRITE_SIZE:?}",
-            hp.0, att.0
+            "{} juiced: {mob:?} e={e:?} hp={} atk={} sprite_size={sprite_size:?}",
+            if is_mega { "Mega elite" } else { "Elite" },
+            hp.0,
+            att.0
         );
     }
 }
+
+/// Baseline + ladder difficulty mods for normal mobs (excludes bosses and endless void mobs).
+fn apply_run_difficulty_to_normal_mobs(
+    mut mobs: Query<
+        (
+            Entity,
+            &Mob,
+            &mut MaxHealth,
+            &mut Attack,
+            &mut FollowSpeed,
+            Option<&mut CurrentHealth>,
+        ),
+        (Added<Mob>, Without<InfiniteModeMob>, Without<DifficultyApplied>),
+    >,
+    difficulty: Res<ActiveRunDifficulty>,
+    mut commands: Commands,
+) {
+    let speed_m = difficulty.speed_multiplier();
+    let dmg_m = difficulty.damage_multiplier();
+    let hp_m = difficulty.hp_multiplier();
+    for (e, mob, mut hp, mut att, mut speed, maybe_current_hp) in mobs.iter_mut() {
+        if mob.is_boss() {
+            commands.entity(e).insert(DifficultyApplied);
+            continue;
+        }
+        speed.0 *= speed_m;
+        if (hp_m - 1.0).abs() > f32::EPSILON {
+            hp.0 = (hp.0 as f32 * hp_m) as i32;
+        }
+        if (dmg_m - 1.0).abs() > f32::EPSILON {
+            att.0 = (att.0 as f32 * dmg_m) as i32;
+        }
+        if let Some(mut current_hp) = maybe_current_hp {
+            current_hp.0 = hp.0;
+        }
+        commands.entity(e).insert(DifficultyApplied);
+    }
+}
+
+#[derive(Component, Default, Debug, Clone)]
+struct DifficultyApplied;
 
 fn juice_up_spawned_mobs_per_day(
     mut elites: Query<

@@ -113,6 +113,8 @@ mod skill_browser_grid;
 pub use skill_browser_grid::*;
 mod beastiary_browser_ui;
 pub use beastiary_browser_ui::*;
+pub mod difficulty_ui;
+pub use difficulty_ui::*;
 mod achievements_ui;
 use crate::run_once_per_run;
 use crate::ui::achievement_banner::{
@@ -987,6 +989,21 @@ impl Plugin for UIPlugin {
                         .run_if(state_changed::<UIState>.and_then(in_state(UIState::Archives))),
                     cleanup_archives_ui
                         .run_if(state_changed::<UIState>.and_then(not(in_state(UIState::Archives)))),
+                    setup_difficulty_ui
+                        .before(CustomFlush)
+                        .run_if(
+                            state_changed::<UIState>
+                                .and_then(in_state(UIState::DifficultySelection)),
+                        ),
+                    cleanup_difficulty_ui.run_if(
+                        state_changed::<UIState>
+                            .and_then(not(in_state(UIState::DifficultySelection))),
+                    ),
+                    handle_difficulty_ui_interactions
+                        .run_if(in_state(UIState::DifficultySelection)),
+                    sync_difficulty_selection_visuals
+                        .run_if(in_state(UIState::DifficultySelection))
+                        .run_if(resource_changed::<crate::difficulty::DifficultySelectState>),
                 )
                     .chain()
                     .run_if(in_state(GameState::MainMenu)),
@@ -1807,6 +1824,10 @@ pub fn handle_new_ui_state(
     }
     for (e, ui) in old_ui.iter() {
         if *ui != next_ui || should_close_self {
+            // Difficulty modal overlays class select — keep that UI mounted behind it.
+            if next_ui == UIState::DifficultySelection && *ui == UIState::ClassSelection {
+                continue;
+            }
             if let Ok(mut entity_commands) = commands.get_entity(e) {
                 entity_commands.despawn();
             }

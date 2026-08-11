@@ -604,6 +604,7 @@ pub fn new_follow(
     mut follows: Query<(
         Entity,
         &FollowState,
+        Option<&FollowSpeed>,
         Option<&EnemyAttackCooldown>,
         &mut AseAnimation,
         &mut KinematicCharacterController,
@@ -612,7 +613,9 @@ pub fn new_follow(
     added: Query<Entity, Added<FollowState>>,
     time: Res<Time>,
 ) {
-    for (entity, follow, att_cooldown, mut anim, mut mover, mob_option) in follows.iter_mut() {
+    for (entity, follow, follow_speed, att_cooldown, mut anim, mut mover, mob_option) in
+        follows.iter_mut()
+    {
         if att_cooldown.is_some() && att_cooldown.unwrap().0.fraction() <= 0.5 {
             continue;
         }
@@ -625,8 +628,10 @@ pub fn new_follow(
         let delta = (target_transform.translation - follow_translation)
             .normalize_or_zero()
             .truncate();
+        // Live FollowSpeed — do not `&mut FollowState` here (conflicts with `Added<FollowState>`).
+        let speed = follow_speed.map(|s| s.0).unwrap_or(follow.speed);
         // Find the direction from the follower to the target and go that way
-        mover.translation = Some(delta * follow.speed * PLAYER_MOVE_SPEED * time.delta_secs());
+        mover.translation = Some(delta * speed * PLAYER_MOVE_SPEED * time.delta_secs());
 
         if added.get(entity).is_ok() {
             if let Some(Mob::RedMushking) = mob_option {

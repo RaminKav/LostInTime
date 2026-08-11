@@ -1688,8 +1688,13 @@ pub fn handle_placing_world_object(
     ground_patch_graphics: Res<GroundPatchesGraphics>,
     mut events: MessageReader<PlaceItemEvent>,
     water_colliders: Query<
-        (Entity, &Collider, &GlobalTransform),
-        (Without<WorldObject>, Without<Mob>, Without<Player>),
+        (Entity, &GlobalTransform),
+        (
+            With<crate::world::chunk::WaterCollider>,
+            Without<WorldObject>,
+            Without<Mob>,
+            Without<Player>,
+        ),
     >,
     container_reg: Res<ContainerRegistry>,
 ) {
@@ -1755,12 +1760,9 @@ pub fn handle_placing_world_object(
                         }
 
                         if place_event.obj.is_water_placeable() {
-                            for (e, _c, t) in water_colliders.iter() {
-                                if t.translation()
-                                    .truncate()
-                                    .distance(tile_pos_to_world_pos(tile_pos, false))
-                                    <= 6.
-                                {
+                            let place_world = tile_pos_to_world_pos(tile_pos, false);
+                            for (e, t) in water_colliders.iter() {
+                                if t.translation().truncate().distance(place_world) <= 6. {
                                     commands.entity(e).insert(Sensor);
                                 }
                             }
@@ -1901,8 +1903,13 @@ pub fn handle_break_object(
     xp: Query<&ExperienceReward>,
     mut analytics_events: MessageWriter<AnalyticsUpdateEvent>,
     water_colliders: Query<
-        (Entity, &Collider, &GlobalTransform),
-        (Without<WorldObject>, Without<Mob>, Without<Player>),
+        (Entity, &GlobalTransform),
+        (
+            With<crate::world::chunk::WaterCollider>,
+            Without<WorldObject>,
+            Without<Mob>,
+            Without<Player>,
+        ),
     >,
     mut chaos_tracker: ResMut<ChaosTracker>,
     mut flash_event: MessageWriter<FlashExpBarEvent>,
@@ -1921,7 +1928,7 @@ pub fn handle_break_object(
             if tile_data.block_type.contains(&WorldObject::WaterTile)
                 && broken.obj.is_water_placeable()
             {
-                for (e, _c, t) in water_colliders.iter() {
+                for (e, t) in water_colliders.iter() {
                     if t.translation().truncate().distance(world_pos) <= 6. {
                         commands.entity(e).remove::<Sensor>();
                     }

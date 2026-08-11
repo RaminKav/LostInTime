@@ -100,6 +100,7 @@ pub struct MenuButtonExtras<'w, 's> {
     asset_server: Res<'w, AssetServer>,
     leaderboard_visible: Option<ResMut<'w, MainMenuLeaderboardVisible>>,
     game_data: Option<ResMut<'w, GameData>>,
+    cheat_settings: Res<'w, CheatSettings>,
 }
 
 #[derive(Component, Clone, Eq, Display, Debug, PartialEq)]
@@ -261,6 +262,10 @@ pub fn handle_menu_button_click_events(
         if *current_ui_state.get() == UIState::EnterName {
             continue;
         }
+        // Difficulty modal is an overlay on class select; ignore sprite menu clicks underneath.
+        if *current_ui_state.get() == UIState::DifficultySelection {
+            continue;
+        }
 
         match event.button {
             MenuButton::Start => {
@@ -363,8 +368,6 @@ pub fn handle_menu_button_click_events(
                 // Confirm button clicked
                 // Check if class is selected (pet is optional)
                 if let Some(class) = &extras.selection_state.selected_class {
-                    // Store the game start data - will be picked up by handle_portal_animation
-                    // We'll use a resource to pass this data to the portal animation system
                     let pets = extras
                         .selection_state
                         .selected_pet
@@ -372,10 +375,35 @@ pub fn handle_menu_button_click_events(
                         .cloned()
                         .collect();
 
-                    commands.insert_resource(PendingGameStart {
-                        class: class.clone(),
-                        pets,
-                    });
+                    // `DEBUG=1` env and Options "Dev Mode" both unlock the picker for testing.
+                    let difficulty_unlocked = *crate::DEBUG
+                        || extras.cheat_settings.dev_mode
+                        || extras
+                            .game_data
+                            .as_ref()
+                            .map(|d| {
+                                crate::difficulty::difficulty_options_unlocked(
+                                    d.max_unlocked_difficulty,
+                                )
+                            })
+                            .unwrap_or(false);
+
+                    if difficulty_unlocked {
+                        commands.insert_resource(
+                            crate::ui::difficulty_ui::PendingDifficultySelection {
+                                class: class.clone(),
+                                pets,
+                            },
+                        );
+                        next_ui_state.set(UIState::DifficultySelection);
+                    } else {
+                        // Pre-first-win: start immediately with baseline-only balancing.
+                        commands.insert_resource(PendingGameStart {
+                            class: class.clone(),
+                            pets,
+                            difficulty: None,
+                        });
+                    }
                 } else {
                     info!("Please select a class before confirming");
                 }

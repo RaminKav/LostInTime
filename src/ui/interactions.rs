@@ -113,6 +113,17 @@ pub enum UIElement {
     Timeline,
     TimelineArrows,
     EliteStar,
+    MegaEliteStar,
+    Difficulty1,
+    Difficulty2,
+    Difficulty3,
+    Difficulty4,
+    Difficulty5,
+    DifficultyMax,
+    YesButton,
+    YesButtonHover,
+    LeftArrow,
+    LeftArrowHover,
     CraftingInventory,
     FurnaceInventory,
     TileHover,
@@ -295,6 +306,8 @@ impl UIElement {
             UIElement::MainMenuUnlocksButton => Some(UIElement::MainMenuUnlocksButtonHover),
             UIElement::MainMenuStartButton => Some(UIElement::MainMenuStartButtonHover),
             UIElement::ExitButton => Some(UIElement::ExitButtonHover),
+            UIElement::YesButton => Some(UIElement::YesButtonHover),
+            UIElement::LeftArrow => Some(UIElement::LeftArrowHover),
             UIElement::MainMenuOptionsButton => Some(UIElement::MainMenuOptionsButtonHover),
             UIElement::LeaderboardButton => Some(UIElement::LeaderboardButtonHover),
             UIElement::UpgradeSlot => Some(UIElement::UpgradeSlotHover),
@@ -343,6 +356,8 @@ impl UIElement {
             UIElement::MainMenuUnlocksButtonHover => Some(UIElement::MainMenuUnlocksButton),
             UIElement::MainMenuStartButtonHover => Some(UIElement::MainMenuStartButton),
             UIElement::ExitButtonHover => Some(UIElement::ExitButton),
+            UIElement::YesButtonHover => Some(UIElement::YesButton),
+            UIElement::LeftArrowHover => Some(UIElement::LeftArrow),
             UIElement::MainMenuOptionsButtonHover => Some(UIElement::MainMenuOptionsButton),
             UIElement::LeaderboardButtonHover => Some(UIElement::LeaderboardButton),
             UIElement::UpgradeSlotHover => Some(UIElement::UpgradeSlot),
@@ -2953,6 +2968,7 @@ pub fn handle_cursor_main_menu_buttons(
     // permanently stuck there, on top of whatever the mouse is actually pointing at.
     let focus_driving = focus_driving(&mouseless, &cursor_pos);
     let menu_open = *curr_ui_state.get() == UIState::ClassSelection
+        || *curr_ui_state.get() == UIState::DifficultySelection
         || *curr_ui_state.get() == UIState::Unlocks
         || *curr_ui_state.get() == UIState::Options
         || *curr_ui_state.get() == UIState::Achievements

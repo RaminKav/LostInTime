@@ -13,7 +13,7 @@ pub struct WaterCollider;
 use super::dimension::{dim_spawned, ActiveDimension, GenerationSeed};
 
 use super::dungeon::Dungeon;
-use super::generation::WorldObjectCache;
+use super::generation::{PendingObjectGenChunks, WorldObjectCache};
 use super::world_helpers::get_neighbour_tile;
 use super::y_sort::YSort;
 
@@ -60,6 +60,7 @@ impl Plugin for ChunkPlugin {
             .add_systems(
                 Update,
                 Self::startup_chunk_generation
+                    .after(generate_and_cache_island_chunks)
                     .run_if(in_state(GameState::Main).or_else(in_state(GameState::Initializing))),
             )
             .add_systems(
@@ -86,7 +87,11 @@ impl Plugin for ChunkPlugin {
             )
             .add_systems(
                 Update,
-                generate_and_cache_island_chunks.run_if(resource_added::<WorldObjectCache>),
+                // Bake island tiles before startup chunk gen / landmark pre-roll on the same frame
+                // that WorldObjectCache is (re)inserted (e.g. era transition).
+                generate_and_cache_island_chunks
+                    .before(Self::startup_chunk_generation)
+                    .run_if(resource_added::<WorldObjectCache>),
             )
             .add_systems(Update, ApplyDeferred.in_set(CustomFlush));
     }
@@ -169,7 +174,11 @@ pub struct Chunk {
     pub chunk_pos: IVec2,
 }
 
-pub fn generate_and_cache_island_chunks(mut game: GameParam, seed: Res<GenerationSeed>) {
+pub fn generate_and_cache_island_chunks(
+    mut game: GameParam,
+    seed: Res<GenerationSeed>,
+    mut pending_object_gen: ResMut<PendingObjectGenChunks>,
+) {
     let gen_radius = ((ISLAND_SIZE / CHUNK_SIZE as f32) + 1.) as i32;
     let era = game.era.current_era.clone();
 
@@ -183,6 +192,9 @@ pub fn generate_and_cache_island_chunks(mut game: GameParam, seed: Res<Generatio
         "Caching ALL chunks: {} chunks, {} tiles total (water_freq: {:?})",
         total_chunks, expected_tiles, game.world_generation_params.water_frequency,
     );
+
+    // Drop deferred object-gen from a previous dimension / cache.
+    pending_object_gen.0.clear();
 
     game.world_obj_cache.tile_data_cache.reserve(expected_tiles);
 
@@ -486,23 +498,23 @@ impl ChunkPlugin {
             return;
         }
         info!("BEGIN STARTUP CHUNK GENERATION!!");
-        // Use ISLAND_SIZE to determine startup chunk radius instead of hardcoded 6.
-        // Always request chunk entities for positions that don't have one (e.g. after dimension
-        // despawn). When data is cached (is_chunk_generated), handle_new_chunk_event will still
-        // spawn the entity and fill from cache — otherwise we'd never create entities and the
-        // loading screen would wait forever for chunks_created > 0.
-        let num_chunks =
-            ((crate::world::ISLAND_SIZE / crate::world::CHUNK_SIZE as f32) + 1.) as i32;
+        // Only materialize chunks near spawn. The full island tile bake still runs in
+        // `generate_and_cache_island_chunks`, and far chunks + their objects load on demand via
+        // `spawn_chunks_around_camera`. Spawning the whole island here (-7..=7 = 225 chunks)
+        // freezes the main thread for many seconds (tile entities, water colliders, object place).
+        let num_chunks = NUM_CHUNKS_AROUND_CAMERA;
+        let mut queued = 0u32;
         for y in -num_chunks..=num_chunks {
             for x in -num_chunks..=num_chunks {
                 let chunk_pos = IVec2::new(x, y);
                 if game.get_chunk_entity(chunk_pos).is_none() {
                     create_chunk_event.write(CreateChunkEvent { chunk_pos });
+                    queued += 1;
                 }
             }
         }
         done_create_chunk_event.write(DoneCreateChunkEvent);
-        info!("END STARTUP CHUNK GENERATION!!");
+        info!("END STARTUP CHUNK GENERATION!! (queued {queued} chunks near spawn)");
     }
     //TODO: change despawning systems to use playe rpos instead??
     /// Mark out-of-range chunks for despawn (deferred to prevent render extraction race condition)

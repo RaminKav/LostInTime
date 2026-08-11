@@ -265,6 +265,7 @@ pub fn follow(
         Entity,
         &mut FollowState,
         &EnemyAnimationState,
+        Option<&FollowSpeed>,
         Option<&EnemyAttackCooldown>,
         Option<&MobStatusEffects>,
         Option<&Parried>,
@@ -280,6 +281,7 @@ pub fn follow(
         entity,
         mut follow,
         anim_state,
+        follow_speed,
         att_cooldown,
         status_option,
         parried_option,
@@ -386,6 +388,10 @@ pub fn follow(
 
         follow.curr_path = Some(direct_path_to_target);
         follow.curr_delta = Some(delta);
+        // Prefer live `FollowSpeed` so late juicing (mega elite +20%, run difficulty,
+        // endless tint boost) is not stuck on the value baked into FollowState at spawn.
+        let speed = follow_speed.map(|s| s.0).unwrap_or(follow.speed);
+        follow.speed = speed;
         // add directional offset so they dont get stuck on walls...
         mover.translation = Some(
             (delta
@@ -405,7 +411,7 @@ pub fn follow(
                         0.
                     },
                 ))
-                * follow.speed
+                * speed
                 * PLAYER_MOVE_SPEED
                 * time.delta_secs()
                 * status_option

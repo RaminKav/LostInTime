@@ -12,7 +12,8 @@ use strum::IntoEnumIterator;
 use crate::{
     assets::{Graphics, SpriteAnchor},
     custom_commands::CommandsExt,
-    enemy::{spawn_helpers::can_spawn_mob_here, CombatAlignment, EliteMob, Mob},
+    difficulty::{ActiveRunDifficulty, MEGA_ELITE_CHANCE},
+    enemy::{spawn_helpers::can_spawn_mob_here, CombatAlignment, EliteMob, MegaEliteMob, Mob},
     item::{object_actions::ObjectAction, LootTable, PlaceItemEvent},
     proto::proto_param::ProtoParam,
     ui::minimap::UpdateMiniMapEvent,
@@ -49,7 +50,12 @@ pub struct DungeonShrineMobDeathEvent(pub Entity);
 pub const NUM_DUNGEON_SHRINE_MOBS: usize = 15;
 pub const DUNGEON_ELITE_SPAWN_RATE: f32 = 0.30;
 
-pub fn roll_dungeon_elite(mob: &Mob, proto: &ProtoParam, rng: &mut impl Rng) -> bool {
+pub fn roll_dungeon_elite(
+    mob: &Mob,
+    proto: &ProtoParam,
+    rng: &mut impl Rng,
+    elite_rate_multiplier: f32,
+) -> bool {
     if *mob == Mob::StoneGolem {
         return false;
     }
@@ -57,7 +63,7 @@ pub fn roll_dungeon_elite(mob: &Mob, proto: &ProtoParam, rng: &mut impl Rng) -> 
         .get_component::<CombatAlignment, _>(mob.clone())
         .map(|a| a != &CombatAlignment::Passive)
         .unwrap_or(false);
-    can_be_elite && rng.gen::<f32>() < DUNGEON_ELITE_SPAWN_RATE
+    can_be_elite && rng.gen::<f32>() < DUNGEON_ELITE_SPAWN_RATE * elite_rate_multiplier
 }
 
 pub fn handle_dungeon_shrine_activation(
@@ -71,6 +77,7 @@ pub fn handle_dungeon_shrine_activation(
     mut proto_param: ProtoParam,
     mut commands: Commands,
     game: GameParam,
+    difficulty: Res<ActiveRunDifficulty>,
 ) {
     for (e, t, mut shrine, mut anim, state) in shrines.iter_mut() {
         if !shrine.is_activated && usize::from(state.current_frame()) == 55 {
@@ -98,8 +105,18 @@ pub fn handle_dungeon_shrine_activation(
                     if let Some(mob_e) =
                         commands.spawn_from_proto(spawned_mob.clone(), &proto_param.defs, spawn_pos)
                     {
-                        if roll_dungeon_elite(&spawned_mob, &proto_param, &mut rng) {
+                        if roll_dungeon_elite(
+                            &spawned_mob,
+                            &proto_param,
+                            &mut rng,
+                            difficulty.elite_rate_multiplier(),
+                        ) {
                             commands.entity(mob_e).insert(EliteMob);
+                            if difficulty.allows_mega_elites()
+                                && rng.gen::<f32>() < MEGA_ELITE_CHANCE
+                            {
+                                commands.entity(mob_e).insert(MegaEliteMob);
+                            }
                         }
                         fallback_count = 0;
                         num_to_spawn -= 1;

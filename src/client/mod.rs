@@ -360,6 +360,12 @@ pub struct GameData {
     /// Whether the main-menu leaderboard panel is shown (persisted).
     #[serde(default)]
     pub show_main_menu_leaderboard: Option<bool>,
+    /// Highest difficulty tier the player may select (0 = locked / no modal, 1..=6).
+    #[serde(default)]
+    pub max_unlocked_difficulty: u8,
+    /// Last difficulty chosen in the picker (1..=6); clamped to [`Self::max_unlocked_difficulty`].
+    #[serde(default)]
+    pub last_selected_difficulty: u8,
 }
 
 impl GameData {
@@ -884,7 +890,8 @@ pub fn load_game_data_for_ui(mut commands: Commands) {
     if let Ok(file_file) = File::open(game_data_file_path) {
         let reader = BufReader::new(file_file);
         match GameData::try_from_json_reader(reader) {
-            Ok(game_data) => {
+            Ok(mut game_data) => {
+                migrate_difficulty_unlock_in_place(&mut game_data);
                 // Insert bounce tracker as a resource
                 commands.insert_resource(game_data.bounce_tracker.clone());
                 let seen_tips_set = game_data.seen_tips.clone();
@@ -907,6 +914,24 @@ pub fn load_game_data_for_ui(mut commands: Commands) {
         commands.insert_resource(GameData::default());
         commands.insert_resource(SeenTutorialChunks::default());
     }
+}
+
+fn migrate_difficulty_unlock_in_place(game_data: &mut GameData) {
+    use crate::player::achievements::Achievement;
+
+    if game_data.max_unlocked_difficulty > 0 {
+        return;
+    }
+    let beaten = game_data.achievements.is_completed(Achievement::Act3)
+        || game_data.achievements.is_claimed(Achievement::Act3);
+    if !beaten {
+        return;
+    }
+    game_data.max_unlocked_difficulty = 1;
+    if game_data.last_selected_difficulty == 0 {
+        game_data.last_selected_difficulty = 1;
+    }
+    crate::difficulty::persist_difficulty_progress(game_data);
 }
 
 /// Persists time fragments to game_data.json immediately when they are spent

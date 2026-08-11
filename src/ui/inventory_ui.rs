@@ -135,6 +135,8 @@ pub enum UIState {
     BeastiaryBrowser,
     /// Main-menu archive modal: bestiary / time crystals / unlocks shortcuts.
     Archives,
+    /// Post-class-select difficulty picker (unlocked after first Era 3 clear).
+    DifficultySelection,
     /// Gamepad-only pause overlay during a run (bound to the Start button): pauses gameplay
     /// like any other menu, but doesn't spawn its own panel — instead it lets the player
     /// navigate the always-visible HUD (heirloom icons, active skill icons, pet skill icon)

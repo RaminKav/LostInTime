@@ -1,4 +1,6 @@
-use super::chunk::{ChunkPlugin, GenerateObjectsEvent, TileSpriteData};
+use super::chunk::{
+    generate_and_cache_island_chunks, ChunkPlugin, GenerateObjectsEvent, TileSpriteData,
+};
 use super::dimension::{ActiveDimension, Era, GenerationSeed};
 use super::dungeon::Dungeon;
 use super::noise_helpers::{_poisson_disk_sampling, get_object_points_for_chunk};
@@ -10,7 +12,6 @@ use super::{WorldGeneration, ISLAND_SIZE};
 use crate::aseprite_assets::Portal;
 use crate::aseprite_helpers::aseprite_bundle;
 use crate::assets::{Graphics, SpriteAnchor};
-use crate::enemy::spawn_helpers::is_tile_water;
 use crate::item::{object_actions::ObjectAction, PlaceItemEvent, WorldObject};
 use crate::pets::state::{Pet, PetSpawner};
 use crate::player::skills::ActiveSkill;
@@ -82,22 +83,45 @@ pub struct WorldObjectCache {
     /// Survives chunk despawn so broken state and costs stay stable.
     pub broken_shrine_costs: HashMap<TileMapPosition, Vec<(crate::item::WorldObject, u32)>>,
 }
+
+/// Chunks waiting for unique landmarks / shrine pre-roll before object generation.
+/// Prevents marking chunks generated without boss shrine, dungeon entrance, or shrines.
+#[derive(Resource, Debug, Default, Clone)]
+pub struct PendingObjectGenChunks(pub Vec<IVec2>);
+
+/// Max chunks to run object generation for in a single frame. Full-island bursts (100+) of
+/// `PlaceItemEvent`s otherwise hitch the main thread for many seconds during Initializing.
+const OBJECT_GEN_CHUNKS_PER_FRAME: usize = 4;
+
+/// Absolute cap when searching for a dry unique-landmark footprint (BossShrine is 9×9).
+const UNIQUE_OBJ_PLACEMENT_MAX_ATTEMPTS: u32 = 4096;
+
 pub struct GenerationPlugin;
 
 impl Plugin for GenerationPlugin {
     fn build(&self, app: &mut App) {
         app.add_message::<WallBreakEvent>()
             .add_message::<DoneGeneratingEvent>()
+            .init_resource::<PendingObjectGenChunks>()
             .add_systems(
                 Update,
                 Self::generate_unique_objects_for_new_world
+                    // Must run after island tile bake + startup chunk events, and before object gen
+                    // materializes chunks — otherwise landmarks can be rolled too late (or the
+                    // one-frame DoneCreateChunkEvent is missed) and never appear in the world.
+                    .after(generate_and_cache_island_chunks)
+                    .after(ChunkPlugin::startup_chunk_generation)
+                    .before(Self::generate_and_cache_objects)
+                    .run_if(resource_exists::<WorldObjectCache>)
                     .run_if(in_state(GameState::Main).or_else(in_state(GameState::Initializing))),
             )
             .add_systems(
                 Update,
                 Self::generate_and_cache_objects
+                    .after(Self::generate_unique_objects_for_new_world)
                     .before(ChunkPlugin::mark_outofrange_chunks_for_despawn)
                     .before(CustomFlush)
+                    .run_if(resource_exists::<WorldObjectCache>)
                     .run_if(
                         resource_exists::<GenerationSeed>.and_then(
                             in_state(GameState::Main).or_else(in_state(GameState::Initializing)),
@@ -470,6 +494,13 @@ impl GenerationPlugin {
     }
 
     fn pre_roll_shrines(game: &mut GameParam) {
+        // Shrine validity uses the noise-baked tile cache. If it's empty we must not
+        // set `shrines_rolled` — every candidate would fail and we'd permanently skip.
+        if game.world_obj_cache.tile_data_cache.is_empty() {
+            warn!("Deferring shrine pre-roll: tile_data_cache is empty");
+            return;
+        }
+
         let mut rng = rand::thread_rng();
 
         // Build a flat list of every shrine instance we want in the world by
@@ -599,10 +630,39 @@ impl GenerationPlugin {
         info!("====================================");
     }
 
+    fn needs_unique_landmarks(game: &GameParam) -> bool {
+        UNIQUE_OBJECTS_DATA
+            .iter()
+            .any(|(obj, _, _)| !game.world_obj_cache.unique_objs.contains_key(obj))
+    }
+
+    fn overworld_landmarks_ready(game: &GameParam) -> bool {
+        !Self::needs_unique_landmarks(game) && game.world_obj_cache.shrines_rolled
+    }
+
+    /// True when any tile in the unique object's footprint is water (or missing from the
+    /// island tile cache). Uses the noise-baked cache so placement works before chunks load.
+    fn unique_obj_footprint_has_water(game: &GameParam, pos: TileMapPosition, size: Vec2) -> bool {
+        let x_halfsize = (size.x / 2.) as i32;
+        let y_halfsize = (size.y / 2.) as i32;
+        for x in (-x_halfsize)..=x_halfsize {
+            for y in (-y_halfsize)..=y_halfsize {
+                let tp = get_neighbour_tile(pos, (x as i8, y as i8));
+                let Some(tile_data) = game.world_obj_cache.tile_data_cache.get(&tp) else {
+                    return true;
+                };
+                if tile_data.block_type.contains(&WorldObject::WaterTile) {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
     //TODO: do the same shit w graphcis resource loading, but w GameData and pkvStore
     pub fn generate_unique_objects_for_new_world(
         mut game: GameParam,
-        done_chunks_event: MessageReader<DoneCreateChunkEvent>,
+        mut done_chunks_event: MessageReader<DoneCreateChunkEvent>,
         mut commands: Commands,
         dungeon_check: Query<&Dungeon>,
         mut meshes: ResMut<Assets<Mesh>>,
@@ -611,57 +671,75 @@ impl GenerationPlugin {
         achievements: Option<Res<crate::player::achievements::Achievements>>,
         asset_server: Res<AssetServer>,
     ) {
-        if done_chunks_event.len() == 0 {
-            return;
-        }
+        let got_done_event = done_chunks_event.read().count() > 0;
+
         // Debug shrine grid owns placement — skip unique objs / portal / shrine pre-roll.
         if *TEST_SHRINES {
             return;
         }
-        let max_obj_spawn_radius = ((ISLAND_SIZE / CHUNK_SIZE as f32) - 3.) as i32;
-
-        // Spawn pet spawners if conditions are met
-        // Spawn Slime Pet in Era1
-        if game.era.current_era == Era::Main {
-            let achievement_ok = achievements
-                .as_ref()
-                .map(|a| !a.has(crate::player::achievements::Achievement::SlimePet))
-                .unwrap_or(true);
-            if achievement_ok {
-                let mut rng = rand::thread_rng();
-                let pos = TileMapPosition::new(
-                    IVec2::new(
-                        rng.gen_range(-max_obj_spawn_radius..max_obj_spawn_radius),
-                        rng.gen_range(-max_obj_spawn_radius..max_obj_spawn_radius),
-                    ),
-                    TilePos::new(rng.gen_range(0..15), rng.gen_range(0..15)),
-                );
-
-                let world_pos = tile_pos_to_world_pos(pos, false);
-                info!("spawning pet slime at {world_pos:?}");
-                Self::spawn_pet_spawner(&mut commands, &asset_server, Pet::Slime, world_pos);
-            }
+        // Room-asset dungeons have no overworld landmarks.
+        if dungeon_check.single().is_ok() {
+            return;
         }
 
-        // Spawn Fairy Pet in Era2
-        if game.era.current_era == Era::Second {
-            let achievement_ok = achievements
-                .as_ref()
-                .map(|a| !a.has(crate::player::achievements::Achievement::FairyPet))
-                .unwrap_or(true);
-            if achievement_ok {
-                let mut rng = rand::thread_rng();
-                let pos = TileMapPosition::new(
-                    IVec2::new(
-                        rng.gen_range(-max_obj_spawn_radius..max_obj_spawn_radius),
-                        rng.gen_range(-max_obj_spawn_radius..max_obj_spawn_radius),
-                    ),
-                    TilePos::new(rng.gen_range(0..15), rng.gen_range(0..15)),
-                );
-                let world_pos = tile_pos_to_world_pos(pos, false);
-                info!("spawning pet fairy at {world_pos:?}");
+        let needs_uniques = Self::needs_unique_landmarks(&game);
+        let needs_shrines = !game.world_obj_cache.shrines_rolled;
+        if !got_done_event && !needs_uniques && !needs_shrines {
+            return;
+        }
 
-                Self::spawn_pet_spawner(&mut commands, &asset_server, Pet::Fairy, world_pos);
+        // Wait for the island tile bake before placing landmarks. This also recovers when
+        // DoneCreateChunkEvent was missed due to system order (common with DEBUG systems).
+        if (needs_uniques || needs_shrines) && game.world_obj_cache.tile_data_cache.is_empty() {
+            return;
+        }
+
+        let max_obj_spawn_radius = ((ISLAND_SIZE / CHUNK_SIZE as f32) - 3.) as i32;
+
+        // Pets / portal are one-shot per dimension spawn (tied to DoneCreateChunkEvent).
+        if got_done_event {
+            // Spawn Slime Pet in Era1
+            if game.era.current_era == Era::Main {
+                let achievement_ok = achievements
+                    .as_ref()
+                    .map(|a| !a.has(crate::player::achievements::Achievement::SlimePet))
+                    .unwrap_or(true);
+                if achievement_ok {
+                    let mut rng = rand::thread_rng();
+                    let pos = TileMapPosition::new(
+                        IVec2::new(
+                            rng.gen_range(-max_obj_spawn_radius..max_obj_spawn_radius),
+                            rng.gen_range(-max_obj_spawn_radius..max_obj_spawn_radius),
+                        ),
+                        TilePos::new(rng.gen_range(0..15), rng.gen_range(0..15)),
+                    );
+
+                    let world_pos = tile_pos_to_world_pos(pos, false);
+                    info!("spawning pet slime at {world_pos:?}");
+                    Self::spawn_pet_spawner(&mut commands, &asset_server, Pet::Slime, world_pos);
+                }
+            }
+
+            // Spawn Fairy Pet in Era2
+            if game.era.current_era == Era::Second {
+                let achievement_ok = achievements
+                    .as_ref()
+                    .map(|a| !a.has(crate::player::achievements::Achievement::FairyPet))
+                    .unwrap_or(true);
+                if achievement_ok {
+                    let mut rng = rand::thread_rng();
+                    let pos = TileMapPosition::new(
+                        IVec2::new(
+                            rng.gen_range(-max_obj_spawn_radius..max_obj_spawn_radius),
+                            rng.gen_range(-max_obj_spawn_radius..max_obj_spawn_radius),
+                        ),
+                        TilePos::new(rng.gen_range(0..15), rng.gen_range(0..15)),
+                    );
+                    let world_pos = tile_pos_to_world_pos(pos, false);
+                    info!("spawning pet fairy at {world_pos:?}");
+
+                    Self::spawn_pet_spawner(&mut commands, &asset_server, Pet::Fairy, world_pos);
+                }
             }
         }
 
@@ -696,35 +774,31 @@ impl GenerationPlugin {
                 let mut pos = gen_new_pos(&mut rng);
                 info!("NEW UNIQUE OBJ: {obj_to_spawn:?} {pos:?}");
 
-                //TODO: this will be funky if size is not even integers
-                let x_halfsize = (size.x / 2.) as i32;
-                let y_halfsize = (size.y / 2.) as i32;
-
                 let mut found_non_water_location = false;
                 let mut max_chunk_retries = 16;
+                let mut attempts = 0u32;
                 'repeat: while !found_non_water_location {
-                    for x in (-x_halfsize)..=x_halfsize {
-                        for y in (-y_halfsize)..=y_halfsize {
-                            let n_pos = tile_pos_to_world_pos(
-                                get_neighbour_tile(pos, (x as i8, y as i8)),
-                                false,
-                            );
-                            if is_tile_water(n_pos, &game).is_ok_and(|x| x) {
-                                let mut rng = rand::thread_rng();
+                    attempts += 1;
+                    if attempts > UNIQUE_OBJ_PLACEMENT_MAX_ATTEMPTS {
+                        warn!(
+                            "Gave up finding dry footprint for {obj_to_spawn:?} after {attempts} attempts; using {pos:?}"
+                        );
+                        break;
+                    }
+                    if Self::unique_obj_footprint_has_water(&game, pos, size) {
+                        let mut rng = rand::thread_rng();
 
-                                pos = TileMapPosition::new(
-                                    pos.chunk_pos,
-                                    TilePos::new(rng.gen_range(0..15), rng.gen_range(0..15)),
-                                );
+                        pos = TileMapPosition::new(
+                            pos.chunk_pos,
+                            TilePos::new(rng.gen_range(0..15), rng.gen_range(0..15)),
+                        );
 
-                                max_chunk_retries -= 1;
-                                if max_chunk_retries == 0 {
-                                    max_chunk_retries = 16;
-                                    pos = gen_new_pos(&mut rng);
-                                }
-                                continue 'repeat;
-                            }
+                        max_chunk_retries -= 1;
+                        if max_chunk_retries == 0 {
+                            max_chunk_retries = 16;
+                            pos = gen_new_pos(&mut rng);
                         }
+                        continue 'repeat;
                     }
                     found_non_water_location = true;
                 }
@@ -737,7 +811,7 @@ impl GenerationPlugin {
             Self::pre_roll_shrines(&mut game);
         }
 
-        if dungeon_check.single().is_err() && !*NO_GEN {
+        if got_done_event && !*NO_GEN {
             info!("SPAWN PORTAL");
             // summon portal
             commands
@@ -794,6 +868,7 @@ impl GenerationPlugin {
         mut commands: Commands,
         mut game: GameParam,
         mut chunk_spawn_event: MessageReader<GenerateObjectsEvent>,
+        mut pending_chunks: ResMut<PendingObjectGenChunks>,
         dungeon_check: Query<&Dungeon, With<ActiveDimension>>,
         seed: Res<GenerationSeed>,
         _chunk_wall_cache: Query<&mut ChunkWallCache>,
@@ -802,14 +877,41 @@ impl GenerationPlugin {
         mut place_item_event: MessageWriter<PlaceItemEvent>,
     ) {
         if *NO_GEN || *TEST_SHRINES {
+            pending_chunks.0.clear();
             return;
         }
         let mut total_coal = 0;
         let mut total_metal = 0;
         // Get dungeon check result once for all chunks (it's the same query result)
         let in_dungeon = dungeon_check.single().is_ok();
+
+        let mut chunk_positions: Vec<IVec2> = pending_chunks.0.drain(..).collect();
         for chunk in chunk_spawn_event.read() {
-            let chunk_pos = chunk.chunk_pos;
+            chunk_positions.push(chunk.chunk_pos);
+        }
+
+        // Overworld object gen must wait until unique landmarks + shrines are pre-rolled.
+        // Otherwise chunks get marked generated without them and never receive them later.
+        if !in_dungeon && !Self::overworld_landmarks_ready(&game) {
+            if !chunk_positions.is_empty() {
+                debug!(
+                    "Deferring object gen for {} chunk(s): landmarks not ready (uniques missing={}, shrines_rolled={})",
+                    chunk_positions.len(),
+                    Self::needs_unique_landmarks(&game),
+                    game.world_obj_cache.shrines_rolled,
+                );
+            }
+            pending_chunks.0 = chunk_positions;
+            return;
+        }
+
+        // Spread object placement across frames so Initializing doesn't freeze on a single
+        // multi-second `PlaceItemEvent` burst (trees/props × water-collider scans, etc.).
+        if chunk_positions.len() > OBJECT_GEN_CHUNKS_PER_FRAME {
+            pending_chunks.0 = chunk_positions.split_off(OBJECT_GEN_CHUNKS_PER_FRAME);
+        }
+
+        for chunk_pos in chunk_positions {
             let is_chunk_generated = game.is_chunk_generated(chunk_pos);
             if !is_chunk_generated {
                 debug!(
@@ -967,21 +1069,24 @@ impl GenerationPlugin {
                         }
                     }
 
-                    // UNIQUE OBJECTS
+                    // UNIQUE OBJECTS — only touch landmarks whose clear radius can reach this chunk.
                     for (unique_obj, pos) in game.world_obj_cache.unique_objs.clone() {
+                        let clear_radius = UNIQUE_OBJECTS_DATA
+                            .iter()
+                            .find(|(o, _, _)| o == &unique_obj)
+                            .map(|(_, _, r)| *r as i8)
+                            .unwrap_or(0);
+                        if (pos.chunk_pos - chunk_pos).abs().max_element() > 1 {
+                            continue;
+                        }
                         if pos.chunk_pos == chunk_pos {
                             objs.insert(pos, unique_obj);
-                        };
-                        // clear out area
-                        let clear_tiles = get_radial_tile_positions(
-                            pos,
-                            *UNIQUE_OBJECTS_DATA
-                                .iter()
-                                .find(|(o, _, _)| o == &unique_obj)
-                                .map(|(_, _, r)| r)
-                                .unwrap() as i8,
-                        );
+                        }
+                        let clear_tiles = get_radial_tile_positions(pos, clear_radius);
                         for pos_to_clear in clear_tiles {
+                            if pos_to_clear.chunk_pos != chunk_pos {
+                                continue;
+                            }
                             if let Some(obj_to_clear) = objs.get(&pos_to_clear) {
                                 if (obj_to_clear.is_tree()
                                     || obj_to_clear.is_medium_size(&proto_param))
@@ -1005,13 +1110,18 @@ impl GenerationPlugin {
                     }
 
                     for (pos, shrine_obj) in game.world_obj_cache.shrines.clone() {
+                        // Shrines clear radius 3 tiles — only nearby chunk coords can overlap.
+                        if (pos.chunk_pos - chunk_pos).abs().max_element() > 1 {
+                            continue;
+                        }
                         if pos.chunk_pos == chunk_pos {
                             objs.insert(pos, shrine_obj);
                         }
-                        // Clear a radius of large foliage objects (trees / medium props)
-                        // around every shrine so it doesn't spawn buried in the forest.
                         let clear_tiles = get_radial_tile_positions(pos, SHRINE_CLEAR_RADIUS);
                         for pos_to_clear in clear_tiles {
+                            if pos_to_clear.chunk_pos != chunk_pos {
+                                continue;
+                            }
                             if let Some(obj_to_clear) = objs.get(&pos_to_clear) {
                                 if (obj_to_clear.is_tree()
                                     || obj_to_clear.is_medium_size(&proto_param))

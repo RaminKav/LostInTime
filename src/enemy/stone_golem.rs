@@ -819,7 +819,13 @@ pub fn stone_golem_follow(
     transforms: Query<&mut Transform>,
     mut mover: Query<&mut KinematicCharacterController>,
     mut follows: Query<
-        (Entity, &FollowState, &Mob, Option<&MobStatusEffects>),
+        (
+            Entity,
+            &mut FollowState,
+            &Mob,
+            Option<&FollowSpeed>,
+            Option<&MobStatusEffects>,
+        ),
         (
             Without<crate::combat::MarkedForDeath>,
             Without<WaveAttackState>,
@@ -828,7 +834,7 @@ pub fn stone_golem_follow(
     >,
     time: Res<Time>,
 ) {
-    for (entity, follow, mob, status_option) in follows.iter_mut() {
+    for (entity, mut follow, mob, follow_speed, status_option) in follows.iter_mut() {
         // Only handle StoneGolem
         if mob != &Mob::StoneGolem {
             continue;
@@ -847,10 +853,13 @@ pub fn stone_golem_follow(
         let mut mover = mover.get_mut(entity).unwrap();
         mover.filter_groups = Some(CollisionGroups::new(Group::NONE, Group::NONE));
 
+        let speed = follow_speed.map(|s| s.0).unwrap_or(follow.speed);
+        follow.speed = speed;
+
         // Apply movement with slow debuff
         mover.translation = Some(
             delta
-                * follow.speed
+                * speed
                 * PLAYER_MOVE_SPEED
                 * time.delta_secs()
                 * status_option

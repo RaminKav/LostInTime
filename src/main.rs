@@ -68,6 +68,7 @@ mod colors;
 mod combat;
 mod custom_commands;
 mod defs;
+mod difficulty;
 mod display_scale;
 mod ecs_helpers;
 mod enemy;
@@ -325,6 +326,7 @@ fn main() {
         .add_plugins(AttributesPlugin)
         .add_plugins(CombatPlugin)
         .add_plugins(EnemyPlugin)
+        .add_plugins(difficulty::DifficultyPlugin)
         .add_plugins(PlayerPlugin)
         .add_plugins(WorldPlugin)
         .add_plugins(ClientPlugin)

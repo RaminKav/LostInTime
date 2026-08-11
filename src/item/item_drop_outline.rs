@@ -303,9 +303,13 @@ fn tag_heirloom_icon_outlines(
     microwave_buttons: Query<&MicrowaveHeirloomButton>,
     skill_choice_cards: Query<&SkillChoiceUI>,
     blessing_cards: Query<&BlessingChoiceUI>,
+    // Require `RenderLayers` so world summons that reuse heirloom atlas sprites
+    // (Ant Farm ants, Summon Ring, etc.) are never auto-outlined. Those would
+    // otherwise get a layer-3 outline child that looks like a second camera-locked ant.
     candidates: Query<
         (Entity, &Sprite),
         (
+            With<RenderLayers>,
             Without<HeirloomIconOutline>,
             Without<Mesh2d>,
             Without<ItemDrop>,

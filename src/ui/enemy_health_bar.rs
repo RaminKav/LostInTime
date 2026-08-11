@@ -5,7 +5,7 @@ use crate::ecs_helpers::SafeHierarchyExt;
 use crate::{
     assets::Graphics,
     attributes::{CurrentHealth, MaxHealth},
-    enemy::{EliteMob, Mob},
+    enemy::{EliteMob, MegaEliteMob, Mob},
 };
 
 use super::UIElement;
@@ -30,20 +30,27 @@ pub fn handle_enemy_health_bar_change(
 }
 
 pub fn add_ui_icon_for_elite_mobs(
-    elites: Query<Entity, Added<EliteMob>>,
+    elites: Query<(Entity, Option<&MegaEliteMob>), Added<EliteMob>>,
     mut commands: Commands,
     graphics: Res<Graphics>,
 ) {
-    for elite in elites.iter() {
+    for (elite, mega) in elites.iter() {
+        let icon = if mega.is_some() {
+            UIElement::MegaEliteStar
+        } else {
+            UIElement::EliteStar
+        };
+        let size = if mega.is_some() { 9. } else { 5. };
+        let offset = if mega.is_some() { 18. } else { 10. };
         commands
             .spawn((
                 Sprite {
-                    image: graphics.get_ui_element_texture(UIElement::EliteStar),
-                    custom_size: Some(Vec2::new(5., 5.)),
+                    image: graphics.get_ui_element_texture(icon),
+                    custom_size: Some(Vec2::new(size, size)),
                     ..default()
                 },
                 Transform {
-                    translation: Vec3::new(0., 10., 1.),
+                    translation: Vec3::new(0., offset, 1.),
                     scale: Vec3::new(1., 1., 1.),
                     ..Default::default()
                 },

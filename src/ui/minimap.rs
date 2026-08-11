@@ -486,36 +486,33 @@ fn clear_cache_for_new_dimensions(
     }
 }
 
-// Cache terrain from spawned chunks for the fog of war system (only terrain, not objects)
+/// Seed minimap terrain from the full island noise bake (`tile_data_cache`).
+///
+/// Previously this only copied tiles from **currently spawned** chunk entities. That worked when
+/// startup materialized the whole island, but with on-demand chunk spawn only the spawn neighborhood
+/// entered `explored_terrain` — far chunks (often the visual bottom of the map for negative Y)
+/// stayed blank gray even after you walked into them, because the island texture is not rebuilt for
+/// terrain discovery.
+///
+/// Fog-of-war (`FogOfWarData`) still gates what the player can see; this cache is just the terrain
+/// color under the fog.
 fn cache_explored_chunks(mut cache: ResMut<MinimapTileCache>, game: GameParam) {
-    let num_chunks = ((ISLAND_SIZE / CHUNK_SIZE as f32) + 1.) as i32;
+    let baked = &game.world_obj_cache.tile_data_cache;
+    if baked.is_empty() {
+        return;
+    }
 
-    // Check all possible chunks and cache their terrain data if they exist
-    for chunk_y in -num_chunks..=num_chunks {
-        for chunk_x in -num_chunks..=num_chunks {
-            let chunk_pos = IVec2::new(chunk_x, chunk_y);
+    // One-shot fill after bake / dimension clear. Avoids rescanning 57k tiles every frame.
+    if cache.explored_terrain.len() >= baked.len() {
+        return;
+    }
 
-            // Only cache if chunk is currently spawned
-            if game.get_chunk_entity(chunk_pos).is_some() {
-                // Cache all tiles in this chunk (TERRAIN ONLY - objects handled separately)
-                for tile_y in 0..CHUNK_SIZE {
-                    for tile_x in 0..CHUNK_SIZE {
-                        let tile_pos = TilePos {
-                            x: tile_x,
-                            y: tile_y,
-                        };
-                        let map_pos = TileMapPosition::new(chunk_pos, tile_pos);
-
-                        // Only cache terrain if not already cached (avoid overwriting)
-                        if !cache.explored_terrain.contains_key(&map_pos) {
-                            if let Some(tile_data) = game.get_tile_data(map_pos) {
-                                cache.explored_terrain.insert(map_pos, tile_data.block_type);
-                            }
-                        }
-                    }
-                }
-            }
-        }
+    cache.explored_terrain.reserve(baked.len());
+    for (pos, tile_data) in baked.iter() {
+        cache
+            .explored_terrain
+            .entry(*pos)
+            .or_insert(tile_data.block_type);
     }
 }
 fn setup_island_map(
@@ -600,7 +597,18 @@ fn setup_island_map(
 
             let map_pos = TileMapPosition::new(chunk_pos, tile_pos);
 
-            if let Some(explored_tile) = minimap_cache.explored_terrain.get(&map_pos) {
+            // Prefer minimap cache; fall back to the full island bake so lazy chunk spawn
+            // doesn't leave far tiles as blank gray if the map opens before seeding finishes.
+            let terrain_blocks = minimap_cache.explored_terrain.get(&map_pos).copied().or_else(
+                || {
+                    game.world_obj_cache
+                        .tile_data_cache
+                        .get(&map_pos)
+                        .map(|t| t.block_type)
+                },
+            );
+
+            if let Some(explored_tile) = terrain_blocks {
                 let mut drew_large_object = false;
                 for dy in -2..=2 {
                     for dx in -2..=2 {

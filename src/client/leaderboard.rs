@@ -504,7 +504,10 @@ impl Plugin for LeaderboardPlugin {
             )
             .add_systems(
                 Update,
-                auto_submit_score_on_game_over.run_if(in_state(GameState::Main)),
+                // Online leaderboard accepts Max difficulty runs only.
+                auto_submit_score_on_game_over
+                    .run_if(in_state(GameState::Main))
+                    .run_if(crate::difficulty::run_is_max_difficulty),
             )
             .add_systems(OnEnter(GameState::MainMenu), auto_fetch_leaderboard_on_menu);
     }

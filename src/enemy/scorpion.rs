@@ -479,6 +479,7 @@ pub fn scorpion_follow(
             &mut ScorpionCurrentTag,
             &mut ScorpionFacingDir,
             &mut ScorpionComfortRing,
+            Option<&FollowSpeed>,
             Option<&MobStatusEffects>,
             Option<&HitAnimationTracker>,
         ),
@@ -494,6 +495,7 @@ pub fn scorpion_follow(
         mut current_tag,
         mut facing_dir,
         mut comfort,
+        follow_speed,
         status_option,
         hit_option,
     ) in follows.iter_mut()
@@ -522,6 +524,8 @@ pub fn scorpion_follow(
         let delta = to_target.normalize_or_zero();
         let move_dir = if comfort.retreating { -delta } else { delta };
         let move_speed_mul = if comfort.retreating { 0.65 } else { 1.0 };
+        let speed = follow_speed.map(|s| s.0).unwrap_or(follow.speed);
+        follow.speed = speed;
 
         follow.curr_delta = Some(delta);
         follow.curr_path = Some(delta);
@@ -529,7 +533,7 @@ pub fn scorpion_follow(
         let mut mover = movers.get_mut(entity).unwrap();
         mover.translation = Some(
             move_dir
-                * follow.speed
+                * speed
                 * PLAYER_MOVE_SPEED
                 * time.delta_secs()
                 * move_speed_mul

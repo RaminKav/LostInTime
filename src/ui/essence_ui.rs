@@ -17,6 +17,7 @@ use crate::{
     chaos::ChaosTracker,
     colors::{LIGHT_RED, RED, SHRINE_GREEN, WHITE},
     custom_commands::CommandsExt,
+    difficulty::ActiveRunDifficulty,
     gamepad_bindings::{get_gamepad_display_name, GamepadBindingButton},
     inventory::{Inventory, ItemStack},
     item::WorldObject,
@@ -421,8 +422,8 @@ fn apply_purchase_multiplier(base: f32, multiplier: f32) -> u32 {
     cost.max(MIN_MERCHANT_COIN_COST)
 }
 
-fn purchase_multiplier_for_level(player_level: u8) -> f32 {
-    1.0 + player_level as f32 * 0.53
+fn purchase_multiplier_for_level(player_level: u8, shop_difficulty_mult: f32) -> f32 {
+    (1.0 + player_level as f32 * 0.53) * shop_difficulty_mult
 }
 
 /// How often live merchant shops recompute their prices against the player's current level.
@@ -462,13 +463,15 @@ pub fn refresh_merchant_prices_on_timer(
     ui_dirty: Option<ResMut<MerchantShopUiDirty>>,
     mut commands: Commands,
     world_markers: Query<Entity, With<MerchantWorldMarkerDisplay>>,
+    difficulty: Res<ActiveRunDifficulty>,
 ) {
     if !timer.0.tick(time.delta()).just_finished() {
         return;
     }
 
     let level = player_level.single().map(|l| l.level).unwrap_or(1);
-    let multiplier = purchase_multiplier_for_level(level);
+    let multiplier =
+        purchase_multiplier_for_level(level, difficulty.shop_price_multiplier());
 
     for slots in cache.shops.values_mut() {
         recompute_slot_prices(slots, multiplier);
@@ -2202,6 +2205,7 @@ pub fn handle_merchant_category_reroll_event(
     mut cache: ResMut<EssenceShopCache>,
     slot_ui: Query<(Entity, &MerchantSlotUi)>,
     reroll_buttons: Query<(Entity, &MerchantCategoryRerollButton)>,
+    difficulty: Res<ActiveRunDifficulty>,
 ) {
     let Ok(ui_root) = essence_ui.single() else {
         return;
@@ -2227,6 +2231,7 @@ pub fn handle_merchant_category_reroll_event(
             &slot_ui,
             &reroll_buttons,
             replenish_purchased,
+            difficulty.shop_price_multiplier(),
         );
     }
 }
@@ -2246,12 +2251,14 @@ pub fn apply_merchant_category_reroll(
     slot_ui: &Query<(Entity, &MerchantSlotUi)>,
     reroll_buttons: &Query<(Entity, &MerchantCategoryRerollButton)>,
     replenish_purchased: bool,
+    shop_difficulty_mult: f32,
 ) {
     let (loot_bonus, player_level) = player_atts
         .single()
         .map(|a| (a.0 .0, a.1.level))
         .unwrap_or((0, 1));
-    let purchase_multiplier = purchase_multiplier_for_level(player_level);
+    let purchase_multiplier =
+        purchase_multiplier_for_level(player_level, shop_difficulty_mult);
     let mut rng = rand::thread_rng();
 
     reroll_merchant_category(
@@ -2293,6 +2300,7 @@ pub fn handle_populate_essence_shop_on_new_spawn(
     mut shop_cache: ResMut<EssenceShopCache>,
     mut commands: Commands,
     proto: ProtoParam,
+    difficulty: Res<ActiveRunDifficulty>,
 ) {
     for (entity, mut shop, transform) in new_spawns.iter_mut() {
         let mut rng = rand::thread_rng();
@@ -2314,7 +2322,8 @@ pub fn handle_populate_essence_shop_on_new_spawn(
 
         let player_level = player_atts.single().map(|a| a.1.level).unwrap_or(1);
         let loot_bonus = player_atts.single().map(|a| a.0 .0).unwrap_or(0);
-        let purchase_multiplier = purchase_multiplier_for_level(player_level);
+        let purchase_multiplier =
+            purchase_multiplier_for_level(player_level, difficulty.shop_price_multiplier());
 
         if let Some(cached) = shop_cache.shops.get(&tile_pos) {
             shop.slots = cached.clone();

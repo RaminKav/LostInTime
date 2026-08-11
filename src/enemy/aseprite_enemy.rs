@@ -430,6 +430,7 @@ pub fn aseprite_follow(
             &mut FollowState,
             &mut AseAnimation,
             &mut CurrentAsepriteTag,
+            Option<&FollowSpeed>,
             Option<&MobStatusEffects>,
             Option<&Parried>,
             Option<&crate::player::combat_heirlooms::DeathDefianceFrozen>,
@@ -448,6 +449,7 @@ pub fn aseprite_follow(
         mut follow,
         mut anim,
         mut current_tag,
+        follow_speed,
         status_option,
         parried_option,
         defiance_frozen_option,
@@ -498,10 +500,14 @@ pub fn aseprite_follow(
 
         follow.curr_path = Some(delta);
         follow.curr_delta = Some(delta);
+        // Prefer live `FollowSpeed` so mega-elite / difficulty juicing is not stuck on
+        // the value baked into FollowState when the state machine was built.
+        let speed = follow_speed.map(|s| s.0).unwrap_or(follow.speed);
+        follow.speed = speed;
 
         mover.translation = Some(
             delta
-                * follow.speed
+                * speed
                 * PLAYER_MOVE_SPEED
                 * time.delta_secs()
                 * status_option
