@@ -247,29 +247,31 @@ pub fn handle_new_stone_golem_state_machine(
         if mob != &Mob::StoneGolem {
             continue;
         }
-        let mut e_cmds = commands.entity(e);
+        let Ok(mut e_cmds) = commands.get_entity(e) else {
+            continue;
+        };
 
         let mut rng = rand::thread_rng();
         let initial_timer = rng.gen_range(3.0..5.0);
         e_cmds
-            .insert(aseprite_bundle(
+            .try_insert(aseprite_bundle(
                 asset_server.load(StoneGolem::PATH),
                 StoneGolem::tags::WALK_FRONT,
                 *transform,
                 Visibility::Inherited,
                 false,
             ))
-            .insert(YSort(0.001))
-            .insert(GolemCurrentTag(StoneGolem::tags::WALK_FRONT.to_string()))
-            .insert(CollisionGroups::new(Group::GROUP_1, Group::GROUP_1))
-            .insert(FollowState {
+            .try_insert(YSort(0.001))
+            .try_insert(GolemCurrentTag(StoneGolem::tags::WALK_FRONT.to_string()))
+            .try_insert(CollisionGroups::new(Group::GROUP_1, Group::GROUP_1))
+            .try_insert(FollowState {
                 target: game.game.player,
                 curr_delta: None,
                 curr_path: None,
                 speed: follow_speed.0,
             })
-            .insert(DamagesWorldObjects)
-            .insert(SpikeAttackTimer {
+            .try_insert(DamagesWorldObjects)
+            .try_insert(SpikeAttackTimer {
                 random_timer: Timer::from_seconds(initial_timer, TimerMode::Once),
                 cooldown_timer: {
                     // Start finished so the first attack isn't gated by the cooldown.
@@ -314,7 +316,7 @@ pub fn handle_new_stone_golem_state_machine(
         // `check_spike_attack_completion` / `check_wave_attack_completion` manually remove the attack
         // state and re-insert FollowState once the attack finishes (same pattern as the scorpion boss).
 
-        e_cmds.insert(state_machine);
+        e_cmds.try_insert(state_machine);
     }
 }
 

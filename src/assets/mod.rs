@@ -459,13 +459,12 @@ impl GameAssetsPlugin {
             )
             .unwrap();
         }
-        // Load class ranks early during loading so Class Selection UI can use it
+        // Load persisted meta early so Class Selection UI can use it
         let game_data_file_path = datafiles::game_data();
         if let Ok(file_file) = File::open(game_data_file_path) {
             let reader = BufReader::new(file_file);
             match GameData::try_from_json_reader(reader) {
                 Ok(game_data) => {
-                    let class_ranks = game_data.class_ranks.clone();
                     let high_scores = game_data.high_scores.clone();
                     let achievements = game_data.achievements.clone();
                     let unlock_upgrades = game_data.unlock_upgrades.clone();
@@ -476,7 +475,6 @@ impl GameAssetsPlugin {
                     let time_crystals = game_data.time_crystals.clone();
                     let beastiary = game_data.beastiary.clone();
 
-                    commands.insert_resource(class_ranks);
                     commands.insert_resource(high_scores);
                     commands.insert_resource(achievements);
                     let seen_tutorial_chunks = seen_tutorial_chunks_from_game_data(&game_data);
@@ -504,8 +502,8 @@ impl GameAssetsPlugin {
                     );
                 }
                 Err(err) => {
-                    error!("Failed to load class ranks from game_data.json: {err:?}");
-                    commands.insert_resource(crate::player::class_rank::ClassRankSystem::new());
+                    error!("Failed to load game_data.json: {err:?}");
+                    commands.insert_resource(crate::player::score::HighScores::default());
                     commands.insert_resource(UnlockUpgrades::default());
                     let mut unlocked = UnlockedClasses::default();
                     unlocked.ensure_defaults(&get_default_unlocked_classes());
@@ -524,7 +522,7 @@ impl GameAssetsPlugin {
                 }
             }
         } else {
-            commands.insert_resource(crate::player::class_rank::ClassRankSystem::new());
+            commands.insert_resource(crate::player::score::HighScores::default());
             commands.insert_resource(UnlockUpgrades::default());
             let mut unlocked = UnlockedClasses::default();
             unlocked.ensure_defaults(&get_default_unlocked_classes());

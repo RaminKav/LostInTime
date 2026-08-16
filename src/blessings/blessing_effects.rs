@@ -18,7 +18,6 @@ use crate::{
     custom_commands::CommandsExt,
     item::{active_skill_shrine::roll_active_skill_shrine_offer_skills, WorldObject},
     player::{
-        class_rank::ClassRankSystem,
         currency::ModifyCurencyEvent,
         score::StartingWeapon,
         skills::{
@@ -280,7 +279,6 @@ pub fn handle_ancestor_blessing_selected(
     mut currency_event: MessageWriter<ModifyCurencyEvent>,
     mut attribute_event: MessageWriter<AttributeChangeEvent>,
     player_class: Option<Res<PlayerClass>>,
-    class_ranks: Option<Res<ClassRankSystem>>,
 ) {
     for event in blessing_event.read() {
         let mut rng = rand::thread_rng();
@@ -303,7 +301,6 @@ pub fn handle_ancestor_blessing_selected(
             &mut commands,
             &asset_server,
             player_class.as_deref(),
-            class_ranks.as_deref(),
         );
         hud_slots.set_minor(OwnedBlessingCard::from_minor(&event.choice));
 
@@ -326,14 +323,11 @@ fn apply_ancestor_blessing(
     commands: &mut Commands,
     asset_server: &AssetServer,
     player_class: Option<&PlayerClass>,
-    class_ranks: Option<&ClassRankSystem>,
 ) {
     let selected_class = player_class
         .map(|pc| pc.class.clone())
         .unwrap_or(SkillClass::None);
-    let base_weapon_rarity = class_ranks
-        .map(|ranks| ranks.get_starting_weapon_rarity(&selected_class))
-        .unwrap_or(ItemRarity::Common);
+    let base_weapon_rarity = ItemRarity::Common;
 
     match choice.blessing {
         AncestorBlessing::ThreeTomes => {
@@ -986,12 +980,15 @@ pub struct PendingStatConversionRoll;
 /// After the major blessing UI closes, fire any deferred era swap from the Time Portal.
 /// Skips temporary leaves (inventory/map/options) while a choice is still pending —
 /// [`MajorBlessingOffer`] is only removed after a completed pick.
+/// Also waits for [`PendingMajorHeirloomPick`] (Singular Focus / Collector's Bargain)
+/// so era swap does not race the secondary pick UI into `GameState::Initializing`.
 pub fn apply_deferred_era_swap_after_major_blessing(
     mut deferred: ResMut<DeferredEraSwap>,
     mut dim_event: MessageWriter<DimensionSpawnEvent>,
     pending_offer: Option<Res<MajorBlessingOffer>>,
+    pending_heirloom_pick: Option<Res<PendingMajorHeirloomPick>>,
 ) {
-    if pending_offer.is_some() {
+    if pending_offer.is_some() || pending_heirloom_pick.is_some() {
         return;
     }
     let Some(era) = deferred.era.take() else {

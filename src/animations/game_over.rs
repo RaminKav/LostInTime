@@ -897,6 +897,7 @@ pub fn handle_game_over_final_stats_tooltip(
             }
             .get_stats_summary(curr_health.0, curr_mana.0, None, None);
             attributes.push(skills.poison_chance_stat_summary());
+            attributes.push(skills.freeze_chance_stat_summary());
 
             // Hitbox is centered above "Try Again"; place tooltip up and to the left so it stays on-screen.
             let tooltip_pos = Vec3::new(-155., 46., 2.);

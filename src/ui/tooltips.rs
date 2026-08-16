@@ -211,6 +211,10 @@ pub struct ToolTipUpdateEvent {
     /// (ingredient slots). Inventory slots use the middle crafting-column pin; blueprint
     /// recipes (`is_recipe`) use the left inventory-column pin.
     pub pin_right: bool,
+    /// `UIState::Inventory` only: pin the card at screen center instead of beside the hovered
+    /// slot. Used for bag (`Normal`) and hotbar slots so the card does not cover neighboring
+    /// slots while browsing.
+    pub pin_center: bool,
 }
 
 #[derive(Debug, Clone, Default, Message)]
@@ -358,18 +362,22 @@ pub fn handle_spawn_inv_item_tooltip(
         } else {
             match *cur_inv_state.get() {
                 UIState::Inventory => {
-                    let focus_driving = mouseless.0 || cursor_pos.suppress_ui_hover;
-                    let tooltip_anchor = inventory_item_tooltip_placement_anchor(
-                        cursor_pos.ui_coords.truncate(),
-                        item.anchor_ui,
-                        focus_driving,
-                    );
-                    inventory_item_tooltip_anchor_offset(
-                        tooltip_anchor,
-                        ITEM_TOOLTIP_LARGE_CARD_SIZE,
-                        resolution.game_width,
-                        resolution.game_height,
-                    )
+                    if item.pin_center {
+                        Vec2::ZERO
+                    } else {
+                        let focus_driving = mouseless.0 || cursor_pos.suppress_ui_hover;
+                        let tooltip_anchor = inventory_item_tooltip_placement_anchor(
+                            cursor_pos.ui_coords.truncate(),
+                            item.anchor_ui,
+                            focus_driving,
+                        );
+                        inventory_item_tooltip_anchor_offset(
+                            tooltip_anchor,
+                            ITEM_TOOLTIP_LARGE_CARD_SIZE,
+                            resolution.game_width,
+                            resolution.game_height,
+                        )
+                    }
                 }
                 UIState::InventoryCrafting => {
                     // Blueprints → left (inventory column). Inventory → middle crafting column.
@@ -1041,7 +1049,8 @@ pub fn handle_spawn_inv_item_tooltip(
         if item.world_anchor.is_some() {
             // World-space tooltip (e.g. blessing choice screen); stays unparented.
         } else if use_absolute_inventory_tooltip {
-            // Absolute UI-space position near the cursor; stats panel stays visible.
+            // Absolute UI-space: bag/hotbar cards sit at screen center; other slots stay
+            // beside the hover so the stats panel can remain visible.
         } else if let Ok(inv) = inv.single() {
             commands.entity(inv).add_child(tooltip);
         } else if let Ok(essence) = essence.single() {
@@ -1227,6 +1236,7 @@ pub fn handle_spawn_inv_player_stats(
             Some(hp_regen_period_secs),
         );
         attributes.push(skills.poison_chance_stat_summary());
+        attributes.push(skills.freeze_chance_stat_summary());
 
         let _ = spawn_stats_tooltip_at(
             &mut commands,

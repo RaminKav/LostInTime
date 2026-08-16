@@ -286,42 +286,42 @@ pub fn add_dungeon_shrine_visuals_on_spawn(
     graphics: Res<Graphics>,
 ) {
     for (e, obj, t) in new_shrines.iter() {
+        let Ok(mut e_cmds) = commands.get_entity(e) else {
+            continue;
+        };
         match obj {
             WorldObject::WeaponShrine => {
-                commands
-                    .entity(e)
-                    .insert(aseprite_bundle(
+                e_cmds
+                    .try_insert(aseprite_bundle(
                         graphics.weapon_shrine_anim.as_ref().unwrap().clone(),
                         WeaponShrineAnim::tags::IDLE,
                         *t,
                         Visibility::Inherited,
                         false,
                     ))
-                    .insert(Name::new("WEAPON_SHRINE"));
+                    .try_insert(Name::new("WEAPON_SHRINE"));
             }
             WorldObject::ArmorShrine => {
-                commands
-                    .entity(e)
-                    .insert(aseprite_bundle(
+                e_cmds
+                    .try_insert(aseprite_bundle(
                         graphics.armor_shrine_anim.as_ref().unwrap().clone(),
                         ArmorShrineAnim::tags::IDLE,
                         *t,
                         Visibility::Inherited,
                         false,
                     ))
-                    .insert(Name::new("ARMOR_SHRINE"));
+                    .try_insert(Name::new("ARMOR_SHRINE"));
             }
             WorldObject::AccessoryShrine => {
-                commands
-                    .entity(e)
-                    .insert(aseprite_bundle(
+                e_cmds
+                    .try_insert(aseprite_bundle(
                         graphics.accessory_shrine_anim.as_ref().unwrap().clone(),
                         AccessoryShrineAnim::tags::IDLE,
                         *t,
                         Visibility::Inherited,
                         false,
                     ))
-                    .insert(Name::new("ACCESSORY_SHRINE"));
+                    .try_insert(Name::new("ACCESSORY_SHRINE"));
             }
             WorldObject::WeaponShrineDone
             | WorldObject::ArmorShrineDone
@@ -329,7 +329,7 @@ pub fn add_dungeon_shrine_visuals_on_spawn(
                 if let Ok(mut anim) = done_anims.get_mut(e) {
                     play_loop(&mut anim, CombatShrineAnim::tags::DONE);
                 } else {
-                    commands.entity(e).insert(aseprite_bundle(
+                    e_cmds.try_insert(aseprite_bundle(
                         graphics.weapon_shrine_anim.as_ref().unwrap().clone(),
                         CombatShrineAnim::tags::DONE,
                         *t,

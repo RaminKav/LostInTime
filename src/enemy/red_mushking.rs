@@ -111,7 +111,9 @@ pub fn handle_new_red_mushking_state_machine(
         if mob != &Mob::RedMushking {
             continue;
         }
-        let mut e_cmds = commands.entity(e);
+        let Ok(mut e_cmds) = commands.get_entity(e) else {
+            continue;
+        };
         let shrine_pos = tile_pos_to_world_pos(
             *game
                 .world_obj_cache
@@ -122,23 +124,23 @@ pub fn handle_new_red_mushking_state_machine(
         );
         mover.filter_groups = Some(CollisionGroups::new(Group::NONE, Group::NONE));
         e_cmds
-            .insert(aseprite_bundle(
+            .try_insert(aseprite_bundle(
                 asset_server.load(RedMushking::PATH),
                 RedMushking::tags::IDLE,
                 *transform,
                 Visibility::Inherited,
                 false,
             ))
-            .insert(FollowState {
+            .try_insert(FollowState {
                 target: game.game.player,
                 curr_delta: None,
                 curr_path: None,
                 speed: follow_speed.0,
             })
-            .insert(DamagesWorldObjects)
-            .insert(HealthThreshold(1.))
-            .insert(AttackCollider(None))
-            .insert(AttackRotation {
+            .try_insert(DamagesWorldObjects)
+            .try_insert(HealthThreshold(1.))
+            .try_insert(AttackCollider(None))
+            .try_insert(AttackRotation {
                 timer: Timer::from_seconds(ATTACK_ROTATION_INTERVAL, TimerMode::Once),
                 index: 0,
             });
@@ -186,7 +188,7 @@ pub fn handle_new_red_mushking_state_machine(
         //     },
         // );
 
-        e_cmds.insert(state_machine);
+        e_cmds.try_insert(state_machine);
     }
 }
 

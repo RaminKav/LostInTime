@@ -107,6 +107,18 @@ pub struct MarkedForDeath;
 #[derive(Component, Debug, Clone)]
 #[component(storage = "SparseSet")]
 pub struct KilledByHeirloomEffect(pub Heirloom);
+
+/// True for Collector's Fury: hits tagged as a heirloom effect, or from a heirloom projectile
+/// (Hero Sword wave, echoes, ice explosions, lightning, etc.).
+fn is_heirloom_damage_hit(hit: &HitEvent) -> bool {
+    if hit.from_heirloom_effect.is_some() {
+        return true;
+    }
+    hit.hit_with_projectile
+        .as_ref()
+        .map(|p| p.animation_category() == AnimVisualCategory::Heirloom)
+        .unwrap_or(false)
+}
 #[derive(Debug, Clone, Message)]
 pub struct EnemyDeathEvent {
     pub entity: Entity,
@@ -627,11 +639,24 @@ pub fn handle_hits(
             if hit_health.0 <= 0 {
                 continue;
             }
-            let dmg = if hit.damage == 0 && hit.hit_entity != game.game.player {
+            let mut dmg = if hit.damage == 0 && hit.hit_entity != game.game.player {
                 1
             } else {
                 hit.damage
             };
+            // Collector's Fury: +15% to all heirloom-effect damage (Hero Sword, echoes,
+            // ice explosions, summons, poison ticks, etc.). Applied once here so spawn
+            // sites do not each need their own multiply.
+            if hit.hit_entity != game.game.player && is_heirloom_damage_hit(hit) {
+                let mult = game
+                    .major_blessings_query
+                    .single()
+                    .map(|m| m.heirloom_damage_multiplier())
+                    .unwrap_or(1.0);
+                if mult != 1.0 {
+                    dmg = ((dmg as f32) * mult).round().max(1.) as i32;
+                }
+            }
             // Propagate crit flags from the HitEvent onto the target so the
             // damage-numbers UI can render yellow/orange numbers. Skip the
             // player (they don't take crits) and skip non-crit hits to keep
@@ -1063,8 +1088,7 @@ pub fn cleanup_marked_for_death_entities(
                     blessing_triggers
                         .increment(crate::blessings::MajorBlessing::IceExplosionChain);
                     let pos = mob_pos.translation();
-                    let dmg = ((attack.0 / 2) as f32 * majors.heirloom_damage_multiplier())
-                        .round() as i32;
+                    let dmg = (attack.0 / 2).max(1);
                     spawn_ice_explosion_hitbox(
                         &mut commands,
                         &graphics,

@@ -1380,6 +1380,7 @@ pub fn handle_item_chest_final_item_hover(
                                     world_anchor: None,
                                     ui_state_tag: None,
                                     pin_right: false,
+                                    pin_center: false,
                                 });
                             }
                         }

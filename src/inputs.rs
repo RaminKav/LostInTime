@@ -1347,9 +1347,15 @@ pub fn mouse_click_system(
     auto_attack: Res<AutoAttackState>,
     aim_params: AttackAimParams,
     bridge_mode: Res<BridgePlacementMode>,
+    mut ignore_held_mouse_attack: Local<bool>,
 ) {
     if *ui_state != UIState::Closed {
+        // Remember a press that started on a menu so releasing into Closed doesn't swing.
+        *ignore_held_mouse_attack = mouse_button_input.pressed(MouseButton::Left);
         return;
+    }
+    if *ignore_held_mouse_attack && !mouse_button_input.pressed(MouseButton::Left) {
+        *ignore_held_mouse_attack = false;
     }
     if bridge_placement_blocks_player_attack(bridge_mode) {
         return;
@@ -1373,7 +1379,9 @@ pub fn mouse_click_system(
         .unwrap_or(false);
 
     // Hit Item, send attack event
-    if mouse_button_input.pressed(MouseButton::Left) || auto_attack.0 || gamepad_attack_pressed {
+    let mouse_attacking =
+        mouse_button_input.pressed(MouseButton::Left) && !*ignore_held_mouse_attack;
+    if mouse_attacking || auto_attack.0 || gamepad_attack_pressed {
         if *DEBUG && mouse_button_input.just_pressed(MouseButton::Left) {
             let obj = game.get_object_from_chunk_cache(cursor_tile_pos);
             info!(

@@ -92,17 +92,20 @@ pub fn aseprite_enemy_setup(
             continue;
         };
 
-        commands
-            .entity(entity)
-            .insert(aseprite_bundle(
+        // Mob may despawn same-frame (e.g. telefrag / spawn cull) before deferred apply.
+        let Ok(mut e_cmds) = commands.get_entity(entity) else {
+            continue;
+        };
+        e_cmds
+            .try_insert(aseprite_bundle(
                 asset_server.load(path),
                 initial_tag,
                 *transform,
                 Visibility::Inherited,
                 false,
             ))
-            .insert(CurrentAsepriteTag(initial_tag.to_string()))
-            .insert(AsepriteBasicEnemy);
+            .try_insert(CurrentAsepriteTag(initial_tag.to_string()))
+            .try_insert(AsepriteBasicEnemy);
     }
 }
 

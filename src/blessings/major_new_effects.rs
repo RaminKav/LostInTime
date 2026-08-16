@@ -164,7 +164,7 @@ pub fn format_effect_pool_description(
     };
     vec![
         format!("Your {} apply", family.display_name()),
-        format!("{}.", status_name),
+        format!("3 {}.", status_name),
     ]
 }
 
@@ -228,6 +228,9 @@ pub fn handle_viral_conductor(
     }
 }
 
+/// Stacks applied by effect-pool majors ("Your X apply 3 Y").
+const EFFECT_POOL_STATUS_STACKS: u32 = 3;
+
 /// Random-pool majors: family hits always apply freeze / frail / poison.
 pub fn handle_effect_pool_status_chance(
     mut hits: MessageReader<HitEvent>,
@@ -263,7 +266,7 @@ pub fn handle_effect_pool_status_chance(
                         hit.hit_entity,
                         status.as_mut(),
                         &mut status_event,
-                        1,
+                        EFFECT_POOL_STATUS_STACKS,
                         None,
                         apply_extra,
                     )
@@ -274,7 +277,7 @@ pub fn handle_effect_pool_status_chance(
                         hit.hit_entity,
                         status.as_mut(),
                         &mut status_event,
-                        1,
+                        EFFECT_POOL_STATUS_STACKS,
                         apply_extra,
                     )
                 }
@@ -284,7 +287,7 @@ pub fn handle_effect_pool_status_chance(
                         hit.hit_entity,
                         status.as_mut(),
                         &mut status_event,
-                        1,
+                        EFFECT_POOL_STATUS_STACKS,
                         poison_tick_secs,
                         3.0,
                         apply_extra,

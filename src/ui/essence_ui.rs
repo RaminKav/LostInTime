@@ -1503,6 +1503,7 @@ pub fn handle_merchant_item_tooltip(
                     world_anchor: None,
                     ui_state_tag: None,
                     pin_right: false,
+                    pin_center: false,
                 });
             }
         }

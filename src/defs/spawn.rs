@@ -284,9 +284,11 @@ pub fn apply_pending_sprite_sheets(
             None,
         );
         let layout = texture_atlas_layouts.add(texture_atlas_layout);
-        commands
-            .entity(entity)
-            .insert(Sprite {
+        let Ok(mut e_cmds) = commands.get_entity(entity) else {
+            continue;
+        };
+        e_cmds
+            .try_insert(Sprite {
                 image: texture_handle,
                 texture_atlas: Some(TextureAtlas { layout, index: 0 }),
                 ..default()
@@ -304,9 +306,11 @@ pub fn apply_pending_sprite_textures(
         let custom_size = world_object
             .filter(|o| **o == WorldObject::BossShrine)
             .map(|_| Vec2::new(128., 128.));
-        commands
-            .entity(entity)
-            .insert(Sprite {
+        let Ok(mut e_cmds) = commands.get_entity(entity) else {
+            continue;
+        };
+        e_cmds
+            .try_insert(Sprite {
                 image: asset_server.load(&pending.0),
                 custom_size,
                 ..default()

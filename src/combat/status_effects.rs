@@ -104,8 +104,8 @@ pub struct BaseSpriteColor(pub Color);
 #[derive(Component)]
 #[component(
     storage = "SparseSet",
-    on_insert = refresh_status_sprite_tint,
-    on_remove = refresh_status_sprite_tint
+    on_insert = apply_status_sprite_tint,
+    on_remove = clear_status_sprite_tint
 )]
 pub struct FrozenTint;
 
@@ -113,8 +113,8 @@ pub struct FrozenTint;
 #[derive(Component)]
 #[component(
     storage = "SparseSet",
-    on_insert = refresh_status_sprite_tint,
-    on_remove = refresh_status_sprite_tint
+    on_insert = apply_status_sprite_tint,
+    on_remove = clear_status_sprite_tint
 )]
 pub struct RapidfireSlowTint;
 
@@ -123,28 +123,46 @@ pub struct RapidfireSlowTint;
 #[derive(Component)]
 #[component(
     storage = "SparseSet",
-    on_insert = refresh_status_sprite_tint,
-    on_remove = refresh_status_sprite_tint
+    on_insert = apply_status_sprite_tint,
+    on_remove = clear_status_sprite_tint
 )]
 pub struct DeathDefianceTint;
 
-fn refresh_status_sprite_tint(mut world: DeferredWorld, context: HookContext) {
-    let entity = context.entity;
-    let has_tint = world.get::<FrozenTint>(entity).is_some()
-        || world.get::<RapidfireSlowTint>(entity).is_some()
-        || world.get::<DeathDefianceTint>(entity).is_some();
+fn status_tint_marker_count(world: &DeferredWorld, entity: Entity) -> u8 {
+    let mut count = 0;
+    if world.get::<FrozenTint>(entity).is_some() {
+        count += 1;
+    }
+    if world.get::<RapidfireSlowTint>(entity).is_some() {
+        count += 1;
+    }
+    if world.get::<DeathDefianceTint>(entity).is_some() {
+        count += 1;
+    }
+    count
+}
 
-    if has_tint {
-        let Some(current) = world.get::<Sprite>(entity).map(|s| s.color) else {
-            return;
-        };
-        if world.get::<BaseSpriteColor>(entity).is_none() {
-            world.commands().entity(entity).insert(BaseSpriteColor(current));
-        }
-        if let Some(mut sprite) = world.get_mut::<Sprite>(entity) {
-            sprite.color = STATUS_EFFECT_BLUE_TINT;
-        }
-    } else if let Some(base) = world.get::<BaseSpriteColor>(entity).map(|b| b.0) {
+fn apply_status_sprite_tint(mut world: DeferredWorld, context: HookContext) {
+    let entity = context.entity;
+    let Some(current) = world.get::<Sprite>(entity).map(|s| s.color) else {
+        return;
+    };
+    if world.get::<BaseSpriteColor>(entity).is_none() {
+        world.commands().entity(entity).insert(BaseSpriteColor(current));
+    }
+    if let Some(mut sprite) = world.get_mut::<Sprite>(entity) {
+        sprite.color = STATUS_EFFECT_BLUE_TINT;
+    }
+}
+
+/// `on_remove` runs while the marker is still present, so a shared insert/remove
+/// hook would keep seeing a tint and never restore the original color.
+fn clear_status_sprite_tint(mut world: DeferredWorld, context: HookContext) {
+    let entity = context.entity;
+    if status_tint_marker_count(&world, entity) > 1 {
+        return;
+    }
+    if let Some(base) = world.get::<BaseSpriteColor>(entity).map(|b| b.0) {
         if let Some(mut sprite) = world.get_mut::<Sprite>(entity) {
             sprite.color = base;
         }
@@ -549,7 +567,7 @@ pub fn try_add_slow_stacks(
     } else {
         status.slow = Some(Slow {
             num_stacks: add,
-            timer: Timer::from_seconds(1.7, TimerMode::Repeating),
+            timer: Timer::from_seconds(2.0, TimerMode::Repeating),
         });
         status_event.write(StatusEffectEvent {
             entity: hit_e,
@@ -608,7 +626,7 @@ pub fn try_add_frail_stacks(
     } else {
         status.frail = Some(Frail {
             num_stacks: add,
-            timer: Timer::from_seconds(1.2, TimerMode::Repeating),
+            timer: Timer::from_seconds(2.0, TimerMode::Repeating),
         });
         status_event.write(StatusEffectEvent {
             entity: hit_e,

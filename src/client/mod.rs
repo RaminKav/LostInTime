@@ -32,7 +32,6 @@ use crate::{
         achievements::Achievements,
         beastiary::{Beastiary, RunBeastiary},
         check_first_run_achievement,
-        class_rank::ClassRankSystem,
         currency::TimeFragmentCurrency,
         levels::PlayerLevel,
         score::{HighScores, RunScore, RunTimer},
@@ -273,7 +272,6 @@ pub struct GameData {
     pub magic_points: u128,
     pub longest_run: u8,
     pub user_id: String,
-    pub class_ranks: ClassRankSystem,
     pub high_scores: HighScores,
     pub achievements: Achievements,
     #[serde(default)]
@@ -453,38 +451,6 @@ pub fn handle_append_run_data_after_death(
         }
         analytics_data.user_id = game_data.user_id.clone();
 
-        // Award class rank experience based on run performance
-        if let Some(class) = &player_class {
-            // Get mobs killed from run score (if available)
-            let mobs_killed = run_score.as_ref().map(|rs| rs.mobs_killed).unwrap_or(0);
-            let run_experience = calculate_class_experience(night.days, mobs_killed);
-            let rank_increased = game_data
-                .class_ranks
-                .add_class_experience(&class.class, run_experience);
-
-            if rank_increased {
-                let new_rank = game_data.class_ranks.get_class_rank(&class.class).rank;
-                let new_rarity = game_data
-                    .class_ranks
-                    .get_class_rank(&class.class)
-                    .get_starting_weapon_rarity();
-                info!(
-                    "Class {:?} ranked up to rank {}! Starting weapon rarity upgraded to {:?}",
-                    class.class, new_rank, new_rarity
-                );
-            }
-
-            info!(
-                "Awarded {} class experience to {:?} (Total: {})",
-                run_experience,
-                class.class,
-                game_data
-                    .class_ranks
-                    .get_class_rank(&class.class)
-                    .total_experience
-            );
-        }
-
         // Update high scores (skip dev-mode runs, same as leaderboard submission)
         if let Some(score) = &run_score {
             if let Some(class) = &player_class {
@@ -533,9 +499,7 @@ pub fn handle_append_run_data_after_death(
             game_data.cumulative_analytics = Some(analytics_data.clone());
         }
 
-        let class_ranks = game_data.class_ranks.clone();
         let high_scores = game_data.high_scores.clone();
-        commands.insert_resource(class_ranks);
         commands.insert_resource(high_scores);
 
         if let Some(classes) = unlocked_classes.as_ref() {
@@ -862,8 +826,6 @@ pub fn load_state(
         match GameData::try_from_json_reader(reader) {
             Ok(game_data) => {
                 commands.insert_resource(game_data.high_scores);
-                // Also make sure class ranks are available early if present
-                commands.insert_resource(game_data.class_ranks);
                 commands.insert_resource(game_data.achievements);
             }
             Err(_) => {
@@ -1061,15 +1023,4 @@ pub fn persist_time_fragments(time_fragments: i32) {
 
 pub fn is_not_paused(state: Res<State<ClientState>>) -> bool {
     *state == ClientState::Unpaused
-}
-
-/// Calculate class experience based on run performance
-fn calculate_class_experience(days_survived: u8, mobs_killed: u32) -> u32 {
-    // Primary experience from mobs killed (10 per mob) //
-    let mob_exp = mobs_killed * 2;
-
-    // Secondary experience from days survived (50 per day)
-    let days_exp = days_survived as u32 * 75;
-
-    mob_exp + days_exp
 }

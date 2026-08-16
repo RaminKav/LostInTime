@@ -3383,6 +3383,14 @@ impl PlayerSkills {
         )
     }
 
+    /// (label, value) row for the player stats tooltip.
+    pub fn freeze_chance_stat_summary(&self) -> (String, String) {
+        (
+            "Freeze Chance   ".to_string(),
+            format!("{:.0}%", self.calculate_freeze_chance() * 100.0),
+        )
+    }
+
     /// Rolls how many poison stacks to apply from total poison chance.
     /// Values above 100% guarantee extra stacks (150% → 1 + 50% roll for 2, 300% → 3, etc.).
     pub fn roll_poison_stacks_from_chance(&self, rng: &mut impl rand::Rng) -> u32 {

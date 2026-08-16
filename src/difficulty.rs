@@ -233,9 +233,12 @@ pub fn unlock_difficulty_after_era3_win(
 }
 
 /// Persist next ladder tier when the Era 3 boss is killed on a new highest difficulty.
+/// Also records highest difficulty cleared for the active class.
 pub fn unlock_difficulty_on_era3_boss_kill(
     boss_kill_tracker: Option<Res<crate::world::portal::BossKillTracker>>,
     mut game_data: Option<ResMut<crate::client::GameData>>,
+    mut high_scores: Option<ResMut<crate::player::score::HighScores>>,
+    player_class: Option<Res<crate::player::skills::PlayerClass>>,
     difficulty: Res<ActiveRunDifficulty>,
 ) {
     let Some(tracker) = boss_kill_tracker else {
@@ -247,22 +250,39 @@ pub fn unlock_difficulty_on_era3_boss_kill(
     let Some(ref mut data) = game_data else {
         return;
     };
-    let Some(new_max) =
-        unlock_difficulty_after_era3_win(data.max_unlocked_difficulty, difficulty.tier())
-    else {
-        return;
-    };
-    info!(
-        "Unlocked difficulty tier {} (was {}, run tier {})",
-        new_max,
-        data.max_unlocked_difficulty,
-        difficulty.tier()
-    );
-    data.max_unlocked_difficulty = new_max;
-    if data.last_selected_difficulty == 0 {
-        data.last_selected_difficulty = 1;
+
+    let run_tier = difficulty.tier();
+    let mut changed = false;
+    if let Some(pc) = player_class.as_deref() {
+        if pc.class != crate::player::skills::SkillClass::None {
+            let before = data.high_scores.highest_difficulty(&pc.class);
+            data.high_scores
+                .update_highest_difficulty(&pc.class, run_tier);
+            if data.high_scores.highest_difficulty(&pc.class) > before {
+                changed = true;
+                if let Some(ref mut scores) = high_scores {
+                    scores.update_highest_difficulty(&pc.class, run_tier);
+                }
+            }
+        }
     }
-    persist_difficulty_progress(data);
+
+    if let Some(new_max) =
+        unlock_difficulty_after_era3_win(data.max_unlocked_difficulty, run_tier)
+    {
+        info!(
+            "Unlocked difficulty tier {} (was {}, run tier {})",
+            new_max, data.max_unlocked_difficulty, run_tier
+        );
+        data.max_unlocked_difficulty = new_max;
+        if data.last_selected_difficulty == 0 {
+            data.last_selected_difficulty = 1;
+        }
+        changed = true;
+    }
+    if changed {
+        persist_difficulty_progress(data);
+    }
 }
 
 pub fn persist_difficulty_progress(game_data: &crate::client::GameData) {
@@ -278,6 +298,7 @@ pub fn persist_difficulty_progress(game_data: &crate::client::GameData) {
     };
     on_disk.max_unlocked_difficulty = game_data.max_unlocked_difficulty;
     on_disk.last_selected_difficulty = game_data.last_selected_difficulty;
+    on_disk.high_scores = game_data.high_scores.clone();
     if let Ok(file) = OpenOptions::new()
         .write(true)
         .create(true)

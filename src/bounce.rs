@@ -486,35 +486,32 @@ pub fn spawn_natural_desert_tornadoes(
     );
 }
 
-/// System to spawn Aseprite animation for pink flowers when they're created
+/// System to spawn Aseprite animation for pink flowers when they're created.
+///
+/// Only insert animation + `Sprite`. Re-inserting `Transform` / `GlobalTransform::default()`
+/// used to teleport every newly spawned flower's collider to the world origin for a frame
+/// (Rapier reads `GlobalTransform`). If the player attacks that same frame — e.g. a blessing
+/// / heirloom click that just closed the UI — every origin-stacked flower breaks, drops
+/// `PinkFlowerBlock` at the player, and grants flower XP.
 pub fn spawn_pink_flower_aseprite(
     mut commands: Commands,
     graphics: Res<crate::assets::Graphics>,
-    pink_flowers: Query<(Entity, &Transform, &WorldObject), Added<WorldObject>>,
+    pink_flowers: Query<(Entity, &WorldObject), Added<WorldObject>>,
 ) {
-    for (entity, transform, world_obj) in pink_flowers.iter() {
-        if world_obj == &WorldObject::PinkFlower {
-            let mut animation = ase_animation(
-                graphics.pink_flower_ase.as_ref().unwrap().clone(),
-                PinkFlowerAseprite::tags::BOUNCE,
-                false,
-            );
-            pause(&mut animation);
-
-            let Ok(mut entity_commands) = commands.get_entity(entity) else {
-                continue;
-            };
-
-            entity_commands.insert((
-                animation,
-                Sprite::default(),
-                *transform,
-                GlobalTransform::default(),
-                Visibility::Inherited,
-                InheritedVisibility::default(),
-                ViewVisibility::default(),
-            ));
+    let Some(ase) = graphics.pink_flower_ase.clone() else {
+        return;
+    };
+    for (entity, world_obj) in pink_flowers.iter() {
+        if world_obj != &WorldObject::PinkFlower {
+            continue;
         }
+        let mut animation = ase_animation(ase.clone(), PinkFlowerAseprite::tags::BOUNCE, false);
+        pause(&mut animation);
+
+        let Ok(mut entity_commands) = commands.get_entity(entity) else {
+            continue;
+        };
+        entity_commands.try_insert((animation, Sprite::default()));
     }
 }
 

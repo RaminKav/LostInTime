@@ -797,6 +797,7 @@ pub fn handle_hovering(
                                 .get(e)
                                 .ok()
                                 .map(|t| t.translation().truncate()),
+                            pin_center: state.r#type.is_inventory() || state.r#type.is_hotbar(),
                             ..Default::default()
                         });
                     }
@@ -830,6 +831,7 @@ pub fn handle_hovering(
                                 .get(e)
                                 .ok()
                                 .map(|t| t.translation().truncate()),
+                            pin_center: state.r#type.is_inventory() || state.r#type.is_hotbar(),
                             ..Default::default()
                         });
                     }

@@ -81,6 +81,11 @@ impl Plugin for BlessingsPlugin {
                 OnExit(UIState::MajorBlessingChoice),
                 apply_deferred_era_swap_after_major_blessing,
             )
+            // Singular Focus / Collector's Bargain keep era deferred until this pick finishes.
+            .add_systems(
+                OnExit(UIState::MajorHeirloomPick),
+                apply_deferred_era_swap_after_major_blessing,
+            )
             .add_systems(
                 Update,
                 debug_open_major_blessing_ui

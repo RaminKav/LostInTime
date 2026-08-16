@@ -4,15 +4,16 @@ use bevy::{camera::visibility::RenderLayers, prelude::*, sprite::Anchor};
 use crate::{
     assets::Graphics,
     attributes::{
-        AttackSpeed, BonusAttackSpeed, CritChance, MaxHealth, MaxMana, ProjectileSize, SkillPower,
-        Speed,
+        AttackSpeed, BonusAttackSpeed, CritChance, ItemRarity, MaxHealth, MaxMana, ProjectileSize,
+        SkillPower, Speed,
     },
     audio::{AudioSoundEffect, SoundSpawner},
     blessings::{
         build_ancestor_blessing_offer, build_major_blessing_offer, Ancestor, AncestorBlessing,
         AncestorBlessingIcon, AncestorBlessingOffer, BlessingTier, CurrentBlessingTier,
         DeferredEraSwap, MajorBlessingOffer, OwnedBlessings, OwnedMajorBlessings,
-        PendingRunStartBlessing, ResolvedAncestorBlessing, ResolvedMajorBlessing,
+        PendingMajorHeirloomPick, PendingRunStartBlessing, ResolvedAncestorBlessing,
+        ResolvedMajorBlessing,
     },
     colors::{LIGHT_RED, SHIELD_BLUE, WHITE, YELLOW_2},
     cursor::CursorPos,
@@ -23,7 +24,6 @@ use crate::{
     },
     juice::bounce::BounceOnHit,
     player::{
-        class_rank::ClassRankSystem,
         levels::PlayerLevel,
         skills::{
             ActiveSkill, Heirloom, HeirloomChoiceQueue, HeirloomRarity, HeirloomWithRarity,
@@ -229,8 +229,6 @@ fn blessing_item_stack_for_tooltip(
     item: WorldObject,
     choice: &ResolvedAncestorBlessing,
     proto: &ProtoParam,
-    class_ranks: Option<&ClassRankSystem>,
-    player_class: Option<&PlayerClass>,
 ) -> ItemStack {
     let mut stack = proto
         .get_item_data(item)
@@ -239,11 +237,7 @@ fn blessing_item_stack_for_tooltip(
     stack.count = 1;
 
     if choice.blessing == AncestorBlessing::UpgradeStartingWeapon && item.is_weapon() {
-        if let (Some(ranks), Some(pc)) = (class_ranks, player_class) {
-            stack.rarity = ranks
-                .get_starting_weapon_rarity(&pc.class)
-                .get_next_rarity();
-        }
+        stack.rarity = ItemRarity::Common.get_next_rarity();
     }
 
     stack
@@ -1016,8 +1010,6 @@ pub fn handle_blessing_choice_icon_tooltips(
     existing_item_tooltips: Query<Entity, With<ItemOrRecipeTooltip>>,
     mut tooltip_requests: MessageWriter<HeirloomTooltipRequest>,
     mut item_tooltip_events: MessageWriter<ToolTipUpdateEvent>,
-    player_class: Option<Res<PlayerClass>>,
-    class_ranks: Option<Res<ClassRankSystem>>,
     skill_power: Query<
         (
             &SkillPower,
@@ -1199,13 +1191,7 @@ pub fn handle_blessing_choice_icon_tooltips(
             let Some(minor) = choice.as_minor() else {
                 return;
             };
-            let item_stack = blessing_item_stack_for_tooltip(
-                *item,
-                minor,
-                &proto,
-                class_ranks.as_deref(),
-                player_class.as_deref(),
-            );
+            let item_stack = blessing_item_stack_for_tooltip(*item, minor, &proto);
             const TOOLTIP_EDGE_PAD: f32 = 8.;
             let half_w = ITEM_TOOLTIP_LARGE_CARD_SIZE.x * 0.5;
             let half_h = ITEM_TOOLTIP_LARGE_CARD_SIZE.y * 0.5;
@@ -1247,6 +1233,7 @@ pub fn transition_after_blessing_choice(
     mut next_game_state: ResMut<NextState<GameState>>,
     mut next_ui_state: ResMut<NextState<UIState>>,
     current_tier: Res<CurrentBlessingTier>,
+    pending_heirloom_pick: Option<Res<PendingMajorHeirloomPick>>,
     time: Res<Time>,
     mut commands: Commands,
 ) {
@@ -1259,9 +1246,15 @@ pub fn transition_after_blessing_choice(
                 commands.remove_resource::<AncestorBlessingOffer>();
             }
             BlessingTier::Major => {
-                // GameState stays Main; closing the UI unpauses and triggers DeferredEraSwap.
-                next_ui_state.set(UIState::Closed);
+                // GameState stays Main. If a secondary heirloom pick is pending (Singular Focus /
+                // Collector's Bargain), open it directly — bouncing through Closed races era swap
+                // into Initializing and can miss the one-shot heirloom-pick setup.
                 commands.remove_resource::<MajorBlessingOffer>();
+                if pending_heirloom_pick.is_some() {
+                    next_ui_state.set(UIState::MajorHeirloomPick);
+                } else {
+                    next_ui_state.set(UIState::Closed);
+                }
             }
         }
         commands.remove_resource::<BlessingTransitionState>();

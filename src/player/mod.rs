@@ -35,7 +35,6 @@ use serde::Deserialize;
 use strum_macros::{Display, EnumIter};
 pub mod achievements;
 pub mod beastiary;
-pub mod class_rank;
 pub mod combat_heirlooms;
 pub mod currency;
 pub mod ice_slide;
@@ -49,7 +48,6 @@ pub mod skills;
 pub mod time_crystals;
 pub mod unlocks;
 pub use achievements::*;
-pub use class_rank::*;
 pub use currency::*;
 use mage_skills::{handle_teleport, tick_just_teleported};
 pub use score::*;
@@ -609,7 +607,6 @@ fn give_player_starting_items(
     proto: ProtoParam,
     mut game: GameParam,
     player_class: Option<Res<PlayerClass>>,
-    class_ranks: Option<Res<ClassRankSystem>>,
     run_state: ResMut<RunUnlockState>,
     unlock_upgrades: Option<Res<UnlockUpgrades>>,
     weapon_override: Option<Res<StartingWeaponOverride>>,
@@ -627,13 +624,9 @@ fn give_player_starting_items(
         .map(|pc| pc.class.clone())
         .unwrap_or(SkillClass::None);
 
-    // Give class-specific starting weapon with rarity based on class rank
+    // Starting weapons are always Common unless an ancestor blessing overrides rarity.
     let default_starting_weapon = selected_class.get_starting_wep();
-    let default_weapon_rarity = if let Some(ranks) = &class_ranks {
-        ranks.get_starting_weapon_rarity(&selected_class)
-    } else {
-        crate::attributes::ItemRarity::Common
-    };
+    let default_weapon_rarity = crate::attributes::ItemRarity::Common;
     let (starting_weapon, weapon_rarity, spawn_default_weapon) =
         if let Some(override_weapon) = weapon_override.as_deref() {
             let rarity = if override_weapon.upgrade_starting_weapon {

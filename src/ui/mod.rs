@@ -1086,6 +1086,9 @@ impl Plugin for UIPlugin {
             // Closed); setup then missed its one `state_changed` frame and never ran on MainMenu.
             .add_systems(OnEnter(UIState::EnterName), setup_name_entry_ui)
             .add_systems(OnExit(UIState::EnterName), cleanup_name_entry_ui)
+            // OnEnter (not Update `state_changed`) so setup cannot miss its one-shot frame
+            // when era transition / UIState bounce races the heirloom pick open.
+            .add_systems(OnEnter(UIState::MajorHeirloomPick), setup_major_heirloom_pick_ui)
             .add_systems(
                 OnExit(UIState::MajorHeirloomPick),
                 cleanup_major_heirloom_pick_ui,
@@ -1391,9 +1394,6 @@ impl Plugin for UIPlugin {
                     ),
                     setup_microwave_shrine_ui.before(CustomFlush).run_if(
                         state_changed::<UIState>.and_then(in_state(UIState::MicrowaveShrine)),
-                    ),
-                    setup_major_heirloom_pick_ui.before(CustomFlush).run_if(
-                        state_changed::<UIState>.and_then(in_state(UIState::MajorHeirloomPick)),
                     ),
                     tick_active_skill_shrine_ui_interaction_lock_timers
                         .run_if(in_state(UIState::ActiveSkillShrine)),

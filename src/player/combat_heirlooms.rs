@@ -286,13 +286,8 @@ fn calculate_summon_damage(
 ) -> (i32, bool, bool) {
     let (damage, was_crit, was_overcrit) =
         game.calculate_player_damage(0, None, 0, None, frail_stacks, 0, false);
-    let mult = game
-        .major_blessings_query
-        .single()
-        .map(|m| m.heirloom_damage_multiplier())
-        .unwrap_or(1.0);
-    let damage = ((damage as f32) * mult).round() as i32;
-    (i32::max(1, damage), was_crit, was_overcrit)
+    // Collector's Fury is applied once in `handle_hits` for heirloom damage.
+    (i32::max(1, damage as i32), was_crit, was_overcrit)
 }
 
 fn get_world_object_sprite(graphics: &Graphics, object: WorldObject) -> Option<Sprite> {

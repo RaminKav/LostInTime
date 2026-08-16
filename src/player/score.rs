@@ -46,11 +46,15 @@ impl RunScore {
     }
 }
 
-/// Tracks high scores across all runs
+/// Tracks high scores and highest difficulty cleared across all runs
 #[derive(Resource, Debug, Clone, Serialize, Deserialize, Default)]
 pub struct HighScores {
     pub overall_high_score: u32,
     pub class_high_scores: std::collections::HashMap<crate::player::skills::SkillClass, u32>,
+    /// Highest run difficulty tier cleared with each class (Era 3 win). 0 = never / baseline only.
+    #[serde(default)]
+    pub class_highest_difficulty:
+        std::collections::HashMap<crate::player::skills::SkillClass, u8>,
 }
 
 impl HighScores {
@@ -63,6 +67,27 @@ impl HighScores {
         if score > *class_score {
             *class_score = score;
         }
+    }
+
+    pub fn update_highest_difficulty(
+        &mut self,
+        class: &crate::player::skills::SkillClass,
+        tier: u8,
+    ) {
+        let entry = self
+            .class_highest_difficulty
+            .entry(class.clone())
+            .or_insert(0);
+        if tier > *entry {
+            *entry = tier;
+        }
+    }
+
+    pub fn highest_difficulty(&self, class: &crate::player::skills::SkillClass) -> u8 {
+        self.class_highest_difficulty
+            .get(class)
+            .copied()
+            .unwrap_or(0)
     }
 }
 

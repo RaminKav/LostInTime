@@ -317,16 +317,16 @@ impl MajorBlessing {
                 vec!["Weapon-attack heirlooms", "trigger an extra time."]
             }
             MajorBlessing::EffectPoolApplyFrail => {
-                vec!["Your ___ apply", "frail."]
+                vec!["Your ___ apply", "3 frail."]
             }
             MajorBlessing::StatusApplyShield => {
                 vec!["Whenever you apply a", "status effect, gain 1", "shield."]
             }
             MajorBlessing::EffectPoolApplyFreeze => {
-                vec!["Your ___ apply", "freeze."]
+                vec!["Your ___ apply", "3 freeze."]
             }
             MajorBlessing::EffectPoolApplyPoison => {
-                vec!["Your ___ apply", "poison."]
+                vec!["Your ___ apply", "3 poison."]
             }
             MajorBlessing::ManaRegenHeal => {
                 vec!["Mana Regen heals you", "for 1 HP."]

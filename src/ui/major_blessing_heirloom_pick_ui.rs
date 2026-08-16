@@ -54,9 +54,26 @@ pub fn setup_major_heirloom_pick_ui(
     asset_server: Res<AssetServer>,
     res: Res<ScreenResolution>,
     player_skills: Query<&PlayerSkills>,
+    pending: Option<Res<PendingMajorHeirloomPick>>,
+    existing: Query<Entity, With<MajorHeirloomPickUI>>,
 ) {
+    if !existing.is_empty() {
+        return;
+    }
     let Ok(skills) = player_skills.single() else {
         return;
+    };
+    let mode = pending
+        .as_ref()
+        .map(|p| p.mode)
+        .unwrap_or(MajorHeirloomPickMode::TripleCopyLoseOne);
+    let subtitle = match mode {
+        MajorHeirloomPickMode::TripleCopyLoseOne => {
+            "Gain 3 copies. Lose 1 random other uncommon."
+        }
+        MajorHeirloomPickMode::ConvertAllToChosen => {
+            "Convert all other uncommons into copies of this one."
+        }
     };
 
     let container = commands
@@ -98,11 +115,7 @@ pub fn setup_major_heirloom_pick_ui(
     commands
         .spawn(
             gf::BODY
-                .text(
-                    &asset_server,
-                    "Gain 3 copies. Lose 1 random other uncommon.",
-                    WHITE,
-                )
+                .text(&asset_server, subtitle, WHITE)
                 .justify(Justify::Center)
                 .with_transform(Transform {
                     translation: Vec3::new(0., 50., 1.),

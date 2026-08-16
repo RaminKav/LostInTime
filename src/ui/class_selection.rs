@@ -26,7 +26,6 @@ use crate::{
     night::NightTracker,
     player::{
         achievements::Achievements,
-        class_rank::ClassRankSystem,
         currency::TimeFragmentCurrency,
         score::HighScores,
         skills::{
@@ -225,7 +224,6 @@ pub fn setup_class_selection_ui(
     asset_server: Res<AssetServer>,
     sprite_handles: Res<PlayerSpriteHandles>,
     res: Res<ScreenResolution>,
-    class_ranks: Res<ClassRankSystem>,
     high_scores: Option<Res<HighScores>>,
     achievements: Option<Res<Achievements>>,
     unlocked_classes: Res<UnlockedClasses>,
@@ -680,7 +678,6 @@ pub fn setup_class_selection_ui(
         &SkillClass::Warrior, // Default to Melee
         &asset_server,
         &graphics,
-        &class_ranks,
         high_scores.as_ref(),
     );
 
@@ -1548,13 +1545,20 @@ pub fn persist_class_unlock_state(
     );
 }
 
+fn cleared_difficulty_label(tier: u8) -> String {
+    match tier {
+        0 => "Diff: -".to_string(),
+        6 => "Diff: Max".to_string(),
+        n => format!("Diff: {n}"),
+    }
+}
+
 fn spawn_player_preview(
     commands: &mut Commands,
     sprite_handles: &PlayerSpriteHandles,
     selected_class: &SkillClass,
     asset_server: &Res<AssetServer>,
     graphics: &Res<Graphics>,
-    class_ranks: &Res<ClassRankSystem>,
     high_scores: Option<&Res<HighScores>>,
 ) -> Entity {
     let ICONS_X_OFFSET = -24.;
@@ -1572,16 +1576,6 @@ fn spawn_player_preview(
     let class_name = &class_data.name;
     let weapon_description = class_data.weapon_description.join(" ");
     let stat_description = class_data.stat_description.join(" ");
-
-    // Get class rank information
-    let class_rank = class_ranks.get_class_rank(selected_class);
-    let rank_text = format!("Rank {}", class_rank.rank);
-    // let exp_to_next = class_rank.get_experience_to_next_rank();
-    // let progress_text = if exp_to_next > 0 {
-    //     format!("Next rank in {} exp", exp_to_next)
-    // } else {
-    //     "Max rank reached!".to_string()
-    // };
 
     // Spawn the player preview container
     let player_container = commands
@@ -1619,11 +1613,17 @@ fn spawn_player_preview(
         .insert(ChildOf(player_container))
         .id();
 
-    // Spawn rank information
-    let _rank_text = commands
+    let cleared_tier = high_scores
+        .map(|hs| hs.highest_difficulty(selected_class))
+        .unwrap_or(0);
+    let _cleared_diff = commands
         .spawn(
             gf::BODY
-                .text(&asset_server, rank_text, WHITE)
+                .text(
+                    &asset_server,
+                    cleared_difficulty_label(cleared_tier),
+                    WHITE,
+                )
                 .anchor(Anchor::CENTER_LEFT)
                 .with_transform(Transform {
                     translation: Vec3::new(-42., TITLE_Y_OFFSET - 14., 1.),
@@ -1632,11 +1632,11 @@ fn spawn_player_preview(
                 }),
         )
         .insert(RenderLayers::from_layers(&[3]))
-        .insert(Name::new("CLASS RANK"))
+        .insert(Name::new("CLASS CLEARED DIFFICULTY"))
         .insert(ChildOf(player_container))
         .id();
 
-    // Highest score for this class (top-right corner display)
+    // Highest score for this class
     let class_high_score = high_scores
         .and_then(|hs| hs.class_high_scores.get(selected_class).copied())
         .unwrap_or(0);
@@ -1677,16 +1677,13 @@ fn spawn_player_preview(
         .insert(ChildOf(player_container))
         .id();
 
-    // Spawn starting weapon to the right of the player
+    // Spawn starting weapon to the right of the player (always Common preview)
     let starting_weapon = selected_class.get_starting_wep();
-
-    // Get the starting weapon rarity based on class rank
-    let weapon_rarity = class_rank.get_starting_weapon_rarity();
 
     let weapon_item_stack = ItemStack {
         obj_type: starting_weapon,
         count: 1,
-        rarity: weapon_rarity.clone(),
+        rarity: ItemRarity::Common,
         attributes: ItemAttributes::default(),
         metadata: ItemDisplayMetaData::default(),
     };
@@ -1747,15 +1744,7 @@ fn spawn_player_preview(
     let _weapon_description_text = commands
         .spawn(
             gf::BODY
-                .text(
-                    &asset_server,
-                    format!("{} {}", weapon_rarity, weapon_description),
-                    if weapon_rarity == ItemRarity::Common {
-                        WHITE
-                    } else {
-                        weapon_rarity.get_color()
-                    },
-                )
+                .text(&asset_server, weapon_description, WHITE)
                 .justify(Justify::Left)
                 .anchor(Anchor::TOP_LEFT)
                 .with_transform(Transform {
@@ -2070,7 +2059,6 @@ pub fn update_preview_sprites(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     graphics: Res<Graphics>,
-    class_ranks: Res<ClassRankSystem>,
     high_scores: Option<Res<HighScores>>,
     unlocked_skills: Res<UnlockedSkills>,
 ) {
@@ -2097,7 +2085,6 @@ pub fn update_preview_sprites(
             selected_class,
             &asset_server,
             &graphics,
-            &class_ranks,
             high_scores.as_ref(),
         );
     }

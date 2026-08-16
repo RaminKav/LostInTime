@@ -2647,9 +2647,9 @@ pub fn track_enemy_hit_projectiles(
         // Get or insert the LastHitProjectile component
         if let Ok(mut last_hit) = enemies.get_mut(hit.hit_entity) {
             last_hit.projectile = hit.hit_with_projectile.clone();
-        } else {
-            // Insert the component if it doesn't exist
-            commands.entity(hit.hit_entity).insert(LastHitProjectile {
+        } else if let Ok(mut entity_commands) = commands.get_entity(hit.hit_entity) {
+            // Entity may despawn before deferred apply (same-frame lethal hits) — use try_insert.
+            entity_commands.try_insert(LastHitProjectile {
                 projectile: hit.hit_with_projectile.clone(),
             });
         }

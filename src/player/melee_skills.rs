@@ -729,10 +729,6 @@ pub fn handle_delayed_heirloom_casts(
         .single()
         .map(|m| m.echo_size_multiplier())
         .unwrap_or(1.0);
-    let heirloom_dmg_mult = majors
-        .single()
-        .map(|m| m.heirloom_damage_multiplier())
-        .unwrap_or(1.0);
     for (entity, mut cast) in query.iter_mut() {
         cast.delay.tick(time.delta());
         if !cast.delay.just_finished() {
@@ -744,8 +740,8 @@ pub fn handle_delayed_heirloom_casts(
                 dmg,
                 size_multiplier,
             } => {
-                let dmg = ((*dmg as f32) * heirloom_dmg_mult).round() as i32;
-                spawn_ice_explosion_hitbox(&mut commands, &graphics, *pos, dmg, *size_multiplier);
+                // Collector's Fury applied in `handle_hits` for heirloom projectiles.
+                spawn_ice_explosion_hitbox(&mut commands, &graphics, *pos, *dmg, *size_multiplier);
             }
             DelayedCastType::Echo {
                 player,
@@ -754,13 +750,12 @@ pub fn handle_delayed_heirloom_casts(
                 size_multiplier,
                 aftershock,
             } => {
-                let dmg = ((*dmg as f32) * heirloom_dmg_mult).round() as i32;
                 spawn_echo_hitbox_scaled(
                     &mut commands,
                     &asset_server,
                     *player,
                     *world_pos,
-                    dmg,
+                    *dmg,
                     *size_multiplier,
                     echo_size_mult,
                     *aftershock,

@@ -25,16 +25,18 @@ pub fn handle_new_fairy_state_machine(
         if mob != &Mob::Fairy {
             continue;
         }
-        let mut e_cmds = commands.entity(e);
+        let Ok(mut e_cmds) = commands.get_entity(e) else {
+            continue;
+        };
         e_cmds
-            .insert(aseprite_bundle(
+            .try_insert(aseprite_bundle(
                 asset_server.load(Fairy::PATH),
                 Fairy::tags::IDLE_FRONT,
                 *transform,
                 Visibility::Inherited,
                 false,
             ))
-            .insert(IdleState {
+            .try_insert(IdleState {
                 walk_timer: Timer::from_seconds(2., TimerMode::Repeating),
                 direction: FacingDirection::new_rand_dir(rand::thread_rng()),
                 speed: idle_state.speed,
@@ -49,7 +51,7 @@ pub fn handle_new_fairy_state_machine(
                     despawn_timer: Timer::from_seconds(2., TimerMode::Once),
                 },
             );
-        e_cmds.insert(state_machine);
+        e_cmds.try_insert(state_machine);
     }
 }
 
