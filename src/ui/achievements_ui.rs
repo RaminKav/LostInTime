@@ -11,7 +11,7 @@ use super::{
 };
 
 use crate::{
-    animations::enemy_sprites::spawn_attack_warning_aseprite,
+    animations::enemy_sprites::spawn_looping_attack_warning_aseprite,
     assets::Graphics,
     audio::{AudioSoundEffect, SoundSpawner},
     colors::{LIGHT_GREEN, WHITE},
@@ -514,12 +514,11 @@ pub fn setup_achievements_ui(
             let is_claimed = achievements.is_claimed(*achievement);
             if is_completed && !is_claimed {
                 let warning_pos = Vec3::new(-225., y_pos, 20.5);
-                let warning_entity = spawn_attack_warning_aseprite(
+                let warning_entity = spawn_looping_attack_warning_aseprite(
                     &mut commands,
                     &asset_server,
                     warning_pos,
                     achievements_bg,
-                    999999.0,
                 );
                 commands.entity(warning_entity).insert((
                     AchievementsUI,
@@ -894,12 +893,11 @@ pub fn update_achievements_page_display(
                     if *is_completed && !*is_claimed {
                         let y_pos = LIST_START_Y - (row_index as f32 * ROW_SPACING);
                         let warning_pos = Vec3::new(-165., y_pos, 20.5);
-                        let warning_entity = spawn_attack_warning_aseprite(
+                        let warning_entity = spawn_looping_attack_warning_aseprite(
                             &mut commands,
                             &asset_server,
                             warning_pos,
                             bg_entity,
-                            999999.0,
                         );
                         commands.entity(warning_entity).insert((
                             AchievementsUI,

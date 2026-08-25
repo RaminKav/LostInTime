@@ -1,11 +1,11 @@
+use std::collections::HashSet;
+
 use crate::aseprite_assets::{
     BigCactusAse, BullAse, Crow, LizardAse, SmallCactusAse, VoidCrawlerAse, VoidWormAse,
 };
-use crate::aseprite_helpers::{
-    ase_animation, aseprite_bundle, collect_finished, is_paused, pause, play_loop, play_once, start,
-};
+use crate::aseprite_helpers::{aseprite_bundle, play_loop, play_once};
 use bevy::prelude::*;
-use bevy_aseprite_ultra::prelude::{AnimationEvents, AnimationState, AseAnimation, Aseprite};
+use bevy_aseprite_ultra::prelude::{AnimationEvents, AseAnimation};
 use bevy_rapier2d::prelude::{Collider, CollisionGroups, Group, KinematicCharacterController};
 use seldom_state::prelude::{always, IntoTrigger, StateMachine};
 
@@ -110,9 +110,30 @@ pub fn aseprite_enemy_setup(
 }
 
 fn set_animation_tag(anim: &mut AseAnimation, current_tag: &mut CurrentAsepriteTag, new_tag: &str) {
+    set_animation_tag_mode(anim, current_tag, new_tag, false);
+}
+
+fn set_attack_animation_tag(
+    anim: &mut AseAnimation,
+    current_tag: &mut CurrentAsepriteTag,
+    new_tag: &str,
+) {
+    set_animation_tag_mode(anim, current_tag, new_tag, true);
+}
+
+fn set_animation_tag_mode(
+    anim: &mut AseAnimation,
+    current_tag: &mut CurrentAsepriteTag,
+    new_tag: &str,
+    once: bool,
+) {
     if current_tag.0 != new_tag {
         // Preserve aseprite handle — never rebuild via `from()` (wipes Handle::default).
-        play_loop(anim, new_tag);
+        if once {
+            play_once(anim, new_tag);
+        } else {
+            play_loop(anim, new_tag);
+        }
         current_tag.0 = new_tag.to_string();
     }
 }
@@ -120,6 +141,32 @@ fn set_animation_tag(anim: &mut AseAnimation, current_tag: &mut CurrentAsepriteT
 /// True if the tag is one of the directional walk tags (mob is in follow/idle, not attacking).
 fn is_walk_tag(tag: &str) -> bool {
     matches!(tag, WALK_UP | WALK_DOWN | WALK_SIDE)
+}
+
+fn is_attack_tag(tag: &str) -> bool {
+    matches!(
+        tag,
+        ATTACK_UP
+            | ATTACK_DOWN
+            | ATTACK_SIDE
+            | ATTACK_STOP_UP
+            | ATTACK_STOP_DOWN
+            | ATTACK_STOP_SIDE
+    )
+}
+
+/// One-shot clips emit `Finished`; looping tags emit `LoopCycleFinished`. Attack
+/// recovery must accept both — `play_loop` never fires `Finished`.
+fn collect_attack_clip_done(events: &mut MessageReader<AnimationEvents>) -> HashSet<Entity> {
+    let mut done = HashSet::new();
+    for event in events.read() {
+        match event {
+            AnimationEvents::Finished(entity) | AnimationEvents::LoopCycleFinished(entity) => {
+                done.insert(*entity);
+            }
+        }
+    }
+    done
 }
 
 /// Maps the mob's facing direction to the matching hit-react tag.
@@ -678,9 +725,7 @@ pub fn aseprite_leap_attack(
     time: Res<Time>,
     skills: Query<&PlayerSkills>,
     asset_server: Res<AssetServer>,
-    mut finished_events: MessageReader<AnimationEvents>,
 ) {
-    let finished = collect_finished(&mut finished_events);
     for (
         entity,
         mob,
@@ -740,29 +785,31 @@ pub fn aseprite_leap_attack(
             // delta each frame makes the tag flip as the mob nears/passes the player,
             // which resets the animation to frame 0 and looks like it plays twice.
             let attack_tag = direction_to_attack_tag(attack.dir.unwrap_or(delta_xy));
-            set_animation_tag(&mut anim, &mut current_tag, attack_tag);
+            set_attack_animation_tag(&mut anim, &mut current_tag, attack_tag);
             commands.entity(entity).insert(MobIsAttacking(mob.clone()));
         }
 
-        if attack.attack_duration_timer.is_finished() {
+        if attack.attack_duration_timer.is_finished() || parried_option.is_some() {
+            // Finish when the lunge duration ends. Waiting on `AnimationEvents::Finished`
+            // soft-locked lizards/void crawlers: attack tags used `play_loop` (never
+            // emits Finished) and a one-frame skip of a one-shot finish left them in
+            // LeapAttackState with no movement.
             attack.dir = None;
-            if finished.contains(&entity) || parried_option.is_some() {
-                if follow_speed.0 > 0. {
-                    commands.entity(entity).insert(FollowState {
-                        target: attack.target,
-                        curr_delta: None,
-                        curr_path: None,
-                        speed: follow_speed.0,
-                    });
-                }
-                let walk_tag = attack_tag_to_walk_tag(&current_tag.0);
-                set_animation_tag(&mut anim, &mut current_tag, walk_tag);
-                commands
-                    .entity(entity)
-                    .remove::<LeapAttackState>()
-                    .remove::<MobIsAttacking>()
-                    .insert(EnemyAttackCooldown(attack.attack_cooldown_timer.clone()));
+            if follow_speed.0 > 0. {
+                commands.entity(entity).insert(FollowState {
+                    target: attack.target,
+                    curr_delta: None,
+                    curr_path: None,
+                    speed: follow_speed.0,
+                });
             }
+            let walk_tag = attack_tag_to_walk_tag(&current_tag.0);
+            set_animation_tag(&mut anim, &mut current_tag, walk_tag);
+            commands
+                .entity(entity)
+                .remove::<LeapAttackState>()
+                .remove::<MobIsAttacking>()
+                .insert(EnemyAttackCooldown(attack.attack_cooldown_timer.clone()));
         } else {
             if attack.attack_startup_timer.fraction() == 0. {
                 spawn_attack_warning_aseprite(
@@ -812,7 +859,7 @@ pub fn aseprite_projectile_attack(
     mut finished_events: MessageReader<AnimationEvents>,
 ) {
     const FEATHER_SPREAD_RAD: f32 = 0.15;
-    let finished = collect_finished(&mut finished_events);
+    let clip_done = collect_attack_clip_done(&mut finished_events);
 
     for (
         entity,
@@ -860,7 +907,8 @@ pub fn aseprite_projectile_attack(
         } else {
             ATTACK_DOWN
         };
-        set_animation_tag(&mut anim, &mut current_tag, attack_tag);
+        let already_on_attack = is_attack_tag(&current_tag.0);
+        set_attack_animation_tag(&mut anim, &mut current_tag, attack_tag);
 
         if attack.dir.is_none() {
             attack.dir = Some(delta);
@@ -900,8 +948,10 @@ pub fn aseprite_projectile_attack(
             commands.entity(entity).insert(AsepriteProjectileFired);
         }
 
-        // Phase 4: wait for attack animation to finish, then transition back
-        if finished.contains(&entity) {
+        // Phase 4: wait for attack animation to finish, then transition back.
+        // Ignore clip events from the same frame we switched off walk (walk loops
+        // emit LoopCycleFinished on the same entity).
+        if already_on_attack && clip_done.contains(&entity) {
             let walk_tag = attack_tag_to_walk_tag(&current_tag.0);
             commands
                 .entity(entity)
@@ -978,7 +1028,7 @@ pub fn aseprite_circle_attack(
     asset_server: Res<AssetServer>,
     mut finished_events: MessageReader<AnimationEvents>,
 ) {
-    let finished = collect_finished(&mut finished_events);
+    let clip_done = collect_attack_clip_done(&mut finished_events);
     for (
         entity,
         mob,
@@ -1017,7 +1067,8 @@ pub fn aseprite_circle_attack(
 
         // Phase 2: play attack animation
         let attack_tag = direction_to_attack_tag(delta);
-        set_animation_tag(&mut anim, &mut current_tag, attack_tag);
+        let already_on_attack = is_attack_tag(&current_tag.0);
+        set_attack_animation_tag(&mut anim, &mut current_tag, attack_tag);
 
         if attack.dir.is_none() {
             attack.dir = Some(delta);
@@ -1051,8 +1102,9 @@ pub fn aseprite_circle_attack(
             });
         }
 
-        // Phase 4: wait for anim to finish
-        if finished.contains(&entity) {
+        // Phase 4: wait for anim to finish (see projectile attack for why we
+        // require `already_on_attack` before accepting clip-done events).
+        if already_on_attack && clip_done.contains(&entity) {
             let walk_tag = attack_tag_to_walk_tag(&current_tag.0);
             commands
                 .entity(entity)
@@ -1127,7 +1179,7 @@ pub fn aseprite_multi_leap_attack(
                 if attack.attack_startup_timer.fraction() == 0. {
                     // Switch to attack anim facing the player, wait for lunge_delay before moving.
                     let attack_tag = direction_to_attack_tag(delta_xy);
-                    set_animation_tag(&mut anim, &mut current_tag, attack_tag);
+                    set_attack_animation_tag(&mut anim, &mut current_tag, attack_tag);
                     if let Ok(mut tf) = local_transforms.get_mut(entity) {
                         apply_horizontal_sprite_flip_for_dir(&mut tf, delta_xy);
                     }
@@ -1148,7 +1200,7 @@ pub fn aseprite_multi_leap_attack(
             MultiLeapPhase::LungeWindup => {
                 // Switch to attack anim facing the player, wait for lunge_delay before moving.
                 let attack_tag = direction_to_attack_tag(delta_xy);
-                set_animation_tag(&mut anim, &mut current_tag, attack_tag);
+                set_attack_animation_tag(&mut anim, &mut current_tag, attack_tag);
                 if let Ok(mut tf) = local_transforms.get_mut(entity) {
                     apply_horizontal_sprite_flip_for_dir(&mut tf, delta_xy);
                 }
@@ -1178,7 +1230,7 @@ pub fn aseprite_multi_leap_attack(
                 attack.attack_duration_timer.tick(time.delta());
 
                 let attack_tag = direction_to_attack_tag(attack.dir.unwrap_or(delta_xy));
-                set_animation_tag(&mut anim, &mut current_tag, attack_tag);
+                set_attack_animation_tag(&mut anim, &mut current_tag, attack_tag);
                 if let Ok(mut tf) = local_transforms.get_mut(entity) {
                     apply_horizontal_sprite_flip_for_dir(&mut tf, attack.dir.unwrap_or(delta_xy));
                 }
@@ -1311,7 +1363,7 @@ pub fn aseprite_bull_charge(
                     charge.phase = BullChargePhase::Charging;
 
                     let attack_tag = direction_to_attack_tag(dir);
-                    set_animation_tag(&mut anim, &mut current_tag, attack_tag);
+                    set_attack_animation_tag(&mut anim, &mut current_tag, attack_tag);
                     commands.entity(entity).insert(MobIsAttacking(mob.clone()));
                     if let Ok(mut tf) = local_transforms.get_mut(entity) {
                         apply_horizontal_sprite_flip_for_dir(&mut tf, dir);
@@ -1333,7 +1385,7 @@ pub fn aseprite_bull_charge(
                     charge.phase = BullChargePhase::Stopping;
                     charge.deceleration_timer.reset();
                     let stop_tag = direction_to_attack_stop_tag(dir);
-                    set_animation_tag(&mut anim, &mut current_tag, stop_tag);
+                    set_attack_animation_tag(&mut anim, &mut current_tag, stop_tag);
                     if let Ok(mut tf) = local_transforms.get_mut(entity) {
                         apply_horizontal_sprite_flip_for_dir(&mut tf, dir);
                     }

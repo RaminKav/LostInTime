@@ -209,3 +209,23 @@ pub fn spawn_attack_warning_aseprite(
         .id();
     entity
 }
+
+/// Persistent UI warning icon (achievements, class unlocks). Loops until the caller despawns it.
+/// Combat telegraphs should use [`spawn_attack_warning_aseprite`], which plays once and despawns.
+pub fn spawn_looping_attack_warning_aseprite(
+    commands: &mut Commands,
+    asset_server: &AssetServer,
+    pos: Vec3,
+    parent: Entity,
+) -> Entity {
+    commands
+        .spawn(aseprite_bundle(
+            asset_server.load(AttackWarning::PATH),
+            AttackWarning::tags::WARNING,
+            Transform::from_translation(pos),
+            Visibility::default(),
+            false,
+        ))
+        .safe_set_parent(parent)
+        .id()
+}

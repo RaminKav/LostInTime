@@ -1281,13 +1281,12 @@ pub fn update_achievements_notification_icon(
         });
     } else if has_unclaimed {
         // Spawn notification icon if it doesn't exist and we need it
-        use crate::animations::enemy_sprites::spawn_attack_warning_aseprite;
-        let icon = spawn_attack_warning_aseprite(
+        use crate::animations::enemy_sprites::spawn_looping_attack_warning_aseprite;
+        let icon = spawn_looping_attack_warning_aseprite(
             &mut commands,
             &asset_server,
             Vec3::new(10., 8., 1.), // Position relative to button
             button_entity,
-            999999.0, // Very long duration
         );
         commands
             .entity(icon)

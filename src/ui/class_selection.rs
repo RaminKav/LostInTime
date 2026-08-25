@@ -10,7 +10,7 @@ use strum::IntoEnumIterator;
 
 use crate::{
     animations::{
-        enemy_sprites::spawn_attack_warning_aseprite, player_sprite::PlayerSpriteHandles,
+        enemy_sprites::spawn_looping_attack_warning_aseprite, player_sprite::PlayerSpriteHandles,
     },
     assets::Graphics,
     attributes::{ItemAttributes, ItemRarity},
@@ -516,12 +516,11 @@ pub fn setup_class_selection_ui(
                         // Spawn warning animation above and center of the slot
                         let warning_y = 50. + y_offset + 11. + CLASS_SELECTION_PANEL_Y; // 15 pixels above the slot center
                         let warning_pos = Vec3::new(x_offset, warning_y, 20.5);
-                        let warning_entity = spawn_attack_warning_aseprite(
+                        let warning_entity = spawn_looping_attack_warning_aseprite(
                             &mut commands,
                             &asset_server,
                             warning_pos,
                             overlay,
-                            999999.0, // Very long duration so it persists
                         );
                         commands.entity(warning_entity).insert((
                             ClassSelectionUI,
