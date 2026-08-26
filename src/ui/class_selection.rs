@@ -1,9 +1,9 @@
-use bevy::text::Justify;
 use crate::aseprite_assets::UIPortal;
 use crate::aseprite_assets::{FairyPetSprite, SlimePetSprite};
 use crate::aseprite_helpers::{aseprite_bundle, play_loop};
 use bevy::prelude::*;
 use bevy::sprite::Anchor;
+use bevy::text::Justify;
 use bevy_aseprite_ultra::prelude::AnimationState as AsepriteAnimationState;
 use bevy_aseprite_ultra::prelude::AseAnimation;
 use strum::IntoEnumIterator;
@@ -96,7 +96,7 @@ pub struct ClassUnlockInfoPanel;
 #[derive(Component)]
 pub enum ClassUnlockInfoTextKind {
     Title,
-    Achievement(usize),
+    Requirement,
     Cost,
 }
 
@@ -225,10 +225,9 @@ pub fn setup_class_selection_ui(
     sprite_handles: Res<PlayerSpriteHandles>,
     res: Res<ScreenResolution>,
     high_scores: Option<Res<HighScores>>,
-    achievements: Option<Res<Achievements>>,
     unlocked_classes: Res<UnlockedClasses>,
     unlock_currency: Option<Res<TimeFragmentCurrency>>,
-    _class_unlocks: Option<Res<ClassUnlockData>>,
+    class_unlocks: Option<Res<ClassUnlockData>>,
     cheat_settings: Res<CheatSettings>,
     existing: Query<Entity, With<ClassSelectionUI>>,
 ) {
@@ -502,17 +501,13 @@ pub fn setup_class_selection_ui(
                 .insert(ChildOf(icon_slot));
         }
 
-        // Spawn warning animation for locked classes that have all achievements met
+        // Spawn warning animation for locked classes that have their Era 3 requirement met
         if !class_unlocked {
-            if let (Some(unlock_data), Some(achievements_res)) =
-                (_class_unlocks.as_ref(), achievements.as_ref())
+            if let (Some(unlock_data), Some(scores)) =
+                (class_unlocks.as_ref(), high_scores.as_ref())
             {
                 if let Some(entry) = unlock_data.entry(class) {
-                    let requirements_met = entry
-                        .achievements
-                        .iter()
-                        .all(|req| achievements_res.has(*req));
-                    if requirements_met {
+                    if entry.era3_requirement_met(scores) {
                         // Spawn warning animation above and center of the slot
                         let warning_y = 50. + y_offset + 11. + CLASS_SELECTION_PANEL_Y; // 15 pixels above the slot center
                         let warning_pos = Vec3::new(x_offset, warning_y, 20.5);
@@ -685,7 +680,7 @@ pub fn setup_class_selection_ui(
 
 pub fn update_class_unlock_warnings(
     mut commands: Commands,
-    achievements: Option<Res<Achievements>>,
+    high_scores: Option<Res<HighScores>>,
     class_unlocks: Option<Res<ClassUnlockData>>,
     unlocked_classes: Res<UnlockedClasses>,
     existing_warnings: Query<(Entity, &ClassIcon), With<ClassUnlockWarningAnimation>>,
@@ -710,17 +705,13 @@ pub fn update_class_unlock_warnings(
         let should_have_warning =
             if cheat_settings.bypass_class_unlocks || unlocked_classes.contains(class) {
                 false // Class is unlocked (or cheat enabled), no warning needed
-            } else if let (Some(unlock_data), Some(achievements_res)) =
-                (class_unlocks.as_ref(), achievements.as_ref())
+            } else if let (Some(unlock_data), Some(scores)) =
+                (class_unlocks.as_ref(), high_scores.as_ref())
             {
-                if let Some(entry) = unlock_data.entry(class) {
-                    entry
-                        .achievements
-                        .iter()
-                        .all(|req| achievements_res.has(*req))
-                } else {
-                    false
-                }
+                unlock_data
+                    .entry(class)
+                    .map(|entry| entry.era3_requirement_met(scores))
+                    .unwrap_or(false)
             } else {
                 false
             };
@@ -737,7 +728,7 @@ fn spawn_class_unlock_info_ui(commands: &mut Commands, asset_server: &AssetServe
             (
                 Sprite {
                     color: Color::srgba(0.08, 0.08, 0.08, 0.98),
-                    custom_size: Some(Vec2::new(110., 110.)),
+                    custom_size: Some(Vec2::new(130., 100.)),
                     ..Default::default()
                 },
                 Transform::from_translation(Vec3::new(0., 0., 30.)),
@@ -754,27 +745,17 @@ fn spawn_class_unlock_info_ui(commands: &mut Commands, asset_server: &AssetServe
     let text_entries = [
         (
             ClassUnlockInfoTextKind::Title,
-            Vec3::new(-48., 40., 1.),
+            Vec3::new(-58., 36., 1.),
             gf::DISPLAY,
         ),
         (
-            ClassUnlockInfoTextKind::Achievement(0),
-            Vec3::new(-48., 16., 1.),
-            gf::BODY,
-        ),
-        (
-            ClassUnlockInfoTextKind::Achievement(1),
-            Vec3::new(-48., 0., 1.),
-            gf::BODY,
-        ),
-        (
-            ClassUnlockInfoTextKind::Achievement(2),
-            Vec3::new(-48., -16., 1.),
+            ClassUnlockInfoTextKind::Requirement,
+            Vec3::new(-58., 8., 1.),
             gf::BODY,
         ),
         (
             ClassUnlockInfoTextKind::Cost,
-            Vec3::new(-48., -38., 1.),
+            Vec3::new(-58., -36., 1.),
             gf::BODY,
         ),
     ];
@@ -909,7 +890,7 @@ pub fn handle_class_selection(
     mut commands: Commands,
     mut selection_state: ResMut<ClassSelectionState>,
     unlocked_classes: Res<UnlockedClasses>,
-    achievements: Option<Res<Achievements>>,
+    high_scores: Option<Res<HighScores>>,
     class_unlocks: Option<Res<ClassUnlockData>>,
     unlock_currency: Option<Res<TimeFragmentCurrency>>,
     mut hover_state: ResMut<ClassUnlockHoverState>,
@@ -968,19 +949,15 @@ pub fn handle_class_selection(
                     Interaction::Hovering => {
                         if confirm_pressed {
                             if is_locked {
-                                if let (Some(unlock_data), Some(achievements_res)) =
-                                    (class_unlocks.as_ref(), achievements.as_ref())
+                                if let (Some(unlock_data), Some(scores)) =
+                                    (class_unlocks.as_ref(), high_scores.as_ref())
                                 {
                                     if let Some(entry) = unlock_data.entry(&class_id) {
-                                        let requirements_met = entry
-                                            .achievements
-                                            .iter()
-                                            .all(|req| achievements_res.has(*req));
                                         let can_afford = unlock_currency
                                             .as_ref()
                                             .map(|currency| currency.can_spend(entry.cost))
                                             .unwrap_or(false);
-                                        if requirements_met && can_afford {
+                                        if entry.era3_requirement_met(scores) && can_afford {
                                             confirm_state.active = true;
                                             confirm_state.class = Some(class_id.clone());
                                             confirm_state.cost = entry.cost;
@@ -1071,7 +1048,7 @@ pub fn handle_slot_deselection(
 
 pub fn update_class_unlock_panel(
     hover_state: Res<ClassUnlockHoverState>,
-    achievements: Option<Res<Achievements>>,
+    high_scores: Option<Res<HighScores>>,
     class_unlocks: Option<Res<ClassUnlockData>>,
     unlocked_classes: Res<UnlockedClasses>,
     unlock_currency: Option<Res<TimeFragmentCurrency>>,
@@ -1097,31 +1074,25 @@ pub fn update_class_unlock_panel(
         return;
     }
 
-    let achievements_ref = achievements.as_ref().map(|a| a.as_ref());
     let unlock_entry = class_unlocks.as_ref().and_then(|data| data.entry(&class));
     let class_data = graphics.get_class_data(class.clone());
     let currency_ref = unlock_currency.as_ref().map(|c| &**c);
+    let scores_ref = high_scores.as_ref().map(|s| s.as_ref());
 
-    let mut achievement_rows: Vec<(String, bool)> = Vec::new();
+    let mut requirement_text = String::new();
+    let mut requirement_met = false;
     let mut cost = 0_u32;
     if let Some(entry) = unlock_entry {
         cost = entry.cost;
-        achievement_rows = entry
-            .achievements
-            .iter()
-            .map(|req| {
-                let done = achievements_ref.map_or(false, |a| a.has(*req));
-                (
-                    format!("{} {}", if done { "[x]" } else { "[ ]" }, req.get_name()),
-                    done,
-                )
-            })
-            .collect();
+        requirement_text = entry.requirement_text();
+        requirement_met = scores_ref
+            .map(|scores| entry.era3_requirement_met(scores))
+            .unwrap_or(false);
     }
 
     if let Ok((mut visibility, mut transform)) = panel_query.single_mut() {
         *visibility = Visibility::Visible;
-        let offset = Vec3::new(86., -20.5, 0.);
+        let offset = Vec3::new(96., -20.5, 0.);
         transform.translation = Vec3::new(
             hover_state.slot_position.x + offset.x,
             hover_state.slot_position.y + offset.y,
@@ -1135,28 +1106,22 @@ pub fn update_class_unlock_panel(
                 text.0 = format!("{}", class_data.name.clone());
                 text_color.0 = Color::WHITE;
             }
-            ClassUnlockInfoTextKind::Achievement(idx) => {
-                if let Some((line, done)) = achievement_rows.get(*idx) {
-                    text.0 = line.clone();
-                    text_color.0 = if *done {
-                        Color::srgb(0.4, 0.9, 0.4)
-                    } else {
-                        Color::srgb(1.0, 0.4, 0.4)
-                    };
+            ClassUnlockInfoTextKind::Requirement => {
+                text.0 = requirement_text.clone();
+                text_color.0 = if requirement_met {
+                    Color::srgb(0.4, 0.9, 0.4)
                 } else {
-                    text.0.clear();
-                    text_color.0 = Color::WHITE;
-                }
+                    Color::srgb(1.0, 0.4, 0.4)
+                };
             }
             ClassUnlockInfoTextKind::Cost => {
                 if let Some(_entry) = unlock_entry {
                     text.0 = format!("Cost: {}", cost);
-                    text_color.0 =
-                        if currency_ref.map(|c| c.can_spend(cost)).unwrap_or(false) {
-                            Color::WHITE
-                        } else {
-                            Color::srgb(1.0, 0.4, 0.4)
-                        };
+                    text_color.0 = if currency_ref.map(|c| c.can_spend(cost)).unwrap_or(false) {
+                        Color::WHITE
+                    } else {
+                        Color::srgb(1.0, 0.4, 0.4)
+                    };
                 } else {
                     text.0.clear();
                     text_color.0 = Color::WHITE;
@@ -1618,11 +1583,7 @@ fn spawn_player_preview(
     let _cleared_diff = commands
         .spawn(
             gf::BODY
-                .text(
-                    &asset_server,
-                    cleared_difficulty_label(cleared_tier),
-                    WHITE,
-                )
+                .text(&asset_server, cleared_difficulty_label(cleared_tier), WHITE)
                 .anchor(Anchor::CENTER_LEFT)
                 .with_transform(Transform {
                     translation: Vec3::new(-42., TITLE_Y_OFFSET - 14., 1.),

@@ -3,11 +3,11 @@
 //! Plain lines stay one [`Text2d`]; keyword / number runs are [`TextSpan`] children
 //! with their own [`TextColor`].
 
-use bevy::color::Alpha;
-use bevy::text::Justify;
 use bevy::camera::visibility::RenderLayers;
+use bevy::color::Alpha;
 use bevy::prelude::*;
 use bevy::sprite::Anchor;
+use bevy::text::Justify;
 
 use crate::colors::{LIGHT_RED, SHIELD_BLUE, YELLOW};
 use crate::player::skills::HeirloomRarity;
@@ -268,10 +268,7 @@ fn starts_number_token(chars: &[char], i: usize) -> bool {
         if chars[i + 1].is_ascii_digit() {
             return true;
         }
-        if chars[i + 1] == '.'
-            && i + 2 < chars.len()
-            && chars[i + 2].is_ascii_digit()
-        {
+        if chars[i + 1] == '.' && i + 2 < chars.len() && chars[i + 2].is_ascii_digit() {
             return true;
         }
     }

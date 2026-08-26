@@ -1,8 +1,8 @@
-use bevy::text::Justify;
 use bevy::camera::visibility::RenderLayers;
 use bevy::input::keyboard::KeyboardInput;
 use bevy::prelude::*;
 use bevy::sprite::Anchor;
+use bevy::text::Justify;
 use bevy::window::Ime;
 
 use crate::{
@@ -154,9 +154,9 @@ pub fn setup_name_entry_ui(
                 .justify(Justify::Left)
                 .anchor(Anchor::CENTER_LEFT)
                 .with_transform(Transform {
-                translation: Vec3::new(-65., 5.5, 104.),
-                scale: gf::BODY.transform_scale(),
-                ..default()
+                    translation: Vec3::new(-65., 5.5, 104.),
+                    scale: gf::BODY.transform_scale(),
+                    ..default()
                 }),
             RenderLayers::from_layers(&[3]),
             NameEntryUI,

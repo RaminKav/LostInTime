@@ -1,8 +1,8 @@
-use bevy::text::Justify;
 use crate::ui::game_fonts as gf;
 use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
 use bevy::sprite::Anchor;
+use bevy::text::Justify;
 
 use crate::{
     assets::Graphics,

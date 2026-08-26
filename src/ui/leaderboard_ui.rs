@@ -1,7 +1,7 @@
-use bevy::text::Justify;
 use crate::ui::game_fonts as gf;
 use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
+use bevy::text::Justify;
 
 use crate::{
     client::leaderboard::LeaderboardCache,

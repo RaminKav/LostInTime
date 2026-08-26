@@ -218,10 +218,7 @@ pub fn run_is_max_difficulty(difficulty: Res<ActiveRunDifficulty>) -> bool {
 }
 
 /// After an Era 3 boss kill, unlock the next ladder tier when appropriate.
-pub fn unlock_difficulty_after_era3_win(
-    max_unlocked: u8,
-    run_tier: u8,
-) -> Option<u8> {
+pub fn unlock_difficulty_after_era3_win(max_unlocked: u8, run_tier: u8) -> Option<u8> {
     if max_unlocked == 0 {
         // First clear (baseline run) unlocks Difficulty 1 + the modal.
         return Some(1);
@@ -255,20 +252,16 @@ pub fn unlock_difficulty_on_era3_boss_kill(
     let mut changed = false;
     if let Some(pc) = player_class.as_deref() {
         if pc.class != crate::player::skills::SkillClass::None {
-            let before = data.high_scores.highest_difficulty(&pc.class);
-            data.high_scores
-                .update_highest_difficulty(&pc.class, run_tier);
-            if data.high_scores.highest_difficulty(&pc.class) > before {
+            if data.high_scores.record_era3_clear(&pc.class, run_tier) {
                 changed = true;
                 if let Some(ref mut scores) = high_scores {
-                    scores.update_highest_difficulty(&pc.class, run_tier);
+                    scores.record_era3_clear(&pc.class, run_tier);
                 }
             }
         }
     }
 
-    if let Some(new_max) =
-        unlock_difficulty_after_era3_win(data.max_unlocked_difficulty, run_tier)
+    if let Some(new_max) = unlock_difficulty_after_era3_win(data.max_unlocked_difficulty, run_tier)
     {
         info!(
             "Unlocked difficulty tier {} (was {}, run tier {})",

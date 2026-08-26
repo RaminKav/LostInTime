@@ -172,8 +172,7 @@ pub fn spawn_heirloom_grid_overlay(
             let icon = commands
                 .spawn((
                     {
-                        let mut sprite =
-                            graphics.get_heirloom_icon(heirloom.clone());
+                        let mut sprite = graphics.get_heirloom_icon(heirloom.clone());
                         sprite.custom_size = Some(Vec2::new(GRID_ICON, GRID_ICON));
                         sprite
                     },

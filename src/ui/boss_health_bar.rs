@@ -6,10 +6,7 @@ use crate::{
     attributes::{CurrentHealth, MaxHealth},
     colors::{BLACK, RED, YELLOW},
     enemy::Mob,
-    ui::{
-        game_fonts as gf,
-        ui_helpers::Z_DEPTH_BOSS_HEALTH_BAR,
-    },
+    ui::{game_fonts as gf, ui_helpers::Z_DEPTH_BOSS_HEALTH_BAR},
     GAME_HEIGHT,
 };
 

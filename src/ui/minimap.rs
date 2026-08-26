@@ -1,4 +1,3 @@
-use bevy::text::Justify;
 use crate::assets::Graphics;
 use crate::client::GameOverEvent;
 use crate::colors::{DARK_BROWN, DESERT_TILE, DESERT_WATER, SNOW_TILE, SNOW_WATER, WHITE};
@@ -18,6 +17,7 @@ use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 use bevy::sprite::Anchor;
 use bevy::sprite_render::MeshMaterial2d;
+use bevy::text::Justify;
 use bevy_ecs_tilemap::prelude::*;
 
 use super::{game_fonts as gf, layout_sync::UiLayoutKey, ui_helpers, UIElement};
@@ -599,14 +599,16 @@ fn setup_island_map(
 
             // Prefer minimap cache; fall back to the full island bake so lazy chunk spawn
             // doesn't leave far tiles as blank gray if the map opens before seeding finishes.
-            let terrain_blocks = minimap_cache.explored_terrain.get(&map_pos).copied().or_else(
-                || {
+            let terrain_blocks = minimap_cache
+                .explored_terrain
+                .get(&map_pos)
+                .copied()
+                .or_else(|| {
                     game.world_obj_cache
                         .tile_data_cache
                         .get(&map_pos)
                         .map(|t| t.block_type)
-                },
-            );
+                });
 
             if let Some(explored_tile) = terrain_blocks {
                 let mut drew_large_object = false;

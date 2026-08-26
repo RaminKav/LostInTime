@@ -1,6 +1,6 @@
-use bevy::text::Justify;
 use crate::aseprite_assets::SkillChoiceFlash;
 use bevy::ecs::system::SystemParam;
+use bevy::text::Justify;
 use bevy::{camera::visibility::RenderLayers, prelude::*, sprite::Anchor};
 use itertools::Itertools;
 use rand::{seq::SliceRandom, Rng};
@@ -35,7 +35,6 @@ use super::{
     ui_helpers, Focusable, Interactable, ToolTipUpdateEvent, TooltipTeardownEvent, UIElement,
     UIState, CURRENCY_BACKGROUND_SIZE, KEYBIND_BADGE_COLOR,
 };
-
 
 /// Background container art size (`assets/ui/ChestContainer.png`).
 pub const CHEST_CONTAINER_UI_SIZE: Vec2 = Vec2::new(130., 148.);
@@ -433,15 +432,15 @@ pub fn setup_item_chest_ui(
     commands
         .spawn((
             (graphics
-                    .spritesheet_map
-                    .as_ref()
-                    .unwrap()
-                    .get(match item_chest_state.chest_type {
-                        ChestType::Item => &WorldObject::ChestBlock,
-                        ChestType::Heirloom => &WorldObject::HeirloomChest,
-                    })
-                    .unwrap()
-                    .clone()),
+                .spritesheet_map
+                .as_ref()
+                .unwrap()
+                .get(match item_chest_state.chest_type {
+                    ChestType::Item => &WorldObject::ChestBlock,
+                    ChestType::Heirloom => &WorldObject::HeirloomChest,
+                })
+                .unwrap()
+                .clone()),
             Transform {
                 translation: Vec2::new(0., CHEST_OPENING_Y).extend(4.),
                 scale: Vec3::new(1., 1., 1.),
@@ -587,12 +586,12 @@ pub fn shuffle_items(
                 commands
                     .spawn((
                         (graphics
-                                .spritesheet_map
-                                .as_ref()
-                                .unwrap()
-                                .get(&pick_new_item.clone())
-                                .unwrap()
-                                .clone()),
+                            .spritesheet_map
+                            .as_ref()
+                            .unwrap()
+                            .get(&pick_new_item.clone())
+                            .unwrap()
+                            .clone()),
                         Transform {
                             translation: Vec3::new(-1., CHEST_ICON_Y, 15.),
                             scale: Vec3::new(1., 1., 1.),
@@ -1241,12 +1240,12 @@ pub fn handle_anim_events(
                             ))
                             .insert(
                                 (graphics
-                                        .spritesheet_map
-                                        .as_ref()
-                                        .unwrap()
-                                        .get(&picked_item.obj_type)
-                                        .unwrap()
-                                        .clone()),
+                                    .spritesheet_map
+                                    .as_ref()
+                                    .unwrap()
+                                    .get(&picked_item.obj_type)
+                                    .unwrap()
+                                    .clone()),
                             )
                             .insert(UIState::ItemChest)
                             .insert(RenderLayers::from_layers(&[3]))
@@ -1291,7 +1290,9 @@ pub fn handle_anim_events(
                                         ..Default::default()
                                     },
                                 ))
-                                .insert(graphics.get_heirloom_icon(picked_heirloom.heirloom.clone()))
+                                .insert(
+                                    graphics.get_heirloom_icon(picked_heirloom.heirloom.clone()),
+                                )
                                 .insert(UIState::ItemChest)
                                 .insert(RenderLayers::from_layers(&[3]))
                                 .insert(ItemChestFinalItem)

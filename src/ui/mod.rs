@@ -543,10 +543,7 @@ pub(crate) fn snap_layer3_visuals_to_pixel_grid(
     resolution: Res<ScreenResolution>,
     mut ui_visuals: Query<
         (&mut Transform, &RenderLayers),
-        (
-            Or<(With<Text2d>, With<Sprite>)>,
-            Without<Camera>,
-        ),
+        (Or<(With<Text2d>, With<Sprite>)>, Without<Camera>),
     >,
 ) {
     for (mut transform, layers) in ui_visuals.iter_mut() {
@@ -1476,8 +1473,7 @@ impl Plugin for UIPlugin {
                 .run_if(state_changed::<UIState>.and_then(in_state(UIState::ClassSelection))),
                 update_class_unlock_warnings
                     .run_if(in_state(UIState::ClassSelection).and_then(
-                        resource_changed::<crate::player::achievements::Achievements>
-                            .or_else(resource_changed::<crate::player::UnlockedClasses>)
+                        resource_changed::<crate::player::UnlockedClasses>
                     )),))
             .add_systems(Update, (
                     handle_anim_events

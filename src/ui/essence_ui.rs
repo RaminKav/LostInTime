@@ -1,6 +1,6 @@
-use bevy::text::Justify;
 use crate::aseprite_helpers::aseprite_bundle;
 use crate::ui::game_fonts as gf;
+use bevy::text::Justify;
 use bevy::{camera::visibility::RenderLayers, ecs::system::ParamSet, prelude::*};
 use rand::{seq::SliceRandom, Rng};
 use strum::IntoEnumIterator;
@@ -279,8 +279,7 @@ impl EssenceShopChoices {
         rerolls_remaining: u32,
         replenish_purchased: bool,
     ) -> bool {
-        rerolls_remaining > 0
-            && (replenish_purchased || !self.category_fully_purchased(category))
+        rerolls_remaining > 0 && (replenish_purchased || !self.category_fully_purchased(category))
     }
 
     pub fn to_world(&self) -> MerchantShop {
@@ -470,8 +469,7 @@ pub fn refresh_merchant_prices_on_timer(
     }
 
     let level = player_level.single().map(|l| l.level).unwrap_or(1);
-    let multiplier =
-        purchase_multiplier_for_level(level, difficulty.shop_price_multiplier());
+    let multiplier = purchase_multiplier_for_level(level, difficulty.shop_price_multiplier());
 
     for slots in cache.shops.values_mut() {
         recompute_slot_prices(slots, multiplier);
@@ -1019,10 +1017,7 @@ pub fn sync_merchant_marker_overlay(
 }
 
 /// World-space (game camera, default render layer) icon for the tracked item.
-fn merchant_world_marker_icon_sprite(
-    graphics: &Graphics,
-    slot: &MerchantShopSlot,
-) -> Sprite {
+fn merchant_world_marker_icon_sprite(graphics: &Graphics, slot: &MerchantShopSlot) -> Sprite {
     match &slot.kind {
         MerchantItemKind::Heirloom { heirloom, .. } => graphics.get_heirloom_icon(heirloom.clone()),
         MerchantItemKind::Equipment(stack) | MerchantItemKind::Material(stack) => graphics
@@ -1331,11 +1326,8 @@ pub fn refresh_merchant_category_ui(
         );
     }
 
-    let reroll_enabled = shop.category_reroll_enabled(
-        category,
-        run_unlocks.rerolls_remaining,
-        replenish_purchased,
-    );
+    let reroll_enabled =
+        shop.category_reroll_enabled(category, run_unlocks.rerolls_remaining, replenish_purchased);
     spawn_merchant_category_reroll_button(
         commands,
         asset_server,
@@ -1574,11 +1566,8 @@ pub fn update_merchant_reroll_button_states(
         .unwrap_or(false);
 
     for (mut sprite, btn) in sprites.p0().iter_mut() {
-        let enabled = shop.category_reroll_enabled(
-            btn.0,
-            run_unlocks.rerolls_remaining,
-            replenish_purchased,
-        );
+        let enabled =
+            shop.category_reroll_enabled(btn.0, run_unlocks.rerolls_remaining, replenish_purchased);
         sprite.color = if enabled {
             KEYBIND_BADGE_COLOR
         } else {
@@ -2258,8 +2247,7 @@ pub fn apply_merchant_category_reroll(
         .single()
         .map(|a| (a.0 .0, a.1.level))
         .unwrap_or((0, 1));
-    let purchase_multiplier =
-        purchase_multiplier_for_level(player_level, shop_difficulty_mult);
+    let purchase_multiplier = purchase_multiplier_for_level(player_level, shop_difficulty_mult);
     let mut rng = rand::thread_rng();
 
     reroll_merchant_category(

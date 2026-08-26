@@ -1,5 +1,5 @@
-use bevy::text::Justify;
 use bevy::color::Alpha;
+use bevy::text::Justify;
 use bevy::{camera::visibility::RenderLayers, prelude::*, sprite::Anchor};
 
 use crate::{
@@ -12,7 +12,6 @@ use crate::{
     ui::game_fonts as gf,
     GameState, ScreenResolution,
 };
-
 
 /// Render layer shared with the rest of the on-screen HUD (see `player_hud`).
 const INTRO_GUIDE_RENDER_LAYER: u8 = 3;
@@ -294,7 +293,11 @@ pub fn tick_intro_guide(
     time: Res<Time>,
     mut roots: Query<(Entity, &mut IntroGuideRoot)>,
     mut visuals: Query<
-        (&IntroGuideVisual, Option<&mut Sprite>, Option<&mut TextColor>),
+        (
+            &IntroGuideVisual,
+            Option<&mut Sprite>,
+            Option<&mut TextColor>,
+        ),
         Or<(With<Sprite>, With<Text2d>)>,
     >,
 ) {

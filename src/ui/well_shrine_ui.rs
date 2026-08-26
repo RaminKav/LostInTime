@@ -1,7 +1,7 @@
-use bevy::text::Justify;
 use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
 use bevy::sprite::Anchor;
+use bevy::text::Justify;
 use rand::Rng;
 
 use crate::{

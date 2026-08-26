@@ -1,6 +1,6 @@
-use bevy::text::Justify;
 use crate::aseprite_assets::CraftingArrowAse;
 use crate::aseprite_helpers::aseprite_bundle;
+use bevy::text::Justify;
 use bevy::{
     camera::visibility::RenderLayers, ecs::system::SystemParam, prelude::*, sprite::Anchor,
 };

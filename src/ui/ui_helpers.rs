@@ -1,8 +1,8 @@
-use bevy::text::Justify;
 use crate::{
     cursor::CursorPos, juice::bounce::BounceOnHit, keybinds::InputBinding, world, Game,
     ScreenResolution,
 };
+use bevy::text::Justify;
 use bevy::{
     camera::visibility::RenderLayers,
     math::primitives::Rectangle,
@@ -21,7 +21,6 @@ use bevy::{
 use bevy_ecs_tilemap::tiles::TilePos;
 
 use super::{game_fonts as gf, Interactable, UIState};
-
 
 /// How much more transparent the centre of a radial overlay is vs. its edge.
 /// Kept small for a very subtle vignette-like effect.

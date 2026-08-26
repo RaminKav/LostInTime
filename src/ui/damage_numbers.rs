@@ -21,7 +21,6 @@ use super::{
     spawn_item_stack_icon, UIElement, UI_SLOT_SIZE,
 };
 
-
 /// Font used for damage, healing/regen, and item-pickup floating labels.
 #[inline]
 pub fn floating_text_font_style(settings: Option<&CheatSettings>) -> FontStyle {

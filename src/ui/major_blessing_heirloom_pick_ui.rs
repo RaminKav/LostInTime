@@ -68,9 +68,7 @@ pub fn setup_major_heirloom_pick_ui(
         .map(|p| p.mode)
         .unwrap_or(MajorHeirloomPickMode::TripleCopyLoseOne);
     let subtitle = match mode {
-        MajorHeirloomPickMode::TripleCopyLoseOne => {
-            "Gain 3 copies. Lose 1 random other uncommon."
-        }
+        MajorHeirloomPickMode::TripleCopyLoseOne => "Gain 3 copies. Lose 1 random other uncommon.",
         MajorHeirloomPickMode::ConvertAllToChosen => {
             "Convert all other uncommons into copies of this one."
         }
@@ -284,14 +282,11 @@ pub fn handle_major_heirloom_pick_click(
                                     .iter()
                                     .enumerate()
                                     .filter(|(_, h)| {
-                                        h.rarity == HeirloomRarity::Uncommon
-                                            && h.heirloom != chosen
+                                        h.rarity == HeirloomRarity::Uncommon && h.heirloom != chosen
                                     })
                                     .map(|(i, _)| i)
                                     .collect();
-                                if let Some(&idx) =
-                                    other_indices.choose(&mut rand::thread_rng())
-                                {
+                                if let Some(&idx) = other_indices.choose(&mut rand::thread_rng()) {
                                     skills.heirlooms.remove(idx);
                                 }
                                 for _ in 0..3 {
@@ -306,13 +301,11 @@ pub fn handle_major_heirloom_pick_click(
                                     .heirlooms
                                     .iter()
                                     .filter(|h| {
-                                        h.rarity == HeirloomRarity::Uncommon
-                                            && h.heirloom != chosen
+                                        h.rarity == HeirloomRarity::Uncommon && h.heirloom != chosen
                                     })
                                     .count();
                                 skills.heirlooms.retain(|h| {
-                                    !(h.rarity == HeirloomRarity::Uncommon
-                                        && h.heirloom != chosen)
+                                    !(h.rarity == HeirloomRarity::Uncommon && h.heirloom != chosen)
                                 });
                                 for _ in 0..other_count {
                                     skills.heirlooms.push(HeirloomWithRarity {

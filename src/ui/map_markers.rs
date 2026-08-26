@@ -30,7 +30,6 @@ use super::{
 use crate::item::WorldObject;
 use crate::Player;
 
-
 /// Radius (UI space) around an existing marker within which a click removes it instead of adding.
 const MARKER_REMOVE_RADIUS: f32 = 5.0;
 /// Marker "x" draw size on the island map.

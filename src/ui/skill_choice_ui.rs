@@ -1,6 +1,6 @@
-use bevy::text::Justify;
 use crate::aseprite_assets::SkillChoiceFlash;
 use crate::aseprite_helpers::aseprite_bundle;
+use bevy::text::Justify;
 use bevy::{camera::visibility::RenderLayers, prelude::*, sprite::Anchor};
 use bevy_aseprite_ultra::prelude::{AnimationState, Aseprite};
 
@@ -568,8 +568,7 @@ pub fn handle_skill_choice_reroll_button(
                                 &mut commands,
                                 &asset_server,
                                 Vec3::new(
-                                    (card.index as f32 - 1.) * (SKILLS_CHOICE_UI_SIZE.x + 16.)
-                                        + 4.,
+                                    (card.index as f32 - 1.) * (SKILLS_CHOICE_UI_SIZE.x + 16.) + 4.,
                                     4.,
                                     15.,
                                 ),

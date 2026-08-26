@@ -1,5 +1,5 @@
-use bevy::text::Justify;
 use bevy::color::Alpha;
+use bevy::text::Justify;
 use bevy::{
     camera::visibility::RenderLayers, ecs::system::SystemParam, prelude::*, sprite::Anchor,
 };
@@ -40,9 +40,7 @@ use crate::{
         ProjectileSize, SkillPower, Speed,
     },
     audio::{AudioSoundEffect, SoundSpawner},
-    blessings::{
-        BlessingTriggerCounts, OwnedBlessingCard, OwnedBlessingHudSlots, OwnedBlessings,
-    },
+    blessings::{BlessingTriggerCounts, OwnedBlessingCard, OwnedBlessingHudSlots, OwnedBlessings},
     chaos::ChaosTracker,
     client::GameOverEvent,
     colors::{
@@ -1012,7 +1010,10 @@ pub fn update_currency_text(
         }
     }
 }
-pub fn update_score_text(score: Res<RunScore>, mut text_query: Query<&mut Text2d, With<ScoreText>>) {
+pub fn update_score_text(
+    score: Res<RunScore>,
+    mut text_query: Query<&mut Text2d, With<ScoreText>>,
+) {
     // handles different text for two different UI elements, game end count and normal in-game
     for mut text in text_query.iter_mut() {
         text.0 = format!("Score: {:}", score.score);
@@ -1701,20 +1702,19 @@ fn spawn_blessing_hud_tooltip_card(
         ))
         .id();
 
-    commands
-        .spawn((
-            gf::HEIRLOOM_CARD_TITLE
-                .text(asset_server, card.title.as_str(), WHITE)
-                .anchor(Anchor::CENTER)
-                .with_transform(Transform {
-                    translation: Vec3::new(0., 24. + BLESSING_HUD_CARD_TITLE_Y_OFFSET, 1.),
-                    scale: gf::HEIRLOOM_CARD_TITLE.transform_scale(),
-                    ..Default::default()
-                }),
-            Name::new("Blessing HUD Tooltip Title"),
-            RenderLayers::from_layers(&[3]),
-            ChildOf(card_e),
-        ));
+    commands.spawn((
+        gf::HEIRLOOM_CARD_TITLE
+            .text(asset_server, card.title.as_str(), WHITE)
+            .anchor(Anchor::CENTER)
+            .with_transform(Transform {
+                translation: Vec3::new(0., 24. + BLESSING_HUD_CARD_TITLE_Y_OFFSET, 1.),
+                scale: gf::HEIRLOOM_CARD_TITLE.transform_scale(),
+                ..Default::default()
+            }),
+        Name::new("Blessing HUD Tooltip Title"),
+        RenderLayers::from_layers(&[3]),
+        ChildOf(card_e),
+    ));
 
     let desc_lines: Vec<&str> = card.description.iter().map(String::as_str).collect();
     let chaos_line_count = card.chaos_lines.len();
@@ -1736,7 +1736,8 @@ fn spawn_blessing_hud_tooltip_card(
         .first()
         .zip(block_line_ys.last())
         .map(|(top, bottom)| {
-            gf::heirloom_desc_text_center_y() - (top + bottom) * 0.5 + BLESSING_HUD_CARD_DESC_Y_OFFSET
+            gf::heirloom_desc_text_center_y() - (top + bottom) * 0.5
+                + BLESSING_HUD_CARD_DESC_Y_OFFSET
         })
         .unwrap_or(BLESSING_HUD_CARD_DESC_Y_OFFSET);
 
@@ -1855,16 +1856,9 @@ pub fn handle_blessing_hud_tooltip(
     };
 
     let (_, card_size) = blessing_hud_card_ui(card);
-    let tooltip_pos = hud_blessing_tooltip_world_position(
-        icon_pos,
-        card_size,
-        res.game_width,
-        res.scale,
-    );
-    let trigger_count = card
-        .major
-        .map(|m| blessing_triggers.get(&m))
-        .unwrap_or(0);
+    let tooltip_pos =
+        hud_blessing_tooltip_world_position(icon_pos, card_size, res.game_width, res.scale);
+    let trigger_count = card.major.map(|m| blessing_triggers.get(&m)).unwrap_or(0);
     spawn_blessing_hud_tooltip_card(
         &mut commands,
         &graphics,
@@ -1923,7 +1917,6 @@ pub fn spawn_skill_tooltip_layout(
     const DESC_TEXT_X: f32 = ICONS_X_OFFSET + 32.;
     const COOLDOWN_TEXT_X: f32 = 158.;
     const TITLE_Y: f32 = TEXT_Y_OFFSET + 10.;
-
 
     commands
         .spawn((
@@ -2512,8 +2505,7 @@ fn spawn_mana_tracker_tooltip(
             commands
                 .spawn((
                     {
-                        let mut sprite =
-                            graphics.get_heirloom_icon(heirloom.clone());
+                        let mut sprite = graphics.get_heirloom_icon(heirloom.clone());
                         sprite.custom_size = Some(Vec2::splat(ORB_TRACKER_ICON_SIZE));
                         sprite
                     },
@@ -2761,8 +2753,7 @@ fn spawn_health_tracker_tooltip(
                 commands
                     .spawn((
                         {
-                            let mut sprite =
-                                graphics.get_heirloom_icon(heirloom);
+                            let mut sprite = graphics.get_heirloom_icon(heirloom);
                             sprite.custom_size = Some(Vec2::splat(ORB_TRACKER_ICON_SIZE));
                             sprite
                         },
@@ -3213,8 +3204,7 @@ pub fn handle_update_player_skills(
                 // Mutate custom_size on the sheet sprite — do not insert a second
                 // `Sprite { ..Default }` (0.19 merges atlas into Sprite; that wipe
                 // left a white quad and broke outline UVs).
-                let mut icon_sprite =
-                    graphics.get_heirloom_icon(heirloom.clone());
+                let mut icon_sprite = graphics.get_heirloom_icon(heirloom.clone());
                 icon_sprite.custom_size = Some(Vec2::new(16., 16.));
                 let icon = commands
                     .spawn((

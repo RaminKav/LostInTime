@@ -1,10 +1,10 @@
-use bevy::text::Justify;
 use crate::aseprite_assets::OptionsCursor;
 use crate::aseprite_helpers::aseprite_bundle;
 use bevy::camera::visibility::RenderLayers;
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 use bevy::sprite::Anchor;
+use bevy::text::Justify;
 
 use std::collections::HashSet;
 use std::fs::File;

@@ -809,10 +809,7 @@ pub fn handle_active_skill_shrine_reroll_button(
         &ActiveSkillShrineRerollButton,
         &Children,
     )>,
-    mut reroll_text: Query<
-        (&mut Text2d, &mut TextColor),
-        With<ActiveSkillShrineRerollsText>,
-    >,
+    mut reroll_text: Query<(&mut Text2d, &mut TextColor), With<ActiveSkillShrineRerollsText>>,
     mut commands: Commands,
     mut run_unlocks: ResMut<RunUnlockState>,
     mut shrine_selection: ResMut<ActiveSkillShrineSelection>,

@@ -98,7 +98,6 @@ pub fn build_banish_tracker_children(
     root: Entity,
     ui_state: UIState,
 ) {
-
     let mut y: f32 = 0.;
     let title = commands
         .spawn((
@@ -174,8 +173,7 @@ pub fn build_banish_tracker_children(
                 let icon_x =
                     BANISH_TRACKER_ICON_SIZE * 0.5 + col as f32 * BANISH_TRACKER_ICON_SPACING;
                 let row_icon_y = icon_y - row as f32 * BANISH_TRACKER_ICON_ROW_SPACING;
-                let mut icon_sprite =
-                    graphics.get_heirloom_icon(choice.heirloom.clone());
+                let mut icon_sprite = graphics.get_heirloom_icon(choice.heirloom.clone());
                 icon_sprite.custom_size = Some(Vec2::new(
                     BANISH_TRACKER_ICON_SIZE,
                     BANISH_TRACKER_ICON_SIZE,

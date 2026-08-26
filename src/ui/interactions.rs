@@ -3634,11 +3634,8 @@ pub fn handle_merchant_category_reroll_buttons(
     let mut any_hovered = false;
 
     for (e, mut interactable, btn, btn_children) in reroll_buttons.iter_mut() {
-        let enabled = shop.category_reroll_enabled(
-            btn.0,
-            run_unlocks.rerolls_remaining,
-            replenish_purchased,
-        );
+        let enabled =
+            shop.category_reroll_enabled(btn.0, run_unlocks.rerolls_remaining, replenish_purchased);
         let icon_color = if enabled {
             Color::WHITE
         } else {

@@ -297,8 +297,7 @@ pub fn setup_time_crystal_progress_ui(
             let icon_x = start_x + i as f32 * ICON_SPACING;
             commands.spawn((
                 {
-                    let mut sprite =
-                        graphics.get_heirloom_icon(heirloom.clone());
+                    let mut sprite = graphics.get_heirloom_icon(heirloom.clone());
                     sprite.custom_size = Some(Vec2::new(ICON_SIZE, ICON_SIZE));
                     sprite
                 },

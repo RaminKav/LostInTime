@@ -1,9 +1,9 @@
-use bevy::text::Justify;
 use crate::aseprite_assets::{
     InventoryStatHighlightCommon, InventoryStatHighlightLegendary, InventoryStatHighlightRare,
     InventoryStatHighlightUncommon,
 };
 use crate::aseprite_helpers::aseprite_bundle;
+use bevy::text::Justify;
 use bevy::{camera::visibility::RenderLayers, prelude::*, sprite::Anchor};
 
 use crate::{
@@ -55,7 +55,6 @@ use super::{
     CRAFTING_INVENTORY_UI_SIZE, FURNACE_INVENTORY_UI_SIZE, INVENTORY_UI_SIZE,
     INV_EQUIP_PANEL_OFFSET_X, INV_SIDE_STATS_BG_ALPHA, INV_SIDE_STATS_BG_PADDING,
 };
-
 
 /// Panel size for `LargeTooltip*` sprites (inventory item card + consumable buff HUD hover).
 pub const ITEM_TOOLTIP_LARGE_CARD_SIZE: Vec2 = Vec2::new(172., 272.);
@@ -1376,32 +1375,33 @@ pub fn spawn_stats_tooltip_at(
             stat_value_font_bold.clone(),
             stat_value_font_regular.clone(),
         );
-        let mut value_commands = commands
-            .spawn((
-                gf::STATS_TOOLTIP_ROW_VALUE
-                    .text(&asset_server, "", YELLOW_2)
-                    .justify(Justify::Right)
-                    .anchor(Anchor::CENTER_RIGHT)
-                    .with_transform(Transform {
-                        translation: text_pos
-                            + Vec3::new(
-                                TOOLTIP_UI_SIZE.x - 2. * STAT_TOOLTIP_INNER_PAD_X - 6.,
-                                0.,
-                                0.,
-                            ),
-                        scale: gf::STATS_TOOLTIP_ROW_VALUE.transform_scale(),
-                        ..Default::default()
-                    }),
-                Name::new("TOOLTIP TEXT"),
-                RenderLayers::from_layers(&[3]),
-            ));
+        let mut value_commands = commands.spawn((
+            gf::STATS_TOOLTIP_ROW_VALUE
+                .text(&asset_server, "", YELLOW_2)
+                .justify(Justify::Right)
+                .anchor(Anchor::CENTER_RIGHT)
+                .with_transform(Transform {
+                    translation: text_pos
+                        + Vec3::new(
+                            TOOLTIP_UI_SIZE.x - 2. * STAT_TOOLTIP_INNER_PAD_X - 6.,
+                            0.,
+                            0.,
+                        ),
+                    scale: gf::STATS_TOOLTIP_ROW_VALUE.transform_scale(),
+                    ..Default::default()
+                }),
+            Name::new("TOOLTIP TEXT"),
+            RenderLayers::from_layers(&[3]),
+        ));
         value_commands.with_children(|parent| {
             for (value, font) in value_spans {
                 parent.spawn((
                     TextSpan::new(value),
                     TextFont {
                         font: font.into(),
-                        font_size: gf::STATS_TOOLTIP_ROW_VALUE.text_font(&asset_server).font_size,
+                        font_size: gf::STATS_TOOLTIP_ROW_VALUE
+                            .text_font(&asset_server)
+                            .font_size,
                         font_smoothing: gf::STATS_TOOLTIP_ROW_VALUE
                             .text_font(&asset_server)
                             .font_smoothing,

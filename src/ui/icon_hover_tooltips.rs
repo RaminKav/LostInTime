@@ -11,7 +11,6 @@ use crate::{
     ScreenResolution,
 };
 
-
 /// Grey translucent backdrop (same fill as HUD keybind badges).
 pub const ICON_HOVER_TOOLTIP_BG_COLOR: Color =
     Color::srgba(62. / 255., 58. / 255., 58. / 255., 0.9);

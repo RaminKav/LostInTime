@@ -1,4 +1,3 @@
-use bevy::text::Justify;
 use crate::{
     assets::Graphics,
     audio::{AudioSoundEffect, SoundSpawner},
@@ -14,6 +13,7 @@ use crate::{
     },
     GameState,
 };
+use bevy::text::Justify;
 
 use bevy::{camera::visibility::RenderLayers, prelude::*, sprite::Anchor};
 use serde::{Deserialize, Serialize};

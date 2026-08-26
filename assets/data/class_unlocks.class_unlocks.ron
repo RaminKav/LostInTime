@@ -1,23 +1,23 @@
 (
     classes: {
         Warrior: (
-            achievements: [],
+            required_classes: [],
             cost: 0,
         ),
         Wizard: (
-            achievements: [],
+            required_classes: [],
             cost: 0,
         ),
         Rogue: (
-            achievements: [Kill100FurDevils, FindDagger],
+            required_classes: [Warrior, Wizard],
             cost: 20,
         ),
         Thief: (
-            achievements: [Bouncy, Act2, FindClaw],
+            required_classes: [Rogue],
             cost: 20,
         ),
         Hunter: (
-            achievements: [StingflySlayer, FindBow],
+            required_classes: [Thief],
             cost: 25,
         ),
     },

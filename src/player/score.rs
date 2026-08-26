@@ -51,10 +51,10 @@ impl RunScore {
 pub struct HighScores {
     pub overall_high_score: u32,
     pub class_high_scores: std::collections::HashMap<crate::player::skills::SkillClass, u32>,
-    /// Highest run difficulty tier cleared with each class (Era 3 win). 0 = never / baseline only.
+    /// Highest run difficulty tier cleared with each class (Era 3 win).
+    /// Missing key = never cleared Era 3 with that class. Present with `0` = baseline clear.
     #[serde(default)]
-    pub class_highest_difficulty:
-        std::collections::HashMap<crate::player::skills::SkillClass, u8>,
+    pub class_highest_difficulty: std::collections::HashMap<crate::player::skills::SkillClass, u8>,
 }
 
 impl HighScores {
@@ -88,6 +88,23 @@ impl HighScores {
             .get(class)
             .copied()
             .unwrap_or(0)
+    }
+
+    /// True if this class has ever cleared Era 3 (including baseline difficulty).
+    pub fn has_cleared_era3(&self, class: &crate::player::skills::SkillClass) -> bool {
+        self.class_highest_difficulty.contains_key(class)
+    }
+
+    /// Record an Era 3 clear. Returns true if this is a new class clear or a higher tier.
+    pub fn record_era3_clear(
+        &mut self,
+        class: &crate::player::skills::SkillClass,
+        tier: u8,
+    ) -> bool {
+        let newly_cleared = !self.has_cleared_era3(class);
+        let before = self.highest_difficulty(class);
+        self.update_highest_difficulty(class, tier);
+        newly_cleared || self.highest_difficulty(class) > before
     }
 }
 

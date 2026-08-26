@@ -1,9 +1,9 @@
-use bevy::text::Justify;
 use crate::aseprite_assets::TutorialAnims;
 use crate::aseprite_helpers::aseprite_bundle;
 use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
 use bevy::sprite::Anchor;
+use bevy::text::Justify;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fs::File;
@@ -37,7 +37,6 @@ use crate::ui::{
     PROGRESS_BACKGROUND_SIZE, UI_SLOT_SIZE,
 };
 use crate::{inventory::Inventory, GameState, ScreenResolution};
-
 
 /// Z layers (sit above gameplay HUD but below pause overlays).
 const Z_TUTORIAL_OVERLAY: f32 = 70.0;

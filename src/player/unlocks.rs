@@ -5,10 +5,7 @@ use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::BufReader;
 
-use super::{
-    achievements::{Achievement, Achievements},
-    currency::TimeFragmentCurrency,
-};
+use super::{achievements::Achievements, currency::TimeFragmentCurrency, score::HighScores};
 use crate::datafiles;
 use crate::item::WorldObject;
 use crate::player::skills::SkillClass;
@@ -104,8 +101,32 @@ pub struct ClassUnlockConfig {
 
 #[derive(Deserialize, Clone, Debug)]
 pub struct ClassUnlockEntry {
-    pub achievements: Vec<Achievement>,
+    /// Any one of these classes must have cleared Era 3. Empty = no era requirement.
+    #[serde(default)]
+    pub required_classes: Vec<SkillClass>,
     pub cost: u32,
+}
+
+impl ClassUnlockEntry {
+    pub fn era3_requirement_met(&self, high_scores: &HighScores) -> bool {
+        if self.required_classes.is_empty() {
+            return true;
+        }
+        self.required_classes
+            .iter()
+            .any(|class| high_scores.has_cleared_era3(class))
+    }
+
+    pub fn requirement_text(&self) -> String {
+        match self.required_classes.as_slice() {
+            [] => String::new(),
+            [class] => format!("Clear the third era\nwith {}", class),
+            classes => {
+                let names: Vec<String> = classes.iter().map(ToString::to_string).collect();
+                format!("Clear the third era\nas the {}", names.join(" or "))
+            }
+        }
+    }
 }
 
 #[derive(Resource, Clone, Debug, Default)]

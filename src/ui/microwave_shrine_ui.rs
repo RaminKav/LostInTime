@@ -1,4 +1,3 @@
-use bevy::text::Justify;
 use crate::{
     assets::Graphics,
     attributes::AttributeChangeEvent,
@@ -26,6 +25,7 @@ use crate::{
 };
 use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
+use bevy::text::Justify;
 
 #[derive(Resource, Default)]
 pub struct MicrowaveShrineUsages(pub u32);
@@ -333,7 +333,8 @@ pub fn handle_microwave_shrine_rarity_click(
                                 let h_btn = commands
                                     .spawn((
                                         {
-                                            let mut sprite = graphics.get_heirloom_icon(heirloom.clone());
+                                            let mut sprite =
+                                                graphics.get_heirloom_icon(heirloom.clone());
                                             sprite.custom_size =
                                                 Some(Vec2::splat(HEIRLOOM_BUTTON_HIT_SIZE));
                                             sprite

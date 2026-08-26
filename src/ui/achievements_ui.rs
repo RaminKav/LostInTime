@@ -1,8 +1,8 @@
-use bevy::text::Justify;
 use bevy::camera::visibility::RenderLayers;
 use bevy::ecs::system::ParamSet;
 use bevy::prelude::*;
 use bevy::sprite::Anchor;
+use bevy::text::Justify;
 use strum::IntoEnumIterator;
 
 use super::{
@@ -632,21 +632,41 @@ pub fn update_achievements_page_display(
     warning_animations: Query<(Entity, &AchievementRow), With<AchievementWarningAnimation>>,
     mut param_set: ParamSet<(
         Query<
-            (&AchievementRow, &mut Text2d, &mut TextColor, &mut Visibility),
+            (
+                &AchievementRow,
+                &mut Text2d,
+                &mut TextColor,
+                &mut Visibility,
+            ),
             With<AchievementNameText>,
         >,
         Query<
-            (&AchievementRow, &mut Text2d, &mut TextColor, &mut Visibility),
+            (
+                &AchievementRow,
+                &mut Text2d,
+                &mut TextColor,
+                &mut Visibility,
+            ),
             With<AchievementDescText>,
         >,
         Query<(&AchievementRow, &mut Sprite, &mut Visibility), With<AchievementCheckbox>>,
         Query<(&AchievementRow, &mut Visibility), With<AchievementCrossout>>,
         Query<
-            (&AchievementRow, &mut Text2d, &mut TextColor, &mut Visibility),
+            (
+                &AchievementRow,
+                &mut Text2d,
+                &mut TextColor,
+                &mut Visibility,
+            ),
             With<AchievementRewardText>,
         >,
         Query<
-            (&AchievementRow, &mut Text2d, &mut TextColor, &mut Visibility),
+            (
+                &AchievementRow,
+                &mut Text2d,
+                &mut TextColor,
+                &mut Visibility,
+            ),
             With<AchievementProgressText>,
         >,
         Query<

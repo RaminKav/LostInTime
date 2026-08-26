@@ -1,5 +1,5 @@
-use bevy::text::Justify;
 use crate::ui::game_fonts as gf;
+use bevy::text::Justify;
 use bevy::{camera::visibility::RenderLayers, prelude::*, sprite::Anchor};
 
 use crate::{
