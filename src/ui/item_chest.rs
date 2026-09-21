@@ -14,6 +14,7 @@ use crate::{
     },
     colors::{WHITE, YELLOW},
     cursor::CursorPos,
+    inputs::MouselessModeState,
     inventory::{Inventory, ItemStack},
     item::{EquipmentType, WorldObject},
     juice::bounce::BounceOnHit,
@@ -32,8 +33,9 @@ use super::{
     game_fonts as gf,
     heirloom_tooltip::{HeirloomTooltipRequest, HeirloomTooltipShow},
     interactions::Interaction,
-    ui_helpers, Focusable, Interactable, ToolTipUpdateEvent, TooltipTeardownEvent, UIElement,
-    UIState, CURRENCY_BACKGROUND_SIZE, KEYBIND_BADGE_COLOR,
+    ui_helpers, FocusInput, Focusable, Interactable, SkipFocusSelectedIndicator,
+    ToolTipUpdateEvent, TooltipTeardownEvent, UIElement, UIState, CURRENCY_BACKGROUND_SIZE,
+    KEYBIND_BADGE_COLOR,
 };
 
 /// Background container art size (`assets/ui/ChestContainer.png`).
@@ -56,6 +58,9 @@ const CHEST_REROLL_BUTTON_Y: f32 = -46.;
 const CHEST_REROLL_BADGE_SIZE: Vec2 = Vec2::new(14., 12.);
 /// Right-side rerolls-remaining counter (CurrencyBackground), relative to chest root.
 const CHEST_REROLL_COUNTER_POS: Vec2 = Vec2::new(116., 20.);
+/// Focus index for the revealed reward icon. Higher than Open/Take/Equip/Banish/reroll so
+/// default focus stays on the action buttons; d-pad up still reaches the icon by position.
+const CHEST_REWARD_FOCUS_INDEX: u32 = 6;
 // Reveal text stack (top → bottom). Sits above the chest icon once it shifts down to
 // `CHEST_ICON_Y` after opening — the chest UI lives in render-layer 3 world space.
 const CHEST_REVEAL_TITLE_Y: f32 = 48.;
@@ -197,6 +202,17 @@ impl ChestButtonKind {
     }
 }
 
+fn chest_reward_focusable() -> Focusable {
+    Focusable {
+        group: UIState::ItemChest,
+        index: CHEST_REWARD_FOCUS_INDEX,
+    }
+}
+
+fn chest_focus_driving(mouseless: &MouselessModeState, cursor_pos: &CursorPos) -> bool {
+    mouseless.0 || cursor_pos.suppress_ui_hover
+}
+
 #[derive(Component)]
 pub struct ItemChestButton {
     pub kind: ChestButtonKind,
@@ -302,10 +318,13 @@ pub fn spawn_chest_button(
         .insert(RenderLayers::from_layers(&[3]))
         .insert(Name::new(format!("ITEM CHEST BUTTON {label}")));
     if enabled {
-        button.insert(Interactable::default()).insert(Focusable {
-            group: ui_state.clone(),
-            index: kind.focus_index(),
-        });
+        button
+            .insert(Interactable::default())
+            .insert(Focusable {
+                group: ui_state.clone(),
+                index: kind.focus_index(),
+            })
+            .insert(SkipFocusSelectedIndicator);
     }
     let button_entity = button.id();
 
@@ -772,10 +791,12 @@ fn spawn_heirloom_chest_reroll_button(
         .insert(Name::new("Heirloom Chest Reroll"));
 
     if enabled {
-        btn.insert(Interactable::default()).insert(Focusable {
-            group: UIState::ItemChest,
-            index: 5,
-        });
+        btn.insert(Interactable::default())
+            .insert(Focusable {
+                group: UIState::ItemChest,
+                index: 5,
+            })
+            .insert(SkipFocusSelectedIndicator);
     }
 
     let btn_e = btn.id();
@@ -922,6 +943,7 @@ pub fn reroll_heirloom_chest_reward(
             heirloom: picked.clone(),
         })
         .insert(Interactable::default())
+        .insert(chest_reward_focusable())
         .insert(Name::new("Chest Final Heirloom"));
 
     spawn_chest_reveal_text(
@@ -1251,6 +1273,7 @@ pub fn handle_anim_events(
                             .insert(RenderLayers::from_layers(&[3]))
                             .insert(ItemChestFinalItem)
                             .insert(Interactable::default())
+                            .insert(chest_reward_focusable())
                             .insert(picked_item.clone())
                             .insert(Name::new("Chest Final Item"));
 
@@ -1300,6 +1323,7 @@ pub fn handle_anim_events(
                                     heirloom: picked_heirloom.clone(),
                                 })
                                 .insert(Interactable::default())
+                                .insert(chest_reward_focusable())
                                 .insert(Name::new("Chest Final Heirloom"));
 
                             // Reveal text stack — same layout as item chests; "Heirloom"
@@ -1324,13 +1348,17 @@ pub fn handle_anim_events(
         }
     }
 }
-/// Handle hovering on the final item in the item chest to show tooltip. On hover-enter we
+/// Handle hovering/focus on the final item in the item chest to show tooltip. On hover-enter we
 /// send two `ToolTipUpdateEvent`s: the primary card (picked item, default ItemChest
 /// position on the left of the chest container) and — when the player already has every
 /// valid slot for this equipment type filled — a *secondary* card on the right showing
 /// what would be displaced, labeled "Currently Equipped".
+///
+/// Controller / mouseless focus uses the same hover path so the tooltip and bounce match
+/// mouse hover (see merchant shop icons in `essence_ui`).
 pub fn handle_item_chest_final_item_hover(
     cursor_pos: Res<CursorPos>,
+    mouseless: Res<MouselessModeState>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     mut final_items: Query<
         (Entity, &mut Interactable, &ItemStack),
@@ -1340,70 +1368,74 @@ pub fn handle_item_chest_final_item_hover(
     mut tooltip_teardown_events: MessageWriter<TooltipTeardownEvent>,
     player_inv: Query<&Inventory, With<crate::player::Player>>,
     proto: ProtoParam,
+    mut commands: Commands,
+    focus_input: FocusInput,
 ) {
     use super::CHEST_INVENTORY_UI_SIZE;
 
     let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None);
+    let focus_driving = chest_focus_driving(&mouseless, &cursor_pos);
     for (e, mut interactable, item_stack) in final_items.iter_mut() {
-        match hit_test {
-            Some(hit_ent) if hit_ent.0 == e => {
-                match interactable.current() {
-                    Interaction::None => {
-                        interactable.change(Interaction::Hovering);
-                        // Primary tooltip — picked item, uses default ItemChest position
-                        // (left side of the chest container) as resolved by
-                        // `handle_spawn_inv_item_tooltip`.
-                        tooltip_update_events.write(ToolTipUpdateEvent {
-                            item_stack: item_stack.clone(),
-                            is_recipe: false,
-                            show_range: false,
-                            ..Default::default()
-                        });
+        let is_hit = matches!(hit_test, Some(hit_ent) if hit_ent.0 == e);
+        let is_focused = focus_driving && focus_input.is_focused(e);
+        if is_hit || is_focused {
+            match interactable.current() {
+                Interaction::None => {
+                    interactable.change(Interaction::Hovering);
+                    commands.entity(e).insert(BounceOnHit::new());
+                    // Primary tooltip — picked item, uses default ItemChest position
+                    // (left side of the chest container) as resolved by
+                    // `handle_spawn_inv_item_tooltip`.
+                    tooltip_update_events.write(ToolTipUpdateEvent {
+                        item_stack: item_stack.clone(),
+                        is_recipe: false,
+                        show_range: false,
+                        ..Default::default()
+                    });
 
-                        // Secondary "Currently Equipped" tooltip — only when equipping
-                        // would displace an existing piece. Same spacing as the primary
-                        // card but mirrored to the right of the chest container.
-                        if let Ok(inv) = player_inv.single() {
-                            if let Some(displaced) =
-                                displaced_equipped_item_stack(inv, item_stack, &proto)
-                            {
-                                tooltip_update_events.write(ToolTipUpdateEvent {
-                                    item_stack: displaced,
-                                    is_recipe: false,
-                                    show_range: false,
-                                    anchor_ui: None,
-                                    info_boxes: vec![],
-                                    position_override: Some(Vec2::new(
-                                        CHEST_INVENTORY_UI_SIZE.x + 20.,
-                                        -CHEST_INVENTORY_UI_SIZE.y / 2. + 40.,
-                                    )),
-                                    header_text: Some("Currently Equipped".to_string()),
-                                    world_anchor: None,
-                                    ui_state_tag: None,
-                                    pin_right: false,
-                                    pin_center: false,
-                                });
-                            }
+                    // Secondary "Currently Equipped" tooltip — only when equipping
+                    // would displace an existing piece. Same spacing as the primary
+                    // card but mirrored to the right of the chest container.
+                    if let Ok(inv) = player_inv.single() {
+                        if let Some(displaced) =
+                            displaced_equipped_item_stack(inv, item_stack, &proto)
+                        {
+                            tooltip_update_events.write(ToolTipUpdateEvent {
+                                item_stack: displaced,
+                                is_recipe: false,
+                                show_range: false,
+                                anchor_ui: None,
+                                info_boxes: vec![],
+                                position_override: Some(Vec2::new(
+                                    CHEST_INVENTORY_UI_SIZE.x + 20.,
+                                    -CHEST_INVENTORY_UI_SIZE.y / 2. + 40.,
+                                )),
+                                header_text: Some("Currently Equipped".to_string()),
+                                world_anchor: None,
+                                ui_state_tag: None,
+                                pin_right: false,
+                                pin_center: false,
+                            });
                         }
                     }
-                    Interaction::Hovering => {}
-                    _ => {}
                 }
+                Interaction::Hovering => {}
+                _ => {}
             }
-            _ => {
-                if matches!(interactable.current(), Interaction::Hovering) {
-                    interactable.change(Interaction::None);
-                    tooltip_teardown_events.write_default();
-                }
-            }
+        } else if matches!(interactable.current(), Interaction::Hovering) {
+            interactable.change(Interaction::None);
+            tooltip_teardown_events.write_default();
         }
     }
 }
 
-/// Handle hovering on the final heirloom in the heirloom chest to show tooltip
+/// Handle hovering/focus on the final heirloom in the heirloom chest to show tooltip.
+/// Controller / mouseless focus uses the same hover path so the tooltip and bounce match
+/// mouse hover (see merchant shop icons in `essence_ui`).
 pub fn handle_heirloom_chest_final_item_hover(
     mut tooltip_requests: MessageWriter<HeirloomTooltipRequest>,
     cursor_pos: Res<CursorPos>,
+    mouseless: Res<MouselessModeState>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     mut final_heirlooms: Query<
         (
@@ -1414,16 +1446,20 @@ pub fn handle_heirloom_chest_final_item_hover(
         ),
         With<ItemChestFinalItem>,
     >,
+    mut commands: Commands,
+    focus_input: FocusInput,
 ) {
-    use super::interactions::Interaction;
-
     let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None);
+    let focus_driving = chest_focus_driving(&mouseless, &cursor_pos);
 
     for (e, transform, mut interactable, heirloom_data) in final_heirlooms.iter_mut() {
-        match hit_test {
-            Some(hit_ent) if hit_ent.0 == e => match interactable.current() {
+        let is_hit = matches!(hit_test, Some(hit_ent) if hit_ent.0 == e);
+        let is_focused = focus_driving && focus_input.is_focused(e);
+        if is_hit || is_focused {
+            match interactable.current() {
                 Interaction::None => {
                     interactable.change(Interaction::Hovering);
+                    commands.entity(e).insert(BounceOnHit::new());
 
                     let icon_pos = transform.translation();
                     let tooltip_pos = Vec3::new(icon_pos.x - 140., icon_pos.y + 12., 15.);
@@ -1439,13 +1475,10 @@ pub fn handle_heirloom_chest_final_item_hover(
                 }
                 Interaction::Hovering => {}
                 _ => {}
-            },
-            _ => {
-                if matches!(interactable.current(), Interaction::Hovering) {
-                    interactable.change(Interaction::None);
-                    tooltip_requests.write(HeirloomTooltipRequest::Clear);
-                }
             }
+        } else if matches!(interactable.current(), Interaction::Hovering) {
+            interactable.change(Interaction::None);
+            tooltip_requests.write(HeirloomTooltipRequest::Clear);
         }
     }
 }

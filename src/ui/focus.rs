@@ -1025,8 +1025,8 @@ pub struct FocusConfirmSet;
 pub struct FocusPlugin;
 
 /// Child overlay spawned on the focused UI icon so controller/mouseless players can see where
-/// focus is. Only used on the merchant shop, microwave shrine, well shrine, and pause HUD —
-/// other screens already convey focus via hover art / bounce.
+/// focus is. Only used on the merchant shop, microwave shrine, well shrine, pause HUD, and
+/// item/heirloom chests — other screens already convey focus via hover art / bounce.
 #[derive(Component)]
 struct UiFocusSelectedIndicator;
 
@@ -1037,7 +1037,11 @@ pub struct SkipFocusSelectedIndicator;
 fn ui_state_shows_focus_selected_indicator(ui_state: &UIState) -> bool {
     matches!(
         ui_state,
-        UIState::Essence | UIState::MicrowaveShrine | UIState::Pause | UIState::WellShrine
+        UIState::Essence
+            | UIState::MicrowaveShrine
+            | UIState::Pause
+            | UIState::WellShrine
+            | UIState::ItemChest
     )
 }
 
