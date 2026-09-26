@@ -17,6 +17,7 @@ mod major_new_effects;
 mod stat_conversion;
 
 pub use ancestors::*;
+pub(crate) use blessing_choice_ui::spawn_blessing_details_hint;
 pub use blessing_choice_ui::*;
 pub use blessing_effects::*;
 pub use major_blessings::*;
@@ -33,113 +34,119 @@ impl Plugin for BlessingsPlugin {
             MajorNewEffectsPlugin,
             StatConversionPlugin,
         ))
-            .add_message::<AncestorBlessingSelectEvent>()
-            .add_message::<MajorBlessingSelectEvent>()
-            .init_resource::<BlessingItemRewards>()
-            .init_resource::<PendingMajorBlessings>()
-            .init_resource::<CurrentBlessingTier>()
-            .init_resource::<DeferredEraSwap>()
-            .init_resource::<BlessingTriggerCounts>()
-            .add_systems(
-                Update,
-                handle_ancestor_blessing_selected
-                    .after(handle_blessing_choice_card_interactions)
-                    .run_if(
-                        in_state(GameState::BlessingChoice)
-                            .and_then(resource_exists::<BlessingTransitionState>),
-                    ),
+        .add_message::<AncestorBlessingSelectEvent>()
+        .add_message::<MajorBlessingSelectEvent>()
+        .init_resource::<BlessingItemRewards>()
+        .init_resource::<PendingMajorBlessings>()
+        .init_resource::<CurrentBlessingTier>()
+        .init_resource::<DeferredEraSwap>()
+        .init_resource::<BlessingTriggerCounts>()
+        .add_systems(
+            Update,
+            handle_ancestor_blessing_selected
+                .after(handle_blessing_choice_card_interactions)
+                .run_if(
+                    in_state(GameState::BlessingChoice)
+                        .and_then(resource_exists::<BlessingTransitionState>),
+                ),
+        )
+        .add_systems(
+            Update,
+            handle_major_blessing_selected
+                .after(handle_blessing_choice_card_interactions)
+                .run_if(
+                    in_state(UIState::MajorBlessingChoice)
+                        .and_then(resource_exists::<BlessingTransitionState>),
+                ),
+        )
+        .add_systems(OnEnter(GameState::BlessingChoice), enter_blessing_ui)
+        .add_systems(
+            Update,
+            transition_after_blessing_choice.run_if(resource_exists::<BlessingTransitionState>),
+        )
+        .add_systems(
+            Update,
+            transition_blessing_ui_after_choice.run_if(resource_exists::<BlessingTransitionState>),
+        )
+        .add_systems(
+            OnEnter(UIState::BlessingChoice),
+            setup_minor_blessing_choice_ui,
+        )
+        .add_systems(
+            OnEnter(UIState::MajorBlessingChoice),
+            setup_major_blessing_choice_ui,
+        )
+        .add_systems(
+            OnExit(UIState::MajorBlessingChoice),
+            apply_deferred_era_swap_after_major_blessing,
+        )
+        // Singular Focus / Collector's Bargain keep era deferred until this pick finishes.
+        .add_systems(
+            OnExit(UIState::MajorHeirloomPick),
+            apply_deferred_era_swap_after_major_blessing,
+        )
+        .add_systems(
+            Update,
+            debug_open_major_blessing_ui
+                .run_if(in_state(GameState::Main))
+                .run_if(in_state(UIState::Closed)),
+        )
+        .add_systems(
+            Update,
+            (
+                debug_reroll_blessing_choices,
+                handle_blessing_choice_card_interactions,
             )
-            .add_systems(
-                Update,
-                handle_major_blessing_selected
-                    .after(handle_blessing_choice_card_interactions)
-                    .run_if(
-                        in_state(UIState::MajorBlessingChoice)
-                            .and_then(resource_exists::<BlessingTransitionState>),
-                    ),
-            )
-            .add_systems(OnEnter(GameState::BlessingChoice), enter_blessing_ui)
-            .add_systems(
-                Update,
-                transition_after_blessing_choice
-                    .run_if(resource_exists::<BlessingTransitionState>),
-            )
-            .add_systems(
-                Update,
-                transition_blessing_ui_after_choice
-                    .run_if(resource_exists::<BlessingTransitionState>),
-            )
-            .add_systems(
-                OnEnter(UIState::BlessingChoice),
-                setup_minor_blessing_choice_ui,
-            )
-            .add_systems(
-                OnEnter(UIState::MajorBlessingChoice),
-                setup_major_blessing_choice_ui,
-            )
-            .add_systems(
-                OnExit(UIState::MajorBlessingChoice),
-                apply_deferred_era_swap_after_major_blessing,
-            )
-            // Singular Focus / Collector's Bargain keep era deferred until this pick finishes.
-            .add_systems(
-                OnExit(UIState::MajorHeirloomPick),
-                apply_deferred_era_swap_after_major_blessing,
-            )
-            .add_systems(
-                Update,
-                debug_open_major_blessing_ui
-                    .run_if(in_state(GameState::Main))
-                    .run_if(in_state(UIState::Closed)),
-            )
-            .add_systems(
-                Update,
-                (
-                    debug_reroll_blessing_choices,
-                    handle_blessing_choice_card_interactions,
+                .chain()
+                .run_if(
+                    in_state(UIState::BlessingChoice)
+                        .or_else(in_state(UIState::MajorBlessingChoice)),
                 )
-                    .chain()
-                    .run_if(
-                        in_state(UIState::BlessingChoice)
-                            .or_else(in_state(UIState::MajorBlessingChoice)),
-                    )
-                    .run_if(not(resource_exists::<BlessingTransitionState>)),
-            )
-            .add_systems(
-                Update,
-                handle_blessing_choice_icon_tooltips
-                    .after(handle_blessing_choice_card_interactions)
-                    .run_if(
-                        in_state(UIState::BlessingChoice)
-                            .or_else(in_state(UIState::MajorBlessingChoice)),
-                    )
-                    .run_if(not(resource_exists::<BlessingTransitionState>)),
-            )
-            .add_systems(
-                Update,
-                process_heirloom_tooltip_requests
-                    .after(handle_blessing_choice_icon_tooltips)
-                    .run_if(
-                        in_state(GameState::BlessingChoice)
-                            .and_then(in_state(UIState::BlessingChoice))
-                            .and_then(not(resource_exists::<BlessingTransitionState>)),
-                    ),
-            )
-            // Major blessing runs in GameState::Main; heirloom tooltips already run there.
-            // Reuse the real inventory item-tooltip renderer for blessing item cards. It is
-            // event-driven; the blessing hover system emits `ToolTipUpdateEvent` with a
-            // `world_anchor`, and this dispatcher (normally Main-only) must also run here.
-            .add_systems(
-                Update,
-                handle_spawn_inv_item_tooltip
-                    .after(handle_blessing_choice_icon_tooltips)
-                    .run_if(
-                        in_state(GameState::BlessingChoice)
-                            .and_then(in_state(UIState::BlessingChoice))
-                            .and_then(not(resource_exists::<BlessingTransitionState>)),
-                    ),
-            )
-            .add_systems(OnEnter(GameState::Main), spawn_blessing_item_drops);
+                .run_if(not(resource_exists::<BlessingTransitionState>)),
+        )
+        .add_systems(
+            Update,
+            handle_blessing_choice_icon_tooltips
+                .after(handle_blessing_choice_card_interactions)
+                .run_if(
+                    in_state(UIState::BlessingChoice)
+                        .or_else(in_state(UIState::MajorBlessingChoice)),
+                )
+                .run_if(not(resource_exists::<BlessingTransitionState>)),
+        )
+        .add_systems(
+            Update,
+            sync_blessing_details_hint.run_if(
+                in_state(UIState::BlessingChoice)
+                    .or_else(in_state(UIState::MajorBlessingChoice))
+                    .or_else(in_state(UIState::Skills)),
+            ),
+        )
+        .add_systems(
+            Update,
+            process_heirloom_tooltip_requests
+                .after(handle_blessing_choice_icon_tooltips)
+                .run_if(
+                    in_state(GameState::BlessingChoice)
+                        .and_then(in_state(UIState::BlessingChoice))
+                        .and_then(not(resource_exists::<BlessingTransitionState>)),
+                ),
+        )
+        // Major blessing runs in GameState::Main; heirloom tooltips already run there.
+        // Reuse the real inventory item-tooltip renderer for blessing item cards. It is
+        // event-driven; the blessing hover system emits `ToolTipUpdateEvent` with a
+        // `world_anchor`, and this dispatcher (normally Main-only) must also run here.
+        .add_systems(
+            Update,
+            handle_spawn_inv_item_tooltip
+                .after(handle_blessing_choice_icon_tooltips)
+                .run_if(
+                    in_state(GameState::BlessingChoice)
+                        .and_then(in_state(UIState::BlessingChoice))
+                        .and_then(not(resource_exists::<BlessingTransitionState>)),
+                ),
+        )
+        .add_systems(OnEnter(GameState::Main), spawn_blessing_item_drops);
     }
 }
 

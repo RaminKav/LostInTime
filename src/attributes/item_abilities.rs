@@ -6,9 +6,7 @@ use crate::{
     animations::AttackEvent,
     attributes::CurrentMana,
     audio::{AudioSoundEffect, SoundSpawner},
-    blessings::{
-        HeirloomManaOverclock, MajorBlessing, OwnedMajorBlessings, overclock_mana_cost,
-    },
+    blessings::{overclock_mana_cost, HeirloomManaOverclock, MajorBlessing, OwnedMajorBlessings},
     item::projectile::{Projectile, RangedAttackEvent},
     player::{
         skills::{Heirloom, PlayerSkills},
@@ -108,8 +106,7 @@ pub fn handle_item_abilitiy_on_attack(
                         mana_cost_heirloom: None,
                         dmg_override: Some(dmg.0),
                         pos_override: None,
-                        spawn_delay: 0.1
-                            + crate::player::melee_skills::HEIRLOOM_EXTRA_CAST_DELAY,
+                        spawn_delay: 0.1 + crate::player::melee_skills::HEIRLOOM_EXTRA_CAST_DELAY,
                     });
                 }
                 commands.spawn(SoundSpawner::new(AudioSoundEffect::AirWaveAttack, 0.2));

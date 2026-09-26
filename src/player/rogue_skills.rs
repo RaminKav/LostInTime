@@ -9,7 +9,7 @@ use crate::{
     animations::{player_sprite::PlayerAnimation, AttackEvent, DoneAnimation},
     attributes::{attribute_helpers::skill_power_multiplier, Attack, CurrentMana, SkillPower},
     audio::{AudioSoundEffect, SoundSpawner},
-    blessings::{HeirloomManaOverclock, MajorBlessing, OwnedBlessings, overclock_mana_cost},
+    blessings::{overclock_mana_cost, HeirloomManaOverclock, MajorBlessing, OwnedBlessings},
     colors::BLACK,
     combat_helpers::spawn_temp_collider,
     cursor::CursorPos,

@@ -1,5 +1,7 @@
+use bevy::ecs::system::SystemParam;
 use bevy::text::Justify;
 use bevy::{camera::visibility::RenderLayers, prelude::*, sprite::Anchor};
+use leafwing_input_manager::prelude::ActionState;
 
 use crate::{
     assets::Graphics,
@@ -17,12 +19,15 @@ use crate::{
     },
     colors::{LIGHT_RED, SHIELD_BLUE, WHITE, YELLOW_2},
     cursor::CursorPos,
+    gamepad_bindings::gamepad_connected,
+    gamepad_input::{UiGamepadAction, UiGamepadInputMarker},
     inventory::ItemStack,
     item::{
         item_drop_outline::{HeirloomIconOutline, UiShadowChild},
         WorldObject,
     },
     juice::bounce::BounceOnHit,
+    keybinds::key_binding_pressed,
     player::{
         levels::PlayerLevel,
         skills::{
@@ -45,8 +50,9 @@ use crate::{
         set_sprite_image,
         ui_helpers::{self, spawn_full_screen_ui_overlay_tuned},
         CheatSettings, Focusable, HeirloomDynamicTooltip, HeirloomTooltipRequest,
-        HeirloomTooltipShow, Interactable, Interaction, ItemOrRecipeTooltip, ToolTipUpdateEvent,
-        UIElement, UIState, ITEM_TOOLTIP_LARGE_CARD_SIZE, SKILLS_CHOICE_UI_SIZE,
+        HeirloomTooltipShow, HoverSelectionGlow, Interactable, Interaction, ItemOrRecipeTooltip,
+        SelectionGlow, ToolTipUpdateEvent, UIElement, UIState, ITEM_TOOLTIP_LARGE_CARD_SIZE,
+        KEYBIND_BADGE_COLOR, KEYBIND_BADGE_SIZE, SKILLS_CHOICE_UI_SIZE,
     },
     GameState, ScreenResolution, DEBUG,
 };
@@ -171,6 +177,120 @@ const BLESSING_CHOICE_TOOLTIP_Z: f32 = 140.0;
 const BLESSING_ANCESTOR_LABEL_GAP: f32 = 16.0;
 /// Horizontal gap left between a card's edge and the tooltip docked beside it.
 const BLESSING_TOOLTIP_CARD_GAP: f32 = 8.0;
+/// Gap between the details key badge and the "Details" label.
+const BLESSING_DETAILS_HINT_GAP: f32 = 3.0;
+/// Visual width of "Details" in [`gf::BODY`] (Alagard scaled by 0.5).
+const BLESSING_DETAILS_LABEL_WIDTH: f32 = 24.0;
+/// "Shift" is wider than a one-character skill bind, so the grey cap grows in width only.
+/// Height starts at [`KEYBIND_BADGE_SIZE`]; both axes then gain [`BLESSING_DETAILS_BADGE_OUTSET`].
+const BLESSING_DETAILS_SHIFT_BADGE: Vec2 = Vec2::new(22., KEYBIND_BADGE_SIZE.y);
+/// Extra pixels added on every side of the details key cap.
+const BLESSING_DETAILS_BADGE_OUTSET: f32 = 1.0;
+const BLESSING_DETAILS_LABEL: &str = "Details";
+
+/// Bottom-center prompt on the blessing pick screen. `gamepad` picks the key label ("Y" vs "Shift").
+#[derive(Component)]
+pub struct BlessingDetailsHint {
+    gamepad: bool,
+    translation: Vec3,
+}
+
+/// Keyboard Shift or controller Y is held. Blessing detail tooltips follow this, not hover alone.
+#[derive(SystemParam)]
+pub struct BlessingDetailsHold<'w, 's> {
+    keys: Res<'w, ButtonInput<KeyCode>>,
+    gamepad: Query<'w, 's, &'static ActionState<UiGamepadAction>, With<UiGamepadInputMarker>>,
+}
+
+impl BlessingDetailsHold<'_, '_> {
+    pub fn held(&self) -> bool {
+        key_binding_pressed(KeyCode::ShiftLeft, &self.keys)
+            || self
+                .gamepad
+                .iter()
+                .any(|actions| actions.pressed(&UiGamepadAction::QuickAction))
+    }
+}
+
+fn blessing_details_key_label(gamepad: bool) -> &'static str {
+    if gamepad {
+        "Y"
+    } else {
+        "Shift"
+    }
+}
+
+fn blessing_details_badge_size(gamepad: bool) -> Vec2 {
+    let base = if gamepad {
+        KEYBIND_BADGE_SIZE
+    } else {
+        BLESSING_DETAILS_SHIFT_BADGE
+    };
+    base + Vec2::splat(BLESSING_DETAILS_BADGE_OUTSET * 2.)
+}
+
+fn blessing_details_hint_layout(badge_width: f32) -> (f32, f32) {
+    let group = badge_width + BLESSING_DETAILS_HINT_GAP + BLESSING_DETAILS_LABEL_WIDTH;
+    let badge_x = -group * 0.5 + badge_width * 0.5;
+    let label_x = badge_x
+        + badge_width * 0.5
+        + BLESSING_DETAILS_HINT_GAP
+        + BLESSING_DETAILS_LABEL_WIDTH * 0.5;
+    (badge_x, label_x)
+}
+
+pub(crate) fn spawn_blessing_details_hint(
+    commands: &mut Commands,
+    asset_server: &AssetServer,
+    ui_state: UIState,
+    gamepad: bool,
+    translation: Vec3,
+) {
+    let badge_size = blessing_details_badge_size(gamepad);
+    let (badge_x, label_x) = blessing_details_hint_layout(badge_size.x);
+
+    let hint = commands
+        .spawn((
+            Transform::from_translation(translation),
+            RenderLayers::from_layers(&[3]),
+            ui_state.clone(),
+            BlessingDetailsHint {
+                gamepad,
+                translation,
+            },
+            Name::new("Blessing Details Hint"),
+        ))
+        .id();
+
+    let (key_bg, _) = ui_helpers::spawn_keybind_badge(
+        commands,
+        asset_server,
+        blessing_details_key_label(gamepad),
+        Transform::from_translation(Vec3::new(badge_x, 0., 0.)),
+        Some(hint),
+        3,
+    );
+    commands.entity(key_bg).insert(Sprite {
+        color: KEYBIND_BADGE_COLOR,
+        custom_size: Some(badge_size),
+        ..default()
+    });
+
+    commands.spawn((
+        gf::BODY
+            .text(asset_server, BLESSING_DETAILS_LABEL, WHITE)
+            .anchor(Anchor::CENTER)
+            .justify(Justify::Center)
+            .with_transform(Transform {
+                translation: Vec3::new(label_x, 0., 1.),
+                scale: gf::BODY.transform_scale(),
+                ..Default::default()
+            }),
+        RenderLayers::from_layers(&[3]),
+        ChildOf(hint),
+        Name::new("Blessing Details Label"),
+    ));
+}
 
 /// Docks a tooltip beside its card rather than a fixed offset, so cards of any width never
 /// overlap their own tooltip: cards in the "left half" of the row dock their tooltip to the
@@ -251,6 +371,7 @@ fn fade_blessing_card_descendants(
     visibility_set: &mut ParamSet<(
         Query<'_, '_, &mut Visibility, With<Text2d>>,
         Query<'_, '_, &mut Visibility, With<UiShadowChild>>,
+        Query<'_, '_, &mut Visibility, With<SelectionGlow>>,
     )>,
 ) {
     if let Ok(mut sprite) = sprites.get_mut(entity) {
@@ -271,6 +392,14 @@ fn fade_blessing_card_descendants(
             } else {
                 Visibility::Inherited
             };
+        }
+    }
+    // Hover outline is a mesh child too. Only force it off while the card is fading —
+    // restoring Inherited here would light up cards that aren't hovered.
+    if alpha < 1.0 {
+        let mut glow_visibilities = visibility_set.p2();
+        if let Ok(mut visibility) = glow_visibilities.get_mut(entity) {
+            *visibility = Visibility::Hidden;
         }
     }
     if let Ok(kids) = children.get(entity) {
@@ -567,6 +696,7 @@ pub fn setup_minor_blessing_choice_ui(
     player_class: Option<Res<PlayerClass>>,
     existing_offer: Option<Res<AncestorBlessingOffer>>,
     mut current_tier: ResMut<CurrentBlessingTier>,
+    gamepads: Query<(), With<Gamepad>>,
 ) {
     current_tier.0 = BlessingTier::Minor;
     // Reuse a pending offer after temporary UI leave (inventory/map/options), like Skills.
@@ -608,6 +738,7 @@ pub fn setup_minor_blessing_choice_ui(
         "Choose a Blessing",
         "Back again...? You hear the voice of your distant ancestor...",
         &choices,
+        gamepad_connected(&gamepads),
     );
 }
 
@@ -621,6 +752,7 @@ pub fn setup_major_blessing_choice_ui(
     run_unlocks: Option<Res<RunUnlockState>>,
     existing_offer: Option<Res<MajorBlessingOffer>>,
     mut current_tier: ResMut<CurrentBlessingTier>,
+    gamepads: Query<(), With<Gamepad>>,
 ) {
     current_tier.0 = BlessingTier::Major;
     // Reuse a pending offer after temporary UI leave (inventory/map/options), like Skills.
@@ -650,6 +782,7 @@ pub fn setup_major_blessing_choice_ui(
         "Choose a Major Blessing",
         "Your ancestor's power surges after the fallen titan...",
         &choices,
+        gamepad_connected(&gamepads),
     );
 }
 
@@ -666,6 +799,7 @@ fn spawn_blessing_choice_screen(
     title: &str,
     subtitle: &str,
     choices: &[(Ancestor, BlessingChoiceKind)],
+    gamepad: bool,
 ) {
     let t_offset = Vec2::new(4., 4.);
 
@@ -708,7 +842,14 @@ fn spawn_blessing_choice_screen(
         asset_server,
         choices,
         t_offset,
+        ui_state.clone(),
+    );
+    spawn_blessing_details_hint(
+        commands,
+        asset_server,
         ui_state,
+        gamepad,
+        Vec3::new(0., -res.game_height * 0.5 + 22., 21.),
     );
 }
 
@@ -750,6 +891,7 @@ fn spawn_blessing_choice_cards(
                 choice: choice.clone(),
             })
             .insert(ui_state.clone())
+            .insert(HoverSelectionGlow)
             .insert(Interactable::default())
             .insert(Focusable {
                 group: ui_state.clone(),
@@ -1025,12 +1167,18 @@ pub fn handle_blessing_choice_icon_tooltips(
         With<Player>,
     >,
     meteor_shower_state: Query<&crate::player::skills::MeteorShowerSkillState, With<Player>>,
+    details_hold: BlessingDetailsHold,
     mut last_hovered: Local<Option<BlessingIconHoverState>>,
 ) {
     let card_count = cards.iter().count() as u32;
-    let currently_hovered = cards
-        .iter()
-        .find(|(_, interactable, _, _)| matches!(interactable.current(), Interaction::Hovering))
+    let details_held = details_hold.held();
+    let currently_hovered = details_held
+        .then(|| {
+            cards.iter().find(|(_, interactable, _, _)| {
+                matches!(interactable.current(), Interaction::Hovering)
+            })
+        })
+        .flatten()
         .and_then(|(ui, _, transform, focusable)| {
             blessing_choice_tooltip_target(&ui.choice).map(|target| {
                 let card_half_width = blessing_choice_card_ui(&ui.choice).1.x * 0.5;
@@ -1228,6 +1376,35 @@ pub fn handle_blessing_choice_icon_tooltips(
     *last_hovered = hover_state;
 }
 
+/// Swap the bottom hint between "Shift" and "Y" when a controller is plugged in or removed.
+pub fn sync_blessing_details_hint(
+    gamepads: Query<(), With<Gamepad>>,
+    hints: Query<(Entity, &BlessingDetailsHint)>,
+    ui_state: Res<State<UIState>>,
+    asset_server: Res<AssetServer>,
+    mut commands: Commands,
+) {
+    let gamepad = gamepad_connected(&gamepads);
+    let stale: Vec<(Entity, Vec3)> = hints
+        .iter()
+        .filter(|(_, hint)| hint.gamepad != gamepad)
+        .map(|(entity, hint)| (entity, hint.translation))
+        .collect();
+    let Some((_, translation)) = stale.first().copied() else {
+        return;
+    };
+    for (entity, _) in stale {
+        commands.entity(entity).despawn();
+    }
+    spawn_blessing_details_hint(
+        &mut commands,
+        &asset_server,
+        ui_state.get().clone(),
+        gamepad,
+        translation,
+    );
+}
+
 pub fn transition_after_blessing_choice(
     mut timer: ResMut<BlessingTransitionState>,
     mut next_game_state: ResMut<NextState<GameState>>,
@@ -1268,6 +1445,7 @@ pub fn transition_blessing_ui_after_choice(
     mut visibility_set: ParamSet<(
         Query<'_, '_, &mut Visibility, With<Text2d>>,
         Query<'_, '_, &mut Visibility, With<UiShadowChild>>,
+        Query<'_, '_, &mut Visibility, With<SelectionGlow>>,
     )>,
     child_hierarchy: Query<&Children>,
     graphics: Res<Graphics>,

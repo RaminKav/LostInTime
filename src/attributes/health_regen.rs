@@ -161,7 +161,9 @@ pub fn handle_mana_regen(
             if let Some(mut pending) = pending_extra {
                 pending.enqueue_pulse();
             } else {
-                commands.entity(entity).insert(PendingExtraManaRegen::new_pulse());
+                commands
+                    .entity(entity)
+                    .insert(PendingExtraManaRegen::new_pulse());
             }
         }
         timer.0.reset();

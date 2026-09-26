@@ -5,6 +5,11 @@
 
 use bevy::prelude::Vec2;
 
+use crate::defs::parse;
+use crate::defs::registry::GameDefs;
+use crate::defs::types::{
+    AnimationTimerDef, ColliderDef, ColliderKind, EntityDef, EraDef, SpriteSheetDef,
+};
 use crate::{
     animations::{
         enemy_sprites::{CharacterAnimationSpriteSheetData, EnemyAnimationState},
@@ -25,11 +30,6 @@ use crate::{
     sapling::GrowsInto,
     world::y_sort::YSort,
 };
-use crate::defs::parse;
-use crate::defs::registry::GameDefs;
-use crate::defs::types::{
-    AnimationTimerDef, ColliderDef, ColliderKind, EntityDef, EraDef, SpriteSheetDef,
-};
 
 fn accessory_shrine() -> EntityDef {
     let mut d = EntityDef {
@@ -42,10 +42,17 @@ fn accessory_shrine() -> EntityDef {
     d.sprite_size = Some(SpriteSize::Small);
     d.sprite_anchor = Some(SpriteAnchor(parse::vec2(r#"((x: 0., y: 12.))"#)));
     d.y_sort = Some(YSort(0.));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: -10., y1: -13., x2: 10., y2: -13., r: 5.5 } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: -10.,
+            y1: -13.,
+            x2: 10.,
+            y2: -13.,
+            r: 5.5,
+        },
+    });
     d
 }
-
 
 fn accessory_shrine_done() -> EntityDef {
     let mut d = EntityDef {
@@ -57,10 +64,17 @@ fn accessory_shrine_done() -> EntityDef {
     d.sprite_size = Some(SpriteSize::Small);
     d.sprite_anchor = Some(SpriteAnchor(parse::vec2(r#"((x: 0., y: 12.))"#)));
     d.y_sort = Some(YSort(0.));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: -10., y1: -13., x2: 10., y2: -13., r: 5.5 } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: -10.,
+            y1: -13.,
+            x2: 10.,
+            y2: -13.,
+            r: 5.5,
+        },
+    });
     d
 }
-
 
 fn active_skill_shrine() -> EntityDef {
     let mut d = EntityDef {
@@ -73,10 +87,17 @@ fn active_skill_shrine() -> EntityDef {
     d.sprite_size = Some(SpriteSize::Small);
     d.sprite_anchor = Some(SpriteAnchor(parse::vec2(r#"((x: 0., y: 16.))"#)));
     d.y_sort = Some(YSort(0.));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: -12., y1: -14., x2: 12., y2: -14., r: 3. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: -12.,
+            y1: -14.,
+            x2: 12.,
+            y2: -14.,
+            r: 3.,
+        },
+    });
     d
 }
-
 
 fn active_skill_shrine_done() -> EntityDef {
     let mut d = EntityDef {
@@ -88,10 +109,17 @@ fn active_skill_shrine_done() -> EntityDef {
     d.sprite_size = Some(SpriteSize::Small);
     d.sprite_anchor = Some(SpriteAnchor(parse::vec2(r#"((x: 0., y: 16.))"#)));
     d.y_sort = Some(YSort(0.));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: -12., y1: -14., x2: 12., y2: -14., r: 3. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: -12.,
+            y1: -14.,
+            x2: 12.,
+            y2: -14.,
+            r: 3.,
+        },
+    });
     d
 }
-
 
 fn alchemy_table() -> EntityDef {
     let mut d = EntityDef {
@@ -104,19 +132,22 @@ fn alchemy_table() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::AlchemyTable);
     d.object_action = Some(parse::object_action(r#"Crafting(AlchemyTable)"#));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 10., y: 4. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 10., y: 4. },
+    });
     d.max_health = Some(MaxHealth(25));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
                 item: AlchemyTableBlock,
                 min: 1,
                 max: 1,
                 rate: 1.
             ),]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn alchemy_table_block() -> EntityDef {
     let mut d = EntityDef {
@@ -130,19 +161,22 @@ fn alchemy_table_block() -> EntityDef {
     d.animation_pos_tracker = Some(AnimationPosTracker(0.0, 0.0, 0.3));
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::AlchemyTableBlock);
-    d.item_actions = Some(parse::item_actions(r#"(actions: [PlacesInto(AlchemyTable)])"#));
+    d.item_actions = Some(parse::item_actions(
+        r#"(actions: [PlacesInto(AlchemyTable)])"#,
+    ));
     d.consumable = Some(ConsumableItem);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: AlchemyTableBlock,
         metadata: (
             name: "Alchemy Table", 
             desc: ["Allows you to", "craft potions."],
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn anvil() -> EntityDef {
     let mut d = EntityDef {
@@ -155,19 +189,22 @@ fn anvil() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::Anvil);
     d.object_action = Some(parse::object_action(r#"Crafting(Anvil)"#));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 4., y: 6. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 4., y: 6. },
+    });
     d.max_health = Some(MaxHealth(25));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
                 item: AnvilBlock,
                 min: 1,
                 max: 1,
                 rate: 1.
             ),]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn anvil_block() -> EntityDef {
     let mut d = EntityDef {
@@ -183,17 +220,18 @@ fn anvil_block() -> EntityDef {
     d.world_object = Some(WorldObject::AnvilBlock);
     d.item_actions = Some(parse::item_actions(r#"(actions: [PlacesInto(Anvil)])"#));
     d.consumable = Some(ConsumableItem);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: AnvilBlock,
         metadata: (
             name: "Anvil", 
             desc: ["Allows you to craft", "weapons and armor."],
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn apple() -> EntityDef {
     let mut d = EntityDef {
@@ -209,17 +247,18 @@ fn apple() -> EntityDef {
     d.world_object = Some(WorldObject::Apple);
     d.item_actions = Some(parse::item_actions(r#"(actions: [ModifyHealth(10)])"#));
     d.consumable = Some(ConsumableItem);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: Apple,
         metadata: (
             name: "Apple", 
             desc: ["Crunchy!","Tasty!", "Eat it!"],
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn arc() -> EntityDef {
     let mut d = EntityDef {
@@ -229,15 +268,29 @@ fn arc() -> EntityDef {
     };
     d.sensor = true;
     d.y_sort = Some(YSort(0.));
-    d.sprite_sheet = Some(SpriteSheetDef { asset: "textures/effects/arc_small.png".into(), size: Vec2::new(48., 24.), cols: 6, rows: 1 });
+    d.sprite_sheet = Some(SpriteSheetDef {
+        asset: "textures/effects/arc_small.png".into(),
+        size: Vec2::new(48., 24.),
+        cols: 6,
+        rows: 1,
+    });
     d.projectile = Some(Projectile::Arc);
-    d.projectile_state = Some(parse::projectile_state(r#"(speed: 250., direction: (x: 0., y: 0.), hit_entities: [], spawn_offset: (x: -40., y: -40.), despawn_on_hit: false)"#));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: -1., y1: 20., x2: -1., y2: -10., r: 9. } });
+    d.projectile_state = Some(parse::projectile_state(
+        r#"(speed: 250., direction: (x: 0., y: 0.), hit_entities: [], spawn_offset: (x: -40., y: -40.), despawn_on_hit: false)"#,
+    ));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: -1.,
+            y1: 20.,
+            x2: -1.,
+            y2: -10.,
+            r: 9.,
+        },
+    });
     d.done_animation = true;
     d.animation_timer = Some(AnimationTimerDef { secs: 0.07 });
     d
 }
-
 
 fn armor_shrine() -> EntityDef {
     let mut d = EntityDef {
@@ -250,10 +303,17 @@ fn armor_shrine() -> EntityDef {
     d.sprite_size = Some(SpriteSize::Small);
     d.sprite_anchor = Some(SpriteAnchor(parse::vec2(r#"((x: 0., y: 12.))"#)));
     d.y_sort = Some(YSort(0.));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: -10., y1: -13., x2: 10., y2: -13., r: 5.5 } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: -10.,
+            y1: -13.,
+            x2: 10.,
+            y2: -13.,
+            r: 5.5,
+        },
+    });
     d
 }
-
 
 fn armor_shrine_done() -> EntityDef {
     let mut d = EntityDef {
@@ -265,10 +325,17 @@ fn armor_shrine_done() -> EntityDef {
     d.sprite_size = Some(SpriteSize::Small);
     d.sprite_anchor = Some(SpriteAnchor(parse::vec2(r#"((x: 0., y: 12.))"#)));
     d.y_sort = Some(YSort(0.));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: -10., y1: -13., x2: 10., y2: -13., r: 5.5 } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: -10.,
+            y1: -13.,
+            x2: 10.,
+            y2: -13.,
+            r: 5.5,
+        },
+    });
     d
 }
-
 
 fn arrow() -> EntityDef {
     let mut d = EntityDef {
@@ -278,25 +345,35 @@ fn arrow() -> EntityDef {
     };
     d.sensor = true;
     d.y_sort = Some(YSort(0.));
-    d.sprite_sheet = Some(SpriteSheetDef { asset: "bevy_survival_sprites.png".into(), size: Vec2::new(16., 16.), cols: 16, rows: 16 });
+    d.sprite_sheet = Some(SpriteSheetDef {
+        asset: "bevy_survival_sprites.png".into(),
+        size: Vec2::new(16., 16.),
+        cols: 16,
+        rows: 16,
+    });
     d.world_object = Some(WorldObject::Arrow);
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 8., y: 8. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 8., y: 8. },
+    });
     d.projectile = Some(Projectile::Arrow);
-    d.projectile_state = Some(parse::projectile_state(r#"(speed: 175., direction: (x: 0., y: 0.), hit_entities: [], spawn_offset: (x: -4., y: -4.), despawn_on_hit: false)"#));
+    d.projectile_state = Some(parse::projectile_state(
+        r#"(speed: 175., direction: (x: 0., y: 0.), hit_entities: [], spawn_offset: (x: -4., y: -4.), despawn_on_hit: false)"#,
+    ));
     d.consumable = Some(ConsumableItem);
     d.animation_timer = Some(AnimationTimerDef { secs: 0.1 });
     d.animation_pos_tracker = Some(AnimationPosTracker(0.0, 0.0, 0.3));
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
           obj_type: Arrow,
           metadata: (
               name: "Arrow", 
               desc: ["An arrow. Used with", "a Bow."]
           ),
           count: 1
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn arrow_volley_shot() -> EntityDef {
     let mut d = EntityDef {
@@ -306,16 +383,24 @@ fn arrow_volley_shot() -> EntityDef {
     };
     d.sensor = true;
     d.y_sort = Some(YSort(0.));
-    d.sprite_sheet = Some(SpriteSheetDef { asset: "bevy_survival_sprites.png".into(), size: Vec2::new(16., 16.), cols: 16, rows: 16 });
+    d.sprite_sheet = Some(SpriteSheetDef {
+        asset: "bevy_survival_sprites.png".into(),
+        size: Vec2::new(16., 16.),
+        cols: 16,
+        rows: 16,
+    });
     d.world_object = Some(WorldObject::ArrowVolleyShot);
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 8., y: 8. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 8., y: 8. },
+    });
     d.projectile = Some(Projectile::ArrowVolleyShot);
-    d.projectile_state = Some(parse::projectile_state(r#"(speed: 175., direction: (x: 0., y: 0.), hit_entities: [], spawn_offset: (x: -4., y: -4.), despawn_on_hit: false)"#));
+    d.projectile_state = Some(parse::projectile_state(
+        r#"(speed: 175., direction: (x: 0., y: 0.), hit_entities: [], spawn_offset: (x: -4., y: -4.), despawn_on_hit: false)"#,
+    ));
     d.animation_timer = Some(AnimationTimerDef { secs: 0.1 });
     d.animation_pos_tracker = Some(AnimationPosTracker(0.0, 0.0, 0.3));
     d
 }
-
 
 fn attack_speed() -> EntityDef {
     let mut d = EntityDef {
@@ -325,14 +410,20 @@ fn attack_speed() -> EntityDef {
     };
     d.sensor = true;
     d.y_sort = Some(YSort(0.));
-    d.sprite_sheet = Some(SpriteSheetDef { asset: "textures/effects/attackspeed.png".into(), size: Vec2::new(64., 64.), cols: 29, rows: 1 });
+    d.sprite_sheet = Some(SpriteSheetDef {
+        asset: "textures/effects/attackspeed.png".into(),
+        size: Vec2::new(64., 64.),
+        cols: 29,
+        rows: 1,
+    });
     d.projectile = Some(Projectile::AttackSpeed);
-    d.projectile_state = Some(parse::projectile_state(r#"(speed: 0., direction: (x: 0., y: 0.), hit_entities: [], despawn_on_hit: false)"#));
+    d.projectile_state = Some(parse::projectile_state(
+        r#"(speed: 0., direction: (x: 0., y: 0.), hit_entities: [], despawn_on_hit: false)"#,
+    ));
     d.done_animation = true;
     d.animation_timer = Some(AnimationTimerDef { secs: 0.03 });
     d
 }
-
 
 fn attack_speed_food() -> EntityDef {
     let mut d = EntityDef {
@@ -346,9 +437,12 @@ fn attack_speed_food() -> EntityDef {
     d.animation_pos_tracker = Some(AnimationPosTracker(0.0, 0.0, 0.3));
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::AttackSpeedFood);
-    d.item_actions = Some(parse::item_actions(r#"(actions: [GainStat("attack_speed", 5)])"#));
+    d.item_actions = Some(parse::item_actions(
+        r#"(actions: [GainStat("attack_speed", 5)])"#,
+    ));
     d.consumable = Some(ConsumableItem);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: AttackSpeedFood,
         metadata: (
             name: "Attack Speed Boost", 
@@ -356,10 +450,10 @@ fn attack_speed_food() -> EntityDef {
         ),
         rarity: Legendary,
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn attack_speed_potion() -> EntityDef {
     let mut d = EntityDef {
@@ -373,9 +467,12 @@ fn attack_speed_potion() -> EntityDef {
     d.animation_pos_tracker = Some(AnimationPosTracker(0.0, 0.0, 0.3));
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::AttackSpeedPotion);
-    d.item_actions = Some(parse::item_actions(r#"(actions: [ ApplyAttackSpeedBuff(7.0, 1.3)])"#));
+    d.item_actions = Some(parse::item_actions(
+        r#"(actions: [ ApplyAttackSpeedBuff(7.0, 1.3)])"#,
+    ));
     d.consumable = Some(ConsumableItem);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: AttackSpeedPotion,
         metadata: (
             name: "Attack Spd Potion", 
@@ -383,10 +480,10 @@ fn attack_speed_potion() -> EntityDef {
         ),
         rarity: Uncommon,
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn bandage() -> EntityDef {
     let mut d = EntityDef {
@@ -402,17 +499,18 @@ fn bandage() -> EntityDef {
     d.world_object = Some(WorldObject::Bandage);
     d.item_actions = Some(parse::item_actions(r#"(actions: [ModifyHealth(35),])"#));
     d.consumable = Some(ConsumableItem);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: Bandage,
         metadata: (
             name: "Bandage", 
             desc: ["A nice way to heal", "some damage. Its", "quite exhausting", "to apply..."]
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn basic_staff() -> EntityDef {
     let mut d = EntityDef {
@@ -427,10 +525,13 @@ fn basic_staff() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::BasicStaff);
     d.equipment_type = Some(EquipmentType::Weapon);
-    d.raw_item_base = Some(parse::raw_item_base(r#"(
+    d.raw_item_base = Some(parse::raw_item_base(
+        r#"(
         attack: Some((start: 6, end: 10)),
-  )"#));
-    d.raw_item_bonus = Some(parse::raw_item_bonus(r#"(
+  )"#,
+    ));
+    d.raw_item_bonus = Some(parse::raw_item_bonus(
+        r#"(
         crit_damage: Some((start: 8, end: 16)),
         crit_chance: Some((start: 6, end: 12)),
         speed: Some((start: 6, end: 10)),
@@ -446,10 +547,12 @@ fn basic_staff() -> EntityDef {
         mana: Some((start: 18, end: 30)),
         mana_regen: Some((start: 4, end: 8)),
         attack_speed: Some((start: 6, end: 10)),
-  )"#));
+  )"#,
+    ));
     d.melee = Some(MeleeAttack);
     d.ranged = Some(RangedAttack(Projectile::Electricity));
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: BasicStaff,
         attributes: (
             attack_cooldown: 0.55
@@ -459,11 +562,11 @@ fn basic_staff() -> EntityDef {
             desc: ["A magical staff."]
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d.scraps_into = Some(parse::scraps_into(r#"([(obj: Log, chance: 1.)])"#));
     d
 }
-
 
 fn bed() -> EntityDef {
     let mut d = EntityDef {
@@ -476,19 +579,22 @@ fn bed() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::Bed);
     d.object_action = Some(parse::object_action(r#"SetHome"#));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 4., y: 8. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 4., y: 8. },
+    });
     d.max_health = Some(MaxHealth(25));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
                 item: BedBlock,
                 min: 1,
                 max: 1,
                 rate: 1.
             ),]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn bed_block() -> EntityDef {
     let mut d = EntityDef {
@@ -504,17 +610,18 @@ fn bed_block() -> EntityDef {
     d.world_object = Some(WorldObject::BedBlock);
     d.item_actions = Some(parse::item_actions(r#"(actions: [PlacesInto(Bed)])"#));
     d.consumable = Some(ConsumableItem);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: BedBlock,
         metadata: (
             name: "Bed", 
             desc: ["Right-Click to","mark your home.", "Return home with a", "Magic Tusk."]
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn berries() -> EntityDef {
     let mut d = EntityDef {
@@ -530,17 +637,18 @@ fn berries() -> EntityDef {
     d.world_object = Some(WorldObject::Berries);
     d.item_actions = Some(parse::item_actions(r#"(actions: [ModifyHealth(5)])"#));
     d.consumable = Some(ConsumableItem);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: Berries,
         metadata: (
             name: "Berries", 
             desc: ["Crunchy and juicy", "berries. So", "refreshing!"]
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn berry_bush() -> EntityDef {
     let mut d = EntityDef {
@@ -554,8 +662,11 @@ fn berry_bush() -> EntityDef {
     d.world_object = Some(WorldObject::BerryBush);
     d.max_health = Some(MaxHealth(1));
     d.experience_reward = Some(ExperienceReward(5));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 6., y: 6. } });
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 6., y: 6. },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
                 item: Berries,
                 min: 1,
@@ -568,10 +679,10 @@ fn berry_bush() -> EntityDef {
                 max: 2,
                 rate: 0.30
             ),]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn berry_jam() -> EntityDef {
     let mut d = EntityDef {
@@ -585,9 +696,12 @@ fn berry_jam() -> EntityDef {
     d.animation_pos_tracker = Some(AnimationPosTracker(0.0, 0.0, 0.3));
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::BerryJam);
-    d.item_actions = Some(parse::item_actions(r#"(actions: [ModifyHealth(75), ModifyMana(150)])"#));
+    d.item_actions = Some(parse::item_actions(
+        r#"(actions: [ModifyHealth(75), ModifyMana(150)])"#,
+    ));
     d.consumable = Some(ConsumableItem);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: BerryJam,
         metadata: (
             name: "Berry Jam", 
@@ -595,10 +709,10 @@ fn berry_jam() -> EntityDef {
         ),
         rarity: Uncommon,
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn big_cactus() -> EntityDef {
     let mut d = EntityDef {
@@ -614,12 +728,23 @@ fn big_cactus() -> EntityDef {
     d.mob = Some(Mob::BigCactus);
     d.combat_alignment = Some(CombatAlignment::Hostile);
     d.follow_speed = Some(FollowSpeed(0.4));
-    d.multi_leap_attack = Some(parse::multi_leap_attack(r#"(activation_distance: 72., duration_per_hit: 0.3, cooldown: 1.3, startup: 0.5, speed: 105., num_hits: 3, pause_between_hits: 0.1, lunge_delay: 0.01, attack_anim_duration: 1.6)"#));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: 0., y1: -1., x2: 0., y2: -1.5, r: 12. } });
+    d.multi_leap_attack = Some(parse::multi_leap_attack(
+        r#"(activation_distance: 72., duration_per_hit: 0.3, cooldown: 1.3, startup: 0.5, speed: 105., num_hits: 3, pause_between_hits: 0.1, lunge_delay: 0.01, attack_anim_duration: 1.6)"#,
+    ));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: 0.,
+            y1: -1.,
+            x2: 0.,
+            y2: -1.5,
+            r: 12.,
+        },
+    });
     d.max_health = Some(MaxHealth(20));
     d.attack = Some(Attack(7));
     d.experience_reward = Some(ExperienceReward(5));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
                 item: SmallPotion,
                 min: 1,
@@ -699,10 +824,10 @@ fn big_cactus() -> EntityDef {
                 rate: 0.00009
             ),
             ]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn blacksmith_merchant() -> EntityDef {
     let mut d = EntityDef {
@@ -714,10 +839,17 @@ fn blacksmith_merchant() -> EntityDef {
     d.sprite_size = Some(SpriteSize::Small);
     d.sprite_anchor = Some(SpriteAnchor(parse::vec2(r#"((x: 0., y: 10.))"#)));
     d.y_sort = Some(YSort(0.));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: -6., y1: -6., x2: 6., y2: -6., r: 8. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: -6.,
+            y1: -6.,
+            x2: 6.,
+            y2: -6.,
+            r: 8.,
+        },
+    });
     d
 }
-
 
 fn blacksmith_merchant_done() -> EntityDef {
     let mut d = EntityDef {
@@ -729,10 +861,17 @@ fn blacksmith_merchant_done() -> EntityDef {
     d.sprite_size = Some(SpriteSize::Small);
     d.sprite_anchor = Some(SpriteAnchor(parse::vec2(r#"((x: 0., y: 10.))"#)));
     d.y_sort = Some(YSort(0.));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: -6., y1: -6., x2: 6., y2: -6., r: 8. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: -6.,
+            y1: -6.,
+            x2: 6.,
+            y2: -6.,
+            r: 8.,
+        },
+    });
     d
 }
-
 
 fn blowdart() -> EntityDef {
     let mut d = EntityDef {
@@ -747,10 +886,13 @@ fn blowdart() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::Blowdart);
     d.equipment_type = Some(EquipmentType::Weapon);
-    d.raw_item_base = Some(parse::raw_item_base(r#"(
+    d.raw_item_base = Some(parse::raw_item_base(
+        r#"(
         attack: Some((start: 7, end: 10)),
-  )"#));
-    d.raw_item_bonus = Some(parse::raw_item_bonus(r#"(
+  )"#,
+    ));
+    d.raw_item_bonus = Some(parse::raw_item_bonus(
+        r#"(
         crit_damage: Some((start: 8, end: 16)),
         crit_chance: Some((start: 6, end: 12)),
         speed: Some((start: 8, end: 16)),
@@ -767,10 +909,12 @@ fn blowdart() -> EntityDef {
         mana_regen: Some((start: 2, end: 5)),
         attack_speed: Some((start: 6, end: 10)),
 
-  )"#));
+  )"#,
+    ));
     d.melee = Some(MeleeAttack);
     d.ranged = Some(RangedAttack(Projectile::Dart));
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: Blowdart,
         attributes: (
             attack_cooldown: 0.4
@@ -780,11 +924,13 @@ fn blowdart() -> EntityDef {
             desc: ["A Ice Staff."]
         ),
         count: 1
-  )"#));
-    d.scraps_into = Some(parse::scraps_into(r#"([(obj: Log, chance: 1.), (obj: Log, chance: 0.5)])"#));
+  )"#,
+    ));
+    d.scraps_into = Some(parse::scraps_into(
+        r#"([(obj: Log, chance: 1.), (obj: Log, chance: 0.5)])"#,
+    ));
     d
 }
-
 
 fn blueberries() -> EntityDef {
     let mut d = EntityDef {
@@ -800,17 +946,18 @@ fn blueberries() -> EntityDef {
     d.world_object = Some(WorldObject::Blueberries);
     d.item_actions = Some(parse::item_actions(r#"(actions: [ModifyMana(25)])"#));
     d.consumable = Some(ConsumableItem);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: Blueberries,
         metadata: (
             name: "Blueberries", 
             desc: ["Crunchy and juicy", "Blueberries. So", "refreshing!"]
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn blueberry_bush() -> EntityDef {
     let mut d = EntityDef {
@@ -824,8 +971,11 @@ fn blueberry_bush() -> EntityDef {
     d.world_object = Some(WorldObject::BlueberryBush);
     d.max_health = Some(MaxHealth(1));
     d.experience_reward = Some(ExperienceReward(5));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 6., y: 6. } });
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 6., y: 6. },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
                 item: Blueberries,
                 min: 1,
@@ -838,10 +988,10 @@ fn blueberry_bush() -> EntityDef {
                 max: 2,
                 rate: 0.30
             ),]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn blue_cape() -> EntityDef {
     let mut d = EntityDef {
@@ -858,17 +1008,18 @@ fn blue_cape() -> EntityDef {
     d.equipment_type = Some(EquipmentType::Cape);
     d.raw_item_base = Some(parse::raw_item_base(r#"()"#));
     d.raw_item_bonus = Some(parse::raw_item_bonus(r#"()"#));
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: BlueCape,
         metadata: (
             name: "Mage's Cape ", 
             desc: ["A simple cape full", "of potential. For", "now, it's only", " purpose is to", "obscure your clothing."]
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn blue_mushroom() -> EntityDef {
     let mut d = EntityDef {
@@ -884,17 +1035,18 @@ fn blue_mushroom() -> EntityDef {
     d.world_object = Some(WorldObject::BlueMushroom);
     d.item_actions = Some(parse::item_actions(r#"(actions: [ModifyHealth(5)])"#));
     d.consumable = Some(ConsumableItem);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: BlueMushroom,
         metadata: (
             name: "Blue Mushroom ", 
             desc: ["Smells funny...", "Looks cool though!", "Good for some", "recipes."]
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn bomb() -> EntityDef {
     let mut d = EntityDef {
@@ -904,13 +1056,19 @@ fn bomb() -> EntityDef {
     };
     d.sensor = true;
     d.y_sort = Some(YSort(0.));
-    d.sprite_sheet = Some(SpriteSheetDef { asset: "bevy_survival_sprites.png".into(), size: Vec2::new(16., 16.), cols: 16, rows: 16 });
+    d.sprite_sheet = Some(SpriteSheetDef {
+        asset: "bevy_survival_sprites.png".into(),
+        size: Vec2::new(16., 16.),
+        cols: 16,
+        rows: 16,
+    });
     d.world_object = Some(WorldObject::Bomb);
     d.projectile = Some(Projectile::Bomb);
-    d.projectile_state = Some(parse::projectile_state(r#"(speed: 250., direction: (x: 0., y: 0.), hit_entities: [], despawn_on_hit: false)"#));
+    d.projectile_state = Some(parse::projectile_state(
+        r#"(speed: 250., direction: (x: 0., y: 0.), hit_entities: [], despawn_on_hit: false)"#,
+    ));
     d
 }
-
 
 fn bomb_explosion() -> EntityDef {
     let mut d = EntityDef {
@@ -920,15 +1078,29 @@ fn bomb_explosion() -> EntityDef {
     };
     d.sensor = true;
     d.y_sort = Some(YSort(0.));
-    d.sprite_sheet = Some(SpriteSheetDef { asset: "textures/effects/bombexplosion.png".into(), size: Vec2::new(48., 48.), cols: 9, rows: 1 });
+    d.sprite_sheet = Some(SpriteSheetDef {
+        asset: "textures/effects/bombexplosion.png".into(),
+        size: Vec2::new(48., 48.),
+        cols: 9,
+        rows: 1,
+    });
     d.projectile = Some(Projectile::BombExplosion);
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: 0., y1: 0., x2: 0., y2: 0., r: 24. } });
-    d.projectile_state = Some(parse::projectile_state(r#"(speed: 0., direction: (x: 0., y: 0.), hit_entities: [], despawn_on_hit: false)"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: 0.,
+            y1: 0.,
+            x2: 0.,
+            y2: 0.,
+            r: 24.,
+        },
+    });
+    d.projectile_state = Some(parse::projectile_state(
+        r#"(speed: 0., direction: (x: 0., y: 0.), hit_entities: [], despawn_on_hit: false)"#,
+    ));
     d.done_animation = true;
     d.animation_timer = Some(AnimationTimerDef { secs: 0.04 });
     d
 }
-
 
 fn bones() -> EntityDef {
     let mut d = EntityDef {
@@ -942,17 +1114,18 @@ fn bones() -> EntityDef {
     d.animation_pos_tracker = Some(AnimationPosTracker(0.0, 0.0, 0.3));
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::Bones);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: Bones,
         metadata: (
             name: "Bone", 
             desc: ["A bone from a", "dead animal.", "Might be useful in", "a recipe."]
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn boss_shrine() -> EntityDef {
     let mut d = EntityDef {
@@ -968,7 +1141,6 @@ fn boss_shrine() -> EntityDef {
     d
 }
 
-
 fn boulder() -> EntityDef {
     let mut d = EntityDef {
         name: "Boulder".into(),
@@ -980,10 +1152,19 @@ fn boulder() -> EntityDef {
     d.y_sort = Some(YSort(-0.02));
     d.world_object = Some(WorldObject::Boulder);
     d.required_equipment_type = Some(RequiredEquipmentType(EquipmentType::Pickaxe));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: 2., y1: -2., x2: 2., y2: -1., r: 8. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: 2.,
+            y1: -2.,
+            x2: 2.,
+            y2: -1.,
+            r: 8.,
+        },
+    });
     d.max_health = Some(MaxHealth(35));
     d.experience_reward = Some(ExperienceReward(10));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [
             (
                 item: StoneChunk,
@@ -991,10 +1172,10 @@ fn boulder() -> EntityDef {
                 max: 5,
                 rate: 1.
             )]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn boulder2() -> EntityDef {
     let mut d = EntityDef {
@@ -1007,10 +1188,19 @@ fn boulder2() -> EntityDef {
     d.y_sort = Some(YSort(-0.025));
     d.world_object = Some(WorldObject::Boulder2);
     d.required_equipment_type = Some(RequiredEquipmentType(EquipmentType::Pickaxe));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: -1., y1: -1., x2: 2., y2: -1., r: 8. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: -1.,
+            y1: -1.,
+            x2: 2.,
+            y2: -1.,
+            r: 8.,
+        },
+    });
     d.max_health = Some(MaxHealth(35));
     d.experience_reward = Some(ExperienceReward(10));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [
             (
                 item: StoneChunk,
@@ -1018,10 +1208,10 @@ fn boulder2() -> EntityDef {
                 max: 5,
                 rate: 1.
             ),]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn bridge() -> EntityDef {
     let mut d = EntityDef {
@@ -1035,17 +1225,18 @@ fn bridge() -> EntityDef {
     d.world_object = Some(WorldObject::Bridge);
     d.required_equipment_type = Some(RequiredEquipmentType(EquipmentType::None));
     d.max_health = Some(MaxHealth(1));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
                 item: BridgeBlock,
                 min: 1,
                 max: 1,
                 rate: 1.
             ),]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn bridge_block() -> EntityDef {
     let mut d = EntityDef {
@@ -1061,17 +1252,18 @@ fn bridge_block() -> EntityDef {
     d.world_object = Some(WorldObject::BridgeBlock);
     d.item_actions = Some(parse::item_actions(r#"(actions: [PlacesInto(Bridge)])"#));
     d.consumable = Some(ConsumableItem);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: BridgeBlock,
         metadata: (
             name: "Bridge", 
             desc: ["Place over water" , "to help walk over", "it!"]
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn brown_mushroom() -> EntityDef {
     let mut d = EntityDef {
@@ -1083,21 +1275,24 @@ fn brown_mushroom() -> EntityDef {
     d.sprite_anchor = Some(SpriteAnchor(parse::vec2(r#"((x: 0., y: 0.))"#)));
     d.y_sort = Some(YSort(-0.01));
     d.world_object = Some(WorldObject::BrownMushroom);
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 },
+    });
     d.sensor = true;
     d.max_health = Some(MaxHealth(1));
     d.experience_reward = Some(ExperienceReward(5));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
                 item: BrownMushroomBlock,
                 min: 1,
                 max: 1,
                 rate: 1.
             ),]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn brown_mushroom_block() -> EntityDef {
     let mut d = EntityDef {
@@ -1111,19 +1306,22 @@ fn brown_mushroom_block() -> EntityDef {
     d.animation_pos_tracker = Some(AnimationPosTracker(0.0, 0.0, 0.3));
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::BrownMushroomBlock);
-    d.item_actions = Some(parse::item_actions(r#"(actions: [ApplyTemporarySpeed(25, 3.0)])"#));
+    d.item_actions = Some(parse::item_actions(
+        r#"(actions: [ApplyTemporarySpeed(25, 3.0)])"#,
+    ));
     d.consumable = Some(ConsumableItem);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: BrownMushroomBlock,
         metadata: (
             name: "Brown Mushroom ", 
             desc: ["Mmm! A nice source", "of food. Must be", "better cooked", "though!"]
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn buckshot() -> EntityDef {
     let mut d = EntityDef {
@@ -1133,15 +1331,23 @@ fn buckshot() -> EntityDef {
     };
     d.sensor = true;
     d.y_sort = Some(YSort(0.));
-    d.sprite_sheet = Some(SpriteSheetDef { asset: "textures/effects/buckshot.png".into(), size: Vec2::new(64., 64.), cols: 7, rows: 1 });
+    d.sprite_sheet = Some(SpriteSheetDef {
+        asset: "textures/effects/buckshot.png".into(),
+        size: Vec2::new(64., 64.),
+        cols: 7,
+        rows: 1,
+    });
     d.projectile = Some(Projectile::Buckshot);
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 0., y: 0. } });
-    d.projectile_state = Some(parse::projectile_state(r#"(speed: 0., direction: (x: 0., y: 0.), hit_entities: [], despawn_on_hit: false)"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 0., y: 0. },
+    });
+    d.projectile_state = Some(parse::projectile_state(
+        r#"(speed: 0., direction: (x: 0., y: 0.), hit_entities: [], despawn_on_hit: false)"#,
+    ));
     d.done_animation = true;
     d.animation_timer = Some(AnimationTimerDef { secs: 0.03 });
     d
 }
-
 
 fn bull() -> EntityDef {
     let mut d = EntityDef {
@@ -1157,12 +1363,23 @@ fn bull() -> EntityDef {
     d.mob = Some(Mob::Bull);
     d.combat_alignment = Some(CombatAlignment::Hostile);
     d.follow_speed = Some(FollowSpeed(0.35));
-    d.bull_charge_attack = Some(parse::bull_charge_attack(r#"(activation_distance: 180., charge_speed: 160., startup: 0.7, cooldown: 1.2, overshoot: 32., stop_duration: 0.6)"#));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: 0., y1: -1., x2: 0., y2: -1.5, r: 7. } });
+    d.bull_charge_attack = Some(parse::bull_charge_attack(
+        r#"(activation_distance: 180., charge_speed: 160., startup: 0.7, cooldown: 1.2, overshoot: 32., stop_duration: 0.6)"#,
+    ));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: 0.,
+            y1: -1.,
+            x2: 0.,
+            y2: -1.5,
+            r: 7.,
+        },
+    });
     d.max_health = Some(MaxHealth(26));
     d.attack = Some(Attack(11));
     d.experience_reward = Some(ExperienceReward(35));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
                 item: SmallPotion,
                 min: 1,
@@ -1242,10 +1459,10 @@ fn bull() -> EntityDef {
                 rate: 0.0001
             ),
             ]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn bull_card() -> EntityDef {
     let mut d = EntityDef {
@@ -1259,7 +1476,8 @@ fn bull_card() -> EntityDef {
     d.animation_pos_tracker = Some(AnimationPosTracker(0.0, 0.0, 0.3));
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::BullCard);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: BullCard,
         metadata: (
             name: "Bull Card",
@@ -1267,10 +1485,10 @@ fn bull_card() -> EntityDef {
         ),
         rarity: Uncommon,
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn bullet() -> EntityDef {
     let mut d = EntityDef {
@@ -1280,14 +1498,22 @@ fn bullet() -> EntityDef {
     };
     d.sensor = true;
     d.y_sort = Some(YSort(0.));
-    d.sprite_sheet = Some(SpriteSheetDef { asset: "bevy_survival_sprites.png".into(), size: Vec2::new(16., 16.), cols: 16, rows: 16 });
+    d.sprite_sheet = Some(SpriteSheetDef {
+        asset: "bevy_survival_sprites.png".into(),
+        size: Vec2::new(16., 16.),
+        cols: 16,
+        rows: 16,
+    });
     d.world_object = Some(WorldObject::Bullet);
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 1.5, y: 1. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 1.5, y: 1. },
+    });
     d.projectile = Some(Projectile::Bullet);
-    d.projectile_state = Some(parse::projectile_state(r#"(speed: 1000., direction: (x: 0., y: 0.), hit_entities: [], despawn_on_hit: true)"#));
+    d.projectile_state = Some(parse::projectile_state(
+        r#"(speed: 1000., direction: (x: 0., y: 0.), hit_entities: [], despawn_on_hit: true)"#,
+    ));
     d
 }
-
 
 fn bush() -> EntityDef {
     let mut d = EntityDef {
@@ -1299,10 +1525,13 @@ fn bush() -> EntityDef {
     d.sprite_anchor = Some(SpriteAnchor(parse::vec2(r#"((x: 8., y: 8.))"#)));
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::Bush);
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 9., y: 9. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 9., y: 9. },
+    });
     d.max_health = Some(MaxHealth(10));
     d.experience_reward = Some(ExperienceReward(10));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
             item: Stick,
                 min: 1,
@@ -1321,10 +1550,10 @@ fn bush() -> EntityDef {
                 max: 1,
                 rate: 0.1
             )]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn bush2() -> EntityDef {
     let mut d = EntityDef {
@@ -1336,10 +1565,13 @@ fn bush2() -> EntityDef {
     d.sprite_anchor = Some(SpriteAnchor(parse::vec2(r#"((x: 8., y: 8.))"#)));
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::Bush2);
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 9., y: 9. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 9., y: 9. },
+    });
     d.max_health = Some(MaxHealth(10));
     d.experience_reward = Some(ExperienceReward(10));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
             item: Stick,
                 min: 1,
@@ -1358,10 +1590,10 @@ fn bush2() -> EntityDef {
                 max: 1,
                 rate: 0.1
             )]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn bushling() -> EntityDef {
     let mut d = EntityDef {
@@ -1377,15 +1609,38 @@ fn bushling() -> EntityDef {
     d.combat_alignment = Some(CombatAlignment::Hostile);
     d.follow_speed = Some(FollowSpeed(0.25));
     d.enemy_anim_state = Some(EnemyAnimationState::Walk);
-    d.leap_attack = Some(LeapAttack { activation_distance: 38., startup: 0.45, duration: 0.35, cooldown: 1.0, speed: 80. });
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: 0., y1: -1., x2: 0., y2: -1.5, r: 8. } });
-    d.sprite_sheet = Some(SpriteSheetDef { asset: "textures/bushling/bushling_down.png".into(), size: Vec2::new(38., 38.), cols: 9, rows: 5 });
+    d.leap_attack = Some(LeapAttack {
+        activation_distance: 38.,
+        startup: 0.45,
+        duration: 0.35,
+        cooldown: 1.0,
+        speed: 80.,
+    });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: 0.,
+            y1: -1.,
+            x2: 0.,
+            y2: -1.5,
+            r: 8.,
+        },
+    });
+    d.sprite_sheet = Some(SpriteSheetDef {
+        asset: "textures/bushling/bushling_down.png".into(),
+        size: Vec2::new(38., 38.),
+        cols: 9,
+        rows: 5,
+    });
     d.animation_timer = Some(AnimationTimerDef { secs: 0.1 });
-    d.anim_sprite_sheet_data = Some(CharacterAnimationSpriteSheetData { animation_frames: vec![4,4,4,9,6], anim_offset: 0 });
+    d.anim_sprite_sheet_data = Some(CharacterAnimationSpriteSheetData {
+        animation_frames: vec![4, 4, 4, 9, 6],
+        anim_offset: 0,
+    });
     d.max_health = Some(MaxHealth(18));
     d.attack = Some(Attack(10));
     d.experience_reward = Some(ExperienceReward(25));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
                 item: SmallPotion,
                 min: 1,
@@ -1465,10 +1720,10 @@ fn bushling() -> EntityDef {
                 rate: 0.00008
             ),
             ]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn bushling_card() -> EntityDef {
     let mut d = EntityDef {
@@ -1482,7 +1737,8 @@ fn bushling_card() -> EntityDef {
     d.animation_pos_tracker = Some(AnimationPosTracker(0.0, 0.0, 0.3));
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::BushlingCard);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: BushlingCard,
         metadata: (
             name: "Bushling Card",
@@ -1490,10 +1746,10 @@ fn bushling_card() -> EntityDef {
         ),
         rarity: Common,
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn bushling_scale() -> EntityDef {
     let mut d = EntityDef {
@@ -1507,17 +1763,18 @@ fn bushling_scale() -> EntityDef {
     d.animation_pos_tracker = Some(AnimationPosTracker(0.0, 0.0, 0.3));
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::BushlingScale);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: BushlingScale,
         metadata: (
             name: "Bushling Scale", 
             desc: ["It's really sharp...", "No wonder those", "things hurt so", "much..."]
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn cactus_berry() -> EntityDef {
     let mut d = EntityDef {
@@ -1533,17 +1790,18 @@ fn cactus_berry() -> EntityDef {
     d.world_object = Some(WorldObject::CactusBerry);
     d.item_actions = Some(parse::item_actions(r#"(actions: [ModifyHealth(5)])"#));
     d.consumable = Some(ConsumableItem);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: CactusBerry,
         metadata: (
             name: "Cactus Berries", 
             desc: ["Crunchy and sharp", "cactus berries."]
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn cactus_flower() -> EntityDef {
     let mut d = EntityDef {
@@ -1557,17 +1815,18 @@ fn cactus_flower() -> EntityDef {
     d.animation_pos_tracker = Some(AnimationPosTracker(0.0, 0.0, 0.3));
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::CactusFlower);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: CactusFlower,
         metadata: (
             name: "Cactus Flower", 
             desc: ["A sharp flower.", "Might help in a","recipe."]
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn cattail() -> EntityDef {
     let mut d = EntityDef {
@@ -1580,17 +1839,18 @@ fn cattail() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::Cattail);
     d.max_health = Some(MaxHealth(1));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
                 item: PlantFibre,
                 min: 1,
                 max: 1,
                 rate: 0.3
             ),]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn cauldron() -> EntityDef {
     let mut d = EntityDef {
@@ -1603,19 +1863,22 @@ fn cauldron() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::Cauldron);
     d.object_action = Some(parse::object_action(r#"Crafting(Cauldron)"#));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 4., y: 6. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 4., y: 6. },
+    });
     d.max_health = Some(MaxHealth(25));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
                 item: CauldronBlock,
                 min: 1,
                 max: 1,
                 rate: 1.
             ),]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn cauldron_block() -> EntityDef {
     let mut d = EntityDef {
@@ -1631,17 +1894,18 @@ fn cauldron_block() -> EntityDef {
     d.world_object = Some(WorldObject::CauldronBlock);
     d.item_actions = Some(parse::item_actions(r#"(actions: [PlacesInto(Cauldron)])"#));
     d.consumable = Some(ConsumableItem);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: CauldronBlock,
         metadata: (
             name: "Cauldron ", 
             desc: ["Allows you to", "cook better food."]
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn cauldron_shrine() -> EntityDef {
     let mut d = EntityDef {
@@ -1654,10 +1918,17 @@ fn cauldron_shrine() -> EntityDef {
     d.sprite_size = Some(SpriteSize::Small);
     d.sprite_anchor = Some(SpriteAnchor(parse::vec2(r#"((x: 0., y: 0.))"#)));
     d.y_sort = Some(YSort(0.));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: -6., y1: -5., x2: 6., y2: -5., r: 7. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: -6.,
+            y1: -5.,
+            x2: 6.,
+            y2: -5.,
+            r: 7.,
+        },
+    });
     d
 }
-
 
 fn cauldron_shrine_done() -> EntityDef {
     let mut d = EntityDef {
@@ -1669,10 +1940,17 @@ fn cauldron_shrine_done() -> EntityDef {
     d.sprite_size = Some(SpriteSize::Small);
     d.sprite_anchor = Some(SpriteAnchor(parse::vec2(r#"((x: 0., y: 0.))"#)));
     d.y_sort = Some(YSort(0.));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: -6., y1: -5., x2: 6., y2: -5., r: 7. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: -6.,
+            y1: -5.,
+            x2: 6.,
+            y2: -5.,
+            r: 7.,
+        },
+    });
     d
 }
-
 
 fn chaos_totem() -> EntityDef {
     let mut d = EntityDef {
@@ -1684,11 +1962,18 @@ fn chaos_totem() -> EntityDef {
     d.sprite_size = Some(SpriteSize::Small);
     d.sprite_anchor = Some(SpriteAnchor(parse::vec2(r#"((x: 0., y: 12.))"#)));
     d.y_sort = Some(YSort(-0.01));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: -8., y1: -8., x2: 8., y2: -8., r: 5. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: -8.,
+            y1: -8.,
+            x2: 8.,
+            y2: -8.,
+            r: 5.,
+        },
+    });
     d.object_action = Some(parse::object_action(r#"IncreaseChaos(1.0)"#));
     d
 }
-
 
 fn chaos_totem_done() -> EntityDef {
     let mut d = EntityDef {
@@ -1700,10 +1985,17 @@ fn chaos_totem_done() -> EntityDef {
     d.sprite_size = Some(SpriteSize::Small);
     d.sprite_anchor = Some(SpriteAnchor(parse::vec2(r#"((x: 0., y: 12.))"#)));
     d.y_sort = Some(YSort(0.));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: -8., y1: -8., x2: 8., y2: -8., r: 5. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: -8.,
+            y1: -8.,
+            x2: 8.,
+            y2: -8.,
+            r: 5.,
+        },
+    });
     d
 }
-
 
 fn chest() -> EntityDef {
     let mut d = EntityDef {
@@ -1715,11 +2007,12 @@ fn chest() -> EntityDef {
     d.sprite_anchor = Some(SpriteAnchor(parse::vec2(r#"((x: 0., y: 0.))"#)));
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::Chest);
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 8., y: 8. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 8., y: 8. },
+    });
     d.max_health = Some(MaxHealth(100));
     d
 }
-
 
 fn chest_block() -> EntityDef {
     let mut d = EntityDef {
@@ -1735,19 +2028,22 @@ fn chest_block() -> EntityDef {
     d.world_object = Some(WorldObject::ChestBlock);
     d.touch_trigger = Some(parse::touch_trigger(r#"ItemChest"#));
     d.consumable = Some(ConsumableItem);
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 9., y: 8. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 9., y: 8. },
+    });
     d.sensor = true;
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: ChestBlock,
         metadata: (
             name: "Chest",
             desc: ["Right-click to open.", "Contains random loot."]
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn chestplate() -> EntityDef {
     let mut d = EntityDef {
@@ -1761,12 +2057,15 @@ fn chestplate() -> EntityDef {
     d.animation_pos_tracker = Some(AnimationPosTracker(0.0, 0.0, 0.3));
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::Chestplate);
-    d.raw_item_base = Some(parse::raw_item_base(r#"(
+    d.raw_item_base = Some(parse::raw_item_base(
+        r#"(
         health: Some((start: 30, end: 45)),
         defence: Some((start: 25, end: 35)),
         speed: Some((start: -16, end: -12)),
-  )"#));
-    d.raw_item_bonus = Some(parse::raw_item_bonus(r#"(
+  )"#,
+    ));
+    d.raw_item_bonus = Some(parse::raw_item_bonus(
+        r#"(
         crit_damage: Some((start: 5, end: 10)),
         crit_chance: Some((start: 4, end: 8)),
         health_regen: Some((start: 10, end: 16)),
@@ -1782,20 +2081,24 @@ fn chestplate() -> EntityDef {
         bonus_damage: Some((start: 12, end: 18)),
         pickup_range: Some((start: 15, end: 30)),
         skill_power: Some((start: 9, end: 15)),
-  )"#));
+  )"#,
+    ));
     d.equipment_type = Some(EquipmentType::Chest);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: Chestplate,
         metadata: (
             name: "Chestplate", 
             desc: ["Nice."]
         ),
         count: 1
-  )"#));
-    d.scraps_into = Some(parse::scraps_into(r#"([(obj: MetalBar, chance: 1.), (obj: MetalBar, chance: 0.5)])"#));
+  )"#,
+    ));
+    d.scraps_into = Some(parse::scraps_into(
+        r#"([(obj: MetalBar, chance: 1.), (obj: MetalBar, chance: 0.5)])"#,
+    ));
     d
 }
-
 
 fn claw() -> EntityDef {
     let mut d = EntityDef {
@@ -1810,10 +2113,13 @@ fn claw() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::Claw);
     d.equipment_type = Some(EquipmentType::Weapon);
-    d.raw_item_base = Some(parse::raw_item_base(r#"(
+    d.raw_item_base = Some(parse::raw_item_base(
+        r#"(
         attack: Some((start: 8, end: 11)),
-  )"#));
-    d.raw_item_bonus = Some(parse::raw_item_bonus(r#"(
+  )"#,
+    ));
+    d.raw_item_bonus = Some(parse::raw_item_bonus(
+        r#"(
         crit_damage: Some((start: 8, end: 18)),
         crit_chance: Some((start: 9, end: 18)),
         speed: Some((start: 7, end: 11)),
@@ -1827,10 +2133,12 @@ fn claw() -> EntityDef {
       
         skill_power: Some((start: 8, end: 13)),
         attack_speed: Some((start: 8, end: 16)),
-  )"#));
+  )"#,
+    ));
     d.melee = Some(MeleeAttack);
     d.ranged = Some(RangedAttack(Projectile::ThrowingStar));
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: Claw,
         attributes: (
             attack_cooldown: 0.67
@@ -1840,11 +2148,13 @@ fn claw() -> EntityDef {
             desc: ["A claw."]
         ),
         count: 1
-  )"#));
-    d.scraps_into = Some(parse::scraps_into(r#"([(obj: MetalBar, chance: 1.), (obj: MetalBar, chance: 0.5)])"#));
+  )"#,
+    ));
+    d.scraps_into = Some(parse::scraps_into(
+        r#"([(obj: MetalBar, chance: 1.), (obj: MetalBar, chance: 0.5)])"#,
+    ));
     d
 }
-
 
 fn coal() -> EntityDef {
     let mut d = EntityDef {
@@ -1858,17 +2168,18 @@ fn coal() -> EntityDef {
     d.animation_pos_tracker = Some(AnimationPosTracker(0.0, 0.0, 0.3));
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::Coal);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: Coal,
         metadata: (
             name: "Coal", 
             desc: ["A chunk of coal.", "Use it in the", "Furnace."]
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn coal_boulder() -> EntityDef {
     let mut d = EntityDef {
@@ -1881,10 +2192,19 @@ fn coal_boulder() -> EntityDef {
     d.y_sort = Some(YSort(-0.015));
     d.world_object = Some(WorldObject::CoalBoulder);
     d.required_equipment_type = Some(RequiredEquipmentType(EquipmentType::Pickaxe));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: -3., y1: -2., x2: 4., y2: -1., r: 6. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: -3.,
+            y1: -2.,
+            x2: 4.,
+            y2: -1.,
+            r: 6.,
+        },
+    });
     d.max_health = Some(MaxHealth(50));
     d.experience_reward = Some(ExperienceReward(15));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [
             (
             item: StoneChunk,
@@ -1892,10 +2212,10 @@ fn coal_boulder() -> EntityDef {
                 max: 4,
                 rate: 0.75
             )]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn coin() -> EntityDef {
     let mut d = EntityDef {
@@ -1909,7 +2229,8 @@ fn coin() -> EntityDef {
     d.animation_pos_tracker = Some(AnimationPosTracker(0.0, 0.0, 0.3));
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::Coin);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: Coin,
         metadata: (
             name: "Coin",
@@ -1917,10 +2238,10 @@ fn coin() -> EntityDef {
         ),
         rarity: Common,
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn combat_shrine() -> EntityDef {
     let mut d = EntityDef {
@@ -1933,10 +2254,17 @@ fn combat_shrine() -> EntityDef {
     d.sprite_size = Some(SpriteSize::Small);
     d.sprite_anchor = Some(SpriteAnchor(parse::vec2(r#"((x: 0., y: 24.))"#)));
     d.y_sort = Some(YSort(-0.012));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: -8., y1: -22., x2: 8., y2: -22., r: 5. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: -8.,
+            y1: -22.,
+            x2: 8.,
+            y2: -22.,
+            r: 5.,
+        },
+    });
     d
 }
-
 
 fn combat_shrine_done() -> EntityDef {
     let mut d = EntityDef {
@@ -1948,10 +2276,17 @@ fn combat_shrine_done() -> EntityDef {
     d.sprite_size = Some(SpriteSize::Small);
     d.sprite_anchor = Some(SpriteAnchor(parse::vec2(r#"((x: 0., y: 24.))"#)));
     d.y_sort = Some(YSort(0.));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: -8., y1: -22., x2: 8., y2: -22., r: 5. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: -8.,
+            y1: -22.,
+            x2: 8.,
+            y2: -22.,
+            r: 5.,
+        },
+    });
     d
 }
-
 
 fn cooked_meat() -> EntityDef {
     let mut d = EntityDef {
@@ -1965,19 +2300,22 @@ fn cooked_meat() -> EntityDef {
     d.animation_pos_tracker = Some(AnimationPosTracker(0.0, 0.0, 0.3));
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::CookedMeat);
-    d.item_actions = Some(parse::item_actions(r#"(actions: [Eat(45), ModifyHealth(10)])"#));
+    d.item_actions = Some(parse::item_actions(
+        r#"(actions: [Eat(45), ModifyHealth(10)])"#,
+    ));
     d.consumable = Some(ConsumableItem);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: CookedMeat,
         metadata: (
             name: "Cooked Meat ", 
             desc: ["This tastes much", "better than raw", "meat!"]
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn crafting_table() -> EntityDef {
     let mut d = EntityDef {
@@ -1990,19 +2328,22 @@ fn crafting_table() -> EntityDef {
     d.y_sort = Some(YSort(-0.1));
     d.world_object = Some(WorldObject::CraftingTable);
     d.object_action = Some(parse::object_action(r#"Crafting(CraftingTable)"#));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 10., y: 4. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 10., y: 4. },
+    });
     d.max_health = Some(MaxHealth(25));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
                 item: CraftingTableBlock,
                 min: 1,
                 max: 1,
                 rate: 1.
             ),]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn crafting_table_block() -> EntityDef {
     let mut d = EntityDef {
@@ -2016,19 +2357,22 @@ fn crafting_table_block() -> EntityDef {
     d.animation_pos_tracker = Some(AnimationPosTracker(0.0, 0.0, 0.3));
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::CraftingTableBlock);
-    d.item_actions = Some(parse::item_actions(r#"(actions: [PlacesInto(CraftingTable)])"#));
+    d.item_actions = Some(parse::item_actions(
+        r#"(actions: [PlacesInto(CraftingTable)])"#,
+    ));
     d.consumable = Some(ConsumableItem);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: CraftingTableBlock,
         metadata: (
             name: "Crafting Table", 
             desc: ["Allows you to", "craft more", "advanced items."]
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn crate_() -> EntityDef {
     let mut d = EntityDef {
@@ -2041,8 +2385,11 @@ fn crate_() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::Crate);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 6., y: 6. } });
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 6., y: 6. },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
                 item: Apple,
                 min: 1,
@@ -2217,10 +2564,10 @@ fn crate_() -> EntityDef {
             ),
             
             ]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn crate2() -> EntityDef {
     let mut d = EntityDef {
@@ -2233,8 +2580,11 @@ fn crate2() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::Crate2);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 6., y: 6. } });
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 6., y: 6. },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
                 item: Apple,
                 min: 1,
@@ -2411,10 +2761,10 @@ fn crate2() -> EntityDef {
                 rate: 0.3
             ),
             ]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn crate_block() -> EntityDef {
     let mut d = EntityDef {
@@ -2429,17 +2779,18 @@ fn crate_block() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::CrateBlock);
     d.consumable = Some(ConsumableItem);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: CrateBlock,
         metadata: (
             name: "Crate", 
             desc: ["crate."]
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn crit_chance_food() -> EntityDef {
     let mut d = EntityDef {
@@ -2453,9 +2804,12 @@ fn crit_chance_food() -> EntityDef {
     d.animation_pos_tracker = Some(AnimationPosTracker(0.0, 0.0, 0.3));
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::CritChanceFood);
-    d.item_actions = Some(parse::item_actions(r#"(actions: [GainStat("crit_chance", 4)])"#));
+    d.item_actions = Some(parse::item_actions(
+        r#"(actions: [GainStat("crit_chance", 4)])"#,
+    ));
     d.consumable = Some(ConsumableItem);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: CritChanceFood,
         metadata: (
             name: "Crit Boost", 
@@ -2463,10 +2817,10 @@ fn crit_chance_food() -> EntityDef {
         ),
         rarity: Rare,
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn crow() -> EntityDef {
     let mut d = EntityDef {
@@ -2482,15 +2836,24 @@ fn crow() -> EntityDef {
     d.mob = Some(Mob::Crow);
     d.combat_alignment = Some(CombatAlignment::Hostile);
     d.follow_speed = Some(FollowSpeed(0.5));
-    d.projectile_attack = Some(parse::projectile_attack(r#"(activation_distance: 55., cooldown: 2.0, projectile: CrowFeather, attack_startup: 0.1, projectile_delay: 0.3)"#));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: 0., y1: -1., x2: 0., y2: -1.5, r: 5. } });
+    d.projectile_attack = Some(parse::projectile_attack(
+        r#"(activation_distance: 55., cooldown: 2.0, projectile: CrowFeather, attack_startup: 0.1, projectile_delay: 0.3)"#,
+    ));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: 0.,
+            y1: -1.,
+            x2: 0.,
+            y2: -1.5,
+            r: 5.,
+        },
+    });
     d.max_health = Some(MaxHealth(20));
     d.attack = Some(Attack(12));
     d.experience_reward = Some(ExperienceReward(25));
     d.loot_table = Some(parse::loot_table(r#"(drops: [])"#));
     d
 }
-
 
 fn crow_feather() -> EntityDef {
     let mut d = EntityDef {
@@ -2500,14 +2863,22 @@ fn crow_feather() -> EntityDef {
     };
     d.sensor = true;
     d.y_sort = Some(YSort(0.));
-    d.sprite_sheet = Some(SpriteSheetDef { asset: "bevy_survival_sprites.png".into(), size: Vec2::new(16., 16.), cols: 16, rows: 16 });
+    d.sprite_sheet = Some(SpriteSheetDef {
+        asset: "bevy_survival_sprites.png".into(),
+        size: Vec2::new(16., 16.),
+        cols: 16,
+        rows: 16,
+    });
     d.world_object = Some(WorldObject::CrowFeather);
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 8., y: 8. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 8., y: 8. },
+    });
     d.projectile = Some(Projectile::CrowFeather);
-    d.projectile_state = Some(parse::projectile_state(r#"(speed: 180, direction: (x: 0., y: 0.), hit_entities: [], despawn_on_hit: true)"#));
+    d.projectile_state = Some(parse::projectile_state(
+        r#"(speed: 180, direction: (x: 0., y: 0.), hit_entities: [], despawn_on_hit: true)"#,
+    ));
     d
 }
-
 
 fn dagger() -> EntityDef {
     let mut d = EntityDef {
@@ -2522,10 +2893,13 @@ fn dagger() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::Dagger);
     d.equipment_type = Some(EquipmentType::Weapon);
-    d.raw_item_base = Some(parse::raw_item_base(r#"(
+    d.raw_item_base = Some(parse::raw_item_base(
+        r#"(
         attack: Some((start: 7, end: 9)),
-  )"#));
-    d.raw_item_bonus = Some(parse::raw_item_bonus(r#"(
+  )"#,
+    ));
+    d.raw_item_bonus = Some(parse::raw_item_bonus(
+        r#"(
         crit_damage: Some((start: 10, end: 16)),
         crit_chance: Some((start: 9, end: 16)),
         speed: Some((start: 6, end: 10)),
@@ -2539,10 +2913,12 @@ fn dagger() -> EntityDef {
       
         skill_power: Some((start: 8, end: 13)),
         attack_speed: Some((start: 6, end: 10)),
-  )"#));
+  )"#,
+    ));
     d.melee = Some(MeleeAttack);
     d.ranged = Some(RangedAttack(Projectile::DaggerProjectile1));
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: Dagger,
         attributes: (
             attack_cooldown: 0.55
@@ -2552,11 +2928,11 @@ fn dagger() -> EntityDef {
             desc: ["A small dagger."]
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d.scraps_into = Some(parse::scraps_into(r#"([(obj: Log, chance: 1.)])"#));
     d
 }
-
 
 fn dagger_projectile1() -> EntityDef {
     let mut d = EntityDef {
@@ -2566,15 +2942,23 @@ fn dagger_projectile1() -> EntityDef {
     };
     d.sensor = true;
     d.y_sort = Some(YSort(0.));
-    d.sprite_sheet = Some(SpriteSheetDef { asset: "textures/effects/DaggerProjectile1.png".into(), size: Vec2::new(17., 24.), cols: 3, rows: 1 });
+    d.sprite_sheet = Some(SpriteSheetDef {
+        asset: "textures/effects/DaggerProjectile1.png".into(),
+        size: Vec2::new(17., 24.),
+        cols: 3,
+        rows: 1,
+    });
     d.projectile = Some(Projectile::DaggerProjectile1);
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 8.5, y: 12. } });
-    d.projectile_state = Some(parse::projectile_state(r#"(speed: 0., direction: (x: 0., y: 0.), spawn_offset: (x: -0., y: -0.), hit_entities: [], despawn_on_hit: false)"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 8.5, y: 12. },
+    });
+    d.projectile_state = Some(parse::projectile_state(
+        r#"(speed: 0., direction: (x: 0., y: 0.), spawn_offset: (x: -0., y: -0.), hit_entities: [], despawn_on_hit: false)"#,
+    ));
     d.done_animation = true;
     d.animation_timer = Some(AnimationTimerDef { secs: 0.06 });
     d
 }
-
 
 fn dagger_projectile2() -> EntityDef {
     let mut d = EntityDef {
@@ -2584,15 +2968,23 @@ fn dagger_projectile2() -> EntityDef {
     };
     d.sensor = true;
     d.y_sort = Some(YSort(0.));
-    d.sprite_sheet = Some(SpriteSheetDef { asset: "textures/effects/DaggerProjectile2.png".into(), size: Vec2::new(17., 24.), cols: 3, rows: 1 });
+    d.sprite_sheet = Some(SpriteSheetDef {
+        asset: "textures/effects/DaggerProjectile2.png".into(),
+        size: Vec2::new(17., 24.),
+        cols: 3,
+        rows: 1,
+    });
     d.projectile = Some(Projectile::DaggerProjectile2);
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 8.5, y: 12. } });
-    d.projectile_state = Some(parse::projectile_state(r#"(speed: 0., direction: (x: 0., y: 0.), spawn_offset: (x: -0., y: -0.), hit_entities: [], despawn_on_hit: false)"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 8.5, y: 12. },
+    });
+    d.projectile_state = Some(parse::projectile_state(
+        r#"(speed: 0., direction: (x: 0., y: 0.), spawn_offset: (x: -0., y: -0.), hit_entities: [], despawn_on_hit: false)"#,
+    ));
     d.done_animation = true;
     d.animation_timer = Some(AnimationTimerDef { secs: 0.06 });
     d
 }
-
 
 fn dagger_slash() -> EntityDef {
     let mut d = EntityDef {
@@ -2602,15 +2994,23 @@ fn dagger_slash() -> EntityDef {
     };
     d.sensor = true;
     d.y_sort = Some(YSort(0.));
-    d.sprite_sheet = Some(SpriteSheetDef { asset: "textures/effects/DaggerSlash.png".into(), size: Vec2::new(95., 96.), cols: 12, rows: 1 });
+    d.sprite_sheet = Some(SpriteSheetDef {
+        asset: "textures/effects/DaggerSlash.png".into(),
+        size: Vec2::new(95., 96.),
+        cols: 12,
+        rows: 1,
+    });
     d.projectile = Some(Projectile::DaggerSlash);
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 40., y: 40. } });
-    d.projectile_state = Some(parse::projectile_state(r#"(speed: 0., direction: (x: 0., y: 0.), spawn_offset: (x: -70., y: -70.), hit_entities: [], despawn_on_hit: false)"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 40., y: 40. },
+    });
+    d.projectile_state = Some(parse::projectile_state(
+        r#"(speed: 0., direction: (x: 0., y: 0.), spawn_offset: (x: -70., y: -70.), hit_entities: [], despawn_on_hit: false)"#,
+    ));
     d.done_animation = true;
     d.animation_timer = Some(AnimationTimerDef { secs: 0.0315 });
     d
 }
-
 
 fn dagger_throw() -> EntityDef {
     let mut d = EntityDef {
@@ -2620,14 +3020,22 @@ fn dagger_throw() -> EntityDef {
     };
     d.sensor = true;
     d.y_sort = Some(YSort(0.));
-    d.sprite_sheet = Some(SpriteSheetDef { asset: "bevy_survival_sprites.png".into(), size: Vec2::new(16., 16.), cols: 16, rows: 16 });
+    d.sprite_sheet = Some(SpriteSheetDef {
+        asset: "bevy_survival_sprites.png".into(),
+        size: Vec2::new(16., 16.),
+        cols: 16,
+        rows: 16,
+    });
     d.world_object = Some(WorldObject::DaggerThrow);
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 5., y: 5. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 5., y: 5. },
+    });
     d.projectile = Some(Projectile::DaggerThrow);
-    d.projectile_state = Some(parse::projectile_state(r#"(speed: 250., direction: (x: 0., y: 0.), hit_entities: [], despawn_on_hit: true)"#));
+    d.projectile_state = Some(parse::projectile_state(
+        r#"(speed: 250., direction: (x: 0., y: 0.), hit_entities: [], despawn_on_hit: true)"#,
+    ));
     d
 }
-
 
 fn dart() -> EntityDef {
     let mut d = EntityDef {
@@ -2637,14 +3045,22 @@ fn dart() -> EntityDef {
     };
     d.sensor = true;
     d.y_sort = Some(YSort(0.));
-    d.sprite_sheet = Some(SpriteSheetDef { asset: "bevy_survival_sprites.png".into(), size: Vec2::new(16., 16.), cols: 16, rows: 16 });
+    d.sprite_sheet = Some(SpriteSheetDef {
+        asset: "bevy_survival_sprites.png".into(),
+        size: Vec2::new(16., 16.),
+        cols: 16,
+        rows: 16,
+    });
     d.world_object = Some(WorldObject::Dart);
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 3.5, y: 2. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 3.5, y: 2. },
+    });
     d.projectile = Some(Projectile::Dart);
-    d.projectile_state = Some(parse::projectile_state(r#"(speed: 300., direction: (x: 0., y: 0.), hit_entities: [], despawn_on_hit: true)"#));
+    d.projectile_state = Some(parse::projectile_state(
+        r#"(speed: 300., direction: (x: 0., y: 0.), hit_entities: [], despawn_on_hit: true)"#,
+    ));
     d
 }
-
 
 fn dead_sapling() -> EntityDef {
     let mut d = EntityDef {
@@ -2656,21 +3072,24 @@ fn dead_sapling() -> EntityDef {
     d.sprite_anchor = Some(SpriteAnchor(parse::vec2(r#"((x: 0., y: 0.))"#)));
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::DeadSapling);
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 },
+    });
     d.sensor = true;
     d.max_health = Some(MaxHealth(1));
     d.experience_reward = Some(ExperienceReward(5));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
                 item: Stick,
                 min: 1,
                 max: 1,
                 rate: 0.8
             ),]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn defence_food() -> EntityDef {
     let mut d = EntityDef {
@@ -2684,9 +3103,12 @@ fn defence_food() -> EntityDef {
     d.animation_pos_tracker = Some(AnimationPosTracker(0.0, 0.0, 0.3));
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::DefenceFood);
-    d.item_actions = Some(parse::item_actions(r#"(actions: [GainStat("defence", 7)])"#));
+    d.item_actions = Some(parse::item_actions(
+        r#"(actions: [GainStat("defence", 7)])"#,
+    ));
     d.consumable = Some(ConsumableItem);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: DefenceFood,
         metadata: (
             name: "Defence Boost", 
@@ -2694,10 +3116,10 @@ fn defence_food() -> EntityDef {
         ),
         rarity: Legendary,
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn desert_bones1() -> EntityDef {
     let mut d = EntityDef {
@@ -2710,11 +3132,14 @@ fn desert_bones1() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::DesertBones1);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 } });
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: Bones, min: 1, max: 1, rate: 1.0)])"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: Bones, min: 1, max: 1, rate: 1.0)])"#,
+    ));
     d
 }
-
 
 fn desert_bones2() -> EntityDef {
     let mut d = EntityDef {
@@ -2727,11 +3152,14 @@ fn desert_bones2() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::DesertBones2);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 } });
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: Bones, min: 1, max: 1, rate: 1.0)])"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: Bones, min: 1, max: 1, rate: 1.0)])"#,
+    ));
     d
 }
-
 
 fn desert_bones3() -> EntityDef {
     let mut d = EntityDef {
@@ -2744,11 +3172,14 @@ fn desert_bones3() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::DesertBones3);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 } });
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: Bones, min: 1, max: 1, rate: 1.0)])"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: Bones, min: 1, max: 1, rate: 1.0)])"#,
+    ));
     d
 }
-
 
 fn desert_crate() -> EntityDef {
     let mut d = EntityDef {
@@ -2761,8 +3192,11 @@ fn desert_crate() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::DesertCrate);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 6., y: 6. } });
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 6., y: 6. },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [   
       (item: ChestBlock, min: 1, max: 1, rate: 0.0004),
       (item: HeirloomChest, min: 1, max: 1, rate: 0.0004),
@@ -2781,10 +3215,10 @@ fn desert_crate() -> EntityDef {
       (item: XPShard, min: 1, max: 1, rate: 0.3),
             
             ]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn desert_crate2() -> EntityDef {
     let mut d = EntityDef {
@@ -2797,8 +3231,11 @@ fn desert_crate2() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::DesertCrate2);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 6., y: 6. } });
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 6., y: 6. },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [
       (item: ChestBlock, min: 1, max: 1, rate: 0.0004),
       (item: HeirloomChest, min: 1, max: 1, rate: 0.0004),
@@ -2816,10 +3253,10 @@ fn desert_crate2() -> EntityDef {
       (item: XPShard, min: 1, max: 1, rate: 1.0),
       (item: XPShard, min: 1, max: 1, rate: 0.3),
             ]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn desert_drift_wood1() -> EntityDef {
     let mut d = EntityDef {
@@ -2832,16 +3269,19 @@ fn desert_drift_wood1() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::DesertDriftWood1);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 10.0, y: 4.5 } });
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 10.0, y: 4.5 },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(
     drops: [
       (item: Log, min: 1, max: 4, rate: 1.0),
       (item: Stick, min: 1, max: 1, rate: 0.3),
     ],
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn desert_drift_wood2() -> EntityDef {
     let mut d = EntityDef {
@@ -2854,16 +3294,19 @@ fn desert_drift_wood2() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::DesertDriftWood2);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 10.0, y: 4.5 } });
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 10.0, y: 4.5 },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(
     drops: [
       (item: Log, min: 1, max: 4, rate: 1.0),
       (item: Stick, min: 1, max: 1, rate: 0.3),
     ],
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn desert_drift_wood3() -> EntityDef {
     let mut d = EntityDef {
@@ -2876,16 +3319,19 @@ fn desert_drift_wood3() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::DesertDriftWood3);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 } });
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(
     drops: [
       (item: Log, min: 1, max: 4, rate: 1.0),
       (item: Stick, min: 1, max: 1, rate: 0.3),
     ],
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn desert_fence1() -> EntityDef {
     let mut d = EntityDef {
@@ -2898,16 +3344,19 @@ fn desert_fence1() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::DesertFence1);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 10.0, y: 4.5 } });
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 10.0, y: 4.5 },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(
     drops: [
       (item: Log, min: 1, max: 4, rate: 1.0),
       (item: Stick, min: 1, max: 1, rate: 1.),
     ],
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn desert_fence2() -> EntityDef {
     let mut d = EntityDef {
@@ -2920,16 +3369,19 @@ fn desert_fence2() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::DesertFence2);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 10.0, y: 4.5 } });
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 10.0, y: 4.5 },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(
     drops: [
       (item: Log, min: 1, max: 4, rate: 1.0),
       (item: Stick, min: 1, max: 1, rate: 1.),
     ],
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn desert_fence3() -> EntityDef {
     let mut d = EntityDef {
@@ -2942,16 +3394,19 @@ fn desert_fence3() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::DesertFence3);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 } });
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(
     drops: [
       (item: Log, min: 1, max: 4, rate: 1.0),
       (item: Stick, min: 1, max: 1, rate: 1.),
     ],
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn desert_grass1() -> EntityDef {
     let mut d = EntityDef {
@@ -2964,10 +3419,11 @@ fn desert_grass1() -> EntityDef {
     d.y_sort = Some(YSort(-0.01));
     d.world_object = Some(WorldObject::DesertGrass1);
     d.max_health = Some(MaxHealth(1));
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: PlantFibre, min: 1, max: 1, rate: 0.75)])"#));
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: PlantFibre, min: 1, max: 1, rate: 0.75)])"#,
+    ));
     d
 }
-
 
 fn desert_grass2() -> EntityDef {
     let mut d = EntityDef {
@@ -2980,10 +3436,11 @@ fn desert_grass2() -> EntityDef {
     d.y_sort = Some(YSort(-0.01));
     d.world_object = Some(WorldObject::DesertGrass2);
     d.max_health = Some(MaxHealth(1));
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: PlantFibre, min: 1, max: 1, rate: 0.75)])"#));
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: PlantFibre, min: 1, max: 1, rate: 0.75)])"#,
+    ));
     d
 }
-
 
 fn desert_grass3() -> EntityDef {
     let mut d = EntityDef {
@@ -2996,10 +3453,11 @@ fn desert_grass3() -> EntityDef {
     d.y_sort = Some(YSort(-0.01));
     d.world_object = Some(WorldObject::DesertGrass3);
     d.max_health = Some(MaxHealth(1));
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: PlantFibre, min: 1, max: 1, rate: 0.75)])"#));
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: PlantFibre, min: 1, max: 1, rate: 0.75)])"#,
+    ));
     d
 }
-
 
 fn desert_grass4() -> EntityDef {
     let mut d = EntityDef {
@@ -3012,10 +3470,11 @@ fn desert_grass4() -> EntityDef {
     d.y_sort = Some(YSort(-0.01));
     d.world_object = Some(WorldObject::DesertGrass4);
     d.max_health = Some(MaxHealth(1));
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: PlantFibre, min: 1, max: 1, rate: 0.75)])"#));
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: PlantFibre, min: 1, max: 1, rate: 0.75)])"#,
+    ));
     d
 }
-
 
 fn desert_large_cactus1() -> EntityDef {
     let mut d = EntityDef {
@@ -3029,19 +3488,28 @@ fn desert_large_cactus1() -> EntityDef {
     d.sprite_size = Some(SpriteSize::Small);
     d.sprite_anchor = Some(SpriteAnchor(parse::vec2(r#"((x: 0., y: 16.))"#)));
     d.required_equipment_type = Some(RequiredEquipmentType(EquipmentType::Axe));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: 0., y1: -20., x2: 0., y2: -12., r: 4. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: 0.,
+            y1: -20.,
+            x2: 0.,
+            y2: -12.,
+            r: 4.,
+        },
+    });
     d.max_health = Some(MaxHealth(25));
     d.y_sort = Some(YSort(0.));
     d.experience_reward = Some(ExperienceReward(5));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [
             (item: CactusFlower, min: 1, max: 2, rate: 0.65),
             (item: CactusBerry, min: 1, max: 3, rate: 0.65),
         ]
-    )"#));
+    )"#,
+    ));
     d
 }
-
 
 fn desert_large_cactus2() -> EntityDef {
     let mut d = EntityDef {
@@ -3055,19 +3523,28 @@ fn desert_large_cactus2() -> EntityDef {
     d.sprite_size = Some(SpriteSize::Small);
     d.sprite_anchor = Some(SpriteAnchor(parse::vec2(r#"((x: 0., y: 16.))"#)));
     d.required_equipment_type = Some(RequiredEquipmentType(EquipmentType::Axe));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: 0., y1: -20., x2: 0., y2: -12., r: 4. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: 0.,
+            y1: -20.,
+            x2: 0.,
+            y2: -12.,
+            r: 4.,
+        },
+    });
     d.max_health = Some(MaxHealth(25));
     d.y_sort = Some(YSort(0.));
     d.experience_reward = Some(ExperienceReward(5));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [
             (item: CactusFlower, min: 1, max: 2, rate: 0.65),
             (item: CactusBerry, min: 1, max: 3, rate: 0.65),
         ]
-    )"#));
+    )"#,
+    ));
     d
 }
-
 
 fn desert_large_cactus3() -> EntityDef {
     let mut d = EntityDef {
@@ -3081,19 +3558,28 @@ fn desert_large_cactus3() -> EntityDef {
     d.sprite_size = Some(SpriteSize::Small);
     d.sprite_anchor = Some(SpriteAnchor(parse::vec2(r#"((x: 0., y: 16.))"#)));
     d.required_equipment_type = Some(RequiredEquipmentType(EquipmentType::Axe));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: 0., y1: -20., x2: 0., y2: -12., r: 4. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: 0.,
+            y1: -20.,
+            x2: 0.,
+            y2: -12.,
+            r: 4.,
+        },
+    });
     d.max_health = Some(MaxHealth(25));
     d.y_sort = Some(YSort(0.));
     d.experience_reward = Some(ExperienceReward(5));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [
             (item: CactusFlower, min: 1, max: 2, rate: 0.65),
             (item: CactusBerry, min: 1, max: 3, rate: 0.65),
         ]
-    )"#));
+    )"#,
+    ));
     d
 }
-
 
 fn desert_large_cactus4() -> EntityDef {
     let mut d = EntityDef {
@@ -3107,19 +3593,28 @@ fn desert_large_cactus4() -> EntityDef {
     d.sprite_size = Some(SpriteSize::Small);
     d.sprite_anchor = Some(SpriteAnchor(parse::vec2(r#"((x: 0., y: 16.))"#)));
     d.required_equipment_type = Some(RequiredEquipmentType(EquipmentType::Axe));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: 0., y1: -20., x2: 0., y2: -12., r: 4. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: 0.,
+            y1: -20.,
+            x2: 0.,
+            y2: -12.,
+            r: 4.,
+        },
+    });
     d.max_health = Some(MaxHealth(25));
     d.y_sort = Some(YSort(0.));
     d.experience_reward = Some(ExperienceReward(5));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [
             (item: CactusFlower, min: 1, max: 2, rate: 0.65),
             (item: CactusBerry, min: 1, max: 3, rate: 0.65),
         ]
-    )"#));
+    )"#,
+    ));
     d
 }
-
 
 fn desert_large_cactus5() -> EntityDef {
     let mut d = EntityDef {
@@ -3133,19 +3628,28 @@ fn desert_large_cactus5() -> EntityDef {
     d.sprite_size = Some(SpriteSize::Small);
     d.sprite_anchor = Some(SpriteAnchor(parse::vec2(r#"((x: 0., y: 16.))"#)));
     d.required_equipment_type = Some(RequiredEquipmentType(EquipmentType::Axe));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: 0., y1: -20., x2: 0., y2: -12., r: 4. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: 0.,
+            y1: -20.,
+            x2: 0.,
+            y2: -12.,
+            r: 4.,
+        },
+    });
     d.max_health = Some(MaxHealth(25));
     d.y_sort = Some(YSort(0.));
     d.experience_reward = Some(ExperienceReward(5));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [
             (item: CactusFlower, min: 1, max: 2, rate: 0.65),
             (item: CactusBerry, min: 1, max: 3, rate: 0.65),
         ]
-    )"#));
+    )"#,
+    ));
     d
 }
-
 
 fn desert_large_cactus6() -> EntityDef {
     let mut d = EntityDef {
@@ -3159,19 +3663,28 @@ fn desert_large_cactus6() -> EntityDef {
     d.sprite_size = Some(SpriteSize::Small);
     d.sprite_anchor = Some(SpriteAnchor(parse::vec2(r#"((x: 0., y: 16.))"#)));
     d.required_equipment_type = Some(RequiredEquipmentType(EquipmentType::Axe));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: 0., y1: -20., x2: 0., y2: -12., r: 4. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: 0.,
+            y1: -20.,
+            x2: 0.,
+            y2: -12.,
+            r: 4.,
+        },
+    });
     d.max_health = Some(MaxHealth(25));
     d.y_sort = Some(YSort(0.));
     d.experience_reward = Some(ExperienceReward(5));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [
             (item: CactusFlower, min: 1, max: 2, rate: 0.65),
             (item: CactusBerry, min: 1, max: 3, rate: 0.65),
         ]
-    )"#));
+    )"#,
+    ));
     d
 }
-
 
 fn desert_large_cactus7() -> EntityDef {
     let mut d = EntityDef {
@@ -3185,19 +3698,28 @@ fn desert_large_cactus7() -> EntityDef {
     d.sprite_size = Some(SpriteSize::Small);
     d.sprite_anchor = Some(SpriteAnchor(parse::vec2(r#"((x: 0., y: 16.))"#)));
     d.required_equipment_type = Some(RequiredEquipmentType(EquipmentType::Axe));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: 0., y1: -20., x2: 0., y2: -12., r: 4. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: 0.,
+            y1: -20.,
+            x2: 0.,
+            y2: -12.,
+            r: 4.,
+        },
+    });
     d.max_health = Some(MaxHealth(25));
     d.y_sort = Some(YSort(0.));
     d.experience_reward = Some(ExperienceReward(5));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [
             (item: CactusFlower, min: 1, max: 2, rate: 0.65),
             (item: CactusBerry, min: 1, max: 3, rate: 0.65),
         ]
-    )"#));
+    )"#,
+    ));
     d
 }
-
 
 fn desert_large_cactus8() -> EntityDef {
     let mut d = EntityDef {
@@ -3211,19 +3733,28 @@ fn desert_large_cactus8() -> EntityDef {
     d.sprite_size = Some(SpriteSize::Small);
     d.sprite_anchor = Some(SpriteAnchor(parse::vec2(r#"((x: 0., y: 16.))"#)));
     d.required_equipment_type = Some(RequiredEquipmentType(EquipmentType::Axe));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: 0., y1: -20., x2: 0., y2: -12., r: 4. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: 0.,
+            y1: -20.,
+            x2: 0.,
+            y2: -12.,
+            r: 4.,
+        },
+    });
     d.max_health = Some(MaxHealth(25));
     d.y_sort = Some(YSort(0.));
     d.experience_reward = Some(ExperienceReward(5));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [
             (item: CactusFlower, min: 1, max: 2, rate: 0.65),
             (item: CactusBerry, min: 1, max: 3, rate: 0.65),
         ]
-    )"#));
+    )"#,
+    ));
     d
 }
-
 
 fn desert_med_boulder1() -> EntityDef {
     let mut d = EntityDef {
@@ -3236,11 +3767,14 @@ fn desert_med_boulder1() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::DesertMedBoulder1);
     d.max_health = Some(MaxHealth(35));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 10.0, y: 10.0 } });
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: StoneChunk, min: 2, max: 5, rate: 1.0)])"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 10.0, y: 10.0 },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: StoneChunk, min: 2, max: 5, rate: 1.0)])"#,
+    ));
     d
 }
-
 
 fn desert_med_boulder2() -> EntityDef {
     let mut d = EntityDef {
@@ -3253,11 +3787,14 @@ fn desert_med_boulder2() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::DesertMedBoulder2);
     d.max_health = Some(MaxHealth(35));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 10.0, y: 10.0 } });
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: StoneChunk, min: 2, max: 5, rate: 1.0)])"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 10.0, y: 10.0 },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: StoneChunk, min: 2, max: 5, rate: 1.0)])"#,
+    ));
     d
 }
-
 
 fn desert_med_boulder3() -> EntityDef {
     let mut d = EntityDef {
@@ -3270,11 +3807,14 @@ fn desert_med_boulder3() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::DesertMedBoulder3);
     d.max_health = Some(MaxHealth(35));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 10.0, y: 10.0 } });
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: StoneChunk, min: 2, max: 5, rate: 1.0)])"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 10.0, y: 10.0 },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: StoneChunk, min: 2, max: 5, rate: 1.0)])"#,
+    ));
     d
 }
-
 
 fn desert_metal_boulder() -> EntityDef {
     let mut d = EntityDef {
@@ -3287,10 +3827,13 @@ fn desert_metal_boulder() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::DesertMetalBoulder);
     d.required_equipment_type = Some(RequiredEquipmentType(EquipmentType::Pickaxe));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 10.0, y: 10.0 } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 10.0, y: 10.0 },
+    });
     d.max_health = Some(MaxHealth(35));
     d.experience_reward = Some(ExperienceReward(20));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [
             (
                 item: StoneChunk,
@@ -3304,10 +3847,10 @@ fn desert_metal_boulder() -> EntityDef {
                 max: 1,
                 rate: 1.
             )]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn desert_skull1() -> EntityDef {
     let mut d = EntityDef {
@@ -3320,11 +3863,14 @@ fn desert_skull1() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::DesertSkull1);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 } });
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: Bones, min: 1, max: 1, rate: 1.0)])"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: Bones, min: 1, max: 1, rate: 1.0)])"#,
+    ));
     d
 }
-
 
 fn desert_skull2() -> EntityDef {
     let mut d = EntityDef {
@@ -3337,11 +3883,14 @@ fn desert_skull2() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::DesertSkull2);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 } });
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: Bones, min: 1, max: 1, rate: 1.0)])"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: Bones, min: 1, max: 1, rate: 1.0)])"#,
+    ));
     d
 }
-
 
 fn desert_skull3() -> EntityDef {
     let mut d = EntityDef {
@@ -3354,11 +3903,14 @@ fn desert_skull3() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::DesertSkull3);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 } });
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: Bones, min: 1, max: 1, rate: 1.0)])"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: Bones, min: 1, max: 1, rate: 1.0)])"#,
+    ));
     d
 }
-
 
 fn desert_skull4() -> EntityDef {
     let mut d = EntityDef {
@@ -3371,11 +3923,14 @@ fn desert_skull4() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::DesertSkull4);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 } });
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: Bones, min: 1, max: 1, rate: 1.0)])"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: Bones, min: 1, max: 1, rate: 1.0)])"#,
+    ));
     d
 }
-
 
 fn desert_sml_boulder1() -> EntityDef {
     let mut d = EntityDef {
@@ -3388,11 +3943,14 @@ fn desert_sml_boulder1() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::DesertSmlBoulder1);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 } });
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: StoneChunk, min: 1, max: 1, rate: 1.0)])"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: StoneChunk, min: 1, max: 1, rate: 1.0)])"#,
+    ));
     d
 }
-
 
 fn desert_sml_boulder2() -> EntityDef {
     let mut d = EntityDef {
@@ -3405,11 +3963,14 @@ fn desert_sml_boulder2() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::DesertSmlBoulder2);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 } });
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: StoneChunk, min: 1, max: 1, rate: 1.0)])"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: StoneChunk, min: 1, max: 1, rate: 1.0)])"#,
+    ));
     d
 }
-
 
 fn desert_sml_boulder3() -> EntityDef {
     let mut d = EntityDef {
@@ -3422,11 +3983,14 @@ fn desert_sml_boulder3() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::DesertSmlBoulder3);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 } });
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: StoneChunk, min: 1, max: 1, rate: 1.0)])"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: StoneChunk, min: 1, max: 1, rate: 1.0)])"#,
+    ));
     d
 }
-
 
 fn desert_sml_boulder4() -> EntityDef {
     let mut d = EntityDef {
@@ -3439,11 +4003,14 @@ fn desert_sml_boulder4() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::DesertSmlBoulder4);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 } });
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: StoneChunk, min: 1, max: 1, rate: 1.0)])"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: StoneChunk, min: 1, max: 1, rate: 1.0)])"#,
+    ));
     d
 }
-
 
 fn desert_sml_boulder5() -> EntityDef {
     let mut d = EntityDef {
@@ -3456,11 +4023,14 @@ fn desert_sml_boulder5() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::DesertSmlBoulder5);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 } });
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: StoneChunk, min: 1, max: 1, rate: 1.0)])"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: StoneChunk, min: 1, max: 1, rate: 1.0)])"#,
+    ));
     d
 }
-
 
 fn desert_sml_boulder6() -> EntityDef {
     let mut d = EntityDef {
@@ -3473,11 +4043,14 @@ fn desert_sml_boulder6() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::DesertSmlBoulder6);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 } });
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: StoneChunk, min: 1, max: 1, rate: 1.0)])"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: StoneChunk, min: 1, max: 1, rate: 1.0)])"#,
+    ));
     d
 }
-
 
 fn dirt_path() -> EntityDef {
     let mut d = EntityDef {
@@ -3493,7 +4066,6 @@ fn dirt_path() -> EntityDef {
     d
 }
 
-
 fn dodge() -> EntityDef {
     let mut d = EntityDef {
         name: "Dodge".into(),
@@ -3506,7 +4078,6 @@ fn dodge() -> EntityDef {
     d.world_object = Some(WorldObject::Dodge);
     d
 }
-
 
 fn dodge_food() -> EntityDef {
     let mut d = EntityDef {
@@ -3522,7 +4093,8 @@ fn dodge_food() -> EntityDef {
     d.world_object = Some(WorldObject::DodgeFood);
     d.item_actions = Some(parse::item_actions(r#"(actions: [GainStat("dodge", 6)])"#));
     d.consumable = Some(ConsumableItem);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: DodgeFood,
         metadata: (
             name: "Dodge Boost", 
@@ -3530,10 +4102,10 @@ fn dodge_food() -> EntityDef {
         ),
         rarity: Rare,
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn dungeon_entrance() -> EntityDef {
     let mut d = EntityDef {
@@ -3547,10 +4119,11 @@ fn dungeon_entrance() -> EntityDef {
     d.world_object = Some(WorldObject::DungeonEntrance);
     d.object_action = Some(parse::object_action(r#"DungeonTeleport"#));
     d.object_action_cost = Some(parse::object_action_cost(r#"Item(Key, 1)"#));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 12., y: 12. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 12., y: 12. },
+    });
     d
 }
-
 
 fn dungeon_entrance_block() -> EntityDef {
     let mut d = EntityDef {
@@ -3564,19 +4137,22 @@ fn dungeon_entrance_block() -> EntityDef {
     d.animation_pos_tracker = Some(AnimationPosTracker(0.0, 0.0, 0.3));
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::DungeonEntranceBlock);
-    d.item_actions = Some(parse::item_actions(r#"(actions: [PlacesInto(DungeonEntrance)])"#));
+    d.item_actions = Some(parse::item_actions(
+        r#"(actions: [PlacesInto(DungeonEntrance)])"#,
+    ));
     d.consumable = Some(ConsumableItem);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: DungeonEntranceBlock,
         metadata: (
             name: "Dungeon Entrance", 
             desc: ["spooky."]
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn dungeon_exit() -> EntityDef {
     let mut d = EntityDef {
@@ -3589,10 +4165,11 @@ fn dungeon_exit() -> EntityDef {
     d.y_sort = Some(YSort(-0.05));
     d.world_object = Some(WorldObject::DungeonExit);
     d.object_action = Some(parse::object_action(r#"DungeonExit"#));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 7., y: 7. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 7., y: 7. },
+    });
     d
 }
-
 
 fn electricity() -> EntityDef {
     let mut d = EntityDef {
@@ -3602,14 +4179,22 @@ fn electricity() -> EntityDef {
     };
     d.sensor = true;
     d.y_sort = Some(YSort(0.));
-    d.sprite_sheet = Some(SpriteSheetDef { asset: "textures/effects/electricity.png".into(), size: Vec2::new(48., 16.), cols: 7, rows: 1 });
+    d.sprite_sheet = Some(SpriteSheetDef {
+        asset: "textures/effects/electricity.png".into(),
+        size: Vec2::new(48., 16.),
+        cols: 7,
+        rows: 1,
+    });
     d.projectile = Some(Projectile::Electricity);
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 24., y: 8. } });
-    d.projectile_state = Some(parse::projectile_state(r#"(speed: 0., direction: (x: 0., y: 0.), hit_entities: [], despawn_on_hit: false)"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 24., y: 8. },
+    });
+    d.projectile_state = Some(parse::projectile_state(
+        r#"(speed: 0., direction: (x: 0., y: 0.), hit_entities: [], despawn_on_hit: false)"#,
+    ));
     d.done_animation = true;
     d
 }
-
 
 fn energy_ball() -> EntityDef {
     let mut d = EntityDef {
@@ -3619,13 +4204,21 @@ fn energy_ball() -> EntityDef {
     };
     d.sensor = true;
     d.y_sort = Some(YSort(0.));
-    d.sprite_sheet = Some(SpriteSheetDef { asset: "bevy_survival_sprites.png".into(), size: Vec2::new(16., 16.), cols: 16, rows: 16 });
+    d.sprite_sheet = Some(SpriteSheetDef {
+        asset: "bevy_survival_sprites.png".into(),
+        size: Vec2::new(16., 16.),
+        cols: 16,
+        rows: 16,
+    });
     d.projectile = Some(Projectile::EnergyBall);
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 6., y: 6. } });
-    d.projectile_state = Some(parse::projectile_state(r#"(speed: 0., direction: (x: 1., y: 0.), hit_entities: [], despawn_on_hit: true)"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 6., y: 6. },
+    });
+    d.projectile_state = Some(parse::projectile_state(
+        r#"(speed: 0., direction: (x: 1., y: 0.), hit_entities: [], despawn_on_hit: true)"#,
+    ));
     d
 }
-
 
 fn era2_berry_bush() -> EntityDef {
     let mut d = EntityDef {
@@ -3639,18 +4232,21 @@ fn era2_berry_bush() -> EntityDef {
     d.world_object = Some(WorldObject::Era2BerryBush);
     d.max_health = Some(MaxHealth(1));
     d.experience_reward = Some(ExperienceReward(5));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 6., y: 6. } });
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 6., y: 6. },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
                 item: Berries,
                 min: 1,
                 max: 1,
                 rate: 1.
             ),]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn era2_boulder() -> EntityDef {
     let mut d = EntityDef {
@@ -3663,10 +4259,19 @@ fn era2_boulder() -> EntityDef {
     d.y_sort = Some(YSort(-0.02));
     d.world_object = Some(WorldObject::Era2Boulder);
     d.required_equipment_type = Some(RequiredEquipmentType(EquipmentType::Pickaxe));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: 2., y1: -2., x2: 2., y2: -1., r: 8. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: 2.,
+            y1: -2.,
+            x2: 2.,
+            y2: -1.,
+            r: 8.,
+        },
+    });
     d.max_health = Some(MaxHealth(35));
     d.experience_reward = Some(ExperienceReward(10));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [
             (
                 item: StoneChunk,
@@ -3674,10 +4279,10 @@ fn era2_boulder() -> EntityDef {
                 max: 5,
                 rate: 1.
             )]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn era2_boulder2() -> EntityDef {
     let mut d = EntityDef {
@@ -3690,10 +4295,19 @@ fn era2_boulder2() -> EntityDef {
     d.y_sort = Some(YSort(-0.025));
     d.world_object = Some(WorldObject::Era2Boulder2);
     d.required_equipment_type = Some(RequiredEquipmentType(EquipmentType::Pickaxe));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: -1., y1: -1., x2: 2., y2: -1., r: 8. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: -1.,
+            y1: -1.,
+            x2: 2.,
+            y2: -1.,
+            r: 8.,
+        },
+    });
     d.max_health = Some(MaxHealth(35));
     d.experience_reward = Some(ExperienceReward(20));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [
             (
                 item: StoneChunk,
@@ -3701,10 +4315,10 @@ fn era2_boulder2() -> EntityDef {
                 max: 5,
                 rate: 1.
             )]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn era2_brown_mushroom() -> EntityDef {
     let mut d = EntityDef {
@@ -3718,17 +4332,18 @@ fn era2_brown_mushroom() -> EntityDef {
     d.world_object = Some(WorldObject::Era2BrownMushroom);
     d.max_health = Some(MaxHealth(1));
     d.experience_reward = Some(ExperienceReward(5));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
                 item: BrownMushroomBlock,
                 min: 1,
                 max: 1,
                 rate: 1.
             ),]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn era2_brown_mushroom_block() -> EntityDef {
     let mut d = EntityDef {
@@ -3744,17 +4359,18 @@ fn era2_brown_mushroom_block() -> EntityDef {
     d.world_object = Some(WorldObject::Era2BrownMushroomBlock);
     d.item_actions = Some(parse::item_actions(r#"(actions: [Eat(10)])"#));
     d.consumable = Some(ConsumableItem);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: Era2BrownMushroomBlock,
         metadata: (
             name: "Brown Mushroom", 
             desc: ["Mmmm!"]
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn era2_coal_boulder() -> EntityDef {
     let mut d = EntityDef {
@@ -3767,10 +4383,13 @@ fn era2_coal_boulder() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::Era2CoalBoulder);
     d.required_equipment_type = Some(RequiredEquipmentType(EquipmentType::Pickaxe));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 9., y: 7. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 9., y: 7. },
+    });
     d.max_health = Some(MaxHealth(85));
     d.experience_reward = Some(ExperienceReward(25));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [
             (
             item: StoneChunk,
@@ -3778,10 +4397,10 @@ fn era2_coal_boulder() -> EntityDef {
                 max: 4,
                 rate: 0.75
             )]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn era2_dead_branch() -> EntityDef {
     let mut d = EntityDef {
@@ -3793,21 +4412,24 @@ fn era2_dead_branch() -> EntityDef {
     d.sprite_anchor = Some(SpriteAnchor(parse::vec2(r#"((x: 0., y: 0.))"#)));
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::Era2DeadBranch);
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 },
+    });
     d.sensor = true;
     d.max_health = Some(MaxHealth(1));
     d.experience_reward = Some(ExperienceReward(5));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
                 item: Stick,
                 min: 1,
                 max: 1,
                 rate: 0.4 
             ),]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn era2_grass() -> EntityDef {
     let mut d = EntityDef {
@@ -3820,17 +4442,18 @@ fn era2_grass() -> EntityDef {
     d.y_sort = Some(YSort(-0.01));
     d.world_object = Some(WorldObject::Era2Grass);
     d.max_health = Some(MaxHealth(1));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
                 item: PlantFibre,
                 min: 1,
                 max: 1,
                 rate: 0.3
             ),]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn era2_grass2() -> EntityDef {
     let mut d = EntityDef {
@@ -3843,17 +4466,18 @@ fn era2_grass2() -> EntityDef {
     d.y_sort = Some(YSort(-0.01));
     d.world_object = Some(WorldObject::Era2Grass2);
     d.max_health = Some(MaxHealth(1));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
                 item: PlantFibre,
                 min: 1,
                 max: 1,
                 rate: 0.3
             ),]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn era2_grass3() -> EntityDef {
     let mut d = EntityDef {
@@ -3866,17 +4490,18 @@ fn era2_grass3() -> EntityDef {
     d.y_sort = Some(YSort(-0.01));
     d.world_object = Some(WorldObject::Era2Grass3);
     d.max_health = Some(MaxHealth(1));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
                 item: PlantFibre,
                 min: 1,
                 max: 1,
                 rate: 0.3
             ),]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn era2_large_tree() -> EntityDef {
     let mut d = EntityDef {
@@ -3890,11 +4515,20 @@ fn era2_large_tree() -> EntityDef {
     d.foliage_size = Some(FoliageSize(parse::vec2(r#"((x: 80., y: 112.))"#)));
     d.sprite_anchor = Some(SpriteAnchor(parse::vec2(r#"((x: 0., y: 32.))"#)));
     d.required_equipment_type = Some(RequiredEquipmentType(EquipmentType::Axe));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: 0., y1: -30., x2: 0., y2: -22., r: 4. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: 0.,
+            y1: -30.,
+            x2: 0.,
+            y2: -22.,
+            r: 4.,
+        },
+    });
     d.max_health = Some(MaxHealth(35));
     d.y_sort = Some(YSort(0.));
     d.experience_reward = Some(ExperienceReward(15));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [
             (
                 item: Log,
@@ -3920,10 +4554,10 @@ fn era2_large_tree() -> EntityDef {
                 max: 3,
                 rate: 0.25
             )]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn era2_magic_boulder() -> EntityDef {
     let mut d = EntityDef {
@@ -3936,10 +4570,13 @@ fn era2_magic_boulder() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::Era2MagicBoulder);
     d.required_equipment_type = Some(RequiredEquipmentType(EquipmentType::Pickaxe));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 9., y: 9. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 9., y: 9. },
+    });
     d.max_health = Some(MaxHealth(100));
     d.experience_reward = Some(ExperienceReward(35));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [
             (
                 item: StoneChunk,
@@ -3953,10 +4590,10 @@ fn era2_magic_boulder() -> EntityDef {
                 max: 1,
                 rate: 1.
             )]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn era2_medium_tree() -> EntityDef {
     let mut d = EntityDef {
@@ -3970,11 +4607,20 @@ fn era2_medium_tree() -> EntityDef {
     d.foliage_size = Some(FoliageSize(parse::vec2(r#"((x: 64., y: 96.))"#)));
     d.sprite_anchor = Some(SpriteAnchor(parse::vec2(r#"((x: 0., y: 32.))"#)));
     d.required_equipment_type = Some(RequiredEquipmentType(EquipmentType::Axe));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: 0., y1: -30., x2: 0., y2: -22., r: 4. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: 0.,
+            y1: -30.,
+            x2: 0.,
+            y2: -22.,
+            r: 4.,
+        },
+    });
     d.max_health = Some(MaxHealth(35));
     d.y_sort = Some(YSort(0.));
     d.experience_reward = Some(ExperienceReward(15));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
                 item: Log,
                 min: 1,
@@ -3999,10 +4645,10 @@ fn era2_medium_tree() -> EntityDef {
                 max: 3,
                 rate: 0.25
             )]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn era2_pebble() -> EntityDef {
     let mut d = EntityDef {
@@ -4015,19 +4661,22 @@ fn era2_pebble() -> EntityDef {
     d.y_sort = Some(YSort(-0.01));
     d.world_object = Some(WorldObject::Era2Pebble);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 },
+    });
     d.experience_reward = Some(ExperienceReward(5));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
                 item: StoneChunk,
                 min: 1,
                 max: 1,
                 rate: 1.
             ),]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn era2_red_flower() -> EntityDef {
     let mut d = EntityDef {
@@ -4041,17 +4690,18 @@ fn era2_red_flower() -> EntityDef {
     d.world_object = Some(WorldObject::Era2RedFlower);
     d.max_health = Some(MaxHealth(1));
     d.experience_reward = Some(ExperienceReward(5));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
                 item: Era2RedFlowerBlock,
                 min: 1,
                 max: 1,
                 rate: 1.
             ),]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn era2_red_flower_block() -> EntityDef {
     let mut d = EntityDef {
@@ -4066,17 +4716,18 @@ fn era2_red_flower_block() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::Era2RedFlowerBlock);
     d.consumable = Some(ConsumableItem);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: Era2RedFlowerBlock,
         metadata: (
             name: "Red Flower", 
             desc: ["Mmmm!"]
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn era2_red_mushroom() -> EntityDef {
     let mut d = EntityDef {
@@ -4090,17 +4741,18 @@ fn era2_red_mushroom() -> EntityDef {
     d.world_object = Some(WorldObject::Era2RedMushroom);
     d.max_health = Some(MaxHealth(1));
     d.experience_reward = Some(ExperienceReward(5));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
                 item: Era2RedMushroomBlock,
                 min: 1,
                 max: 1,
                 rate: 1.
             ),]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn era2_red_mushroom_block() -> EntityDef {
     let mut d = EntityDef {
@@ -4116,17 +4768,18 @@ fn era2_red_mushroom_block() -> EntityDef {
     d.world_object = Some(WorldObject::Era2RedMushroomBlock);
     d.item_actions = Some(parse::item_actions(r#"(actions: [ModifyHealth(5)])"#));
     d.consumable = Some(ConsumableItem);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: Era2RedMushroomBlock,
         metadata: (
             name: "Red Mushroom", 
             desc: ["Mmmm!"]
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn era2_small_tree() -> EntityDef {
     let mut d = EntityDef {
@@ -4140,11 +4793,20 @@ fn era2_small_tree() -> EntityDef {
     d.foliage_size = Some(FoliageSize(parse::vec2(r#"((x: 48., y: 96.))"#)));
     d.sprite_anchor = Some(SpriteAnchor(parse::vec2(r#"((x: 0., y: 32.))"#)));
     d.required_equipment_type = Some(RequiredEquipmentType(EquipmentType::Axe));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: 0., y1: -30., x2: 0., y2: -22., r: 4. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: 0.,
+            y1: -30.,
+            x2: 0.,
+            y2: -22.,
+            r: 4.,
+        },
+    });
     d.max_health = Some(MaxHealth(35));
     d.y_sort = Some(YSort(0.));
     d.experience_reward = Some(ExperienceReward(15));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
                 item: Log,
                 min: 1,
@@ -4169,10 +4831,10 @@ fn era2_small_tree() -> EntityDef {
                 max: 3,
                 rate: 0.25
             )]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn era2_stump() -> EntityDef {
     let mut d = EntityDef {
@@ -4185,10 +4847,13 @@ fn era2_stump() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::Era2Stump);
     d.required_equipment_type = Some(RequiredEquipmentType(EquipmentType::Axe));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 5., y: 5. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 5., y: 5. },
+    });
     d.max_health = Some(MaxHealth(20));
     d.experience_reward = Some(ExperienceReward(8));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
                 item: Log,
                 min: 1,
@@ -4200,10 +4865,10 @@ fn era2_stump() -> EntityDef {
                 max: 1,
                 rate: 0.3
             )]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn era2_stump2() -> EntityDef {
     let mut d = EntityDef {
@@ -4216,10 +4881,13 @@ fn era2_stump2() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::Era2Stump2);
     d.required_equipment_type = Some(RequiredEquipmentType(EquipmentType::Axe));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 5., y: 5. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 5., y: 5. },
+    });
     d.max_health = Some(MaxHealth(20));
     d.experience_reward = Some(ExperienceReward(8));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
                 item: Log,
                 min: 1,
@@ -4231,10 +4899,10 @@ fn era2_stump2() -> EntityDef {
                 max: 1,
                 rate: 0.3
             )]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn era2_white_flower() -> EntityDef {
     let mut d = EntityDef {
@@ -4248,17 +4916,18 @@ fn era2_white_flower() -> EntityDef {
     d.world_object = Some(WorldObject::Era2WhiteFlower);
     d.max_health = Some(MaxHealth(1));
     d.experience_reward = Some(ExperienceReward(10));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
                 item: Era2WhiteFlowerBlock,
                 min: 1,
                 max: 1,
                 rate: 1.
             ),]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn era2_white_flower_block() -> EntityDef {
     let mut d = EntityDef {
@@ -4273,17 +4942,18 @@ fn era2_white_flower_block() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::Era2WhiteFlowerBlock);
     d.consumable = Some(ConsumableItem);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: Era2WhiteFlowerBlock,
         metadata: (
             name: "White Flower", 
             desc: ["Mmmm!"]
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn essence() -> EntityDef {
     let mut d = EntityDef {
@@ -4298,17 +4968,18 @@ fn essence() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::Essence);
     d.item_actions = Some(parse::item_actions(r#"(actions: [Essence])"#));
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: Essence,
         metadata: (
             name: "Essence", 
             desc: ["Essence of the", "Forrest. Can", "be spent to", "aid you."]
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn fairy() -> EntityDef {
     let mut d = EntityDef {
@@ -4322,11 +4993,18 @@ fn fairy() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.combat_alignment = Some(CombatAlignment::Passive);
     d.idle_state = Some((2., 0.3));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: 0., y1: -1., x2: 0., y2: -1.5, r: 5. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: 0.,
+            y1: -1.,
+            x2: 0.,
+            y2: -1.5,
+            r: 5.,
+        },
+    });
     d.max_health = Some(MaxHealth(100));
     d
 }
-
 
 fn fairy_pet() -> EntityDef {
     let mut d = EntityDef {
@@ -4342,7 +5020,6 @@ fn fairy_pet() -> EntityDef {
     d
 }
 
-
 fn feather() -> EntityDef {
     let mut d = EntityDef {
         name: "Feather".into(),
@@ -4355,17 +5032,18 @@ fn feather() -> EntityDef {
     d.animation_pos_tracker = Some(AnimationPosTracker(0.0, 0.0, 0.3));
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::Feather);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: Feather,
         metadata: (
             name: "Feather ", 
             desc: ["Very fluffy.", "Useful in crafting."]
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn fire_attack() -> EntityDef {
     let mut d = EntityDef {
@@ -4375,15 +5053,29 @@ fn fire_attack() -> EntityDef {
     };
     d.sensor = true;
     d.y_sort = Some(YSort(0.));
-    d.sprite_sheet = Some(SpriteSheetDef { asset: "textures/effects/FireAttack.png".into(), size: Vec2::new(16., 26.), cols: 6, rows: 1 });
+    d.sprite_sheet = Some(SpriteSheetDef {
+        asset: "textures/effects/FireAttack.png".into(),
+        size: Vec2::new(16., 26.),
+        cols: 6,
+        rows: 1,
+    });
     d.projectile = Some(Projectile::FireAttack);
-    d.projectile_state = Some(parse::projectile_state(r#"(speed: 0., direction: (x: 0., y: 0.), hit_entities: [], spawn_offset: (x: -10., y: -20.), despawn_on_hit: false)"#));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: 4., y1: 10., x2: 4., y2: -10., r: 7. } });
+    d.projectile_state = Some(parse::projectile_state(
+        r#"(speed: 0., direction: (x: 0., y: 0.), hit_entities: [], spawn_offset: (x: -10., y: -20.), despawn_on_hit: false)"#,
+    ));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: 4.,
+            y1: 10.,
+            x2: 4.,
+            y2: -10.,
+            r: 7.,
+        },
+    });
     d.done_animation = true;
     d.animation_timer = Some(AnimationTimerDef { secs: 0.05 });
     d
 }
-
 
 fn fireball() -> EntityDef {
     let mut d = EntityDef {
@@ -4393,14 +5085,22 @@ fn fireball() -> EntityDef {
     };
     d.sensor = true;
     d.y_sort = Some(YSort(0.));
-    d.sprite_sheet = Some(SpriteSheetDef { asset: "bevy_survival_sprites.png".into(), size: Vec2::new(16., 16.), cols: 16, rows: 16 });
+    d.sprite_sheet = Some(SpriteSheetDef {
+        asset: "bevy_survival_sprites.png".into(),
+        size: Vec2::new(16., 16.),
+        cols: 16,
+        rows: 16,
+    });
     d.world_object = Some(WorldObject::Fireball);
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 5., y: 5. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 5., y: 5. },
+    });
     d.projectile = Some(Projectile::Fireball);
-    d.projectile_state = Some(parse::projectile_state(r#"(speed: 200., direction: (x: 0., y: 0.), hit_entities: [], despawn_on_hit: true)"#));
+    d.projectile_state = Some(parse::projectile_state(
+        r#"(speed: 200., direction: (x: 0., y: 0.), hit_entities: [], despawn_on_hit: true)"#,
+    ));
     d
 }
-
 
 fn fire_explosion_aoe() -> EntityDef {
     let mut d = EntityDef {
@@ -4410,15 +5110,23 @@ fn fire_explosion_aoe() -> EntityDef {
     };
     d.sensor = true;
     d.y_sort = Some(YSort(0.));
-    d.sprite_sheet = Some(SpriteSheetDef { asset: "textures/effects/fireexplosionaoe.png".into(), size: Vec2::new(64., 64.), cols: 4, rows: 1 });
+    d.sprite_sheet = Some(SpriteSheetDef {
+        asset: "textures/effects/fireexplosionaoe.png".into(),
+        size: Vec2::new(64., 64.),
+        cols: 4,
+        rows: 1,
+    });
     d.projectile = Some(Projectile::IceExplosionAOE);
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 26., y: 26. } });
-    d.projectile_state = Some(parse::projectile_state(r#"(speed: 0., direction: (x: 0., y: 0.), hit_entities: [], despawn_on_hit: false)"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 26., y: 26. },
+    });
+    d.projectile_state = Some(parse::projectile_state(
+        r#"(speed: 0., direction: (x: 0., y: 0.), hit_entities: [], despawn_on_hit: false)"#,
+    ));
     d.done_animation = true;
     d.animation_timer = Some(AnimationTimerDef { secs: 0.1 });
     d
 }
-
 
 fn fire_ring() -> EntityDef {
     let mut d = EntityDef {
@@ -4428,14 +5136,22 @@ fn fire_ring() -> EntityDef {
     };
     d.sensor = true;
     d.y_sort = Some(YSort(-0.15));
-    d.sprite_sheet = Some(SpriteSheetDef { asset: "textures/effects/firering.png".into(), size: Vec2::new(64., 64.), cols: 14, rows: 1 });
+    d.sprite_sheet = Some(SpriteSheetDef {
+        asset: "textures/effects/firering.png".into(),
+        size: Vec2::new(64., 64.),
+        cols: 14,
+        rows: 1,
+    });
     d.projectile = Some(Projectile::FireRing);
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 24., y: 24. } });
-    d.projectile_state = Some(parse::projectile_state(r#"(speed: 0., direction: (x: 0., y: 0.), hit_entities: [], despawn_on_hit: false)"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 24., y: 24. },
+    });
+    d.projectile_state = Some(parse::projectile_state(
+        r#"(speed: 0., direction: (x: 0., y: 0.), hit_entities: [], despawn_on_hit: false)"#,
+    ));
     d.animation_timer = Some(AnimationTimerDef { secs: 0.09 });
     d
 }
-
 
 fn fire_staff() -> EntityDef {
     let mut d = EntityDef {
@@ -4450,10 +5166,13 @@ fn fire_staff() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::FireStaff);
     d.equipment_type = Some(EquipmentType::Weapon);
-    d.raw_item_base = Some(parse::raw_item_base(r#"(
+    d.raw_item_base = Some(parse::raw_item_base(
+        r#"(
         attack: Some((start: 10, end: 16)),
-  )"#));
-    d.raw_item_bonus = Some(parse::raw_item_bonus(r#"(
+  )"#,
+    ));
+    d.raw_item_bonus = Some(parse::raw_item_bonus(
+        r#"(
         crit_damage: Some((start: 8, end: 16)),
         crit_chance: Some((start: 6, end: 12)),
         speed: Some((start: 6, end: 10)),
@@ -4469,10 +5188,12 @@ fn fire_staff() -> EntityDef {
         mana: Some((start: 18, end: 30)),
         mana_regen: Some((start: 4, end: 8)),
         attack_speed: Some((start: 6, end: 10)),
-  )"#));
+  )"#,
+    ));
     d.melee = Some(MeleeAttack);
     d.ranged = Some(RangedAttack(Projectile::Fireball));
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: FireStaff,
         attributes: (
             attack_cooldown: 0.45
@@ -4482,11 +5203,13 @@ fn fire_staff() -> EntityDef {
             desc: ["A Fire Staff."]
         ),
         count: 1
-  )"#));
-    d.scraps_into = Some(parse::scraps_into(r#"([(obj: Log, chance: 1.), (obj: Log, chance: 0.5)])"#));
+  )"#,
+    ));
+    d.scraps_into = Some(parse::scraps_into(
+        r#"([(obj: Log, chance: 1.), (obj: Log, chance: 0.5)])"#,
+    ));
     d
 }
-
 
 fn flint() -> EntityDef {
     let mut d = EntityDef {
@@ -4500,17 +5223,18 @@ fn flint() -> EntityDef {
     d.animation_pos_tracker = Some(AnimationPosTracker(0.0, 0.0, 0.3));
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::Flint);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: Flint,
         metadata: (
             name: "Stone Shard ", 
             desc: ["A chipped piece", "of Stone."]
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn flower_cactus1() -> EntityDef {
     let mut d = EntityDef {
@@ -4523,11 +5247,14 @@ fn flower_cactus1() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::FlowerCactus1);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 } });
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: CactusFlower, min: 1, max: 1, rate: 1.0)])"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: CactusFlower, min: 1, max: 1, rate: 1.0)])"#,
+    ));
     d
 }
-
 
 fn flower_cactus2() -> EntityDef {
     let mut d = EntityDef {
@@ -4540,11 +5267,14 @@ fn flower_cactus2() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::FlowerCactus2);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 } });
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: CactusFlower, min: 1, max: 1, rate: 1.0)])"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: CactusFlower, min: 1, max: 1, rate: 1.0)])"#,
+    ));
     d
 }
-
 
 fn flower_cactus3() -> EntityDef {
     let mut d = EntityDef {
@@ -4557,11 +5287,14 @@ fn flower_cactus3() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::FlowerCactus3);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 } });
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: CactusFlower, min: 1, max: 1, rate: 1.0)])"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: CactusFlower, min: 1, max: 1, rate: 1.0)])"#,
+    ));
     d
 }
-
 
 fn flower_cactus4() -> EntityDef {
     let mut d = EntityDef {
@@ -4574,11 +5307,14 @@ fn flower_cactus4() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::FlowerCactus4);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 } });
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: CactusFlower, min: 1, max: 1, rate: 1.0)])"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: CactusFlower, min: 1, max: 1, rate: 1.0)])"#,
+    ));
     d
 }
-
 
 fn forest_pants() -> EntityDef {
     let mut d = EntityDef {
@@ -4592,11 +5328,14 @@ fn forest_pants() -> EntityDef {
     d.animation_pos_tracker = Some(AnimationPosTracker(0.0, 0.0, 0.3));
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::ForestPants);
-    d.raw_item_base = Some(parse::raw_item_base(r#"(
+    d.raw_item_base = Some(parse::raw_item_base(
+        r#"(
         health: Some((start: 18, end: 25)),
         defence: Some((start: 12, end: 18)),
-  )"#));
-    d.raw_item_bonus = Some(parse::raw_item_bonus(r#"(
+  )"#,
+    ));
+    d.raw_item_bonus = Some(parse::raw_item_bonus(
+        r#"(
         crit_damage: Some((start: 12, end: 18)),
         crit_chance: Some((start: 8, end: 13)),
         speed: Some((start: 10, end: 17)),
@@ -4613,20 +5352,22 @@ fn forest_pants() -> EntityDef {
         bonus_damage: Some((start: 5, end: 10)),
         pickup_range: Some((start: 15, end: 30)),
         skill_power: Some((start: 8, end: 16)),
-  )"#));
+  )"#,
+    ));
     d.equipment_type = Some(EquipmentType::Legs);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: ForestPants,
         metadata: (
             name: "Forest Pants", 
             desc: ["Nice."]
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d.scraps_into = Some(parse::scraps_into(r#"([])"#));
     d
 }
-
 
 fn forest_shirt() -> EntityDef {
     let mut d = EntityDef {
@@ -4640,11 +5381,14 @@ fn forest_shirt() -> EntityDef {
     d.animation_pos_tracker = Some(AnimationPosTracker(0.0, 0.0, 0.3));
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::ForestShirt);
-    d.raw_item_base = Some(parse::raw_item_base(r#"(
+    d.raw_item_base = Some(parse::raw_item_base(
+        r#"(
       health: Some((start: 22, end: 30)),
         defence: Some((start: 14, end: 20)),
-  )"#));
-    d.raw_item_bonus = Some(parse::raw_item_bonus(r#"(
+  )"#,
+    ));
+    d.raw_item_bonus = Some(parse::raw_item_bonus(
+        r#"(
        crit_damage: Some((start: 12, end: 18)),
         crit_chance: Some((start: 8, end: 13)),
         speed: Some((start: 10, end: 17)),
@@ -4661,20 +5405,22 @@ fn forest_shirt() -> EntityDef {
         bonus_damage: Some((start: 5, end: 10)),
         pickup_range: Some((start: 15, end: 30)),
         skill_power: Some((start: 8, end: 16)),
-  )"#));
+  )"#,
+    ));
     d.equipment_type = Some(EquipmentType::Chest);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: ForestShirt,
         metadata: (
             name: "Forest Shirt", 
             desc: ["Nice."]
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d.scraps_into = Some(parse::scraps_into(r#"([])"#));
     d
 }
-
 
 fn forest_shoes() -> EntityDef {
     let mut d = EntityDef {
@@ -4688,11 +5434,14 @@ fn forest_shoes() -> EntityDef {
     d.animation_pos_tracker = Some(AnimationPosTracker(0.0, 0.0, 0.3));
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::ForestShoes);
-    d.raw_item_base = Some(parse::raw_item_base(r#"(
+    d.raw_item_base = Some(parse::raw_item_base(
+        r#"(
         health: Some((start: 18, end: 25)),
         defence: Some((start: 12, end: 18)),
-  )"#));
-    d.raw_item_bonus = Some(parse::raw_item_bonus(r#"(
+  )"#,
+    ));
+    d.raw_item_bonus = Some(parse::raw_item_bonus(
+        r#"(
         crit_damage: Some((start: 12, end: 18)),
         crit_chance: Some((start: 8, end: 13)),
         speed: Some((start: 16, end: 24)),
@@ -4709,20 +5458,22 @@ fn forest_shoes() -> EntityDef {
         bonus_damage: Some((start: 5, end: 10)),
         pickup_range: Some((start: 15, end: 30)),
         skill_power: Some((start: 8, end: 16)),
-  )"#));
+  )"#,
+    ));
     d.equipment_type = Some(EquipmentType::Feet);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: ForestShoes,
         metadata: (
             name: "Forest Shoes", 
             desc: ["Nice."]
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d.scraps_into = Some(parse::scraps_into(r#"([])"#));
     d
 }
-
 
 fn fur_devil() -> EntityDef {
     let mut d = EntityDef {
@@ -4738,15 +5489,38 @@ fn fur_devil() -> EntityDef {
     d.combat_alignment = Some(CombatAlignment::Hostile);
     d.follow_speed = Some(FollowSpeed(0.27));
     d.enemy_anim_state = Some(EnemyAnimationState::Walk);
-    d.leap_attack = Some(LeapAttack { activation_distance: 24., startup: 0.25, duration: 0.42, cooldown: 0.7, speed: 95. });
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: 0., y1: -1., x2: 0., y2: -1.5, r: 5.5 } });
-    d.sprite_sheet = Some(SpriteSheetDef { asset: "textures/furdevil/furdevil_down.png".into(), size: Vec2::new(32., 32.), cols: 8, rows: 6 });
+    d.leap_attack = Some(LeapAttack {
+        activation_distance: 24.,
+        startup: 0.25,
+        duration: 0.42,
+        cooldown: 0.7,
+        speed: 95.,
+    });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: 0.,
+            y1: -1.,
+            x2: 0.,
+            y2: -1.5,
+            r: 5.5,
+        },
+    });
+    d.sprite_sheet = Some(SpriteSheetDef {
+        asset: "textures/furdevil/furdevil_down.png".into(),
+        size: Vec2::new(32., 32.),
+        cols: 8,
+        rows: 6,
+    });
     d.animation_timer = Some(AnimationTimerDef { secs: 0.06 });
-    d.anim_sprite_sheet_data = Some(CharacterAnimationSpriteSheetData { animation_frames: vec![4,6,4,8,7], anim_offset: 0 });
+    d.anim_sprite_sheet_data = Some(CharacterAnimationSpriteSheetData {
+        animation_frames: vec![4, 6, 4, 8, 7],
+        anim_offset: 0,
+    });
     d.max_health = Some(MaxHealth(10));
     d.attack = Some(Attack(8));
     d.experience_reward = Some(ExperienceReward(20));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
                 item: SmallPotion,
                 min: 1,
@@ -4826,10 +5600,10 @@ fn fur_devil() -> EntityDef {
                 rate: 0.00007
             ),
             ]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn fur_devil_card() -> EntityDef {
     let mut d = EntityDef {
@@ -4843,7 +5617,8 @@ fn fur_devil_card() -> EntityDef {
     d.animation_pos_tracker = Some(AnimationPosTracker(0.0, 0.0, 0.3));
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::FurDevilCard);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: FurDevilCard,
         metadata: (
             name: "Fur Devil Card",
@@ -4851,10 +5626,10 @@ fn fur_devil_card() -> EntityDef {
         ),
         rarity: Common,
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn furnace() -> EntityDef {
     let mut d = EntityDef {
@@ -4867,19 +5642,22 @@ fn furnace() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::Furnace);
     d.object_action = Some(parse::object_action(r#"Furnace"#));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 4., y: 6. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 4., y: 6. },
+    });
     d.max_health = Some(MaxHealth(25));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
                 item: FurnaceBlock,
                 min: 1,
                 max: 1,
                 rate: 1.
             ),]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn furnace_block() -> EntityDef {
     let mut d = EntityDef {
@@ -4895,17 +5673,18 @@ fn furnace_block() -> EntityDef {
     d.world_object = Some(WorldObject::FurnaceBlock);
     d.item_actions = Some(parse::item_actions(r#"(actions: [PlacesInto(Furnace)])"#));
     d.consumable = Some(ConsumableItem);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: FurnaceBlock,
         metadata: (
             name: "Furnace", 
             desc: ["Allows you to", "smelt or cook raw", "food."]
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn fury_kunai() -> EntityDef {
     let mut d = EntityDef {
@@ -4915,14 +5694,22 @@ fn fury_kunai() -> EntityDef {
     };
     d.sensor = true;
     d.y_sort = Some(YSort(0.));
-    d.sprite_sheet = Some(SpriteSheetDef { asset: "bevy_survival_sprites.png".into(), size: Vec2::new(16., 16.), cols: 16, rows: 16 });
+    d.sprite_sheet = Some(SpriteSheetDef {
+        asset: "bevy_survival_sprites.png".into(),
+        size: Vec2::new(16., 16.),
+        cols: 16,
+        rows: 16,
+    });
     d.world_object = Some(WorldObject::FuryKunai);
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 5., y: 5. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 5., y: 5. },
+    });
     d.projectile = Some(Projectile::FuryKunai);
-    d.projectile_state = Some(parse::projectile_state(r#"(speed: 250., direction: (x: 0., y: 0.), hit_entities: [], despawn_on_hit: true)"#));
+    d.projectile_state = Some(parse::projectile_state(
+        r#"(speed: 250., direction: (x: 0., y: 0.), hit_entities: [], despawn_on_hit: true)"#,
+    ));
     d
 }
-
 
 fn gamble_shrine() -> EntityDef {
     let mut d = EntityDef {
@@ -4935,10 +5722,17 @@ fn gamble_shrine() -> EntityDef {
     d.sprite_size = Some(SpriteSize::Small);
     d.sprite_anchor = Some(SpriteAnchor(parse::vec2(r#"((x: 0., y: 24.))"#)));
     d.y_sort = Some(YSort(0.));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: -10., y1: -24., x2: 10., y2: -24., r: 7. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: -10.,
+            y1: -24.,
+            x2: 10.,
+            y2: -24.,
+            r: 7.,
+        },
+    });
     d
 }
-
 
 fn gamble_shrine_done() -> EntityDef {
     let mut d = EntityDef {
@@ -4950,10 +5744,17 @@ fn gamble_shrine_done() -> EntityDef {
     d.sprite_size = Some(SpriteSize::Small);
     d.sprite_anchor = Some(SpriteAnchor(parse::vec2(r#"((x: 0., y: 24.))"#)));
     d.y_sort = Some(YSort(0.));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: -10., y1: -24., x2: 10., y2: -24., r: 7. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: -10.,
+            y1: -24.,
+            x2: 10.,
+            y2: -24.,
+            r: 7.,
+        },
+    });
     d
 }
-
 
 fn grass() -> EntityDef {
     let mut d = EntityDef {
@@ -4966,17 +5767,18 @@ fn grass() -> EntityDef {
     d.y_sort = Some(YSort(-0.01));
     d.world_object = Some(WorldObject::Grass);
     d.max_health = Some(MaxHealth(1));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
                 item: PlantFibre,
                 min: 1,
                 max: 1,
                 rate: 0.75
             ),]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn grass2() -> EntityDef {
     let mut d = EntityDef {
@@ -4989,17 +5791,18 @@ fn grass2() -> EntityDef {
     d.y_sort = Some(YSort(-0.01));
     d.world_object = Some(WorldObject::Grass2);
     d.max_health = Some(MaxHealth(1));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
                 item: PlantFibre,
                 min: 1,
                 max: 1,
                 rate: 0.75
             ),]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn grass3() -> EntityDef {
     let mut d = EntityDef {
@@ -5012,17 +5815,18 @@ fn grass3() -> EntityDef {
     d.y_sort = Some(YSort(-0.01));
     d.world_object = Some(WorldObject::Grass3);
     d.max_health = Some(MaxHealth(1));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
                 item: PlantFibre,
                 min: 1,
                 max: 1,
                 rate: 0.75
             ),]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn grass_block() -> EntityDef {
     let mut d = EntityDef {
@@ -5038,17 +5842,18 @@ fn grass_block() -> EntityDef {
     d.world_object = Some(WorldObject::GrassBlock);
     d.item_actions = Some(parse::item_actions(r#"(actions: [PlacesInto(Grass)])"#));
     d.consumable = Some(ConsumableItem);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: GrassBlock,
         metadata: (
             name: "Grass", 
             desc: ["grass."]
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn green_cape() -> EntityDef {
     let mut d = EntityDef {
@@ -5065,17 +5870,18 @@ fn green_cape() -> EntityDef {
     d.equipment_type = Some(EquipmentType::Cape);
     d.raw_item_base = Some(parse::raw_item_base(r#"()"#));
     d.raw_item_bonus = Some(parse::raw_item_bonus(r#"()"#));
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: GreenCape,
         metadata: (
             name: "Rogue's Cape", 
             desc: ["A simple cape full", "of potential. For", "now, it's only", " purpose is to", "obscure your clothing."]
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn green_sapling_block() -> EntityDef {
     let mut d = EntityDef {
@@ -5089,19 +5895,22 @@ fn green_sapling_block() -> EntityDef {
     d.animation_pos_tracker = Some(AnimationPosTracker(0.0, 0.0, 0.3));
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::GreenSaplingBlock);
-    d.item_actions = Some(parse::item_actions(r#"(actions: [PlacesInto(GreenSaplingStage1)])"#));
+    d.item_actions = Some(parse::item_actions(
+        r#"(actions: [PlacesInto(GreenSaplingStage1)])"#,
+    ));
     d.consumable = Some(ConsumableItem);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: GreenSaplingBlock,
         metadata: (
             name: "Green Sapling", 
             desc: ["Grows into a tree", "when placed on", "the ground."],
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn green_sapling_stage1() -> EntityDef {
     let mut d = EntityDef {
@@ -5116,21 +5925,30 @@ fn green_sapling_stage1() -> EntityDef {
     d.sapling_secs = Some(60.);
     d.foliage_size = Some(FoliageSize(parse::vec2(r#"((x: 16., y: 16.))"#)));
     d.sprite_anchor = Some(SpriteAnchor(parse::vec2(r#"((x: 0., y: 0.))"#)));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: 0., y1: -10., x2: 0., y2: -6., r: 1.5 } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: 0.,
+            y1: -10.,
+            x2: 0.,
+            y2: -6.,
+            r: 1.5,
+        },
+    });
     d.max_health = Some(MaxHealth(1));
     d.y_sort = Some(YSort(0.));
     d.sprite_texture = Some("GreenSaplingStage1.png".into());
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
                 item: GreenSaplingBlock,
                 min: 1,
                 max: 1,
                 rate: 1.
             ),]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn green_sapling_stage2() -> EntityDef {
     let mut d = EntityDef {
@@ -5141,10 +5959,19 @@ fn green_sapling_stage2() -> EntityDef {
     d.world_object = Some(WorldObject::GreenSaplingStage2);
     d.sprite_size = Some(SpriteSize::Small);
     d.sprite_anchor = Some(SpriteAnchor(parse::vec2(r#"((x: 0., y: 8.))"#)));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: 0., y1: -10., x2: 0., y2: 2., r: 2.5 } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: 0.,
+            y1: -10.,
+            x2: 0.,
+            y2: 2.,
+            r: 2.5,
+        },
+    });
     d.y_sort = Some(YSort(0.));
     d.sprite_texture = Some("GreenSaplingStage2.png".into());
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
                 item: GreenSaplingBlock,
                 min: 1,
@@ -5157,10 +5984,10 @@ fn green_sapling_stage2() -> EntityDef {
                 max: 2,
                 rate: 0.75
             ),]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn green_sapling_stage3() -> EntityDef {
     let mut d = EntityDef {
@@ -5176,11 +6003,20 @@ fn green_sapling_stage3() -> EntityDef {
     d.sprite_size = Some(SpriteSize::Small);
     d.foliage_size = Some(FoliageSize(parse::vec2(r#"((x: 16., y: 32.))"#)));
     d.sprite_anchor = Some(SpriteAnchor(parse::vec2(r#"((x: 0., y: 8.))"#)));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: 0., y1: -24., x2: 0., y2: -14., r: 1.5 } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: 0.,
+            y1: -24.,
+            x2: 0.,
+            y2: -14.,
+            r: 1.5,
+        },
+    });
     d.max_health = Some(MaxHealth(20));
     d.y_sort = Some(YSort(0.));
     d.experience_reward = Some(ExperienceReward(5));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
                 item: GreenSaplingBlock,
                 min: 1,
@@ -5193,10 +6029,10 @@ fn green_sapling_stage3() -> EntityDef {
                 max: 2,
                 rate: 0.75
             ),]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn green_whip() -> EntityDef {
     let mut d = EntityDef {
@@ -5206,15 +6042,23 @@ fn green_whip() -> EntityDef {
     };
     d.sensor = true;
     d.y_sort = Some(YSort(0.));
-    d.sprite_sheet = Some(SpriteSheetDef { asset: "textures/effects/greenwhip.png".into(), size: Vec2::new(64., 64.), cols: 9, rows: 1 });
+    d.sprite_sheet = Some(SpriteSheetDef {
+        asset: "textures/effects/greenwhip.png".into(),
+        size: Vec2::new(64., 64.),
+        cols: 9,
+        rows: 1,
+    });
     d.projectile = Some(Projectile::GreenWhip);
-    d.projectile_state = Some(parse::projectile_state(r#"(speed: 0., direction: (x: 0., y: 0.), hit_entities: [], spawn_offset: (x: -24., y: -24.), despawn_on_hit: false)"#));
-    d.arc_projectile_data = Some(parse::arc_projectile_data(r#"(size: (x: 20., y: 16.), col_size: (x: 16., y: 8.), arc: (x: 1.0, y: 1.0), col_points: [1.5707, -0., -1.5, -2.2, -2.4, -2.4, -2.4, -2.4, -2.4])"#));
+    d.projectile_state = Some(parse::projectile_state(
+        r#"(speed: 0., direction: (x: 0., y: 0.), hit_entities: [], spawn_offset: (x: -24., y: -24.), despawn_on_hit: false)"#,
+    ));
+    d.arc_projectile_data = Some(parse::arc_projectile_data(
+        r#"(size: (x: 20., y: 16.), col_size: (x: 16., y: 8.), arc: (x: 1.0, y: 1.0), col_points: [1.5707, -0., -1.5, -2.2, -2.4, -2.4, -2.4, -2.4, -2.4])"#,
+    ));
     d.done_animation = true;
     d.animation_timer = Some(AnimationTimerDef { secs: 0.08 });
     d
 }
-
 
 fn grey_cape() -> EntityDef {
     let mut d = EntityDef {
@@ -5231,17 +6075,18 @@ fn grey_cape() -> EntityDef {
     d.equipment_type = Some(EquipmentType::Cape);
     d.raw_item_base = Some(parse::raw_item_base(r#"()"#));
     d.raw_item_bonus = Some(parse::raw_item_bonus(r#"()"#));
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: GreyCape,
         metadata: (
             name: "Neutral Cape", 
             desc: ["A simple cape full", "of potential. For", "now, it's only", "purpose is to", "obscure your", "clothing."]
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn gun() -> EntityDef {
     let mut d = EntityDef {
@@ -5256,10 +6101,13 @@ fn gun() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::Gun);
     d.equipment_type = Some(EquipmentType::Weapon);
-    d.raw_item_base = Some(parse::raw_item_base(r#"(
+    d.raw_item_base = Some(parse::raw_item_base(
+        r#"(
         attack: Some((start: 7, end: 9)),
-  )"#));
-    d.raw_item_bonus = Some(parse::raw_item_bonus(r#"(
+  )"#,
+    ));
+    d.raw_item_bonus = Some(parse::raw_item_bonus(
+        r#"(
         crit_damage: Some((start: 8, end: 20)),
         crit_chance: Some((start: 5, end: 11)),
         speed: Some((start: 6, end: 10)),
@@ -5273,10 +6121,12 @@ fn gun() -> EntityDef {
       
         skill_power: Some((start: 8, end: 13)),
         attack_speed: Some((start: 9, end: 14)),
-  )"#));
+  )"#,
+    ));
     d.melee = Some(MeleeAttack);
     d.ranged = Some(RangedAttack(Projectile::Bullet));
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: Gun,
         attributes: (
             attack_cooldown: 0.25
@@ -5286,11 +6136,13 @@ fn gun() -> EntityDef {
             desc: ["A Gun."]
         ),
         count: 1
-  )"#));
-    d.scraps_into = Some(parse::scraps_into(r#"([(obj: Log, chance: 1.), (obj: Log, chance: 0.5)])"#));
+  )"#,
+    ));
+    d.scraps_into = Some(parse::scraps_into(
+        r#"([(obj: Log, chance: 1.), (obj: Log, chance: 0.5)])"#,
+    ));
     d
 }
-
 
 fn hammer() -> EntityDef {
     let mut d = EntityDef {
@@ -5305,10 +6157,13 @@ fn hammer() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::Hammer);
     d.equipment_type = Some(EquipmentType::Weapon);
-    d.raw_item_base = Some(parse::raw_item_base(r#"(
+    d.raw_item_base = Some(parse::raw_item_base(
+        r#"(
         attack: Some((start: 11, end: 14)),
-  )"#));
-    d.raw_item_bonus = Some(parse::raw_item_bonus(r#"(
+  )"#,
+    ));
+    d.raw_item_bonus = Some(parse::raw_item_bonus(
+        r#"(
        crit_damage: Some((start: 10, end: 14)),
         crit_chance: Some((start: 7, end: 12)),
         speed: Some((start: 4, end: 8)),
@@ -5322,10 +6177,12 @@ fn hammer() -> EntityDef {
         
         skill_power: Some((start: 8, end: 13)),
         attack_speed: Some((start: 8, end: 12)),
-  )"#));
+  )"#,
+    ));
     d.melee = Some(MeleeAttack);
     d.ranged = Some(RangedAttack(Projectile::HammerProjectile));
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: Hammer,
         attributes: (
             attack_cooldown: 1.
@@ -5335,11 +6192,13 @@ fn hammer() -> EntityDef {
             desc: ["A rusty Hammer."]
         ),
         count: 1
-  )"#));
-    d.scraps_into = Some(parse::scraps_into(r#"([(obj: StoneChunk, chance: 1.),(obj: StoneChunk, chance: 1.), (obj: StoneChunk, chance: 0.5)])"#));
+  )"#,
+    ));
+    d.scraps_into = Some(parse::scraps_into(
+        r#"([(obj: StoneChunk, chance: 1.),(obj: StoneChunk, chance: 1.), (obj: StoneChunk, chance: 0.5)])"#,
+    ));
     d
 }
-
 
 fn hammer_projectile() -> EntityDef {
     let mut d = EntityDef {
@@ -5349,15 +6208,23 @@ fn hammer_projectile() -> EntityDef {
     };
     d.sensor = true;
     d.y_sort = Some(YSort(0.));
-    d.sprite_sheet = Some(SpriteSheetDef { asset: "textures/effects/HammerProjectile.png".into(), size: Vec2::new(48., 48.), cols: 3, rows: 1 });
+    d.sprite_sheet = Some(SpriteSheetDef {
+        asset: "textures/effects/HammerProjectile.png".into(),
+        size: Vec2::new(48., 48.),
+        cols: 3,
+        rows: 1,
+    });
     d.projectile = Some(Projectile::HammerProjectile);
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 24., y: 24. } });
-    d.projectile_state = Some(parse::projectile_state(r#"(speed: 0., direction: (x: 0., y: 0.), spawn_offset: (x: -20., y: -20.), hit_entities: [], despawn_on_hit: false)"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 24., y: 24. },
+    });
+    d.projectile_state = Some(parse::projectile_state(
+        r#"(speed: 0., direction: (x: 0., y: 0.), spawn_offset: (x: -20., y: -20.), hit_entities: [], despawn_on_hit: false)"#,
+    ));
     d.done_animation = true;
     d.animation_timer = Some(AnimationTimerDef { secs: 0.08 });
     d
 }
-
 
 fn heal_hearts() -> EntityDef {
     let mut d = EntityDef {
@@ -5367,14 +6234,20 @@ fn heal_hearts() -> EntityDef {
     };
     d.sensor = true;
     d.y_sort = Some(YSort(0.));
-    d.sprite_sheet = Some(SpriteSheetDef { asset: "textures/effects/healhearts.png".into(), size: Vec2::new(64., 64.), cols: 23, rows: 1 });
+    d.sprite_sheet = Some(SpriteSheetDef {
+        asset: "textures/effects/healhearts.png".into(),
+        size: Vec2::new(64., 64.),
+        cols: 23,
+        rows: 1,
+    });
     d.projectile = Some(Projectile::HealHearts);
-    d.projectile_state = Some(parse::projectile_state(r#"(speed: 0., direction: (x: 0., y: 0.), hit_entities: [], despawn_on_hit: false)"#));
+    d.projectile_state = Some(parse::projectile_state(
+        r#"(speed: 0., direction: (x: 0., y: 0.), hit_entities: [], despawn_on_hit: false)"#,
+    ));
     d.done_animation = true;
     d.animation_timer = Some(AnimationTimerDef { secs: 0.03 });
     d
 }
-
 
 fn health_food() -> EntityDef {
     let mut d = EntityDef {
@@ -5388,9 +6261,12 @@ fn health_food() -> EntityDef {
     d.animation_pos_tracker = Some(AnimationPosTracker(0.0, 0.0, 0.3));
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::HealthFood);
-    d.item_actions = Some(parse::item_actions(r#"(actions: [GainStat("health", 15)])"#));
+    d.item_actions = Some(parse::item_actions(
+        r#"(actions: [GainStat("health", 15)])"#,
+    ));
     d.consumable = Some(ConsumableItem);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: HealthFood,
         metadata: (
             name: "Health Boost", 
@@ -5398,10 +6274,10 @@ fn health_food() -> EntityDef {
         ),
         rarity: Rare,
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn heirloom_chest() -> EntityDef {
     let mut d = EntityDef {
@@ -5417,19 +6293,22 @@ fn heirloom_chest() -> EntityDef {
     d.world_object = Some(WorldObject::HeirloomChest);
     d.touch_trigger = Some(parse::touch_trigger(r#"HeirloomChest"#));
     d.consumable = Some(ConsumableItem);
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 9., y: 8. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 9., y: 8. },
+    });
     d.sensor = true;
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: HeirloomChest,
         metadata: (
             name: "Heirloom Chest",
             desc: ["Right-click to open.", "Contains a random heirloom."]
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn heirloom_shrine() -> EntityDef {
     let mut d = EntityDef {
@@ -5442,10 +6321,17 @@ fn heirloom_shrine() -> EntityDef {
     d.sprite_size = Some(SpriteSize::Small);
     d.sprite_anchor = Some(SpriteAnchor(parse::vec2(r#"((x: 0., y: 14.))"#)));
     d.y_sort = Some(YSort(0.));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: -27., y1: -11., x2: 27., y2: -12., r: 6. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: -27.,
+            y1: -11.,
+            x2: 27.,
+            y2: -12.,
+            r: 6.,
+        },
+    });
     d
 }
-
 
 fn heirloom_shrine_done() -> EntityDef {
     let mut d = EntityDef {
@@ -5457,10 +6343,17 @@ fn heirloom_shrine_done() -> EntityDef {
     d.sprite_size = Some(SpriteSize::Small);
     d.sprite_anchor = Some(SpriteAnchor(parse::vec2(r#"((x: 0., y: 14.))"#)));
     d.y_sort = Some(YSort(-0.01));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: -27., y1: -11., x2: 27., y2: -12., r: 6. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: -27.,
+            y1: -11.,
+            x2: 27.,
+            y2: -12.,
+            r: 6.,
+        },
+    });
     d
 }
-
 
 fn hog() -> EntityDef {
     let mut d = EntityDef {
@@ -5477,13 +6370,30 @@ fn hog() -> EntityDef {
     d.mob_level = Some(1);
     d.enemy_anim_state = Some(EnemyAnimationState::Walk);
     d.left_facing_side_profile = true;
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: 0., y1: -1., x2: 0., y2: -1.5, r: 7.5 } });
-    d.sprite_sheet = Some(SpriteSheetDef { asset: "textures/hog/hog_down.png".into(), size: Vec2::new(64., 64.), cols: 4, rows: 6 });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: 0.,
+            y1: -1.,
+            x2: 0.,
+            y2: -1.5,
+            r: 7.5,
+        },
+    });
+    d.sprite_sheet = Some(SpriteSheetDef {
+        asset: "textures/hog/hog_down.png".into(),
+        size: Vec2::new(64., 64.),
+        cols: 4,
+        rows: 6,
+    });
     d.animation_timer = Some(AnimationTimerDef { secs: 0.1 });
-    d.anim_sprite_sheet_data = Some(CharacterAnimationSpriteSheetData { animation_frames: vec![4,4,4,4,4], anim_offset: 0 });
+    d.anim_sprite_sheet_data = Some(CharacterAnimationSpriteSheetData {
+        animation_frames: vec![4, 4, 4, 4, 4],
+        anim_offset: 0,
+    });
     d.max_health = Some(MaxHealth(28));
     d.experience_reward = Some(ExperienceReward(15));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
                 item: Leather,
                 min: 1,
@@ -5503,10 +6413,10 @@ fn hog() -> EntityDef {
                 rate: 0.85
             ),
             ]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn ice_patch() -> EntityDef {
     let mut d = EntityDef {
@@ -5522,7 +6432,6 @@ fn ice_patch() -> EntityDef {
     d
 }
 
-
 fn ice_shard() -> EntityDef {
     let mut d = EntityDef {
         name: "IceShard".into(),
@@ -5531,14 +6440,22 @@ fn ice_shard() -> EntityDef {
     };
     d.sensor = true;
     d.y_sort = Some(YSort(0.));
-    d.sprite_sheet = Some(SpriteSheetDef { asset: "bevy_survival_sprites.png".into(), size: Vec2::new(16., 16.), cols: 16, rows: 16 });
+    d.sprite_sheet = Some(SpriteSheetDef {
+        asset: "bevy_survival_sprites.png".into(),
+        size: Vec2::new(16., 16.),
+        cols: 16,
+        rows: 16,
+    });
     d.world_object = Some(WorldObject::IceShard);
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 5., y: 5. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 5., y: 5. },
+    });
     d.projectile = Some(Projectile::IceShard);
-    d.projectile_state = Some(parse::projectile_state(r#"(speed: 200., direction: (x: 0., y: 0.), hit_entities: [], despawn_on_hit: true)"#));
+    d.projectile_state = Some(parse::projectile_state(
+        r#"(speed: 200., direction: (x: 0., y: 0.), hit_entities: [], despawn_on_hit: true)"#,
+    ));
     d
 }
-
 
 fn ice_staff() -> EntityDef {
     let mut d = EntityDef {
@@ -5553,10 +6470,13 @@ fn ice_staff() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::IceStaff);
     d.equipment_type = Some(EquipmentType::Weapon);
-    d.raw_item_base = Some(parse::raw_item_base(r#"(
+    d.raw_item_base = Some(parse::raw_item_base(
+        r#"(
         attack: Some((start: 10, end: 16)),
-  )"#));
-    d.raw_item_bonus = Some(parse::raw_item_bonus(r#"(
+  )"#,
+    ));
+    d.raw_item_bonus = Some(parse::raw_item_bonus(
+        r#"(
         crit_damage: Some((start: 8, end: 16)),
         crit_chance: Some((start: 6, end: 12)),
         speed: Some((start: 6, end: 10)),
@@ -5572,10 +6492,12 @@ fn ice_staff() -> EntityDef {
         mana: Some((start: 18, end: 30)),
         mana_regen: Some((start: 4, end: 8)),
         attack_speed: Some((start: 6, end: 10)),
-  )"#));
+  )"#,
+    ));
     d.melee = Some(MeleeAttack);
     d.ranged = Some(RangedAttack(Projectile::IceShard));
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: IceStaff,
         attributes: (
             attack_cooldown: 0.5
@@ -5585,11 +6507,13 @@ fn ice_staff() -> EntityDef {
             desc: ["A Ice Staff."]
         ),
         count: 1
-  )"#));
-    d.scraps_into = Some(parse::scraps_into(r#"([(obj: Log, chance: 1.), (obj: Log, chance: 0.5)])"#));
+  )"#,
+    ));
+    d.scraps_into = Some(parse::scraps_into(
+        r#"([(obj: Log, chance: 1.), (obj: Log, chance: 0.5)])"#,
+    ));
     d
 }
-
 
 fn ice_wall() -> EntityDef {
     let mut d = EntityDef {
@@ -5599,15 +6523,29 @@ fn ice_wall() -> EntityDef {
     };
     d.sensor = true;
     d.y_sort = Some(YSort(10.));
-    d.sprite_sheet = Some(SpriteSheetDef { asset: "textures/effects/icepillar.png".into(), size: Vec2::new(111., 111.), cols: 13, rows: 1 });
+    d.sprite_sheet = Some(SpriteSheetDef {
+        asset: "textures/effects/icepillar.png".into(),
+        size: Vec2::new(111., 111.),
+        cols: 13,
+        rows: 1,
+    });
     d.projectile = Some(Projectile::IceWall);
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: 0., y1: -28., x2: 0., y2: 0., r: 24. } });
-    d.projectile_state = Some(parse::projectile_state(r#"(speed: 0., direction: (x: 0., y: 0.), hit_entities: [], despawn_on_hit: false)"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: 0.,
+            y1: -28.,
+            x2: 0.,
+            y2: 0.,
+            r: 24.,
+        },
+    });
+    d.projectile_state = Some(parse::projectile_state(
+        r#"(speed: 0., direction: (x: 0., y: 0.), hit_entities: [], despawn_on_hit: false)"#,
+    ));
     d.done_animation = true;
     d.animation_timer = Some(AnimationTimerDef { secs: 0.045 });
     d
 }
-
 
 fn inventory_bag() -> EntityDef {
     let mut d = EntityDef {
@@ -5622,7 +6560,6 @@ fn inventory_bag() -> EntityDef {
     d
 }
 
-
 fn key() -> EntityDef {
     let mut d = EntityDef {
         name: "Key".into(),
@@ -5636,7 +6573,8 @@ fn key() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::Key);
     d.item_actions = Some(parse::item_actions(r#"(actions: [DungeonKey])"#));
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: Key,
         metadata: (
             name: "Key ", 
@@ -5644,10 +6582,10 @@ fn key() -> EntityDef {
         ),
         rarity: Legendary,
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn large_cactus_card() -> EntityDef {
     let mut d = EntityDef {
@@ -5661,7 +6599,8 @@ fn large_cactus_card() -> EntityDef {
     d.animation_pos_tracker = Some(AnimationPosTracker(0.0, 0.0, 0.3));
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::LargeCactusCard);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: LargeCactusCard,
         metadata: (
             name: "Large Cactus Card",
@@ -5669,10 +6608,10 @@ fn large_cactus_card() -> EntityDef {
         ),
         rarity: Uncommon,
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn large_mana_potion() -> EntityDef {
     let mut d = EntityDef {
@@ -5688,7 +6627,8 @@ fn large_mana_potion() -> EntityDef {
     d.world_object = Some(WorldObject::LargeManaPotion);
     d.item_actions = Some(parse::item_actions(r#"(actions: [ ModifyMana(75)])"#));
     d.consumable = Some(ConsumableItem);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: LargeManaPotion,
         rarity: Rare,
         metadata: (
@@ -5696,10 +6636,10 @@ fn large_mana_potion() -> EntityDef {
             desc: ["For advanced Mana", "enjoyers."]
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn large_mushroom_stump() -> EntityDef {
     let mut d = EntityDef {
@@ -5712,10 +6652,13 @@ fn large_mushroom_stump() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::LargeMushroomStump);
     d.required_equipment_type = Some(RequiredEquipmentType(EquipmentType::Axe));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 9., y: 9. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 9., y: 9. },
+    });
     d.max_health = Some(MaxHealth(45));
     d.experience_reward = Some(ExperienceReward(10));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
                 item: Log,
                 min: 3,
@@ -5727,10 +6670,10 @@ fn large_mushroom_stump() -> EntityDef {
                 max: 2,
                 rate: 0.75
             ),]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn large_potion() -> EntityDef {
     let mut d = EntityDef {
@@ -5746,7 +6689,8 @@ fn large_potion() -> EntityDef {
     d.world_object = Some(WorldObject::LargePotion);
     d.item_actions = Some(parse::item_actions(r#"(actions: [ ModifyHealth(150)])"#));
     d.consumable = Some(ConsumableItem);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: LargePotion,
         metadata: (
             name: "Large Potion ", 
@@ -5754,10 +6698,10 @@ fn large_potion() -> EntityDef {
         ),
         rarity: Rare,
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn large_stump() -> EntityDef {
     let mut d = EntityDef {
@@ -5770,20 +6714,23 @@ fn large_stump() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::LargeStump);
     d.required_equipment_type = Some(RequiredEquipmentType(EquipmentType::Axe));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 9., y: 9. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 9., y: 9. },
+    });
     d.max_health = Some(MaxHealth(45));
     d.experience_reward = Some(ExperienceReward(10));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
             item: Log,
                 min: 3,
                 max: 5,
                 rate: 1.
             ),]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn laser_beam() -> EntityDef {
     let mut d = EntityDef {
@@ -5793,16 +6740,24 @@ fn laser_beam() -> EntityDef {
     };
     d.sensor = true;
     d.y_sort = Some(YSort(0.));
-    d.sprite_sheet = Some(SpriteSheetDef { asset: "textures/effects/LaserBeam.png".into(), size: Vec2::new(128., 64.), cols: 1, rows: 18 });
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 64., y: 20. } });
+    d.sprite_sheet = Some(SpriteSheetDef {
+        asset: "textures/effects/LaserBeam.png".into(),
+        size: Vec2::new(128., 64.),
+        cols: 1,
+        rows: 18,
+    });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 64., y: 20. },
+    });
     d.projectile = Some(Projectile::LaserBeam);
-    d.projectile_state = Some(parse::projectile_state(r#"(speed: 0., spawn_offset: (x: -30., y: -30.), hit_entities: [], despawn_on_hit: false)"#));
+    d.projectile_state = Some(parse::projectile_state(
+        r#"(speed: 0., spawn_offset: (x: -30., y: -30.), hit_entities: [], despawn_on_hit: false)"#,
+    ));
     d.done_animation = true;
     d.animation_timer = Some(AnimationTimerDef { secs: 0.06 });
     d.animation_pos_tracker = Some(AnimationPosTracker(0.0, 0.0, 0.3));
     d
 }
-
 
 fn leather() -> EntityDef {
     let mut d = EntityDef {
@@ -5816,17 +6771,18 @@ fn leather() -> EntityDef {
     d.animation_pos_tracker = Some(AnimationPosTracker(0.0, 0.0, 0.3));
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::Leather);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: Leather,
         metadata: (
             name: "Leather", 
             desc: ["Strong and durable.", "Useful in crafting."],
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn leather_pants() -> EntityDef {
     let mut d = EntityDef {
@@ -5840,11 +6796,14 @@ fn leather_pants() -> EntityDef {
     d.animation_pos_tracker = Some(AnimationPosTracker(0.0, 0.0, 0.3));
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::LeatherPants);
-    d.raw_item_base = Some(parse::raw_item_base(r#"(
+    d.raw_item_base = Some(parse::raw_item_base(
+        r#"(
         health: Some((start: 13, end: 20)),
         defence: Some((start: 10, end: 14)),
-  )"#));
-    d.raw_item_bonus = Some(parse::raw_item_bonus(r#"(
+  )"#,
+    ));
+    d.raw_item_bonus = Some(parse::raw_item_bonus(
+        r#"(
         crit_damage: Some((start: 5, end: 10)),
         crit_chance: Some((start: 4, end: 6)),
         speed: Some((start: 8, end: 12)),
@@ -5861,20 +6820,24 @@ fn leather_pants() -> EntityDef {
         bonus_damage: Some((start: 5, end: 10)),
         pickup_range: Some((start: 15, end: 30)),
         skill_power: Some((start: 12, end: 22)),
-  )"#));
+  )"#,
+    ));
     d.equipment_type = Some(EquipmentType::Legs);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: LeatherPants,
         metadata: (
             name: "Leather Pants", 
             desc: ["Nice."]
         ),
         count: 1
-  )"#));
-    d.scraps_into = Some(parse::scraps_into(r#"([(obj: Leather, chance: 1.), (obj: Leather, chance: 0.5)])"#));
+  )"#,
+    ));
+    d.scraps_into = Some(parse::scraps_into(
+        r#"([(obj: Leather, chance: 1.), (obj: Leather, chance: 0.5)])"#,
+    ));
     d
 }
-
 
 fn leather_shoes() -> EntityDef {
     let mut d = EntityDef {
@@ -5888,11 +6851,14 @@ fn leather_shoes() -> EntityDef {
     d.animation_pos_tracker = Some(AnimationPosTracker(0.0, 0.0, 0.3));
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::LeatherShoes);
-    d.raw_item_base = Some(parse::raw_item_base(r#"(
+    d.raw_item_base = Some(parse::raw_item_base(
+        r#"(
         health: Some((start: 13, end: 20)),
         defence: Some((start: 10, end: 14)),
-  )"#));
-    d.raw_item_bonus = Some(parse::raw_item_bonus(r#"(
+  )"#,
+    ));
+    d.raw_item_bonus = Some(parse::raw_item_bonus(
+        r#"(
         crit_damage: Some((start: 5, end: 10)),
         crit_chance: Some((start: 4, end: 6)),
         speed: Some((start: 12, end: 18)),
@@ -5909,20 +6875,24 @@ fn leather_shoes() -> EntityDef {
         bonus_damage: Some((start: 5, end: 10)),
         pickup_range: Some((start: 15, end: 30)),
         skill_power: Some((start: 12, end: 22)),
-  )"#));
+  )"#,
+    ));
     d.equipment_type = Some(EquipmentType::Feet);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: LeatherShoes,
         metadata: (
             name: "Leather Shoes ", 
             desc: ["Nice."]
         ),
         count: 1
-  )"#));
-    d.scraps_into = Some(parse::scraps_into(r#"([(obj: Leather, chance: 1.), (obj: Leather, chance: 0.5)])"#));
+  )"#,
+    ));
+    d.scraps_into = Some(parse::scraps_into(
+        r#"([(obj: Leather, chance: 1.), (obj: Leather, chance: 0.5)])"#,
+    ));
     d
 }
-
 
 fn leather_tunic() -> EntityDef {
     let mut d = EntityDef {
@@ -5936,12 +6906,15 @@ fn leather_tunic() -> EntityDef {
     d.animation_pos_tracker = Some(AnimationPosTracker(0.0, 0.0, 0.3));
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::LeatherTunic);
-    d.raw_item_base = Some(parse::raw_item_base(r#"(
+    d.raw_item_base = Some(parse::raw_item_base(
+        r#"(
         health: Some((start: 15, end: 22)),
         defence: Some((start: 12, end: 17)),
         
-  )"#));
-    d.raw_item_bonus = Some(parse::raw_item_bonus(r#"(
+  )"#,
+    ));
+    d.raw_item_bonus = Some(parse::raw_item_bonus(
+        r#"(
         crit_damage: Some((start: 5, end: 10)),
         crit_chance: Some((start: 4, end: 6)),
         speed: Some((start: 8, end: 12)),
@@ -5958,20 +6931,24 @@ fn leather_tunic() -> EntityDef {
         bonus_damage: Some((start: 5, end: 10)),
         pickup_range: Some((start: 15, end: 30)),
         skill_power: Some((start: 12, end: 22)),
-  )"#));
+  )"#,
+    ));
     d.equipment_type = Some(EquipmentType::Chest);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: LeatherTunic,
         metadata: (
             name: "Leather Tunic", 
             desc: ["Nice."]
         ),
         count: 1
-  )"#));
-    d.scraps_into = Some(parse::scraps_into(r#"([(obj: Leather, chance: 1.), (obj: Leather, chance: 0.5)])"#));
+  )"#,
+    ));
+    d.scraps_into = Some(parse::scraps_into(
+        r#"([(obj: Leather, chance: 1.), (obj: Leather, chance: 0.5)])"#,
+    ));
     d
 }
-
 
 fn lifesteal_food() -> EntityDef {
     let mut d = EntityDef {
@@ -5985,9 +6962,12 @@ fn lifesteal_food() -> EntityDef {
     d.animation_pos_tracker = Some(AnimationPosTracker(0.0, 0.0, 0.3));
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::LifestealFood);
-    d.item_actions = Some(parse::item_actions(r#"(actions: [GainStat("lifesteal", 1)])"#));
+    d.item_actions = Some(parse::item_actions(
+        r#"(actions: [GainStat("lifesteal", 1)])"#,
+    ));
     d.consumable = Some(ConsumableItem);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: LifestealFood,
         metadata: (
             name: "Lifesteal Boost", 
@@ -5995,10 +6975,10 @@ fn lifesteal_food() -> EntityDef {
         ),
         rarity: Rare,
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn lightning() -> EntityDef {
     let mut d = EntityDef {
@@ -6008,15 +6988,29 @@ fn lightning() -> EntityDef {
     };
     d.sensor = true;
     d.y_sort = Some(YSort(0.));
-    d.sprite_sheet = Some(SpriteSheetDef { asset: "textures/effects/Lightning.png".into(), size: Vec2::new(48., 128.), cols: 7, rows: 1 });
+    d.sprite_sheet = Some(SpriteSheetDef {
+        asset: "textures/effects/Lightning.png".into(),
+        size: Vec2::new(48., 128.),
+        cols: 7,
+        rows: 1,
+    });
     d.projectile = Some(Projectile::Lightning);
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: 0., y1: -48., x2: 0., y2: -40., r: 18. } });
-    d.projectile_state = Some(parse::projectile_state(r#"(speed: 0., direction: (x: 0., y: 0.), spawn_offset: (x: 0., y: 0.), hit_entities: [], despawn_on_hit: false)"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: 0.,
+            y1: -48.,
+            x2: 0.,
+            y2: -40.,
+            r: 18.,
+        },
+    });
+    d.projectile_state = Some(parse::projectile_state(
+        r#"(speed: 0., direction: (x: 0., y: 0.), spawn_offset: (x: 0., y: 0.), hit_entities: [], despawn_on_hit: false)"#,
+    ));
     d.done_animation = true;
     d.animation_timer = Some(AnimationTimerDef { secs: 0.05 });
     d
 }
-
 
 fn lillypad() -> EntityDef {
     let mut d = EntityDef {
@@ -6029,17 +7023,18 @@ fn lillypad() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::Lillypad);
     d.max_health = Some(MaxHealth(1));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
                 item: PlantFibre,
                 min: 1,
                 max: 1,
                 rate: 0.3
             ),]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn lizard() -> EntityDef {
     let mut d = EntityDef {
@@ -6055,12 +7050,27 @@ fn lizard() -> EntityDef {
     d.mob = Some(Mob::Lizard);
     d.combat_alignment = Some(CombatAlignment::Hostile);
     d.follow_speed = Some(FollowSpeed(0.62));
-    d.leap_attack = Some(LeapAttack { activation_distance: 32., startup: 0.1, duration: 0.42, cooldown: 1., speed: 90. });
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: 0., y1: -1., x2: 0., y2: -1.5, r: 5.5 } });
+    d.leap_attack = Some(LeapAttack {
+        activation_distance: 32.,
+        startup: 0.1,
+        duration: 0.42,
+        cooldown: 1.,
+        speed: 90.,
+    });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: 0.,
+            y1: -1.,
+            x2: 0.,
+            y2: -1.5,
+            r: 5.5,
+        },
+    });
     d.max_health = Some(MaxHealth(8));
     d.attack = Some(Attack(8));
     d.experience_reward = Some(ExperienceReward(20));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
                 item: SmallPotion,
                 min: 1,
@@ -6140,10 +7150,10 @@ fn lizard() -> EntityDef {
                 rate: 0.00007
             ),
             ]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn lizard_card() -> EntityDef {
     let mut d = EntityDef {
@@ -6157,7 +7167,8 @@ fn lizard_card() -> EntityDef {
     d.animation_pos_tracker = Some(AnimationPosTracker(0.0, 0.0, 0.3));
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::LizardCard);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: LizardCard,
         metadata: (
             name: "Lizard Card",
@@ -6165,10 +7176,10 @@ fn lizard_card() -> EntityDef {
         ),
         rarity: Common,
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn log() -> EntityDef {
     let mut d = EntityDef {
@@ -6183,17 +7194,18 @@ fn log() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::Log);
     d.consumable = Some(ConsumableItem);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: Log,
         metadata: (
             name: "Log", 
             desc: ["A Long Log.", "It will be useful", "for building."]
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn magic_gem() -> EntityDef {
     let mut d = EntityDef {
@@ -6207,7 +7219,8 @@ fn magic_gem() -> EntityDef {
     d.animation_pos_tracker = Some(AnimationPosTracker(0.0, 0.0, 0.3));
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::MagicGem);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: MagicGem,
         metadata: (
             name: "Magic Gem ", 
@@ -6215,10 +7228,10 @@ fn magic_gem() -> EntityDef {
         ),
         rarity: Rare,
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn magic_tusk() -> EntityDef {
     let mut d = EntityDef {
@@ -6234,7 +7247,8 @@ fn magic_tusk() -> EntityDef {
     d.world_object = Some(WorldObject::MagicTusk);
     d.item_actions = Some(parse::item_actions(r#"(actions: [TeleportHome])"#));
     d.consumable = Some(ConsumableItem);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: MagicTusk,
         metadata: (
             name: "Magic Tusk ", 
@@ -6242,10 +7256,10 @@ fn magic_tusk() -> EntityDef {
         ),
         rarity: Rare,
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn magic_whip() -> EntityDef {
     let mut d = EntityDef {
@@ -6260,10 +7274,13 @@ fn magic_whip() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::MagicWhip);
     d.equipment_type = Some(EquipmentType::Weapon);
-    d.raw_item_base = Some(parse::raw_item_base(r#"(
+    d.raw_item_base = Some(parse::raw_item_base(
+        r#"(
         attack: Some((start: 9, end: 12)),
-  )"#));
-    d.raw_item_bonus = Some(parse::raw_item_bonus(r#"(
+  )"#,
+    ));
+    d.raw_item_bonus = Some(parse::raw_item_bonus(
+        r#"(
         crit_damage: Some((start: 8, end: 16)),
         crit_chance: Some((start: 6, end: 12)),
         speed: Some((start: 6, end: 10)),
@@ -6279,10 +7296,12 @@ fn magic_whip() -> EntityDef {
         mana: Some((start: 18, end: 30)),
         mana_regen: Some((start: 4, end: 8)),
         attack_speed: Some((start: 6, end: 10)),
-  )"#));
+  )"#,
+    ));
     d.melee = Some(MeleeAttack);
     d.ranged = Some(RangedAttack(Projectile::GreenWhip));
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: MagicWhip,
         attributes: (
             attack_cooldown: 0.7
@@ -6292,11 +7311,13 @@ fn magic_whip() -> EntityDef {
             desc: ["A magic whip."]
         ),
         count: 1
-  )"#));
-    d.scraps_into = Some(parse::scraps_into(r#"([(obj: Log, chance: 1.), (obj: Log, chance: 0.5)])"#));
+  )"#,
+    ));
+    d.scraps_into = Some(parse::scraps_into(
+        r#"([(obj: Log, chance: 1.), (obj: Log, chance: 0.5)])"#,
+    ));
     d
 }
-
 
 fn mana_food() -> EntityDef {
     let mut d = EntityDef {
@@ -6312,7 +7333,8 @@ fn mana_food() -> EntityDef {
     d.world_object = Some(WorldObject::ManaFood);
     d.item_actions = Some(parse::item_actions(r#"(actions: [GainStat("mana", 15)])"#));
     d.consumable = Some(ConsumableItem);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: ManaFood,
         metadata: (
             name: "Mana Boost", 
@@ -6320,10 +7342,10 @@ fn mana_food() -> EntityDef {
         ),
         rarity: Rare,
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn mana_orb() -> EntityDef {
     let mut d = EntityDef {
@@ -6337,7 +7359,8 @@ fn mana_orb() -> EntityDef {
     d.animation_pos_tracker = Some(AnimationPosTracker(0.0, 0.0, 0.3));
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::ManaOrb);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: ManaOrb,
         metadata: (
             name: "Mana Orb",
@@ -6345,10 +7368,10 @@ fn mana_orb() -> EntityDef {
         ),
         rarity: Common,
         count: 1,
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn mana_orb_projectile() -> EntityDef {
     let mut d = EntityDef {
@@ -6358,14 +7381,22 @@ fn mana_orb_projectile() -> EntityDef {
     };
     d.sensor = true;
     d.y_sort = Some(YSort(0.));
-    d.sprite_sheet = Some(SpriteSheetDef { asset: "bevy_survival_sprites.png".into(), size: Vec2::new(16., 16.), cols: 16, rows: 16 });
+    d.sprite_sheet = Some(SpriteSheetDef {
+        asset: "bevy_survival_sprites.png".into(),
+        size: Vec2::new(16., 16.),
+        cols: 16,
+        rows: 16,
+    });
     d.world_object = Some(WorldObject::ManaOrb);
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 5., y: 5. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 5., y: 5. },
+    });
     d.projectile = Some(Projectile::ManaOrbProjectile);
-    d.projectile_state = Some(parse::projectile_state(r#"(speed: 125., direction: (x: 0., y: 0.), hit_entities: [], despawn_on_hit: true)"#));
+    d.projectile_state = Some(parse::projectile_state(
+        r#"(speed: 125., direction: (x: 0., y: 0.), hit_entities: [], despawn_on_hit: true)"#,
+    ));
     d
 }
-
 
 fn mana_regen_food() -> EntityDef {
     let mut d = EntityDef {
@@ -6379,9 +7410,12 @@ fn mana_regen_food() -> EntityDef {
     d.animation_pos_tracker = Some(AnimationPosTracker(0.0, 0.0, 0.3));
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::ManaRegenFood);
-    d.item_actions = Some(parse::item_actions(r#"(actions: [GainStat("mana_regen", 3)])"#));
+    d.item_actions = Some(parse::item_actions(
+        r#"(actions: [GainStat("mana_regen", 3)])"#,
+    ));
     d.consumable = Some(ConsumableItem);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: ManaRegenFood,
         metadata: (
             name: "Mana Regen Boost", 
@@ -6389,10 +7423,10 @@ fn mana_regen_food() -> EntityDef {
         ),
         rarity: Rare,
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn med_cactus1() -> EntityDef {
     let mut d = EntityDef {
@@ -6405,11 +7439,14 @@ fn med_cactus1() -> EntityDef {
     d.y_sort = Some(YSort(-0.01));
     d.world_object = Some(WorldObject::MedCactus1);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 5., y: 5. } });
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: PlantFibre, min: 1, max: 1, rate: 0.75)])"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 5., y: 5. },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: PlantFibre, min: 1, max: 1, rate: 0.75)])"#,
+    ));
     d
 }
-
 
 fn med_cactus2() -> EntityDef {
     let mut d = EntityDef {
@@ -6422,11 +7459,14 @@ fn med_cactus2() -> EntityDef {
     d.y_sort = Some(YSort(-0.01));
     d.world_object = Some(WorldObject::MedCactus2);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 5., y: 5. } });
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: PlantFibre, min: 1, max: 1, rate: 0.75)])"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 5., y: 5. },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: PlantFibre, min: 1, max: 1, rate: 0.75)])"#,
+    ));
     d
 }
-
 
 fn med_cactus3() -> EntityDef {
     let mut d = EntityDef {
@@ -6439,11 +7479,14 @@ fn med_cactus3() -> EntityDef {
     d.y_sort = Some(YSort(-0.01));
     d.world_object = Some(WorldObject::MedCactus3);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 5., y: 5. } });
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: PlantFibre, min: 1, max: 1, rate: 0.75)])"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 5., y: 5. },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: PlantFibre, min: 1, max: 1, rate: 0.75)])"#,
+    ));
     d
 }
-
 
 fn med_cactus4() -> EntityDef {
     let mut d = EntityDef {
@@ -6456,11 +7499,14 @@ fn med_cactus4() -> EntityDef {
     d.y_sort = Some(YSort(-0.01));
     d.world_object = Some(WorldObject::MedCactus4);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 5., y: 5. } });
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: PlantFibre, min: 1, max: 1, rate: 0.75)])"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 5., y: 5. },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: PlantFibre, min: 1, max: 1, rate: 0.75)])"#,
+    ));
     d
 }
-
 
 fn med_cactus5() -> EntityDef {
     let mut d = EntityDef {
@@ -6473,11 +7519,14 @@ fn med_cactus5() -> EntityDef {
     d.y_sort = Some(YSort(-0.01));
     d.world_object = Some(WorldObject::MedCactus5);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 5., y: 5. } });
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: PlantFibre, min: 1, max: 1, rate: 0.75)])"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 5., y: 5. },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: PlantFibre, min: 1, max: 1, rate: 0.75)])"#,
+    ));
     d
 }
-
 
 fn med_fruit_cactus1() -> EntityDef {
     let mut d = EntityDef {
@@ -6490,11 +7539,14 @@ fn med_fruit_cactus1() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::MedFruitCactus1);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 } });
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: CactusBerry, min: 1, max: 1, rate: 1.0)])"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: CactusBerry, min: 1, max: 1, rate: 1.0)])"#,
+    ));
     d
 }
-
 
 fn med_fruit_cactus2() -> EntityDef {
     let mut d = EntityDef {
@@ -6507,11 +7559,14 @@ fn med_fruit_cactus2() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::MedFruitCactus2);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 } });
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: CactusBerry, min: 1, max: 1, rate: 1.0)])"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: CactusBerry, min: 1, max: 1, rate: 1.0)])"#,
+    ));
     d
 }
-
 
 fn medium_green_tree() -> EntityDef {
     let mut d = EntityDef {
@@ -6526,11 +7581,20 @@ fn medium_green_tree() -> EntityDef {
     d.foliage_size = Some(FoliageSize(parse::vec2(r#"((x: 64., y: 96.))"#)));
     d.sprite_anchor = Some(SpriteAnchor(parse::vec2(r#"((x: 0., y: 32.))"#)));
     d.required_equipment_type = Some(RequiredEquipmentType(EquipmentType::Axe));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: 0., y1: -30., x2: 0., y2: -22., r: 4. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: 0.,
+            y1: -30.,
+            x2: 0.,
+            y2: -22.,
+            r: 4.,
+        },
+    });
     d.max_health = Some(MaxHealth(30));
     d.y_sort = Some(YSort(0.));
     d.experience_reward = Some(ExperienceReward(5));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [
             (
                 item: Stick,
@@ -6549,10 +7613,10 @@ fn medium_green_tree() -> EntityDef {
                 max: 3,
                 rate: 0.25
             )]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn medium_yellow_tree() -> EntityDef {
     let mut d = EntityDef {
@@ -6567,11 +7631,20 @@ fn medium_yellow_tree() -> EntityDef {
     d.fade_opacity = Some(FadeOpacity);
     d.sprite_anchor = Some(SpriteAnchor(parse::vec2(r#"((x: 0., y: 32.))"#)));
     d.required_equipment_type = Some(RequiredEquipmentType(EquipmentType::Axe));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: 0., y1: -30., x2: 0., y2: -22., r: 4. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: 0.,
+            y1: -30.,
+            x2: 0.,
+            y2: -22.,
+            r: 4.,
+        },
+    });
     d.max_health = Some(MaxHealth(30));
     d.y_sort = Some(YSort(0.));
     d.experience_reward = Some(ExperienceReward(5));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [
             (
                 item: Stick,
@@ -6590,10 +7663,10 @@ fn medium_yellow_tree() -> EntityDef {
                 max: 3,
                 rate: 0.25
             )]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn metal_bar() -> EntityDef {
     let mut d = EntityDef {
@@ -6607,17 +7680,18 @@ fn metal_bar() -> EntityDef {
     d.animation_pos_tracker = Some(AnimationPosTracker(0.0, 0.0, 0.3));
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::MetalBar);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: MetalBar,
         metadata: (
             name: "Metal Bar ", 
             desc: ["A metal ingot.", "Useful in crafting."],
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn metal_boulder() -> EntityDef {
     let mut d = EntityDef {
@@ -6630,10 +7704,19 @@ fn metal_boulder() -> EntityDef {
     d.y_sort = Some(YSort(-0.015));
     d.world_object = Some(WorldObject::MetalBoulder);
     d.required_equipment_type = Some(RequiredEquipmentType(EquipmentType::Pickaxe));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: -2., y1: -1., x2: 3., y2: -2., r: 8. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: -2.,
+            y1: -1.,
+            x2: 3.,
+            y2: -2.,
+            r: 8.,
+        },
+    });
     d.max_health = Some(MaxHealth(50));
     d.experience_reward = Some(ExperienceReward(20));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [
             (
                 item: StoneChunk,
@@ -6647,10 +7730,10 @@ fn metal_boulder() -> EntityDef {
                 max: 1,
                 rate: 1.
             )]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn metal_pants() -> EntityDef {
     let mut d = EntityDef {
@@ -6664,12 +7747,15 @@ fn metal_pants() -> EntityDef {
     d.animation_pos_tracker = Some(AnimationPosTracker(0.0, 0.0, 0.3));
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::MetalPants);
-    d.raw_item_base = Some(parse::raw_item_base(r#"(
+    d.raw_item_base = Some(parse::raw_item_base(
+        r#"(
         health: Some((start: 25, end: 33)),
         defence: Some((start: 20, end: 30)),
         speed: Some((start: -12, end: -8)),
-  )"#));
-    d.raw_item_bonus = Some(parse::raw_item_bonus(r#"(
+  )"#,
+    ));
+    d.raw_item_bonus = Some(parse::raw_item_bonus(
+        r#"(
         crit_damage: Some((start: 5, end: 10)),
         crit_chance: Some((start: 4, end: 8)),
         health_regen: Some((start: 10, end: 16)),
@@ -6685,20 +7771,24 @@ fn metal_pants() -> EntityDef {
         bonus_damage: Some((start: 12, end: 18)),
         pickup_range: Some((start: 15, end: 30)),
         skill_power: Some((start: 9, end: 15)),
-  )"#));
+  )"#,
+    ));
     d.equipment_type = Some(EquipmentType::Legs);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: MetalPants,
         metadata: (
             name: "Metal Pants", 
             desc: ["Nice."]
         ),
         count: 1
-  )"#));
-    d.scraps_into = Some(parse::scraps_into(r#"([(obj: MetalBar, chance: 1.), (obj: MetalBar, chance: 0.5)])"#));
+  )"#,
+    ));
+    d.scraps_into = Some(parse::scraps_into(
+        r#"([(obj: MetalBar, chance: 1.), (obj: MetalBar, chance: 0.5)])"#,
+    ));
     d
 }
-
 
 fn metal_shard() -> EntityDef {
     let mut d = EntityDef {
@@ -6712,17 +7802,18 @@ fn metal_shard() -> EntityDef {
     d.animation_pos_tracker = Some(AnimationPosTracker(0.0, 0.0, 0.3));
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::MetalShard);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: MetalShard,
         metadata: (
             name: "Metal Shard ", 
             desc: ["A metal shard. Not", "very useful in this", "state."]
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn metal_shoes() -> EntityDef {
     let mut d = EntityDef {
@@ -6736,12 +7827,15 @@ fn metal_shoes() -> EntityDef {
     d.animation_pos_tracker = Some(AnimationPosTracker(0.0, 0.0, 0.3));
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::MetalShoes);
-    d.raw_item_base = Some(parse::raw_item_base(r#"(
+    d.raw_item_base = Some(parse::raw_item_base(
+        r#"(
         health: Some((start: 25, end: 33)),
         defence: Some((start: 20, end: 30)),
         speed: Some((start: -12, end: -8)),
-  )"#));
-    d.raw_item_bonus = Some(parse::raw_item_bonus(r#"(
+  )"#,
+    ));
+    d.raw_item_bonus = Some(parse::raw_item_bonus(
+        r#"(
         crit_damage: Some((start: 5, end: 10)),
         crit_chance: Some((start: 4, end: 8)),
         health_regen: Some((start: 10, end: 16)),
@@ -6757,20 +7851,24 @@ fn metal_shoes() -> EntityDef {
         bonus_damage: Some((start: 12, end: 18)),
         pickup_range: Some((start: 15, end: 30)),
         skill_power: Some((start: 9, end: 15)),
-  )"#));
+  )"#,
+    ));
     d.equipment_type = Some(EquipmentType::Feet);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: MetalShoes,
         metadata: (
             name: "Metal Shoes ", 
             desc: ["Nice."]
         ),
         count: 1
-  )"#));
-    d.scraps_into = Some(parse::scraps_into(r#"([(obj: MetalBar, chance: 1.), (obj: MetalBar, chance: 0.5)])"#));
+  )"#,
+    ));
+    d.scraps_into = Some(parse::scraps_into(
+        r#"([(obj: MetalBar, chance: 1.), (obj: MetalBar, chance: 0.5)])"#,
+    ));
     d
 }
-
 
 fn meteor() -> EntityDef {
     let mut d = EntityDef {
@@ -6780,15 +7878,29 @@ fn meteor() -> EntityDef {
     };
     d.sensor = true;
     d.y_sort = Some(YSort(10.));
-    d.sprite_sheet = Some(SpriteSheetDef { asset: "textures/effects/meteor.png".into(), size: Vec2::new(80., 160.), cols: 14, rows: 1 });
+    d.sprite_sheet = Some(SpriteSheetDef {
+        asset: "textures/effects/meteor.png".into(),
+        size: Vec2::new(80., 160.),
+        cols: 14,
+        rows: 1,
+    });
     d.projectile = Some(Projectile::Meteor);
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: 0., y1: -50., x2: 0., y2: -46., r: 24. } });
-    d.projectile_state = Some(parse::projectile_state(r#"(speed: 0., direction: (x: 0., y: 0.), hit_entities: [], despawn_on_hit: false)"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: 0.,
+            y1: -50.,
+            x2: 0.,
+            y2: -46.,
+            r: 24.,
+        },
+    });
+    d.projectile_state = Some(parse::projectile_state(
+        r#"(speed: 0., direction: (x: 0., y: 0.), hit_entities: [], despawn_on_hit: false)"#,
+    ));
     d.done_animation = true;
     d.animation_timer = Some(AnimationTimerDef { secs: 0.05 });
     d
 }
-
 
 fn microwave_shrine() -> EntityDef {
     let mut d = EntityDef {
@@ -6801,10 +7913,17 @@ fn microwave_shrine() -> EntityDef {
     d.sprite_size = Some(SpriteSize::Small);
     d.sprite_anchor = Some(SpriteAnchor(parse::vec2(r#"((x: 0., y: 16.))"#)));
     d.y_sort = Some(YSort(-0.01));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: -12., y1: -12., x2: 12., y2: -12., r: 8. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: -12.,
+            y1: -12.,
+            x2: 12.,
+            y2: -12.,
+            r: 8.,
+        },
+    });
     d
 }
-
 
 fn microwave_shrine_done() -> EntityDef {
     let mut d = EntityDef {
@@ -6816,10 +7935,17 @@ fn microwave_shrine_done() -> EntityDef {
     d.sprite_size = Some(SpriteSize::Small);
     d.sprite_anchor = Some(SpriteAnchor(parse::vec2(r#"((x: 0., y: 16.))"#)));
     d.y_sort = Some(YSort(0.));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: -12., y1: -12., x2: 12., y2: -12., r: 8. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: -12.,
+            y1: -12.,
+            x2: 12.,
+            y2: -12.,
+            r: 8.,
+        },
+    });
     d
 }
-
 
 fn miracle_seed() -> EntityDef {
     let mut d = EntityDef {
@@ -6835,17 +7961,18 @@ fn miracle_seed() -> EntityDef {
     d.world_object = Some(WorldObject::MiracleSeed);
     d.item_actions = Some(parse::item_actions(r#"(actions: [GrantSkillPoint(1)])"#));
     d.consumable = Some(ConsumableItem);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: MiracleSeed,
         metadata: (
             name: "Miracle Seed", 
             desc: ["A magic seed.", "Will grant", "+1 skill pt.",]
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn movement_speed_potion() -> EntityDef {
     let mut d = EntityDef {
@@ -6859,9 +7986,12 @@ fn movement_speed_potion() -> EntityDef {
     d.animation_pos_tracker = Some(AnimationPosTracker(0.0, 0.0, 0.3));
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::MovementSpeedPotion);
-    d.item_actions = Some(parse::item_actions(r#"(actions: [ ApplyMovementSpeedBuff(10.0, 1.5)])"#));
+    d.item_actions = Some(parse::item_actions(
+        r#"(actions: [ ApplyMovementSpeedBuff(10.0, 1.5)])"#,
+    ));
     d.consumable = Some(ConsumableItem);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: MovementSpeedPotion,
         metadata: (
             name: "Speed Potion ", 
@@ -6869,10 +7999,10 @@ fn movement_speed_potion() -> EntityDef {
         ),
         rarity: Uncommon,
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn orb_of_transformation() -> EntityDef {
     let mut d = EntityDef {
@@ -6887,7 +8017,8 @@ fn orb_of_transformation() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::OrbOfTransformation);
     d.consumable = Some(ConsumableItem);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: OrbOfTransformation,
         metadata: (
             name: "Mysterious Orb",
@@ -6896,10 +8027,10 @@ fn orb_of_transformation() -> EntityDef {
         count: 1,
         rarity: Legendary
 
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn pebble() -> EntityDef {
     let mut d = EntityDef {
@@ -6912,19 +8043,22 @@ fn pebble() -> EntityDef {
     d.y_sort = Some(YSort(-0.01));
     d.world_object = Some(WorldObject::Pebble);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 },
+    });
     d.experience_reward = Some(ExperienceReward(5));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
                 item: StoneChunk,
                 min: 1,
                 max: 1,
                 rate: 1.
             ),]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn pebble_block() -> EntityDef {
     let mut d = EntityDef {
@@ -6939,17 +8073,18 @@ fn pebble_block() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::PebbleBlock);
     d.consumable = Some(ConsumableItem);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: PebbleBlock,
         metadata: (
             name: "Pebble", 
             desc: ["A small piece of", "rock. A few of", "them might make a", "big chunk of stone."]
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn pendant() -> EntityDef {
     let mut d = EntityDef {
@@ -6964,7 +8099,8 @@ fn pendant() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::Pendant);
     d.raw_item_base = Some(parse::raw_item_base(r#"()"#));
-    d.raw_item_bonus = Some(parse::raw_item_bonus(r#"(
+    d.raw_item_bonus = Some(parse::raw_item_bonus(
+        r#"(
         health: Some((start: 20, end: 30)),
         defence: Some((start: 16, end: 28)),
         crit_damage: Some((start: 16, end: 28)),
@@ -6983,20 +8119,24 @@ fn pendant() -> EntityDef {
         bonus_damage: Some((start: 18, end: 28)),
         pickup_range: Some((start: 28, end: 44)),
         skill_power: Some((start: 20, end: 33)),
-  )"#));
+  )"#,
+    ));
     d.equipment_type = Some(EquipmentType::Pendant);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: Pendant,
         metadata: (
             name: "Pendant", 
             desc: ["shiny!"]
         ),
         count: 1
-  )"#));
-    d.scraps_into = Some(parse::scraps_into(r#"([(obj: MetalBar, chance: 1.), (obj: MetalBar, chance: 0.5)])"#));
+  )"#,
+    ));
+    d.scraps_into = Some(parse::scraps_into(
+        r#"([(obj: MetalBar, chance: 1.), (obj: MetalBar, chance: 0.5)])"#,
+    ));
     d
 }
-
 
 fn pink_beacon() -> EntityDef {
     let mut d = EntityDef {
@@ -7009,19 +8149,22 @@ fn pink_beacon() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::PinkBeacon);
     d.object_action = Some(parse::object_action(r#"ToggleBeacon(PinkBeacon)"#));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 4., y: 6. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 4., y: 6. },
+    });
     d.max_health = Some(MaxHealth(25));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
                 item: PinkBeaconBlock,
                 min: 1,
                 max: 1,
                 rate: 1.
             ),]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn pink_beacon_block() -> EntityDef {
     let mut d = EntityDef {
@@ -7036,17 +8179,18 @@ fn pink_beacon_block() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::PinkBeaconBlock);
     d.item_actions = Some(parse::item_actions(r#"(actions: [BeaconPortal])"#));
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: PinkBeaconBlock,
         metadata: (
             name: "Portal Map ", 
             desc: ["Guides you to","the Portal."]
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn pink_flower() -> EntityDef {
     let mut d = EntityDef {
@@ -7058,22 +8202,25 @@ fn pink_flower() -> EntityDef {
     d.sprite_anchor = Some(SpriteAnchor(parse::vec2(r#"((x: 0., y: 0.))"#)));
     d.world_object = Some(WorldObject::PinkFlower);
     d.touch_trigger = Some(parse::touch_trigger(r#"Bounce"#));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 5., y: 5. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 5., y: 5. },
+    });
     d.sensor = true;
     d.max_health = Some(MaxHealth(1));
     d.experience_reward = Some(ExperienceReward(7));
     d.y_sort = Some(YSort(-0.01));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
                 item: PinkFlowerBlock,
                 min: 1,
                 max: 1,
                 rate: 1.
             ),]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn pink_flower_block() -> EntityDef {
     let mut d = EntityDef {
@@ -7087,17 +8234,18 @@ fn pink_flower_block() -> EntityDef {
     d.animation_pos_tracker = Some(AnimationPosTracker(0.0, 0.0, 0.3));
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::PinkFlowerBlock);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: PinkFlowerBlock,
         metadata: (
             name: "Pink Flower ", 
             desc: ["Smells really", "nice. Is it useful?"]
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn pink_flower_stew() -> EntityDef {
     let mut d = EntityDef {
@@ -7113,7 +8261,8 @@ fn pink_flower_stew() -> EntityDef {
     d.world_object = Some(WorldObject::PinkFlowerStew);
     d.item_actions = Some(parse::item_actions(r#"(actions: [TriggerBounce])"#));
     d.consumable = Some(ConsumableItem);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: PinkFlowerStew,
         metadata: (
             name: "Pink Stew", 
@@ -7121,10 +8270,10 @@ fn pink_flower_stew() -> EntityDef {
         ),
         rarity: Uncommon,
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn plant_fibre() -> EntityDef {
     let mut d = EntityDef {
@@ -7138,17 +8287,18 @@ fn plant_fibre() -> EntityDef {
     d.animation_pos_tracker = Some(AnimationPosTracker(0.0, 0.0, 0.3));
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::PlantFibre);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: PlantFibre,
         metadata: (
             name: "Plant Fibre", 
             desc: ["Might be able to", "make some string", "with enough of", "these..."]
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn plasma_ball() -> EntityDef {
     let mut d = EntityDef {
@@ -7158,16 +8308,24 @@ fn plasma_ball() -> EntityDef {
     };
     d.sensor = true;
     d.y_sort = Some(YSort(0.));
-    d.sprite_sheet = Some(SpriteSheetDef { asset: "textures/effects/PlasmaBall.png".into(), size: Vec2::new(24., 24.), cols: 24, rows: 1 });
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 12., y: 12. } });
+    d.sprite_sheet = Some(SpriteSheetDef {
+        asset: "textures/effects/PlasmaBall.png".into(),
+        size: Vec2::new(24., 24.),
+        cols: 24,
+        rows: 1,
+    });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 12., y: 12. },
+    });
     d.projectile = Some(Projectile::PlasmaBall);
-    d.projectile_state = Some(parse::projectile_state(r#"(speed: 70., spawn_offset: (x: -20., y: -20.), hit_entities: [], despawn_on_hit: false)"#));
+    d.projectile_state = Some(parse::projectile_state(
+        r#"(speed: 70., spawn_offset: (x: -20., y: -20.), hit_entities: [], despawn_on_hit: false)"#,
+    ));
     d.done_animation = true;
     d.animation_timer = Some(AnimationTimerDef { secs: 0.04 });
     d.animation_pos_tracker = Some(AnimationPosTracker(0.0, 0.0, 0.3));
     d
 }
-
 
 fn plasma_explosion() -> EntityDef {
     let mut d = EntityDef {
@@ -7177,16 +8335,24 @@ fn plasma_explosion() -> EntityDef {
     };
     d.sensor = true;
     d.y_sort = Some(YSort(0.));
-    d.sprite_sheet = Some(SpriteSheetDef { asset: "textures/effects/PlasmaExplosionLarge.png".into(), size: Vec2::new(64., 64.), cols: 9, rows: 1 });
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 32., y: 32. } });
+    d.sprite_sheet = Some(SpriteSheetDef {
+        asset: "textures/effects/PlasmaExplosionLarge.png".into(),
+        size: Vec2::new(64., 64.),
+        cols: 9,
+        rows: 1,
+    });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 32., y: 32. },
+    });
     d.projectile = Some(Projectile::PlasmaExplosion);
-    d.projectile_state = Some(parse::projectile_state(r#"(speed: 0., spawn_offset: (x: -64., y: -64.), hit_entities: [], despawn_on_hit: false)"#));
+    d.projectile_state = Some(parse::projectile_state(
+        r#"(speed: 0., spawn_offset: (x: -64., y: -64.), hit_entities: [], despawn_on_hit: false)"#,
+    ));
     d.done_animation = true;
     d.animation_timer = Some(AnimationTimerDef { secs: 0.04 });
     d.animation_pos_tracker = Some(AnimationPosTracker(0.0, 0.0, 0.3));
     d
 }
-
 
 fn plasma_staff() -> EntityDef {
     let mut d = EntityDef {
@@ -7201,10 +8367,13 @@ fn plasma_staff() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::PlasmaStaff);
     d.equipment_type = Some(EquipmentType::Weapon);
-    d.raw_item_base = Some(parse::raw_item_base(r#"(
+    d.raw_item_base = Some(parse::raw_item_base(
+        r#"(
         attack: Some((start: 10, end: 16)),
-  )"#));
-    d.raw_item_bonus = Some(parse::raw_item_bonus(r#"(
+  )"#,
+    ));
+    d.raw_item_bonus = Some(parse::raw_item_bonus(
+        r#"(
         crit_damage: Some((start: 8, end: 16)),
         crit_chance: Some((start: 6, end: 12)),
         speed: Some((start: 6, end: 10)),
@@ -7220,11 +8389,13 @@ fn plasma_staff() -> EntityDef {
         mana: Some((start: 18, end: 30)),
         mana_regen: Some((start: 4, end: 8)),
         attack_speed: Some((start: 6, end: 10)),
-  )"#));
+  )"#,
+    ));
     d.melee = Some(MeleeAttack);
     d.mana_cost = Some(ManaCost(5));
     d.ranged = Some(RangedAttack(Projectile::PlasmaBall));
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: PlasmaStaff,
         attributes: (
             attack_cooldown: 1.
@@ -7234,11 +8405,13 @@ fn plasma_staff() -> EntityDef {
             desc: ["A Plasma Staff."]
         ),
         count: 1
-  )"#));
-    d.scraps_into = Some(parse::scraps_into(r#"([(obj: Log, chance: 1.), (obj: Log, chance: 0.5)])"#));
+  )"#,
+    ));
+    d.scraps_into = Some(parse::scraps_into(
+        r#"([(obj: Log, chance: 1.), (obj: Log, chance: 0.5)])"#,
+    ));
     d
 }
-
 
 fn poison_cloud() -> EntityDef {
     let mut d = EntityDef {
@@ -7248,15 +8421,29 @@ fn poison_cloud() -> EntityDef {
     };
     d.sensor = true;
     d.y_sort = Some(YSort(0.));
-    d.sprite_sheet = Some(SpriteSheetDef { asset: "textures/effects/poisoncloudsmall.png".into(), size: Vec2::new(64., 64.), cols: 14, rows: 1 });
+    d.sprite_sheet = Some(SpriteSheetDef {
+        asset: "textures/effects/poisoncloudsmall.png".into(),
+        size: Vec2::new(64., 64.),
+        cols: 14,
+        rows: 1,
+    });
     d.projectile = Some(Projectile::PoisonCloud);
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: 0., y1: -16., x2: 0., y2: -16., r: 16. } });
-    d.projectile_state = Some(parse::projectile_state(r#"(speed: 0., direction: (x: 0., y: 0.), hit_entities: [], despawn_on_hit: false)"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: 0.,
+            y1: -16.,
+            x2: 0.,
+            y2: -16.,
+            r: 16.,
+        },
+    });
+    d.projectile_state = Some(parse::projectile_state(
+        r#"(speed: 0., direction: (x: 0., y: 0.), hit_entities: [], despawn_on_hit: false)"#,
+    ));
     d.done_animation = true;
     d.animation_timer = Some(AnimationTimerDef { secs: 0.04 });
     d
 }
-
 
 fn possessed_blade() -> EntityDef {
     let mut d = EntityDef {
@@ -7266,14 +8453,22 @@ fn possessed_blade() -> EntityDef {
     };
     d.sensor = true;
     d.y_sort = Some(YSort(0.));
-    d.sprite_sheet = Some(SpriteSheetDef { asset: "bevy_survival_sprites.png".into(), size: Vec2::new(16., 16.), cols: 16, rows: 16 });
+    d.sprite_sheet = Some(SpriteSheetDef {
+        asset: "bevy_survival_sprites.png".into(),
+        size: Vec2::new(16., 16.),
+        cols: 16,
+        rows: 16,
+    });
     d.world_object = Some(WorldObject::PossessedBlade);
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 10., y: 7. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 10., y: 7. },
+    });
     d.projectile = Some(Projectile::PossessedBlade);
-    d.projectile_state = Some(parse::projectile_state(r#"(speed: 250., direction: (x: 0., y: 0.), hit_entities: [], despawn_on_hit: false)"#));
+    d.projectile_state = Some(parse::projectile_state(
+        r#"(speed: 250., direction: (x: 0., y: 0.), hit_entities: [], despawn_on_hit: false)"#,
+    ));
     d
 }
-
 
 fn raw_meat() -> EntityDef {
     let mut d = EntityDef {
@@ -7287,19 +8482,22 @@ fn raw_meat() -> EntityDef {
     d.animation_pos_tracker = Some(AnimationPosTracker(0.0, 0.0, 0.3));
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::RawMeat);
-    d.item_actions = Some(parse::item_actions(r#"(actions: [Eat(10), ModifyHealth(-10)])"#));
+    d.item_actions = Some(parse::item_actions(
+        r#"(actions: [Eat(10), ModifyHealth(-10)])"#,
+    ));
     d.consumable = Some(ConsumableItem);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: RawMeat,
         metadata: (
             name: "Raw Meat", 
             desc: ["NOT yummy. In", "fact it looks a", "little dangerous."]
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn red_beacon() -> EntityDef {
     let mut d = EntityDef {
@@ -7312,19 +8510,22 @@ fn red_beacon() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::RedBeacon);
     d.object_action = Some(parse::object_action(r#"ToggleBeacon(RedBeacon)"#));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 4., y: 6. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 4., y: 6. },
+    });
     d.max_health = Some(MaxHealth(25));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
                 item: RedBeaconBlock,
                 min: 1,
                 max: 1,
                 rate: 1.
             ),]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn red_beacon_block() -> EntityDef {
     let mut d = EntityDef {
@@ -7339,17 +8540,18 @@ fn red_beacon_block() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::RedBeaconBlock);
     d.item_actions = Some(parse::item_actions(r#"(actions: [BeaconBossShrine])"#));
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: RedBeaconBlock,
         metadata: (
             name: "Boss Map ", 
             desc: ["Guides you to","the Boss Shrine."]
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn red_cape() -> EntityDef {
     let mut d = EntityDef {
@@ -7366,17 +8568,18 @@ fn red_cape() -> EntityDef {
     d.equipment_type = Some(EquipmentType::Cape);
     d.raw_item_base = Some(parse::raw_item_base(r#"()"#));
     d.raw_item_bonus = Some(parse::raw_item_bonus(r#"()"#));
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: RedCape,
         metadata: (
             name: "Warrior's Cape", 
             desc: ["A simple cape full", "of potential. For", "now, it's only", " purpose is to", "obscure your clothing."]
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn red_flower() -> EntityDef {
     let mut d = EntityDef {
@@ -7388,21 +8591,24 @@ fn red_flower() -> EntityDef {
     d.sprite_anchor = Some(SpriteAnchor(parse::vec2(r#"((x: 0., y: 0.))"#)));
     d.y_sort = Some(YSort(-0.01));
     d.world_object = Some(WorldObject::RedFlower);
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 },
+    });
     d.sensor = true;
     d.max_health = Some(MaxHealth(1));
     d.experience_reward = Some(ExperienceReward(5));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
                 item: RedFlowerBlock,
                 min: 1,
                 max: 1,
                 rate: 1.
             ),]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn red_flower_block() -> EntityDef {
     let mut d = EntityDef {
@@ -7416,17 +8622,18 @@ fn red_flower_block() -> EntityDef {
     d.animation_pos_tracker = Some(AnimationPosTracker(0.0, 0.0, 0.3));
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::RedFlowerBlock);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: RedFlowerBlock,
         metadata: (
             name: "Red Flower ", 
             desc: ["A red flower.", "Might help in a","recipe."]
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn red_mushking() -> EntityDef {
     let mut d = EntityDef {
@@ -7441,12 +8648,27 @@ fn red_mushking() -> EntityDef {
     d.y_sort = Some(YSort(1.));
     d.combat_alignment = Some(CombatAlignment::Hostile);
     d.follow_speed = Some(FollowSpeed(0.65));
-    d.leap_attack = Some(LeapAttack { activation_distance: 128., startup: 0.35, duration: 1.0, cooldown: 1.25, speed: 150. });
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: -17., y1: -15., x2: 17., y2: -15., r: 14. } });
+    d.leap_attack = Some(LeapAttack {
+        activation_distance: 128.,
+        startup: 0.35,
+        duration: 1.0,
+        cooldown: 1.25,
+        speed: 150.,
+    });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: -17.,
+            y1: -15.,
+            x2: 17.,
+            y2: -15.,
+            r: 14.,
+        },
+    });
     d.max_health = Some(MaxHealth(1750));
     d.attack = Some(Attack(15));
     d.mob_level = Some(1);
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
                 item: SmallPotion,
                 min: 1,
@@ -7538,10 +8760,10 @@ fn red_mushking() -> EntityDef {
                 rate: 1.
             ),
             ]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn red_mushling() -> EntityDef {
     let mut d = EntityDef {
@@ -7555,11 +8777,20 @@ fn red_mushling() -> EntityDef {
     d.sensor = true;
     d.y_sort = Some(YSort(0.));
     d.combat_alignment = Some(CombatAlignment::Neutral);
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: 0., y1: -1., x2: 0., y2: -1.5, r: 4. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: 0.,
+            y1: -1.,
+            x2: 0.,
+            y2: -1.5,
+            r: 4.,
+        },
+    });
     d.max_health = Some(MaxHealth(12));
     d.attack = Some(Attack(10));
     d.experience_reward = Some(ExperienceReward(15));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
                 item: SmallPotion,
                 min: 1,
@@ -7645,10 +8876,10 @@ fn red_mushling() -> EntityDef {
                 rate: 0.00009
             ),
             ]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn red_mushling_card() -> EntityDef {
     let mut d = EntityDef {
@@ -7662,7 +8893,8 @@ fn red_mushling_card() -> EntityDef {
     d.animation_pos_tracker = Some(AnimationPosTracker(0.0, 0.0, 0.3));
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::RedMushlingCard);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: RedMushlingCard,
         metadata: (
             name: "Red Mushling Card",
@@ -7670,10 +8902,10 @@ fn red_mushling_card() -> EntityDef {
         ),
         rarity: Common,
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn red_mushroom() -> EntityDef {
     let mut d = EntityDef {
@@ -7685,21 +8917,24 @@ fn red_mushroom() -> EntityDef {
     d.sprite_anchor = Some(SpriteAnchor(parse::vec2(r#"((x: 0., y: 0.))"#)));
     d.y_sort = Some(YSort(-0.01));
     d.world_object = Some(WorldObject::RedMushroom);
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 },
+    });
     d.sensor = true;
     d.max_health = Some(MaxHealth(1));
     d.experience_reward = Some(ExperienceReward(5));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
                 item: RedMushroomBlock,
                 min: 1,
                 max: 1,
                 rate: 1.
             ),]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn red_mushroom_block() -> EntityDef {
     let mut d = EntityDef {
@@ -7715,17 +8950,18 @@ fn red_mushroom_block() -> EntityDef {
     d.world_object = Some(WorldObject::RedMushroomBlock);
     d.item_actions = Some(parse::item_actions(r#"(actions: [ModifyHealth(5)])"#));
     d.consumable = Some(ConsumableItem);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: RedMushroomBlock,
         metadata: (
             name: "Red Mushroom ", 
             desc: ["Smells funny...", "Looks cool though!", "I should try", "cooking it."]
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn red_sapling_block() -> EntityDef {
     let mut d = EntityDef {
@@ -7740,17 +8976,18 @@ fn red_sapling_block() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::RedSaplingBlock);
     d.consumable = Some(ConsumableItem);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: RedSaplingBlock,
         metadata: (
             name: "Red Sapling", 
             desc: ["Grows into a tree", "when placed on", "the ground."],
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn red_sapling_stage1() -> EntityDef {
     let mut d = EntityDef {
@@ -7766,20 +9003,29 @@ fn red_sapling_stage1() -> EntityDef {
     d.sapling_secs = Some(60.);
     d.foliage_size = Some(FoliageSize(parse::vec2(r#"((x: 16., y: 16.))"#)));
     d.sprite_anchor = Some(SpriteAnchor(parse::vec2(r#"((x: 0., y: 0.))"#)));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: 0., y1: -10., x2: 0., y2: -6., r: 1.5 } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: 0.,
+            y1: -10.,
+            x2: 0.,
+            y2: -6.,
+            r: 1.5,
+        },
+    });
     d.max_health = Some(MaxHealth(1));
     d.y_sort = Some(YSort(0.));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
                 item: RedSaplingBlock,
                 min: 1,
                 max: 1,
                 rate: 1.
             ),]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn red_sapling_stage2() -> EntityDef {
     let mut d = EntityDef {
@@ -7795,11 +9041,20 @@ fn red_sapling_stage2() -> EntityDef {
     d.sprite_size = Some(SpriteSize::Small);
     d.foliage_size = Some(FoliageSize(parse::vec2(r#"((x: 16., y: 32.))"#)));
     d.sprite_anchor = Some(SpriteAnchor(parse::vec2(r#"((x: 0., y: 8.))"#)));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: 0., y1: -24., x2: 0., y2: -14., r: 1.5 } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: 0.,
+            y1: -24.,
+            x2: 0.,
+            y2: -14.,
+            r: 1.5,
+        },
+    });
     d.max_health = Some(MaxHealth(12));
     d.y_sort = Some(YSort(0.));
     d.experience_reward = Some(ExperienceReward(5));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
                 item: RedSaplingBlock,
                 min: 1,
@@ -7812,10 +9067,10 @@ fn red_sapling_stage2() -> EntityDef {
                 max: 2,
                 rate: 0.75
             ),]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn red_sapling_stage3() -> EntityDef {
     let mut d = EntityDef {
@@ -7831,11 +9086,20 @@ fn red_sapling_stage3() -> EntityDef {
     d.sprite_size = Some(SpriteSize::Small);
     d.foliage_size = Some(FoliageSize(parse::vec2(r#"((x: 16., y: 32.))"#)));
     d.sprite_anchor = Some(SpriteAnchor(parse::vec2(r#"((x: 0., y: 8.))"#)));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: 0., y1: -24., x2: 0., y2: -14., r: 1.5 } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: 0.,
+            y1: -24.,
+            x2: 0.,
+            y2: -14.,
+            r: 1.5,
+        },
+    });
     d.max_health = Some(MaxHealth(20));
     d.y_sort = Some(YSort(0.));
     d.experience_reward = Some(ExperienceReward(5));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
                 item: RedSaplingBlock,
                 min: 1,
@@ -7848,10 +9112,10 @@ fn red_sapling_stage3() -> EntityDef {
                 max: 2,
                 rate: 0.75
             ),]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn red_stew() -> EntityDef {
     let mut d = EntityDef {
@@ -7865,9 +9129,12 @@ fn red_stew() -> EntityDef {
     d.animation_pos_tracker = Some(AnimationPosTracker(0.0, 0.0, 0.3));
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::RedStew);
-    d.item_actions = Some(parse::item_actions(r#"(actions: [ApplyPeriodicHeal(5,0.4,5.0),])"#));
+    d.item_actions = Some(parse::item_actions(
+        r#"(actions: [ApplyPeriodicHeal(5,0.4,5.0),])"#,
+    ));
     d.consumable = Some(ConsumableItem);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: RedStew,
         metadata: (
             name: "Red Stew", 
@@ -7875,10 +9142,10 @@ fn red_stew() -> EntityDef {
         ),
         rarity: Uncommon,
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn red_tree() -> EntityDef {
     let mut d = EntityDef {
@@ -7893,11 +9160,20 @@ fn red_tree() -> EntityDef {
     d.fade_opacity = Some(FadeOpacity);
     d.sprite_anchor = Some(SpriteAnchor(parse::vec2(r#"((x: 0., y: 32.))"#)));
     d.required_equipment_type = Some(RequiredEquipmentType(EquipmentType::Axe));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: 0., y1: -30., x2: 0., y2: -22., r: 4. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: 0.,
+            y1: -30.,
+            x2: 0.,
+            y2: -22.,
+            r: 4.,
+        },
+    });
     d.max_health = Some(MaxHealth(25));
     d.y_sort = Some(YSort(0.));
     d.experience_reward = Some(ExperienceReward(10));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [
             (
                 item: Stick,
@@ -7917,10 +9193,10 @@ fn red_tree() -> EntityDef {
                 rate: 0.75
             ),
            ]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn ring() -> EntityDef {
     let mut d = EntityDef {
@@ -7935,7 +9211,8 @@ fn ring() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::Ring);
     d.raw_item_base = Some(parse::raw_item_base(r#"()"#));
-    d.raw_item_bonus = Some(parse::raw_item_bonus(r#"(
+    d.raw_item_bonus = Some(parse::raw_item_bonus(
+        r#"(
         health: Some((start: 12, end: 20)),
         defence: Some((start: 10, end: 18)),
         crit_damage: Some((start: 13, end: 22)),
@@ -7954,20 +9231,24 @@ fn ring() -> EntityDef {
         bonus_damage: Some((start: 10, end: 18)),
         pickup_range: Some((start: 24, end: 36)),
         skill_power: Some((start: 16, end: 26)),
-  )"#));
+  )"#,
+    ));
     d.equipment_type = Some(EquipmentType::Ring);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: Ring,
         metadata: (
             name: "Ring", 
             desc: ["shiny!"]
         ),
         count: 1
-  )"#));
-    d.scraps_into = Some(parse::scraps_into(r#"([(obj: MetalBar, chance: 1.), (obj: MetalBar, chance: 0.5)])"#));
+  )"#,
+    ));
+    d.scraps_into = Some(parse::scraps_into(
+        r#"([(obj: MetalBar, chance: 1.), (obj: MetalBar, chance: 0.5)])"#,
+    ));
     d
 }
-
 
 fn rock() -> EntityDef {
     let mut d = EntityDef {
@@ -7977,14 +9258,22 @@ fn rock() -> EntityDef {
     };
     d.sensor = true;
     d.y_sort = Some(YSort(0.));
-    d.sprite_sheet = Some(SpriteSheetDef { asset: "bevy_survival_sprites.png".into(), size: Vec2::new(16., 16.), cols: 16, rows: 16 });
+    d.sprite_sheet = Some(SpriteSheetDef {
+        asset: "bevy_survival_sprites.png".into(),
+        size: Vec2::new(16., 16.),
+        cols: 16,
+        rows: 16,
+    });
     d.world_object = Some(WorldObject::Flint);
     d.projectile = Some(Projectile::Rock);
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 8., y: 8. } });
-    d.projectile_state = Some(parse::projectile_state(r#"(speed: 2., direction: (x: 0., y: 0.), hit_entities: [], despawn_on_hit: true)"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 8., y: 8. },
+    });
+    d.projectile_state = Some(parse::projectile_state(
+        r#"(speed: 2., direction: (x: 0., y: 0.), hit_entities: [], despawn_on_hit: true)"#,
+    ));
     d
 }
-
 
 fn scorpion() -> EntityDef {
     let mut d = EntityDef {
@@ -7998,7 +9287,8 @@ fn scorpion() -> EntityDef {
     d.y_sort = Some(YSort(1.));
     d.combat_alignment = Some(CombatAlignment::Hostile);
     d.follow_speed = Some(FollowSpeed(0.65));
-    d.scorpion_claw_attack = Some(parse::scorpion_claw_attack(r#"(
+    d.scorpion_claw_attack = Some(parse::scorpion_claw_attack(
+        r#"(
         activation_distance: 90.,
         cooldown: 1.0,
         prep_duration: 0.4,
@@ -8007,8 +9297,10 @@ fn scorpion() -> EntityDef {
         lunge_speed: 260.,
         hitbox_duration: 0.3,
         hitbox_offset: 22.,
-    )"#));
-    d.scorpion_tail_attack = Some(parse::scorpion_tail_attack(r#"(
+    )"#,
+    ));
+    d.scorpion_tail_attack = Some(parse::scorpion_tail_attack(
+        r#"(
         activation_distance: 999.,
         cooldown: 2.0,
         prep_duration: 0.5,
@@ -8017,18 +9309,30 @@ fn scorpion() -> EntityDef {
         projectiles_per_wave: 3,
         cone_half_angle: 0.35,
         wave_duration: 0.35,
-    )"#));
-    d.scorpion_tornado_attack = Some(parse::scorpion_tornado_attack(r#"(
+    )"#,
+    ));
+    d.scorpion_tornado_attack = Some(parse::scorpion_tornado_attack(
+        r#"(
         interval: 7.0,
         tornado_duration: 20.0,
         tornado_speed: 55.,
         spawn_distance: 32.,
-    )"#));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: -6., y1: -10., x2: 6., y2: -10., r: 18. } });
+    )"#,
+    ));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: -6.,
+            y1: -10.,
+            x2: 6.,
+            y2: -10.,
+            r: 18.,
+        },
+    });
     d.max_health = Some(MaxHealth(2800));
     d.attack = Some(Attack(15));
     d.mob_level = Some(1);
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
                 item: SmallPotion,
                 min: 1,
@@ -8114,10 +9418,10 @@ fn scorpion() -> EntityDef {
                 rate: 1.
             ),
             ]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn scorpion_projectile() -> EntityDef {
     let mut d = EntityDef {
@@ -8127,13 +9431,21 @@ fn scorpion_projectile() -> EntityDef {
     };
     d.sensor = true;
     d.y_sort = Some(YSort(0.));
-    d.sprite_sheet = Some(SpriteSheetDef { asset: "textures/scorpion/scorpionProjectile.png".into(), size: Vec2::new(20., 32.), cols: 1, rows: 1 });
+    d.sprite_sheet = Some(SpriteSheetDef {
+        asset: "textures/scorpion/scorpionProjectile.png".into(),
+        size: Vec2::new(20., 32.),
+        cols: 1,
+        rows: 1,
+    });
     d.projectile = Some(Projectile::ScorpionProjectile);
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 7., y: 12. } });
-    d.projectile_state = Some(parse::projectile_state(r#"(speed: 140., direction: (x: 0., y: 0.), hit_entities: [], despawn_on_hit: true)"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 7., y: 12. },
+    });
+    d.projectile_state = Some(parse::projectile_state(
+        r#"(speed: 140., direction: (x: 0., y: 0.), hit_entities: [], despawn_on_hit: true)"#,
+    ));
     d
 }
-
 
 fn scrapper() -> EntityDef {
     let mut d = EntityDef {
@@ -8146,19 +9458,22 @@ fn scrapper() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::Scrapper);
     d.object_action = Some(parse::object_action(r#"Scrapper"#));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 8., y: 8. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 8., y: 8. },
+    });
     d.max_health = Some(MaxHealth(5));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
                 item: ScrapperBlock,
                 min: 1,
                 max: 1,
                 rate: 1.
             ),]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn scrapper_block() -> EntityDef {
     let mut d = EntityDef {
@@ -8174,17 +9489,18 @@ fn scrapper_block() -> EntityDef {
     d.world_object = Some(WorldObject::ScrapperBlock);
     d.item_actions = Some(parse::item_actions(r#"(actions: [PlacesInto(Scrapper)])"#));
     d.consumable = Some(ConsumableItem);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: ScrapperBlock,
         metadata: (
             name: "Scrapper ", 
             desc: ["Can get rid of", "unwanted items. Some", "items can return", "resources."],
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn shout() -> EntityDef {
     let mut d = EntityDef {
@@ -8194,15 +9510,23 @@ fn shout() -> EntityDef {
     };
     d.sensor = true;
     d.y_sort = Some(YSort(0.));
-    d.sprite_sheet = Some(SpriteSheetDef { asset: "textures/effects/shout.png".into(), size: Vec2::new(96., 96.), cols: 10, rows: 1 });
+    d.sprite_sheet = Some(SpriteSheetDef {
+        asset: "textures/effects/shout.png".into(),
+        size: Vec2::new(96., 96.),
+        cols: 10,
+        rows: 1,
+    });
     d.projectile = Some(Projectile::Shout);
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 48., y: 48. } });
-    d.projectile_state = Some(parse::projectile_state(r#"(speed: 0., direction: (x: 0., y: 0.), hit_entities: [], despawn_on_hit: false)"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 48., y: 48. },
+    });
+    d.projectile_state = Some(parse::projectile_state(
+        r#"(speed: 0., direction: (x: 0., y: 0.), hit_entities: [], despawn_on_hit: false)"#,
+    ));
     d.done_animation = true;
     d.animation_timer = Some(AnimationTimerDef { secs: 0.03 });
     d
 }
-
 
 fn size_food() -> EntityDef {
     let mut d = EntityDef {
@@ -8218,7 +9542,8 @@ fn size_food() -> EntityDef {
     d.world_object = Some(WorldObject::SizeFood);
     d.item_actions = Some(parse::item_actions(r#"(actions: [GainStat("size", 5)])"#));
     d.consumable = Some(ConsumableItem);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: SizeFood,
         metadata: (
             name: "Size Boost", 
@@ -8226,10 +9551,10 @@ fn size_food() -> EntityDef {
         ),
         rarity: Legendary,
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn skill_power_food() -> EntityDef {
     let mut d = EntityDef {
@@ -8243,9 +9568,12 @@ fn skill_power_food() -> EntityDef {
     d.animation_pos_tracker = Some(AnimationPosTracker(0.0, 0.0, 0.3));
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::SkillPowerFood);
-    d.item_actions = Some(parse::item_actions(r#"(actions: [GainStat("skill_power", 10)])"#));
+    d.item_actions = Some(parse::item_actions(
+        r#"(actions: [GainStat("skill_power", 10)])"#,
+    ));
     d.consumable = Some(ConsumableItem);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: SkillPowerFood,
         metadata: (
             name: "Skill Power Boost", 
@@ -8253,10 +9581,10 @@ fn skill_power_food() -> EntityDef {
         ),
         rarity: Rare,
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn slime() -> EntityDef {
     let mut d = EntityDef {
@@ -8272,16 +9600,39 @@ fn slime() -> EntityDef {
     d.combat_alignment = Some(CombatAlignment::Hostile);
     d.follow_speed = Some(FollowSpeed(0.55));
     d.enemy_anim_state = Some(EnemyAnimationState::Walk);
-    d.leap_attack = Some(LeapAttack { activation_distance: 100., startup: 1., duration: 0.6, cooldown: 3.0, speed: 2.5 });
-    d.sprite_sheet = Some(SpriteSheetDef { asset: "textures/slime/slime_down.png".into(), size: Vec2::new(96., 96.), cols: 7, rows: 5 });
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: 0., y1: -16., x2: 0., y2: -16.5, r: 34. } });
+    d.leap_attack = Some(LeapAttack {
+        activation_distance: 100.,
+        startup: 1.,
+        duration: 0.6,
+        cooldown: 3.0,
+        speed: 2.5,
+    });
+    d.sprite_sheet = Some(SpriteSheetDef {
+        asset: "textures/slime/slime_down.png".into(),
+        size: Vec2::new(96., 96.),
+        cols: 7,
+        rows: 5,
+    });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: 0.,
+            y1: -16.,
+            x2: 0.,
+            y2: -16.5,
+            r: 34.,
+        },
+    });
     d.animation_timer = Some(AnimationTimerDef { secs: 0.2 });
     d.animation_frame_tracker = Some(AnimationFrameTracker(0, 7));
-    d.anim_sprite_sheet_data = Some(CharacterAnimationSpriteSheetData { animation_frames: vec![7,7,7,7,7], anim_offset: 0 });
+    d.anim_sprite_sheet_data = Some(CharacterAnimationSpriteSheetData {
+        animation_frames: vec![7, 7, 7, 7, 7],
+        anim_offset: 0,
+    });
     d.max_health = Some(MaxHealth(500));
     d.attack = Some(Attack(25));
     d.experience_reward = Some(ExperienceReward(275));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
                 item: SmallPotion,
                 min: 1,
@@ -8313,10 +9664,10 @@ fn slime() -> EntityDef {
                 rate: 1.
             ),
             ]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn slime_goo() -> EntityDef {
     let mut d = EntityDef {
@@ -8330,17 +9681,18 @@ fn slime_goo() -> EntityDef {
     d.animation_pos_tracker = Some(AnimationPosTracker(0.0, 0.0, 0.3));
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::SlimeGoo);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: SlimeGoo,
         metadata: (
             name: "Slime Goo ", 
             desc: ["A glob of Slime", "Goo. Probably", "can't eat it. But it", " might be useful."]
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn slime_goo_projectile() -> EntityDef {
     let mut d = EntityDef {
@@ -8350,14 +9702,22 @@ fn slime_goo_projectile() -> EntityDef {
     };
     d.sensor = true;
     d.y_sort = Some(YSort(0.));
-    d.sprite_sheet = Some(SpriteSheetDef { asset: "bevy_survival_sprites.png".into(), size: Vec2::new(16., 16.), cols: 16, rows: 16 });
+    d.sprite_sheet = Some(SpriteSheetDef {
+        asset: "bevy_survival_sprites.png".into(),
+        size: Vec2::new(16., 16.),
+        cols: 16,
+        rows: 16,
+    });
     d.world_object = Some(WorldObject::SlimeGooProjectile);
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 8., y: 8. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 8., y: 8. },
+    });
     d.projectile = Some(Projectile::SlimeGooProjectile);
-    d.projectile_state = Some(parse::projectile_state(r#"(speed: 120, direction: (x: 0., y: 0.), hit_entities: [], despawn_on_hit: true)"#));
+    d.projectile_state = Some(parse::projectile_state(
+        r#"(speed: 120, direction: (x: 0., y: 0.), hit_entities: [], despawn_on_hit: true)"#,
+    ));
     d
 }
-
 
 fn slime_pet() -> EntityDef {
     let mut d = EntityDef {
@@ -8373,7 +9733,6 @@ fn slime_pet() -> EntityDef {
     d
 }
 
-
 fn small_cactus() -> EntityDef {
     let mut d = EntityDef {
         name: "SmallCactus".into(),
@@ -8388,12 +9747,23 @@ fn small_cactus() -> EntityDef {
     d.mob = Some(Mob::SmallCactus);
     d.combat_alignment = Some(CombatAlignment::Hostile);
     d.follow_speed = Some(FollowSpeed(0.55));
-    d.circle_attack = Some(parse::circle_attack(r#"(activation_distance: 28., cooldown: 1.5, startup: 0.2, hitbox_offset: 16., hitbox_delay: 0.2, hitbox_radius: 10.)"#));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: 0., y1: -1., x2: 0., y2: -1.5, r: 6. } });
+    d.circle_attack = Some(parse::circle_attack(
+        r#"(activation_distance: 28., cooldown: 1.5, startup: 0.2, hitbox_offset: 16., hitbox_delay: 0.2, hitbox_radius: 10.)"#,
+    ));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: 0.,
+            y1: -1.,
+            x2: 0.,
+            y2: -1.5,
+            r: 6.,
+        },
+    });
     d.max_health = Some(MaxHealth(11));
     d.attack = Some(Attack(12));
     d.experience_reward = Some(ExperienceReward(5));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
                 item: SmallPotion,
                 min: 1,
@@ -8473,10 +9843,10 @@ fn small_cactus() -> EntityDef {
                 rate: 0.00007
             ),
             ]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn small_cactus_card() -> EntityDef {
     let mut d = EntityDef {
@@ -8490,7 +9860,8 @@ fn small_cactus_card() -> EntityDef {
     d.animation_pos_tracker = Some(AnimationPosTracker(0.0, 0.0, 0.3));
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::SmallCactusCard);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: SmallCactusCard,
         metadata: (
             name: "Small Cactus Card",
@@ -8498,10 +9869,10 @@ fn small_cactus_card() -> EntityDef {
         ),
         rarity: Common,
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn small_green_tree() -> EntityDef {
     let mut d = EntityDef {
@@ -8515,12 +9886,21 @@ fn small_green_tree() -> EntityDef {
     d.foliage_size = Some(FoliageSize(parse::vec2(r#"((x: 64., y: 96.))"#)));
     d.sprite_anchor = Some(SpriteAnchor(parse::vec2(r#"((x: 0., y: 32.))"#)));
     d.required_equipment_type = Some(RequiredEquipmentType(EquipmentType::Axe));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: 0., y1: -30., x2: 0., y2: -23.5, r: 4. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: 0.,
+            y1: -30.,
+            x2: 0.,
+            y2: -23.5,
+            r: 4.,
+        },
+    });
     d.max_health = Some(MaxHealth(25));
     d.y_sort = Some(YSort(0.));
     d.experience_reward = Some(ExperienceReward(5));
     d.sprite_texture = Some("smallgreentree.png".into());
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [
             (
                 item: Log,
@@ -8540,10 +9920,10 @@ fn small_green_tree() -> EntityDef {
                 max: 3,
                 rate: 0.25
             )]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn small_mana_potion() -> EntityDef {
     let mut d = EntityDef {
@@ -8559,7 +9939,8 @@ fn small_mana_potion() -> EntityDef {
     d.world_object = Some(WorldObject::SmallManaPotion);
     d.item_actions = Some(parse::item_actions(r#"(actions: [ ModifyMana(40)])"#));
     d.consumable = Some(ConsumableItem);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: SmallManaPotion,
         metadata: (
             name: "Small Mana Potion", 
@@ -8567,10 +9948,10 @@ fn small_mana_potion() -> EntityDef {
         ),
         rarity: Uncommon,
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn small_potion() -> EntityDef {
     let mut d = EntityDef {
@@ -8586,7 +9967,8 @@ fn small_potion() -> EntityDef {
     d.world_object = Some(WorldObject::SmallPotion);
     d.item_actions = Some(parse::item_actions(r#"(actions: [ ModifyHealth(50)])"#));
     d.consumable = Some(ConsumableItem);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: SmallPotion,
         metadata: (
             name: "Small Potion ", 
@@ -8594,10 +9976,10 @@ fn small_potion() -> EntityDef {
         ),
         rarity: Uncommon,
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn small_yellow_tree() -> EntityDef {
     let mut d = EntityDef {
@@ -8612,11 +9994,20 @@ fn small_yellow_tree() -> EntityDef {
     d.foliage_size = Some(FoliageSize(parse::vec2(r#"((x: 64., y: 96.))"#)));
     d.sprite_anchor = Some(SpriteAnchor(parse::vec2(r#"((x: 0., y: 32.))"#)));
     d.required_equipment_type = Some(RequiredEquipmentType(EquipmentType::Axe));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: 0., y1: -30., x2: 0., y2: -22., r: 4. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: 0.,
+            y1: -30.,
+            x2: 0.,
+            y2: -22.,
+            r: 4.,
+        },
+    });
     d.max_health = Some(MaxHealth(25));
     d.y_sort = Some(YSort(0.));
     d.experience_reward = Some(ExperienceReward(5));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [
             (
                 item: Stick,
@@ -8635,10 +10026,10 @@ fn small_yellow_tree() -> EntityDef {
                 max: 3,
                 rate: 0.25
             )]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn sml_cactus1() -> EntityDef {
     let mut d = EntityDef {
@@ -8651,11 +10042,14 @@ fn sml_cactus1() -> EntityDef {
     d.y_sort = Some(YSort(-0.01));
     d.world_object = Some(WorldObject::SmlCactus1);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 5., y: 5. } });
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: PlantFibre, min: 1, max: 1, rate: 0.75)])"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 5., y: 5. },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: PlantFibre, min: 1, max: 1, rate: 0.75)])"#,
+    ));
     d
 }
-
 
 fn sml_cactus2() -> EntityDef {
     let mut d = EntityDef {
@@ -8668,11 +10062,14 @@ fn sml_cactus2() -> EntityDef {
     d.y_sort = Some(YSort(-0.01));
     d.world_object = Some(WorldObject::SmlCactus2);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 5., y: 5. } });
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: PlantFibre, min: 1, max: 1, rate: 0.75)])"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 5., y: 5. },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: PlantFibre, min: 1, max: 1, rate: 0.75)])"#,
+    ));
     d
 }
-
 
 fn sml_cactus3() -> EntityDef {
     let mut d = EntityDef {
@@ -8685,11 +10082,14 @@ fn sml_cactus3() -> EntityDef {
     d.y_sort = Some(YSort(-0.01));
     d.world_object = Some(WorldObject::SmlCactus3);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 5., y: 5. } });
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: PlantFibre, min: 1, max: 1, rate: 0.75)])"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 5., y: 5. },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: PlantFibre, min: 1, max: 1, rate: 0.75)])"#,
+    ));
     d
 }
-
 
 fn sml_fruit_cactus1() -> EntityDef {
     let mut d = EntityDef {
@@ -8702,11 +10102,14 @@ fn sml_fruit_cactus1() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::SmlFruitCactus1);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 } });
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: CactusBerry, min: 1, max: 1, rate: 1.0)])"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: CactusBerry, min: 1, max: 1, rate: 1.0)])"#,
+    ));
     d
 }
-
 
 fn sml_fruit_cactus2() -> EntityDef {
     let mut d = EntityDef {
@@ -8719,11 +10122,14 @@ fn sml_fruit_cactus2() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::SmlFruitCactus2);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 } });
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: CactusBerry, min: 1, max: 1, rate: 1.0)])"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: CactusBerry, min: 1, max: 1, rate: 1.0)])"#,
+    ));
     d
 }
-
 
 fn sml_fruit_cactus3() -> EntityDef {
     let mut d = EntityDef {
@@ -8736,11 +10142,14 @@ fn sml_fruit_cactus3() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::SmlFruitCactus3);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 } });
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: CactusBerry, min: 1, max: 1, rate: 1.0)])"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: CactusBerry, min: 1, max: 1, rate: 1.0)])"#,
+    ));
     d
 }
-
 
 fn sml_fruit_cactus4() -> EntityDef {
     let mut d = EntityDef {
@@ -8753,11 +10162,14 @@ fn sml_fruit_cactus4() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::SmlFruitCactus4);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 } });
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: CactusBerry, min: 1, max: 1, rate: 1.0)])"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: CactusBerry, min: 1, max: 1, rate: 1.0)])"#,
+    ));
     d
 }
-
 
 fn smoke() -> EntityDef {
     let mut d = EntityDef {
@@ -8767,15 +10179,23 @@ fn smoke() -> EntityDef {
     };
     d.sensor = true;
     d.y_sort = Some(YSort(0.));
-    d.sprite_sheet = Some(SpriteSheetDef { asset: "textures/effects/smoke2.png".into(), size: Vec2::new(48., 48.), cols: 16, rows: 1 });
+    d.sprite_sheet = Some(SpriteSheetDef {
+        asset: "textures/effects/smoke2.png".into(),
+        size: Vec2::new(48., 48.),
+        cols: 16,
+        rows: 1,
+    });
     d.projectile = Some(Projectile::Smoke);
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 0., y: 0. } });
-    d.projectile_state = Some(parse::projectile_state(r#"(speed: 0., direction: (x: 0., y: 0.), hit_entities: [], despawn_on_hit: false)"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 0., y: 0. },
+    });
+    d.projectile_state = Some(parse::projectile_state(
+        r#"(speed: 0., direction: (x: 0., y: 0.), hit_entities: [], despawn_on_hit: false)"#,
+    ));
     d.done_animation = true;
     d.animation_timer = Some(AnimationTimerDef { secs: 0.05 });
     d
 }
-
 
 fn snow_berry_bush_med1() -> EntityDef {
     let mut d = EntityDef {
@@ -8789,11 +10209,14 @@ fn snow_berry_bush_med1() -> EntityDef {
     d.world_object = Some(WorldObject::SnowBerryBushMed1);
     d.max_health = Some(MaxHealth(1));
     d.experience_reward = Some(ExperienceReward(5));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 9., y: 9. } });
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: YellowBerries, min: 1, max: 1, rate: 1.0)])"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 9., y: 9. },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: YellowBerries, min: 1, max: 1, rate: 1.0)])"#,
+    ));
     d
 }
-
 
 fn snow_berry_bush_med2() -> EntityDef {
     let mut d = EntityDef {
@@ -8807,11 +10230,14 @@ fn snow_berry_bush_med2() -> EntityDef {
     d.world_object = Some(WorldObject::SnowBerryBushMed2);
     d.max_health = Some(MaxHealth(1));
     d.experience_reward = Some(ExperienceReward(5));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 9., y: 9. } });
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: YellowBerries, min: 1, max: 1, rate: 1.0)])"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 9., y: 9. },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: YellowBerries, min: 1, max: 1, rate: 1.0)])"#,
+    ));
     d
 }
-
 
 fn snow_berry_bush_sml1() -> EntityDef {
     let mut d = EntityDef {
@@ -8825,11 +10251,14 @@ fn snow_berry_bush_sml1() -> EntityDef {
     d.world_object = Some(WorldObject::SnowBerryBushSml1);
     d.max_health = Some(MaxHealth(1));
     d.experience_reward = Some(ExperienceReward(5));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 6., y: 6. } });
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: YellowBerries, min: 1, max: 1, rate: 1.0)])"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 6., y: 6. },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: YellowBerries, min: 1, max: 1, rate: 1.0)])"#,
+    ));
     d
 }
-
 
 fn snow_berry_bush_sml2() -> EntityDef {
     let mut d = EntityDef {
@@ -8843,11 +10272,14 @@ fn snow_berry_bush_sml2() -> EntityDef {
     d.world_object = Some(WorldObject::SnowBerryBushSml2);
     d.max_health = Some(MaxHealth(1));
     d.experience_reward = Some(ExperienceReward(5));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 6., y: 6. } });
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: YellowBerries, min: 1, max: 1, rate: 1.0)])"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 6., y: 6. },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: YellowBerries, min: 1, max: 1, rate: 1.0)])"#,
+    ));
     d
 }
-
 
 fn snow_berry_bush_sml3() -> EntityDef {
     let mut d = EntityDef {
@@ -8861,11 +10293,14 @@ fn snow_berry_bush_sml3() -> EntityDef {
     d.world_object = Some(WorldObject::SnowBerryBushSml3);
     d.max_health = Some(MaxHealth(1));
     d.experience_reward = Some(ExperienceReward(5));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 6., y: 6. } });
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: YellowBerries, min: 1, max: 1, rate: 1.0)])"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 6., y: 6. },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: YellowBerries, min: 1, max: 1, rate: 1.0)])"#,
+    ));
     d
 }
-
 
 fn snow_berry_bush_sml4() -> EntityDef {
     let mut d = EntityDef {
@@ -8879,11 +10314,14 @@ fn snow_berry_bush_sml4() -> EntityDef {
     d.world_object = Some(WorldObject::SnowBerryBushSml4);
     d.max_health = Some(MaxHealth(1));
     d.experience_reward = Some(ExperienceReward(5));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 6., y: 6. } });
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: YellowBerries, min: 1, max: 1, rate: 1.0)])"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 6., y: 6. },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: YellowBerries, min: 1, max: 1, rate: 1.0)])"#,
+    ));
     d
 }
-
 
 fn snow_bush1() -> EntityDef {
     let mut d = EntityDef {
@@ -8896,11 +10334,14 @@ fn snow_bush1() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::SnowBush1);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 } });
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: PlantFibre, min: 1, max: 2, rate: 0.75)])"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: PlantFibre, min: 1, max: 2, rate: 0.75)])"#,
+    ));
     d
 }
-
 
 fn snow_bush2() -> EntityDef {
     let mut d = EntityDef {
@@ -8913,11 +10354,14 @@ fn snow_bush2() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::SnowBush2);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 } });
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: PlantFibre, min: 1, max: 2, rate: 0.75)])"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: PlantFibre, min: 1, max: 2, rate: 0.75)])"#,
+    ));
     d
 }
-
 
 fn snow_bush3() -> EntityDef {
     let mut d = EntityDef {
@@ -8930,11 +10374,14 @@ fn snow_bush3() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::SnowBush3);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 } });
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: PlantFibre, min: 1, max: 2, rate: 0.75)])"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: PlantFibre, min: 1, max: 2, rate: 0.75)])"#,
+    ));
     d
 }
-
 
 fn snow_bush4() -> EntityDef {
     let mut d = EntityDef {
@@ -8947,11 +10394,14 @@ fn snow_bush4() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::SnowBush4);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 } });
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: PlantFibre, min: 1, max: 2, rate: 0.75)])"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: PlantFibre, min: 1, max: 2, rate: 0.75)])"#,
+    ));
     d
 }
-
 
 fn snow_bush_med1() -> EntityDef {
     let mut d = EntityDef {
@@ -8964,11 +10414,14 @@ fn snow_bush_med1() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::SnowBushMed1);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 9., y: 9. } });
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: Stick, min: 1, max: 3, rate: 0.75), (item: PlantFibre, min: 1, max: 2, rate: 0.25)])"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 9., y: 9. },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: Stick, min: 1, max: 3, rate: 0.75), (item: PlantFibre, min: 1, max: 2, rate: 0.25)])"#,
+    ));
     d
 }
-
 
 fn snow_bush_med2() -> EntityDef {
     let mut d = EntityDef {
@@ -8981,11 +10434,14 @@ fn snow_bush_med2() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::SnowBushMed2);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 9., y: 9. } });
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: Stick, min: 1, max: 3, rate: 0.75), (item: PlantFibre, min: 1, max: 2, rate: 0.25)])"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 9., y: 9. },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: Stick, min: 1, max: 3, rate: 0.75), (item: PlantFibre, min: 1, max: 2, rate: 0.25)])"#,
+    ));
     d
 }
-
 
 fn snow_bush_snow1() -> EntityDef {
     let mut d = EntityDef {
@@ -8998,11 +10454,14 @@ fn snow_bush_snow1() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::SnowBushSnow1);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 } });
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: PlantFibre, min: 1, max: 2, rate: 0.75)])"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: PlantFibre, min: 1, max: 2, rate: 0.75)])"#,
+    ));
     d
 }
-
 
 fn snow_bush_snow2() -> EntityDef {
     let mut d = EntityDef {
@@ -9015,11 +10474,14 @@ fn snow_bush_snow2() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::SnowBushSnow2);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 } });
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: PlantFibre, min: 1, max: 2, rate: 0.75)])"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: PlantFibre, min: 1, max: 2, rate: 0.75)])"#,
+    ));
     d
 }
-
 
 fn snow_bush_snow3() -> EntityDef {
     let mut d = EntityDef {
@@ -9032,11 +10494,14 @@ fn snow_bush_snow3() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::SnowBushSnow3);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 } });
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: PlantFibre, min: 1, max: 2, rate: 0.75)])"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: PlantFibre, min: 1, max: 2, rate: 0.75)])"#,
+    ));
     d
 }
-
 
 fn snow_bush_snow4() -> EntityDef {
     let mut d = EntityDef {
@@ -9049,11 +10514,14 @@ fn snow_bush_snow4() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::SnowBushSnow4);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 } });
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: PlantFibre, min: 1, max: 2, rate: 0.75)])"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: PlantFibre, min: 1, max: 2, rate: 0.75)])"#,
+    ));
     d
 }
-
 
 fn snow_bush_snow_med1() -> EntityDef {
     let mut d = EntityDef {
@@ -9066,11 +10534,14 @@ fn snow_bush_snow_med1() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::SnowBushSnowMed1);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 9., y: 9. } });
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: Stick, min: 1, max: 3, rate: 0.75), (item: PlantFibre, min: 1, max: 2, rate: 0.25)])"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 9., y: 9. },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: Stick, min: 1, max: 3, rate: 0.75), (item: PlantFibre, min: 1, max: 2, rate: 0.25)])"#,
+    ));
     d
 }
-
 
 fn snow_bush_snow_med2() -> EntityDef {
     let mut d = EntityDef {
@@ -9083,11 +10554,14 @@ fn snow_bush_snow_med2() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::SnowBushSnowMed2);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 9., y: 9. } });
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: Stick, min: 1, max: 3, rate: 0.75), (item: PlantFibre, min: 1, max: 2, rate: 0.25)])"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 9., y: 9. },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: Stick, min: 1, max: 3, rate: 0.75), (item: PlantFibre, min: 1, max: 2, rate: 0.25)])"#,
+    ));
     d
 }
-
 
 fn snow_crate1() -> EntityDef {
     let mut d = EntityDef {
@@ -9100,8 +10574,11 @@ fn snow_crate1() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::SnowCrate1);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 6., y: 6. } });
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 6., y: 6. },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [
             (item: ChestBlock, min: 1, max: 1, rate: 0.0004),
             (item: HeirloomChest, min: 1, max: 1, rate: 0.0004),
@@ -9122,10 +10599,10 @@ fn snow_crate1() -> EntityDef {
             (item: XPShard, min: 1, max: 1, rate: 1.0),
             (item: XPShard, min: 1, max: 1, rate: 0.3),
         ],
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn snow_crate2() -> EntityDef {
     let mut d = EntityDef {
@@ -9138,8 +10615,11 @@ fn snow_crate2() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::SnowCrate2);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 6., y: 6. } });
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 6., y: 6. },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [
             (item: ChestBlock, min: 1, max: 1, rate: 0.0004),
             (item: HeirloomChest, min: 1, max: 1, rate: 0.0004),
@@ -9160,10 +10640,10 @@ fn snow_crate2() -> EntityDef {
             (item: XPShard, min: 1, max: 1, rate: 1.0),
             (item: XPShard, min: 1, max: 1, rate: 0.3),
         ],
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn snow_crate3() -> EntityDef {
     let mut d = EntityDef {
@@ -9176,8 +10656,11 @@ fn snow_crate3() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::SnowCrate3);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 6., y: 6. } });
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 6., y: 6. },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [
             (item: ChestBlock, min: 1, max: 1, rate: 0.0004),
             (item: HeirloomChest, min: 1, max: 1, rate: 0.0004),
@@ -9198,10 +10681,10 @@ fn snow_crate3() -> EntityDef {
             (item: XPShard, min: 1, max: 1, rate: 1.0),
             (item: XPShard, min: 1, max: 1, rate: 0.3),
         ],
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn snow_crate4() -> EntityDef {
     let mut d = EntityDef {
@@ -9214,8 +10697,11 @@ fn snow_crate4() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::SnowCrate4);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 6., y: 6. } });
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 6., y: 6. },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [
             (item: ChestBlock, min: 1, max: 1, rate: 0.0004),
             (item: HeirloomChest, min: 1, max: 1, rate: 0.0004),
@@ -9236,10 +10722,10 @@ fn snow_crate4() -> EntityDef {
             (item: XPShard, min: 1, max: 1, rate: 1.0),
             (item: XPShard, min: 1, max: 1, rate: 0.3),
         ],
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn snow_crystal_med1() -> EntityDef {
     let mut d = EntityDef {
@@ -9252,8 +10738,11 @@ fn snow_crystal_med1() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::SnowCrystalMed1);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 6., y: 6. } });
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 6., y: 6. },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [
             (item: XPShard, min: 1, max: 1, rate: 1.0),
             (item: XPShard, min: 1, max: 1, rate: 1.0),
@@ -9266,10 +10755,10 @@ fn snow_crystal_med1() -> EntityDef {
             (item: XPShardMedium, min: 1, max: 1, rate: 0.3),
             (item: XPShardLarge, min: 1, max: 1, rate: 0.2),
         ],
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn snow_crystal_med2() -> EntityDef {
     let mut d = EntityDef {
@@ -9282,8 +10771,11 @@ fn snow_crystal_med2() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::SnowCrystalMed2);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 6., y: 6. } });
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 6., y: 6. },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [
             (item: XPShard, min: 1, max: 1, rate: 1.0),
             (item: XPShard, min: 1, max: 1, rate: 1.0),
@@ -9296,10 +10788,10 @@ fn snow_crystal_med2() -> EntityDef {
             (item: XPShardMedium, min: 1, max: 1, rate: 0.3),
             (item: XPShardLarge, min: 1, max: 1, rate: 0.2),
         ],
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn snow_crystal_sml1() -> EntityDef {
     let mut d = EntityDef {
@@ -9312,8 +10804,11 @@ fn snow_crystal_sml1() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::SnowCrystalSml1);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 4., y: 4. } });
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 4., y: 4. },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [
             (item: XPShard, min: 1, max: 1, rate: 1.0),
             (item: XPShard, min: 1, max: 1, rate: 1.0),
@@ -9324,10 +10819,10 @@ fn snow_crystal_sml1() -> EntityDef {
             (item: XPShard, min: 1, max: 1, rate: 0.5),
             (item: XPShardMedium, min: 1, max: 1, rate: 0.5),
         ],
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn snow_crystal_sml2() -> EntityDef {
     let mut d = EntityDef {
@@ -9340,8 +10835,11 @@ fn snow_crystal_sml2() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::SnowCrystalSml2);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 4., y: 4. } });
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 4., y: 4. },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [
             (item: XPShard, min: 1, max: 1, rate: 1.0),
             (item: XPShard, min: 1, max: 1, rate: 1.0),
@@ -9352,10 +10850,10 @@ fn snow_crystal_sml2() -> EntityDef {
             (item: XPShard, min: 1, max: 1, rate: 0.5),
             (item: XPShardMedium, min: 1, max: 1, rate: 0.5),
         ],
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn snow_crystal_sml3() -> EntityDef {
     let mut d = EntityDef {
@@ -9368,8 +10866,11 @@ fn snow_crystal_sml3() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::SnowCrystalSml3);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 4., y: 4. } });
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 4., y: 4. },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [
             (item: XPShard, min: 1, max: 1, rate: 1.0),
             (item: XPShard, min: 1, max: 1, rate: 1.0),
@@ -9380,10 +10881,10 @@ fn snow_crystal_sml3() -> EntityDef {
             (item: XPShard, min: 1, max: 1, rate: 0.5),
             (item: XPShardMedium, min: 1, max: 1, rate: 0.5),
         ],
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn snow_crystal_sml4() -> EntityDef {
     let mut d = EntityDef {
@@ -9396,8 +10897,11 @@ fn snow_crystal_sml4() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::SnowCrystalSml4);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 4., y: 4. } });
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 4., y: 4. },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [
             (item: XPShard, min: 1, max: 1, rate: 1.0),
             (item: XPShard, min: 1, max: 1, rate: 1.0),
@@ -9408,10 +10912,10 @@ fn snow_crystal_sml4() -> EntityDef {
             (item: XPShard, min: 1, max: 1, rate: 0.5),
             (item: XPShardMedium, min: 1, max: 1, rate: 0.5),
         ],
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn snow_dead_sapling() -> EntityDef {
     let mut d = EntityDef {
@@ -9423,21 +10927,24 @@ fn snow_dead_sapling() -> EntityDef {
     d.sprite_anchor = Some(SpriteAnchor(parse::vec2(r#"((x: 0., y: 0.))"#)));
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::SnowDeadSapling);
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 },
+    });
     d.sensor = true;
     d.max_health = Some(MaxHealth(1));
     d.experience_reward = Some(ExperienceReward(5));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
                 item: Stick,
                 min: 1,
                 max: 1,
                 rate: 0.8
             ),]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn snow_flower() -> EntityDef {
     let mut d = EntityDef {
@@ -9449,21 +10956,24 @@ fn snow_flower() -> EntityDef {
     d.sprite_anchor = Some(SpriteAnchor(parse::vec2(r#"((x: 0., y: 0.))"#)));
     d.y_sort = Some(YSort(-0.01));
     d.world_object = Some(WorldObject::SnowFlower);
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 },
+    });
     d.sensor = true;
     d.max_health = Some(MaxHealth(1));
     d.experience_reward = Some(ExperienceReward(5));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
                 item: SnowFlowerBlock,
                 min: 1,
                 max: 1,
                 rate: 1.
             ),]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn snow_flower2() -> EntityDef {
     let mut d = EntityDef {
@@ -9475,21 +10985,24 @@ fn snow_flower2() -> EntityDef {
     d.sprite_anchor = Some(SpriteAnchor(parse::vec2(r#"((x: 0., y: 0.))"#)));
     d.y_sort = Some(YSort(-0.01));
     d.world_object = Some(WorldObject::SnowFlower2);
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 },
+    });
     d.sensor = true;
     d.max_health = Some(MaxHealth(1));
     d.experience_reward = Some(ExperienceReward(5));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
                 item: SnowFlower2Block,
                 min: 1,
                 max: 1,
                 rate: 1.
             ),]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn snow_flower2_block() -> EntityDef {
     let mut d = EntityDef {
@@ -9504,17 +11017,18 @@ fn snow_flower2_block() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::SnowFlower2Block);
     d.consumable = Some(ConsumableItem);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: SnowFlower2Block,
         metadata: (
             name: "Orange Flower", 
             desc: ["A white flower.", "Might help in a","recipe."]
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn snow_flower_block() -> EntityDef {
     let mut d = EntityDef {
@@ -9529,17 +11043,18 @@ fn snow_flower_block() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::SnowFlowerBlock);
     d.consumable = Some(ConsumableItem);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: SnowFlowerBlock,
         metadata: (
             name: "White Flower ", 
             desc: ["A white flower.", "Might help in a","recipe."]
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn snow_grass1() -> EntityDef {
     let mut d = EntityDef {
@@ -9552,10 +11067,11 @@ fn snow_grass1() -> EntityDef {
     d.y_sort = Some(YSort(-0.01));
     d.world_object = Some(WorldObject::SnowGrass1);
     d.max_health = Some(MaxHealth(1));
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: PlantFibre, min: 1, max: 1, rate: 0.75)])"#));
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: PlantFibre, min: 1, max: 1, rate: 0.75)])"#,
+    ));
     d
 }
-
 
 fn snow_grass2() -> EntityDef {
     let mut d = EntityDef {
@@ -9568,10 +11084,11 @@ fn snow_grass2() -> EntityDef {
     d.y_sort = Some(YSort(-0.01));
     d.world_object = Some(WorldObject::SnowGrass2);
     d.max_health = Some(MaxHealth(1));
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: PlantFibre, min: 1, max: 1, rate: 0.75)])"#));
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: PlantFibre, min: 1, max: 1, rate: 0.75)])"#,
+    ));
     d
 }
-
 
 fn snow_grass3() -> EntityDef {
     let mut d = EntityDef {
@@ -9584,10 +11101,11 @@ fn snow_grass3() -> EntityDef {
     d.y_sort = Some(YSort(-0.01));
     d.world_object = Some(WorldObject::SnowGrass3);
     d.max_health = Some(MaxHealth(1));
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: PlantFibre, min: 1, max: 1, rate: 0.75)])"#));
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: PlantFibre, min: 1, max: 1, rate: 0.75)])"#,
+    ));
     d
 }
-
 
 fn snow_grass4() -> EntityDef {
     let mut d = EntityDef {
@@ -9600,10 +11118,11 @@ fn snow_grass4() -> EntityDef {
     d.y_sort = Some(YSort(-0.01));
     d.world_object = Some(WorldObject::SnowGrass4);
     d.max_health = Some(MaxHealth(1));
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: PlantFibre, min: 1, max: 1, rate: 0.75)])"#));
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: PlantFibre, min: 1, max: 1, rate: 0.75)])"#,
+    ));
     d
 }
-
 
 fn snow_leafless_tree1() -> EntityDef {
     let mut d = EntityDef {
@@ -9616,15 +11135,24 @@ fn snow_leafless_tree1() -> EntityDef {
     d.fade_opacity = Some(FadeOpacity);
     d.sprite_anchor = Some(SpriteAnchor(parse::vec2(r#"((x: 0., y: 32.))"#)));
     d.required_equipment_type = Some(RequiredEquipmentType(EquipmentType::Axe));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: 0., y1: -30., x2: 0., y2: -23.5, r: 4. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: 0.,
+            y1: -30.,
+            x2: 0.,
+            y2: -23.5,
+            r: 4.,
+        },
+    });
     d.max_health = Some(MaxHealth(25));
     d.y_sort = Some(YSort(0.));
     d.experience_reward = Some(ExperienceReward(5));
     d.sprite_texture = Some("snowleaflesstree1.png".into());
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: Stick, min: 1, max: 2, rate: 0.5), (item: Log, min: 1, max: 4, rate: 1.)])"#));
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: Stick, min: 1, max: 2, rate: 0.5), (item: Log, min: 1, max: 4, rate: 1.)])"#,
+    ));
     d
 }
-
 
 fn snow_leafless_tree2() -> EntityDef {
     let mut d = EntityDef {
@@ -9637,15 +11165,24 @@ fn snow_leafless_tree2() -> EntityDef {
     d.fade_opacity = Some(FadeOpacity);
     d.sprite_anchor = Some(SpriteAnchor(parse::vec2(r#"((x: 0., y: 32.))"#)));
     d.required_equipment_type = Some(RequiredEquipmentType(EquipmentType::Axe));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: 0., y1: -30., x2: 0., y2: -23.5, r: 4. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: 0.,
+            y1: -30.,
+            x2: 0.,
+            y2: -23.5,
+            r: 4.,
+        },
+    });
     d.max_health = Some(MaxHealth(25));
     d.y_sort = Some(YSort(0.));
     d.experience_reward = Some(ExperienceReward(5));
     d.sprite_texture = Some("snowleaflesstree2.png".into());
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: Stick, min: 1, max: 2, rate: 0.5), (item: Log, min: 1, max: 4, rate: 1.)])"#));
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: Stick, min: 1, max: 2, rate: 0.5), (item: Log, min: 1, max: 4, rate: 1.)])"#,
+    ));
     d
 }
-
 
 fn snow_leafless_tree3() -> EntityDef {
     let mut d = EntityDef {
@@ -9658,15 +11195,24 @@ fn snow_leafless_tree3() -> EntityDef {
     d.fade_opacity = Some(FadeOpacity);
     d.sprite_anchor = Some(SpriteAnchor(parse::vec2(r#"((x: 0., y: 32.))"#)));
     d.required_equipment_type = Some(RequiredEquipmentType(EquipmentType::Axe));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: 0., y1: -30., x2: 0., y2: -23.5, r: 4. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: 0.,
+            y1: -30.,
+            x2: 0.,
+            y2: -23.5,
+            r: 4.,
+        },
+    });
     d.max_health = Some(MaxHealth(25));
     d.y_sort = Some(YSort(0.));
     d.experience_reward = Some(ExperienceReward(10));
     d.sprite_texture = Some("snowleaflesstree3.png".into());
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: Stick, min: 1, max: 2, rate: 0.5), (item: Log, min: 1, max: 4, rate: 1.)])"#));
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: Stick, min: 1, max: 2, rate: 0.5), (item: Log, min: 1, max: 4, rate: 1.)])"#,
+    ));
     d
 }
-
 
 fn snow_med_boulder1() -> EntityDef {
     let mut d = EntityDef {
@@ -9679,11 +11225,14 @@ fn snow_med_boulder1() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::SnowMedBoulder1);
     d.max_health = Some(MaxHealth(35));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 10.0, y: 10.0 } });
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: StoneChunk, min: 2, max: 5, rate: 1.0)])"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 10.0, y: 10.0 },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: StoneChunk, min: 2, max: 5, rate: 1.0)])"#,
+    ));
     d
 }
-
 
 fn snow_med_boulder2() -> EntityDef {
     let mut d = EntityDef {
@@ -9696,11 +11245,14 @@ fn snow_med_boulder2() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::SnowMedBoulder2);
     d.max_health = Some(MaxHealth(35));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 10.0, y: 10.0 } });
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: StoneChunk, min: 2, max: 5, rate: 1.0)])"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 10.0, y: 10.0 },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: StoneChunk, min: 2, max: 5, rate: 1.0)])"#,
+    ));
     d
 }
-
 
 fn snow_med_boulder3() -> EntityDef {
     let mut d = EntityDef {
@@ -9713,11 +11265,14 @@ fn snow_med_boulder3() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::SnowMedBoulder3);
     d.max_health = Some(MaxHealth(35));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 10.0, y: 10.0 } });
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: StoneChunk, min: 2, max: 5, rate: 1.0)])"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 10.0, y: 10.0 },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: StoneChunk, min: 2, max: 5, rate: 1.0)])"#,
+    ));
     d
 }
-
 
 fn snow_metal_boulder() -> EntityDef {
     let mut d = EntityDef {
@@ -9730,10 +11285,13 @@ fn snow_metal_boulder() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::SnowMetalBoulder);
     d.required_equipment_type = Some(RequiredEquipmentType(EquipmentType::Pickaxe));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 10.0, y: 10.0 } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 10.0, y: 10.0 },
+    });
     d.max_health = Some(MaxHealth(50));
     d.experience_reward = Some(ExperienceReward(20));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [
             (
                 item: StoneChunk,
@@ -9747,10 +11305,10 @@ fn snow_metal_boulder() -> EntityDef {
                 max: 1,
                 rate: 1.
             )]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn snow_mushroom1() -> EntityDef {
     let mut d = EntityDef {
@@ -9762,14 +11320,17 @@ fn snow_mushroom1() -> EntityDef {
     d.sprite_anchor = Some(SpriteAnchor(parse::vec2(r#"((x: 0., y: 0.))"#)));
     d.y_sort = Some(YSort(-0.01));
     d.world_object = Some(WorldObject::SnowMushroom1);
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 },
+    });
     d.sensor = true;
     d.max_health = Some(MaxHealth(1));
     d.experience_reward = Some(ExperienceReward(5));
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: BlueMushroom, min: 1, max: 1, rate: 1.0)])"#));
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: BlueMushroom, min: 1, max: 1, rate: 1.0)])"#,
+    ));
     d
 }
-
 
 fn snow_mushroom2() -> EntityDef {
     let mut d = EntityDef {
@@ -9781,14 +11342,17 @@ fn snow_mushroom2() -> EntityDef {
     d.sprite_anchor = Some(SpriteAnchor(parse::vec2(r#"((x: 0., y: 0.))"#)));
     d.y_sort = Some(YSort(-0.01));
     d.world_object = Some(WorldObject::SnowMushroom2);
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 },
+    });
     d.sensor = true;
     d.max_health = Some(MaxHealth(1));
     d.experience_reward = Some(ExperienceReward(5));
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: BlueMushroom, min: 1, max: 1, rate: 1.0)])"#));
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: BlueMushroom, min: 1, max: 1, rate: 1.0)])"#,
+    ));
     d
 }
-
 
 fn snow_sml_boulder1() -> EntityDef {
     let mut d = EntityDef {
@@ -9801,11 +11365,14 @@ fn snow_sml_boulder1() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::SnowSmlBoulder1);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 } });
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: StoneChunk, min: 1, max: 1, rate: 1.0)])"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: StoneChunk, min: 1, max: 1, rate: 1.0)])"#,
+    ));
     d
 }
-
 
 fn snow_sml_boulder2() -> EntityDef {
     let mut d = EntityDef {
@@ -9818,11 +11385,14 @@ fn snow_sml_boulder2() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::SnowSmlBoulder2);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 } });
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: StoneChunk, min: 1, max: 1, rate: 1.0)])"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: StoneChunk, min: 1, max: 1, rate: 1.0)])"#,
+    ));
     d
 }
-
 
 fn snow_sml_boulder3() -> EntityDef {
     let mut d = EntityDef {
@@ -9835,11 +11405,14 @@ fn snow_sml_boulder3() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::SnowSmlBoulder3);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 } });
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: StoneChunk, min: 1, max: 1, rate: 1.0)])"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: StoneChunk, min: 1, max: 1, rate: 1.0)])"#,
+    ));
     d
 }
-
 
 fn snow_sml_boulder4() -> EntityDef {
     let mut d = EntityDef {
@@ -9852,11 +11425,14 @@ fn snow_sml_boulder4() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::SnowSmlBoulder4);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 } });
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: StoneChunk, min: 1, max: 1, rate: 1.0)])"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: StoneChunk, min: 1, max: 1, rate: 1.0)])"#,
+    ));
     d
 }
-
 
 fn snow_sml_boulder5() -> EntityDef {
     let mut d = EntityDef {
@@ -9869,11 +11445,14 @@ fn snow_sml_boulder5() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::SnowSmlBoulder5);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 } });
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: StoneChunk, min: 1, max: 1, rate: 1.0)])"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: StoneChunk, min: 1, max: 1, rate: 1.0)])"#,
+    ));
     d
 }
-
 
 fn snow_sml_boulder6() -> EntityDef {
     let mut d = EntityDef {
@@ -9886,11 +11465,14 @@ fn snow_sml_boulder6() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::SnowSmlBoulder6);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 } });
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: StoneChunk, min: 1, max: 1, rate: 1.0)])"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: StoneChunk, min: 1, max: 1, rate: 1.0)])"#,
+    ));
     d
 }
-
 
 fn snow_tree1() -> EntityDef {
     let mut d = EntityDef {
@@ -9903,15 +11485,24 @@ fn snow_tree1() -> EntityDef {
     d.fade_opacity = Some(FadeOpacity);
     d.sprite_anchor = Some(SpriteAnchor(parse::vec2(r#"((x: 0., y: 32.))"#)));
     d.required_equipment_type = Some(RequiredEquipmentType(EquipmentType::Axe));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: 0., y1: -30., x2: 0., y2: -23.5, r: 4. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: 0.,
+            y1: -30.,
+            x2: 0.,
+            y2: -23.5,
+            r: 4.,
+        },
+    });
     d.max_health = Some(MaxHealth(25));
     d.y_sort = Some(YSort(0.));
     d.experience_reward = Some(ExperienceReward(5));
     d.sprite_texture = Some("snowtree1.png".into());
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: Stick, min: 1, max: 2, rate: 0.5), (item: Log, min: 1, max: 4, rate: 1.)])"#));
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: Stick, min: 1, max: 2, rate: 0.5), (item: Log, min: 1, max: 4, rate: 1.)])"#,
+    ));
     d
 }
-
 
 fn snow_tree2() -> EntityDef {
     let mut d = EntityDef {
@@ -9924,15 +11515,24 @@ fn snow_tree2() -> EntityDef {
     d.fade_opacity = Some(FadeOpacity);
     d.sprite_anchor = Some(SpriteAnchor(parse::vec2(r#"((x: 0., y: 32.))"#)));
     d.required_equipment_type = Some(RequiredEquipmentType(EquipmentType::Axe));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: 0., y1: -30., x2: 0., y2: -23.5, r: 4. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: 0.,
+            y1: -30.,
+            x2: 0.,
+            y2: -23.5,
+            r: 4.,
+        },
+    });
     d.max_health = Some(MaxHealth(25));
     d.y_sort = Some(YSort(0.));
     d.experience_reward = Some(ExperienceReward(5));
     d.sprite_texture = Some("snowtree2.png".into());
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: Stick, min: 1, max: 2, rate: 0.5), (item: Log, min: 1, max: 4, rate: 1.)])"#));
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: Stick, min: 1, max: 2, rate: 0.5), (item: Log, min: 1, max: 4, rate: 1.)])"#,
+    ));
     d
 }
-
 
 fn snow_tree3() -> EntityDef {
     let mut d = EntityDef {
@@ -9945,15 +11545,24 @@ fn snow_tree3() -> EntityDef {
     d.fade_opacity = Some(FadeOpacity);
     d.sprite_anchor = Some(SpriteAnchor(parse::vec2(r#"((x: 0., y: 32.))"#)));
     d.required_equipment_type = Some(RequiredEquipmentType(EquipmentType::Axe));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: 0., y1: -30., x2: 0., y2: -23.5, r: 4. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: 0.,
+            y1: -30.,
+            x2: 0.,
+            y2: -23.5,
+            r: 4.,
+        },
+    });
     d.max_health = Some(MaxHealth(25));
     d.y_sort = Some(YSort(0.));
     d.experience_reward = Some(ExperienceReward(5));
     d.sprite_texture = Some("snowtree3.png".into());
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: Stick, min: 1, max: 2, rate: 0.5), (item: Log, min: 1, max: 4, rate: 1.)])"#));
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: Stick, min: 1, max: 2, rate: 0.5), (item: Log, min: 1, max: 4, rate: 1.)])"#,
+    ));
     d
 }
-
 
 fn snow_tree4() -> EntityDef {
     let mut d = EntityDef {
@@ -9966,15 +11575,24 @@ fn snow_tree4() -> EntityDef {
     d.fade_opacity = Some(FadeOpacity);
     d.sprite_anchor = Some(SpriteAnchor(parse::vec2(r#"((x: 0., y: 32.))"#)));
     d.required_equipment_type = Some(RequiredEquipmentType(EquipmentType::Axe));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: 0., y1: -30., x2: 0., y2: -23.5, r: 4. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: 0.,
+            y1: -30.,
+            x2: 0.,
+            y2: -23.5,
+            r: 4.,
+        },
+    });
     d.max_health = Some(MaxHealth(25));
     d.y_sort = Some(YSort(0.));
     d.experience_reward = Some(ExperienceReward(5));
     d.sprite_texture = Some("snowtree4.png".into());
-    d.loot_table = Some(parse::loot_table(r#"(drops: [(item: Stick, min: 1, max: 2, rate: 0.5), (item: Log, min: 1, max: 4, rate: 1.)])"#));
+    d.loot_table = Some(parse::loot_table(
+        r#"(drops: [(item: Stick, min: 1, max: 2, rate: 0.5), (item: Log, min: 1, max: 4, rate: 1.)])"#,
+    ));
     d
 }
-
 
 fn spear() -> EntityDef {
     let mut d = EntityDef {
@@ -9989,10 +11607,13 @@ fn spear() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::Spear);
     d.equipment_type = Some(EquipmentType::Weapon);
-    d.raw_item_base = Some(parse::raw_item_base(r#"(
+    d.raw_item_base = Some(parse::raw_item_base(
+        r#"(
         attack: Some((start: 8, end: 11)),
-  )"#));
-    d.raw_item_bonus = Some(parse::raw_item_bonus(r#"(
+  )"#,
+    ));
+    d.raw_item_bonus = Some(parse::raw_item_bonus(
+        r#"(
         crit_damage: Some((start: 6, end: 12)),
         crit_chance: Some((start: 4, end: 9)),
         speed: Some((start: 6, end: 9)),
@@ -10005,10 +11626,12 @@ fn spear() -> EntityDef {
         bonus_damage: Some((start: 5, end: 8)),
         skill_power: Some((start: 8, end: 13)),
         attack_speed: Some((start: 6, end: 10)),
-  )"#));
+  )"#,
+    ));
     d.melee = Some(MeleeAttack);
     d.ranged = Some(RangedAttack(Projectile::SpearProjectile));
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: Spear,
         attributes: (
             attack_cooldown: 1.
@@ -10018,10 +11641,10 @@ fn spear() -> EntityDef {
             desc: ["A long spear."]
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn spear_gravity() -> EntityDef {
     let mut d = EntityDef {
@@ -10031,14 +11654,20 @@ fn spear_gravity() -> EntityDef {
     };
     d.sensor = true;
     d.y_sort = Some(YSort(10.));
-    d.sprite_sheet = Some(SpriteSheetDef { asset: "textures/effects/speargravity.png".into(), size: Vec2::new(48., 55.), cols: 24, rows: 1 });
+    d.sprite_sheet = Some(SpriteSheetDef {
+        asset: "textures/effects/speargravity.png".into(),
+        size: Vec2::new(48., 55.),
+        cols: 24,
+        rows: 1,
+    });
     d.projectile = Some(Projectile::SpearGravity);
-    d.projectile_state = Some(parse::projectile_state(r#"(speed: 0., direction: (x: 0., y: 0.), hit_entities: [], despawn_on_hit: false)"#));
+    d.projectile_state = Some(parse::projectile_state(
+        r#"(speed: 0., direction: (x: 0., y: 0.), hit_entities: [], despawn_on_hit: false)"#,
+    ));
     d.done_animation = true;
     d.animation_timer = Some(AnimationTimerDef { secs: 0.045 });
     d
 }
-
 
 fn spear_projectile() -> EntityDef {
     let mut d = EntityDef {
@@ -10048,15 +11677,23 @@ fn spear_projectile() -> EntityDef {
     };
     d.sensor = true;
     d.y_sort = Some(YSort(0.));
-    d.sprite_sheet = Some(SpriteSheetDef { asset: "textures/effects/SpearProjectile.png".into(), size: Vec2::new(86., 10.), cols: 3, rows: 1 });
+    d.sprite_sheet = Some(SpriteSheetDef {
+        asset: "textures/effects/SpearProjectile.png".into(),
+        size: Vec2::new(86., 10.),
+        cols: 3,
+        rows: 1,
+    });
     d.projectile = Some(Projectile::SpearProjectile);
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 43., y: 5. } });
-    d.projectile_state = Some(parse::projectile_state(r#"(speed: 0., direction: (x: 0., y: 0.), spawn_offset: (x: -4., y: -4.), hit_entities: [], despawn_on_hit: false)"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 43., y: 5. },
+    });
+    d.projectile_state = Some(parse::projectile_state(
+        r#"(speed: 0., direction: (x: 0., y: 0.), spawn_offset: (x: -4., y: -4.), hit_entities: [], despawn_on_hit: false)"#,
+    ));
     d.done_animation = true;
     d.animation_timer = Some(AnimationTimerDef { secs: 0.1 });
     d
 }
-
 
 fn speed_food() -> EntityDef {
     let mut d = EntityDef {
@@ -10072,7 +11709,8 @@ fn speed_food() -> EntityDef {
     d.world_object = Some(WorldObject::SpeedFood);
     d.item_actions = Some(parse::item_actions(r#"(actions: [GainStat("speed", 5)])"#));
     d.consumable = Some(ConsumableItem);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: SpeedFood,
         metadata: (
             name: "Speed Boost", 
@@ -10080,10 +11718,10 @@ fn speed_food() -> EntityDef {
         ),
         rarity: Rare,
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn spike_slime() -> EntityDef {
     let mut d = EntityDef {
@@ -10099,17 +11737,42 @@ fn spike_slime() -> EntityDef {
     d.combat_alignment = Some(CombatAlignment::Hostile);
     d.follow_speed = Some(FollowSpeed(0.32));
     d.enemy_anim_state = Some(EnemyAnimationState::Walk);
-    d.leap_attack = Some(LeapAttack { activation_distance: 38., startup: 0.7, duration: 0.2, cooldown: 1.5, speed: 145. });
-    d.projectile_attack = Some(parse::projectile_attack(r#"(activation_distance: 120., cooldown: 2.0, projectile: SlimeGooProjectile)"#));
-    d.sprite_sheet = Some(SpriteSheetDef { asset: "textures/spikeslime/spikeslime_down.png".into(), size: Vec2::new(32., 32.), cols: 6, rows: 5 });
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: 0., y1: -4., x2: 0., y2: -4.5, r: 7. } });
+    d.leap_attack = Some(LeapAttack {
+        activation_distance: 38.,
+        startup: 0.7,
+        duration: 0.2,
+        cooldown: 1.5,
+        speed: 145.,
+    });
+    d.projectile_attack = Some(parse::projectile_attack(
+        r#"(activation_distance: 120., cooldown: 2.0, projectile: SlimeGooProjectile)"#,
+    ));
+    d.sprite_sheet = Some(SpriteSheetDef {
+        asset: "textures/spikeslime/spikeslime_down.png".into(),
+        size: Vec2::new(32., 32.),
+        cols: 6,
+        rows: 5,
+    });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: 0.,
+            y1: -4.,
+            x2: 0.,
+            y2: -4.5,
+            r: 7.,
+        },
+    });
     d.animation_timer = Some(AnimationTimerDef { secs: 0.1 });
     d.animation_frame_tracker = Some(AnimationFrameTracker(0, 7));
-    d.anim_sprite_sheet_data = Some(CharacterAnimationSpriteSheetData { animation_frames: vec![4,4,4,6,4], anim_offset: 0 });
+    d.anim_sprite_sheet_data = Some(CharacterAnimationSpriteSheetData {
+        animation_frames: vec![4, 4, 4, 6, 4],
+        anim_offset: 0,
+    });
     d.max_health = Some(MaxHealth(14));
     d.attack = Some(Attack(12));
     d.experience_reward = Some(ExperienceReward(20));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
          drops: [(
                 item: SmallPotion,
                 min: 1,
@@ -10189,10 +11852,10 @@ fn spike_slime() -> EntityDef {
                 rate: 0.0001
             ),
             ]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn spike_slime_card() -> EntityDef {
     let mut d = EntityDef {
@@ -10206,7 +11869,8 @@ fn spike_slime_card() -> EntityDef {
     d.animation_pos_tracker = Some(AnimationPosTracker(0.0, 0.0, 0.3));
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::SpikeSlimeCard);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: SpikeSlimeCard,
         metadata: (
             name: "Spike Slime Card",
@@ -10214,10 +11878,10 @@ fn spike_slime_card() -> EntityDef {
         ),
         rarity: Uncommon,
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn spin_attack() -> EntityDef {
     let mut d = EntityDef {
@@ -10227,15 +11891,23 @@ fn spin_attack() -> EntityDef {
     };
     d.sensor = true;
     d.y_sort = Some(YSort(0.));
-    d.sprite_sheet = Some(SpriteSheetDef { asset: "textures/effects/SpinAttack.png".into(), size: Vec2::new(64., 64.), cols: 11, rows: 1 });
+    d.sprite_sheet = Some(SpriteSheetDef {
+        asset: "textures/effects/SpinAttack.png".into(),
+        size: Vec2::new(64., 64.),
+        cols: 11,
+        rows: 1,
+    });
     d.projectile = Some(Projectile::SpinAttack);
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 18., y: 18. } });
-    d.projectile_state = Some(parse::projectile_state(r#"(speed: 0., direction: (x: 0., y: 0.), hit_entities: [], despawn_on_hit: false)"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 18., y: 18. },
+    });
+    d.projectile_state = Some(parse::projectile_state(
+        r#"(speed: 0., direction: (x: 0., y: 0.), hit_entities: [], despawn_on_hit: false)"#,
+    ));
     d.done_animation = true;
     d.animation_timer = Some(AnimationTimerDef { secs: 0.04 });
     d
 }
-
 
 fn stick() -> EntityDef {
     let mut d = EntityDef {
@@ -10249,17 +11921,18 @@ fn stick() -> EntityDef {
     d.animation_pos_tracker = Some(AnimationPosTracker(0.0, 0.0, 0.3));
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::Stick);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: Stick,
         metadata: (
             name: "Stick", 
             desc: ["A Stick. Useful in", "crafting various", "tools."]
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn sting_fly() -> EntityDef {
     let mut d = EntityDef {
@@ -10276,15 +11949,38 @@ fn sting_fly() -> EntityDef {
     d.follow_speed = Some(FollowSpeed(0.4));
     d.enemy_anim_state = Some(EnemyAnimationState::Walk);
     d.left_facing_side_profile = true;
-    d.leap_attack = Some(LeapAttack { activation_distance: 72., startup: 0.5, duration: 0.42, cooldown: 1.8, speed: 124. });
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: 0., y1: -1., x2: 0., y2: -1.5, r: 6. } });
-    d.sprite_sheet = Some(SpriteSheetDef { asset: "textures/stingfly/stingfly_down.png".into(), size: Vec2::new(38., 38.), cols: 10, rows: 5 });
+    d.leap_attack = Some(LeapAttack {
+        activation_distance: 72.,
+        startup: 0.5,
+        duration: 0.42,
+        cooldown: 1.8,
+        speed: 124.,
+    });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: 0.,
+            y1: -1.,
+            x2: 0.,
+            y2: -1.5,
+            r: 6.,
+        },
+    });
+    d.sprite_sheet = Some(SpriteSheetDef {
+        asset: "textures/stingfly/stingfly_down.png".into(),
+        size: Vec2::new(38., 38.),
+        cols: 10,
+        rows: 5,
+    });
     d.animation_timer = Some(AnimationTimerDef { secs: 0.08 });
-    d.anim_sprite_sheet_data = Some(CharacterAnimationSpriteSheetData { animation_frames: vec![4,4,4,10,7], anim_offset: 0 });
+    d.anim_sprite_sheet_data = Some(CharacterAnimationSpriteSheetData {
+        animation_frames: vec![4, 4, 4, 10, 7],
+        anim_offset: 0,
+    });
     d.max_health = Some(MaxHealth(12));
     d.attack = Some(Attack(13));
     d.experience_reward = Some(ExperienceReward(25));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
          drops: [(
                 item: SmallPotion,
                 min: 1,
@@ -10364,10 +12060,10 @@ fn sting_fly() -> EntityDef {
                 rate: 0.0001
             ),
             ]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn stingfly_card() -> EntityDef {
     let mut d = EntityDef {
@@ -10381,7 +12077,8 @@ fn stingfly_card() -> EntityDef {
     d.animation_pos_tracker = Some(AnimationPosTracker(0.0, 0.0, 0.3));
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::StingflyCard);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: StingflyCard,
         metadata: (
             name: "Sting Fly Card",
@@ -10389,10 +12086,10 @@ fn stingfly_card() -> EntityDef {
         ),
         rarity: Uncommon,
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn stone_chunk() -> EntityDef {
     let mut d = EntityDef {
@@ -10407,17 +12104,18 @@ fn stone_chunk() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::StoneChunk);
     d.consumable = Some(ConsumableItem);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: StoneChunk,
         metadata: (
             name: "Stone ", 
             desc: ["A big chunk of", "stone. Can be used", "to craft various", "tools."]
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn stone_golem() -> EntityDef {
     let mut d = EntityDef {
@@ -10432,11 +12130,20 @@ fn stone_golem() -> EntityDef {
     d.y_sort = Some(YSort(0.001));
     d.combat_alignment = Some(CombatAlignment::Hostile);
     d.follow_speed = Some(FollowSpeed(0.5));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: -14., y1: -14., x2: 14., y2: -14., r: 14. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: -14.,
+            y1: -14.,
+            x2: 14.,
+            y2: -14.,
+            r: 14.,
+        },
+    });
     d.max_health = Some(MaxHealth(530));
     d.attack = Some(Attack(20));
     d.mob_level = Some(1);
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
                 item: TimeFragment,
                 min: 1,
@@ -10511,10 +12218,10 @@ fn stone_golem() -> EntityDef {
             ),
 
             ]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn stone_golem_card() -> EntityDef {
     let mut d = EntityDef {
@@ -10528,7 +12235,8 @@ fn stone_golem_card() -> EntityDef {
     d.animation_pos_tracker = Some(AnimationPosTracker(0.0, 0.0, 0.3));
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::StoneGolemCard);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: StoneGolemCard,
         metadata: (
             name: "Stone Golem Card",
@@ -10536,10 +12244,10 @@ fn stone_golem_card() -> EntityDef {
         ),
         rarity: Rare,
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn stone_wall() -> EntityDef {
     let mut d = EntityDef {
@@ -10553,20 +12261,31 @@ fn stone_wall() -> EntityDef {
     d.world_object = Some(WorldObject::StoneWall);
     d.wall = Some(parse::wall(r#"StoneWall"#));
     d.required_equipment_type = Some(RequiredEquipmentType(EquipmentType::Pickaxe));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: 0., y1: -3., x2: 0., y2: -2., r: 7.5 } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: 0.,
+            y1: -3.,
+            x2: 0.,
+            y2: -2.,
+            r: 7.5,
+        },
+    });
     d.max_health = Some(MaxHealth(999999));
-    d.wall_texture_data = Some(parse::wall_texture_data(r#"(obj_bit_index: 15, texture_offset: 0)"#));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.wall_texture_data = Some(parse::wall_texture_data(
+        r#"(obj_bit_index: 15, texture_offset: 0)"#,
+    ));
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
                 item: StoneWallBlock,
                 min: 1,
                 max: 1,
                 rate: 1.
             ),]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn stone_wall_block() -> EntityDef {
     let mut d = EntityDef {
@@ -10582,17 +12301,18 @@ fn stone_wall_block() -> EntityDef {
     d.world_object = Some(WorldObject::StoneWallBlock);
     d.item_actions = Some(parse::item_actions(r#"(actions: [PlacesInto(StoneWall)])"#));
     d.consumable = Some(ConsumableItem);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: StoneWallBlock,
         metadata: (
             name: "Stone Wall", 
             desc: ["Creates a Stone", "Wall."]
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn string() -> EntityDef {
     let mut d = EntityDef {
@@ -10606,17 +12326,18 @@ fn string() -> EntityDef {
     d.animation_pos_tracker = Some(AnimationPosTracker(0.0, 0.0, 0.3));
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::String);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: String,
         metadata: (
             name: "String ", 
             desc: ["Some string. Helps", "to craft various", "tools."]
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn stump() -> EntityDef {
     let mut d = EntityDef {
@@ -10629,10 +12350,13 @@ fn stump() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::Stump);
     d.required_equipment_type = Some(RequiredEquipmentType(EquipmentType::Axe));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 5., y: 5. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 5., y: 5. },
+    });
     d.max_health = Some(MaxHealth(15));
     d.experience_reward = Some(ExperienceReward(5));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
                 item: Log,
                 min: 1,
@@ -10644,10 +12368,10 @@ fn stump() -> EntityDef {
                 max: 1,
                 rate: 0.3
             )]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn stump2() -> EntityDef {
     let mut d = EntityDef {
@@ -10660,10 +12384,13 @@ fn stump2() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::Stump2);
     d.required_equipment_type = Some(RequiredEquipmentType(EquipmentType::Axe));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 5., y: 5. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 5., y: 5. },
+    });
     d.max_health = Some(MaxHealth(15));
     d.experience_reward = Some(ExperienceReward(5));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
                 item: Log,
                 min: 1,
@@ -10675,10 +12402,10 @@ fn stump2() -> EntityDef {
                 max: 1,
                 rate: 0.3
             )]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn sword() -> EntityDef {
     let mut d = EntityDef {
@@ -10693,10 +12420,13 @@ fn sword() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::Sword);
     d.equipment_type = Some(EquipmentType::Weapon);
-    d.raw_item_base = Some(parse::raw_item_base(r#"(
+    d.raw_item_base = Some(parse::raw_item_base(
+        r#"(
         attack: Some((start: 9, end: 12)),
-  )"#));
-    d.raw_item_bonus = Some(parse::raw_item_bonus(r#"(
+  )"#,
+    ));
+    d.raw_item_bonus = Some(parse::raw_item_bonus(
+        r#"(
         crit_damage: Some((start: 6, end: 12)),
         crit_chance: Some((start: 4, end: 9)),
         speed: Some((start: 6, end: 9)),
@@ -10710,10 +12440,12 @@ fn sword() -> EntityDef {
       
         skill_power: Some((start: 8, end: 13)),
         attack_speed: Some((start: 6, end: 10)),
-  )"#));
+  )"#,
+    ));
     d.melee = Some(MeleeAttack);
     d.ranged = Some(RangedAttack(Projectile::SwordProjectile));
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: Sword,
         attributes: (
             attack_cooldown: 0.65
@@ -10723,11 +12455,13 @@ fn sword() -> EntityDef {
             desc: ["A rusty sword."]
         ),
         count: 1
-  )"#));
-    d.scraps_into = Some(parse::scraps_into(r#"([(obj: StoneChunk, chance: 1.),(obj: StoneChunk, chance: 1.), (obj: StoneChunk, chance: 0.5)])"#));
+  )"#,
+    ));
+    d.scraps_into = Some(parse::scraps_into(
+        r#"([(obj: StoneChunk, chance: 1.),(obj: StoneChunk, chance: 1.), (obj: StoneChunk, chance: 0.5)])"#,
+    ));
     d
 }
-
 
 fn sword_projectile() -> EntityDef {
     let mut d = EntityDef {
@@ -10737,15 +12471,23 @@ fn sword_projectile() -> EntityDef {
     };
     d.sensor = true;
     d.y_sort = Some(YSort(0.));
-    d.sprite_sheet = Some(SpriteSheetDef { asset: "textures/effects/SwordProjectile.png".into(), size: Vec2::new(25., 32.), cols: 3, rows: 1 });
+    d.sprite_sheet = Some(SpriteSheetDef {
+        asset: "textures/effects/SwordProjectile.png".into(),
+        size: Vec2::new(25., 32.),
+        cols: 3,
+        rows: 1,
+    });
     d.projectile = Some(Projectile::SwordProjectile);
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 12.5, y: 16. } });
-    d.projectile_state = Some(parse::projectile_state(r#"(speed: 0., direction: (x: 0., y: 0.), spawn_offset: (x: -10., y: -10.), hit_entities: [], despawn_on_hit: false)"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 12.5, y: 16. },
+    });
+    d.projectile_state = Some(parse::projectile_state(
+        r#"(speed: 0., direction: (x: 0., y: 0.), spawn_offset: (x: -10., y: -10.), hit_entities: [], despawn_on_hit: false)"#,
+    ));
     d.done_animation = true;
     d.animation_timer = Some(AnimationTimerDef { secs: 0.1 });
     d
 }
-
 
 fn teleport_lightning() -> EntityDef {
     let mut d = EntityDef {
@@ -10755,15 +12497,23 @@ fn teleport_lightning() -> EntityDef {
     };
     d.sensor = true;
     d.y_sort = Some(YSort(0.));
-    d.sprite_sheet = Some(SpriteSheetDef { asset: "textures/effects/TeleportLightning.png".into(), size: Vec2::new(104., 48.), cols: 4, rows: 1 });
+    d.sprite_sheet = Some(SpriteSheetDef {
+        asset: "textures/effects/TeleportLightning.png".into(),
+        size: Vec2::new(104., 48.),
+        cols: 4,
+        rows: 1,
+    });
     d.projectile = Some(Projectile::TeleportLightning);
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 52., y: 19.2 } });
-    d.projectile_state = Some(parse::projectile_state(r#"(speed: 0., direction: (x: 0., y: 0.), spawn_offset: (x: 0., y: 0.), hit_entities: [], despawn_on_hit: false)"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 52., y: 19.2 },
+    });
+    d.projectile_state = Some(parse::projectile_state(
+        r#"(speed: 0., direction: (x: 0., y: 0.), spawn_offset: (x: 0., y: 0.), hit_entities: [], despawn_on_hit: false)"#,
+    ));
     d.done_animation = true;
     d.animation_timer = Some(AnimationTimerDef { secs: 0.065 });
     d
 }
-
 
 fn thorns_food() -> EntityDef {
     let mut d = EntityDef {
@@ -10777,9 +12527,12 @@ fn thorns_food() -> EntityDef {
     d.animation_pos_tracker = Some(AnimationPosTracker(0.0, 0.0, 0.3));
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::ThornsFood);
-    d.item_actions = Some(parse::item_actions(r#"(actions: [GainStat("thorns", 15)])"#));
+    d.item_actions = Some(parse::item_actions(
+        r#"(actions: [GainStat("thorns", 15)])"#,
+    ));
     d.consumable = Some(ConsumableItem);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: ThornsFood,
         metadata: (
             name: "Thorns Boost", 
@@ -10787,10 +12540,10 @@ fn thorns_food() -> EntityDef {
         ),
         rarity: Rare,
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn thorns_projectile() -> EntityDef {
     let mut d = EntityDef {
@@ -10800,15 +12553,23 @@ fn thorns_projectile() -> EntityDef {
     };
     d.sensor = true;
     d.y_sort = Some(YSort(0.));
-    d.sprite_sheet = Some(SpriteSheetDef { asset: "textures/effects/ThornsProjectile.png".into(), size: Vec2::new(65., 10.), cols: 3, rows: 1 });
+    d.sprite_sheet = Some(SpriteSheetDef {
+        asset: "textures/effects/ThornsProjectile.png".into(),
+        size: Vec2::new(65., 10.),
+        cols: 3,
+        rows: 1,
+    });
     d.projectile = Some(Projectile::ThornsProjectile);
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 33., y: 5. } });
-    d.projectile_state = Some(parse::projectile_state(r#"(speed: 0., direction: (x: 0., y: 0.), spawn_offset: (x: -4., y: -4.), hit_entities: [], despawn_on_hit: false)"#));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 33., y: 5. },
+    });
+    d.projectile_state = Some(parse::projectile_state(
+        r#"(speed: 0., direction: (x: 0., y: 0.), spawn_offset: (x: -4., y: -4.), hit_entities: [], despawn_on_hit: false)"#,
+    ));
     d.done_animation = true;
     d.animation_timer = Some(AnimationTimerDef { secs: 0.1 });
     d
 }
-
 
 fn throwing_star() -> EntityDef {
     let mut d = EntityDef {
@@ -10818,15 +12579,23 @@ fn throwing_star() -> EntityDef {
     };
     d.sensor = true;
     d.y_sort = Some(YSort(0.));
-    d.sprite_sheet = Some(SpriteSheetDef { asset: "textures/effects/ninjastar.png".into(), size: Vec2::new(16., 16.), cols: 8, rows: 1 });
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 6., y: 6. } });
+    d.sprite_sheet = Some(SpriteSheetDef {
+        asset: "textures/effects/ninjastar.png".into(),
+        size: Vec2::new(16., 16.),
+        cols: 8,
+        rows: 1,
+    });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 6., y: 6. },
+    });
     d.projectile = Some(Projectile::ThrowingStar);
-    d.projectile_state = Some(parse::projectile_state(r#"(speed: 220., spawn_offset: (x: 0., y: 2.), hit_entities: [], despawn_on_hit: true)"#));
+    d.projectile_state = Some(parse::projectile_state(
+        r#"(speed: 220., spawn_offset: (x: 0., y: 2.), hit_entities: [], despawn_on_hit: true)"#,
+    ));
     d.animation_timer = Some(AnimationTimerDef { secs: 0.02 });
     d.animation_pos_tracker = Some(AnimationPosTracker(0.0, 0.0, 0.3));
     d
 }
-
 
 fn throwing_star_large() -> EntityDef {
     let mut d = EntityDef {
@@ -10836,15 +12605,23 @@ fn throwing_star_large() -> EntityDef {
     };
     d.sensor = true;
     d.y_sort = Some(YSort(0.));
-    d.sprite_sheet = Some(SpriteSheetDef { asset: "textures/effects/ninjastarlarge.png".into(), size: Vec2::new(32., 32.), cols: 8, rows: 1 });
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 16., y: 16. } });
+    d.sprite_sheet = Some(SpriteSheetDef {
+        asset: "textures/effects/ninjastarlarge.png".into(),
+        size: Vec2::new(32., 32.),
+        cols: 8,
+        rows: 1,
+    });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 16., y: 16. },
+    });
     d.projectile = Some(Projectile::ThrowingStarLarge);
-    d.projectile_state = Some(parse::projectile_state(r#"(speed: 260., spawn_offset: (x: 0., y: 2.), hit_entities: [], despawn_on_hit: false)"#));
+    d.projectile_state = Some(parse::projectile_state(
+        r#"(speed: 260., spawn_offset: (x: 0., y: 2.), hit_entities: [], despawn_on_hit: false)"#,
+    ));
     d.animation_timer = Some(AnimationTimerDef { secs: 0.055 });
     d.animation_pos_tracker = Some(AnimationPosTracker(0.0, 0.0, 0.3));
     d
 }
-
 
 fn time_fragment() -> EntityDef {
     let mut d = EntityDef {
@@ -10858,7 +12635,8 @@ fn time_fragment() -> EntityDef {
     d.animation_pos_tracker = Some(AnimationPosTracker(0.0, 0.0, 0.3));
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::TimeFragment);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: TimeFragment,
         metadata: (
             name: "Time Fragment", 
@@ -10866,10 +12644,10 @@ fn time_fragment() -> EntityDef {
         ),
         rarity: Rare,
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn time_gate() -> EntityDef {
     let mut d = EntityDef {
@@ -10881,11 +12659,12 @@ fn time_gate() -> EntityDef {
     d.sprite_size = Some(SpriteSize::Medium);
     d.sprite_anchor = Some(SpriteAnchor(parse::vec2(r#"((x: 0., y: 0.))"#)));
     d.y_sort = Some(YSort(0.));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 12., y: 20. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 12., y: 20. },
+    });
     d.sprite_texture = Some("textures/TimeGate.png".into());
     d
 }
-
 
 fn tooltip_inspect() -> EntityDef {
     let mut d = EntityDef {
@@ -10900,7 +12679,6 @@ fn tooltip_inspect() -> EntityDef {
     d
 }
 
-
 fn tumbleweed1() -> EntityDef {
     let mut d = EntityDef {
         name: "Tumbleweed1".into(),
@@ -10912,8 +12690,11 @@ fn tumbleweed1() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::Tumbleweed1);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 } });
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(
     drops: [
       (item: XPShard, min: 1, max: 1, rate: 1.0),
       (item: XPShard, min: 1, max: 1, rate: 1.0),
@@ -10924,10 +12705,10 @@ fn tumbleweed1() -> EntityDef {
       (item: XPShard, min: 1, max: 1, rate: 0.5),
       (item: XPShardMedium, min: 1, max: 1, rate: 0.5),
     ],
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn tumbleweed2() -> EntityDef {
     let mut d = EntityDef {
@@ -10940,8 +12721,11 @@ fn tumbleweed2() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::Tumbleweed2);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 } });
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(
     drops: [
       (item: XPShard, min: 1, max: 1, rate: 1.0),
       (item: XPShard, min: 1, max: 1, rate: 1.0),
@@ -10952,10 +12736,10 @@ fn tumbleweed2() -> EntityDef {
       (item: XPShard, min: 1, max: 1, rate: 0.5),
       (item: XPShardMedium, min: 1, max: 1, rate: 0.5),
     ],
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn tumbleweed3() -> EntityDef {
     let mut d = EntityDef {
@@ -10968,8 +12752,11 @@ fn tumbleweed3() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::Tumbleweed3);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 } });
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(
     drops: [
       (item: XPShard, min: 1, max: 1, rate: 1.0),
       (item: XPShard, min: 1, max: 1, rate: 1.0),
@@ -10980,10 +12767,10 @@ fn tumbleweed3() -> EntityDef {
       (item: XPShard, min: 1, max: 1, rate: 0.5),
       (item: XPShardMedium, min: 1, max: 1, rate: 0.5),
     ],
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn tumbleweed4() -> EntityDef {
     let mut d = EntityDef {
@@ -10996,8 +12783,11 @@ fn tumbleweed4() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::Tumbleweed4);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 } });
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(
     drops: [
       (item: XPShard, min: 1, max: 1, rate: 1.0),
       (item: XPShard, min: 1, max: 1, rate: 1.0),
@@ -11008,10 +12798,10 @@ fn tumbleweed4() -> EntityDef {
       (item: XPShard, min: 1, max: 1, rate: 0.5),
       (item: XPShardMedium, min: 1, max: 1, rate: 0.5),
     ],
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn tusk() -> EntityDef {
     let mut d = EntityDef {
@@ -11025,17 +12815,18 @@ fn tusk() -> EntityDef {
     d.animation_pos_tracker = Some(AnimationPosTracker(0.0, 0.0, 0.3));
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::Tusk);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: Tusk,
         metadata: (
             name: "Tusk", 
             desc: ["Pointy!"]
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn upgrade_station() -> EntityDef {
     let mut d = EntityDef {
@@ -11048,19 +12839,22 @@ fn upgrade_station() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::UpgradeStation);
     d.object_action = Some(parse::object_action(r#"Furnace"#));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 4., y: 6. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 4., y: 6. },
+    });
     d.max_health = Some(MaxHealth(25));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
                 item: UpgradeStationBlock,
                 min: 1,
                 max: 1,
                 rate: 1.
             ),]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn upgrade_station_block() -> EntityDef {
     let mut d = EntityDef {
@@ -11074,19 +12868,22 @@ fn upgrade_station_block() -> EntityDef {
     d.animation_pos_tracker = Some(AnimationPosTracker(0.0, 0.0, 0.3));
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::UpgradeStationBlock);
-    d.item_actions = Some(parse::item_actions(r#"(actions: [PlacesInto(UpgradeStation)])"#));
+    d.item_actions = Some(parse::item_actions(
+        r#"(actions: [PlacesInto(UpgradeStation)])"#,
+    ));
     d.consumable = Some(ConsumableItem);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: UpgradeStationBlock,
         metadata: (
             name: "Upgrade Station ", 
             desc: ["Allows you to", "upgrade and", "improve your","equipment. "]
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn upgrade_tome() -> EntityDef {
     let mut d = EntityDef {
@@ -11101,7 +12898,8 @@ fn upgrade_tome() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::UpgradeTome);
     d.consumable = Some(ConsumableItem);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: UpgradeTome,
         metadata: (
             name: "Upgrade Tome", 
@@ -11109,10 +12907,10 @@ fn upgrade_tome() -> EntityDef {
         ),
         count: 1,
         rarity: Rare
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn void_crawler() -> EntityDef {
     let mut d = EntityDef {
@@ -11128,12 +12926,27 @@ fn void_crawler() -> EntityDef {
     d.mob = Some(Mob::VoidCrawler);
     d.combat_alignment = Some(CombatAlignment::Hostile);
     d.follow_speed = Some(FollowSpeed(0.8));
-    d.leap_attack = Some(LeapAttack { activation_distance: 28., startup: 0.2, duration: 0.38, cooldown: 0.6, speed: 60. });
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: 0., y1: -1., x2: 0., y2: -1.5, r: 5. } });
+    d.leap_attack = Some(LeapAttack {
+        activation_distance: 28.,
+        startup: 0.2,
+        duration: 0.38,
+        cooldown: 0.6,
+        speed: 60.,
+    });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: 0.,
+            y1: -1.,
+            x2: 0.,
+            y2: -1.5,
+            r: 5.,
+        },
+    });
     d.max_health = Some(MaxHealth(10));
     d.attack = Some(Attack(12));
     d.experience_reward = Some(ExperienceReward(20));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [
             (
                 item: ChestBlock,
@@ -11172,10 +12985,10 @@ fn void_crawler() -> EntityDef {
                 rate: 0.00005
             ),
             ]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn void_crawler_card() -> EntityDef {
     let mut d = EntityDef {
@@ -11189,7 +13002,8 @@ fn void_crawler_card() -> EntityDef {
     d.animation_pos_tracker = Some(AnimationPosTracker(0.0, 0.0, 0.3));
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::VoidCrawlerCard);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: VoidCrawlerCard,
         metadata: (
             name: "Void Crawler Card",
@@ -11197,10 +13011,10 @@ fn void_crawler_card() -> EntityDef {
         ),
         rarity: Uncommon,
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn void_worm() -> EntityDef {
     let mut d = EntityDef {
@@ -11216,12 +13030,23 @@ fn void_worm() -> EntityDef {
     d.mob = Some(Mob::VoidWorm);
     d.combat_alignment = Some(CombatAlignment::Hostile);
     d.follow_speed = Some(FollowSpeed(0.4));
-    d.laser_attack = Some(parse::laser_attack(r#"(min_stop_distance: 100., max_stop_distance: 200., laser_duration: 5., walk_duration: 3.)"#));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: 0., y1: 14., x2: 0., y2: -14., r: 11. } });
+    d.laser_attack = Some(parse::laser_attack(
+        r#"(min_stop_distance: 100., max_stop_distance: 200., laser_duration: 5., walk_duration: 3.)"#,
+    ));
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: 0.,
+            y1: 14.,
+            x2: 0.,
+            y2: -14.,
+            r: 11.,
+        },
+    });
     d.max_health = Some(MaxHealth(45));
     d.attack = Some(Attack(18));
     d.experience_reward = Some(ExperienceReward(40));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [
             (
                 item: HeirloomChest,
@@ -11254,10 +13079,10 @@ fn void_worm() -> EntityDef {
                 rate: 0.0001
             ),
             ]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn void_worm_card() -> EntityDef {
     let mut d = EntityDef {
@@ -11271,7 +13096,8 @@ fn void_worm_card() -> EntityDef {
     d.animation_pos_tracker = Some(AnimationPosTracker(0.0, 0.0, 0.3));
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::VoidWormCard);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: VoidWormCard,
         metadata: (
             name: "Void Worm Card",
@@ -11279,10 +13105,10 @@ fn void_worm_card() -> EntityDef {
         ),
         rarity: Uncommon,
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn water_boulder() -> EntityDef {
     let mut d = EntityDef {
@@ -11294,20 +13120,23 @@ fn water_boulder() -> EntityDef {
     d.sprite_anchor = Some(SpriteAnchor(parse::vec2(r#"((x: 0., y: 0.))"#)));
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::WaterBoulder);
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 8., y: 8. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 8., y: 8. },
+    });
     d.max_health = Some(MaxHealth(35));
     d.experience_reward = Some(ExperienceReward(5));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
             item: StoneChunk,
                 min: 1,
                 max: 1,
                 rate: 1.
             ),]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn water_boulder2() -> EntityDef {
     let mut d = EntityDef {
@@ -11320,20 +13149,23 @@ fn water_boulder2() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::WaterBoulder);
     d.required_equipment_type = Some(RequiredEquipmentType(EquipmentType::Pickaxe));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 8., y: 9. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 8., y: 9. },
+    });
     d.max_health = Some(MaxHealth(35));
     d.experience_reward = Some(ExperienceReward(5));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
             item: StoneChunk,
                 min: 2,
                 max: 5,
                 rate: 1.
             )]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn weapon_shrine() -> EntityDef {
     let mut d = EntityDef {
@@ -11346,10 +13178,17 @@ fn weapon_shrine() -> EntityDef {
     d.sprite_size = Some(SpriteSize::Small);
     d.sprite_anchor = Some(SpriteAnchor(parse::vec2(r#"((x: 0., y: 12.))"#)));
     d.y_sort = Some(YSort(0.));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: -10., y1: -13., x2: 10., y2: -13., r: 5.5 } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: -10.,
+            y1: -13.,
+            x2: 10.,
+            y2: -13.,
+            r: 5.5,
+        },
+    });
     d
 }
-
 
 fn weapon_shrine_done() -> EntityDef {
     let mut d = EntityDef {
@@ -11361,10 +13200,17 @@ fn weapon_shrine_done() -> EntityDef {
     d.sprite_size = Some(SpriteSize::Small);
     d.sprite_anchor = Some(SpriteAnchor(parse::vec2(r#"((x: 0., y: 12.))"#)));
     d.y_sort = Some(YSort(0.));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: -10., y1: -13., x2: 10., y2: -13., r: 5.5 } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: -10.,
+            y1: -13.,
+            x2: 10.,
+            y2: -13.,
+            r: 5.5,
+        },
+    });
     d
 }
-
 
 fn well_shrine() -> EntityDef {
     let mut d = EntityDef {
@@ -11377,10 +13223,17 @@ fn well_shrine() -> EntityDef {
     d.sprite_size = Some(SpriteSize::Small);
     d.sprite_anchor = Some(SpriteAnchor(parse::vec2(r#"((x: 0., y: 22.))"#)));
     d.y_sort = Some(YSort(-0.02));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: -8., y1: -16., x2: 8., y2: -16., r: 10. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: -8.,
+            y1: -16.,
+            x2: 8.,
+            y2: -16.,
+            r: 10.,
+        },
+    });
     d
 }
-
 
 fn well_shrine_done() -> EntityDef {
     let mut d = EntityDef {
@@ -11392,10 +13245,17 @@ fn well_shrine_done() -> EntityDef {
     d.sprite_size = Some(SpriteSize::Small);
     d.sprite_anchor = Some(SpriteAnchor(parse::vec2(r#"((x: 0., y: 22.))"#)));
     d.y_sort = Some(YSort(0.));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: -8., y1: -16., x2: 8., y2: -16., r: 10. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: -8.,
+            y1: -16.,
+            x2: 8.,
+            y2: -16.,
+            r: 10.,
+        },
+    });
     d
 }
-
 
 fn wood_axe() -> EntityDef {
     let mut d = EntityDef {
@@ -11410,18 +13270,21 @@ fn wood_axe() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::WoodAxe);
     d.equipment_type = Some(EquipmentType::Axe);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: WoodAxe,
         metadata: (
             name: "Wood Axe", 
             desc: ["Keep this axe in", "your inventory to", "chop trees with", "your weapon."]
         ),
         count: 1
-  )"#));
-    d.scraps_into = Some(parse::scraps_into(r#"([(obj: StoneChunk, chance: 1.),(obj: StoneChunk, chance: 1.), (obj: StoneChunk, chance: 0.5)])"#));
+  )"#,
+    ));
+    d.scraps_into = Some(parse::scraps_into(
+        r#"([(obj: StoneChunk, chance: 1.),(obj: StoneChunk, chance: 1.), (obj: StoneChunk, chance: 0.5)])"#,
+    ));
     d
 }
-
 
 fn wood_bow() -> EntityDef {
     let mut d = EntityDef {
@@ -11436,10 +13299,13 @@ fn wood_bow() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::WoodBow);
     d.equipment_type = Some(EquipmentType::Weapon);
-    d.raw_item_base = Some(parse::raw_item_base(r#"(
+    d.raw_item_base = Some(parse::raw_item_base(
+        r#"(
         attack: Some((start: 10, end: 13)),
-  )"#));
-    d.raw_item_bonus = Some(parse::raw_item_bonus(r#"(
+  )"#,
+    ));
+    d.raw_item_bonus = Some(parse::raw_item_bonus(
+        r#"(
         crit_damage: Some((start: 14, end: 30)),
         crit_chance: Some((start: 8, end: 14)),
         speed: Some((start: 6, end: 10)),
@@ -11453,10 +13319,12 @@ fn wood_bow() -> EntityDef {
       
         skill_power: Some((start: 8, end: 13)),
         attack_speed: Some((start: 6, end: 10)),
-  )"#));
+  )"#,
+    ));
     d.melee = Some(MeleeAttack);
     d.ranged = Some(RangedAttack(Projectile::Arrow));
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: WoodBow,
         attributes: (
             attack_cooldown: 1.
@@ -11466,11 +13334,11 @@ fn wood_bow() -> EntityDef {
             desc: ["A wood bow."]
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d.scraps_into = Some(parse::scraps_into(r#"([ (obj: Log, chance: 0.5)])"#));
     d
 }
-
 
 fn wood_door() -> EntityDef {
     let mut d = EntityDef {
@@ -11484,20 +13352,31 @@ fn wood_door() -> EntityDef {
     d.world_object = Some(WorldObject::WoodDoor);
     d.object_action = Some(parse::object_action(r#"ChangeObject(WoodDoorOpen)"#));
     d.wall = Some(parse::wall(r#"WoodDoor"#));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: 0., y1: -3., x2: 0., y2: -2., r: 7.5 } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: 0.,
+            y1: -3.,
+            x2: 0.,
+            y2: -2.,
+            r: 7.5,
+        },
+    });
     d.max_health = Some(MaxHealth(35));
-    d.wall_texture_data = Some(parse::wall_texture_data(r#"(obj_bit_index: 15, texture_offset: 2)"#));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.wall_texture_data = Some(parse::wall_texture_data(
+        r#"(obj_bit_index: 15, texture_offset: 2)"#,
+    ));
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
                 item: WoodDoorBlock,
                 min: 1,
                 max: 1,
                 rate: 1.
             ),]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn wood_door_block() -> EntityDef {
     let mut d = EntityDef {
@@ -11513,17 +13392,18 @@ fn wood_door_block() -> EntityDef {
     d.world_object = Some(WorldObject::WoodDoorBlock);
     d.item_actions = Some(parse::item_actions(r#"(actions: [PlacesInto(WoodDoor)])"#));
     d.consumable = Some(ConsumableItem);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: WoodDoorBlock,
         metadata: (
             name: "Wood Door", 
             desc: ["Creates a Wood","Door."]
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn wood_door_open() -> EntityDef {
     let mut d = EntityDef {
@@ -11538,18 +13418,21 @@ fn wood_door_open() -> EntityDef {
     d.object_action = Some(parse::object_action(r#"ChangeObject(WoodDoor)"#));
     d.wall = Some(parse::wall(r#"WoodDoorOpen"#));
     d.max_health = Some(MaxHealth(35));
-    d.wall_texture_data = Some(parse::wall_texture_data(r#"(obj_bit_index: 15, texture_offset: 3)"#));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.wall_texture_data = Some(parse::wall_texture_data(
+        r#"(obj_bit_index: 15, texture_offset: 3)"#,
+    ));
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
                 item: WoodDoorBlock,
                 min: 1,
                 max: 1,
                 rate: 1.
             ),]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn wood_pickaxe() -> EntityDef {
     let mut d = EntityDef {
@@ -11564,17 +13447,18 @@ fn wood_pickaxe() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::WoodPickaxe);
     d.equipment_type = Some(EquipmentType::Pickaxe);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: WoodPickaxe,
         metadata: (
             name: "Wood Pickaxe", 
             desc: ["Keep this pickaxe in", "your inventory to", "mine rocks with", "your weapon."]
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn wood_plank() -> EntityDef {
     let mut d = EntityDef {
@@ -11588,17 +13472,18 @@ fn wood_plank() -> EntityDef {
     d.animation_pos_tracker = Some(AnimationPosTracker(0.0, 0.0, 0.3));
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::WoodPlank);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: WoodPlank,
         metadata: (
             name: "Wood Plank", 
             desc: ["Sturdy! Must be","able to build","quite a few things", "with this."]
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn wood_sword() -> EntityDef {
     let mut d = EntityDef {
@@ -11613,10 +13498,13 @@ fn wood_sword() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::WoodSword);
     d.equipment_type = Some(EquipmentType::Weapon);
-    d.raw_item_base = Some(parse::raw_item_base(r#"(
+    d.raw_item_base = Some(parse::raw_item_base(
+        r#"(
         attack: Some((start: 7, end: 9)),
-  )"#));
-    d.raw_item_bonus = Some(parse::raw_item_bonus(r#"(
+  )"#,
+    ));
+    d.raw_item_bonus = Some(parse::raw_item_bonus(
+        r#"(
         crit_damage: Some((start: 2, end: 4)),
         crit_chance: Some((start: 2, end: 4)),
         healing: Some((start: 2, end: 5)),
@@ -11626,10 +13514,12 @@ fn wood_sword() -> EntityDef {
         dodge: Some((start: 1, end: 3)),
         xp_rate: Some((start: 4, end: 10)),
         loot_rate: Some((start: 3, end: 5)),
-  )"#));
+  )"#,
+    ));
     d.melee = Some(MeleeAttack);
     d.ranged = Some(RangedAttack(Projectile::SwordProjectile));
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: WoodSword,
         attributes: (
             attack_cooldown: 0.65
@@ -11639,11 +13529,11 @@ fn wood_sword() -> EntityDef {
             desc: ["A wood sword."],
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d.scraps_into = Some(parse::scraps_into(r#"([(obj: Log, chance: 1.)])"#));
     d
 }
-
 
 fn wood_wall() -> EntityDef {
     let mut d = EntityDef {
@@ -11656,20 +13546,31 @@ fn wood_wall() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::WoodWall);
     d.wall = Some(parse::wall(r#"WoodWall"#));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: 0., y1: -3., x2: 0., y2: -2., r: 7.5 } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: 0.,
+            y1: -3.,
+            x2: 0.,
+            y2: -2.,
+            r: 7.5,
+        },
+    });
     d.max_health = Some(MaxHealth(35));
-    d.wall_texture_data = Some(parse::wall_texture_data(r#"(obj_bit_index: 15, texture_offset: 1)"#));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.wall_texture_data = Some(parse::wall_texture_data(
+        r#"(obj_bit_index: 15, texture_offset: 1)"#,
+    ));
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
                 item: WoodWallBlock,
                 min: 1,
                 max: 1,
                 rate: 1.
             ),]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn wood_wall_block() -> EntityDef {
     let mut d = EntityDef {
@@ -11685,17 +13586,18 @@ fn wood_wall_block() -> EntityDef {
     d.world_object = Some(WorldObject::WoodWallBlock);
     d.item_actions = Some(parse::item_actions(r#"(actions: [PlacesInto(WoodWall)])"#));
     d.consumable = Some(ConsumableItem);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: WoodWallBlock,
         metadata: (
             name: "Wood Wall", 
             desc: ["Creates a Wood", "Wall."]
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn xp_jug() -> EntityDef {
     let mut d = EntityDef {
@@ -11708,8 +13610,11 @@ fn xp_jug() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::XPJug);
     d.max_health = Some(MaxHealth(1));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 4., y: 4. } });
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 4., y: 4. },
+    });
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [
             (
                 item: XPShard,
@@ -11760,10 +13665,10 @@ fn xp_jug() -> EntityDef {
                 rate: 0.5
             ),
             ]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn xp_shard() -> EntityDef {
     let mut d = EntityDef {
@@ -11777,7 +13682,8 @@ fn xp_shard() -> EntityDef {
     d.animation_pos_tracker = Some(AnimationPosTracker(0.0, 0.0, 0.3));
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::XPShard);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: XPShard,
         metadata: (
             name: "XP Shard",
@@ -11785,10 +13691,10 @@ fn xp_shard() -> EntityDef {
         ),
         rarity: Common,
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn xp_shard_large() -> EntityDef {
     let mut d = EntityDef {
@@ -11802,7 +13708,8 @@ fn xp_shard_large() -> EntityDef {
     d.animation_pos_tracker = Some(AnimationPosTracker(0.0, 0.0, 0.3));
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::XPShardLarge);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: XPShardLarge,
         metadata: (
             name: "XP Shard",
@@ -11810,10 +13717,10 @@ fn xp_shard_large() -> EntityDef {
         ),
         rarity: Common,
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn xp_shard_medium() -> EntityDef {
     let mut d = EntityDef {
@@ -11827,7 +13734,8 @@ fn xp_shard_medium() -> EntityDef {
     d.animation_pos_tracker = Some(AnimationPosTracker(0.0, 0.0, 0.3));
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::XPShardMedium);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: XPShardMedium,
         metadata: (
             name: "XP Shard",
@@ -11835,10 +13743,10 @@ fn xp_shard_medium() -> EntityDef {
         ),
         rarity: Common,
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn yellow_beacon() -> EntityDef {
     let mut d = EntityDef {
@@ -11851,19 +13759,22 @@ fn yellow_beacon() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::YellowBeacon);
     d.object_action = Some(parse::object_action(r#"ToggleBeacon(YellowBeacon)"#));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 4., y: 6. } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 4., y: 6. },
+    });
     d.max_health = Some(MaxHealth(25));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
                 item: YellowBeaconBlock,
                 min: 1,
                 max: 1,
                 rate: 1.
             ),]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn yellow_beacon_block() -> EntityDef {
     let mut d = EntityDef {
@@ -11878,17 +13789,18 @@ fn yellow_beacon_block() -> EntityDef {
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::YellowBeaconBlock);
     d.item_actions = Some(parse::item_actions(r#"(actions: [BeaconDungeonEntrance])"#));
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: YellowBeaconBlock,
         metadata: (
             name: "Dungeon Map ", 
             desc: ["Guides you to","the Dungeon."]
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn yellow_berries() -> EntityDef {
     let mut d = EntityDef {
@@ -11904,17 +13816,18 @@ fn yellow_berries() -> EntityDef {
     d.world_object = Some(WorldObject::YellowBerries);
     d.item_actions = Some(parse::item_actions(r#"(actions: [ModifyHealth(5)])"#));
     d.consumable = Some(ConsumableItem);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: YellowBerries,
         metadata: (
             name: "Yellow Berries", 
             desc: ["Crunchy and juicy", "Yellow Berries. So", "refreshing!"]
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn yellow_flower() -> EntityDef {
     let mut d = EntityDef {
@@ -11926,21 +13839,24 @@ fn yellow_flower() -> EntityDef {
     d.sprite_anchor = Some(SpriteAnchor(parse::vec2(r#"((x: 0., y: 0.))"#)));
     d.y_sort = Some(YSort(-0.01));
     d.world_object = Some(WorldObject::YellowFlower);
-    d.collider = Some(ColliderDef { kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Cuboid { x: 4.5, y: 4.5 },
+    });
     d.sensor = true;
     d.max_health = Some(MaxHealth(1));
     d.experience_reward = Some(ExperienceReward(5));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
                 item: YellowFlowerBlock,
                 min: 1,
                 max: 1,
                 rate: 1.
             ),]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn yellow_flower_block() -> EntityDef {
     let mut d = EntityDef {
@@ -11954,17 +13870,18 @@ fn yellow_flower_block() -> EntityDef {
     d.animation_pos_tracker = Some(AnimationPosTracker(0.0, 0.0, 0.3));
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::YellowFlowerBlock);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: YellowFlowerBlock,
         metadata: (
             name: "Yellow Flower ", 
             desc: ["A Yellow Flower.", "It glows with","wisdom."]
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn yellow_flower_stew() -> EntityDef {
     let mut d = EntityDef {
@@ -11978,9 +13895,12 @@ fn yellow_flower_stew() -> EntityDef {
     d.animation_pos_tracker = Some(AnimationPosTracker(0.0, 0.0, 0.3));
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::YellowFlowerStew);
-    d.item_actions = Some(parse::item_actions(r#"(actions: [ApplyTemporarySpeed(25, 7.0)])"#));
+    d.item_actions = Some(parse::item_actions(
+        r#"(actions: [ApplyTemporarySpeed(25, 7.0)])"#,
+    ));
     d.consumable = Some(ConsumableItem);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: YellowFlowerStew,
         metadata: (
             name: "Yellow Stew", 
@@ -11988,10 +13908,10 @@ fn yellow_flower_stew() -> EntityDef {
         ),
         rarity: Uncommon,
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn yellow_sapling_block() -> EntityDef {
     let mut d = EntityDef {
@@ -12005,19 +13925,22 @@ fn yellow_sapling_block() -> EntityDef {
     d.animation_pos_tracker = Some(AnimationPosTracker(0.0, 0.0, 0.3));
     d.y_sort = Some(YSort(0.));
     d.world_object = Some(WorldObject::YellowSaplingBlock);
-    d.item_actions = Some(parse::item_actions(r#"(actions: [PlacesInto(YellowSaplingStage1)])"#));
+    d.item_actions = Some(parse::item_actions(
+        r#"(actions: [PlacesInto(YellowSaplingStage1)])"#,
+    ));
     d.consumable = Some(ConsumableItem);
-    d.item_stack = Some(parse::item_stack(r#"(
+    d.item_stack = Some(parse::item_stack(
+        r#"(
         obj_type: YellowSaplingBlock,
         metadata: (
             name: "Yellow Sapling",
             desc: ["Grows into a tree", "when placed on", "the ground."],
         ),
         count: 1
-  )"#));
+  )"#,
+    ));
     d
 }
-
 
 fn yellow_sapling_stage1() -> EntityDef {
     let mut d = EntityDef {
@@ -12033,20 +13956,29 @@ fn yellow_sapling_stage1() -> EntityDef {
     d.sprite_size = Some(SpriteSize::Small);
     d.foliage_size = Some(FoliageSize(parse::vec2(r#"((x: 16., y: 16.))"#)));
     d.sprite_anchor = Some(SpriteAnchor(parse::vec2(r#"((x: 0., y: 0.))"#)));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: 0., y1: -10., x2: 0., y2: -6., r: 1.5 } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: 0.,
+            y1: -10.,
+            x2: 0.,
+            y2: -6.,
+            r: 1.5,
+        },
+    });
     d.max_health = Some(MaxHealth(1));
     d.y_sort = Some(YSort(0.));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
                 item: YellowSaplingBlock,
                 min: 1,
                 max: 1,
                 rate: 1.
             ),]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn yellow_sapling_stage2() -> EntityDef {
     let mut d = EntityDef {
@@ -12062,11 +13994,20 @@ fn yellow_sapling_stage2() -> EntityDef {
     d.sprite_size = Some(SpriteSize::Small);
     d.foliage_size = Some(FoliageSize(parse::vec2(r#"((x: 16., y: 32.))"#)));
     d.sprite_anchor = Some(SpriteAnchor(parse::vec2(r#"((x: 0., y: 8.))"#)));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: 0., y1: -24., x2: 0., y2: -14., r: 1.5 } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: 0.,
+            y1: -24.,
+            x2: 0.,
+            y2: -14.,
+            r: 1.5,
+        },
+    });
     d.max_health = Some(MaxHealth(12));
     d.y_sort = Some(YSort(0.));
     d.experience_reward = Some(ExperienceReward(5));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
                 item: YellowSaplingBlock,
                 min: 1,
@@ -12079,10 +14020,10 @@ fn yellow_sapling_stage2() -> EntityDef {
                 max: 2,
                 rate: 0.75
             ),]
-        )"#));
+        )"#,
+    ));
     d
 }
-
 
 fn yellow_sapling_stage3() -> EntityDef {
     let mut d = EntityDef {
@@ -12098,11 +14039,20 @@ fn yellow_sapling_stage3() -> EntityDef {
     d.sprite_size = Some(SpriteSize::Small);
     d.foliage_size = Some(FoliageSize(parse::vec2(r#"((x: 16., y: 32.))"#)));
     d.sprite_anchor = Some(SpriteAnchor(parse::vec2(r#"((x: 0., y: 8.))"#)));
-    d.collider = Some(ColliderDef { kind: ColliderKind::Capsule { x1: 0., y1: -24., x2: 0., y2: -14., r: 1.5 } });
+    d.collider = Some(ColliderDef {
+        kind: ColliderKind::Capsule {
+            x1: 0.,
+            y1: -24.,
+            x2: 0.,
+            y2: -14.,
+            r: 1.5,
+        },
+    });
     d.max_health = Some(MaxHealth(20));
     d.y_sort = Some(YSort(0.));
     d.experience_reward = Some(ExperienceReward(5));
-    d.loot_table = Some(parse::loot_table(r#"(
+    d.loot_table = Some(parse::loot_table(
+        r#"(
         drops: [(
                 item: YellowSaplingBlock,
                 min: 1,
@@ -12115,14 +14065,16 @@ fn yellow_sapling_stage3() -> EntityDef {
                 max: 2,
                 rate: 0.75
             ),]
-        )"#));
+        )"#,
+    ));
     d
 }
 
 fn era1_world_generation_params() -> EraDef {
     EraDef {
         name: "Era1WorldGenerationParams".into(),
-        world_generation: parse::world_generation(r#"(
+        world_generation: parse::world_generation(
+            r#"(
       water_frequency: 0.29,
       stone_frequency: 0.0,
       sand_frequency: 0.32,
@@ -12235,15 +14187,16 @@ fn era1_world_generation_params() -> EraDef {
         HeirloomShrine: [GrassTile, ],
         ChaosTotem: [GrassTile, ],
       }
-    )"#),
+    )"#,
+        ),
     }
 }
-
 
 fn era2_world_generation_params() -> EraDef {
     EraDef {
         name: "Era2WorldGenerationParams".into(),
-        world_generation: parse::world_generation(r#"(
+        world_generation: parse::world_generation(
+            r#"(
       water_frequency: 0.33,
       stone_frequency: 0.0,
       sand_frequency: 0.32,
@@ -12471,15 +14424,16 @@ fn era2_world_generation_params() -> EraDef {
         DesertCrate: [GrassTile],
         DesertCrate2: [GrassTile],
       }
-    )"#),
+    )"#,
+        ),
     }
 }
-
 
 fn era3_world_generation_params() -> EraDef {
     EraDef {
         name: "Era3WorldGenerationParams".into(),
-        world_generation: parse::world_generation(r#"(
+        world_generation: parse::world_generation(
+            r#"(
       water_frequency: 0.33,
       stone_frequency: 0.0,
       sand_frequency: 0.32,
@@ -12637,15 +14591,16 @@ fn era3_world_generation_params() -> EraDef {
         ChaosTotem: [GrassTile],
         BlacksmithMerchant: [GrassTile],
       }
-    )"#),
+    )"#,
+        ),
     }
 }
-
 
 fn era4_world_generation_params() -> EraDef {
     EraDef {
         name: "Era4WorldGenerationParams".into(),
-        world_generation: parse::world_generation(r#"(
+        world_generation: parse::world_generation(
+            r#"(
       water_frequency: 0.0,
       stone_frequency: 1.0,
       sand_frequency: 0.0,
@@ -12691,10 +14646,10 @@ fn era4_world_generation_params() -> EraDef {
         ArmorShrineDone: [StoneTile],
         AccessoryShrineDone: [StoneTile],
       }
-    )"#),
+    )"#,
+        ),
     }
 }
-
 
 pub fn register_entities(defs: &mut GameDefs) {
     defs.insert_entity(accessory_shrine());

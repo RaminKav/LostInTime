@@ -91,12 +91,10 @@ impl OwnedBlessingCard {
                 choice.blessing.starting_chaos() as i32
             ));
         }
-        let card_rarity = choice.blessing.display_card_rarity().or_else(|| {
-            choice
-                .resolved_heirloom
-                .as_ref()
-                .map(|h| h.rarity)
-        });
+        let card_rarity = choice
+            .blessing
+            .display_card_rarity()
+            .or_else(|| choice.resolved_heirloom.as_ref().map(|h| h.rarity));
         Self {
             title: choice.title.clone(),
             description: choice.description.clone(),
@@ -818,18 +816,12 @@ fn apply_major_blessing(
             }
         }
         MajorBlessing::RandomLegendaryArmor => {
-            if let Some(armor) = WorldObject::iter()
-                .filter(|o| o.is_armor())
-                .choose(rng)
-            {
+            if let Some(armor) = WorldObject::iter().filter(|o| o.is_armor()).choose(rng) {
                 blessing_item_rewards.queue_item_with_rarity(armor, ItemRarity::Legendary);
             }
         }
         MajorBlessing::RandomLegendaryAccessory => {
-            if let Some(acc) = WorldObject::iter()
-                .filter(|o| o.is_accessory())
-                .choose(rng)
-            {
+            if let Some(acc) = WorldObject::iter().filter(|o| o.is_accessory()).choose(rng) {
                 blessing_item_rewards.queue_item_with_rarity(acc, ItemRarity::Legendary);
             }
         }
@@ -900,9 +892,11 @@ fn apply_major_blessing(
                 if let Some(pool) = effect_pool {
                     pool.push(entry);
                 } else {
-                    commands.entity(player_entity).insert(EffectPoolStatusChances {
-                        entries: vec![entry],
-                    });
+                    commands
+                        .entity(player_entity)
+                        .insert(EffectPoolStatusChances {
+                            entries: vec![entry],
+                        });
                 }
             }
         }

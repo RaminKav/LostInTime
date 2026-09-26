@@ -122,11 +122,9 @@ impl Plugin for GenerationPlugin {
                     .before(ChunkPlugin::mark_outofrange_chunks_for_despawn)
                     .before(CustomFlush)
                     .run_if(resource_exists::<WorldObjectCache>)
-                    .run_if(
-                        resource_exists::<GenerationSeed>.and_then(
-                            in_state(GameState::Main).or_else(in_state(GameState::Initializing)),
-                        ),
-                    ),
+                    .run_if(resource_exists::<GenerationSeed>.and_then(
+                        in_state(GameState::Main).or_else(in_state(GameState::Initializing)),
+                    )),
             )
             .add_systems(
                 Update,

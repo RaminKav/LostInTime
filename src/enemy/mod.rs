@@ -722,7 +722,11 @@ fn apply_run_difficulty_to_normal_mobs(
             &mut FollowSpeed,
             Option<&mut CurrentHealth>,
         ),
-        (Added<Mob>, Without<InfiniteModeMob>, Without<DifficultyApplied>),
+        (
+            Added<Mob>,
+            Without<InfiniteModeMob>,
+            Without<DifficultyApplied>,
+        ),
     >,
     difficulty: Res<ActiveRunDifficulty>,
     mut commands: Commands,

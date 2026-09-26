@@ -62,17 +62,13 @@ impl EntityDef {
     pub fn scaled_capsule_collider(&self, scale: f32) -> Option<bevy_rapier2d::prelude::Collider> {
         let col = self.collider.as_ref()?;
         match col.kind {
-            super::types::ColliderKind::Capsule {
-                x1,
-                y1,
-                x2,
-                y2,
-                r,
-            } => Some(bevy_rapier2d::prelude::Collider::capsule(
-                bevy::prelude::Vec2::new(x1 * scale, y1 * scale),
-                bevy::prelude::Vec2::new(x2 * scale, y2 * scale),
-                r * scale,
-            )),
+            super::types::ColliderKind::Capsule { x1, y1, x2, y2, r } => {
+                Some(bevy_rapier2d::prelude::Collider::capsule(
+                    bevy::prelude::Vec2::new(x1 * scale, y1 * scale),
+                    bevy::prelude::Vec2::new(x2 * scale, y2 * scale),
+                    r * scale,
+                ))
+            }
             super::types::ColliderKind::Cuboid { x, y } => Some(
                 bevy_rapier2d::prelude::Collider::cuboid(x * scale, y * scale),
             ),

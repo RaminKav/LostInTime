@@ -109,20 +109,25 @@ fn fragment(mesh: VertexOutput) -> @location(0) vec4<f32> {
     // instead of continuously interpolating.
     let time = floor(params.x / frame_duration) * frame_duration;
 
-    // Sample up to 4 rings unconditionally (uniform control flow), same pattern as the item
-    // drop-shadow shader. Ring `k` sits `k` texels from the art's silhouette.
-    var hits = array<f32, 4>(
+    // Sample up to 8 rings unconditionally (uniform control flow), same pattern as the item
+    // drop-shadow shader. Ring `k` sits `k` texels from the art's silhouette. `num_layers`
+    // (params.z) drops the outer rings, so small slots can stay at ~3–4px while cards go thicker.
+    var hits = array<f32, 8>(
         ring_alpha(slot_uv, texel, 1.0),
         ring_alpha(slot_uv, texel, 2.0),
         ring_alpha(slot_uv, texel, 3.0),
         ring_alpha(slot_uv, texel, 4.0),
+        ring_alpha(slot_uv, texel, 5.0),
+        ring_alpha(slot_uv, texel, 6.0),
+        ring_alpha(slot_uv, texel, 7.0),
+        ring_alpha(slot_uv, texel, 8.0),
     );
 
     // Smallest ring index with an opaque neighbor wins (nearest silhouette pixel), fading
     // out to 0 by `num_layers` texels away. Cubing the linear falloff makes the outer layers
     // drop off sharply instead of a constant per-layer decrease.
     var layer_fade = 0.0;
-    for (var i = 4; i >= 1; i = i - 1) {
+    for (var i = 8; i >= 1; i = i - 1) {
         let fi = f32(i);
         if (fi <= num_layers && hits[i - 1] > 0.01) {
             let linear_fade = clamp(1.0 - (fi - 1.0) / num_layers, 0.0, 1.0);

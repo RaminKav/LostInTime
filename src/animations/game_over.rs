@@ -1,6 +1,6 @@
-use bevy::text::Justify;
 use crate::aseprite_helpers::pause;
 use crate::ui::game_fonts as gf;
+use bevy::text::Justify;
 use bevy_aseprite_ultra::prelude::AseAnimation;
 use std::{fs::File, io::BufReader};
 

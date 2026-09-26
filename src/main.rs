@@ -951,8 +951,7 @@ impl<'w, 's> GameParam<'w, 's> {
             };
 
         // Frail: +3% damage per stack (additive), applied at the end.
-        let frail_multiplier =
-            crate::combat::status_effects::frail_damage_multiplier(frail_stacks);
+        let frail_multiplier = crate::combat::status_effects::frail_damage_multiplier(frail_stacks);
 
         // Total flat bonus damage (including mana charge)
         let total_dmg_bonus = dmg_bonus as i32 + mana_charge_bonus;

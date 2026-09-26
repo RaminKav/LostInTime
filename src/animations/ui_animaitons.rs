@@ -83,8 +83,7 @@ pub fn handle_move_animations(
             if let Some(child) = child_option {
                 for child_e in child.iter() {
                     if let Ok(mut text_color) = child_text_query.get_mut(child_e) {
-                        let new_fade =
-                            text_color.0.to_srgba().alpha - fade * time.delta_secs();
+                        let new_fade = text_color.0.to_srgba().alpha - fade * time.delta_secs();
                         text_color.0 = text_color.0.with_alpha(new_fade);
                     }
                 }
@@ -156,12 +155,12 @@ pub fn handle_ui_time_fragments(
         let icon_e = entity_commands
             .insert((
                 (graphics
-                        .spritesheet_map
-                        .as_ref()
-                        .unwrap()
-                        .get(&icon.icon)
-                        .unwrap()
-                        .clone()),
+                    .spritesheet_map
+                    .as_ref()
+                    .unwrap()
+                    .get(&icon.icon)
+                    .unwrap()
+                    .clone()),
                 Transform::from_translation(icon.start),
             ))
             .insert(MoveUIAnimation {

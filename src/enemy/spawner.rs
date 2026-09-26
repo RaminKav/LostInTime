@@ -390,13 +390,10 @@ fn handle_spawn_mobs(
                     .unwrap_or(false);
                 // Endless void mobs skip run-difficulty elite scaling entirely.
                 if !infinite_mode.active && can_be_elite {
-                    let elite_rate =
-                        ELITE_SPAWN_RATE * difficulty.elite_rate_multiplier();
+                    let elite_rate = ELITE_SPAWN_RATE * difficulty.elite_rate_multiplier();
                     if rng.gen::<f32>() < elite_rate {
                         commands.entity(spawned_mob).insert(EliteMob);
-                        if difficulty.allows_mega_elites()
-                            && rng.gen::<f32>() < MEGA_ELITE_CHANCE
-                        {
+                        if difficulty.allows_mega_elites() && rng.gen::<f32>() < MEGA_ELITE_CHANCE {
                             commands.entity(spawned_mob).insert(MegaEliteMob);
                         }
                     }

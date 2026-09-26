@@ -743,8 +743,10 @@ impl ObjectAction {
                     }
                     // Offer a major blessing before the era swap when one was earned.
                     if item_action_param.pending_major_blessings.0 > 0 {
-                        item_action_param.pending_major_blessings.0 =
-                            item_action_param.pending_major_blessings.0.saturating_sub(1);
+                        item_action_param.pending_major_blessings.0 = item_action_param
+                            .pending_major_blessings
+                            .0
+                            .saturating_sub(1);
                         item_action_param.current_blessing_tier.0 = BlessingTier::Major;
                         item_action_param.deferred_era_swap.era = Some(era);
                         item_action_param

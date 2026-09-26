@@ -18,7 +18,9 @@ use crate::attributes::{CurrentMana, Lifesteal, ProjectileSize};
 use crate::NO_DROPS;
 
 pub mod combat_helpers;
-use crate::blessings::{HeirloomManaOverclock, MajorBlessing, OwnedBlessings, OwnedMajorBlessings, overclock_mana_cost};
+use crate::blessings::{
+    overclock_mana_cost, HeirloomManaOverclock, MajorBlessing, OwnedBlessings, OwnedMajorBlessings,
+};
 use crate::enemy::EliteMob;
 use crate::night::InfiniteMode;
 use crate::player::melee_skills::{
@@ -1085,8 +1087,7 @@ pub fn cleanup_marked_for_death_entities(
             {
                 let mut rng = rand::thread_rng();
                 if rng.gen_bool(0.40) {
-                    blessing_triggers
-                        .increment(crate::blessings::MajorBlessing::IceExplosionChain);
+                    blessing_triggers.increment(crate::blessings::MajorBlessing::IceExplosionChain);
                     let pos = mob_pos.translation();
                     let dmg = (attack.0 / 2).max(1);
                     spawn_ice_explosion_hitbox(

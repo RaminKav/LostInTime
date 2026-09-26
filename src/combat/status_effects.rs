@@ -148,7 +148,10 @@ fn apply_status_sprite_tint(mut world: DeferredWorld, context: HookContext) {
         return;
     };
     if world.get::<BaseSpriteColor>(entity).is_none() {
-        world.commands().entity(entity).insert(BaseSpriteColor(current));
+        world
+            .commands()
+            .entity(entity)
+            .insert(BaseSpriteColor(current));
     }
     if let Some(mut sprite) = world.get_mut::<Sprite>(entity) {
         sprite.color = STATUS_EFFECT_BLUE_TINT;

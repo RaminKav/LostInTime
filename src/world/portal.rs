@@ -251,8 +251,7 @@ pub fn track_boss_kills(
 
                 // Major blessings: first clear of Era 1 / Era 2 bosses only (not Era 3).
                 if matches!(era, Era::Main | Era::Second) {
-                    pending_major_blessings.0 =
-                        pending_major_blessings.0.saturating_add(1);
+                    pending_major_blessings.0 = pending_major_blessings.0.saturating_add(1);
                     info!(
                         "Queued major blessing (pending={})",
                         pending_major_blessings.0

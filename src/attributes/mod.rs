@@ -61,9 +61,7 @@ pub use consumable_buffs::{
 use hunger::*;
 pub mod item_abilities;
 
-use self::health_regen::{
-    handle_health_regen, handle_mana_regen, handle_pending_extra_mana_regen,
-};
+use self::health_regen::{handle_health_regen, handle_mana_regen, handle_pending_extra_mana_regen};
 use bevy::sprite_render::MeshMaterial2d;
 pub struct AttributesPlugin;
 pub const MAX_GEAR_LEVEL: u8 = 10;
@@ -581,9 +579,8 @@ impl ItemAttributes {
         let base_attack_speed =
             self.attack_speed.value + skills.get_count(Heirloom::AttackSpeed) * 15;
         // Blazing Tempo: multiply computed attack speed (0 * 1.25 stays 0).
-        let total_attack_speed = (base_attack_speed as f32
-            * major_blessings.attack_speed_multiplier())
-            .round() as i32;
+        let total_attack_speed =
+            (base_attack_speed as f32 * major_blessings.attack_speed_multiplier()).round() as i32;
         entity.insert(AttackSpeed(total_attack_speed));
 
         if self.attack_cooldown > 0. {
@@ -717,9 +714,8 @@ impl ItemAttributes {
             + skills.get_count(Heirloom::SkillPower) * 15
             + skill_power_hunt_bonus;
         // Arcane Mastery: multiply computed skill power (0 * 1.35 stays 0).
-        let skill_power = (base_skill_power as f32
-            * major_blessings.skill_damage_multiplier())
-            .round() as i32;
+        let skill_power =
+            (base_skill_power as f32 * major_blessings.skill_damage_multiplier()).round() as i32;
         entity.insert(SkillPower(skill_power));
     }
     pub fn get_random_existing_bonus_attribute_string(

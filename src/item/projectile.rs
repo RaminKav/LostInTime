@@ -8,7 +8,7 @@ use crate::{
         modifiers::ModifyManaEvent, Attack, CurrentMana, ManaRegen, MaxMana, ProjectileSize,
     },
     audio::{AudioSoundEffect, SoundSpawner},
-    blessings::{HeirloomManaOverclock, MajorBlessing, OwnedMajorBlessings, overclock_mana_cost},
+    blessings::{overclock_mana_cost, HeirloomManaOverclock, MajorBlessing, OwnedMajorBlessings},
     client::is_not_paused,
     combat::AttackTimer,
     cursor::CursorPos,

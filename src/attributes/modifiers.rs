@@ -35,14 +35,8 @@ pub fn handle_modify_health_event(
     mut blessing_triggers: ResMut<BlessingTriggerCounts>,
 ) {
     for event in event.read() {
-        let Ok((
-            player_e,
-            mut health,
-            bonus_healing_rate,
-            max_health,
-            mut shield,
-            majors,
-        )) = query.single_mut()
+        let Ok((player_e, mut health, bonus_healing_rate, max_health, mut shield, majors)) =
+            query.single_mut()
         else {
             return;
         };

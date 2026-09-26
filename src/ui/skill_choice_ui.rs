@@ -40,7 +40,7 @@ use super::{
         Z_DEPTH_HEIRLOOM_SKILL_CHOICE_CONTENT, Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND,
         Z_DEPTH_HEIRLOOM_SKILL_CHOICE_OVERLAY,
     },
-    Focusable, Interactable, UIElement, UIState, SKILLS_CHOICE_UI_SIZE,
+    Focusable, HoverSelectionGlow, Interactable, UIElement, UIState, SKILLS_CHOICE_UI_SIZE,
 };
 
 /// Bounce strength for heirloom choice cards on hover (fraction of default mob bounce).
@@ -52,7 +52,8 @@ const SKILL_CHOICE_REROLL_BUTTON_Y: f32 = -142.;
 const SKILL_CHOICE_REROLL_BADGE_SIZE: Vec2 = Vec2::new(14., 12.);
 const SKILL_CHOICE_COUNT_TEXT_Y: f32 = -142.;
 
-/// Side info boxes spawned on hover for a level-up choice card (despawned on unhover).
+/// Side stat boxes for a level-up choice card. Shown while Shift or controller Y is held
+/// on the hovered card, and removed on release.
 #[derive(Component)]
 pub struct SkillChoiceInfoBoxRoot;
 
@@ -93,11 +94,17 @@ pub fn handle_skill_choice_info_box_hover(
     resolution: Res<ScreenResolution>,
     cards: Query<(Entity, &SkillChoiceUI, &Interactable, &GlobalTransform)>,
     existing_roots: Query<Entity, With<SkillChoiceInfoBoxRoot>>,
+    details_hold: crate::blessings::BlessingDetailsHold,
     mut last_card: Local<Option<Entity>>,
 ) {
-    let hovered = cards
-        .iter()
-        .find(|(_, _, interactable, _)| matches!(interactable.current(), Interaction::Hovering));
+    let hovered = details_hold
+        .held()
+        .then(|| {
+            cards.iter().find(|(_, _, interactable, _)| {
+                matches!(interactable.current(), Interaction::Hovering)
+            })
+        })
+        .flatten();
 
     let hovered_card = hovered.map(|(e, _, _, _)| e);
 
@@ -154,6 +161,7 @@ pub fn setup_skill_choice_ui(
     res: Res<ScreenResolution>,
     run_unlocks: Res<RunUnlockState>,
     time_crystals: Res<TimeCrystals>,
+    gamepads: Query<(), With<Gamepad>>,
 ) {
     if choices_queue.queue.is_empty() {
         next_ui_state.set(UIState::Closed);
@@ -330,6 +338,18 @@ pub fn setup_skill_choice_ui(
         BanishCountText,
         Name::new("Banish Count Text2d"),
     ));
+
+    crate::blessings::spawn_blessing_details_hint(
+        &mut commands,
+        asset_server,
+        UIState::Skills,
+        crate::gamepad_bindings::gamepad_connected(&gamepads),
+        Vec3::new(
+            0.,
+            SKILL_CHOICE_COUNT_TEXT_Y - 20.,
+            Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND,
+        ),
+    );
 }
 
 fn spawn_skill_choice_reroll_button(
@@ -443,6 +463,7 @@ pub fn spawn_skill_choice_entities(
                 skill_choice: choice,
                 interaction_lock_timer: Timer::from_seconds(0.75, TimerMode::Once),
             })
+            .insert(HoverSelectionGlow)
             .insert(Interactable::default())
             .insert(Focusable {
                 group: UIState::Skills,

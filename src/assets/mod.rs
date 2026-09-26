@@ -260,13 +260,7 @@ fn atlas_frame_sprite(
     index: usize,
     custom_size: Vec2,
 ) -> Sprite {
-    let mut sprite = Sprite::from_atlas_image(
-        image,
-        TextureAtlas {
-            layout,
-            index,
-        },
-    );
+    let mut sprite = Sprite::from_atlas_image(image, TextureAtlas { layout, index });
     sprite.custom_size = Some(custom_size);
     sprite
 }
@@ -280,7 +274,8 @@ impl Graphics {
                 .expect("wall sprite sheet image is not loaded")
                 .clone(),
             TextureAtlas {
-                layout: self.wall_texture_atlas_layout
+                layout: self
+                    .wall_texture_atlas_layout
                     .as_ref()
                     .expect("wall sprite sheet layout is not loaded")
                     .clone(),
@@ -666,12 +661,7 @@ impl GameAssetsPlugin {
             .map(|(item, index, size)| {
                 (
                     item,
-                    atlas_frame_sprite(
-                        image_handle.clone(),
-                        atlas_handle.clone(),
-                        index,
-                        size,
-                    ),
+                    atlas_frame_sprite(image_handle.clone(), atlas_handle.clone(), index, size),
                 )
             })
             .collect::<HashMap<_, _>>();
@@ -680,12 +670,7 @@ impl GameAssetsPlugin {
             .map(|(item, index, size)| {
                 (
                     item,
-                    atlas_frame_sprite(
-                        image_handle.clone(),
-                        atlas_handle.clone(),
-                        index,
-                        size,
-                    ),
+                    atlas_frame_sprite(image_handle.clone(), atlas_handle.clone(), index, size),
                 )
             })
             .collect::<HashMap<_, _>>();
@@ -694,24 +679,14 @@ impl GameAssetsPlugin {
             .map(|(heirloom, index, size)| {
                 (
                     heirloom,
-                    atlas_frame_sprite(
-                        image_handle.clone(),
-                        atlas_handle.clone(),
-                        index,
-                        size,
-                    ),
+                    atlas_frame_sprite(image_handle.clone(), atlas_handle.clone(), index, size),
                 )
             })
             .collect::<HashMap<_, _>>();
         let cursor_color_sprites = cursor_entries
             .into_iter()
             .map(|(index, size)| {
-                atlas_frame_sprite(
-                    image_handle.clone(),
-                    atlas_handle.clone(),
-                    index,
-                    size,
-                )
+                atlas_frame_sprite(image_handle.clone(), atlas_handle.clone(), index, size)
             })
             .collect::<Vec<_>>();
 

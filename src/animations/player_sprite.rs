@@ -454,17 +454,14 @@ pub fn change_player_class_visuals(
         active_skills[0].add_skill_components(e, &mut commands);
 
         // Do not `.insert(player_class.clone())` — `PlayerClass` is a Resource.
-        commands
-            .entity(e)
-            .insert(class.clone())
-            .insert((
-                AseAnimation {
-                    aseprite: handle,
-                    animation: Animation::tag(anim).with_repeat(AnimationRepeat::Loop),
-                },
-                AnimationState::default(),
-                Sprite::default(),
-            ));
+        commands.entity(e).insert(class.clone()).insert((
+            AseAnimation {
+                aseprite: handle,
+                animation: Animation::tag(anim).with_repeat(AnimationRepeat::Loop),
+            },
+            AnimationState::default(),
+            Sprite::default(),
+        ));
 
         att_event.write(AttributeChangeEvent);
     }

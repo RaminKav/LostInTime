@@ -1,6 +1,6 @@
-use bevy::text::Justify;
 use bevy::color::Alpha;
 use bevy::prelude::*;
+use bevy::text::Justify;
 use serde::Serialize;
 use std::collections::HashMap;
 

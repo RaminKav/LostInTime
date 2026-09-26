@@ -3,11 +3,7 @@ use core::fmt::Display;
 
 use crate::{
     assets::Graphics,
-    defs::{
-        lookup::DefComponent,
-        registry::GameDefs,
-        types::SpriteSheetDef,
-    },
+    defs::{lookup::DefComponent, registry::GameDefs, types::SpriteSheetDef},
     inventory::ItemStack,
     item::{
         melee::MeleeAttack,

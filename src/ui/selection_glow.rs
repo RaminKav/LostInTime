@@ -1,14 +1,15 @@
-//! Pixelated yellow glow border behind the class-select / pet-select slot backgrounds when
-//! they're the current selection (see `PlayerSelectSlot`/`PetSelectSlot` in `class_selection.rs`).
+//! Pixelated yellow glow border behind class-select / pet-select slots, and behind blessing
+//! and heirloom choice cards.
 //!
-//! The Selected slot art already swaps in on its own (`update_slot_visuals`), but Hover takes
-//! priority over Selected there — so if you hover a slot you already had selected, the art
-//! flips to the Hover texture and the "this is still selected" signal would otherwise vanish.
-//! This glow is a separate, non-destructive child quad spawned *behind* the slot sprite (same
-//! trick as `crate::item::item_drop_outline::UiShadow`), so it keeps showing regardless of
-//! which texture is currently on top. The shader samples the Selected art's own alpha channel
-//! to hug its actual silhouette (rounded corners, top notch, etc.) rather than a bounding-box
-//! shape, so it never "borders" the sprite's fully transparent corners.
+//! Slots show it while selected (`PlayerSelectSlot`/`PetSelectSlot` in `class_selection.rs`).
+//! Hover swaps their art off the Selected texture, so the glow is what keeps the selection
+//! readable. Blessing and heirloom choice cards marked with [`HoverSelectionGlow`] show the
+//! same outline while hovered.
+//!
+//! The glow is a non-destructive child quad spawned *behind* the sprite (same trick as
+//! `crate::item::item_drop_outline::UiShadow`). It samples that art's alpha so the border hugs
+//! the real silhouette (rounded corners, top notch, card frame) instead of the sprite's
+//! bounding rectangle.
 use bevy::camera::visibility::RenderLayers;
 use bevy::math::primitives::Rectangle;
 use bevy::mesh::Mesh2d;
@@ -20,6 +21,7 @@ use bevy::sprite_render::{AlphaMode2d, Material2d, Material2dPlugin};
 
 use crate::assets::Graphics;
 use crate::ui::class_selection::{PetSelectSlot, PlayerSelectSlot};
+use crate::ui::interactions::{Interactable, Interaction};
 use crate::ui::UIElement;
 
 /// Darker gold from the selected slot borders (`#FFC825` on `PlayerSelectSlotSelected.png`
@@ -29,13 +31,18 @@ pub const SELECTION_GLOW_COLOR: Color = Color::srgb(1., 200. / 255., 37. / 255.)
 pub const SELECTION_GLOW_HOT_COLOR: Color = Color::srgb(1., 235. / 255., 87. / 255.);
 
 const GLOW_Z: f32 = -0.5;
+/// In front of the card drop-shadow (`UiShadow` sits at -0.5) and still behind the card sprite.
+const CARD_GLOW_Z: f32 = -0.25;
 /// How much larger than the slot's own size the glow quad is — only the part that pokes out
 /// past the slot's edges ends up visible, since the slot art itself is opaque and sits in front.
 /// Just needs to comfortably fit the border layers below plus a little slack.
 const GLOW_SCALE: f32 = 1.3;
 /// Border thickness, in texels (the slot art's own pixel resolution is 1:1 with game pixels) —
-/// a 3-4 pixel border as requested, with opacity decreasing outward one texel at a time.
+/// a 3-4 pixel border on the small class/pet slots, with opacity decreasing outward.
 const GLOW_BORDER_LAYERS: f32 = 3.5;
+/// Blessing and heirloom cards are much larger than those slots, so the same 3px fringe
+/// reads as a hairline. About twice as thick, still inside the shader's 8-texel ring cap.
+const CARD_GLOW_BORDER_LAYERS: f32 = 7.0;
 /// How quickly the shimmer noise drifts to new brightness values.
 const GLOW_SHIMMER_SPEED: f32 = 0.6;
 const GLOW_INTENSITY: f32 = 0.8;
@@ -76,17 +83,20 @@ impl Material2d for SelectionGlowMaterial {
 #[derive(Component)]
 pub struct SelectionGlow;
 
-/// Marks a `PlayerSelectSlot`/`PetSelectSlot` background that already has its glow child
-/// spawned, so `spawn_selection_glows` doesn't duplicate it every frame.
+/// Put this on a card sprite (with [`Interactable`]) to show [`SelectionGlow`] while hovered.
+#[derive(Component)]
+pub struct HoverSelectionGlow;
+
+/// Marks a slot or choice card that already has its glow child spawned, so
+/// `spawn_selection_glows` doesn't duplicate it every frame.
 #[derive(Component)]
 pub struct SelectionGlowApplied;
 
-/// Glow materials keyed by the "Selected" art texture they sample (which also implies the
-/// slot's size/aspect ratio) — class slots and pet slots use distinct art, but every slot of a
-/// given kind shares the exact same asset, so this stays a small, fixed-size cache.
+/// Glow materials keyed by the sampled art and its pixel size. Slots of one kind, and cards of
+/// one rarity, share an asset, so this stays a small cache.
 #[derive(Resource, Default)]
 pub struct SelectionGlowState {
-    pub materials: HashMap<Handle<Image>, Handle<SelectionGlowMaterial>>,
+    pub materials: HashMap<(Handle<Image>, i32, i32, i32), Handle<SelectionGlowMaterial>>,
 }
 
 pub struct SelectionGlowPlugin;
@@ -100,6 +110,7 @@ impl Plugin for SelectionGlowPlugin {
                 (
                     spawn_selection_glows,
                     update_selection_glow_visibility,
+                    update_card_glow_visibility,
                     animate_selection_glow_material,
                 ),
             );
@@ -120,8 +131,12 @@ fn spawn_selection_glows(
         (Entity, &Sprite, &PetSelectSlot, Option<&RenderLayers>),
         Without<SelectionGlowApplied>,
     >,
+    cards: Query<
+        (Entity, &Sprite, &Interactable, Option<&RenderLayers>),
+        (With<HoverSelectionGlow>, Without<SelectionGlowApplied>),
+    >,
 ) {
-    if player_slots.is_empty() && pet_slots.is_empty() {
+    if player_slots.is_empty() && pet_slots.is_empty() && cards.is_empty() {
         return;
     }
 
@@ -139,6 +154,8 @@ fn spawn_selection_glows(
             &player_art,
             slot.is_selected,
             layers,
+            GLOW_Z,
+            GLOW_BORDER_LAYERS,
         );
     }
     for (entity, sprite, slot, layers) in &pet_slots {
@@ -152,6 +169,25 @@ fn spawn_selection_glows(
             &pet_art,
             slot.is_selected,
             layers,
+            GLOW_Z,
+            GLOW_BORDER_LAYERS,
+        );
+    }
+    for (entity, sprite, interactable, layers) in &cards {
+        let art = sprite.image.clone();
+        let hovered = matches!(interactable.current(), Interaction::Hovering);
+        spawn_glow_child(
+            &mut commands,
+            &mut meshes,
+            &mut materials,
+            &mut state,
+            entity,
+            sprite,
+            &art,
+            hovered,
+            layers,
+            CARD_GLOW_Z,
+            CARD_GLOW_BORDER_LAYERS,
         );
     }
 }
@@ -164,19 +200,27 @@ fn spawn_glow_child(
     parent: Entity,
     sprite: &Sprite,
     art_texture: &Handle<Image>,
-    is_selected: bool,
+    visible: bool,
     layers: Option<&RenderLayers>,
+    z: f32,
+    border_layers: f32,
 ) {
     let base_size = sprite.custom_size.unwrap_or(Vec2::new(44., 60.));
     let glow_size = base_size * GLOW_SCALE;
+    let material_key = (
+        art_texture.clone(),
+        base_size.x.round() as i32,
+        base_size.y.round() as i32,
+        (border_layers * 10.).round() as i32,
+    );
     let material = state
         .materials
-        .entry(art_texture.clone())
+        .entry(material_key)
         .or_insert_with(|| {
             materials.add(SelectionGlowMaterial {
                 glow_color: SELECTION_GLOW_COLOR.to_linear().to_vec4(),
                 hot_color: SELECTION_GLOW_HOT_COLOR.to_linear().to_vec4(),
-                params: Vec4::new(0., GLOW_SHIMMER_SPEED, GLOW_BORDER_LAYERS, GLOW_INTENSITY),
+                params: Vec4::new(0., GLOW_SHIMMER_SPEED, border_layers, GLOW_INTENSITY),
                 shape_params: Vec4::new(base_size.x, base_size.y, GLOW_SCALE, GLOW_FRAME_DURATION),
                 source_texture: Some(art_texture.clone()),
             })
@@ -192,8 +236,8 @@ fn spawn_glow_child(
             mesh,
             MeshMaterial2d(material.clone()),
             (
-                Transform::from_xyz(0., 0., GLOW_Z),
-                if is_selected {
+                Transform::from_xyz(0., 0., z),
+                if visible {
                     Visibility::Visible
                 } else {
                     Visibility::Hidden
@@ -218,6 +262,16 @@ fn update_selection_glow_visibility(
     }
     for (slot, children) in &pet_slots {
         set_children_glow_visibility(children, slot.is_selected, &mut glow_visibility);
+    }
+}
+
+fn update_card_glow_visibility(
+    cards: Query<(&Interactable, &Children), (Changed<Interactable>, With<HoverSelectionGlow>)>,
+    mut glow_visibility: Query<&mut Visibility, With<SelectionGlow>>,
+) {
+    for (interactable, children) in &cards {
+        let hovered = matches!(interactable.current(), Interaction::Hovering);
+        set_children_glow_visibility(children, hovered, &mut glow_visibility);
     }
 }
 

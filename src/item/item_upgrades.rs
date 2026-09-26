@@ -369,8 +369,7 @@ pub fn handle_on_hit_upgrades(
                             spawn_delayed_heirloom_cast, DelayedCastType, HEIRLOOM_EXTRA_CAST_DELAY,
                         };
                         throttle.count += 1;
-                        blessing_triggers
-                            .increment(MajorBlessing::WeaponHeirloomDoubleTrigger);
+                        blessing_triggers.increment(MajorBlessing::WeaponHeirloomDoubleTrigger);
                         spawn_delayed_heirloom_cast(
                             &mut commands,
                             HEIRLOOM_EXTRA_CAST_DELAY,

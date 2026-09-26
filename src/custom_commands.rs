@@ -105,10 +105,7 @@ impl CommandsExt for Commands<'_, '_> {
                         // Full SpriteSheetBundle (not bare atlas+sprite) so GlobalTransform
                         // is always present even if spawn_from_def regresses.
                         spawned_entity_commands
-                            .insert((
-                                sprite.clone(),
-                                Transform::from_translation(pos.extend(0.)),
-                            ))
+                            .insert((sprite.clone(), Transform::from_translation(pos.extend(0.))))
                             .remove::<PendingSpriteSheet>()
                             .remove::<PendingSpriteTexture>();
                     }
@@ -308,8 +305,7 @@ impl CommandsExt for Commands<'_, '_> {
             let sprite_data = proto_param
                 .get_component::<WallTextureData, _>(obj.clone())
                 .unwrap();
-            let wall_index =
-                (sprite_data.obj_bit_index + sprite_data.texture_offset * 32) as usize;
+            let wall_index = (sprite_data.obj_bit_index + sprite_data.texture_offset * 32) as usize;
             spawned_entity_commands
                 .insert((
                     proto_param.graphics.wall_sprite(wall_index),

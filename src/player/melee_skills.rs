@@ -13,8 +13,8 @@ use crate::{
     },
     audio::{AudioSoundEffect, SoundSpawner},
     blessings::{
-        HeirloomManaOverclock, MajorBlessing, OwnedBlessings, OwnedMajorBlessings,
-        overclock_mana_cost,
+        overclock_mana_cost, HeirloomManaOverclock, MajorBlessing, OwnedBlessings,
+        OwnedMajorBlessings,
     },
     colors::LIGHT_RED,
     combat_helpers::{spawn_deferred_aseprite_collider, spawn_temp_collider},
@@ -618,7 +618,8 @@ pub fn handle_spear_pull_delay(
     time: Res<Time>,
     mut commands: Commands,
 ) {
-    for (player_e, mut pull_delay, attack, skill_power, blessings, majors) in player_query.iter_mut()
+    for (player_e, mut pull_delay, attack, skill_power, blessings, majors) in
+        player_query.iter_mut()
     {
         pull_delay.delay_timer.tick(time.delta());
         if !pull_delay.delay_timer.just_finished() {
@@ -703,10 +704,7 @@ pub enum DelayedCastType {
         aftershock: bool,
     },
     /// Twin Strike Relics: second cherry bomb with a freshly rolled target.
-    CherryBomb {
-        start_pos: Vec2,
-        dmg: i32,
-    },
+    CherryBomb { start_pos: Vec2, dmg: i32 },
 }
 
 #[derive(Component)]

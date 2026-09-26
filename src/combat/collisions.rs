@@ -1,8 +1,7 @@
 use super::{try_add_slow_stacks, HitEvent, HitMarker, InvincibilityTimer, StatusEffectEvent};
 use crate::aseprite_helpers::start;
 use crate::blessings::{
-    FromCoinLightning, LightningStrikeHitEvent, MajorBlessing, OwnedBlessings,
-    OwnedMajorBlessings,
+    FromCoinLightning, LightningStrikeHitEvent, MajorBlessing, OwnedBlessings, OwnedMajorBlessings,
 };
 use crate::client::is_not_paused;
 use crate::combat::LifestealEvent;
@@ -345,8 +344,15 @@ fn check_projectile_hit_mob_collisions(
                             spear_att,
                             from_coin.is_some(),
                         )
-                    } else if let Ok((proj_entity, state, proj, att, ice_aoe, spear_att, from_coin)) =
-                        projectiles.get_mut(*e1)
+                    } else if let Ok((
+                        proj_entity,
+                        state,
+                        proj,
+                        att,
+                        ice_aoe,
+                        spear_att,
+                        from_coin,
+                    )) = projectiles.get_mut(*e1)
                     {
                         //collider and proj data are on the same entity
                         (

@@ -16,9 +16,7 @@ use crate::{
     audio::{AudioSoundEffect, SoundSpawner},
     blessings::{Blessing, MajorBlessing, OwnedBlessings, OwnedMajorBlessings},
     combat::{
-        status_effects::{
-            Frail, FrozenTint, MobStatusEffects, RapidfireSlowTint,
-        },
+        status_effects::{Frail, FrozenTint, MobStatusEffects, RapidfireSlowTint},
         EnemyDeathEvent, HitEvent,
     },
     cursor::CursorPos,
@@ -1357,9 +1355,7 @@ pub fn handle_active_skill_event(
 
                         let echo_size_mult = major_blessings.echo_size_multiplier();
                         if aftershock {
-                            trigger_counts
-                                .p1()
-                                .increment(MajorBlessing::EchoAftershock);
+                            trigger_counts.p1().increment(MajorBlessing::EchoAftershock);
                         }
                         if i == 0 {
                             crate::player::melee_skills::spawn_echo_hitbox_scaled(
@@ -1458,14 +1454,7 @@ pub fn handle_rapidfire_slow_enemies(
 /// Remove RapidfireSlow from all enemies when RapidFire ends
 pub fn handle_rapidfire_slow_remove(
     rapidfire_states: Query<&RapidfireState, With<Player>>,
-    mut enemies: Query<
-        (
-            Entity,
-            &mut MobStatusEffects,
-            Option<&RapidfireSlowTint>,
-        ),
-        With<Mob>,
-    >,
+    mut enemies: Query<(Entity, &mut MobStatusEffects, Option<&RapidfireSlowTint>), With<Mob>>,
     mut commands: Commands,
 ) {
     let rapidfire_active = rapidfire_states
@@ -1918,12 +1907,7 @@ pub fn tick_arrow_volley(
     mut commands: Commands,
     mut volley_q: Query<(Entity, &mut ArrowVolleyState, &GlobalTransform), With<Player>>,
     player_skills: Query<
-        (
-            &SkillPower,
-            &Attack,
-            &OwnedBlessings,
-            &OwnedMajorBlessings,
-        ),
+        (&SkillPower, &Attack, &OwnedBlessings, &OwnedMajorBlessings),
         With<Player>,
     >,
     cursor: Res<CursorPos>,
@@ -2446,12 +2430,7 @@ pub fn handle_fury_skill(
     fury_states: Query<(&FuryState, &GlobalTransform), With<Player>>,
     enemies: Query<(Entity, &GlobalTransform), With<Mob>>,
     player_skills: Query<
-        (
-            &SkillPower,
-            &Attack,
-            &OwnedBlessings,
-            &OwnedMajorBlessings,
-        ),
+        (&SkillPower, &Attack, &OwnedBlessings, &OwnedMajorBlessings),
         With<Player>,
     >,
     mut ranged_attack_events: MessageWriter<RangedAttackEvent>,

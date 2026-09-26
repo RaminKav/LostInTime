@@ -360,9 +360,7 @@ mod tests {
 
     #[test]
     fn scraps_into_list() {
-        let s = scraps_into(
-            "([(obj: StoneChunk, chance: 1.), (obj: StoneChunk, chance: 0.5)])",
-        );
+        let s = scraps_into("([(obj: StoneChunk, chance: 1.), (obj: StoneChunk, chance: 0.5)])");
         assert_eq!(s.0.len(), 2);
     }
 

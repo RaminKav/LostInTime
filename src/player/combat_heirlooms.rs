@@ -2978,14 +2978,8 @@ pub fn handle_cherry_bomb_on_attack(
     mut trigger_counts: ResMut<HeirloomTriggerCounts>,
     mut blessing_triggers: ResMut<BlessingTriggerCounts>,
 ) {
-    let Ok((
-        skills,
-        attack,
-        player_transform,
-        mut current_mana,
-        majors,
-        mut overclock,
-    )) = player.single_mut()
+    let Ok((skills, attack, player_transform, mut current_mana, majors, mut overclock)) =
+        player.single_mut()
     else {
         return;
     };
@@ -3151,13 +3145,7 @@ pub fn apply_bomb_frail_at_position(
             continue;
         }
         if let Ok(mut status) = mob_status.get_mut(enemy_entity) {
-            try_add_frail_stacks(
-                enemy_entity,
-                status.as_mut(),
-                status_event,
-                3,
-                apply_extra,
-            );
+            try_add_frail_stacks(enemy_entity, status.as_mut(), status_event, 3, apply_extra);
         }
     }
 }

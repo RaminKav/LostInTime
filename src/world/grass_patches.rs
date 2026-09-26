@@ -199,13 +199,7 @@ fn make_patch_sprite(
     index: usize,
     size: Vec2,
 ) -> Sprite {
-    let mut sprite = Sprite::from_atlas_image(
-        image,
-        TextureAtlas {
-            layout,
-            index,
-        },
-    );
+    let mut sprite = Sprite::from_atlas_image(image, TextureAtlas { layout, index });
     sprite.custom_size = Some(size);
     sprite
 }

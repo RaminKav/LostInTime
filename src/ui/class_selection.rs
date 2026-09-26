@@ -21,6 +21,7 @@ use crate::{
     colors::{DARK_WOOD_BROWN, WHITE, YELLOW_2},
     container::ContainerRegistry,
     cursor::CursorPos,
+    inputs::MouselessModeState,
     inventory::ItemStack,
     item::{CraftingTracker, ItemDisplayMetaData, WorldObject},
     night::NightTracker,
@@ -897,6 +898,7 @@ pub fn handle_class_selection(
     mut confirm_state: ResMut<ClassUnlockConfirmState>,
     cheat_settings: Res<CheatSettings>,
     focus_input: crate::ui::focus::FocusInput,
+    mouseless: Res<MouselessModeState>,
 ) {
     if confirm_state.active {
         return;
@@ -904,6 +906,10 @@ pub fn handle_class_selection(
 
     let hit_test = super::ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
+    // Default focus sits on the first class slot. During mouse play that must not count as
+    // hover, or that slot stays on the hover frame after the pointer leaves and after another
+    // class is selected. Gamepad / mouseless still uses focus as the highlight.
+    let focus_driving = mouseless.0 || cursor_pos.suppress_ui_hover;
 
     hover_state.hovered_class = None;
     hover_state.slot_position = Vec3::ZERO;
@@ -916,7 +922,7 @@ pub fn handle_class_selection(
         };
 
         let is_hit = matches!(hit_test, Some(hit_ent) if hit_ent.0 == entity);
-        let is_focused = focus_input.is_focused(entity);
+        let is_focused = focus_driving && focus_input.is_focused(entity);
         let confirm_pressed =
             (is_hit && left_mouse_pressed) || (is_focused && focus_input.confirm_just_pressed());
 
