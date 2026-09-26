@@ -12,10 +12,10 @@
 #import bevy_sprite::mesh2d_functions
 #import bevy_sprite::mesh2d_vertex_output::VertexOutput
 
-// Base purple sampled from the Selected slot art (linear 0..1).
+// Base gold sampled from the Selected slot art (linear 0..1).
 @group(#{MATERIAL_BIND_GROUP}) @binding(0)
 var<uniform> glow_color: vec4<f32>;
-// Brighter purple mixed in on shimmer highlights.
+// Brighter yellow mixed in on shimmer highlights.
 @group(#{MATERIAL_BIND_GROUP}) @binding(1)
 var<uniform> hot_color: vec4<f32>;
 // params: x = time (seconds), y = shimmer speed, z = border thickness in texels (matches the

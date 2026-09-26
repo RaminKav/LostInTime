@@ -1,4 +1,4 @@
-//! Pixelated purple glow border behind the class-select / pet-select slot backgrounds when
+//! Pixelated yellow glow border behind the class-select / pet-select slot backgrounds when
 //! they're the current selection (see `PlayerSelectSlot`/`PetSelectSlot` in `class_selection.rs`).
 //!
 //! The Selected slot art already swaps in on its own (`update_slot_visuals`), but Hover takes
@@ -22,11 +22,11 @@ use crate::assets::Graphics;
 use crate::ui::class_selection::{PetSelectSlot, PlayerSelectSlot};
 use crate::ui::UIElement;
 
-/// Base purple sampled from `PlayerSelectSlotSelected.png` / `PetSelectSlotSelected.png`'s
-/// border pixel (#5D2375-ish) so the glow reads as "the same purple as the selected frame".
-pub const SELECTION_GLOW_COLOR: Color = Color::srgb(93. / 255., 35. / 255., 117. / 255.);
-/// Brighter purple mixed in on shimmer highlights.
-pub const SELECTION_GLOW_HOT_COLOR: Color = Color::srgb(189. / 255., 88. / 255., 214. / 255.);
+/// Darker gold from the selected slot borders (`#FFC825` on `PlayerSelectSlotSelected.png`
+/// and `PetSelectSlotSelected.png`) so the halo reads as the same yellow as the frame.
+pub const SELECTION_GLOW_COLOR: Color = Color::srgb(1., 200. / 255., 37. / 255.);
+/// Brighter yellow from those same borders (`#FFEB57`), mixed in on shimmer highlights.
+pub const SELECTION_GLOW_HOT_COLOR: Color = Color::srgb(1., 235. / 255., 87. / 255.);
 
 const GLOW_Z: f32 = -0.5;
 /// How much larger than the slot's own size the glow quad is — only the part that pokes out
