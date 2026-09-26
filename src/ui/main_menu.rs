@@ -16,7 +16,7 @@ use strum_macros::Display;
 
 use crate::{
     assets::Graphics,
-    audio::UpdateBGMTrackEvent,
+    audio::{MainMenuStartupFade, UpdateBGMTrackEvent},
     client::analytics::{connect_server, AnalyticsData},
     client::GameData,
     colors::{overwrite_alpha, WHITE},
@@ -152,6 +152,10 @@ pub struct AchievementsNotificationIcon;
 #[derive(Component)]
 pub struct GameStartFadein(pub Timer);
 
+/// Full-screen black overlay used only for the first main-menu fade-in after launch.
+#[derive(Component)]
+pub struct MainMenuStartupOverlay;
+
 /// Short hover label for 28×28 main-menu icon buttons (Archives, Achievements, etc.).
 #[derive(Component, Clone, Copy)]
 pub struct MainMenuIconTooltipText(pub &'static str);
@@ -223,10 +227,39 @@ pub fn display_main_menu(
     });
 }
 
+/// Covers the first main-menu frame in black so the menu and music can fade in together.
+pub fn spawn_main_menu_startup_fade(
+    mut commands: Commands,
+    resolution: Res<ScreenResolution>,
+    mut already_played: Local<bool>,
+) {
+    if *already_played {
+        return;
+    }
+    *already_played = true;
+
+    commands.insert_resource(MainMenuStartupFade::new());
+    commands.spawn((
+        Sprite {
+            color: Color::srgba(0., 0., 0., 1.),
+            custom_size: Some(ui_helpers::full_screen_overlay_size(&resolution)),
+            ..default()
+        },
+        Transform {
+            translation: Vec3::new(0., 0., ui_helpers::Z_DEPTH_MAIN_MENU_STARTUP_FADE),
+            ..default()
+        },
+        MainMenuStartupOverlay,
+        RenderLayers::from_layers(&[3]),
+        Name::new("Main Menu Startup Fade"),
+    ));
+}
+
 pub fn remove_main_menu(
     mut commands: Commands,
     query: Query<Entity, With<MainMenu>>,
     menu_buttons: Query<Entity, With<MenuButton>>,
+    fade_overlays: Query<Entity, With<MainMenuStartupOverlay>>,
 ) {
     for entity in query.iter() {
         commands.entity(entity).despawn();
@@ -234,6 +267,9 @@ pub fn remove_main_menu(
         for button in menu_buttons.iter() {
             commands.entity(button).despawn();
         }
+    }
+    for entity in fade_overlays.iter() {
+        commands.entity(entity).despawn();
     }
 }
 
@@ -1180,6 +1216,34 @@ pub fn spawn_menu_text_buttons(
         group: UIState::Closed,
         index: 6,
     });
+}
+
+pub fn tick_main_menu_startup_fade(
+    mut commands: Commands,
+    time: Res<Time>,
+    fade: Option<ResMut<MainMenuStartupFade>>,
+    mut overlay: Query<(Entity, &mut Sprite), With<MainMenuStartupOverlay>>,
+) {
+    let Some(mut fade) = fade else {
+        for (entity, _) in overlay.iter() {
+            commands.entity(entity).despawn();
+        }
+        return;
+    };
+
+    fade.0.tick(time.delta());
+    let alpha = 1.0 - fade.fade_amount();
+    let finished = fade.0.is_finished();
+    for (entity, mut sprite) in overlay.iter_mut() {
+        if finished {
+            commands.entity(entity).despawn();
+        } else {
+            sprite.color = overwrite_alpha(sprite.color, alpha);
+        }
+    }
+    if finished {
+        commands.remove_resource::<MainMenuStartupFade>();
+    }
 }
 
 pub fn tick_game_start_overlay(

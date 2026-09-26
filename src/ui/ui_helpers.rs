@@ -98,6 +98,8 @@ pub const Z_DEPTH_BOSS_HEALTH_BAR: f32 = 5.0;
 pub const Z_DEPTH_GLOBAL_TEXT_MESSAGE: f32 = 6.0;
 /// Bottom icon/text row on the main menu — must stay below [`Z_DEPTH_MAIN_MENU_MODAL_OVERLAY`].
 pub const Z_DEPTH_MAIN_MENU_BUTTONS: f32 = 1.0;
+/// First-launch black fade covering the main menu (above name-entry / loading at z ≈ 100).
+pub const Z_DEPTH_MAIN_MENU_STARTUP_FADE: f32 = 110.0;
 /// Full-screen dim behind sub-menus opened from the main menu (achievements, archives, etc.).
 pub const Z_DEPTH_MAIN_MENU_MODAL_OVERLAY: f32 = 8.0;
 /// Panel/content root for those sub-menus (above the dim, below options/name-entry layers).

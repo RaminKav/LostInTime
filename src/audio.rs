@@ -29,7 +29,35 @@ const MAX_HIT_SOUNDS_PER_FRAME: usize = 3;
 
 /// Marker for the entity currently playing background music.
 #[derive(Component)]
-struct BgmAudio;
+pub(crate) struct BgmAudio;
+
+/// Playback multiplier applied on top of [`AudioVolume::music_fraction`].
+const BGM_PLAYBACK_SCALE: f32 = 0.75;
+
+/// First-launch main-menu fade. `timer.fraction()` is 0 at silent/black and 1 when fully in.
+#[derive(Resource)]
+pub struct MainMenuStartupFade(pub Timer);
+
+pub const MAIN_MENU_STARTUP_FADE_SECS: f32 = 5.5;
+
+impl MainMenuStartupFade {
+    pub fn new() -> Self {
+        Self(Timer::from_seconds(
+            MAIN_MENU_STARTUP_FADE_SECS,
+            TimerMode::Once,
+        ))
+    }
+
+    /// Smoothstep 0→1 so the reveal and music swell ease in together.
+    pub fn fade_amount(&self) -> f32 {
+        let t = self.0.fraction().clamp(0.0, 1.0);
+        t * t * (3.0 - 2.0 * t)
+    }
+}
+
+pub(crate) fn bgm_linear_volume(volume: &AudioVolume, fade: Option<&MainMenuStartupFade>) -> f32 {
+    BGM_PLAYBACK_SCALE * volume.music_fraction() * fade.map(|f| f.fade_amount()).unwrap_or(1.0)
+}
 
 /// Controls the global volume for music and sound effects independently.
 /// Values range from 0 (muted) to 10 (full volume).
@@ -338,6 +366,7 @@ pub fn handle_sound_spawners(
     mut cooldowns: ResMut<SoundCooldowns>,
     mut cache: ResMut<SoundCache>,
     volume: Res<AudioVolume>,
+    startup_fade: Option<Res<MainMenuStartupFade>>,
 ) {
     if *crate::NO_AUDIO {
         for (e, _) in sounds.iter() {
@@ -346,6 +375,11 @@ pub fn handle_sound_spawners(
         return;
     }
     for (e, mut sound) in sounds.iter_mut() {
+        // Controller auto-focuses the start button on launch; don't blip hover SFX under the fade.
+        if startup_fade.is_some() && sound.sound == AudioSoundEffect::ButtonHover {
+            commands.entity(e).despawn();
+            continue;
+        }
         let mut play_sound = false;
         if let Some(delay) = sound.delay.as_mut() {
             delay.tick(time.delta());
@@ -421,6 +455,7 @@ pub fn bgm_audio(
     mut bgm_update_events: MessageReader<UpdateBGMTrackEvent>,
     mut cache: ResMut<SoundCache>,
     volume: Res<AudioVolume>,
+    fade: Option<Res<MainMenuStartupFade>>,
     bgm_sinks: Query<&AudioSink, With<BgmAudio>>,
 ) {
     if *crate::NO_AUDIO {
@@ -450,7 +485,8 @@ pub fn bgm_audio(
         let entity = commands
             .spawn((
                 AudioPlayer::new(bgm_handle),
-                PlaybackSettings::LOOP.with_volume(Volume::Linear(0.75 * volume.music_fraction())),
+                PlaybackSettings::LOOP
+                    .with_volume(Volume::Linear(bgm_linear_volume(&volume, fade.as_deref()))),
                 BgmAudio,
             ))
             .id();
@@ -458,18 +494,20 @@ pub fn bgm_audio(
     }
 }
 
-/// Adjusts the currently-playing BGM sink whenever the music volume changes.
+/// Adjusts the currently-playing BGM sink whenever the music volume or startup fade changes.
 pub fn update_bgm_volume(
     volume: Res<AudioVolume>,
     bgm_tracker: Res<BGMPicker>,
+    fade: Option<Res<MainMenuStartupFade>>,
     mut bgm_sinks: Query<&mut AudioSink, With<BgmAudio>>,
 ) {
-    if !volume.is_changed() {
+    let fade_changed = fade.as_ref().is_some_and(|f| f.is_changed());
+    if !volume.is_changed() && !fade_changed {
         return;
     }
     if let Some(entity) = bgm_tracker.current_entity {
         if let Ok(mut sink) = bgm_sinks.get_mut(entity) {
-            sink.set_volume(Volume::Linear(0.75 * volume.music_fraction()));
+            sink.set_volume(Volume::Linear(bgm_linear_volume(&volume, fade.as_deref())));
         }
     }
 }

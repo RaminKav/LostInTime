@@ -688,6 +688,14 @@ impl Plugin for UIPlugin {
                 font_atlas_sampler::ensure_font_atlas_linear_sampling
                     .after(bevy::sprite::update_text2d_layout),
             )
+            .add_systems(OnEnter(GameState::MainMenu), spawn_main_menu_startup_fade)
+            .add_systems(
+                Update,
+                tick_main_menu_startup_fade
+                    .after(crate::audio::bgm_audio)
+                    .before(crate::audio::update_bgm_volume)
+                    .before(crate::audio::handle_sound_spawners),
+            )
             .add_systems(OnEnter(GameState::MainMenu), 
                 init_main_menu_leaderboard_visibility
                     .after(load_game_data_for_ui),
