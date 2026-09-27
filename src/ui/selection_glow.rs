@@ -39,7 +39,7 @@ const CARD_GLOW_Z: f32 = -0.25;
 const GLOW_SCALE: f32 = 1.3;
 /// Border thickness, in texels (the slot art's own pixel resolution is 1:1 with game pixels) —
 /// a 3-4 pixel border on the small class/pet slots, with opacity decreasing outward.
-const GLOW_BORDER_LAYERS: f32 = 3.5;
+const GLOW_BORDER_LAYERS: f32 = 5.0;
 /// Blessing and heirloom cards are much larger than those slots, so the same 3px fringe
 /// reads as a hairline. About twice as thick, still inside the shader's 8-texel distance cap.
 const CARD_GLOW_BORDER_LAYERS: f32 = 5.0;
