@@ -23,6 +23,7 @@ use crate::{
     ui::{
         essence_ui::{MERCHANT_REROLL_ICON_PATH, MERCHANT_REROLL_ICON_SIZE},
         game_fonts as gf,
+        nine_slice::{spawn_growable_banner_title, PURPLE_BANNER},
         ui_helpers::{self, spawn_full_screen_ui_overlay_tuned},
         CheatSettings, KEYBIND_BADGE_COLOR,
     },
@@ -171,20 +172,16 @@ pub fn setup_skill_choice_ui(
     let choices = &choices_queue.queue[0];
     let t_offset = Vec2::new(4., 4.);
 
-    let title_text = commands
-        .spawn((
-            gf::MENU_TITLE
-                .text(&asset_server, "Choose an Heirloom".to_string(), WHITE)
-                .with_transform(Transform {
-                    translation: Vec3::new(0., 115., Z_DEPTH_HEIRLOOM_SKILL_CHOICE_CONTENT),
-                    scale: gf::MENU_TITLE.transform_scale(),
-                    ..Default::default()
-                }),
-            RenderLayers::from_layers(&[3]),
-        ))
-        .id();
-
-    commands.entity(title_text).insert(UIState::Skills);
+    let title_banner = spawn_growable_banner_title(
+        &mut commands,
+        asset_server,
+        PURPLE_BANNER,
+        gf::MENU_TITLE,
+        "Choose an Heirloom",
+        WHITE,
+        Vec3::new(0., 115., Z_DEPTH_HEIRLOOM_SKILL_CHOICE_CONTENT),
+    );
+    commands.entity(title_banner).insert(UIState::Skills);
 
     let heirloom_choice_overlay = spawn_full_screen_ui_overlay_tuned(
         &mut commands,

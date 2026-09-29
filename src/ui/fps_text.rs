@@ -5,6 +5,7 @@ use bevy::{
 };
 
 use bevy::image::TextureAtlas;
+use bevy::sprite::Anchor;
 use bevy::text::{Justify, TextLayoutInfo};
 
 use crate::{ui::game_fonts as gf, ScreenResolution, UICamera, DEBUG};
@@ -24,9 +25,10 @@ pub fn spawn_fps_text(
     asset_server: Res<AssetServer>,
     resolution: Res<ScreenResolution>,
 ) {
+    // Left edge. The label is left-anchored so a wider FPS value grows to the right.
     let raw = Vec2::new(
-        resolution.game_width / 2. - 28.5,
-        -resolution.game_height / 2. + 10.5,
+        resolution.game_width / 2. - 60.,
+        -resolution.game_height / 2. + 8.,
     );
     let snapped = snap_world_xy_to_pixel_grid(raw, resolution.scale);
 
@@ -35,10 +37,11 @@ pub fn spawn_fps_text(
         gf::HUD_FPS_DEBUG
             .text(
                 &asset_server,
-                format!("FPS: \n\n{VERSION}"),
+                format!("{VERSION}\n\nFPS: "),
                 Color::srgba(75. / 255., 61. / 255., 68. / 255., 1.),
             )
-            .justify(Justify::Right)
+            .justify(Justify::Left)
+            .anchor(Anchor::CENTER_LEFT)
             .with_transform(Transform {
                 translation: Vec3::new(snapped.x, snapped.y, 1.),
                 scale: gf::HUD_FPS_DEBUG.transform_scale(),
@@ -267,7 +270,7 @@ pub fn text_update_system(
     for mut text in &mut query {
         if let Some(fps) = diagnostics.get(&FrameTimeDiagnosticsPlugin::FPS) {
             if let Some(value) = fps.smoothed() {
-                text.0 = format!("FPS: {value:.0}\n{VERSION}");
+                text.0 = format!("{VERSION}\nFPS: {value:.0}");
             }
         }
     }

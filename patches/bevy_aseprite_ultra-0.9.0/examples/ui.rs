@@ -39,7 +39,7 @@ fn setup(mut cmd: Commands, server: Res<AssetServer>) {
                 border_radius: BorderRadius::all(Val::Px(15.)),
                 ..default()
             },
-            BorderColor::all(css::BLUE)
+            BorderColor::all(css::BLUE),
         ))
         .id();
 

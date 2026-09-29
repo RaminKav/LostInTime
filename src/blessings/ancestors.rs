@@ -228,21 +228,6 @@ impl AncestorBlessing {
         }
     }
 
-    pub fn display_card_rarity(&self) -> Option<HeirloomRarity> {
-        match self {
-            AncestorBlessing::ThreeCommonHeirlooms
-            | AncestorBlessing::TwoOfSpecificCommon
-            | AncestorBlessing::FiveOfRandomCommon => Some(HeirloomRarity::Common),
-            AncestorBlessing::OneUncommonHeirloom
-            | AncestorBlessing::SpecificUncommon
-            | AncestorBlessing::ThreeOfRandomUncommon => Some(HeirloomRarity::Uncommon),
-            AncestorBlessing::TwoRandomRareHeirlooms
-            | AncestorBlessing::SpecificRareHeirloom
-            | AncestorBlessing::RandomRareEquipment => Some(HeirloomRarity::Rare),
-            _ => None,
-        }
-    }
-
     pub fn hides_resolved_reward_from_player(&self) -> bool {
         matches!(
             self,

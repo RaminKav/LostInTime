@@ -80,6 +80,7 @@ pub mod major_blessing_heirloom_pick_ui;
 pub use major_blessing_heirloom_pick_ui::*;
 pub mod well_shrine_ui;
 pub use well_shrine_ui::*;
+pub mod nine_slice;
 pub mod ui_helpers;
 pub use chest_ui::*;
 pub use enemy_health_bar::*;
@@ -686,6 +687,11 @@ impl Plugin for UIPlugin {
             .add_systems(
                 PostUpdate,
                 font_atlas_sampler::ensure_font_atlas_linear_sampling
+                    .after(bevy::sprite::update_text2d_layout),
+            )
+            .add_systems(
+                PostUpdate,
+                nine_slice::fit_nine_slice_banners_to_text
                     .after(bevy::sprite::update_text2d_layout),
             )
             .add_systems(OnEnter(GameState::MainMenu), spawn_main_menu_startup_fade)
@@ -1308,6 +1314,7 @@ impl Plugin for UIPlugin {
                     player_hud::handle_consumable_buff_hud_tooltip,
                     player_hud::handle_active_skill_hud_tooltip,
                     player_hud::handle_blessing_hud_tooltip,
+                    player_hud::sync_hud_blessing_slot_icons,
                     player_hud::handle_mana_tracker_hud_tooltip,
                     player_hud::handle_health_tracker_hud_tooltip,
                     player_hud::update_skill_tooltip_cooldown.after(player_hud::handle_active_skill_hud_tooltip),

@@ -6,7 +6,8 @@ use strum::IntoEnumIterator;
 use crate::{
     attributes::{AttributeChangeEvent, FoodAttributeBonuses, ItemRarity},
     blessings::{
-        ancestors::{stat_food_pool, AncestorBlessing},
+        ancestors::{stat_food_pool, Ancestor, AncestorBlessing},
+        blessing_art::{frame_art, BlessingFrameArt, BlessingHudIconId},
         AncestorBlessingSelectEvent, BlessingMaxHpPenalty, BlessingTransitionState,
         DeferredEraSwap, EffectPoolStatusChance, EffectPoolStatusChances, HeirloomManaOverclock,
         MajorBlessing, MajorBlessingOffer, MajorBlessingSelectEvent, MajorBlessingStatBonuses,
@@ -43,8 +44,10 @@ pub struct OwnedBlessingCard {
     pub description: Vec<String>,
     /// Extra chaos tradeoff lines (minor blessings), shown in red like the choice card.
     pub chaos_lines: Vec<String>,
-    /// Card frame rarity; `None` uses the base SkillChoice frame.
-    pub card_rarity: Option<crate::player::skills::HeirloomRarity>,
+    /// Ancestor whose frame this card uses.
+    pub ancestor: Ancestor,
+    /// Run-start minor blessing, when this card is the B1 slot.
+    pub minor_blessing: Option<AncestorBlessing>,
     /// Major blessing identity for trigger tracking (HUD tooltips).
     pub major: Option<MajorBlessing>,
 }
@@ -81,7 +84,7 @@ impl OwnedBlessingHudSlots {
 }
 
 impl OwnedBlessingCard {
-    pub fn from_minor(choice: &ResolvedAncestorBlessing) -> Self {
+    pub fn from_minor(ancestor: Ancestor, choice: &ResolvedAncestorBlessing) -> Self {
         let mut chaos_lines = Vec::new();
         let penalty = choice.blessing.max_hp_penalty_pct();
         if penalty > 0.0 {
@@ -91,15 +94,12 @@ impl OwnedBlessingCard {
                 choice.blessing.starting_chaos() as i32
             ));
         }
-        let card_rarity = choice
-            .blessing
-            .display_card_rarity()
-            .or_else(|| choice.resolved_heirloom.as_ref().map(|h| h.rarity));
         Self {
             title: choice.title.clone(),
             description: choice.description.clone(),
             chaos_lines,
-            card_rarity,
+            ancestor,
+            minor_blessing: Some(choice.blessing),
             major: None,
         }
     }
@@ -109,8 +109,21 @@ impl OwnedBlessingCard {
             title: choice.title.clone(),
             description: choice.description.clone(),
             chaos_lines: Vec::new(),
-            card_rarity: choice.display_card_rarity(),
+            ancestor: choice.blessing.ancestor(),
+            minor_blessing: None,
             major: Some(choice.blessing),
+        }
+    }
+
+    pub fn frame_art(&self) -> BlessingFrameArt {
+        frame_art(self.ancestor, self.major.is_some())
+    }
+
+    pub fn hud_icon_id(&self) -> Option<BlessingHudIconId> {
+        if let Some(major) = self.major {
+            Some(BlessingHudIconId::Major(major))
+        } else {
+            self.minor_blessing.map(BlessingHudIconId::Minor)
         }
     }
 }
@@ -300,7 +313,7 @@ pub fn handle_ancestor_blessing_selected(
             &asset_server,
             player_class.as_deref(),
         );
-        hud_slots.set_minor(OwnedBlessingCard::from_minor(&event.choice));
+        hud_slots.set_minor(OwnedBlessingCard::from_minor(event.ancestor, &event.choice));
 
         attribute_event.write(AttributeChangeEvent);
     }

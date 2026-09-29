@@ -40,7 +40,10 @@ use crate::{
         ProjectileSize, SkillPower, Speed,
     },
     audio::{AudioSoundEffect, SoundSpawner},
-    blessings::{BlessingTriggerCounts, OwnedBlessingCard, OwnedBlessingHudSlots, OwnedBlessings},
+    blessings::{
+        blessing_art::{BlessingHudIconId, BLESSING_CARD_TITLE_Y, HUD_EMPTY_SLOT_ART},
+        BlessingTriggerCounts, OwnedBlessingCard, OwnedBlessingHudSlots, OwnedBlessings,
+    },
     chaos::ChaosTracker,
     client::GameOverEvent,
     colors::{
@@ -74,9 +77,7 @@ use crate::{
         CoinCurrency, Player, RunScore, TimeFragmentCurrency,
     },
     proto::proto_param::ProtoParam,
-    ui::{
-        game_fonts as gf, CheatSettings, Interactable, SKILLS_CHOICE_UI_SIZE, SKILL_TOOLTIP_SIZE,
-    },
+    ui::{game_fonts as gf, CheatSettings, Interactable, SKILL_TOOLTIP_SIZE},
     GameState, InputMappings, Pet, ScreenResolution,
 };
 use std::time::Duration;
@@ -307,12 +308,13 @@ pub fn hud_settings_icon_x(game_width: f32) -> f32 {
     hud_bag_icon_x(game_width) + HUD_CORNER_ICON_SPACING
 }
 
-/// Square dark-grey blessing slot icons (B1 / B2 / B3) on the bottom-right HUD.
-pub const HUD_BLESSING_ICON_SIZE: Vec2 = Vec2::new(18., 18.);
-const HUD_BLESSING_ICON_SPACING: f32 = 30.0;
-const HUD_CORNER_RIGHT_PADDING: f32 = 6.0;
-/// Shift the whole B1–B3 row left from the right screen edge.
-const HUD_BLESSING_ROW_LEFT_NUDGE: f32 = 30.0;
+/// Pyramid center, measured from the right screen edge.
+const HUD_BLESSING_PYRAMID_RIGHT_INSET: f32 = 49.0;
+/// Diagonal step between the top diamond and each bottom diamond. Half of the 44px slot
+/// puts the empty-slot borders flush; the extra 2px per axis opens a 4px stair-step gap.
+const HUD_BLESSING_PYRAMID_STEP: f32 = HUD_EMPTY_SLOT_ART.size.x * 0.5 + 2.0;
+/// Lift above the corner-icon row so the bottom pair's tips stay 2px above the screen edge.
+const HUD_BLESSING_PYRAMID_TOP_Y: f32 = 30.0;
 const HUD_BLESSING_SLOT_COUNT: usize = 3;
 
 /// Bottom-right HUD blessing slot (B1 = minor, B2/B3 = majors).
@@ -321,17 +323,33 @@ pub struct HudBlessingSlotIcon {
     pub index: usize,
 }
 
+/// Last blessing painted into a HUD slot, so the icon child is only swapped when it changes.
+#[derive(Component, Default)]
+pub(crate) struct HudBlessingSlotShown(Option<BlessingHudIconId>);
+
+/// 42×42 blessing icon drawn on top of the 44×44 slot background.
+#[derive(Component)]
+pub(crate) struct HudBlessingSlotGlyph;
+
 #[derive(Component)]
 pub struct BlessingHudTooltip;
 
-/// World-space x for blessing slot `index` (0=B1 … 2=B3). B3 sits nearest the right edge.
-pub fn hud_blessing_icon_x(game_width: f32, index: usize) -> f32 {
-    let rightmost = game_width * 0.5
-        - HUD_CORNER_RIGHT_PADDING
-        - HUD_BLESSING_ICON_SIZE.x * 0.5
-        - HUD_BLESSING_ROW_LEFT_NUDGE;
-    let from_right = (HUD_BLESSING_SLOT_COUNT - 1).saturating_sub(index) as f32;
-    rightmost - from_right * HUD_BLESSING_ICON_SPACING
+/// World-space position for blessing slot `index` in the bottom-right pyramid:
+/// B1 (minor) on top, B2 bottom-left, B3 bottom-right.
+pub fn hud_blessing_icon_position(game_width: f32, game_height: f32, index: usize) -> Vec2 {
+    let center_x = game_width * 0.5 - HUD_BLESSING_PYRAMID_RIGHT_INSET;
+    let top_y = hud_bottom_corner_icon_row_y(game_height) + HUD_BLESSING_PYRAMID_TOP_Y;
+    let bottom_y = top_y - HUD_BLESSING_PYRAMID_STEP;
+    match index {
+        0 => Vec2::new(center_x, top_y),
+        1 => Vec2::new(center_x - HUD_BLESSING_PYRAMID_STEP, bottom_y),
+        _ => Vec2::new(center_x + HUD_BLESSING_PYRAMID_STEP, bottom_y),
+    }
+}
+
+/// Top edge of the B1 diamond, so tooltips clear the whole pyramid.
+fn hud_blessing_pyramid_top_y(game_width: f32, game_height: f32) -> f32 {
+    hud_blessing_icon_position(game_width, game_height, 0).y + HUD_EMPTY_SLOT_ART.size.y * 0.5
 }
 
 #[derive(Component)]
@@ -915,39 +933,39 @@ pub fn setup_currency_ui(
         .entity(settings_key_text)
         .insert(OptionsKeybindText);
 
-    // Blessing slots B1–B3 (bottom-right), mirroring the left corner icon row.
+    // Blessing slots B1–B3 (bottom-right pyramid).
     for index in 0..HUD_BLESSING_SLOT_COUNT {
         let label = format!("B{}", index + 1);
-        let x = hud_blessing_icon_x(res.game_width, index);
+        let pos = hud_blessing_icon_position(res.game_width, res.game_height, index);
         let slot = commands
             .spawn((
                 Sprite {
-                    color: crate::ui::KEYBIND_BADGE_COLOR,
-                    custom_size: Some(HUD_BLESSING_ICON_SIZE),
+                    image: asset_server.load(HUD_EMPTY_SLOT_ART.path),
+                    color: WHITE,
+                    custom_size: Some(HUD_EMPTY_SLOT_ART.size),
                     ..default()
                 },
-                Transform::from_translation(Vec3::new(x, corner_y, 6.)),
+                Transform::from_translation(pos.extend(6.)),
                 RenderLayers::from_layers(&[3]),
                 HudBlessingSlotIcon { index },
+                HudBlessingSlotShown::default(),
                 Interactable::default(),
                 UIElement::HeirloomHudIcon,
                 Name::new(format!("BLESSING HUD SLOT {label}")),
             ))
             .id();
-        commands
-            .spawn(
-                gf::MICRO
-                    .text(&asset_server, label, WHITE)
-                    .justify(Justify::Center)
-                    .anchor(Anchor::CENTER)
-                    .with_transform(Transform {
-                        translation: Vec3::new(0., 0., 1.),
-                        scale: gf::MICRO.transform_scale(),
-                        ..Default::default()
-                    }),
-            )
-            .insert(RenderLayers::from_layers(&[3]))
-            .insert(ChildOf(slot));
+        commands.spawn((
+            Sprite {
+                color: WHITE,
+                custom_size: Some(Vec2::new(42., 42.)),
+                ..default()
+            },
+            Transform::from_translation(Vec3::new(0., 0., 1.)),
+            Visibility::Hidden,
+            RenderLayers::from_layers(&[3]),
+            HudBlessingSlotGlyph,
+            ChildOf(slot),
+        ));
     }
 }
 
@@ -1636,23 +1654,51 @@ fn hud_skill_tooltip_world_position(icon_pos: Vec3, ui_scale: u32, pause_menu: b
 }
 
 /// Matches blessing choice card title / body layout (`spawn_blessing_choice_card`).
-const BLESSING_HUD_CARD_TITLE_Y_OFFSET: f32 = -4.;
 const BLESSING_HUD_CARD_DESC_Y_OFFSET: f32 = -2.;
 const BLESSING_HUD_CHAOS_DESC_GAP: f32 = 4.0;
 /// Gap from icon top to card bottom; card center sits above the B1–B3 icons.
 const HUD_BLESSING_TOOLTIP_GAP_Y: f32 = 10.;
 
-fn blessing_hud_card_ui(card: &OwnedBlessingCard) -> (UIElement, Vec2) {
-    if let Some(rarity) = card.card_rarity {
-        return Heirloom::None.get_ui_element(rarity);
+/// Draws the picked blessing's 42×42 icon over the slot's 44×44 background.
+/// Empty slots hide the icon so the question-mark diamond shows through.
+pub(crate) fn sync_hud_blessing_slot_icons(
+    asset_server: Res<AssetServer>,
+    hud_slots: Query<&OwnedBlessingHudSlots, With<Player>>,
+    mut slots: Query<(&HudBlessingSlotIcon, &mut HudBlessingSlotShown, &Children)>,
+    mut glyphs: Query<(&mut Sprite, &mut Visibility), With<HudBlessingSlotGlyph>>,
+) {
+    let Ok(owned) = hud_slots.single() else {
+        return;
+    };
+    for (slot, mut shown, children) in &mut slots {
+        let next = owned.slot(slot.index).and_then(|card| card.hud_icon_id());
+        if shown.0 == next {
+            continue;
+        }
+        shown.0 = next;
+        let Some(glyph) = children.iter().find(|child| glyphs.contains(*child)) else {
+            continue;
+        };
+        let Ok((mut sprite, mut visibility)) = glyphs.get_mut(glyph) else {
+            continue;
+        };
+        if let Some(icon_id) = next {
+            let icon = icon_id.art();
+            sprite.image = asset_server.load(icon.path);
+            sprite.custom_size = Some(icon.size);
+            sprite.color = WHITE;
+            *visibility = Visibility::Inherited;
+        } else {
+            *visibility = Visibility::Hidden;
+        }
     }
-    (UIElement::SkillChoice, SKILLS_CHOICE_UI_SIZE)
 }
 
 fn hud_blessing_tooltip_world_position(
     icon_pos: Vec3,
     card_size: Vec2,
     game_width: f32,
+    game_height: f32,
     ui_scale: u32,
 ) -> Vec3 {
     let half_card_x = card_size.x * 0.5;
@@ -1660,8 +1706,7 @@ fn hud_blessing_tooltip_world_position(
     let max_x = game_width * 0.5 - half_card_x - margin;
     let min_x = -game_width * 0.5 + half_card_x + margin;
     let x = icon_pos.x.clamp(min_x, max_x);
-    let y = icon_pos.y
-        + HUD_BLESSING_ICON_SIZE.y * 0.5
+    let y = hud_blessing_pyramid_top_y(game_width, game_height)
         + HUD_BLESSING_TOOLTIP_GAP_Y
         + card_size.y * 0.5;
     Vec3::new(
@@ -1681,12 +1726,13 @@ fn spawn_blessing_hud_tooltip_card(
     position: Vec3,
     trigger_count: u32,
 ) -> Entity {
-    let (ui_element, size) = blessing_hud_card_ui(card);
+    let frame = card.frame_art();
+    let size = frame.size;
 
     let card_e = commands
         .spawn((
             Sprite {
-                image: graphics.get_ui_element_texture(ui_element.clone()),
+                image: asset_server.load(frame.path),
                 custom_size: Some(size),
                 ..default()
             },
@@ -1695,19 +1741,33 @@ fn spawn_blessing_hud_tooltip_card(
                 ..Default::default()
             },
             BlessingHudTooltip,
-            ui_element,
             Name::new("BLESSING HUD TOOLTIP"),
             RenderLayers::from_layers(&[3]),
             UiShadow::container(),
         ))
         .id();
 
+    if let Some(icon_id) = card.hud_icon_id() {
+        let icon = icon_id.art();
+        commands.spawn((
+            Sprite {
+                image: asset_server.load(icon.path),
+                custom_size: Some(icon.size),
+                ..default()
+            },
+            Transform::from_translation(frame.icon_translation()),
+            RenderLayers::from_layers(&[3]),
+            ChildOf(card_e),
+            Name::new("BLESSING HUD TOOLTIP ICON"),
+        ));
+    }
+
     commands.spawn((
         gf::HEIRLOOM_CARD_TITLE
             .text(asset_server, card.title.as_str(), WHITE)
             .anchor(Anchor::CENTER)
             .with_transform(Transform {
-                translation: Vec3::new(0., 24. + BLESSING_HUD_CARD_TITLE_Y_OFFSET, 1.),
+                translation: Vec3::new(0., BLESSING_CARD_TITLE_Y, 1.),
                 scale: gf::HEIRLOOM_CARD_TITLE.transform_scale(),
                 ..Default::default()
             }),
@@ -1855,9 +1915,14 @@ pub fn handle_blessing_hud_tooltip(
         return;
     };
 
-    let (_, card_size) = blessing_hud_card_ui(card);
-    let tooltip_pos =
-        hud_blessing_tooltip_world_position(icon_pos, card_size, res.game_width, res.scale);
+    let card_size = card.frame_art().size;
+    let tooltip_pos = hud_blessing_tooltip_world_position(
+        icon_pos,
+        card_size,
+        res.game_width,
+        res.game_height,
+        res.scale,
+    );
     let trigger_count = card.major.map(|m| blessing_triggers.get(&m)).unwrap_or(0);
     spawn_blessing_hud_tooltip_card(
         &mut commands,
@@ -5020,8 +5085,9 @@ pub fn sync_player_hud_layout_to_resolution(
         };
     }
     for (slot, mut transform) in layout.p5().iter_mut() {
-        transform.translation.y = corner_y;
-        transform.translation.x = hud_blessing_icon_x(res.game_width, slot.index);
+        let pos = hud_blessing_icon_position(res.game_width, res.game_height, slot.index);
+        transform.translation.x = pos.x;
+        transform.translation.y = pos.y;
     }
 }
 
@@ -5127,7 +5193,7 @@ pub fn sync_player_hud_slots_layout_to_resolution(
         transform.translation.y = heirloom_row_y - row as f32 * 16.;
     }
 
-    let raw_fps = Vec2::new(res.game_width / 2. - 28.5, -res.game_height / 2. + 10.5);
+    let raw_fps = Vec2::new(res.game_width / 2. - 34.5, -res.game_height / 2. + 10.5);
     for mut transform in slots.p6().iter_mut() {
         transform.translation.x = super::snap_world_to_pixel_grid(raw_fps.x, res.scale);
         transform.translation.y = super::snap_world_to_pixel_grid(raw_fps.y, res.scale);

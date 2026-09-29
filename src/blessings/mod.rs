@@ -9,6 +9,7 @@ use crate::{
 };
 
 mod ancestors;
+pub(crate) mod blessing_art;
 mod blessing_choice_ui;
 mod blessing_effects;
 mod major_blessings;

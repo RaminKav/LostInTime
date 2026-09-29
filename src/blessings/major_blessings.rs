@@ -355,11 +355,6 @@ impl MajorBlessing {
         }
     }
 
-    pub fn display_card_rarity(&self) -> Option<HeirloomRarity> {
-        // Temporary: all major cards use the rare frame for visual consistency.
-        Some(HeirloomRarity::Rare)
-    }
-
     pub fn max_hp_penalty_pct(&self) -> f32 {
         match self {
             MajorBlessing::LuckChaosTradeoff => 0.25,
@@ -592,10 +587,6 @@ impl ResolvedMajorBlessing {
             resolved_stat_conversion,
             resolved_effect_family,
         }
-    }
-
-    pub fn display_card_rarity(&self) -> Option<HeirloomRarity> {
-        self.blessing.display_card_rarity()
     }
 
     pub fn max_hp_penalty_pct(&self) -> f32 {
