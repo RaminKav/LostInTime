@@ -41,7 +41,7 @@ use crate::{
     },
     audio::{AudioSoundEffect, SoundSpawner},
     blessings::{
-        blessing_art::{BlessingHudIconId, BLESSING_CARD_TITLE_Y, HUD_EMPTY_SLOT_ART},
+        blessing_art::{blessing_card_text_layout, BlessingHudIconId, HUD_EMPTY_SLOT_ART},
         BlessingTriggerCounts, OwnedBlessingCard, OwnedBlessingHudSlots, OwnedBlessings,
     },
     chaos::ChaosTracker,
@@ -801,6 +801,8 @@ pub fn setup_currency_ui(
 
     let chaos_value = chaos_tracker.get_chaos() + infinite_mode.get_chaos_bonus();
 
+    // Local z stays under the blessing overlay (parent z 7 + 1). A higher local z
+    // draws the readout on top of that screen.
     commands
         .spawn((
             gf::HUD_PROGRESS_STAT
@@ -808,7 +810,7 @@ pub fn setup_currency_ui(
                 .justify(Justify::Center)
                 .anchor(Anchor::CENTER)
                 .with_transform(Transform {
-                    translation: Vec3::new(0., 4., 2.),
+                    translation: Vec3::new(0., 4., 1.),
                     scale: gf::HUD_PROGRESS_STAT.transform_scale(),
                     ..default()
                 }),
@@ -825,7 +827,7 @@ pub fn setup_currency_ui(
                 .justify(Justify::Center)
                 .anchor(Anchor::CENTER)
                 .with_transform(Transform {
-                    translation: Vec3::new(0., -5., 2.),
+                    translation: Vec3::new(0., -5., 1.),
                     scale: gf::HUD_PROGRESS_STAT.transform_scale(),
                     ..default()
                 }),
@@ -1654,7 +1656,6 @@ fn hud_skill_tooltip_world_position(icon_pos: Vec3, ui_scale: u32, pause_menu: b
 }
 
 /// Matches blessing choice card title / body layout (`spawn_blessing_choice_card`).
-const BLESSING_HUD_CARD_DESC_Y_OFFSET: f32 = -2.;
 const BLESSING_HUD_CHAOS_DESC_GAP: f32 = 4.0;
 /// Gap from icon top to card bottom; card center sits above the B1–B3 icons.
 const HUD_BLESSING_TOOLTIP_GAP_Y: f32 = 10.;
@@ -1728,6 +1729,7 @@ fn spawn_blessing_hud_tooltip_card(
 ) -> Entity {
     let frame = card.frame_art();
     let size = frame.size;
+    let text_layout = blessing_card_text_layout(card.ancestor, card.major.is_some());
 
     let card_e = commands
         .spawn((
@@ -1764,10 +1766,14 @@ fn spawn_blessing_hud_tooltip_card(
 
     commands.spawn((
         gf::HEIRLOOM_CARD_TITLE
-            .text(asset_server, card.title.as_str(), WHITE)
+            .text(
+                asset_server,
+                card.title.as_str(),
+                card.ancestor.blessing_name_color(),
+            )
             .anchor(Anchor::CENTER)
             .with_transform(Transform {
-                translation: Vec3::new(0., BLESSING_CARD_TITLE_Y, 1.),
+                translation: Vec3::new(text_layout.title_x, text_layout.title_y, 1.),
                 scale: gf::HEIRLOOM_CARD_TITLE.transform_scale(),
                 ..Default::default()
             }),
@@ -1795,11 +1801,8 @@ fn spawn_blessing_hud_tooltip_card(
     let block_center_offset = block_line_ys
         .first()
         .zip(block_line_ys.last())
-        .map(|(top, bottom)| {
-            gf::heirloom_desc_text_center_y() - (top + bottom) * 0.5
-                + BLESSING_HUD_CARD_DESC_Y_OFFSET
-        })
-        .unwrap_or(BLESSING_HUD_CARD_DESC_Y_OFFSET);
+        .map(|(top, bottom)| text_layout.desc_center_y - (top + bottom) * 0.5)
+        .unwrap_or(0.0);
 
     for (line_index, desc) in desc_lines.iter().enumerate() {
         let y = block_line_ys[line_index] + block_center_offset;
@@ -1808,8 +1811,8 @@ fn spawn_blessing_hud_tooltip_card(
             asset_server,
             gf::HEIRLOOM_CARD_BODY,
             &blessing_desc_line(*desc, &[]),
-            YELLOW_2,
-            Vec3::new(2., y, 1.),
+            WHITE,
+            Vec3::new(text_layout.desc_x, y, 1.),
             Anchor::CENTER,
             Justify::Center,
             3,
@@ -1825,7 +1828,7 @@ fn spawn_blessing_hud_tooltip_card(
             gf::HEIRLOOM_CARD_BODY,
             &skill_desc_line(line),
             LIGHT_RED,
-            Vec3::new(2., y, 1.),
+            Vec3::new(text_layout.desc_x, y, 1.),
             Anchor::CENTER,
             Justify::Center,
             3,

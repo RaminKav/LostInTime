@@ -179,7 +179,7 @@ pub fn setup_skill_choice_ui(
         gf::MENU_TITLE,
         "Choose an Heirloom",
         WHITE,
-        Vec3::new(0., 115., Z_DEPTH_HEIRLOOM_SKILL_CHOICE_CONTENT),
+        Vec3::new(0., 131., Z_DEPTH_HEIRLOOM_SKILL_CHOICE_CONTENT),
     );
     commands.entity(title_banner).insert(UIState::Skills);
 

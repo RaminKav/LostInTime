@@ -13,7 +13,7 @@ use crate::attributes::CurrentMana;
 use crate::audio::{AudioSoundEffect, SoundSpawner};
 use crate::chaos::ChaosTracker;
 use crate::client::GameData;
-use crate::colors::{BLACK, DARK_GREEN, WHITE, YELLOW_2};
+use crate::colors::{BLACK, DARK_GREEN, DARK_WOOD_BROWN, WHITE, YELLOW_2};
 use crate::cursor::CursorPos;
 use crate::datafiles;
 use crate::item::WorldObject;
@@ -623,7 +623,7 @@ fn panel_center_x(
 }
 
 fn show_find_boss_shrine_hint(events: &mut MessageWriter<GlobalTextMessageEvent>) {
-    events.write(GlobalTextMessageEvent::new("Find the Boss Shrine", WHITE));
+    events.write(GlobalTextMessageEvent::new("Find the Boss Shrine", DARK_WOOD_BROWN));
 }
 
 fn schedule_pending_find_boss_shrine_hint(

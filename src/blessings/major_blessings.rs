@@ -178,149 +178,164 @@ impl MajorBlessing {
         match self {
             MajorBlessing::LightningCoinChance => {
                 vec![
-                    "Lightning strikes have",
-                    "a 15% chance to create",
-                    "a coin.",
+                    "Lightning strikes",
+                    "have a 15% chance",
+                    "to create a coin.",
                 ]
             }
-            MajorBlessing::EchoSizeBoost => vec!["Echoes gain +25% size."],
-            MajorBlessing::PoisonTickFaster => vec!["Poison ticks 30% faster."],
+            MajorBlessing::EchoSizeBoost => vec!["Echoes gain", "+25% size."],
+            MajorBlessing::PoisonTickFaster => vec!["Poison ticks", "30% faster."],
             MajorBlessing::HeirloomDamageBoost => {
-                vec!["All Heirloom effects", "gain +15% damage."]
+                vec!["All Heirloom", "effects gain", "+15% damage."]
             }
             MajorBlessing::ExtraManaRegen => {
-                vec!["Whenever you trigger", "Mana Regen, regen 1", "extra mana."]
+                vec!["On Mana Regen,", "regen 1 extra", "mana."]
             }
             MajorBlessing::TripleUncommonHeirloom => {
                 vec![
-                    "Pick an uncommon heirloom,",
-                    "gain 3 copies of it.",
-                    "Lose 1 random uncommon.",
+                    "Pick an uncommon",
+                    "heirloom and gain",
+                    "3 copies of it.",
+                    "Lose 1 random",
+                    "uncommon.",
                 ]
             }
             MajorBlessing::SummonRetrigger => {
                 vec![
-                    "Heirloom Summon triggers",
-                    "have a 30% chance to",
+                    "Heirloom Summon",
+                    "triggers have a",
+                    "30% chance to",
                     "summon again.",
                 ]
             }
             MajorBlessing::TouchThorns => {
-                vec!["Deal thorns damage to", "enemies when you touch", "them."]
+                vec!["Deal thorns", "damage to enemies", "you touch."]
             }
             MajorBlessing::AttackSpeedBoost => {
-                vec!["Gain 25% more attack", "speed from all sources."]
+                vec!["Gain 25% more", "attack speed from", "all sources."]
             }
             MajorBlessing::RandomLegendaryWeapon => {
                 vec!["Gain a random", "legendary weapon."]
             }
             MajorBlessing::RandomLegendaryArmor => {
-                vec!["Gain a random", "legendary armor piece."]
+                vec!["Gain a random", "legendary armor", "piece."]
             }
             MajorBlessing::RandomLegendaryAccessory => {
-                vec!["Gain a random", "legendary accessory."]
+                vec!["Gain a random", "legendary", "accessory."]
             }
             MajorBlessing::PetSizeAndAttackSpeed => {
                 vec![
-                    "Your pet attacks gain",
-                    "+100% size and",
-                    "50% attack speed.",
+                    "Your pet attacks",
+                    "gain +100% size",
+                    "and 50% attack",
+                    "speed.",
                 ]
             }
             MajorBlessing::SkillDamageBoost => {
-                vec!["Gain 35% more skill", "damage from all sources."]
+                vec!["Gain 35% more", "skill damage from", "all sources."]
             }
             MajorBlessing::SkillCooldownCut => {
-                vec!["Base skill cooldowns are", "reduced by 2s (min 0.5)."]
+                vec!["Base skill", "cooldowns drop 2s", "(minimum 0.5)."]
             }
             MajorBlessing::SkillPoisonStacks => {
-                vec!["Skill damage applies", "5 poison stacks."]
+                vec!["Skill damage", "applies 5", "poison stacks."]
             }
             MajorBlessing::MovementSkillSummons => {
                 vec![
-                    "When you use your",
-                    "class movement skill,",
-                    "trigger all summon",
-                    "heirloom effects.",
+                    "Using your",
+                    "movement skill",
+                    "triggers all",
+                    "summon heirloom",
+                    "effects.",
                 ]
             }
             MajorBlessing::IceExplosionChain => {
                 vec![
                     "Enemies killed by",
-                    "Ice Explosions have a",
-                    "40% chance to trigger",
-                    "another Ice Explosion.",
+                    "Ice Explosions",
+                    "have a 40% chance",
+                    "to trigger another.",
                 ]
             }
             MajorBlessing::StatConversion => {
-                vec!["Gain +X StatA per Y StatB.", "Gain +1 Chaos per 5Y StatB."]
+                vec![
+                    "Gain +X",
+                    "Stat per Y",
+                    "of another.",
+                    "",
+                    "Gain +1 Chaos",
+                    "per 5 of it.",
+                ]
             }
             MajorBlessing::LuckChaosTradeoff => {
                 vec!["Gain 50 Luck.", "-25% Max HP.", "+5 Chaos."]
             }
             MajorBlessing::ManaDrainShield => {
                 vec![
-                    "Every 2.5s drain 50% of",
-                    "your remaining mana to",
-                    "gain a shield equal to",
-                    "the amount drained.",
+                    "Every 2.5s, drain",
+                    "50% of your mana",
+                    "to gain a shield",
+                    "of that amount.",
                 ]
             }
             MajorBlessing::MerchantSlotReplenish => {
                 vec![
-                    "Purchased merchant",
-                    "slots replenish on",
-                    "reroll.",
+                    "Purchased",
+                    "merchant slots",
+                    "replenish",
+                    "on reroll.",
                     "",
                     "Gain 3 rerolls.",
                 ]
             }
             MajorBlessing::TomesAndOrbs => {
-                vec!["Gain 10 upgrade tomes.", "", "Gain 10 orbs."]
+                vec!["Gain 10", "upgrade tomes.", "", "Gain 10 orbs."]
             }
             MajorBlessing::RerollsAndBanishes => {
                 vec!["Gain 7 Rerolls.", "", "Gain 3 Banishes."]
             }
             MajorBlessing::CoinDropRate => {
-                vec!["Enemies have a +20%", "coin drop rate."]
+                vec!["Enemies have a", "+20% coin", "drop rate."]
             }
             MajorBlessing::EchoAftershock => {
                 vec![
-                    "Echoes spawn a second",
-                    "copy that stays where",
-                    "they were triggered.",
+                    "Echoes spawn a",
+                    "second copy that",
+                    "stays where they",
+                    "were triggered.",
                 ]
             }
             MajorBlessing::ViralConductor => {
                 vec![
-                    "Poison ticks have a 5%",
-                    "chance to trigger",
-                    "Lightning on a nearby",
+                    "Poison ticks have",
+                    "a 5% chance to",
+                    "trigger Lightning",
+                    "on a nearby",
                     "enemy.",
                 ]
             }
             MajorBlessing::HeirloomOverclock => {
-                vec!["Every 5th heirloom", "triggers that costs mana", "is free."]
+                vec!["Every 5th heirloom", "trigger that costs", "mana is free."]
             }
             MajorBlessing::SharedAffliction => {
-                vec!["Applying a freeze stack", "also applies a poison", "stack."]
+                vec!["A freeze stack", "also applies a", "poison stack."]
             }
             MajorBlessing::ConvertUncommons => {
                 vec![
                     "Pick an uncommon",
-                    "heirloom. Convert all",
-                    "other uncommons into",
-                    "copies of it.",
+                    "heirloom. Convert",
+                    "other uncommons",
+                    "into copies of it.",
                 ]
             }
             MajorBlessing::WeaponHeirloomDoubleTrigger => {
-                vec!["Weapon-attack heirlooms", "trigger an extra time."]
+                vec!["Weapon-attack", "heirlooms trigger", "an extra time."]
             }
             MajorBlessing::EffectPoolApplyFrail => {
                 vec!["Your ___ apply", "3 frail."]
             }
             MajorBlessing::StatusApplyShield => {
-                vec!["Whenever you apply a", "status effect, gain 1", "shield."]
+                vec!["Whenever you", "apply a status,", "gain 1 shield."]
             }
             MajorBlessing::EffectPoolApplyFreeze => {
                 vec!["Your ___ apply", "3 freeze."]
@@ -329,28 +344,28 @@ impl MajorBlessing {
                 vec!["Your ___ apply", "3 poison."]
             }
             MajorBlessing::ManaRegenHeal => {
-                vec!["Mana Regen heals you", "for 1 HP."]
+                vec!["Mana Regen", "heals you", "for 1 HP."]
             }
             MajorBlessing::SkillsApplyAllStatuses => {
-                vec!["Skills apply 1 freeze,", "poison, and frail."]
+                vec!["Skills apply", "1 freeze, 1 poison,", "and 1 frail."]
             }
             MajorBlessing::StatusApplyExtra => {
-                vec!["Whenever you apply a", "status effect, apply 1", "more."]
+                vec!["Whenever you", "apply a status,", "apply 1 more."]
             }
             MajorBlessing::OverhealToShield => {
                 vec![
                     "Healing at full HP",
-                    "converts to shields,",
-                    "up to 50% of max HP.",
+                    "becomes shields,",
+                    "up to 50% max HP.",
                     "",
                     "-30% Max HP.",
                 ]
             }
             MajorBlessing::LargeObjectEcho => {
-                vec!["Breaking an object", "triggers an Echo at its", "location."]
+                vec!["Breaking an object", "triggers an Echo", "at its location."]
             }
             MajorBlessing::ObjectBreakLoot => {
-                vec!["Breaking objects has a", "chance to drop loot!"]
+                vec!["Breaking objects", "can drop loot."]
             }
         }
     }

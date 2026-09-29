@@ -5,7 +5,7 @@ use crate::{
     attributes::AttributeChangeEvent,
     bounce::DesertTornado,
     chaos::EraTransitionState,
-    colors::{DESERT_TILE, SNOW_TILE},
+    colors::{DARK_GREEN, DESERT_TILE, SNOW_TILE},
     enemy::{spawner::MobSpawningPaused, Mob},
     item::{Equipment, ItemDrop, WorldObject},
     night::NightTracker,
@@ -115,7 +115,8 @@ impl Era {
     /// Grass-tile minimap fill for this era (see [`crate::ui::minimap`]).
     pub fn minimap_grass_background_color(&self) -> Color {
         match self {
-            Era::Main | Era::DungeonMain => WorldObject::GrassTile.get_obj_color(),
+            Era::Main => DARK_GREEN,
+            Era::DungeonMain => WorldObject::GrassTile.get_obj_color(),
             Era::Second => DESERT_TILE,
             Era::Third => SNOW_TILE,
         }

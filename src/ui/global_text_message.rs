@@ -15,6 +15,7 @@ use crate::{
 
 use super::{
     game_fonts::{FontStyle, GLOBAL_MESSAGE, GLOBAL_MESSAGE_SUBTEXT},
+    nine_slice::{BANNER_LABEL_OFFSET_Y, BEIGE_BANNER_LARGE},
     spawn_item_stack_icon,
     ui_helpers::Z_DEPTH_GLOBAL_TEXT_MESSAGE,
 };
@@ -134,6 +135,10 @@ pub struct GlobalTextMessage {
 #[derive(Component)]
 pub(crate) struct GlobalTextMessagePart;
 
+/// Main popup uses [`BEIGE_BANNER_LARGE`] and fades from full opacity.
+#[derive(Component)]
+pub(crate) struct GlobalTextMessageBanner;
+
 /// Vertical layout for main + optional subtitle panels (shared center at root origin).
 struct MessageStackLayout {
     main_center_y: f32,
@@ -225,6 +230,24 @@ fn message_stack_layout(main_h: f32, sub_h: f32) -> MessageStackLayout {
         main_center_y: sub_h * 0.5,
         sub_center_y: -main_h * 0.5,
     }
+}
+
+fn spawn_message_banner(
+    commands: &mut Commands,
+    asset_server: &AssetServer,
+    parent: Entity,
+    size: Vec2,
+    center: Vec3,
+) {
+    commands.spawn((
+        BEIGE_BANNER_LARGE.sprite(asset_server, size),
+        Transform::from_translation(center),
+        RenderLayers::from_layers(&[3]),
+        GlobalTextMessagePart,
+        GlobalTextMessageBanner,
+        ChildOf(parent),
+        Name::new("Global Text Message Banner"),
+    ));
 }
 
 fn spawn_panel_sprite(commands: &mut Commands, parent: Entity, size: Vec2, center: Vec3) {
@@ -356,7 +379,17 @@ pub fn handle_global_text_message_events(
             ))
             .id();
 
-        let main_panel_size = message_panel_size(event, resolution.game_width);
+        // `panel_width` is the flat middle the text sits in. The banner caps are
+        // extra, so they are added on top — otherwise a short label like
+        // "WARNING!" (135px) overflows a 164px slice whose middle is only ~99px.
+        let content_width = message_panel_size(event, resolution.game_width).x;
+        let banner_width = content_width
+            + BEIGE_BANNER_LARGE.border.min_inset.x
+            + BEIGE_BANNER_LARGE.border.max_inset.x;
+        let main_panel_size = Vec2::new(
+            banner_width.max(BEIGE_BANNER_LARGE.native_size.x),
+            BEIGE_BANNER_LARGE.native_size.y,
+        );
         let sub_panel_size = event.sub_text.as_ref().map(|sub| {
             Vec2::new(
                 subtext_panel_width(sub, resolution.game_width, event.sub_panel_width),
@@ -369,9 +402,15 @@ pub fn handle_global_text_message_events(
         );
 
         let main_center = Vec3::new(0., layout.main_center_y, 0.);
-        let main_text_z = Vec3::new(0., layout.main_center_y, 1.);
+        let main_text_z = Vec3::new(0., layout.main_center_y + BANNER_LABEL_OFFSET_Y, 1.);
 
-        spawn_panel_sprite(&mut commands, root, main_panel_size, main_center);
+        spawn_message_banner(
+            &mut commands,
+            &asset_server,
+            root,
+            main_panel_size,
+            main_center,
+        );
         spawn_main_text(
             &mut commands,
             root,
@@ -397,7 +436,11 @@ pub fn handle_global_text_message_events(
             commands.entity(icon).insert((
                 GlobalTextMessagePart,
                 Transform {
-                    translation: Vec3::new(icon_x, layout.main_center_y, 2.),
+                    translation: Vec3::new(
+                        icon_x,
+                        layout.main_center_y + BANNER_LABEL_OFFSET_Y,
+                        2.,
+                    ),
                     scale: Vec3::splat(ICON_SCALE),
                     ..Default::default()
                 },
@@ -409,7 +452,7 @@ pub fn handle_global_text_message_events(
         if let (Some(sub_text), Some(sub_size)) = (&event.sub_text, sub_panel_size) {
             let sub_color = event.sub_text_color.unwrap_or(event.color);
             let sub_center = Vec3::new(0., layout.sub_center_y, 0.);
-            let sub_text_z = Vec3::new(0., layout.sub_center_y + 2., 1.);
+            let sub_text_z = Vec3::new(0., layout.sub_center_y, 1.);
 
             spawn_panel_sprite(&mut commands, root, sub_size, sub_center);
             spawn_sub_text(
@@ -428,15 +471,16 @@ fn fade_message_parts(
     alpha: f32,
     children: &Children,
     texts: &mut Query<&mut TextColor, With<GlobalTextMessagePart>>,
-    sprites: &mut Query<&mut Sprite, With<GlobalTextMessagePart>>,
+    sprites: &mut Query<(&mut Sprite, Has<GlobalTextMessageBanner>), With<GlobalTextMessagePart>>,
     child_q: &Query<&Children>,
 ) {
     for child in children.iter() {
         if let Ok(mut color) = texts.get_mut(child) {
             color.0 = color.0.with_alpha(alpha);
         }
-        if let Ok(mut sprite) = sprites.get_mut(child) {
-            sprite.color = sprite.color.with_alpha(alpha.min(0.75));
+        if let Ok((mut sprite, is_banner)) = sprites.get_mut(child) {
+            let max_alpha = if is_banner { 1.0 } else { 0.75 };
+            sprite.color = sprite.color.with_alpha(alpha.min(max_alpha));
         }
         if let Ok(grandchildren) = child_q.get(child) {
             fade_message_parts(alpha, grandchildren, texts, sprites, child_q);
@@ -449,7 +493,7 @@ pub fn tick_global_text_messages(
     time: Res<Time>,
     mut roots: Query<(Entity, &mut GlobalTextMessage, &Children)>,
     mut texts: Query<&mut TextColor, With<GlobalTextMessagePart>>,
-    mut sprites: Query<&mut Sprite, With<GlobalTextMessagePart>>,
+    mut sprites: Query<(&mut Sprite, Has<GlobalTextMessageBanner>), With<GlobalTextMessagePart>>,
     child_q: Query<&Children>,
 ) {
     for (entity, mut message, children) in roots.iter_mut() {

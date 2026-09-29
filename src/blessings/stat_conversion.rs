@@ -149,11 +149,14 @@ fn format_half_amount(halves: i32) -> String {
     }
 }
 
-fn format_per_clause(halves: i32, source_name: &str) -> String {
+fn format_per_clause(halves: i32, source_name: &str) -> Vec<String> {
     if halves <= 2 {
-        format!("per {}.", source_name)
+        vec![format!("per {}.", source_name)]
     } else {
-        format!("per {} {}.", format_half_amount(halves), source_name)
+        vec![
+            format!("per {}", format_half_amount(halves)),
+            format!("{}.", source_name),
+        ]
     }
 }
 
@@ -222,16 +225,14 @@ pub fn roll_stat_conversion_pair(rng: &mut impl Rng) -> ResolvedStatConversion {
 
 pub fn format_stat_conversion_description(rolled: &ResolvedStatConversion) -> Vec<String> {
     let chaos_per = rolled.chaos_per_halves();
-    vec![
-        format!(
-            "Gain +{} {}",
-            format_half_amount(rolled.gain.max(1)),
-            rolled.target.name(),
-        ),
-        format_per_clause(rolled.per.max(1), rolled.source.name()),
-        "Gain +1 Chaos".to_string(),
-        format_per_clause(chaos_per, rolled.source.name()),
-    ]
+    let mut lines = vec![
+        format!("Gain +{}", format_half_amount(rolled.gain.max(1))),
+        rolled.target.name().to_string(),
+    ];
+    lines.extend(format_per_clause(rolled.per.max(1), rolled.source.name()));
+    lines.push("Gain +1 Chaos".to_string());
+    lines.extend(format_per_clause(chaos_per, rolled.source.name()));
+    lines
 }
 
 pub fn format_stat_conversion(rolled: &ResolvedStatConversion) -> String {

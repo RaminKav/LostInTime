@@ -684,7 +684,7 @@ pub fn tick_active_skill_slot_choice_ui_interaction_lock_timers(
 }
 
 pub fn handle_active_skill_shrine_ui_interaction(
-    cursor_pos: Res<crate::cursor::CursorPos>,
+    (cursor_pos, res): (Res<crate::cursor::CursorPos>, Res<ScreenResolution>),
     mouse_input: Res<ButtonInput<MouseButton>>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     mut skill_choices: Query<(Entity, &mut Interactable, &ActiveSkillShrineUI)>,
@@ -725,6 +725,7 @@ pub fn handle_active_skill_shrine_ui_interaction(
                                 &mut transform,
                                 Some(&mut bounce),
                                 true,
+                                res.scale,
                             );
                             bounce.activate();
                         }
@@ -789,6 +790,7 @@ pub fn handle_active_skill_shrine_ui_interaction(
                         &mut transform,
                         Some(&mut bounce),
                         false,
+                        res.scale,
                     );
                 }
             }
@@ -1205,6 +1207,7 @@ pub fn handle_active_skill_shrine_overwrite_interaction(
     shrine_overwrite_res: Option<Res<ActiveSkillShrineOverwrite>>,
     shrine_focus: ShrineUiFocus,
     mut tutorial_trigger: ActiveSkillShrineTutorialTrigger,
+    res: Res<ScreenResolution>,
 ) {
     // Only handle if this is a shrine overwrite, not heirloom limbo
     let overwrite = if let Some(overwrite_res) = shrine_overwrite_res.as_ref() {
@@ -1237,6 +1240,7 @@ pub fn handle_active_skill_shrine_overwrite_interaction(
                                 &mut transform,
                                 Some(&mut bounce),
                                 true,
+                                res.scale,
                             );
                             bounce.activate();
                         }
@@ -1281,6 +1285,7 @@ pub fn handle_active_skill_shrine_overwrite_interaction(
                         &mut transform,
                         Some(&mut bounce),
                         false,
+                        res.scale,
                     );
                 }
             }

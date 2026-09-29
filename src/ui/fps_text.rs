@@ -9,7 +9,7 @@ use bevy::sprite::Anchor;
 use bevy::text::{Justify, TextLayoutInfo};
 
 use crate::{ui::game_fonts as gf, ScreenResolution, UICamera, DEBUG};
-const VERSION: &str = "v0.27.0";
+const VERSION: &str = "v0.28.0";
 #[derive(Component)]
 pub struct FPSText;
 

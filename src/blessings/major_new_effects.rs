@@ -163,8 +163,9 @@ pub fn format_effect_pool_description(
         EffectPoolStatus::Poison => "poison",
     };
     vec![
-        format!("Your {} apply", family.display_name()),
-        format!("3 {}.", status_name),
+        "Your".to_string(),
+        family.display_name().to_string(),
+        format!("apply 3 {}.", status_name),
     ]
 }
 

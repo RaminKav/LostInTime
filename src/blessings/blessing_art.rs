@@ -7,9 +7,50 @@ const ICON_SIZE: Vec2 = Vec2::new(42.0, 42.0);
 
 const BLESSING_ICON_Z: f32 = 4.0;
 
-/// Card-local Y of the blessing title. The diamond icon sits above this
-/// (center around y 45–48, half-height 21), so the title starts just under the slot.
-pub const BLESSING_CARD_TITLE_Y: f32 = 4.0;
+/// Card-local placement of the blessing name and description.
+///
+/// Each ancestor frame draws its name plate and description panel in a slightly
+/// different place. These are absolute card-local coordinates (+Y up, origin at
+/// the sprite center), measured from the frame PNGs.
+#[derive(Clone, Copy, Debug)]
+pub struct BlessingCardTextLayout {
+    /// Horizontal placement of the blessing name. Shared by every frame.
+    pub title_x: f32,
+    /// Center of the name plate (the band between the two border lines).
+    pub title_y: f32,
+    /// Horizontal center of the description panel.
+    pub desc_x: f32,
+    /// Vertical center of the description panel, where the text block is centered.
+    pub desc_center_y: f32,
+}
+
+/// Name-plate and description-panel placement for one ancestor frame.
+///
+/// The title sits 1px below the plate's geometric center so Alagard's cap height
+/// lands in the band. `desc_x` and `desc_center_y` are the center of that frame's
+/// description panel, with no extra nudge.
+pub fn blessing_card_text_layout(ancestor: Ancestor, major: bool) -> BlessingCardTextLayout {
+    let (title_y, desc_x, desc_center_y) = match (ancestor, major) {
+        (Ancestor::Chaos, false) => (6.0, 2.0, -35.0),
+        (Ancestor::Chaos, true) => (3.0, 2.0, -38.0),
+        // The green rails are drawn over the panel, so the center is the slate
+        // underneath them, not the gap to the left of the rails.
+        (Ancestor::Heirlooms, false) => (6.0, -3.0, -36.0),
+        (Ancestor::Heirlooms, true) => (3.0, -4.0, -39.0),
+        (Ancestor::Resources, false) => (6.0, -2.0, -35.0),
+        (Ancestor::Resources, true) => (3.0, -2.0, -38.0),
+        (Ancestor::Skills, false) => (8.0, -3.0, -35.0),
+        (Ancestor::Skills, true) => (5.0, -5.0, -38.0),
+        (Ancestor::Weapons, false) => (2.0, -4.0, -39.0),
+        (Ancestor::Weapons, true) => (0.0, -5.0, -41.0),
+    };
+    BlessingCardTextLayout {
+        title_x: -2.0,
+        title_y,
+        desc_x,
+        desc_center_y,
+    }
+}
 
 /// Ancestor card frame, drawn at its PNG's exact pixel size.
 #[derive(Clone, Copy, Debug)]

@@ -38,7 +38,7 @@ const BGM_PLAYBACK_SCALE: f32 = 0.75;
 #[derive(Resource)]
 pub struct MainMenuStartupFade(pub Timer);
 
-pub const MAIN_MENU_STARTUP_FADE_SECS: f32 = 5.5;
+pub const MAIN_MENU_STARTUP_FADE_SECS: f32 = 1.5;
 
 impl MainMenuStartupFade {
     pub fn new() -> Self {
@@ -48,10 +48,10 @@ impl MainMenuStartupFade {
         ))
     }
 
-    /// Smoothstep 0→1 so the reveal and music swell ease in together.
+    /// Cubic ease-in: stays darker/quieter early, then catches up quickly.
     pub fn fade_amount(&self) -> f32 {
         let t = self.0.fraction().clamp(0.0, 1.0);
-        t * t * (3.0 - 2.0 * t)
+        t * t * t
     }
 }
 

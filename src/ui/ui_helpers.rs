@@ -122,7 +122,14 @@ pub const Z_DEPTH_OPTIONS_OVERLAY: f32 = 85.0;
 pub const Z_DEPTH_OPTIONS_CONTENT: f32 = 86.0;
 
 /// Scale multiplier applied to UI cards/containers while hovered or focused.
-pub const UI_HOVER_SCALE: f32 = 1.1;
+///
+/// Each texel grows from `ui_scale` to `ui_scale + 1` physical pixels, so hovered sprites stay
+/// on the pixel grid. Any other factor makes nearest sampling duplicate texel rows at
+/// different spots in each child sprite, which opens slivers between stacked layers.
+pub fn ui_hover_scale(ui_scale: u32) -> f32 {
+    let s = ui_scale.max(1) as f32;
+    (s + 1.0) / s
+}
 
 /// Sets idle scale for a hoverable UI element. When a [`BounceOnHit`] is present, updates its
 /// `rest_scale` so the bounce animation peaks above the hover size and settles back to it.
@@ -130,8 +137,13 @@ pub fn apply_ui_hover_scale(
     transform: &mut Transform,
     bounce: Option<&mut BounceOnHit>,
     hovered: bool,
+    ui_scale: u32,
 ) {
-    let scale = if hovered { UI_HOVER_SCALE } else { 1.0 };
+    let scale = if hovered {
+        ui_hover_scale(ui_scale)
+    } else {
+        1.0
+    };
     if let Some(bounce) = bounce {
         bounce.rest_scale = scale;
         if hovered {

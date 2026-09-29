@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 
 use crate::{
-    colors::WHITE,
+    colors::DARK_WOOD_BROWN,
     player::Player,
     ui::global_text_message::GlobalTextMessageEvent,
     world::{
@@ -66,7 +66,7 @@ pub fn handle_goal_state_updates(
                     let event = if game.era.current_era == Era::Third {
                         GlobalTextMessageEvent::final_endless_survive_prompt()
                     } else {
-                        GlobalTextMessageEvent::new("Return to the portal...", WHITE)
+                        GlobalTextMessageEvent::new("Return to the portal...", DARK_WOOD_BROWN)
                     };
                     global_text_events.write(event);
                 }

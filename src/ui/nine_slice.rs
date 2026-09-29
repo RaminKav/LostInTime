@@ -14,7 +14,7 @@ use super::game_fonts::FontStyle;
 /// Extra space on each side of the label, inside the stretchable center.
 const BANNER_LABEL_PADDING_X: f32 = 6.0;
 /// Local Y offset so the label sits in the ribbon band, above the hanging tails.
-const BANNER_LABEL_OFFSET_Y: f32 = 4.0;
+pub(crate) const BANNER_LABEL_OFFSET_Y: f32 = 4.0;
 
 /// A texture sliced so it can grow wider than its source image.
 #[derive(Clone, Copy)]
@@ -45,13 +45,33 @@ impl NineSliceDef {
     }
 }
 
-/// `assets/ui/BannerPurple.png` (70×32). Columns 22–48 are the flat middle.
+/// `assets/ui/BannerPurple.png` (70×40). Columns 22–48 are the flat middle.
 pub const PURPLE_BANNER: NineSliceDef = NineSliceDef {
     path: "ui/BannerPurple.png",
     native_size: Vec2::new(70.0, 40.0),
     border: BorderRect {
         min_inset: Vec2::new(22.0, 0.0),
         max_inset: Vec2::new(21.0, 0.0),
+    },
+};
+
+/// `assets/ui/BannerPurpleLarge.png` (84×60). Columns 33–51 are the flat middle.
+pub const PURPLE_BANNER_LARGE: NineSliceDef = NineSliceDef {
+    path: "ui/BannerPurpleLarge.png",
+    native_size: Vec2::new(84.0, 60.0),
+    border: BorderRect {
+        min_inset: Vec2::new(33.0, 0.0),
+        max_inset: Vec2::new(32.0, 0.0),
+    },
+};
+
+/// `assets/ui/BannerBeigeLarge.png` (84×60). Same slice as [`PURPLE_BANNER_LARGE`].
+pub const BEIGE_BANNER_LARGE: NineSliceDef = NineSliceDef {
+    path: "ui/BannerBeigeLarge.png",
+    native_size: Vec2::new(84.0, 60.0),
+    border: BorderRect {
+        min_inset: Vec2::new(33.0, 0.0),
+        max_inset: Vec2::new(32.0, 0.0),
     },
 };
 

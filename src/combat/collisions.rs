@@ -975,7 +975,7 @@ pub fn check_item_drop_collisions(
                 .map(|data| data.rarity.clone())
                 .unwrap_or(ItemRarity::Common);
             let text_color = if item_rarity == ItemRarity::Common {
-                crate::colors::WHITE
+                crate::colors::DARK_WOOD_BROWN
             } else {
                 item_rarity.get_color()
             };

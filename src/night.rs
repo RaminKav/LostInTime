@@ -18,7 +18,7 @@ use crate::{
     chaos::hp_multiplier_for_total_chaos,
     chaos::ChaosTracker,
     client::is_not_paused,
-    colors::WHITE,
+    colors::DARK_WOOD_BROWN,
     enemy::spawner::MobSpawningPaused,
     player::Player,
     run_once_per_run,
@@ -752,7 +752,7 @@ pub fn tick_night_color(
                 new_day_event.write_default();
                 global_text_events.write(GlobalTextMessageEvent::day_announcement(
                     night_tracker.display_day(),
-                    WHITE,
+                    DARK_WOOD_BROWN,
                 ));
             }
             music_changed = true;

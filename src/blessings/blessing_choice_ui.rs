@@ -12,8 +12,8 @@ use crate::{
     audio::{AudioSoundEffect, SoundSpawner},
     blessings::{
         blessing_art::{
-            frame_art, major_icon, minor_icon, BlessingFrameArt, BlessingIconArt,
-            BLESSING_CARD_TITLE_Y,
+            blessing_card_text_layout, frame_art, major_icon, minor_icon, BlessingFrameArt,
+            BlessingIconArt,
         },
         build_ancestor_blessing_offer, build_major_blessing_offer, Ancestor, AncestorBlessing,
         AncestorBlessingIcon, AncestorBlessingOffer, BlessingTier, CurrentBlessingTier,
@@ -21,7 +21,7 @@ use crate::{
         PendingMajorHeirloomPick, PendingRunStartBlessing, ResolvedAncestorBlessing,
         ResolvedMajorBlessing,
     },
-    colors::{LIGHT_RED, WHITE, YELLOW_2},
+    colors::{LIGHT_RED, WHITE},
     cursor::CursorPos,
     gamepad_bindings::gamepad_connected,
     gamepad_input::{UiGamepadAction, UiGamepadInputMarker},
@@ -47,11 +47,11 @@ use crate::{
         damage_numbers::spawn_floating_text_with_shadow,
         desc_spans::{blessing_desc_line, skill_desc_line, spawn_desc_line},
         game_fonts::{self as gf, FLOATING_TEXT, HEIRLOOM_CARD_DESC_LINE_STEP},
+        nine_slice::{spawn_growable_banner_title, PURPLE_BANNER_LARGE},
         player_hud::{
             active_skill_tooltip_params_from_player, spawn_skill_tooltip_content,
             spawn_skill_tooltip_shell, SKILL_TOOLTIP_ICON_SIZE,
         },
-        nine_slice::{spawn_growable_banner_title, PURPLE_BANNER},
         ui_helpers::{self, spawn_full_screen_ui_overlay_tuned},
         CheatSettings, Focusable, HeirloomDynamicTooltip, HeirloomTooltipRequest,
         HeirloomTooltipShow, HoverSelectionGlow, Interactable, Interaction, ItemOrRecipeTooltip,
@@ -160,7 +160,6 @@ pub fn enter_blessing_ui(mut next_ui_state: ResMut<NextState<UIState>>) {
     next_ui_state.set(UIState::BlessingChoice);
 }
 
-const BLESSING_CARD_DESC_Y_OFFSET: f32 = -2.;
 const BLESSING_CHAOS_DESC_GAP: f32 = 4.0;
 const BLESSING_HEIRLOOM_REVEAL_TEXT_Y: f32 = -102.;
 /// Bounce strength for blessing choice cards on hover (fraction of default mob bounce).
@@ -424,6 +423,8 @@ fn spawn_blessing_choice_card(
 ) -> Entity {
     let frame = blessing_choice_frame(ancestor, choice);
     let size = frame.size;
+    let text_layout =
+        blessing_card_text_layout(ancestor, matches!(choice, BlessingChoiceKind::Major(_)));
 
     let card_e = commands
         .spawn((
@@ -452,10 +453,14 @@ fn spawn_blessing_choice_card(
 
     let mut text_title = commands.spawn((
         gf::HEIRLOOM_CARD_TITLE
-            .text(&asset_server, choice.title().to_string(), WHITE)
+            .text(
+                &asset_server,
+                choice.title().to_string(),
+                ancestor.blessing_name_color(),
+            )
             .anchor(Anchor::CENTER)
             .with_transform(Transform {
-                translation: Vec3::new(0., BLESSING_CARD_TITLE_Y, 1.),
+                translation: Vec3::new(text_layout.title_x, text_layout.title_y, 1.),
                 scale: gf::HEIRLOOM_CARD_TITLE.transform_scale(),
                 ..Default::default()
             }),
@@ -503,10 +508,8 @@ fn spawn_blessing_choice_card(
     let block_center_offset = block_line_ys
         .first()
         .zip(block_line_ys.last())
-        .map(|(top, bottom)| {
-            gf::heirloom_desc_text_center_y() - (top + bottom) * 0.5 + BLESSING_CARD_DESC_Y_OFFSET
-        })
-        .unwrap_or(BLESSING_CARD_DESC_Y_OFFSET);
+        .map(|(top, bottom)| text_layout.desc_center_y - (top + bottom) * 0.5)
+        .unwrap_or(0.0);
 
     let highlight_phrases = choice
         .as_minor()
@@ -519,8 +522,8 @@ fn spawn_blessing_choice_card(
             asset_server,
             gf::HEIRLOOM_CARD_BODY,
             &blessing_desc_line(*desc, &highlight_phrases),
-            YELLOW_2,
-            Vec3::new(2., y, 1.),
+            WHITE,
+            Vec3::new(text_layout.desc_x, y, 1.),
             Anchor::CENTER,
             Justify::Center,
             3,
@@ -542,7 +545,7 @@ fn spawn_blessing_choice_card(
                 gf::HEIRLOOM_CARD_BODY,
                 &skill_desc_line(line),
                 LIGHT_RED,
-                Vec3::new(2., y, 1.),
+                Vec3::new(text_layout.desc_x, y, 1.),
                 Anchor::CENTER,
                 Justify::Center,
                 3,
@@ -690,11 +693,11 @@ fn spawn_blessing_choice_screen(
     let title_banner = spawn_growable_banner_title(
         commands,
         asset_server,
-        PURPLE_BANNER,
+        PURPLE_BANNER_LARGE,
         gf::GLOBAL_MESSAGE,
         title,
         WHITE,
-        Vec3::new(0., 144., 20.),
+        Vec3::new(0., 128., 20.),
     );
     commands.entity(title_banner).insert(ui_state.clone());
 
@@ -702,7 +705,7 @@ fn spawn_blessing_choice_screen(
         gf::BODY
             .text(asset_server, subtitle.to_string(), WHITE)
             .with_transform(Transform {
-                translation: Vec3::new(0., 110., 20.),
+                translation: Vec3::new(0., 94., 20.),
                 scale: gf::BODY.transform_scale(),
                 ..Default::default()
             }),
@@ -923,6 +926,7 @@ pub fn handle_blessing_choice_card_interactions(
     mut minor_event: MessageWriter<AncestorBlessingSelectEvent>,
     mut major_event: MessageWriter<MajorBlessingSelectEvent>,
     ui_focus: Res<crate::ui::focus::UiFocus>,
+    res: Res<ScreenResolution>,
 ) {
     let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
@@ -939,7 +943,12 @@ pub fn handle_blessing_choice_card_interactions(
                     interactable.change(Interaction::Hovering);
                     commands.spawn(SoundSpawner::new(AudioSoundEffect::UISkillHover, 0.2));
 
-                    ui_helpers::apply_ui_hover_scale(&mut transform, Some(&mut bounce), true);
+                    ui_helpers::apply_ui_hover_scale(
+                        &mut transform,
+                        Some(&mut bounce),
+                        true,
+                        res.scale,
+                    );
                     bounce.activate();
                 }
                 Interaction::Hovering => {
@@ -988,7 +997,7 @@ pub fn handle_blessing_choice_card_interactions(
             };
 
             interactable.change(Interaction::None);
-            ui_helpers::apply_ui_hover_scale(&mut transform, Some(&mut bounce), false);
+            ui_helpers::apply_ui_hover_scale(&mut transform, Some(&mut bounce), false, res.scale);
         }
     }
 }

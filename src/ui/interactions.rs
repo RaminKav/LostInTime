@@ -67,7 +67,7 @@ use crate::{
         },
         InventoryState,
     },
-    GameParam, InputMappings,
+    GameParam, InputMappings, ScreenResolution,
 };
 
 use super::{
@@ -2057,6 +2057,7 @@ pub fn handle_cursor_skills_buttons(
     graphics: Res<Graphics>,
     mut pick_params: SkillChoicePickParams,
     mut tips_param: ParamSet<(MessageWriter<TipEvent>, Res<SeenTips>, ResMut<ChaosTracker>)>,
+    res: Res<ScreenResolution>,
 ) {
     let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
@@ -2085,7 +2086,12 @@ pub fn handle_cursor_skills_buttons(
                         e,
                         graphics.get_ui_element_texture(ui_element),
                     );
-                    ui_helpers::apply_ui_hover_scale(&mut transform, Some(&mut bounce), true);
+                    ui_helpers::apply_ui_hover_scale(
+                        &mut transform,
+                        Some(&mut bounce),
+                        true,
+                        res.scale,
+                    );
                     bounce.activate();
                 }
                 Interaction::Hovering => {
@@ -2209,7 +2215,7 @@ pub fn handle_cursor_skills_buttons(
                 e,
                 graphics.get_ui_element_texture(ui_element),
             );
-            ui_helpers::apply_ui_hover_scale(&mut transform, Some(&mut bounce), false);
+            ui_helpers::apply_ui_hover_scale(&mut transform, Some(&mut bounce), false, res.scale);
         }
     }
 }

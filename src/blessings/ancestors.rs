@@ -6,7 +6,10 @@ use rand::Rng;
 use strum::IntoEnumIterator;
 
 use crate::{
-    colors::{LIGHT_BLUE, LIGHT_GREY, LIGHT_RED, RARE_TOOLTIP_TITLE, YELLOW_2},
+    colors::{
+        ANCESTOR_CHAOS, ANCESTOR_HEIRLOOMS, ANCESTOR_RESOURCES, ANCESTOR_SKILLS, ANCESTOR_WEAPONS,
+        LIGHT_BLUE, LIGHT_GREY, LIGHT_RED, RARE_TOOLTIP_TITLE, YELLOW_2,
+    },
     item::{active_skill_shrine::roll_active_skill_shrine_offer_skills, WorldObject},
     player::skills::{
         ActiveSkill, Heirloom, HeirloomChoiceQueue, HeirloomRarity, HeirloomWithRarity,
@@ -49,6 +52,17 @@ impl Ancestor {
             Ancestor::Chaos => LIGHT_RED,
             Ancestor::Weapons => LIGHT_GREY,
             Ancestor::Skills => LIGHT_BLUE,
+        }
+    }
+
+    /// Blessing title on the choice card and HUD tooltip.
+    pub fn blessing_name_color(self) -> Color {
+        match self {
+            Ancestor::Resources => ANCESTOR_RESOURCES,
+            Ancestor::Weapons => ANCESTOR_WEAPONS,
+            Ancestor::Skills => ANCESTOR_SKILLS,
+            Ancestor::Heirlooms => ANCESTOR_HEIRLOOMS,
+            Ancestor::Chaos => ANCESTOR_CHAOS,
         }
     }
 
@@ -249,64 +263,75 @@ impl AncestorBlessing {
 
     pub fn base_description(&self) -> Vec<&'static str> {
         match self {
-            AncestorBlessing::ThreeTomes => vec!["Start with 3 upgrade", "tomes."],
+            AncestorBlessing::ThreeTomes => vec!["Start with 3", "upgrade tomes."],
             AncestorBlessing::ThreeOrbs => vec!["Start with 3 orbs", "of transformation."],
-            AncestorBlessing::TwoOrbsTwoTomes => vec!["Start with 2 orbs", "and 2 upgrade tomes."],
+            AncestorBlessing::TwoOrbsTwoTomes => {
+                vec!["Start with 2 orbs", "and 2 upgrade", "tomes."]
+            }
             AncestorBlessing::FiftyGold => vec!["Start with", "50 gold."],
             AncestorBlessing::ThreeStatFoods => {
-                vec!["Start with 3 random", "stat boosts."]
+                vec!["Start with 3", "random stat", "boosts."]
             }
             AncestorBlessing::ThreeRerolls => vec!["Start with 3 extra", "rerolls this run."],
             AncestorBlessing::TwoBanishes => vec!["Start with 2 extra", "banishes this run."],
             AncestorBlessing::ThreeCommonHeirlooms => {
-                vec!["Start with 3 random", "common heirlooms."]
+                vec!["Start with 3", "random common", "heirlooms."]
             }
             AncestorBlessing::OneUncommonHeirloom => {
-                vec!["Start with 1 random", "uncommon heirloom."]
+                vec!["Start with 1", "random", "uncommon", "heirloom."]
             }
             AncestorBlessing::SpecificUncommon => {
-                vec!["Start with a specific", "uncommon heirloom."]
+                vec!["Start with a", "specific", "uncommon", "heirloom."]
             }
             AncestorBlessing::TwoOfSpecificCommon => {
-                vec!["Start with 2 copies of", "a specific common."]
+                vec!["Start with 2", "copies of a", "specific common."]
             }
             AncestorBlessing::UpgradeStartingWeapon => {
                 vec!["Upgrade starting", "weapon one tier."]
             }
-            AncestorBlessing::RandomWeapon => vec!["Start with a random", "weapon."],
-            AncestorBlessing::RandomEquipment => vec!["Start with a random", "equipment."],
-            AncestorBlessing::RandomAccessory => vec!["Start with a random", "accessory."],
+            AncestorBlessing::RandomWeapon => vec!["Start with a", "random weapon."],
+            AncestorBlessing::RandomEquipment => {
+                vec!["Start with a", "random", "equipment."]
+            }
+            AncestorBlessing::RandomAccessory => vec!["Start with a", "random accessory."],
             AncestorBlessing::ReplaceWithSpecificWeapon => {
                 vec![
-                    "Lose starting weapon.",
-                    "Start with a random",
-                    "weapon one tier higher.",
+                    "Lose starting",
+                    "weapon.",
+                    "Start with a",
+                    "random weapon,",
+                    "one tier higher.",
                 ]
             }
             AncestorBlessing::RandomWeaponHeirloom => {
-                vec!["Start with a random", "weapon heirloom."]
+                vec!["Start with a", "random weapon", "heirloom."]
             }
-            AncestorBlessing::RandomSkill => vec!["Start with a random", "extra skill."],
-            AncestorBlessing::SpecificSkill => vec!["Start with a specific", "extra skill."],
+            AncestorBlessing::RandomSkill => vec!["Start with a", "random extra", "skill."],
+            AncestorBlessing::SpecificSkill => vec!["Start with a", "specific extra", "skill."],
             AncestorBlessing::SkillHeirloom => vec!["Start with a", "skill heirloom."],
             AncestorBlessing::PlasmaWeapon => {
-                vec!["Start with plasma staff.", "Powerful, but costs mana."]
+                vec![
+                    "Start with",
+                    "plasma staff.",
+                    "Powerful, but",
+                    "costs mana.",
+                ]
             }
-            AncestorBlessing::LaserBeam => vec!["Start with the laser.", "beam skill."],
+            AncestorBlessing::LaserBeam => vec!["Start with", "the laser beam", "skill."],
             AncestorBlessing::SpecificRareHeirloom => {
-                vec!["Start with a specific", "rare heirloom."]
+                vec!["Start with a", "specific rare", "heirloom."]
             }
             AncestorBlessing::TwoRandomRareHeirlooms => {
-                vec!["Start with 2 random", "rare heirlooms."]
+                vec!["Start with 2", "random rare", "heirlooms."]
             }
             AncestorBlessing::FiveOfRandomCommon => {
-                vec!["Start with 5 copies of", "a random common."]
+                vec!["Start with 5", "copies of a", "random common."]
             }
             AncestorBlessing::ThreeOfRandomUncommon => {
-                vec!["Start with 3 copies of", "a random uncommon."]
+                vec!["Start with 3", "copies of a", "random", "uncommon."]
             }
             AncestorBlessing::RandomRareEquipment => {
-                vec!["Start with a random", "rare equipment."]
+                vec!["Start with a", "random rare", "equipment."]
             }
         }
     }
@@ -334,16 +359,28 @@ impl AncestorBlessing {
                 vec!["Start with".to_string(), format!("{name}.")]
             }
             AncestorBlessing::TwoOfSpecificCommon => {
-                vec!["Start with 2 copies of".to_string(), format!("{name}.")]
+                vec![
+                    "Start with 2".to_string(),
+                    "copies of".to_string(),
+                    format!("{name}."),
+                ]
             }
             AncestorBlessing::SpecificRareHeirloom => {
                 vec!["Start with".to_string(), format!("{name}.")]
             }
             AncestorBlessing::FiveOfRandomCommon => {
-                vec!["Start with 5 copies of".to_string(), format!("{name}.")]
+                vec![
+                    "Start with 5".to_string(),
+                    "copies of".to_string(),
+                    format!("{name}."),
+                ]
             }
             AncestorBlessing::ThreeOfRandomUncommon => {
-                vec!["Start with 3 copies of".to_string(), format!("{name}.")]
+                vec![
+                    "Start with 3".to_string(),
+                    "copies of".to_string(),
+                    format!("{name}."),
+                ]
             }
             AncestorBlessing::RandomWeaponHeirloom | AncestorBlessing::SkillHeirloom => {
                 vec!["Start with".to_string(), format!("{name}.")]
@@ -356,9 +393,11 @@ impl AncestorBlessing {
             }
             AncestorBlessing::ReplaceWithSpecificWeapon => {
                 vec![
-                    "Lose starting weapon.".to_string(),
-                    "Start with a random".to_string(),
-                    "weapon one tier higher.".to_string(),
+                    "Lose starting".to_string(),
+                    "weapon.".to_string(),
+                    "Start with a".to_string(),
+                    "random weapon,".to_string(),
+                    "one tier higher.".to_string(),
                 ]
             }
             AncestorBlessing::RandomWeapon
@@ -369,7 +408,11 @@ impl AncestorBlessing {
                 .map(|s| s.to_string())
                 .collect(),
             AncestorBlessing::UpgradeStartingWeapon => {
-                vec!["Upgrade starting".to_string(), format!("{name} one tier.")]
+                vec![
+                    "Upgrade starting".to_string(),
+                    name.to_string(),
+                    "one tier.".to_string(),
+                ]
             }
             _ => self
                 .base_description()

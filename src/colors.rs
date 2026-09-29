@@ -55,6 +55,12 @@ pub const CRAFT_BUTTON_TEXT: Color = Color::srgba(225. / 255., 224. / 255., 164.
 pub const COMMON_TOOLTIP_TITLE: Color = Color::srgba(225. / 255., 222. / 255., 231. / 255., 1.);
 pub const UNCOMMON_TOOLTIP_TITLE: Color = Color::srgba(186. / 255., 243. / 255., 234. / 255., 1.);
 pub const RARE_TOOLTIP_TITLE: Color = Color::srgba(234. / 255., 140. / 255., 245. / 255., 1.);
+/// Blessing-card title colors, one per ancestor.
+pub const ANCESTOR_RESOURCES: Color = Color::srgba(213. / 255., 140. / 255., 67. / 255., 1.);
+pub const ANCESTOR_WEAPONS: Color = Color::srgba(226. / 255., 89. / 255., 65. / 255., 1.);
+pub const ANCESTOR_SKILLS: Color = Color::srgba(161. / 255., 203. / 255., 255. / 255., 1.);
+pub const ANCESTOR_HEIRLOOMS: Color = Color::srgba(155. / 255., 255. / 255., 112. / 255., 1.);
+pub const ANCESTOR_CHAOS: Color = Color::srgba(234. / 255., 140. / 255., 245. / 255., 1.);
 pub const LEGENDARY_TOOLTIP_TITLE: Color = Color::srgba(233. / 255., 149. / 255., 7. / 255., 1.);
 
 pub fn overwrite_alpha(color: Color, alpha: f32) -> Color {
