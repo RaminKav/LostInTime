@@ -115,7 +115,7 @@ pub struct ChestPickupDelay(pub Timer);
 
 impl Default for ChestPickupDelay {
     fn default() -> Self {
-        Self(Timer::from_seconds(2.0, TimerMode::Once))
+        Self(Timer::from_seconds(1.5, TimerMode::Once))
     }
 }
 

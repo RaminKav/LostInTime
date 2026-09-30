@@ -3,8 +3,8 @@ use crate::blessings::OwnedBlessings;
 use crate::chaos::ChaosTracker;
 use crate::cursor::CursorPos;
 use crate::gamepad_input::{
-    gamepad_hotbar_just_pressed, gamepad_skill_just_pressed, gamepad_skill_pressed, GamepadAction,
-    UiGamepadAction, UiGamepadInputMarker,
+    gamepad_hotbar_just_pressed, gamepad_skill_just_pressed, gamepad_skill_pressed,
+    ActiveInputDevice, GamepadAction, InputDeviceKind, UiGamepadAction, UiGamepadInputMarker,
 };
 use leafwing_input_manager::prelude::ActionState;
 use std::time::Duration;
@@ -340,6 +340,7 @@ pub fn attack_aim_direction(
 pub struct AttackAimParams<'w, 's> {
     pub auto_target: Res<'w, AttackAutoTargetState>,
     pub manual_aim: Res<'w, crate::aim::ManualAimOverride>,
+    pub active_device: Res<'w, ActiveInputDevice>,
     pub enemies: Query<'w, 's, &'static GlobalTransform, With<Mob>>,
 }
 
@@ -785,6 +786,49 @@ pub fn player_move_inputs(
     }
 }
 
+/// Minimum time between gamepad casts of the same non-movement skill.
+/// Analog triggers can cross the press threshold twice during one physical pull, which
+/// spends both charges instantly when a skill has more than one.
+const GAMEPAD_NON_MOVEMENT_SKILL_RETRIGGER_SECS: f32 = 0.35;
+
+#[derive(Clone, Copy)]
+pub(crate) struct GamepadSkillCastClock {
+    last_cast_secs: [f32; 5],
+}
+
+impl Default for GamepadSkillCastClock {
+    fn default() -> Self {
+        Self {
+            last_cast_secs: [f32::NEG_INFINITY; 5],
+        }
+    }
+}
+
+fn gamepad_non_movement_retrigger_blocked(
+    skill: ActiveSkill,
+    via_gamepad: bool,
+    slot: usize,
+    now: f32,
+    clock: &GamepadSkillCastClock,
+) -> bool {
+    via_gamepad
+        && !skill.is_movement_skill()
+        && slot < clock.last_cast_secs.len()
+        && now - clock.last_cast_secs[slot] < GAMEPAD_NON_MOVEMENT_SKILL_RETRIGGER_SECS
+}
+
+fn record_gamepad_non_movement_cast(
+    skill: ActiveSkill,
+    via_gamepad: bool,
+    slot: usize,
+    now: f32,
+    clock: &mut GamepadSkillCastClock,
+) {
+    if via_gamepad && !skill.is_movement_skill() && slot < clock.last_cast_secs.len() {
+        clock.last_cast_secs[slot] = now;
+    }
+}
+
 pub fn dispatch_active_skill_events(
     mut ev: MessageWriter<ActiveSkillUsedEvent>,
     key_input: Res<ButtonInput<KeyCode>>,
@@ -803,6 +847,9 @@ pub fn dispatch_active_skill_events(
     gamepad_action_q: Query<&ActionState<GamepadAction>, With<Player>>,
     mouseless_mode: Res<MouselessModeState>,
     mut pending_ground_aim: ResMut<PendingGroundAimSkill>,
+    time: Res<Time>,
+    mut gamepad_cast_clock: Local<GamepadSkillCastClock>,
+    mut pending_aim_from_gamepad: Local<bool>,
 ) {
     if bridge_mode.active {
         return;
@@ -821,11 +868,30 @@ pub fn dispatch_active_skill_events(
             || gamepad_skill_pressed(gamepad_action_state, slot);
         if !still_held {
             pending_ground_aim.0 = None;
+            let from_gamepad = *pending_aim_from_gamepad;
+            *pending_aim_from_gamepad = false;
             if let Some(skill) = skills.get_active_skill_in_slot(slot) {
+                let now = time.elapsed_secs();
+                if gamepad_non_movement_retrigger_blocked(
+                    skill,
+                    from_gamepad,
+                    slot,
+                    now,
+                    &gamepad_cast_clock,
+                ) {
+                    return;
+                }
                 let effective_cd =
                     skills.effective_skill_cooldown_with_majors(&skill, blessings, major_blessings);
                 let s = &class_slots.0[slot];
                 if s.max_charges > 0 && s.current_charges > 0 {
+                    record_gamepad_non_movement_cast(
+                        skill,
+                        from_gamepad,
+                        slot,
+                        now,
+                        &mut gamepad_cast_clock,
+                    );
                     ev.write(ActiveSkillUsedEvent {
                         slot,
                         cooldown: effective_cd,
@@ -859,12 +925,30 @@ pub fn dispatch_active_skill_events(
             // before you click, so there's nothing to gain from a hold step.
             let via_keyboard_mouse = keybinds.check_skill_input(slot, &key_input, &mouse_input);
             let via_gamepad = gamepad_skill_just_pressed(gamepad_action_state, slot);
+            let now = time.elapsed_secs();
+            if gamepad_non_movement_retrigger_blocked(
+                skill,
+                via_gamepad,
+                slot,
+                now,
+                &gamepad_cast_clock,
+            ) {
+                return;
+            }
             if skill.is_ground_targeted()
                 && (via_gamepad || (mouseless_mode.0 && via_keyboard_mouse))
             {
+                *pending_aim_from_gamepad = via_gamepad;
                 pending_ground_aim.0 = Some(slot);
                 return;
             }
+            record_gamepad_non_movement_cast(
+                skill,
+                via_gamepad,
+                slot,
+                now,
+                &mut gamepad_cast_clock,
+            );
             let effective_cd =
                 skills.effective_skill_cooldown_with_majors(&skill, blessings, major_blessings);
             ev.write(ActiveSkillUsedEvent {
@@ -1520,6 +1604,12 @@ pub fn mouse_click_system(
             direction,
             ignore_cooldown: false,
         });
+        // Controller aim parks `CursorPos::world_coords` a few tiles ahead of the player
+        // (see `AIM_RETICLE_RANGE`). That point is not a cursor the player is pointing at
+        // an object with, so it must not break or damage the tile under it.
+        if aim_params.active_device.0 == InputDeviceKind::Gamepad {
+            return;
+        }
         if player_pos
             .truncate()
             .distance(cursor_pos.world_coords.truncate())

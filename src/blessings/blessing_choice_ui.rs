@@ -164,6 +164,28 @@ const BLESSING_CHAOS_DESC_GAP: f32 = 4.0;
 const BLESSING_HEIRLOOM_REVEAL_TEXT_Y: f32 = -102.;
 /// Bounce strength for blessing choice cards on hover (fraction of default mob bounce).
 const BLESSING_CARD_BOUNCE_STRENGTH: f32 = 0.4;
+/// Resting card row before the per-scale hover clearance drop.
+const BLESSING_CARD_ROW_Y: f32 = -20.0;
+/// UI scale where a hovered card still clears the subtitle under the banner.
+/// Hover is `(scale + 1) / scale`, so a 1080p window (scale 3) grows cards
+/// further than a retina laptop (scale 5). The row drops by that extra growth.
+const BLESSING_CARD_LAYOUT_SCALE: u32 = 5;
+
+/// Banner and the line under it. Raised so a hovered card's bounce stays below the subtitle.
+const BLESSING_HEADER_Y: f32 = 144.0;
+const BLESSING_SUBTITLE_Y: f32 = 110.0;
+/// Under the choice cards (z = 10) and above the vignette (z = 9), so a grown card covers this line.
+const BLESSING_SUBTITLE_Z: f32 = 9.5;
+
+/// Card center Y that keeps the hovered top at the same height on every UI scale.
+fn blessing_card_center_y(ui_scale: u32, half_height: f32, y_offset: f32) -> f32 {
+    let extra_growth = half_height
+        * (ui_helpers::ui_hover_scale(ui_scale)
+            - ui_helpers::ui_hover_scale(BLESSING_CARD_LAYOUT_SCALE))
+        .max(0.0);
+    BLESSING_CARD_ROW_Y + y_offset - extra_growth
+}
+
 /// Layer-3 z for blessing hover tooltips — matches [`HEIRLOOM_TOOLTIP_CARD_Z`] so skill/item
 /// cards render above the screen title copy (z ≈ 20) and choice cards (z ≈ 10).
 const BLESSING_CHOICE_TOOLTIP_Z: f32 = 140.0;
@@ -697,7 +719,7 @@ fn spawn_blessing_choice_screen(
         gf::GLOBAL_MESSAGE,
         title,
         WHITE,
-        Vec3::new(0., 128., 20.),
+        Vec3::new(0., BLESSING_HEADER_Y, 20.),
     );
     commands.entity(title_banner).insert(ui_state.clone());
 
@@ -705,7 +727,7 @@ fn spawn_blessing_choice_screen(
         gf::BODY
             .text(asset_server, subtitle.to_string(), WHITE)
             .with_transform(Transform {
-                translation: Vec3::new(0., 94., 20.),
+                translation: Vec3::new(0., BLESSING_SUBTITLE_Y, BLESSING_SUBTITLE_Z),
                 scale: gf::BODY.transform_scale(),
                 ..Default::default()
             }),
@@ -722,7 +744,14 @@ fn spawn_blessing_choice_screen(
     );
     commands.entity(overlay).insert(ui_state.clone());
 
-    spawn_blessing_choice_cards(commands, asset_server, choices, t_offset, ui_state.clone());
+    spawn_blessing_choice_cards(
+        commands,
+        asset_server,
+        choices,
+        t_offset,
+        ui_state.clone(),
+        res.scale,
+    );
     spawn_blessing_details_hint(
         commands,
         asset_server,
@@ -738,6 +767,7 @@ fn spawn_blessing_choice_cards(
     choices: &[(Ancestor, BlessingChoiceKind)],
     t_offset: Vec2,
     ui_state: UIState,
+    ui_scale: u32,
 ) {
     let frames: Vec<BlessingFrameArt> = choices
         .iter()
@@ -747,17 +777,18 @@ fn spawn_blessing_choice_cards(
     let count = frames.len();
     let total_w =
         frames.iter().map(|frame| frame.size.x).sum::<f32>() + gap * count.saturating_sub(1) as f32;
+    let half_height = frames
+        .iter()
+        .map(|frame| frame.size.y * 0.5)
+        .fold(0.0_f32, f32::max);
+    let card_center_y = blessing_card_center_y(ui_scale, half_height, t_offset.y).round();
     let mut cursor = -total_w * 0.5;
     for (card_index, ((ancestor, choice), frame)) in choices.iter().zip(frames).enumerate() {
         let card_index = card_index as u32;
         let size = frame.size;
-        let translation = Vec2::new(cursor + size.x * 0.5, -20.);
+        let card_x = cursor + size.x * 0.5;
         cursor += size.x + gap;
-        let position = Vec3::new(
-            (translation.x + t_offset.x).round(),
-            (translation.y + t_offset.y).round(),
-            10.,
-        );
+        let position = Vec3::new((card_x + t_offset.x).round(), card_center_y, 10.);
         let card_e =
             spawn_blessing_choice_card(commands, asset_server, *ancestor, choice, position);
         commands
@@ -799,6 +830,7 @@ pub struct DebugBlessingRerollParam<'w, 's> {
     run_unlocks: Option<Res<'w, RunUnlockState>>,
     current_tier: Res<'w, CurrentBlessingTier>,
     ui_state: Res<'w, State<UIState>>,
+    res: Res<'w, ScreenResolution>,
 }
 
 /// Debug/dev-mode: press B while the game UI is closed to open the major blessing picker
@@ -908,6 +940,7 @@ pub fn debug_reroll_blessing_choices(mut p: DebugBlessingRerollParam) {
         &choices,
         Vec2::new(4., 4.),
         active_ui,
+        p.res.scale,
     );
 }
 
@@ -1394,5 +1427,25 @@ pub fn transition_blessing_ui_after_choice(
                 &mut visibility_set,
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod blessing_card_row_tests {
+    use super::blessing_card_center_y;
+
+    #[test]
+    fn retina_scale_keeps_the_laid_out_row() {
+        // -20 row + the 4px card offset, no extra drop at the layout scale.
+        assert_eq!(blessing_card_center_y(5, 86.0, 4.0), -16.0);
+    }
+
+    #[test]
+    fn ten_eighty_p_drops_the_row_by_the_extra_hover_growth() {
+        // Scale 3 hover is 4/3, scale 5 is 1.2. A 172px card (half 86) grows
+        // 86 * (4/3 - 1.2) further, so the row drops by that amount.
+        let y = blessing_card_center_y(3, 86.0, 4.0);
+        let expected = -16.0 - 86.0 * (4.0 / 3.0 - 1.2);
+        assert!((y - expected).abs() < 1e-4, "{y} vs {expected}");
     }
 }

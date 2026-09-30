@@ -623,7 +623,10 @@ fn panel_center_x(
 }
 
 fn show_find_boss_shrine_hint(events: &mut MessageWriter<GlobalTextMessageEvent>) {
-    events.write(GlobalTextMessageEvent::new("Find the Boss Shrine", DARK_WOOD_BROWN));
+    events.write(GlobalTextMessageEvent::new(
+        "Find the Boss Shrine",
+        DARK_WOOD_BROWN,
+    ));
 }
 
 fn schedule_pending_find_boss_shrine_hint(

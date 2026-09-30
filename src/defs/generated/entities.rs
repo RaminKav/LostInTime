@@ -8206,7 +8206,7 @@ fn pink_flower() -> EntityDef {
         kind: ColliderKind::Cuboid { x: 5., y: 5. },
     });
     d.sensor = true;
-    d.max_health = Some(MaxHealth(1));
+    d.max_health = Some(MaxHealth(30));
     d.experience_reward = Some(ExperienceReward(7));
     d.y_sort = Some(YSort(-0.01));
     d.loot_table = Some(parse::loot_table(
